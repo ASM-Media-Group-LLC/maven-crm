@@ -1,0 +1,140 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// tg-inbox-send (S3.2) — envía un mensaje SALIENTE desde la bandeja de Telegram
+// (responder a una conversación) y lo persiste como tg_messages(direction='out').
+//
+// Flujo (espejo de wa-inbox-send): valida el JWT del usuario → permiso
+// Telegram/Bandeja → resuelve la conversación (account_id + peer) → gating por
+// dueño (mismo criterio que la RLS de lectura) → manda por el gateway MTProto
+// (POST /message/sendText/:accountId {to,text}) → guarda el saliente + actualiza
+// la metadata. Escribe con service_role (bypassa RLS deny-all de escritura).
+//
+// El "to" del gateway acepta username | t.me url | id numérico → preferimos el
+// @username del peer (estable) y caemos al peer_id (user id numérico) si no hay.
+
+const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
+const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+}
+
+// Envía por el gateway de Telegram. Devuelve el id del mensaje si sale OK.
+async function sendViaGateway(
+  accountId: string,
+  to: string,
+  text: string,
+): Promise<{ ok: boolean; externalId?: string | null; error?: string }> {
+  if (!GW_API_KEY) return { ok: false, error: "gateway_not_configured" };
+  try {
+    const resp = await fetch(`${GW_URL}/message/sendText/${accountId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
+      body: JSON.stringify({ to, text }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || (data as any)?.ok === false) {
+      return { ok: false, error: (data as any)?.error || `gateway ${resp.status}` };
+    }
+    return { ok: true, externalId: (data as any)?.id != null ? String((data as any).id) : null };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // ── Auth: JWT del usuario ──────────────────────────────────────────────────
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return json({ ok: false, error: "missing_auth" }, 401);
+
+  const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: userData, error: uErr } = await sb.auth.getUser(token);
+  if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
+  const userId = userData.user.id;
+
+  // ── Permiso: Telegram / Bandeja (has_permission ya devuelve true para admin) ──
+  const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
+    _user_id: userId, _module: "Telegram", _submodule: "Bandeja",
+  });
+  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
+
+  // ── Input ────────────────────────────────────────────────────────────────
+  let payload: { conversation_id?: string; body?: string } = {};
+  try { payload = await req.json(); } catch { /* */ }
+  const conversationId = payload.conversation_id;
+  const text = (payload.body ?? "").trim();
+  if (!conversationId || !text) return json({ ok: false, error: "missing_conversation_or_body" }, 400);
+
+  // ── Resolver conversación → account_id + peer ───────────────────────────────
+  const { data: conv } = await (sb as any)
+    .from("tg_conversations")
+    .select("id, tenant_id, account_id, peer_id, peer_username, assigned_to")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
+
+  // ── Gating por dueño: mismo criterio que la RLS de lectura (supervisor+ o dueño) ─
+  if (conv.assigned_to !== userId) {
+    const { data: isSup } = await sb.rpc("is_in_role_group", {
+      _user_id: userId, _group: "supervisor_or_above",
+    });
+    if (!isSup) return json({ ok: false, error: "not_your_conversation" }, 200);
+  }
+
+  // Destino: preferimos @username (estable); si no hay, el user id numérico.
+  const to = (conv.peer_username as string | null) || (conv.peer_id as string);
+  if (!to) return json({ ok: false, error: "peer_unresolved" }, 422);
+
+  // ── Enviar por el gateway ───────────────────────────────────────────────────
+  const sent = await sendViaGateway(conv.account_id as string, to, text);
+  const nowIso = new Date().toISOString();
+
+  if (!sent.ok) {
+    // Registramos el intento como FALLIDO (queda en rojo en el hilo) + aviso claro.
+    await sb.from("tg_messages").insert({
+      tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
+      external_id: null, sender_id: null, body: text, msg_type: "text",
+      status: "failed", sent_at: nowIso,
+    });
+    await sb.from("tg_conversations")
+      .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
+      .eq("id", conversationId);
+    return json({ ok: false, reason: "send_failed", error: sent.error, to }, 200);
+  }
+
+  // ── Persistir el saliente + actualizar metadata ─────────────────────────────
+  const { data: msg, error: mErr } = await sb
+    .from("tg_messages")
+    .insert({
+      tenant_id: conv.tenant_id,
+      conversation_id: conversationId,
+      direction: "out",
+      external_id: sent.externalId ?? null,
+      sender_id: null,
+      body: text,
+      msg_type: "text",
+      status: "sent",
+      sent_at: nowIso,
+    })
+    .select("id")
+    .single();
+  if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);
+
+  await sb.from("tg_conversations")
+    .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
+    .eq("id", conversationId);
+
+  return json({ ok: true, message_id: msg?.id, external_id: sent.externalId ?? null });
+});

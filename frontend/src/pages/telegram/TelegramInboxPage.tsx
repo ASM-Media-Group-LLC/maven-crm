@@ -1,10 +1,10 @@
-// Bandeja de Telegram (S3.1) — LECTURA. Espejo simplificado de la bandeja de WhatsApp
-// (pages/inbox/InboxPage.tsx): lista de conversaciones + hilo + realtime + deep-link ?c=<id>.
-// Muestra los DMs que el gateway ingesta vía telegram-ingest (tg_conversations/tg_messages).
+// Bandeja de Telegram — LECTURA (S3.1) + RESPONDER (S3.2). Espejo simplificado de la bandeja
+// de WhatsApp (pages/inbox/InboxPage.tsx): lista + hilo + realtime + deep-link ?c=<id> + envío.
+// Muestra los DMs que el gateway ingesta vía telegram-ingest (tg_conversations/tg_messages) y
+// responde vía la edge tg-inbox-send (gateway MTProto).
 //
 // Seguridad: RLS por dueño (closer ve solo lo asignado; supervisor+ ve todo) + peer_phone
 // REVOCADO a authenticated → acá SIEMPRE se seleccionan columnas explícitas (nunca *).
-// Responder (enviar) llega en S3.2 (edge tg-inbox-send + ChatComposer).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,10 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign } from "lucide-react";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
 const CONV_COLS =
@@ -64,10 +68,15 @@ const peerLabel = (c: TgConv) =>
 
 const TelegramInboxPage = () => {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Barra de emojis del composer, persistida por usuario (scope "telegram").
+  const [tgEmojis, setTgEmojis] = usePersistedEmojis("telegram", user?.id);
 
   // Deep-link /telegram/bandeja?c=<id>
   useEffect(() => {
@@ -172,6 +181,28 @@ const TelegramInboxPage = () => {
         (c.last_message_preview ?? "").toLowerCase().includes(q),
     );
   }, [allConversations, search]);
+
+  // Envío (S3.2): responder por el gateway vía la edge tg-inbox-send. Solo texto por ahora
+  // (media = slice posterior). onSend del ChatComposer: si throwea, conserva el texto.
+  const composerSend = async (text: string, files: File[]) => {
+    if (files.length) toast({ title: "Solo texto por ahora", description: "Adjuntar media a Telegram llega en un próximo slice." });
+    const body = text.trim();
+    if (!body || !selectedId) throw new Error("empty"); // conserva staging/estado
+    const { data, error } = await supabase.functions.invoke("tg-inbox-send", {
+      body: { conversation_id: selectedId, body },
+    });
+    const res = data as { ok?: boolean; error?: string; reason?: string } | null;
+    if (error || !res?.ok) {
+      toast({
+        title: "No se pudo enviar",
+        description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
+        variant: "destructive",
+      });
+      throw new Error(res?.error || "send_failed"); // conserva el texto para reintentar
+    }
+    qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] });
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -320,10 +351,17 @@ const TelegramInboxPage = () => {
                 </div>
               </ScrollArea>
 
-              {/* Responder llega en S3.2 (edge tg-inbox-send + ChatComposer con auto-grow). */}
-              <div className="border-t bg-card px-4 py-3 text-center text-xs text-muted-foreground">
-                Responder desde Maven llega en el próximo slice.
-              </div>
+              {/* Composer unificado (emojis arriba · cajón auto-grow al medio · Enviar). Hereda el
+                  auto-grow compartido con WhatsApp/Messenger/Chatter. Solo texto por ahora. */}
+              <ChatComposer
+                value={draft}
+                onChange={setDraft}
+                onSend={composerSend}
+                placeholder={`Responder a ${peerLabel(selected)}…`}
+                emojis={tgEmojis}
+                onAddEmoji={(e) => setTgEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+                onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
+              />
             </>
           )}
         </section>

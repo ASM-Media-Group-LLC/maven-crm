@@ -43,6 +43,9 @@ verify_jwt = false  # webhook de Evolution (sin JWT) — NO cambiar o el bot dej
 [functions.telegram-ingest]
 verify_jwt = false  # webhook del telegram-gateway (sin JWT) — auth propia: token TELEGRAM_INGEST_TOKEN
 
+[functions.tg-inbox-send]
+verify_jwt = false  # envía saliente desde la bandeja de Telegram (auth propia: getUser + permiso Telegram/Bandeja + gating por dueño)
+
 [functions.wa-inbox-open]
 verify_jwt = false  # abre/crea conversación del inbox para un lead (auth propia: getUser + permiso + membresía de canal)
 
