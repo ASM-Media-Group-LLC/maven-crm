@@ -47,6 +47,7 @@ const InboxChannelsPage = lazy(() => import("./pages/inbox/ChannelsPage"));
 const InboxBotsPage = lazy(() => import("./pages/inbox/BotsPage"));
 const InboxAnalyticsPage = lazy(() => import("./pages/inbox/InboxAnalyticsPage"));
 const TelegramChannelsPage = lazy(() => import("./pages/telegram/TelegramChannelsPage"));
+const TelegramInboxPage = lazy(() => import("./pages/telegram/TelegramInboxPage"));
 const OpportunitiesPage = lazy(() => import("./pages/opportunities/OpportunitiesPage"));
 
 // Proyecto MP — its own sub-app, kept lazy.
@@ -291,6 +292,7 @@ const App = () => (
                 <Route path="/inbox/analitica" element={<PermissionRoute module="WhatsApp" submodule="Analítica"><InboxAnalyticsPage /></PermissionRoute>} />
                 {/* Telegram (canal) — S0: cuentas/manager. Bandeja + botón = próximos slices. */}
                 <Route path="/telegram" element={<PermissionRoute module="Telegram"><TelegramChannelsPage /></PermissionRoute>} />
+                <Route path="/telegram/bandeja" element={<PermissionRoute module="Telegram" submodule="Bandeja"><TelegramInboxPage /></PermissionRoute>} />
                 {/* Oportunidades ahora vive como subtab dentro de Closers (gated por Closers/Oportunidades). El path viejo redirige. */}
                 <Route path="/oportunidades" element={<Navigate to="/closers" replace />} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />

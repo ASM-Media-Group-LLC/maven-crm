@@ -4,15 +4,18 @@
 // userbot MTProto (login por teléfono + código). La bandeja y el botón de chatear
 // llegan en los próximos slices (S1 gateway multi-cuenta+envío → S2 tablas tg_* →
 // S3 botón + inbox). No hay tablas tg_* todavía: esta pantalla es el punto de entrada.
+import { Link } from "react-router-dom";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Radio, MessageSquarePlus, Inbox } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Panel del gateway de Telegram (Dokploy) — ahí se vincula la cuenta (teléfono + código).
 // El gateway de Telegram se sirve por HTTP (nip.io sin TLS) — verificado en vivo.
 const TG_GATEWAY_MANAGER = "http://telegram-gw.147.93.3.97.nip.io/manager";
 
 const TelegramChannelsPage = () => {
+  const { canAccess } = usePermissions();
   return (
     <div className="space-y-5 px-6 py-5 max-w-3xl">
       {/* Header */}
@@ -24,6 +27,11 @@ const TelegramChannelsPage = () => {
             Canal de contacto por Telegram — cuentas y conexión. <span className="text-sky-500 font-medium">Beta</span>
           </p>
         </div>
+        {canAccess("Telegram", "Bandeja") && (
+          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
+            <Link to="/telegram/bandeja"><Inbox className="h-4 w-4" /> Bandeja</Link>
+          </Button>
+        )}
       </div>
 
       {/* Conectar cuenta */}
