@@ -291,14 +291,8 @@ const InboxPage = () => {
     refetchOnWindowFocus: false,
   });
   const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
-  // Nombre corto del closer que mandó un saliente (para etiquetar burbujas en líneas compartidas).
+  // Nombre corto del closer que mandó un saliente (para etiquetar la burbuja: "quién lo mandó").
   const firstName = (id: string | null) => { const n = userName(id); return n ? n.split(/\s+/)[0] : null; };
-  // Solo etiquetamos el emisor cuando el hilo tuvo ≥2 closers distintos (línea compartida): en un
-  // 1-a-1 el header ya dice quién la maneja, así no metemos ruido en cada burbuja.
-  const showSenderLabels = useMemo(
-    () => new Set(messages.filter((mm) => mm.direction === "out" && mm.sender_user_id).map((mm) => mm.sender_user_id)).size > 1,
-    [messages],
-  );
 
   // Canales (id→label) para el panel de info + el filtro por canal de la bandeja.
   const { data: channels = [] } = useQuery({
@@ -1064,7 +1058,7 @@ const InboxPage = () => {
                 <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {messages.map((m, i) => {
+                  {messages.map((m) => {
                     const isOut = m.direction === "out";
                     const isDeleted = !!m.deleted_at;
                     const mediaShown = !!m.media_url && ["image", "sticker", "video", "audio", "document"].includes(m.msg_type);
@@ -1073,11 +1067,9 @@ const InboxPage = () => {
                     const quoted = m.reply_to_message_id
                       ? messages.find((x) => x.id === m.reply_to_message_id) ?? null
                       : null;
-                    // Etiqueta "quién lo mandó" en salientes de líneas compartidas: solo si cambió
-                    // el emisor respecto al saliente anterior (colapsa consecutivos, estilo grupo).
-                    const prev = i > 0 ? messages[i - 1] : null;
-                    const showSender = showSenderLabels && isOut && !isDeleted && !!m.sender_user_id &&
-                      (!prev || prev.direction !== "out" || prev.sender_user_id !== m.sender_user_id);
+                    // Etiqueta "quién lo mandó" en CADA saliente con emisor conocido (mensajes viejos
+                    // o enviados desde el propio teléfono no tienen sender_user_id → sin nombre, es correcto).
+                    const showSender = isOut && !isDeleted && !!m.sender_user_id;
                     return (
                       <div key={m.id} className={cn("group flex flex-col", isOut ? "items-end" : "items-start")}>
                         <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
