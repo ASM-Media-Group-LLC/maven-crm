@@ -27,6 +27,7 @@ export function TgChatButton({
   telegramUsername = null,
   name = null,
   className,
+  compact = false,
 }: {
   creatorId?: string | null;
   contactId?: string | null;
@@ -40,6 +41,8 @@ export function TgChatButton({
   telegramUsername?: string | null;
   name?: string | null;
   className?: string;
+  /** Solo ícono (sin la palabra "Telegram") — para tablas compactas. */
+  compact?: boolean;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,14 +78,14 @@ export function TgChatButton({
 
   // Una sola línea (o ninguna registrada aún) → abre directo con la default.
   const trigger = channels.length <= 1 ? (
-    <Button type="button" variant="ghost" size="sm" className={btnClass} disabled={busy} onClick={() => open(channels[0]?.account_id ?? null)}>
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TelegramIcon className="h-3.5 w-3.5" />} Telegram
+    <Button type="button" variant="ghost" size="sm" className={btnClass} disabled={busy} title={compact ? "Telegram" : undefined} onClick={() => open(channels[0]?.account_id ?? null)}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TelegramIcon className="h-3.5 w-3.5" />}{compact ? "" : " Telegram"}
     </Button>
   ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className={btnClass} disabled={busy}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TelegramIcon className="h-3.5 w-3.5" />} Telegram <ChevronDown className="h-3 w-3" />
+        <Button type="button" variant="ghost" size="sm" className={btnClass} disabled={busy} title={compact ? "Telegram" : undefined}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TelegramIcon className="h-3.5 w-3.5" />}{compact ? "" : " Telegram"} <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

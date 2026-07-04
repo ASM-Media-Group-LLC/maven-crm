@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMyWaChannels } from "@/hooks/useMyWaChannels";
 import { TgChatButton } from "@/components/TgChatButton";
+import OnlyFansIcon from "@/components/icons/OnlyFansIcon";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -23,7 +24,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus, Pencil } from "lucide-react";
+import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -471,14 +472,14 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   }
 
   const trigger = channels.length === 1 ? (
-    <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} onClick={() => open(channels[0].id)}>
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp
+    <Button variant="ghost" size="sm" className="h-7 w-7 justify-center p-0 text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp" onClick={() => open(channels[0].id)}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
     </Button>
   ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp <ChevronDown className="h-3 w-3" />
+        <Button variant="ghost" size="sm" className="h-7 gap-0.5 px-1.5 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -555,10 +556,11 @@ const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
   );
 };
 
-// Link de OnlyFans EDITABLE inline. Motivo (owner): los closers descubren el link de OF de
-// la modelo mientras chatean y lo cargan ahí mismo desde la tabla → no puede ser solo lectura.
-// Vacío → "+ OF" para pegar el link; cargado → link clickeable "OF ↗" + lápiz para editar.
-// Guarda en closer_creators.onlyfans_url vía onFieldChange (misma vía que notas/categoría).
+// Link de OnlyFans EDITABLE inline, como un ícono compacto (el SÍMBOLO de OnlyFans, no texto).
+// Motivo (owner): los closers descubren el link de OF de la modelo mientras chatean y lo cargan
+// ahí mismo desde la tabla → no puede ser solo lectura. Ícono azul cuando está cargado, gris
+// punteado cuando está vacío. Un clic abre un popover para ABRIR el link y/o EDITARLO. Guarda
+// en closer_creators.onlyfans_url vía onFieldChange (misma vía que notas/categoría).
 const InlineOfLink = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(value || "");
@@ -569,70 +571,65 @@ const InlineOfLink = memo(({ value, onSave }: { value: string | null; onSave: (v
   };
   const href = value ? (value.startsWith("http") ? value : `https://onlyfans.com/${value.replace(/^\/+/, "")}`) : "";
   return (
-    <span className="inline-flex items-center gap-1">
-      {value && (
-        <a href={href} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline max-w-[110px] truncate" title={value}>
-          <ExternalLink className="h-3 w-3 shrink-0" /> OF
-        </a>
-      )}
-      <Popover open={open} onOpenChange={(o) => { if (o) setText(value || ""); setOpen(o); }} modal={true}>
-        <PopoverTrigger asChild>
-          {value ? (
-            <button type="button" className="text-muted-foreground/50 hover:text-foreground transition-colors" title="Editar link de OnlyFans">
-              <Pencil className="h-3 w-3" />
-            </button>
-          ) : (
-            <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors" title="Agregar link de OnlyFans">
-              <Plus className="h-3 w-3" /> OF
-            </button>
-          )}
-        </PopoverTrigger>
-        <PopoverContent align="start" side="bottom" className="w-72 p-2.5">
-          <Label className="text-xs">Link de OnlyFans</Label>
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } if (e.key === "Escape") setOpen(false); }}
-            autoFocus
-            placeholder="onlyfans.com/… o el handle"
-            className="h-8 text-sm mt-1"
-          />
-          <div className="mt-2 flex justify-end gap-1.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
-          </div>
-        </PopoverContent>
-      </Popover>
-    </span>
+    <Popover open={open} onOpenChange={(o) => { if (o) setText(value || ""); setOpen(o); }} modal={true}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={value ? "OnlyFans — ver o editar" : "Agregar link de OnlyFans"}
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${value ? "border-transparent text-[#00AFF0] hover:bg-[#00AFF0]/10" : "border-dashed border-border text-muted-foreground/40 hover:border-muted-foreground/40 hover:text-muted-foreground"}`}
+        >
+          <OnlyFansIcon className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="bottom" className="w-72 p-2.5">
+        {value && (
+          <a href={href} target="_blank" rel="noopener noreferrer"
+            className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#00AFF0] hover:underline">
+            <OnlyFansIcon className="h-3.5 w-3.5" /> Abrir OnlyFans <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+        <Label className="text-xs">Link de OnlyFans</Label>
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } if (e.key === "Escape") setOpen(false); }}
+          autoFocus
+          placeholder="onlyfans.com/… o el handle"
+          className="h-8 text-sm mt-1"
+        />
+        <div className="mt-2 flex justify-end gap-1.5">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 });
 InlineOfLink.displayName = "InlineOfLink";
 
-// Contacto del lead: WhatsApp + Telegram (mismo patrón/gating), con el MISMO tamaño/padding
-// para que los íconos queden alineados (antes se veían "torcidos" por padding distinto). El
-// de Telegram contacta por el TELÉFONO del lead (importContacts server-side), no por el canal
-// de promo; para leads de closer pasa closer_creator_id (el edge resuelve teléfono + gatea por
-// dueño), para leadgen pasa el phone ya resuelto. Si el usuario no tiene líneas de TG, el botón
-// se auto-oculta y queda solo WhatsApp. `onOfSave` (opcional): habilita el link de OF editable
-// inline acá (los closers lo cargan mientras chatean).
+// Contacto del lead: WhatsApp + Telegram + OF, EN FILA y solo-íconos (como el mockup) para
+// que las filas queden compactas (antes apilados verticalmente = filas altas). WhatsApp y
+// Telegram con el mismo tamaño; el de TG contacta por el TELÉFONO del lead (importContacts
+// server-side), no por el canal de promo. `onOfSave` (opcional): habilita el símbolo de OF
+// editable inline (los closers pegan el link mientras chatean).
 const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl, onOfSave }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null; onlyfansUrl?: string | null; onOfSave?: (v: string | null) => void }) => (
-  <div className="flex flex-col items-start gap-0.5">
+  <div className="flex items-center gap-1">
     <LeadWhatsappButton leadId={leadId} source={source} resolvedPhone={resolvedPhone} />
     <TgChatButton
       closerCreatorId={source === "closer" ? leadId : null}
       phone={resolvedPhone}
-      className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700"
+      compact
+      className="h-7 gap-0.5 px-1.5 text-xs text-sky-600 hover:text-sky-700"
     />
     {onOfSave ? (
-      <span className="pl-2"><InlineOfLink value={onlyfansUrl ?? null} onSave={onOfSave} /></span>
+      <InlineOfLink value={onlyfansUrl ?? null} onSave={onOfSave} />
     ) : onlyfansUrl ? (
       <a
         href={onlyfansUrl.startsWith("http") ? onlyfansUrl : `https://onlyfans.com/${onlyfansUrl}`}
-        target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 h-6 px-2 text-xs text-primary hover:underline"
+        target="_blank" rel="noopener noreferrer" title="OnlyFans"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#00AFF0] hover:bg-[#00AFF0]/10"
       >
-        <ExternalLink className="h-3 w-3" /> OnlyFans
+        <OnlyFansIcon className="h-4 w-4" />
       </a>
     ) : null}
   </div>
