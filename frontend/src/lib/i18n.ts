@@ -67,12 +67,107 @@ const translations = {
   "permissions.save": { es: "Guardar Permisos", en: "Save Permissions" },
   "permissions.saving": { es: "Guardando...", en: "Saving..." },
   "common.cancel": { es: "Cancelar", en: "Cancel" },
+
+  // Comunes (reusables entre módulos)
+  "common.all": { es: "Todos", en: "All" },
+  "common.loading": { es: "Cargando…", en: "Loading…" },
+  "common.noResults": { es: "Sin resultados.", en: "No results." },
+  "common.error": { es: "Error", en: "Error" },
+  "common.reply": { es: "Responder", en: "Reply" },
+  "common.react": { es: "Reaccionar", en: "React" },
+  "common.file": { es: "Archivo", en: "File" },
+  "common.clear": { es: "Vaciar", en: "Clear" },
+  "common.delete": { es: "Eliminar", en: "Delete" },
+  "common.searchPerson": { es: "Buscar persona…", en: "Search person…" },
+  "common.unassigned": { es: "Sin asignar", en: "Unassigned" },
+
+  // Composer compartido (ChatComposer + pickers)
+  "composer.recordAudio": { es: "Grabar audio", en: "Record audio" },
+  "composer.cancelReply": { es: "Cancelar respuesta", en: "Cancel reply" },
+  "composer.attach": { es: "Adjuntar foto / video", en: "Attach photo / video" },
+  "composer.send": { es: "Enviar", en: "Send" },
+  "composer.removeAttachment": { es: "Quitar adjunto", en: "Remove attachment" },
+  "gif.search": { es: "Buscar GIF…", en: "Search GIF…" },
+  "gif.trending": { es: "Tendencias", en: "Trending" },
+  "gif.none": { es: "Sin resultados", en: "No results" },
+  "sticker.upload": { es: "Subir", en: "Upload" },
+  "sticker.none": { es: "Sin stickers todavía", en: "No stickers yet" },
+  "sticker.remove": { es: "Quitar", en: "Remove" },
+  "rec.micError": { es: "No se pudo acceder al micrófono", en: "Couldn't access the microphone" },
+  "rec.cancel": { es: "Cancelar", en: "Cancel" },
+  "rec.send": { es: "Enviar", en: "Send" },
+  "lightbox.download": { es: "Descargar", en: "Download" },
+  "lightbox.close": { es: "Cerrar", en: "Close" },
+  "lightbox.zoomIn": { es: "Acercar", en: "Zoom in" },
+  "lightbox.zoomOut": { es: "Alejar", en: "Zoom out" },
+
+  // Telegram — bandeja
+  "tg.accounts": { es: "Cuentas", en: "Accounts" },
+  "tg.searchConversation": { es: "Buscar conversación…", en: "Search conversation…" },
+  "tg.channel": { es: "Canal", en: "Channel" },
+  "tg.unread": { es: "No leídos", en: "Unread" },
+  "tg.favorites": { es: "Favoritos", en: "Favorites" },
+  "tg.archived": { es: "Archivados", en: "Archived" },
+  "tg.viewArchived": { es: "Ver archivados", en: "View archived" },
+  "tg.emptyArchived": { es: "No hay chats archivados.", en: "No archived chats." },
+  "tg.emptyUnread": { es: "No hay conversaciones sin leer.", en: "No unread conversations." },
+  "tg.emptyFavorites": { es: "No hay favoritos todavía. Click derecho en un chat → Añadir a Favoritos.", en: "No favorites yet. Right-click a chat → Add to Favorites." },
+  "tg.emptyAll": { es: "No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram.", en: "No conversations yet. They show up here when someone messages you on Telegram." },
+  "tg.pickConversation": { es: "Elegí una conversación para verla.", en: "Pick a conversation to view it." },
+  "tg.assignConversation": { es: "Asignar conversación", en: "Assign conversation" },
+  "tg.assign": { es: "Asignar", en: "Assign" },
+  "tg.assignmentReadOnly": { es: "Asignación (solo lectura)", en: "Assignment (read-only)" },
+  "tg.couldNotAssign": { es: "No se pudo asignar", en: "Couldn't assign" },
+  "tg.assignedTo": { es: "Asignada a {name}", en: "Assigned to {name}" },
+  "tg.assignmentRemoved": { es: "Asignación quitada", en: "Assignment removed" },
+  "tg.noMessages": { es: "Sin mensajes.", en: "No messages." },
+  "tg.notDelivered": { es: "no entregado", en: "not delivered" },
+  "tg.unreadOne": { es: "No leído", en: "Unread" },
+  "tg.viewLarge": { es: "Ver en grande", en: "View large" },
+  "tg.quotedMessage": { es: "Mensaje citado", en: "Quoted message" },
+  "tg.messageDeleted": { es: "Mensaje eliminado", en: "Message deleted" },
+  "tg.replying": { es: "Respondiendo", en: "Replying" },
+  "tg.replyTo": { es: "Responder a {name}…", en: "Reply to {name}…" },
+  "tg.deleteForEveryone": { es: "Eliminar para todos", en: "Delete for everyone" },
+  "tg.archiveChat": { es: "Archivar chat", en: "Archive chat" },
+  "tg.unarchiveChat": { es: "Desarchivar chat", en: "Unarchive chat" },
+  "tg.pinChat": { es: "Fijar chat", en: "Pin chat" },
+  "tg.unpinChat": { es: "Desfijar chat", en: "Unpin chat" },
+  "tg.markAsRead": { es: "Marcar como leído", en: "Mark as read" },
+  "tg.markAsUnread": { es: "Marcar como no leído", en: "Mark as unread" },
+  "tg.addFavorite": { es: "Añadir a Favoritos", en: "Add to Favorites" },
+  "tg.removeFavorite": { es: "Quitar de Favoritos", en: "Remove from Favorites" },
+  "tg.clearChat": { es: "Vaciar chat", en: "Clear chat" },
+  "tg.deleteChat": { es: "Eliminar chat", en: "Delete chat" },
+  "tg.couldNotUpdate": { es: "No se pudo actualizar el chat", en: "Couldn't update the chat" },
+  "tg.couldNotComplete": { es: "No se pudo completar", en: "Couldn't complete" },
+  "tg.chatCleared": { es: "Chat vaciado", en: "Chat cleared" },
+  "tg.chatDeleted": { es: "Chat eliminado", en: "Chat deleted" },
+  "tg.clearChatConfirm": { es: "Se borrarán todos los mensajes de \"{name}\". La conversación queda vacía. No se puede deshacer.", en: "All messages with \"{name}\" will be deleted. The conversation is emptied. This can't be undone." },
+  "tg.deleteChatConfirm": { es: "Se eliminará la conversación con \"{name}\" y todos sus mensajes. No se puede deshacer.", en: "The conversation with \"{name}\" and all its messages will be deleted. This can't be undone." },
+  "tg.couldNotSend": { es: "No se pudo enviar", en: "Couldn't send" },
+  "tg.gatewayNoDeliverMsg": { es: "El gateway no pudo entregar el mensaje.", en: "The gateway couldn't deliver the message." },
+  "tg.gatewayNoDeliverFile": { es: "El gateway no pudo entregar el archivo.", en: "The gateway couldn't deliver the file." },
+  "tg.couldNotUpload": { es: "No se pudo subir el archivo", en: "Couldn't upload the file" },
+  "tg.couldNotReact": { es: "No se pudo reaccionar", en: "Couldn't react" },
+  "tg.couldNotDelete": { es: "No se pudo borrar", en: "Couldn't delete" },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
 
-export function getTranslation(key: TranslationKey, lang: Language): string {
-  return translations[key]?.[lang] ?? key;
+// Interpolación: t("wa.replyingTo", { name }) reemplaza {name} en el texto. Necesaria para la
+// migración i18n completa (casi todos los textos reales tienen partes dinámicas). Si falta la
+// clave, devuelve la key tal cual (útil para detectar textos sin traducir en QA).
+export function getTranslation(
+  key: TranslationKey,
+  lang: Language,
+  params?: Record<string, string | number>,
+): string {
+  let s: string = translations[key]?.[lang] ?? key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, String(v));
+  }
+  return s;
 }
 
 export default translations;

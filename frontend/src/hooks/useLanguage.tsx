@@ -5,7 +5,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   toggleLanguage: () => void;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -26,7 +26,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language, setLanguage]);
 
   const t = useCallback(
-    (key: TranslationKey) => getTranslation(key, language),
+    (key: TranslationKey, params?: Record<string, string | number>) => getTranslation(key, language, params),
     [language]
   );
 

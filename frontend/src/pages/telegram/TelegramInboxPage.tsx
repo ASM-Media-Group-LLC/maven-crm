@@ -41,6 +41,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
@@ -72,11 +73,11 @@ const CHANNEL_CHIP_PALETTE = [
 const channelChipClass = (key: string | null) =>
   key ? CHANNEL_CHIP_PALETTE[hash(key) % CHANNEL_CHIP_PALETTE.length] : "bg-muted text-muted-foreground";
 
-// Fecha + hora (idéntico a la bandeja de WhatsApp: "3 jul, 04:00 p. m.").
-const fmtTime = (iso: string | null): string => {
+// Fecha + hora, según idioma ("3 jul, 04:00 p. m." en ES / "Jul 3, 04:00 PM" en EN).
+const fmtTime = (iso: string | null, locale = "es-CO"): string => {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   } catch { return ""; }
 };
 
@@ -141,6 +142,8 @@ const TelegramInboxPage = () => {
   const { canAccess } = usePermissions();
   const canAssign = canAccess("Telegram", "Asignar conversaciones");
   const { isAdmin } = useUserRole();
+  const { t, language } = useLanguage();
+  const dtLocale = language === "en" ? "en-US" : "es-CO";
 
   // Deep-link /telegram/bandeja?c=<id>
   useEffect(() => {
@@ -234,15 +237,15 @@ const TelegramInboxPage = () => {
     const { error } = await (supabase as any).rpc("tg_assign_conversation", {
       p_conversation_id: selectedId, p_assignee: userId,
     });
-    if (error) { toast({ title: "No se pudo asignar", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("tg.couldNotAssign"), description: error.message, variant: "destructive" }); return; }
     qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
-    toast({ title: userId ? `Asignada a ${userName(userId)}` : "Asignación quitada" });
+    toast({ title: userId ? t("tg.assignedTo", { name: userName(userId) ?? "" }) : t("tg.assignmentRemoved") });
   };
 
   // ── Acciones de la LISTA (click derecho): fijar / archivar / favorito / marcar no leído ──
   const toggleFlag = async (id: string, flag: "archived" | "pinned" | "favorite" | "manually_unread", value: boolean) => {
     const { error } = await (supabase as any).rpc("tg_set_conversation_flag", { p_conversation_id: id, p_flag: flag, p_value: value });
-    if (error) { toast({ title: "No se pudo actualizar el chat", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("tg.couldNotUpdate"), description: error.message, variant: "destructive" }); return; }
     qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
   };
   // Marcar leído/no leído: leído resetea el no-leído real (tg_mark_read) + la marca manual.
@@ -263,8 +266,8 @@ const TelegramInboxPage = () => {
     const fn = kind === "clear" ? "tg_clear_conversation" : "tg_delete_conversation";
     const { error } = await (supabase as any).rpc(fn, { p_conversation_id: id });
     setDestructive(null);
-    if (error) { toast({ title: "No se pudo completar", description: error.message, variant: "destructive" }); return; }
-    toast({ title: kind === "clear" ? "Chat vaciado" : "Chat eliminado" });
+    if (error) { toast({ title: t("tg.couldNotComplete"), description: error.message, variant: "destructive" }); return; }
+    toast({ title: kind === "clear" ? t("tg.chatCleared") : t("tg.chatDeleted") });
     if (kind === "delete" && selectedId === id) setSelectedId(null);
     qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
     if (selectedId === id) qc.invalidateQueries({ queryKey: ["tg-inbox-messages", id] });
@@ -328,7 +331,7 @@ const TelegramInboxPage = () => {
     const { error } = await supabase.storage.from("tg-media").upload(path, file, {
       contentType: (file as File).type || "application/octet-stream", upsert: true,
     });
-    if (error) { toast({ title: "No se pudo subir el archivo", description: error.message, variant: "destructive" }); return null; }
+    if (error) { toast({ title: t("tg.couldNotUpload"), description: error.message, variant: "destructive" }); return null; }
     return supabase.storage.from("tg-media").getPublicUrl(path).data.publicUrl;
   };
 
@@ -349,12 +352,12 @@ const TelegramInboxPage = () => {
       .then(({ data, error }) => {
         const res = data as { ok?: boolean; error?: string; reason?: string } | null;
         if (error || !res?.ok) toast({
-          title: "No se pudo enviar",
-          description: res?.reason === "send_failed" ? "El gateway no pudo entregar el archivo." : (res?.error || error?.message || "Error"),
+          title: t("tg.couldNotSend"),
+          description: res?.reason === "send_failed" ? t("tg.gatewayNoDeliverFile") : (res?.error || error?.message || t("common.error")),
           variant: "destructive",
         });
       })
-      .catch((e) => toast({ title: "No se pudo enviar", description: (e as Error).message, variant: "destructive" }))
+      .catch((e) => toast({ title: t("tg.couldNotSend"), description: (e as Error).message, variant: "destructive" }))
       .finally(invalidateThread);
   };
 
@@ -387,12 +390,12 @@ const TelegramInboxPage = () => {
       .then(({ data, error }) => {
         const res = data as { ok?: boolean; error?: string; reason?: string } | null;
         if (error || !res?.ok) toast({
-          title: "No se pudo enviar",
-          description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
+          title: t("tg.couldNotSend"),
+          description: res?.reason === "send_failed" ? t("tg.gatewayNoDeliverMsg") : (res?.error || error?.message || t("common.error")),
           variant: "destructive",
         });
       })
-      .catch((e) => toast({ title: "No se pudo enviar", description: (e as Error).message, variant: "destructive" }))
+      .catch((e) => toast({ title: t("tg.couldNotSend"), description: (e as Error).message, variant: "destructive" }))
       .finally(invalidateThread);
     setReplyingTo(null);
   };
@@ -400,13 +403,13 @@ const TelegramInboxPage = () => {
   const reactTo = (m: TgMsg, emoji: string) => {
     if (!canActOn(m)) return;
     void supabase.functions.invoke("tg-inbox-action", { body: { message_id: m.id, action: "react", emoji } })
-      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: "No se pudo reaccionar", description: res?.error || error?.message || "Error", variant: "destructive" }); })
+      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: t("tg.couldNotReact"), description: res?.error || error?.message || t("common.error"), variant: "destructive" }); })
       .finally(() => qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] }));
   };
   const deleteMsg = (m: TgMsg) => {
     if (!canActOn(m)) return;
     void supabase.functions.invoke("tg-inbox-action", { body: { message_id: m.id, action: "delete" } })
-      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: "No se pudo borrar", description: res?.error || error?.message || "Error", variant: "destructive" }); })
+      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: t("tg.couldNotDelete"), description: res?.error || error?.message || t("common.error"), variant: "destructive" }); })
       .finally(() => qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] }));
   };
 
@@ -430,7 +433,7 @@ const TelegramInboxPage = () => {
         <h1 className="text-base font-semibold">Telegram</h1>
         <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">Beta</span>
         <Link to="/telegram" className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <Radio className="h-3.5 w-3.5" /> Cuentas
+          <Radio className="h-3.5 w-3.5" /> {t("tg.accounts")}
         </Link>
       </div>
 
@@ -442,7 +445,7 @@ const TelegramInboxPage = () => {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar conversación…"
+              placeholder={t("tg.searchConversation")}
               className="h-9 pl-8"
             />
           </div>
@@ -450,14 +453,14 @@ const TelegramInboxPage = () => {
           {/* Filtro por CANAL (línea) — solo si hay más de una. Ortogonal a los chips de abajo. */}
           {channels.length > 1 && (
             <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-2">
-              <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">Canal</span>
+              <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">{t("tg.channel")}</span>
               <button
                 type="button"
                 onClick={() => setChannelFilter(null)}
                 className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                   !channelFilter ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
               >
-                Todos
+                {t("common.all")}
               </button>
               {channels.map((ch) => (
                 <button
@@ -475,7 +478,7 @@ const TelegramInboxPage = () => {
 
           {/* Filtros (chips): presets + archivados. */}
           <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-3">
-            {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
+            {([["todos", "common.all"], ["no_leidos", "tg.unread"], ["favoritos", "tg.favorites"]] as const).map(([key, lkey]) => (
               <button
                 key={key}
                 type="button"
@@ -483,32 +486,32 @@ const TelegramInboxPage = () => {
                 className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                   !showArchived && chatFilter === key ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
               >
-                {label}
+                {t(lkey)}
               </button>
             ))}
             <button
               type="button"
               onClick={() => setShowArchived((v) => !v)}
-              title="Ver archivados"
+              title={t("tg.viewArchived")}
               className={cn("ml-auto flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                 showArchived ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
             >
-              <Archive className="h-3 w-3" /> Archivados
+              <Archive className="h-3 w-3" /> {t("tg.archived")}
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {convLoading ? (
               <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}
               </div>
             ) : filtered.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                 <InboxIcon className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                {showArchived ? "No hay chats archivados."
-                  : chatFilter === "no_leidos" ? "No hay conversaciones sin leer."
-                  : chatFilter === "favoritos" ? "No hay favoritos todavía. Click derecho en un chat → Añadir a Favoritos."
-                  : "No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram."}
+                {showArchived ? t("tg.emptyArchived")
+                  : chatFilter === "no_leidos" ? t("tg.emptyUnread")
+                  : chatFilter === "favoritos" ? t("tg.emptyFavorites")
+                  : t("tg.emptyAll")}
               </div>
             ) : (
               <ul className="space-y-0.5 px-2 py-2">
@@ -538,7 +541,7 @@ const TelegramInboxPage = () => {
                                   {peerLabel(c)}
                                 </span>
                                 <span className={cn("ml-auto shrink-0 text-[10px] tabular-nums", unread ? "font-semibold text-sky-500" : "text-muted-foreground")}>
-                                  {fmtTime(c.last_message_at)}
+                                  {fmtTime(c.last_message_at, dtLocale)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
@@ -556,7 +559,7 @@ const TelegramInboxPage = () => {
                                     {c.unread_count > 99 ? "99+" : c.unread_count}
                                   </span>
                                 ) : (
-                                  <span className={cn("ml-auto h-2.5 w-2.5 shrink-0 rounded-full", TG_GRAD)} title="No leído" />
+                                  <span className={cn("ml-auto h-2.5 w-2.5 shrink-0 rounded-full", TG_GRAD)} title={t("tg.unreadOne")} />
                                 ))}
                               </div>
                             </div>
@@ -564,25 +567,25 @@ const TelegramInboxPage = () => {
                         </ContextMenuTrigger>
                         <ContextMenuContent className="w-56">
                           <ContextMenuItem onClick={() => toggleFlag(c.id, "archived", !c.archived)}>
-                            <Archive className="mr-2 h-4 w-4" /> {c.archived ? "Desarchivar chat" : "Archivar chat"}
+                            <Archive className="mr-2 h-4 w-4" /> {c.archived ? t("tg.unarchiveChat") : t("tg.archiveChat")}
                           </ContextMenuItem>
                           <ContextMenuItem onClick={() => toggleFlag(c.id, "pinned", !c.pinned)}>
-                            <Pin className="mr-2 h-4 w-4" /> {c.pinned ? "Desfijar chat" : "Fijar chat"}
+                            <Pin className="mr-2 h-4 w-4" /> {c.pinned ? t("tg.unpinChat") : t("tg.pinChat")}
                           </ContextMenuItem>
                           <ContextMenuItem onClick={() => markRead(c.id, unread)}>
-                            <MailOpen className="mr-2 h-4 w-4" /> {unread ? "Marcar como leído" : "Marcar como no leído"}
+                            <MailOpen className="mr-2 h-4 w-4" /> {unread ? t("tg.markAsRead") : t("tg.markAsUnread")}
                           </ContextMenuItem>
                           <ContextMenuItem onClick={() => toggleFlag(c.id, "favorite", !c.favorite)}>
-                            <Star className="mr-2 h-4 w-4" /> {c.favorite ? "Quitar de Favoritos" : "Añadir a Favoritos"}
+                            <Star className="mr-2 h-4 w-4" /> {c.favorite ? t("tg.removeFavorite") : t("tg.addFavorite")}
                           </ContextMenuItem>
                           {isAdmin && (
                             <>
                               <ContextMenuSeparator />
                               <ContextMenuItem className="text-warning focus:text-warning" onClick={() => setDestructive({ kind: "clear", id: c.id, label: peerLabel(c) })}>
-                                <Eraser className="mr-2 h-4 w-4" /> Vaciar chat
+                                <Eraser className="mr-2 h-4 w-4" /> {t("tg.clearChat")}
                               </ContextMenuItem>
                               <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => setDestructive({ kind: "delete", id: c.id, label: peerLabel(c) })}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar chat
+                                <Trash2 className="mr-2 h-4 w-4" /> {t("tg.deleteChat")}
                               </ContextMenuItem>
                             </>
                           )}
@@ -600,7 +603,7 @@ const TelegramInboxPage = () => {
         <section className={cn(selectedId ? "flex" : "hidden md:flex", "min-h-0 flex-1 flex-col")}>
           {!selected ? (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              Elegí una conversación para verla.
+              {t("tg.pickConversation")}
             </div>
           ) : (
             <>
@@ -623,18 +626,18 @@ const TelegramInboxPage = () => {
                 {canAssign ? (
                   <Popover open={assignOpen} onOpenChange={setAssignOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
+                      <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title={t("tg.assignConversation")}>
                         <UserCheck className="h-3.5 w-3.5" />
-                        {userName(selected.assigned_to) ?? "Asignar"}
+                        {userName(selected.assigned_to) ?? t("tg.assign")}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-56 p-0">
                       <Command>
-                        <CommandInput placeholder="Buscar persona…" className="h-9" />
+                        <CommandInput placeholder={t("common.searchPerson")} className="h-9" />
                         <CommandList>
-                          <CommandEmpty>Sin resultados.</CommandEmpty>
+                          <CommandEmpty>{t("common.noResults")}</CommandEmpty>
                           <CommandGroup>
-                            <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>Sin asignar</CommandItem>
+                            <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>{t("common.unassigned")}</CommandItem>
                             {users.map((u) => (
                               <CommandItem key={u.id} value={u.full_name || u.id} onSelect={() => assignConversation(u.id)}>
                                 {u.full_name || u.id.slice(0, 8)}
@@ -646,9 +649,9 @@ const TelegramInboxPage = () => {
                     </PopoverContent>
                   </Popover>
                 ) : (
-                  <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title="Asignación (solo lectura)">
+                  <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title={t("tg.assignmentReadOnly")}>
                     <UserCheck className="h-3.5 w-3.5" />
-                    {userName(selected.assigned_to) ?? "Sin asignar"}
+                    {userName(selected.assigned_to) ?? t("common.unassigned")}
                   </span>
                 )}
               </div>
@@ -658,7 +661,7 @@ const TelegramInboxPage = () => {
                   {msgLoading ? (
                     <div className="flex justify-center py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
                   ) : messages.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
+                    <div className="py-10 text-center text-sm text-muted-foreground">{t("tg.noMessages")}</div>
                   ) : (
                     messages.map((m) => {
                       const isOut = m.direction === "out";
@@ -686,7 +689,7 @@ const TelegramInboxPage = () => {
 
                               {hasQuote && (
                                 <div className={cn("mb-1 rounded border-l-2 px-2 py-1 text-xs", isOut ? "border-white/50 bg-black/10" : "border-sky-400 bg-muted/60")}>
-                                  <p className="truncate opacity-80">{quoted ? (quoted.body || `[${quoted.msg_type}]`) : "Mensaje citado"}</p>
+                                  <p className="truncate opacity-80">{quoted ? (quoted.body || `[${quoted.msg_type}]`) : t("tg.quotedMessage")}</p>
                                 </div>
                               )}
 
@@ -704,7 +707,7 @@ const TelegramInboxPage = () => {
                                     ? <video src={m.media_url as string} autoPlay loop muted playsInline className="max-h-64 rounded-lg" />
                                     : <video src={m.media_url as string} controls className="max-h-64 rounded-lg" />}
                                   {m.msg_type === "video" && (
-                                    <button type="button" onClick={() => openViewer(m.id)} title="Ver en grande"
+                                    <button type="button" onClick={() => openViewer(m.id)} title={t("tg.viewLarge")}
                                       className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white transition hover:bg-black/80">
                                       <Maximize2 className="h-3.5 w-3.5" />
                                     </button>
@@ -716,12 +719,12 @@ const TelegramInboxPage = () => {
                               )}
                               {mediaShown && m.msg_type === "document" && (
                                 <a href={m.media_url as string} target="_blank" rel="noreferrer" className="mb-1 flex items-center gap-1.5 underline">
-                                  <FileText className="h-4 w-4" /> Archivo
+                                  <FileText className="h-4 w-4" /> {t("common.file")}
                                 </a>
                               )}
 
                               {deleted ? (
-                                <span className="italic">Mensaje eliminado</span>
+                                <span className="italic">{t("tg.messageDeleted")}</span>
                               ) : m.body ? (
                                 <span className="whitespace-pre-wrap break-words">{m.body}</span>
                               ) : (!mediaShown && m.msg_type !== "text") ? (
@@ -729,7 +732,7 @@ const TelegramInboxPage = () => {
                               ) : null}
 
                               <span className={cn("ml-2 align-bottom text-[10px] tabular-nums", isOut && !deleted ? "text-white/70" : "text-muted-foreground")}>
-                                {failed ? "no entregado · " : ""}{fmtTime(m.sent_at)}
+                                {failed ? t("tg.notDelivered") + " · " : ""}{fmtTime(m.sent_at, dtLocale)}
                               </span>
 
                               {!deleted && m.reaction && (
@@ -744,13 +747,13 @@ const TelegramInboxPage = () => {
                             {/* Acciones al hover: responder · reaccionar · borrar (borrar solo en salientes). */}
                             {canActOn(m) && (
                               <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
-                                <button type="button" onClick={() => setReplyingTo(m)} title="Responder"
+                                <button type="button" onClick={() => setReplyingTo(m)} title={t("common.reply")}
                                   className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
                                   <Reply className="h-4 w-4" />
                                 </button>
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <button type="button" title="Reaccionar" className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                                    <button type="button" title={t("common.react")} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
                                       <Smile className="h-4 w-4" />
                                     </button>
                                   </PopoverTrigger>
@@ -763,7 +766,7 @@ const TelegramInboxPage = () => {
                                   </PopoverContent>
                                 </Popover>
                                 {isOut && (
-                                  <button type="button" onClick={() => deleteMsg(m)} title="Eliminar para todos"
+                                  <button type="button" onClick={() => deleteMsg(m)} title={t("tg.deleteForEveryone")}
                                     className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
                                     <Trash2 className="h-4 w-4" />
                                   </button>
@@ -797,7 +800,7 @@ const TelegramInboxPage = () => {
                   value={draft}
                   onChange={setDraft}
                   onSend={composerSend}
-                  placeholder={`Responder a ${peerLabel(selected)}…`}
+                  placeholder={t("tg.replyTo", { name: peerLabel(selected) })}
                   emojis={tgEmojis}
                   onAddEmoji={(e) => setTgEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
                   onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
@@ -806,10 +809,10 @@ const TelegramInboxPage = () => {
                     <div className="flex items-center gap-2 rounded-lg border-l-2 border-sky-400 bg-muted/60 px-2 py-1.5 text-xs">
                       <Reply className="h-3.5 w-3.5 shrink-0 text-sky-500" />
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sky-600 dark:text-sky-400">Respondiendo</div>
+                        <div className="font-medium text-sky-600 dark:text-sky-400">{t("tg.replying")}</div>
                         <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
                       </div>
-                      <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Cancelar respuesta">
+                      <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label={t("composer.cancelReply")}>
                         <XIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -818,7 +821,7 @@ const TelegramInboxPage = () => {
                     <>
                       <GifPicker onPick={(url) => sendMediaUrl(url, "gif")} />
                       <StickerPicker onPick={(url) => sendMediaUrl(url, "sticker")} />
-                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground" title="Grabar audio" onClick={() => setRecording(true)}>
+                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground" title={t("composer.recordAudio")} onClick={() => setRecording(true)}>
                         <Mic className="h-4 w-4" />
                       </Button>
                     </>
@@ -835,17 +838,17 @@ const TelegramInboxPage = () => {
       <AlertDialog open={!!destructive} onOpenChange={(o) => { if (!o) setDestructive(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{destructive?.kind === "clear" ? "Vaciar chat" : "Eliminar chat"}</AlertDialogTitle>
+            <AlertDialogTitle>{destructive?.kind === "clear" ? t("tg.clearChat") : t("tg.deleteChat")}</AlertDialogTitle>
             <AlertDialogDescription>
               {destructive?.kind === "clear"
-                ? `Se borrarán todos los mensajes de "${destructive?.label}". La conversación queda vacía. No se puede deshacer.`
-                : `Se eliminará la conversación con "${destructive?.label}" y todos sus mensajes. No se puede deshacer.`}
+                ? t("tg.clearChatConfirm", { name: destructive?.label ?? "" })
+                : t("tg.deleteChatConfirm", { name: destructive?.label ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={runDestructive} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {destructive?.kind === "clear" ? "Vaciar" : "Eliminar"}
+              {destructive?.kind === "clear" ? t("common.clear") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
