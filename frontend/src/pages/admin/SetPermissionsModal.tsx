@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChevronDown, ChevronRight, Copy, Menu as MenuIcon, MousePointerClick, Database } from "lucide-react";
 import { toast } from "sonner";
-import { useRolePermissions, useRoles, MODULES_CONFIG, type RolePermission } from "./useRoles";
+import { useRolePermissions, useRoles, MODULES_CONFIG, moduleLabel, type RolePermission } from "./useRoles";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -417,7 +417,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                 onCheckedChange={() => toggleModule(mod.module)}
                                 className="h-4 w-4 shrink-0"
                               />
-                              <span className="truncate text-sm font-semibold">{mod.module}</span>
+                              <span className="truncate text-sm font-semibold">{moduleLabel(mod.module)}</span>
                               {hasSubtabs && (
                                 <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                   {enabledSubtabs}/{mod.subtabs.length}

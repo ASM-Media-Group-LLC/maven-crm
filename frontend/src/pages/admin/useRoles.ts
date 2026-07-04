@@ -112,6 +112,11 @@ const def = (
   return { group, module, subtabs: subs, functions, submodules: [...subs.map((s) => s.name), ...functions] };
 };
 
+// Nombre VISIBLE del módulo en la UI de permisos. La KEY (p.ej. "Creator Sales") se conserva en
+// role_permissions / PermissionRoute / canAccess; esto es solo cosmético para no confundir al usuario.
+const MODULE_LABELS: Record<string, string> = { "Creator Sales": "Ventas" };
+export const moduleLabel = (module: string): string => MODULE_LABELS[module] ?? module;
+
 export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
   def("Menú", "Dashboard"),

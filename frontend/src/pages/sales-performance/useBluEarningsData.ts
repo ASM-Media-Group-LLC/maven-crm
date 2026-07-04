@@ -17,24 +17,35 @@ import type { EarningsRow } from "./types";
 // = el cap, así cada página llena devuelve 1000 y la paginación recorre las 11k+ filas.
 const PAGE_SIZE = 1000;
 
+const SELECT_COLS =
+  "id, date, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, message_gross, tips_gross, contribution_pct, active_fans, new_fans, creator_id, blu_creator_name";
+
 const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
-  let all: any[] = [];
-  let from = 0;
-  // Paginar (la tabla tiene 11k+ filas; PostgREST corta en 1000 por defecto).
-  while (true) {
-    const { data, error } = await (supabase as any)
-      .from("creator_daily_earnings")
-      .select(
-        "id, date, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, message_gross, tips_gross, contribution_pct, active_fans, new_fans, creator_id, blu_creator_name",
-      )
-      .order("date", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
+  // PERF: antes se paginaba SECUENCIAL (~14 requests encadenados sobre 13k+ filas → lento).
+  // Ahora contamos primero (head=true, sin traer filas) y disparamos TODAS las páginas EN PARALELO.
+  // Orden estable date+id (tiebreak) para que el .range() no salte/duplique filas entre páginas.
+  const { count, error: cErr } = await (supabase as any)
+    .from("creator_daily_earnings")
+    .select("id", { count: "exact", head: true });
+  if (cErr) throw cErr;
+  const total = count ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const chunks = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      (supabase as any)
+        .from("creator_daily_earnings")
+        .select(SELECT_COLS)
+        .order("date", { ascending: false })
+        .order("id", { ascending: false })
+        .range(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE - 1)
+        .then(({ data, error }: { data: any[] | null; error: unknown }) => {
+          if (error) throw error;
+          return data ?? [];
+        }),
+    ),
+  );
+  const all: any[] = chunks.flat();
 
   const creatorIds = [...new Set(all.map((e) => e.creator_id).filter(Boolean) as string[])];
   let creatorsMap: Record<string, string> = {};
@@ -83,5 +94,10 @@ export const useBluEarningsData = () => {
   return useQuery({
     queryKey: ["blu_earnings_dashboard2"],
     queryFn: fetchBluEarnings,
+    // La data se sirve de caché al cambiar entre subtabs de Ventas (Dashboard/Reportes/IA/Auditoría)
+    // y al volver — sin re-disparar las páginas. El bridge de BLU actualiza 1×/día, no cada minuto.
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
   });
 };
