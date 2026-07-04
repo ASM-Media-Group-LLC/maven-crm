@@ -24,6 +24,42 @@ const { TelegramClient, Api } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { computeCheck } = require("telegram/Password");
 const { NewMessage } = require("telegram/events");
+const { CustomFile } = require("telegram/client/uploads"); // enviar media (sendFile) desde un Buffer
+
+// Tope de media ENTRANTE que descargamos y mandamos a la bandeja (base64 vía el ingest).
+// DMs de Telegram son casi siempre chicos (fotos, notas de voz, stickers); videos grandes
+// se dejan como "[video]" sin preview para no reventar el body del edge.
+const MAX_INGEST_MEDIA = 5 * 1024 * 1024; // 5 MB
+
+// Tipo canónico del mensaje entrante (para msg_type de la bandeja).
+function tgMsgType(msg) {
+  try {
+    if (msg.sticker) return "sticker";
+    if (msg.gif) return "gif";
+    if (msg.photo) return "photo";
+    if (msg.video) return "video";
+    if (msg.voice) return "voice";
+    if (msg.audio) return "audio";
+    if (msg.document) return "document";
+  } catch (_) { /* getters pueden lanzar */ }
+  return msg && msg.media ? "media" : "text";
+}
+
+// MIME + nombre de archivo para la media entrante (mejor esfuerzo).
+function tgMediaMeta(msg, type) {
+  let mime = null, name = null;
+  try { mime = msg.document && msg.document.mimeType ? String(msg.document.mimeType) : null; } catch (_) { /* */ }
+  if (!mime) {
+    mime = type === "photo" ? "image/jpeg"
+      : type === "sticker" ? "image/webp"
+      : (type === "video" || type === "gif") ? "video/mp4"
+      : type === "voice" ? "audio/ogg"
+      : "application/octet-stream";
+  }
+  const ext = mime.split("/")[1] ? mime.split("/")[1].split(";")[0] : "bin";
+  name = `tg_${(msg && msg.id) || Date.now()}.${ext}`;
+  return { mime, name };
+}
 
 const PORT = parseInt(process.env.PORT || "8091", 10);
 const API_KEY = process.env.API_KEY || "";
@@ -147,7 +183,27 @@ function attachIngestListener(id, client) {
         : (sender && sender.id != null ? String(sender.id) : null);
       if (!peerId) return;
       const name = sender ? ([sender.firstName, sender.lastName].filter(Boolean).join(" ") || null) : null;
-      const type = msg.media ? (msg.photo ? "photo" : (msg.voice ? "voice" : (msg.document ? "document" : "media"))) : "text";
+      const type = tgMsgType(msg);
+
+      // Descargar la media entrante y mandarla en base64 al ingest (que la sube a storage y
+      // setea media_url). Así la bandeja RENDERIZA foto/voz/sticker/video, no solo "[tipo]".
+      let mediaB64 = null, mediaMime = null, mediaName = null;
+      if (msg.media && type !== "text") {
+        try {
+          const buf = await client.downloadMedia(msg, {});
+          if (buf && buf.length && buf.length <= MAX_INGEST_MEDIA) {
+            const meta = tgMediaMeta(msg, type);
+            mediaB64 = Buffer.from(buf).toString("base64");
+            mediaMime = meta.mime;
+            mediaName = meta.name;
+          }
+        } catch (e) { console.error(`[telegram-gateway] downloadMedia (${id}):`, e.message); }
+      }
+
+      // Cita entrante: id nativo del mensaje al que responde (si aplica).
+      let replyToExternalId = null;
+      try { replyToExternalId = msg.replyToMsgId != null ? String(msg.replyToMsgId) : null; } catch (_) { /* */ }
+
       await postIngest(id, {
         id: peerId,
         username: (sender && sender.username) || null,
@@ -160,6 +216,10 @@ function attachIngestListener(id, client) {
         type,
         senderId: peerId,
         date: msg.date,
+        replyToExternalId,
+        mediaB64,
+        mediaMime,
+        mediaName,
       });
     } catch (e) { console.error(`[telegram-gateway] handler ingest (${id}):`, e.message); }
   }, new NewMessage({}));
@@ -265,18 +325,86 @@ app.post("/channel/join", apiGuard, async (req, res) => {
 // POST /message/sendText/:id  body { to, text }  → manda un DM/mensaje desde la
 // cuenta :id. `to` = @username, t.me/user, o id numérico de chat. (Enviar a un
 // teléfono suelto que no está en contactos no está soportado todavía.)
+// Resuelve el "to" (username | t.me link | id numérico) a un entity de GramJS.
+async function resolvePeer(c, to) {
+  const peer = String(to).replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
+  return c.getEntity(/^\d+$/.test(peer) ? Number(peer) : peer);
+}
+
 app.post("/message/sendText/:id", apiGuard, async (req, res) => {
   const id = req.params.id;
   const to = ((req.body && req.body.to) || "").toString().trim();
   const text = (req.body && req.body.text) || "";
+  const replyTo = req.body && req.body.replyTo;   // id nativo del mensaje citado (opcional)
   if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: "id de cuenta inválido" });
   if (!to || !text) return res.status(400).json({ ok: false, error: "faltan 'to' y/o 'text'" });
   try {
     const c = await getClient(id);
-    let peer = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
-    const entity = await c.getEntity(/^\d+$/.test(peer) ? Number(peer) : peer);
-    const sent = await c.sendMessage(entity, { message: String(text) });
+    const entity = await resolvePeer(c, to);
+    const opts = { message: String(text) };
+    if (replyTo) opts.replyTo = Number(replyTo);
+    const sent = await c.sendMessage(entity, opts);
     res.json({ ok: true, id: sent?.id ?? null });
+  } catch (e) { res.status(500).json({ ok: false, error: String((e && e.message) || e) }); }
+});
+
+// Enviar MEDIA (imagen/video/audio/voz/gif/sticker/documento). El edge sube el archivo a
+// storage y nos pasa su `url`; acá lo bajamos a un Buffer y lo mandamos por MTProto (sendFile).
+app.post("/message/sendMedia/:id", apiGuard, async (req, res) => {
+  const id = req.params.id;
+  const b = req.body || {};
+  const to = (b.to || "").toString().trim();
+  const url = (b.url || "").toString().trim();
+  const kind = (b.kind || "document").toString();   // image|video|audio|voice|gif|sticker|document
+  const caption = b.caption ? String(b.caption) : undefined;
+  const replyTo = b.replyTo;
+  const fileName = b.fileName ? String(b.fileName) : `tg_${kind}`;
+  if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: "id de cuenta inválido" });
+  if (!to || !url) return res.status(400).json({ ok: false, error: "faltan 'to' y/o 'url'" });
+  try {
+    const c = await getClient(id);
+    const entity = await resolvePeer(c, to);
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).json({ ok: false, error: `no pude bajar la media (${r.status})` });
+    const buf = Buffer.from(await r.arrayBuffer());
+    const file = new CustomFile(fileName, buf.length, "", buf);
+    const opts = { file, caption, replyTo: replyTo ? Number(replyTo) : undefined };
+    if (kind === "voice") opts.voiceNote = true;
+    if (kind === "gif") opts.attributes = [new Api.DocumentAttributeAnimated()];
+    const sent = await c.sendFile(entity, opts);
+    res.json({ ok: true, id: sent?.id ?? null });
+  } catch (e) { res.status(500).json({ ok: false, error: String((e && e.message) || e) }); }
+});
+
+// Reaccionar a un mensaje con un emoji (o quitar la reacción si `emoticon` viene vacío).
+app.post("/message/react/:id", apiGuard, async (req, res) => {
+  const id = req.params.id;
+  const b = req.body || {};
+  const to = (b.to || "").toString().trim();
+  const msgId = b.msgId;
+  const emoticon = b.emoticon ? String(b.emoticon) : "";
+  if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: "id de cuenta inválido" });
+  if (!to || !msgId) return res.status(400).json({ ok: false, error: "faltan 'to' y/o 'msgId'" });
+  try {
+    const c = await getClient(id);
+    const entity = await resolvePeer(c, to);
+    const reaction = emoticon ? [new Api.ReactionEmoji({ emoticon })] : [];
+    await c.invoke(new Api.messages.SendReaction({ peer: entity, msgId: Number(msgId), reaction }));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ ok: false, error: String((e && e.message) || e) }); }
+});
+
+// Borrar un mensaje (revoke = para todos, como "eliminar para todos" de WhatsApp).
+app.post("/message/delete/:id", apiGuard, async (req, res) => {
+  const id = req.params.id;
+  const b = req.body || {};
+  const msgId = b.msgId;
+  if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: "id de cuenta inválido" });
+  if (!msgId) return res.status(400).json({ ok: false, error: "falta 'msgId'" });
+  try {
+    const c = await getClient(id);
+    await c.invoke(new Api.messages.DeleteMessages({ id: [Number(msgId)], revoke: b.revoke !== false }));
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ ok: false, error: String((e && e.message) || e) }); }
 });
 

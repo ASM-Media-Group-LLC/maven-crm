@@ -29,13 +29,14 @@ async function sendViaGateway(
   accountId: string,
   to: string,
   text: string,
+  replyTo?: string | null,
 ): Promise<{ ok: boolean; externalId?: string | null; error?: string }> {
   if (!GW_API_KEY) return { ok: false, error: "gateway_not_configured" };
   try {
     const resp = await fetch(`${GW_URL}/message/sendText/${accountId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
-      body: JSON.stringify({ to, text }),
+      body: JSON.stringify({ to, text, replyTo: replyTo ?? undefined }),
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || (data as any)?.ok === false) {
@@ -71,11 +72,20 @@ serve(async (req) => {
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   // ── Input ────────────────────────────────────────────────────────────────
-  let payload: { conversation_id?: string; body?: string } = {};
+  let payload: { conversation_id?: string; body?: string; reply_to_message_id?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const conversationId = payload.conversation_id;
   const text = (payload.body ?? "").trim();
+  const replyToMessageId = payload.reply_to_message_id || null;
   if (!conversationId || !text) return json({ ok: false, error: "missing_conversation_or_body" }, 400);
+
+  // Cita: resolvemos el id nativo (external_id) del mensaje citado para pasárselo al gateway.
+  let replyToExternalId: string | null = null;
+  if (replyToMessageId) {
+    const { data: q } = await (sb as any)
+      .from("tg_messages").select("external_id").eq("id", replyToMessageId).maybeSingle();
+    replyToExternalId = (q?.external_id as string | undefined) ?? null;
+  }
 
   // ── Resolver conversación → account_id + peer ───────────────────────────────
   const { data: conv } = await (sb as any)
@@ -98,7 +108,7 @@ serve(async (req) => {
   if (!to) return json({ ok: false, error: "peer_unresolved" }, 422);
 
   // ── Enviar por el gateway ───────────────────────────────────────────────────
-  const sent = await sendViaGateway(conv.account_id as string, to, text);
+  const sent = await sendViaGateway(conv.account_id as string, to, text, replyToExternalId);
   const nowIso = new Date().toISOString();
 
   if (!sent.ok) {
@@ -107,6 +117,7 @@ serve(async (req) => {
       tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
       external_id: null, sender_id: null, sender_user_id: userId, body: text, msg_type: "text",
       status: "failed", sent_at: nowIso,
+      reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
     });
     await sb.from("tg_conversations")
       .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
@@ -128,6 +139,8 @@ serve(async (req) => {
       msg_type: "text",
       status: "sent",
       sent_at: nowIso,
+      reply_to_message_id: replyToMessageId,
+      reply_to_external_id: replyToExternalId,
     })
     .select("id")
     .single();

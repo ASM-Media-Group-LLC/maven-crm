@@ -119,6 +119,33 @@ serve(async (req) => {
     }
   }
 
+  const externalId = message.id != null ? String(message.id) : null;
+
+  // 1b) Media entrante: el gateway la manda en base64 (mediaB64/mediaMime/mediaName). La
+  //     subimos al bucket público tg-media y guardamos su URL → la bandeja la renderiza.
+  let mediaUrl: string | null = message.mediaUrl ?? null;
+  if (!mediaUrl && message.mediaB64 && externalId) {
+    try {
+      const bytes = Uint8Array.from(atob(String(message.mediaB64)), (ch) => ch.charCodeAt(0));
+      const path = `${conversationId}/${externalId}_${message.mediaName || "media.bin"}`;
+      const { error: upErr } = await sb.storage.from("tg-media").upload(path, bytes, {
+        contentType: message.mediaMime || "application/octet-stream",
+        upsert: true,
+      });
+      if (!upErr) mediaUrl = sb.storage.from("tg-media").getPublicUrl(path).data.publicUrl;
+      else console.warn("tg-media upload:", upErr.message);
+    } catch (e) { console.warn("tg-media decode/upload:", (e as Error).message); }
+  }
+
+  // 1c) Cita entrante: resolver el id nativo del mensaje citado → nuestra fila (si la tenemos).
+  const replyExt = message.replyToExternalId != null ? String(message.replyToExternalId) : null;
+  let replyToMessageId: string | null = null;
+  if (replyExt) {
+    const { data: q } = await sb.from("tg_messages")
+      .select("id").eq("conversation_id", conversationId).eq("external_id", replyExt).maybeSingle();
+    replyToMessageId = (q?.id as string | undefined) ?? null;
+  }
+
   // 2) insert idempotente del mensaje por (conversation_id, external_id).
   const { error: mErr } = await sb
     .from("tg_messages")
@@ -127,11 +154,13 @@ serve(async (req) => {
         tenant_id: TENANT_ID,
         conversation_id: conversationId,
         direction,
-        external_id: message.id != null ? String(message.id) : null,
+        external_id: externalId,
         sender_id: message.senderId != null ? String(message.senderId) : null,
         body: message.text ?? null,
         msg_type: message.type ?? "text",
-        media_url: message.mediaUrl ?? null,
+        media_url: mediaUrl,
+        reply_to_external_id: replyExt,
+        reply_to_message_id: replyToMessageId,
         sent_at: sentAt,
       },
       { onConflict: "conversation_id,external_id", ignoreDuplicates: true },

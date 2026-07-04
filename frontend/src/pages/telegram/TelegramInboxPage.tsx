@@ -1,7 +1,8 @@
-// Bandeja de Telegram — LECTURA (S3.1) + RESPONDER (S3.2) + asignación (S4). Layout calcado
-// de la bandeja de WhatsApp (pages/inbox/InboxPage.tsx) — filas redondeadas SIN líneas, chips
-// de filtro por canal arriba, etiqueta de canal por fila, hora fecha+hora — con la identidad
-// CELESTE de Telegram (gradiente #4bc0f0→#2b8fd8 en acentos).
+// Bandeja de Telegram — LECTURA + RESPONDER + asignación + INTERACCIONES (citar, reaccionar,
+// borrar) + MEDIA (enviar imagen/video/audio/voz/GIF/sticker y renderizar la entrante). Layout
+// calcado de la bandeja de WhatsApp (pages/inbox/InboxPage.tsx) con la identidad CELESTE de
+// Telegram (gradiente #4bc0f0→#2b8fd8). Reusa los componentes de WhatsApp: GifPicker,
+// StickerPicker, AudioRecorderBar y MediaLightbox.
 //
 // Seguridad: RLS por dueño + peer_phone REVOCADO → columnas explícitas (nunca *).
 // REALTIME: esta página solo escucha tg_conversations; los INSERT de tg_messages los maneja
@@ -18,8 +19,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
-import { ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign, UserCheck, Search } from "lucide-react";
+import {
+  ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign, UserCheck, Search,
+  Reply, Trash2, Smile, Mic, Maximize2, X as XIcon, FileText,
+} from "lucide-react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { GifPicker } from "@/pages/inbox/GifPicker";
+import { StickerPicker } from "@/pages/inbox/StickerPicker";
+import { AudioRecorderBar } from "@/pages/inbox/AudioRecorder";
+import { MediaLightbox, type LightboxItem } from "@/pages/inbox/MediaLightbox";
 import { usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -63,9 +71,21 @@ const fmtTime = (iso: string | null): string => {
   } catch { return ""; }
 };
 
+// Reacciones rápidas (mismas que WhatsApp).
+const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥"];
+// kind (lo que mandamos) → msg_type (lo que renderizamos), para el optimista.
+const MSG_TYPE_BY_KIND: Record<string, string> = {
+  image: "photo", video: "video", audio: "audio", voice: "voice", gif: "gif", sticker: "sticker", document: "document",
+};
+const kindForMime = (mime: string) =>
+  mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "document";
+const isImageType = (t: string) => t === "photo" || t === "image" || t === "sticker";
+
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
 const CONV_COLS =
   "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, created_at";
+const MSG_COLS =
+  "id, direction, body, msg_type, media_url, sent_at, status, sender_user_id, reply_to_message_id, reply_to_external_id, reaction, deleted_at";
 
 interface TgConv {
   id: string; account_id: string; peer_id: string;
@@ -78,6 +98,8 @@ interface TgMsg {
   id: string; direction: "in" | "out"; body: string | null;
   msg_type: string; media_url: string | null; sent_at: string | null; status: string | null;
   sender_user_id: string | null; // closer (usuario Maven) que mandó el saliente; null si entrante
+  reply_to_message_id: string | null; reply_to_external_id: string | null;
+  reaction: string | null; deleted_at: string | null;
 }
 
 const peerLabel = (c: TgConv) =>
@@ -99,6 +121,9 @@ const TelegramInboxPage = () => {
   const [channelFilter, setChannelFilter] = useState<string | null>(null); // account_id activo (null = todos)
   const [draft, setDraft] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<TgMsg | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [viewer, setViewer] = useState<{ items: LightboxItem[]; index: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [tgEmojis, setTgEmojis] = usePersistedEmojis("telegram", user?.id);
   const { canAccess } = usePermissions();
@@ -165,7 +190,7 @@ const TelegramInboxPage = () => {
       if (!selectedId) return [] as TgMsg[];
       const { data, error } = await (supabase as any)
         .from("tg_messages")
-        .select("id, direction, body, msg_type, media_url, sent_at, status, sender_user_id")
+        .select(MSG_COLS)
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -204,6 +229,8 @@ const TelegramInboxPage = () => {
   // Marcar leído al abrir (RPC; el cliente no puede UPDATE directo).
   useEffect(() => {
     if (!selectedId) return;
+    setReplyingTo(null);
+    setRecording(false);
     (supabase as any).rpc("tg_mark_read", { p_conversation_id: selectedId }).then(() => {
       qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
       qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
@@ -240,43 +267,110 @@ const TelegramInboxPage = () => {
     );
   }, [allConversations, search, chatFilter, channelFilter]);
 
-  // Envío (S3.2): responder por el gateway vía tg-inbox-send. onSend del ChatComposer:
-  // si throwea, conserva el texto. Solo texto por ahora.
-  const composerSend = async (text: string, files: File[]) => {
-    if (files.length) toast({ title: "Solo texto por ahora", description: "Adjuntar media a Telegram llega en un próximo slice." });
-    const body = text.trim();
-    if (!body || !selectedId) throw new Error("empty");
+  const invalidateThread = () => {
+    qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] });
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+  };
+  const isOptimistic = (id: string) => id.startsWith("optimistic-");
+  const canActOn = (m: TgMsg) => !isOptimistic(m.id) && !m.deleted_at;
+
+  // Sube un archivo/blob al bucket público tg-media y devuelve su URL (o null).
+  const uploadToTg = async (file: File | Blob, name: string): Promise<string | null> => {
+    if (!selectedId) return null;
+    const path = `out/${selectedId}/${Date.now()}_${name}`;
+    const { error } = await supabase.storage.from("tg-media").upload(path, file, {
+      contentType: (file as File).type || "application/octet-stream", upsert: true,
+    });
+    if (error) { toast({ title: "No se pudo subir el archivo", description: error.message, variant: "destructive" }); return null; }
+    return supabase.storage.from("tg-media").getPublicUrl(path).data.publicUrl;
+  };
+
+  // Enviar MEDIA (optimista + fire-and-reconcile, como el texto).
+  const sendMediaUrl = (url: string, kind: string, opts: { caption?: string; fileName?: string; replyTo?: string | null } = {}) => {
     const convId = selectedId;
-
-    // OPTIMISTA (igual que WhatsApp): pintamos la burbuja saliente YA y dejamos que el input se
-    // limpie al instante; el envío real por el gateway (MTProto, ~1-3s) corre por detrás y se
-    // reconcilia al terminar. Antes se AWAITeaba todo el round-trip → el composer se "freezeaba".
-    const optimisticId = "optimistic-" + Date.now();
-    qc.setQueryData<TgMsg[]>(["tg-inbox-messages", convId], (old = []) => [
-      ...old,
-      { id: optimisticId, direction: "out", body, msg_type: "text", media_url: null,
-        sent_at: new Date().toISOString(), status: "sent", sender_user_id: user?.id ?? null },
-    ]);
-
-    // Fire-and-reconcile: NO await (así doSend del ChatComposer resuelve ya y limpia el input).
-    void supabase.functions.invoke("tg-inbox-send", { body: { conversation_id: convId, body } })
+    if (!convId || !url) return;
+    const msgType = MSG_TYPE_BY_KIND[kind] ?? "document";
+    const optimisticId = "optimistic-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    qc.setQueryData<TgMsg[]>(["tg-inbox-messages", convId], (old = []) => [...old, {
+      id: optimisticId, direction: "out", body: opts.caption ?? null, msg_type: msgType, media_url: url,
+      sent_at: new Date().toISOString(), status: "sent", sender_user_id: user?.id ?? null,
+      reply_to_message_id: opts.replyTo ?? null, reply_to_external_id: null, reaction: null, deleted_at: null,
+    }]);
+    void supabase.functions.invoke("tg-inbox-send-media", {
+      body: { conversation_id: convId, url, kind, caption: opts.caption, file_name: opts.fileName, reply_to_message_id: opts.replyTo },
+    })
       .then(({ data, error }) => {
         const res = data as { ok?: boolean; error?: string; reason?: string } | null;
-        if (error || !res?.ok) {
-          toast({
-            title: "No se pudo enviar",
-            description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
-            variant: "destructive",
-          });
-        }
+        if (error || !res?.ok) toast({
+          title: "No se pudo enviar",
+          description: res?.reason === "send_failed" ? "El gateway no pudo entregar el archivo." : (res?.error || error?.message || "Error"),
+          variant: "destructive",
+        });
       })
       .catch((e) => toast({ title: "No se pudo enviar", description: (e as Error).message, variant: "destructive" }))
-      // Reconciliar contra la BD (reemplaza el optimista por la fila real 'sent', o muestra la
-      // 'failed' que insertó el edge; en errores sin fila, quita el optimista).
-      .finally(() => {
-        qc.invalidateQueries({ queryKey: ["tg-inbox-messages", convId] });
-        qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
-      });
+      .finally(invalidateThread);
+  };
+
+  // Envío del composer: texto (optimista) o adjuntos (subir + enviar como media). Con cita.
+  const composerSend = async (text: string, files: File[]) => {
+    const convId = selectedId;
+    if (!convId) throw new Error("no_conv");
+    const replyId = replyingTo && !isOptimistic(replyingTo.id) ? replyingTo.id : null;
+    const body = text.trim();
+
+    if (files.length) {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const url = await uploadToTg(f, f.name || "archivo");
+        if (!url) throw new Error("upload_failed"); // ChatComposer conserva texto/adjuntos
+        sendMediaUrl(url, kindForMime(f.type), { caption: i === 0 && body ? body : undefined, fileName: f.name, replyTo: replyId });
+      }
+      setReplyingTo(null);
+      return;
+    }
+
+    if (!body) throw new Error("empty");
+    const optimisticId = "optimistic-" + Date.now();
+    qc.setQueryData<TgMsg[]>(["tg-inbox-messages", convId], (old = []) => [...old, {
+      id: optimisticId, direction: "out", body, msg_type: "text", media_url: null,
+      sent_at: new Date().toISOString(), status: "sent", sender_user_id: user?.id ?? null,
+      reply_to_message_id: replyId, reply_to_external_id: null, reaction: null, deleted_at: null,
+    }]);
+    void supabase.functions.invoke("tg-inbox-send", { body: { conversation_id: convId, body, reply_to_message_id: replyId } })
+      .then(({ data, error }) => {
+        const res = data as { ok?: boolean; error?: string; reason?: string } | null;
+        if (error || !res?.ok) toast({
+          title: "No se pudo enviar",
+          description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
+          variant: "destructive",
+        });
+      })
+      .catch((e) => toast({ title: "No se pudo enviar", description: (e as Error).message, variant: "destructive" }))
+      .finally(invalidateThread);
+    setReplyingTo(null);
+  };
+
+  const reactTo = (m: TgMsg, emoji: string) => {
+    if (!canActOn(m)) return;
+    void supabase.functions.invoke("tg-inbox-action", { body: { message_id: m.id, action: "react", emoji } })
+      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: "No se pudo reaccionar", description: res?.error || error?.message || "Error", variant: "destructive" }); })
+      .finally(() => qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] }));
+  };
+  const deleteMsg = (m: TgMsg) => {
+    if (!canActOn(m)) return;
+    void supabase.functions.invoke("tg-inbox-action", { body: { message_id: m.id, action: "delete" } })
+      .then(({ data, error }) => { const res = data as any; if (error || !res?.ok) toast({ title: "No se pudo borrar", description: res?.error || error?.message || "Error", variant: "destructive" }); })
+      .finally(() => qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] }));
+  };
+
+  // Visor de media (foto/video/gif) — reusa el lightbox de WhatsApp.
+  const openViewer = (clickedId: string) => {
+    const items: LightboxItem[] = messages
+      .filter((mm) => mm.media_url && !mm.deleted_at && (isImageType(mm.msg_type) || mm.msg_type === "video" || mm.msg_type === "gif") && mm.msg_type !== "sticker")
+      .map((mm) => ({ id: mm.id, url: mm.media_url as string, type: (mm.msg_type === "video" || mm.msg_type === "gif" ? "video" : "image") as "image" | "video" }));
+    if (!items.length) return;
+    const index = Math.max(0, items.findIndex((it) => it.id === clickedId));
+    setViewer({ items, index });
   };
 
   const showChannelChip = !channelFilter && channels.length > 1;
@@ -478,30 +572,113 @@ const TelegramInboxPage = () => {
                     messages.map((m) => {
                       const isOut = m.direction === "out";
                       const failed = isOut && m.status === "failed";
-                      // Etiqueta "quién lo mandó" en CADA saliente con emisor conocido (mensajes viejos
-                      // o enviados desde el propio teléfono no tienen sender_user_id → sin nombre, es correcto).
-                      const showSender = isOut && !!m.sender_user_id;
+                      const deleted = !!m.deleted_at;
+                      // Etiqueta "quién lo mandó" en CADA saliente con emisor conocido.
+                      const showSender = isOut && !!m.sender_user_id && !deleted;
+                      const quoted = m.reply_to_message_id ? messages.find((x) => x.id === m.reply_to_message_id) : null;
+                      const hasQuote = !deleted && (!!m.reply_to_message_id || !!m.reply_to_external_id);
+                      const mediaShown = !deleted && !!m.media_url;
                       return (
                         <div key={m.id} className={cn("flex", isOut ? "justify-end" : "justify-start")}>
-                          <div className={cn(
-                            "max-w-[75%] px-3 py-1.5 text-sm shadow-sm",
-                            isOut
-                              ? failed ? "rounded-2xl rounded-br-md bg-destructive/80 text-white" : cn("rounded-2xl rounded-br-md text-white", TG_GRAD)
-                              : "rounded-2xl rounded-bl-md border bg-card",
-                          )}>
-                            {showSender && (
-                              <div className="mb-0.5 text-[11px] font-semibold text-white/85">
-                                {firstName(m.sender_user_id)}
+                          <div className={cn("group flex max-w-[85%] items-center gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
+                            <div className={cn(
+                              "min-w-0 max-w-full px-3 py-1.5 text-sm shadow-sm",
+                              deleted
+                                ? "rounded-2xl border bg-muted text-muted-foreground"
+                                : isOut
+                                  ? failed ? "rounded-2xl rounded-br-md bg-destructive/80 text-white" : cn("rounded-2xl rounded-br-md text-white", TG_GRAD)
+                                  : "rounded-2xl rounded-bl-md border bg-card",
+                            )}>
+                              {showSender && (
+                                <div className="mb-0.5 text-[11px] font-semibold text-white/85">{firstName(m.sender_user_id)}</div>
+                              )}
+
+                              {hasQuote && (
+                                <div className={cn("mb-1 rounded border-l-2 px-2 py-1 text-xs", isOut ? "border-white/50 bg-black/10" : "border-sky-400 bg-muted/60")}>
+                                  <p className="truncate opacity-80">{quoted ? (quoted.body || `[${quoted.msg_type}]`) : "Mensaje citado"}</p>
+                                </div>
+                              )}
+
+                              {mediaShown && isImageType(m.msg_type) && (
+                                <img
+                                  src={m.media_url as string}
+                                  alt=""
+                                  onClick={m.msg_type !== "sticker" ? () => openViewer(m.id) : undefined}
+                                  className={cn("mb-1 rounded-lg object-cover", m.msg_type === "sticker" ? "max-h-28" : "max-h-64 cursor-zoom-in")}
+                                />
+                              )}
+                              {mediaShown && (m.msg_type === "video" || m.msg_type === "gif") && (
+                                <div className="relative mb-1">
+                                  {m.msg_type === "gif"
+                                    ? <video src={m.media_url as string} autoPlay loop muted playsInline className="max-h-64 rounded-lg" />
+                                    : <video src={m.media_url as string} controls className="max-h-64 rounded-lg" />}
+                                  {m.msg_type === "video" && (
+                                    <button type="button" onClick={() => openViewer(m.id)} title="Ver en grande"
+                                      className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white transition hover:bg-black/80">
+                                      <Maximize2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {mediaShown && (m.msg_type === "voice" || m.msg_type === "audio") && (
+                                <audio controls src={m.media_url as string} className="mb-1 w-56 max-w-full" />
+                              )}
+                              {mediaShown && m.msg_type === "document" && (
+                                <a href={m.media_url as string} target="_blank" rel="noreferrer" className="mb-1 flex items-center gap-1.5 underline">
+                                  <FileText className="h-4 w-4" /> Archivo
+                                </a>
+                              )}
+
+                              {deleted ? (
+                                <span className="italic">Mensaje eliminado</span>
+                              ) : m.body ? (
+                                <span className="whitespace-pre-wrap break-words">{m.body}</span>
+                              ) : (!mediaShown && m.msg_type !== "text") ? (
+                                <span className="italic opacity-80">[{m.msg_type}]</span>
+                              ) : null}
+
+                              <span className={cn("ml-2 align-bottom text-[10px] tabular-nums", isOut && !deleted ? "text-white/70" : "text-muted-foreground")}>
+                                {failed ? "no entregado · " : ""}{fmtTime(m.sent_at)}
+                              </span>
+
+                              {!deleted && m.reaction && (
+                                <div className="mt-0.5">
+                                  <span className={cn("inline-block rounded-full px-1.5 py-0.5 text-[13px] leading-none", isOut ? "bg-black/20" : "bg-muted")}>
+                                    {m.reaction}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Acciones al hover: responder · reaccionar · borrar (borrar solo en salientes). */}
+                            {canActOn(m) && (
+                              <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                                <button type="button" onClick={() => setReplyingTo(m)} title="Responder"
+                                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                                  <Reply className="h-4 w-4" />
+                                </button>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button type="button" title="Reaccionar" className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                                      <Smile className="h-4 w-4" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent align="center" className="w-auto p-1">
+                                    <div className="flex gap-0.5">
+                                      {REACTIONS.map((e) => (
+                                        <button key={e} type="button" onClick={() => reactTo(m, e)} className="rounded p-1 text-lg leading-none hover:bg-muted">{e}</button>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {isOut && (
+                                  <button type="button" onClick={() => deleteMsg(m)} title="Eliminar para todos"
+                                    className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
                             )}
-                            {m.msg_type !== "text" && !m.body ? (
-                              <span className="italic opacity-80">[{m.msg_type}]</span>
-                            ) : (
-                              <span className="whitespace-pre-wrap break-words">{m.body}</span>
-                            )}
-                            <span className={cn("ml-2 align-bottom text-[10px] tabular-nums", isOut ? "text-white/70" : "text-muted-foreground")}>
-                              {failed ? "no entregado · " : ""}{fmtTime(m.sent_at)}
-                            </span>
                           </div>
                         </div>
                       );
@@ -511,21 +688,58 @@ const TelegramInboxPage = () => {
                 </div>
               </div>
 
-              {/* Composer unificado (emojis arriba · cajón auto-grow · Enviar celeste del canal). */}
-              <ChatComposer
-                value={draft}
-                onChange={setDraft}
-                onSend={composerSend}
-                placeholder={`Responder a ${peerLabel(selected)}…`}
-                emojis={tgEmojis}
-                onAddEmoji={(e) => setTgEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
-                onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
-                sendButtonClassName={TG_GRAD}
-              />
+              {/* Composer: mientras se graba audio, el recorder toma el lugar del cajón. */}
+              {recording ? (
+                <div className="border-t bg-card p-2">
+                  <AudioRecorderBar
+                    onSend={async (blob) => {
+                      setRecording(false);
+                      const ext = (blob.type.split("/")[1] || "ogg").split(";")[0];
+                      const url = await uploadToTg(blob, `voz_${Date.now()}.${ext}`);
+                      if (url) sendMediaUrl(url, "voice", { fileName: "voz" });
+                    }}
+                    onCancel={() => setRecording(false)}
+                  />
+                </div>
+              ) : (
+                <ChatComposer
+                  value={draft}
+                  onChange={setDraft}
+                  onSend={composerSend}
+                  placeholder={`Responder a ${peerLabel(selected)}…`}
+                  emojis={tgEmojis}
+                  onAddEmoji={(e) => setTgEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+                  onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
+                  sendButtonClassName={TG_GRAD}
+                  replyBar={replyingTo ? (
+                    <div className="flex items-center gap-2 rounded-lg border-l-2 border-sky-400 bg-muted/60 px-2 py-1.5 text-xs">
+                      <Reply className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sky-600 dark:text-sky-400">Respondiendo</div>
+                        <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
+                      </div>
+                      <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Cancelar respuesta">
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : undefined}
+                  toolbarExtra={
+                    <>
+                      <GifPicker onPick={(url) => sendMediaUrl(url, "gif")} />
+                      <StickerPicker onPick={(url) => sendMediaUrl(url, "sticker")} />
+                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground" title="Grabar audio" onClick={() => setRecording(true)}>
+                        <Mic className="h-4 w-4" />
+                      </Button>
+                    </>
+                  }
+                />
+              )}
             </>
           )}
         </section>
       </div>
+
+      {viewer && <MediaLightbox items={viewer.items} index={viewer.index} onClose={() => setViewer(null)} />}
     </div>
   );
 };
