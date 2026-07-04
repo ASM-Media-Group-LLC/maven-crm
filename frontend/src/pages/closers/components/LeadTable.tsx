@@ -359,7 +359,15 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className="inline-flex items-center gap-0.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-muted/50 transition-colors">
+        <button className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-muted/50 transition-colors" title={`${count} de 6 contactos`}>
+          <span className="flex items-center gap-0.5" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 w-1.5 rounded-full ${i < count ? (count >= 6 ? "bg-orange-500" : "bg-sky-500") : "bg-muted-foreground/25"}`}
+              />
+            ))}
+          </span>
           {count}/6 <ChevronDown className="h-3 w-3" />
         </button>
       </PopoverTrigger>
@@ -510,6 +518,41 @@ const relDays = (d: string | null | undefined): string => {
   if (days <= 0) return "hoy";
   if (days === 1) return "ayer";
   return `hace ${days} d`;
+};
+
+// Celda "Seguimiento": la pill de contactos (con puntos de progreso, MISMO popover de
+// registro) + últ/próx + badges Vencido/Decidir/Último intento. Consolida las viejas
+// columnas # Contactos + Último contacto + Alertas. No cambia el flujo: la cadencia
+// (1/3/5/8/15/29 días) y los badges se derivan de passed_date + contact_count como siempre.
+const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
+  const overdue = isContactOverdue(c.passed_date, c.contact_count);
+  const decision = needsContactDecision(c.stage, c.contact_count);
+  const lastAttempt = c.contact_count >= 6;
+  const next = getNextContactDate(c.passed_date, c.contact_count);
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <ContactCountCell creatorId={c.id} count={c.contact_count} />
+      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+        {c.last_contact_date ? `últ ${format(new Date(c.last_contact_date), "dd/MM")}` : "sin contacto"}
+        {next ? ` · próx ${format(next, "dd/MM")}` : ""}
+      </span>
+      {overdue && (
+        <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title="El contacto programado venció">
+          <AlertTriangle className="h-3 w-3" /> Vencido
+        </Badge>
+      )}
+      {decision && (
+        <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
+          <AlertTriangle className="h-3 w-3" /> Decidir
+        </Badge>
+      )}
+      {lastAttempt && !decision && (
+        <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
+          <Clock className="h-3 w-3" /> Último intento
+        </Badge>
+      )}
+    </div>
+  );
 };
 
 // Contacto del lead: WhatsApp + Telegram (mismo patrón/gating), con el MISMO tamaño/padding
@@ -749,35 +792,28 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "confirmadas":
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
-            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
+            <TableHead className={stickyBase}>Contactar</TableHead>
             <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Extras</TableHead>
             <TableHead className={stickyBase}>Plataforma</TableHead>
-              <TableHead className={stickyBase}>Revenue</TableHead>
-              <TableHead className={stickyBase}>OF URL</TableHead>
-              <TableHead className={stickyBase}>Notas</TableHead>
-              <TableHead className={`w-10 ${stickyBase}`}></TableHead>
-              <TableHead className={stickyAction}>Acciones</TableHead>
+            <TableHead className={stickyBase}>Revenue</TableHead>
+            <TableHead className={stickyBase}>Notas</TableHead>
+            <TableHead className={`w-8 ${stickyBase}`}></TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Categoría" sortKey="category" {...sp} />
-            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
             <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Plataformas</TableHead>
             <TableHead className={stickyBase}>Rev. Plat.</TableHead>
-            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -785,12 +821,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "no_interesadas":
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Closer" sortKey="agent_name" {...sp} />
-            <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
-            <TableHead className={stickyBase}>OF URL</TableHead>
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
             <TableHead className={stickyBase}>Motivo</TableHead>
             <TableHead className={stickyBase}>Detalle</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
@@ -800,15 +832,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "antiguos":
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Creado por" sortKey="agent_name" {...sp} />
-            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
-            <SortHeader label="Categoría" sortKey="category" {...sp} />
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
             <SortHeader label="Estado" sortKey="stage" {...sp} />
-            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
-            <TableHead className={stickyBase}>OF URL</TableHead>
+            <TableHead className={stickyBase}>Contactar</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -816,16 +843,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       default: // todas
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
             <SortHeader label="Estado" sortKey="stage" {...sp} />
-            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
-            <SortHeader label="Categoría" sortKey="category" {...sp} />
-            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
-            <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
-            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
-            <TableHead className={stickyBase}>OF URL</TableHead>
+            <SortHeader label="Seguimiento" sortKey="contact_count" {...sp} />
+            <TableHead className={stickyBase}>Contactar</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -936,21 +958,24 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <>
             <TableRow key={c.id}>
-              <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-              <TableCell>{igLink}</TableCell>
-              <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-              <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
-              <TableCell>
+              <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+              <TableCell className="align-top">
+                <div className="flex items-center gap-1.5">{igLink}</div>
+                <div className="text-[10px] text-muted-foreground/70 mt-1">
+                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                </div>
+              </TableCell>
+              <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+              <TableCell className="align-top">
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} disabled={!canEditComisiones} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
                   <SelectTrigger className="h-7 w-28 text-xs">
                     <SelectValue placeholder="Plataforma" />
@@ -960,24 +985,16 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   </SelectContent>
                 </Select>
               </TableCell>
-              <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
-              <TableCell className="text-sm">
-                {c.onlyfans_url ? (
-                  <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                    className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                    <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                  </a>
-                ) : <span className="text-muted-foreground">—</span>}
-              </TableCell>
-              <TableCell>
+              <TableCell className="font-semibold text-sm align-top tabular-nums">${revenue.toLocaleString()}</TableCell>
+              <TableCell className="align-top">
                 <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
                   <ChevronDown className={`h-4 w-4 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                 </Button>
               </TableCell>
-              <TableCell className="text-right sticky right-0 bg-background z-20">
+              <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -995,7 +1012,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableRow>
             {expandedId === c.id && (
               <TableRow>
-                <TableCell colSpan={13} className="bg-muted/30 p-4">
+                <TableCell colSpan={11} className="bg-muted/30 p-4">
                   <PlatformSalesPanel creatorId={c.id} />
                 </TableCell>
               </TableRow>
@@ -1006,17 +1023,25 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "completadas":
         return (
           <TableRow key={c.id}>
-            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell>{igLink}</TableCell>
-            <TableCell>
-              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+            <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+            <TableCell className="align-top">
+              <div className="flex items-center gap-1.5">{igLink}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
+                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                </span>
+                {c.onlyfans_url && (
+                  <a href={c.onlyfans_url.startsWith("http") ? c.onlyfans_url : `https://onlyfans.com/${c.onlyfans_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                    <ExternalLink className="h-3 w-3" /> OF
+                  </a>
+                )}
+              </div>
             </TableCell>
-            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} /></TableCell>
-            <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} /></TableCell>
+            <TableCell className="align-top"><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} /></TableCell>
+            <TableCell className="align-top"><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} /></TableCell>
             <TableCell
-              className="cursor-pointer hover:bg-muted/50 rounded"
+              className="cursor-pointer hover:bg-muted/50 rounded align-top"
               onClick={() => setPlatformModalId(c.id)}
             >
               <div className="flex flex-wrap gap-1">
@@ -1034,21 +1059,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
-            <TableCell className="text-sm font-medium">
+            <TableCell className="text-sm font-medium align-top tabular-nums">
               ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
             </TableCell>
-            <TableCell className="text-sm">
-              {c.onlyfans_url ? (
-                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
-            <TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
-            <TableCell className="text-right sticky right-0 bg-background z-20">
+            <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -1077,28 +1094,26 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "no_interesadas":
         return (
           <TableRow key={c.id}>
-            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell>{igLink}</TableCell>
-            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
+            <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+            <TableCell className="align-top">
+              <div className="flex items-center gap-1.5">{igLink}</div>
+              <div className="flex items-center gap-x-1.5 gap-y-0.5 mt-1 flex-wrap text-[10px] text-muted-foreground/70">
+                <span>{c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}</span>
+                {c.last_contact_date && <span>· últ contacto {format(new Date(c.last_contact_date), "dd/MM")}</span>}
+                {c.onlyfans_url && (
+                  <a href={c.onlyfans_url.startsWith("http") ? c.onlyfans_url : `https://onlyfans.com/${c.onlyfans_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                    <ExternalLink className="h-3 w-3" /> OF
+                  </a>
+                )}
+              </div>
             </TableCell>
-            <TableCell className="text-sm">
-              {c.onlyfans_url ? (
-                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
-            <TableCell>
+            <TableCell className="align-top">
               <InlineCloseReasonSelect value={c.close_reason_code} onSave={(v) => onFieldChange(c.id, "close_reason_code", v)} />
             </TableCell>
-            <TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} emptyLabel="Motivo" />
             </TableCell>
-            <TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
           </TableRow>
@@ -1108,32 +1123,25 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "antiguos":
         return (
           <TableRow key={c.id}>
-            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell>{igLink}</TableCell>
-            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell>
-              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+            <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+            <TableCell className="align-top">
+              <div className="flex items-center gap-1.5">{igLink}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
+                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                </span>
+              </div>
             </TableCell>
-            <TableCell>
-              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-            </TableCell>
-            <TableCell>
+            <TableCell className="align-top">
               <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
-            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
-            <TableCell className="text-sm">
-              {c.onlyfans_url ? (
-                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
-            <TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
-            <TableCell className="text-right sticky right-0 bg-background z-20">
+            <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -1165,35 +1173,26 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       default: // todas
         return (
           <TableRow key={c.id}>
-            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell>{igLink}</TableCell>
-            <TableCell>
+            <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+            <TableCell className="align-top">
+              <div className="flex items-center gap-1.5">{igLink}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
+                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="align-top">
               <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v, c._source)} disabled={!canEditStatus} />
             </TableCell>
-            <TableCell>
-              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
-            </TableCell>
-            <TableCell>
-              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-            </TableCell>
-            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
-            <TableCell>
-              <ContactCountCell creatorId={c.id} count={c.contact_count} />
-            </TableCell>
-            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
-            <TableCell className="text-sm">
-              {c.onlyfans_url ? (
-                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
-            <TableCell>
+            <TableCell className="align-top"><SeguimientoCell c={c} /></TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
-            <TableCell className="text-right sticky right-0 bg-background z-20">
+            <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1224,7 +1223,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
   return (
     <>
-      <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="min-w-[1000px]">
+      <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="min-w-[760px]">
         <TableHeader>
           {renderHeaders()}
         </TableHeader>
