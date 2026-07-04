@@ -74,6 +74,7 @@ interface MsgRow {
   sent_at: string;
   status: string | null;
   deleted_at: string | null;
+  sender_user_id: string | null; // closer (usuario Maven) que mandó el saliente; null si entrante o bot
 }
 
 // Palomitas de WhatsApp para los mensajes SALIENTES según el estado de entrega:
@@ -269,7 +270,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status, deleted_at")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status, deleted_at, sender_user_id")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -290,6 +291,14 @@ const InboxPage = () => {
     refetchOnWindowFocus: false,
   });
   const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
+  // Nombre corto del closer que mandó un saliente (para etiquetar burbujas en líneas compartidas).
+  const firstName = (id: string | null) => { const n = userName(id); return n ? n.split(/\s+/)[0] : null; };
+  // Solo etiquetamos el emisor cuando el hilo tuvo ≥2 closers distintos (línea compartida): en un
+  // 1-a-1 el header ya dice quién la maneja, así no metemos ruido en cada burbuja.
+  const showSenderLabels = useMemo(
+    () => new Set(messages.filter((mm) => mm.direction === "out" && mm.sender_user_id).map((mm) => mm.sender_user_id)).size > 1,
+    [messages],
+  );
 
   // Canales (id→label) para el panel de info + el filtro por canal de la bandeja.
   const { data: channels = [] } = useQuery({
@@ -530,7 +539,7 @@ const InboxPage = () => {
     const optimisticId = "optimistic-" + Date.now();
     qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) => [
       ...old,
-      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, agent_reaction: null, reply_to_message_id: replyTo?.id ?? null, sent_at: new Date().toISOString(), status: "sent" },
+      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, agent_reaction: null, reply_to_message_id: replyTo?.id ?? null, sent_at: new Date().toISOString(), status: "sent", sender_user_id: user?.id ?? null },
     ]);
 
     setSending(true);
@@ -1055,7 +1064,7 @@ const InboxPage = () => {
                 <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {messages.map((m) => {
+                  {messages.map((m, i) => {
                     const isOut = m.direction === "out";
                     const isDeleted = !!m.deleted_at;
                     const mediaShown = !!m.media_url && ["image", "sticker", "video", "audio", "document"].includes(m.msg_type);
@@ -1064,6 +1073,11 @@ const InboxPage = () => {
                     const quoted = m.reply_to_message_id
                       ? messages.find((x) => x.id === m.reply_to_message_id) ?? null
                       : null;
+                    // Etiqueta "quién lo mandó" en salientes de líneas compartidas: solo si cambió
+                    // el emisor respecto al saliente anterior (colapsa consecutivos, estilo grupo).
+                    const prev = i > 0 ? messages[i - 1] : null;
+                    const showSender = showSenderLabels && isOut && !isDeleted && !!m.sender_user_id &&
+                      (!prev || prev.direction !== "out" || prev.sender_user_id !== m.sender_user_id);
                     return (
                       <div key={m.id} className={cn("group flex flex-col", isOut ? "items-end" : "items-start")}>
                         <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
@@ -1076,6 +1090,11 @@ const InboxPage = () => {
                               m.agent_reaction && "mb-2",
                             )}
                           >
+                            {showSender && (
+                              <div className="mb-0.5 text-[11px] font-semibold text-white/85">
+                                {firstName(m.sender_user_id)}
+                              </div>
+                            )}
                             {m.reply_to_message_id && (
                               <div
                                 className={cn(

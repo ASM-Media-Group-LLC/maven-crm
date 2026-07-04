@@ -105,7 +105,7 @@ serve(async (req) => {
     // Registramos el intento como FALLIDO (queda en rojo en el hilo) + aviso claro.
     await sb.from("tg_messages").insert({
       tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
-      external_id: null, sender_id: null, body: text, msg_type: "text",
+      external_id: null, sender_id: null, sender_user_id: userId, body: text, msg_type: "text",
       status: "failed", sent_at: nowIso,
     });
     await sb.from("tg_conversations")
@@ -123,6 +123,7 @@ serve(async (req) => {
       direction: "out",
       external_id: sent.externalId ?? null,
       sender_id: null,
+      sender_user_id: userId,
       body: text,
       msg_type: "text",
       status: "sent",

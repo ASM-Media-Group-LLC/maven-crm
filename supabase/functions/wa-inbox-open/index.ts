@@ -1,5 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { whatsappCors } from "../_shared/whatsapp.ts";
+
+// CORS inline (antes venía de ../_shared/whatsapp.ts). Se inlinea para que esta función sea
+// self-contained y se pueda desplegar como archivo único (idéntico comportamiento).
+const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? "https://maven.asmtech.ai";
+const whatsappCors = {
+  "Access-Control-Allow-Origin": CORS_ALLOW_ORIGIN,
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
+  "Vary": "Origin",
+};
 
 // wa-inbox-open — Closers: abre (o crea) la conversación del inbox con un lead en
 // un canal dado, para que el closer le escriba desde Maven. Devuelve conversation_id
@@ -161,6 +170,28 @@ Deno.serve(async (req) => {
       if (sc.country_code && sc.phone) e164 = joinCc(sc.country_code, sc.phone);
       else if (sc.phone) e164 = cleanE164(sc.phone);
       displayName = displayName || sc.name || sc.handle || null;
+    }
+  }
+
+  // Auto-tomar (desde Contactos): si el contacto YA es un lead del pipeline SIN dueño, se te
+  // asigna (como "Tomar") y queda ligado (wa_contacts.closer_creator_id) para registrar el
+  // contacto. Si ya es tuyo, se liga. Si es de otro closer, no se toca. Si no hay lead, no se
+  // crea (queda como contacto suelto). leadOwner=vos hace que la conversación quede tuya.
+  if (!leadIdForContact && payload.contact_id) {
+    const { data: leadRows } = await (sb as any)
+      .from("closer_creators").select("id, assigned_to").eq("source_contact_id", payload.contact_id).limit(1);
+    const lead = leadRows && leadRows[0];
+    if (lead) {
+      if (!lead.assigned_to) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: claimed } = await (sb as any).from("closer_creators")
+          .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
+          .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
+        if (claimed) { leadIdForContact = lead.id; leadOwner = userId; }
+      } else if (lead.assigned_to === userId) {
+        leadIdForContact = lead.id; leadOwner = userId;
+      }
+      // de otro closer → no tocar
     }
   }
 

@@ -76,6 +76,9 @@ serve(async (req) => {
   const closerCreatorId = payload.closer_creator_id ?? null;
   const reqAccountId = payload.account_id ?? null; // línea desde la que se abre (opcional)
   let displayName = payload.name ?? null;
+  // Lead del pipeline a ligar en la conversación (para el auto-registro de contacto).
+  // Desde la tabla de Closers viene explícito; desde Contactos se resuelve/auto-toma abajo.
+  let leadIdForConv: string | null = closerCreatorId;
 
   // ── Destino: contactar por TELÉFONO PERSONAL (como WhatsApp), NO por telegram_handle. ──
   let to = payload.telegram_username ? cleanHandle(payload.telegram_username) : "";
@@ -136,6 +139,27 @@ serve(async (req) => {
     }
   }
 
+  // ── Auto-tomar (desde Contactos): si el contacto YA es un lead del pipeline SIN dueño, se
+  //    te asigna (como "Tomar") y queda ligado para registrar el contacto. Si ya es tuyo, se
+  //    liga. Si es de otro closer, no se toca. Si no hay lead, no se crea (contacto suelto). ──
+  if (!leadIdForConv && contactId) {
+    const { data: leadRows } = await (sb as any)
+      .from("closer_creators").select("id, assigned_to").eq("source_contact_id", contactId).limit(1);
+    const lead = leadRows && leadRows[0];
+    if (lead) {
+      if (!lead.assigned_to) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: claimed } = await (sb as any).from("closer_creators")
+          .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
+          .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
+        if (claimed) leadIdForConv = lead.id;          // lo tomaste vos
+      } else if (lead.assigned_to === userId) {
+        leadIdForConv = lead.id;                        // ya es tuyo → ligar para registrar
+      }
+      // de otro closer → no tocar (no ligar, no reclamar)
+    }
+  }
+
   if (!to) {
     return json({ ok: false, error: "Este contacto no tiene teléfono (ni usuario de Telegram) cargado." }, 200);
   }
@@ -168,7 +192,7 @@ serve(async (req) => {
   // ── find-or-create tg_conversations (account_id, peer_id) ───────────────────────
   const { data: existing } = await (sb as any)
     .from("tg_conversations")
-    .select("id, assigned_to, creator_id")
+    .select("id, assigned_to, creator_id, closer_creator_id")
     .eq("account_id", accountId)
     .eq("peer_id", peerId)
     .maybeSingle();
@@ -176,6 +200,7 @@ serve(async (req) => {
   if (existing) {
     const patch: Record<string, unknown> = {};
     if (creatorId && !existing.creator_id) patch.creator_id = creatorId;
+    if (leadIdForConv && !existing.closer_creator_id) patch.closer_creator_id = leadIdForConv; // liga el lead → habilita auto-registro
     if (!existing.assigned_to) patch.assigned_to = userId; // asignar al que abre → la ve por RLS
     if (peerName) patch.peer_name = peerName;
     if (peerUsername) patch.peer_username = peerUsername;
@@ -194,6 +219,7 @@ serve(async (req) => {
       peer_phone: resolved.phone ?? null,
       creator_id: creatorId,
       contact_id: contactId,
+      closer_creator_id: leadIdForConv,
       assigned_to: userId,
       status: "open",
     })

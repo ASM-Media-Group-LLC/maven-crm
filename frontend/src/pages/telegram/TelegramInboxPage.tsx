@@ -77,6 +77,7 @@ interface TgConv {
 interface TgMsg {
   id: string; direction: "in" | "out"; body: string | null;
   msg_type: string; media_url: string | null; sent_at: string | null; status: string | null;
+  sender_user_id: string | null; // closer (usuario Maven) que mandó el saliente; null si entrante
 }
 
 const peerLabel = (c: TgConv) =>
@@ -164,7 +165,7 @@ const TelegramInboxPage = () => {
       if (!selectedId) return [] as TgMsg[];
       const { data, error } = await (supabase as any)
         .from("tg_messages")
-        .select("id, direction, body, msg_type, media_url, sent_at, status")
+        .select("id, direction, body, msg_type, media_url, sent_at, status, sender_user_id")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -186,6 +187,14 @@ const TelegramInboxPage = () => {
     refetchOnWindowFocus: false,
   });
   const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
+  // Nombre corto del closer que mandó un saliente (para etiquetar burbujas en líneas compartidas).
+  const firstName = (id: string | null) => { const n = userName(id); return n ? n.split(/\s+/)[0] : null; };
+  // Solo etiquetamos el emisor cuando el hilo tuvo ≥2 closers distintos (línea compartida): en un
+  // 1-a-1 el header ya dice quién la maneja, así no metemos ruido en cada burbuja.
+  const showSenderLabels = useMemo(
+    () => new Set(messages.filter((mm) => mm.direction === "out" && mm.sender_user_id).map((mm) => mm.sender_user_id)).size > 1,
+    [messages],
+  );
 
   const assignConversation = async (userId: string | null) => {
     if (!selectedId) return;
@@ -453,9 +462,14 @@ const TelegramInboxPage = () => {
                   ) : messages.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
                   ) : (
-                    messages.map((m) => {
+                    messages.map((m, i) => {
                       const isOut = m.direction === "out";
                       const failed = isOut && m.status === "failed";
+                      // Etiqueta "quién lo mandó" en salientes de líneas compartidas: solo si cambió
+                      // el emisor respecto al saliente anterior (colapsa consecutivos, estilo grupo).
+                      const prev = i > 0 ? messages[i - 1] : null;
+                      const showSender = showSenderLabels && isOut && !!m.sender_user_id &&
+                        (!prev || prev.direction !== "out" || prev.sender_user_id !== m.sender_user_id);
                       return (
                         <div key={m.id} className={cn("flex", isOut ? "justify-end" : "justify-start")}>
                           <div className={cn(
@@ -464,6 +478,11 @@ const TelegramInboxPage = () => {
                               ? failed ? "rounded-2xl rounded-br-md bg-destructive/80 text-white" : cn("rounded-2xl rounded-br-md text-white", TG_GRAD)
                               : "rounded-2xl rounded-bl-md border bg-card",
                           )}>
+                            {showSender && (
+                              <div className="mb-0.5 text-[11px] font-semibold text-white/85">
+                                {firstName(m.sender_user_id)}
+                              </div>
+                            )}
                             {m.msg_type !== "text" && !m.body ? (
                               <span className="italic opacity-80">[{m.msg_type}]</span>
                             ) : (
