@@ -120,15 +120,19 @@ serve(async (req) => {
           return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
         }
       }
-      // Teléfono: preferimos el del contacto origen (closers_contacts.country_code es la
-      // fuente confiable) si el del lead viene sin país (≤10 díg) o falta.
+      // El contacto origen (closers_contacts) es la FUENTE CONFIABLE: país EXPLÍCITO (country_code)
+      // + teléfono normalizado. closer_creators.phone suele venir NACIONAL sin país → quedaría mal
+      // (p.ej. brasileño "11948566396" → "+11948566396", leído como +1). Por eso, si el contacto
+      // origen tiene país+teléfono, SIEMPRE preferimos su join. Solo si le falta el país caemos al lead.
       let e164 = lead.phone ? cleanE164(lead.phone) : null;
-      if (lead.source_contact_id && (!e164 || onlyDigits(e164).length <= 10)) {
+      if (lead.source_contact_id) {
         const { data: sc } = await (sb as any)
           .from("closers_contacts").select("country_code, phone").eq("id", lead.source_contact_id).maybeSingle();
-        if (sc) {
-          const fromContact = (sc.country_code && sc.phone) ? joinCc(sc.country_code, sc.phone)
-                            : (sc.phone ? cleanE164(sc.phone) : null);
+        if (sc?.country_code && sc?.phone) {
+          const fromContact = joinCc(sc.country_code, sc.phone);
+          if (fromContact && onlyDigits(fromContact).length >= 10) e164 = fromContact;
+        } else if (sc?.phone && (!e164 || onlyDigits(e164).length <= 10)) {
+          const fromContact = cleanE164(sc.phone);
           if (fromContact && onlyDigits(fromContact).length > 10) e164 = fromContact;
         }
       }
