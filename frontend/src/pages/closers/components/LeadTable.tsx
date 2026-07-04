@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
+import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus, Pencil } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -555,14 +555,68 @@ const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
   );
 };
 
+// Link de OnlyFans EDITABLE inline. Motivo (owner): los closers descubren el link de OF de
+// la modelo mientras chatean y lo cargan ahí mismo desde la tabla → no puede ser solo lectura.
+// Vacío → "+ OF" para pegar el link; cargado → link clickeable "OF ↗" + lápiz para editar.
+// Guarda en closer_creators.onlyfans_url vía onFieldChange (misma vía que notas/categoría).
+const InlineOfLink = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(value || "");
+  const save = () => {
+    const v = text.trim();
+    if (v !== (value || "")) onSave(v || null);
+    setOpen(false);
+  };
+  const href = value ? (value.startsWith("http") ? value : `https://onlyfans.com/${value.replace(/^\/+/, "")}`) : "";
+  return (
+    <span className="inline-flex items-center gap-1">
+      {value && (
+        <a href={href} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline max-w-[110px] truncate" title={value}>
+          <ExternalLink className="h-3 w-3 shrink-0" /> OF
+        </a>
+      )}
+      <Popover open={open} onOpenChange={(o) => { if (o) setText(value || ""); setOpen(o); }} modal={true}>
+        <PopoverTrigger asChild>
+          {value ? (
+            <button type="button" className="text-muted-foreground/50 hover:text-foreground transition-colors" title="Editar link de OnlyFans">
+              <Pencil className="h-3 w-3" />
+            </button>
+          ) : (
+            <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors" title="Agregar link de OnlyFans">
+              <Plus className="h-3 w-3" /> OF
+            </button>
+          )}
+        </PopoverTrigger>
+        <PopoverContent align="start" side="bottom" className="w-72 p-2.5">
+          <Label className="text-xs">Link de OnlyFans</Label>
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } if (e.key === "Escape") setOpen(false); }}
+            autoFocus
+            placeholder="onlyfans.com/… o el handle"
+            className="h-8 text-sm mt-1"
+          />
+          <div className="mt-2 flex justify-end gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </span>
+  );
+});
+InlineOfLink.displayName = "InlineOfLink";
+
 // Contacto del lead: WhatsApp + Telegram (mismo patrón/gating), con el MISMO tamaño/padding
 // para que los íconos queden alineados (antes se veían "torcidos" por padding distinto). El
 // de Telegram contacta por el TELÉFONO del lead (importContacts server-side), no por el canal
 // de promo; para leads de closer pasa closer_creator_id (el edge resuelve teléfono + gatea por
 // dueño), para leadgen pasa el phone ya resuelto. Si el usuario no tiene líneas de TG, el botón
-// se auto-oculta y queda solo WhatsApp. `onlyfansUrl` opcional: consolida el link de OF acá
-// (lo usan las variantes rediseñadas para no gastar una columna casi vacía).
-const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null; onlyfansUrl?: string | null }) => (
+// se auto-oculta y queda solo WhatsApp. `onOfSave` (opcional): habilita el link de OF editable
+// inline acá (los closers lo cargan mientras chatean).
+const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl, onOfSave }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null; onlyfansUrl?: string | null; onOfSave?: (v: string | null) => void }) => (
   <div className="flex flex-col items-start gap-0.5">
     <LeadWhatsappButton leadId={leadId} source={source} resolvedPhone={resolvedPhone} />
     <TgChatButton
@@ -570,7 +624,9 @@ const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl }: { le
       phone={resolvedPhone}
       className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700"
     />
-    {onlyfansUrl ? (
+    {onOfSave ? (
+      <span className="pl-2"><InlineOfLink value={onlyfansUrl ?? null} onSave={onOfSave} /></span>
+    ) : onlyfansUrl ? (
       <a
         href={onlyfansUrl.startsWith("http") ? onlyfansUrl : `https://onlyfans.com/${onlyfansUrl}`}
         target="_blank" rel="noopener noreferrer"
@@ -918,7 +974,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
-            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} onOfSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
@@ -965,7 +1021,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </div>
               </TableCell>
-              <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+              <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} onOfSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} /></TableCell>
               <TableCell className="align-top">
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
               </TableCell>
@@ -1031,11 +1087,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
                   {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </span>
-                {c.onlyfans_url && (
-                  <a href={c.onlyfans_url.startsWith("http") ? c.onlyfans_url : `https://onlyfans.com/${c.onlyfans_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
-                    <ExternalLink className="h-3 w-3" /> OF
-                  </a>
-                )}
+                <InlineOfLink value={c.onlyfans_url} onSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} />
               </div>
             </TableCell>
             <TableCell className="align-top"><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} /></TableCell>
@@ -1100,11 +1152,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <div className="flex items-center gap-x-1.5 gap-y-0.5 mt-1 flex-wrap text-[10px] text-muted-foreground/70">
                 <span>{c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}</span>
                 {c.last_contact_date && <span>· últ contacto {format(new Date(c.last_contact_date), "dd/MM")}</span>}
-                {c.onlyfans_url && (
-                  <a href={c.onlyfans_url.startsWith("http") ? c.onlyfans_url : `https://onlyfans.com/${c.onlyfans_url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                    <ExternalLink className="h-3 w-3" /> OF
-                  </a>
-                )}
+                <InlineOfLink value={c.onlyfans_url} onSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} />
               </div>
             </TableCell>
             <TableCell className="align-top">
@@ -1137,7 +1185,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top">
               <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
-            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} onOfSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
@@ -1188,7 +1236,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v, c._source)} disabled={!canEditStatus} />
             </TableCell>
             <TableCell className="align-top"><SeguimientoCell c={c} /></TableCell>
-            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} onOfSave={(v) => onFieldChange(c.id, "onlyfans_url", v)} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
