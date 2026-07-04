@@ -246,18 +246,37 @@ const TelegramInboxPage = () => {
     if (files.length) toast({ title: "Solo texto por ahora", description: "Adjuntar media a Telegram llega en un próximo slice." });
     const body = text.trim();
     if (!body || !selectedId) throw new Error("empty");
-    const { data, error } = await supabase.functions.invoke("tg-inbox-send", { body: { conversation_id: selectedId, body } });
-    const res = data as { ok?: boolean; error?: string; reason?: string } | null;
-    if (error || !res?.ok) {
-      toast({
-        title: "No se pudo enviar",
-        description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
-        variant: "destructive",
+    const convId = selectedId;
+
+    // OPTIMISTA (igual que WhatsApp): pintamos la burbuja saliente YA y dejamos que el input se
+    // limpie al instante; el envío real por el gateway (MTProto, ~1-3s) corre por detrás y se
+    // reconcilia al terminar. Antes se AWAITeaba todo el round-trip → el composer se "freezeaba".
+    const optimisticId = "optimistic-" + Date.now();
+    qc.setQueryData<TgMsg[]>(["tg-inbox-messages", convId], (old = []) => [
+      ...old,
+      { id: optimisticId, direction: "out", body, msg_type: "text", media_url: null,
+        sent_at: new Date().toISOString(), status: "sent", sender_user_id: user?.id ?? null },
+    ]);
+
+    // Fire-and-reconcile: NO await (así doSend del ChatComposer resuelve ya y limpia el input).
+    void supabase.functions.invoke("tg-inbox-send", { body: { conversation_id: convId, body } })
+      .then(({ data, error }) => {
+        const res = data as { ok?: boolean; error?: string; reason?: string } | null;
+        if (error || !res?.ok) {
+          toast({
+            title: "No se pudo enviar",
+            description: res?.reason === "send_failed" ? "El gateway no pudo entregar el mensaje." : (res?.error || error?.message || "Error"),
+            variant: "destructive",
+          });
+        }
+      })
+      .catch((e) => toast({ title: "No se pudo enviar", description: (e as Error).message, variant: "destructive" }))
+      // Reconciliar contra la BD (reemplaza el optimista por la fila real 'sent', o muestra la
+      // 'failed' que insertó el edge; en errores sin fila, quita el optimista).
+      .finally(() => {
+        qc.invalidateQueries({ queryKey: ["tg-inbox-messages", convId] });
+        qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
       });
-      throw new Error(res?.error || "send_failed");
-    }
-    qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] });
-    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
   };
 
   const showChannelChip = !channelFilter && channels.length > 1;
