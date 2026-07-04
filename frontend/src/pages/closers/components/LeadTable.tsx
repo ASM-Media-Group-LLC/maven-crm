@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMyWaChannels } from "@/hooks/useMyWaChannels";
 import { TgChatButton } from "@/components/TgChatButton";
 import OnlyFansIcon from "@/components/icons/OnlyFansIcon";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -24,7 +25,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -473,13 +474,13 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
 
   const trigger = channels.length === 1 ? (
     <Button variant="ghost" size="sm" className="h-7 w-7 justify-center p-0 text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp" onClick={() => open(channels[0].id)}>
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WhatsAppIcon className="h-3.5 w-3.5" />}
     </Button>
   ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="h-7 gap-0.5 px-1.5 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp">
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} <ChevronDown className="h-3 w-3" />
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WhatsAppIcon className="h-3.5 w-3.5" />} <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
