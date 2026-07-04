@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface LightboxItem {
   id?: string;
@@ -27,6 +28,7 @@ export function MediaLightbox({
   index: number;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [i, setI] = useState(index);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -127,22 +129,22 @@ export function MediaLightbox({
         <div className="flex items-center gap-0.5">
           {isImage && (
             <>
-              <button type="button" onClick={() => zoomBy(-STEP)} title="Alejar (−)" className="rounded-full p-2 hover:bg-white/15">
+              <button type="button" onClick={() => zoomBy(-STEP)} title={t("lightbox.zoomOut")} className="rounded-full p-2 hover:bg-white/15">
                 <ZoomOut className="h-5 w-5" />
               </button>
               <span className="w-12 text-center text-xs tabular-nums opacity-80">{Math.round(scale * 100)}%</span>
-              <button type="button" onClick={() => zoomBy(STEP)} title="Acercar (+)" className="rounded-full p-2 hover:bg-white/15">
+              <button type="button" onClick={() => zoomBy(STEP)} title={t("lightbox.zoomIn")} className="rounded-full p-2 hover:bg-white/15">
                 <ZoomIn className="h-5 w-5" />
               </button>
-              <button type="button" onClick={reset} title="Restablecer (doble-clic)" className="rounded-full p-2 hover:bg-white/15">
+              <button type="button" onClick={reset} title={t("lightbox.reset")} className="rounded-full p-2 hover:bg-white/15">
                 <RotateCcw className="h-5 w-5" />
               </button>
             </>
           )}
-          <a href={cur.url} target="_blank" rel="noreferrer" download title="Descargar / abrir" className="rounded-full p-2 hover:bg-white/15">
+          <a href={cur.url} target="_blank" rel="noreferrer" download title={t("lightbox.download")} className="rounded-full p-2 hover:bg-white/15">
             <Download className="h-5 w-5" />
           </a>
-          <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-full p-2 hover:bg-white/15">
+          <button type="button" onClick={onClose} title={t("lightbox.close")} className="rounded-full p-2 hover:bg-white/15">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -159,7 +161,7 @@ export function MediaLightbox({
             type="button"
             onClick={() => go(-1)}
             disabled={i === 0}
-            title="Anterior (←)"
+            title={t("lightbox.prev")}
             className="absolute left-2 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 disabled:pointer-events-none disabled:opacity-30"
           >
             <ChevronLeft className="h-7 w-7" />
@@ -193,7 +195,7 @@ export function MediaLightbox({
             type="button"
             onClick={() => go(1)}
             disabled={i === items.length - 1}
-            title="Siguiente (→)"
+            title={t("lightbox.next")}
             className="absolute right-2 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 disabled:pointer-events-none disabled:opacity-30"
           >
             <ChevronRight className="h-7 w-7" />

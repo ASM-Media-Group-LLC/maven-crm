@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Loader2, Sticker, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const BUCKET = "creator-files";
 
@@ -59,6 +60,7 @@ const STICKERS_QUERY = {
 };
 
 export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -94,7 +96,7 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
       if (ins.error) throw ins.error;
       qc.invalidateQueries({ queryKey: ["wa-stickers"] });
     } catch (err) {
-      toast({ title: "No se pudo guardar el sticker", description: (err as Error).message, variant: "destructive" });
+      toast({ title: t("sticker.saveError"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -109,16 +111,16 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Stickers" disabled={disabled}
+        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title={t("sticker.title")} disabled={disabled}
           onMouseEnter={prefetchStickers} onFocus={prefetchStickers}>
           <Sticker className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-80 p-2">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Stickers</span>
+          <span className="text-xs font-medium text-muted-foreground">{t("sticker.title")}</span>
           <Button variant="outline" size="sm" className="h-7 text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
-            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />} Subir
+            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />} {t("sticker.upload")}
           </Button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onUpload} />
         </div>
@@ -127,7 +129,7 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
             <div className="col-span-3 flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           )}
           {!isLoading && stickers.length === 0 && (
-            <div className="col-span-3 py-6 text-center text-xs text-muted-foreground">Subí tu primer sticker con "Subir".</div>
+            <div className="col-span-3 py-6 text-center text-xs text-muted-foreground">{t("sticker.none")}</div>
           )}
           {!isLoading && stickers.map((s) => (
             <div key={s.id} className="group relative">
@@ -141,7 +143,7 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
               <button
                 type="button"
                 onClick={() => remove(s.id, s.storage_path)}
-                title="Eliminar de la galería"
+                title={t("sticker.removeFromGallery")}
                 className="absolute right-0 top-0 hidden h-5 w-5 items-center justify-center rounded-full bg-destructive text-white group-hover:flex"
               >
                 <Trash2 className="h-3 w-3" />

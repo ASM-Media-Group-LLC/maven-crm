@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Pause, Mic, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface AudioRecorderBarProps {
   onSend: (blob: Blob, durationSec: number) => void;
@@ -15,6 +16,7 @@ interface AudioRecorderBarProps {
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
+  const { t } = useLanguage();
   const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [ready, setReady] = useState(false);
@@ -79,7 +81,7 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
         };
         render();
       } catch { /* sin ondas: igual graba */ }
-    }).catch(() => { if (!cancelled) setError("No se pudo acceder al micrófono"); });
+    }).catch(() => { if (!cancelled) setError(t("rec.micError")); });
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
@@ -128,7 +130,7 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
       <div className="flex items-center gap-2 border-t border-border px-4 py-3 text-sm text-destructive">
         🎤 {error}.
         <button type="button" className="ml-auto rounded px-2 py-1 text-muted-foreground hover:text-foreground" onClick={onCancel}>
-          Cerrar
+          {t("rec.close")}
         </button>
       </div>
     );
@@ -140,8 +142,8 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
         type="button"
         onClick={() => finish(false)}
         className="shrink-0 rounded-full p-2 text-destructive transition hover:bg-destructive/10"
-        title="Cancelar grabación"
-        aria-label="Cancelar"
+        title={t("rec.cancelRecording")}
+        aria-label={t("rec.cancel")}
       >
         <Trash2 className="h-5 w-5" />
       </button>
@@ -155,8 +157,8 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
         onClick={togglePause}
         disabled={!ready}
         className="shrink-0 rounded-full p-2 transition hover:bg-muted disabled:opacity-50"
-        title={paused ? "Reanudar" : "Pausar"}
-        aria-label={paused ? "Reanudar" : "Pausar"}
+        title={paused ? t("rec.resume") : t("rec.pause")}
+        aria-label={paused ? t("rec.resume") : t("rec.pause")}
       >
         {paused ? <Mic className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
       </button>
@@ -165,8 +167,8 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
         onClick={() => finish(true)}
         disabled={!ready}
         className="shrink-0 rounded-full bg-primary p-2 text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-        title="Enviar nota de voz"
-        aria-label="Enviar"
+        title={t("rec.sendVoice")}
+        aria-label={t("rec.send")}
       >
         <Send className="h-5 w-5" />
       </button>
