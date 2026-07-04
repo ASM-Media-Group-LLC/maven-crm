@@ -463,13 +463,13 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   }
 
   const trigger = channels.length === 1 ? (
-    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} onClick={() => open(channels[0].id)}>
+    <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} onClick={() => open(channels[0].id)}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp
     </Button>
   ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy}>
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -503,19 +503,39 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   );
 };
 
-// Contacto del lead: WhatsApp + Telegram apilados (mismo patrón/gating). El de Telegram
-// contacta por el TELÉFONO del lead (importContacts server-side), no por el canal de promo;
-// para leads de closer pasa closer_creator_id (el edge resuelve teléfono + gatea por dueño),
-// para leadgen pasa el phone ya resuelto. Si el usuario no tiene líneas de TG, el botón no
-// aparece (TgChatButton se auto-oculta) y queda solo WhatsApp.
-const LeadContactButtons = ({ leadId, source, resolvedPhone }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null }) => (
+// Fecha relativa corta ("hoy" / "ayer" / "hace N d") para columnas de fecha.
+const relDays = (d: string | null | undefined): string => {
+  if (!d) return "";
+  const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  return `hace ${days} d`;
+};
+
+// Contacto del lead: WhatsApp + Telegram (mismo patrón/gating), con el MISMO tamaño/padding
+// para que los íconos queden alineados (antes se veían "torcidos" por padding distinto). El
+// de Telegram contacta por el TELÉFONO del lead (importContacts server-side), no por el canal
+// de promo; para leads de closer pasa closer_creator_id (el edge resuelve teléfono + gatea por
+// dueño), para leadgen pasa el phone ya resuelto. Si el usuario no tiene líneas de TG, el botón
+// se auto-oculta y queda solo WhatsApp. `onlyfansUrl` opcional: consolida el link de OF acá
+// (lo usan las variantes rediseñadas para no gastar una columna casi vacía).
+const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null; onlyfansUrl?: string | null }) => (
   <div className="flex flex-col items-start gap-0.5">
     <LeadWhatsappButton leadId={leadId} source={source} resolvedPhone={resolvedPhone} />
     <TgChatButton
       closerCreatorId={source === "closer" ? leadId : null}
       phone={resolvedPhone}
-      className="h-7 gap-1 px-1.5 text-xs text-sky-600 hover:text-sky-700"
+      className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700"
     />
+    {onlyfansUrl ? (
+      <a
+        href={onlyfansUrl.startsWith("http") ? onlyfansUrl : `https://onlyfans.com/${onlyfansUrl}`}
+        target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 h-6 px-2 text-xs text-primary hover:underline"
+      >
+        <ExternalLink className="h-3 w-3" /> OnlyFans
+      </a>
+    ) : null}
   </div>
 );
 
@@ -717,18 +737,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "asignadas":
         return (
           <TableRow>
-            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
-            <SortHeader label="Creación" sortKey="created_at" {...sp} />
-            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
-            <SortHeader label="Categoría" sortKey="category" {...sp} />
-            <SortHeader label="Fecha asignación" sortKey="passed_date" {...sp} />
-            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
-            <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
-            <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
-            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
-            <TableHead className={stickyBase}>OF URL</TableHead>
-            <TableHead className={stickyBase}>Alertas</TableHead>
+            <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Asignada" sortKey="passed_date" {...sp} />
+            <SortHeader label="Seguimiento" sortKey="contact_count" {...sp} />
+            <TableHead className={stickyBase}>Contactar</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -844,39 +857,28 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "asignadas":
         return (
           <TableRow key={c.id}>
-            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell>{igLink}</TableCell>
-            <TableCell>
-              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+            <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+            <TableCell className="align-top">
+              <div className="flex items-center gap-1.5">{igLink}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                {c.created_at && <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">creado {format(new Date(c.created_at), "dd/MM")}</span>}
+              </div>
             </TableCell>
-            <TableCell>
-              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+            <TableCell className="align-top">
+              <div className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yy") : "—"}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {relDays(c.passed_date)}{c.agent_name ? ` · ${c.agent_name}` : ""}
+              </div>
             </TableCell>
-            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
-            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
-            <TableCell>
-              <ContactCountCell creatorId={c.id} count={c.contact_count} />
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
-              {nextDate && (
-                <p className="text-[10px] text-muted-foreground/70">
-                  Próximo: {format(nextDate, "dd/MM")}
-                </p>
-              )}
-            </TableCell>
-            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
-            <TableCell className="text-sm">
-              {c.onlyfans_url ? (
-                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
-                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
-            <TableCell>
-              <div className="flex gap-1">
+            <TableCell className="align-top">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <ContactCountCell creatorId={c.id} count={c.contact_count} />
+                <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                  {c.last_contact_date ? `últ ${format(new Date(c.last_contact_date), "dd/MM")}` : "sin contacto"}
+                  {nextDate ? ` · próx ${format(nextDate, "dd/MM")}` : ""}
+                </span>
                 {contactOverdue && (
                   <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title="El contacto programado venció">
                     <AlertTriangle className="h-3 w-3" /> Vencido
@@ -894,10 +896,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
-            <TableCell>
+            <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+            <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
-            <TableCell className="text-right sticky right-0 bg-background z-20">
+            <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
