@@ -22,7 +22,15 @@ import {
 import {
   ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign, UserCheck, Search,
   Reply, Trash2, Smile, Mic, Maximize2, X as XIcon, FileText,
+  Pin, Star, Archive, MailOpen, Eraser,
 } from "lucide-react";
+import {
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
@@ -32,6 +40,7 @@ import { usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
@@ -83,7 +92,7 @@ const isImageType = (t: string) => t === "photo" || t === "image" || t === "stic
 
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
 const CONV_COLS =
-  "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, created_at";
+  "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, manually_unread, created_at";
 const MSG_COLS =
   "id, direction, body, msg_type, media_url, sent_at, status, sender_user_id, reply_to_message_id, reply_to_external_id, reaction, deleted_at";
 
@@ -92,7 +101,8 @@ interface TgConv {
   peer_name: string | null; peer_username: string | null;
   status: string | null; assigned_to: string | null;
   last_message_at: string | null; last_message_preview: string | null;
-  unread_count: number; archived: boolean; pinned: boolean; favorite: boolean; created_at: string;
+  unread_count: number; archived: boolean; pinned: boolean; favorite: boolean;
+  manually_unread: boolean; created_at: string;
 }
 interface TgMsg {
   id: string; direction: "in" | "out"; body: string | null;
@@ -117,8 +127,10 @@ const TelegramInboxPage = () => {
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos">("todos");
+  const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos" | "favoritos">("todos");
   const [channelFilter, setChannelFilter] = useState<string | null>(null); // account_id activo (null = todos)
+  const [showArchived, setShowArchived] = useState(false);
+  const [destructive, setDestructive] = useState<{ kind: "clear" | "delete"; id: string; label: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<TgMsg | null>(null);
@@ -128,6 +140,7 @@ const TelegramInboxPage = () => {
   const [tgEmojis, setTgEmojis] = usePersistedEmojis("telegram", user?.id);
   const { canAccess } = usePermissions();
   const canAssign = canAccess("Telegram", "Asignar conversaciones");
+  const { isAdmin } = useUserRole();
 
   // Deep-link /telegram/bandeja?c=<id>
   useEffect(() => {
@@ -226,6 +239,37 @@ const TelegramInboxPage = () => {
     toast({ title: userId ? `Asignada a ${userName(userId)}` : "Asignación quitada" });
   };
 
+  // ── Acciones de la LISTA (click derecho): fijar / archivar / favorito / marcar no leído ──
+  const toggleFlag = async (id: string, flag: "archived" | "pinned" | "favorite" | "manually_unread", value: boolean) => {
+    const { error } = await (supabase as any).rpc("tg_set_conversation_flag", { p_conversation_id: id, p_flag: flag, p_value: value });
+    if (error) { toast({ title: "No se pudo actualizar el chat", description: error.message, variant: "destructive" }); return; }
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+  };
+  // Marcar leído/no leído: leído resetea el no-leído real (tg_mark_read) + la marca manual.
+  const markRead = async (id: string, read: boolean) => {
+    if (read) {
+      await (supabase as any).rpc("tg_mark_read", { p_conversation_id: id });
+      await (supabase as any).rpc("tg_set_conversation_flag", { p_conversation_id: id, p_flag: "manually_unread", p_value: false });
+    } else {
+      await (supabase as any).rpc("tg_set_conversation_flag", { p_conversation_id: id, p_flag: "manually_unread", p_value: true });
+    }
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+    qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+  };
+  // Vaciar / Eliminar (solo admin) — confirma vía AlertDialog.
+  const runDestructive = async () => {
+    if (!destructive) return;
+    const { kind, id } = destructive;
+    const fn = kind === "clear" ? "tg_clear_conversation" : "tg_delete_conversation";
+    const { error } = await (supabase as any).rpc(fn, { p_conversation_id: id });
+    setDestructive(null);
+    if (error) { toast({ title: "No se pudo completar", description: error.message, variant: "destructive" }); return; }
+    toast({ title: kind === "clear" ? "Chat vaciado" : "Chat eliminado" });
+    if (kind === "delete" && selectedId === id) setSelectedId(null);
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+    if (selectedId === id) qc.invalidateQueries({ queryKey: ["tg-inbox-messages", id] });
+  };
+
   // Marcar leído al abrir (RPC; el cliente no puede UPDATE directo).
   useEffect(() => {
     if (!selectedId) return;
@@ -256,16 +300,19 @@ const TelegramInboxPage = () => {
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
 
+  const isUnread = (c: TgConv) => (c.unread_count ?? 0) > 0 || c.manually_unread;
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = allConversations.filter((c) => !c.archived);
-    if (chatFilter === "no_leidos") list = list.filter((c) => (c.unread_count ?? 0) > 0);
+    let list = allConversations.filter((c) => (showArchived ? c.archived : !c.archived));
+    if (chatFilter === "no_leidos") list = list.filter((c) => isUnread(c));
+    else if (chatFilter === "favoritos") list = list.filter((c) => c.favorite);
     if (channelFilter) list = list.filter((c) => c.account_id === channelFilter); // filtro por canal (ortogonal)
-    if (!q) return list;
-    return list.filter(
+    if (q) list = list.filter(
       (c) => peerLabel(c).toLowerCase().includes(q) || (c.last_message_preview ?? "").toLowerCase().includes(q),
     );
-  }, [allConversations, search, chatFilter, channelFilter]);
+    // Fijados primero (salvo en la vista de archivados).
+    return [...list].sort((a, b) => Number(b.pinned && !b.archived) - Number(a.pinned && !a.archived));
+  }, [allConversations, search, chatFilter, channelFilter, showArchived]);
 
   const invalidateThread = () => {
     qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] });
@@ -426,19 +473,28 @@ const TelegramInboxPage = () => {
             </div>
           )}
 
-          {/* Filtros (chips): presets. */}
+          {/* Filtros (chips): presets + archivados. */}
           <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-3">
-            {([["todos", "Todos"], ["no_leidos", "No leídos"]] as const).map(([key, label]) => (
+            {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => setChatFilter(key)}
+                onClick={() => { setChatFilter(key); setShowArchived(false); }}
                 className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  chatFilter === key ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
+                  !showArchived && chatFilter === key ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
               >
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              title="Ver archivados"
+              className={cn("ml-auto flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                showArchived ? `${TG_GRAD_R} text-white shadow-sm` : "bg-muted text-foreground border border-border hover:bg-muted/70")}
+            >
+              <Archive className="h-3 w-3" /> Archivados
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -449,54 +505,89 @@ const TelegramInboxPage = () => {
             ) : filtered.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                 <InboxIcon className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                {chatFilter === "no_leidos" ? "No hay conversaciones sin leer."
+                {showArchived ? "No hay chats archivados."
+                  : chatFilter === "no_leidos" ? "No hay conversaciones sin leer."
+                  : chatFilter === "favoritos" ? "No hay favoritos todavía. Click derecho en un chat → Añadir a Favoritos."
                   : "No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram."}
               </div>
             ) : (
               <ul className="space-y-0.5 px-2 py-2">
                 {filtered.map((c) => {
-                  const unread = (c.unread_count ?? 0) > 0;
+                  const unread = isUnread(c);
                   const active = selectedId === c.id;
                   return (
                     <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(c.id)}
-                        className={cn(
-                          "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
-                          active && `bg-muted before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r ${TG_GRAD_BAR}`,
-                        )}
-                      >
-                        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white", avatarGrad(c.peer_id))}>
-                          {initials(c)}
-                        </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className={cn("min-w-0 flex-1 truncate text-sm", unread ? "font-bold" : "font-medium")}>
-                              {peerLabel(c)}
-                            </span>
-                            <span className={cn("ml-auto shrink-0 text-[10px] tabular-nums", unread ? "font-semibold text-sky-500" : "text-muted-foreground")}>
-                              {fmtTime(c.last_message_at)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {showChannelChip && (
-                              <span className={cn("shrink-0 max-w-[90px] truncate rounded px-1 py-0.5 text-[9px] font-medium", channelChipClass(c.account_id))}
-                                title={channelLabel(c.account_id) ?? undefined}>
-                                {channelLabel(c.account_id)}
-                              </span>
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(c.id)}
+                            className={cn(
+                              "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+                              active && `bg-muted before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r ${TG_GRAD_BAR}`,
                             )}
-                            <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
-                              {c.last_message_preview ?? "—"}
-                            </span>
-                            {unread && (
-                              <span className={cn("ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-bold text-white shadow-sm", TG_GRAD)}>
-                                {c.unread_count > 99 ? "99+" : c.unread_count}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
+                          >
+                            <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white", avatarGrad(c.peer_id))}>
+                              {initials(c)}
+                            </div>
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                {c.pinned && !c.archived && <Pin className="h-3 w-3 shrink-0 text-muted-foreground" />}
+                                {c.favorite && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
+                                <span className={cn("min-w-0 flex-1 truncate text-sm", unread ? "font-bold" : "font-medium")}>
+                                  {peerLabel(c)}
+                                </span>
+                                <span className={cn("ml-auto shrink-0 text-[10px] tabular-nums", unread ? "font-semibold text-sky-500" : "text-muted-foreground")}>
+                                  {fmtTime(c.last_message_at)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {showChannelChip && (
+                                  <span className={cn("shrink-0 max-w-[90px] truncate rounded px-1 py-0.5 text-[9px] font-medium", channelChipClass(c.account_id))}
+                                    title={channelLabel(c.account_id) ?? undefined}>
+                                    {channelLabel(c.account_id)}
+                                  </span>
+                                )}
+                                <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                                  {c.last_message_preview ?? "—"}
+                                </span>
+                                {unread && ((c.unread_count ?? 0) > 0 ? (
+                                  <span className={cn("ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-bold text-white shadow-sm", TG_GRAD)}>
+                                    {c.unread_count > 99 ? "99+" : c.unread_count}
+                                  </span>
+                                ) : (
+                                  <span className={cn("ml-auto h-2.5 w-2.5 shrink-0 rounded-full", TG_GRAD)} title="No leído" />
+                                ))}
+                              </div>
+                            </div>
+                          </button>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-56">
+                          <ContextMenuItem onClick={() => toggleFlag(c.id, "archived", !c.archived)}>
+                            <Archive className="mr-2 h-4 w-4" /> {c.archived ? "Desarchivar chat" : "Archivar chat"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => toggleFlag(c.id, "pinned", !c.pinned)}>
+                            <Pin className="mr-2 h-4 w-4" /> {c.pinned ? "Desfijar chat" : "Fijar chat"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => markRead(c.id, unread)}>
+                            <MailOpen className="mr-2 h-4 w-4" /> {unread ? "Marcar como leído" : "Marcar como no leído"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => toggleFlag(c.id, "favorite", !c.favorite)}>
+                            <Star className="mr-2 h-4 w-4" /> {c.favorite ? "Quitar de Favoritos" : "Añadir a Favoritos"}
+                          </ContextMenuItem>
+                          {isAdmin && (
+                            <>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem className="text-warning focus:text-warning" onClick={() => setDestructive({ kind: "clear", id: c.id, label: peerLabel(c) })}>
+                                <Eraser className="mr-2 h-4 w-4" /> Vaciar chat
+                              </ContextMenuItem>
+                              <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => setDestructive({ kind: "delete", id: c.id, label: peerLabel(c) })}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar chat
+                              </ContextMenuItem>
+                            </>
+                          )}
+                        </ContextMenuContent>
+                      </ContextMenu>
                     </li>
                   );
                 })}
@@ -740,6 +831,25 @@ const TelegramInboxPage = () => {
       </div>
 
       {viewer && <MediaLightbox items={viewer.items} index={viewer.index} onClose={() => setViewer(null)} />}
+
+      <AlertDialog open={!!destructive} onOpenChange={(o) => { if (!o) setDestructive(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{destructive?.kind === "clear" ? "Vaciar chat" : "Eliminar chat"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {destructive?.kind === "clear"
+                ? `Se borrarán todos los mensajes de "${destructive?.label}". La conversación queda vacía. No se puede deshacer.`
+                : `Se eliminará la conversación con "${destructive?.label}" y todos sus mensajes. No se puede deshacer.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={runDestructive} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {destructive?.kind === "clear" ? "Vaciar" : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
