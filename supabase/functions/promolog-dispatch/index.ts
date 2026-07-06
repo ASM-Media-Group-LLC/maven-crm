@@ -100,15 +100,21 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── Parse body (opcional: force=true para saltar rate-limit) ───────────
-  let body: { force?: boolean; max_creators?: number; only_handles?: string[]; retry_of?: string } = {};
+  let body: { force?: boolean; max_creators?: number; only_handles?: string[]; retry_of?: string; one_chunk?: boolean } = {};
   try {
     if (req.headers.get("content-type")?.includes("application/json")) {
       body = await req.json();
     }
   } catch (_) { /* ignore */ }
 
-  // ── Rate-limit: no más de 1 run/día ─────────────────────────────────────
-  if (!body.force) {
+  // one_chunk: modo ESCALONADO — 1 solo Apify run por invocación, solo creadoras
+  // sin entry de hoy. Un cron cada 5 min tickea hasta cubrir a todas, de a UN run
+  // por vez → la misma sesión de IG NO se usa desde 5 IPs simultáneas (esa
+  // concurrencia era la causa del no_story_media masivo; validado: run solo lee bien).
+  const oneChunk = body.one_chunk === true;
+
+  // ── Rate-limit: no más de 1 run/día (no aplica a one_chunk, que escalona) ─
+  if (!body.force && !oneChunk) {
     const { data: already } = await (sb as any).rpc("promolog_dispatched_today", {
       p_tenant_id: TENANT_ID,
     });
@@ -135,10 +141,30 @@ Deno.serve(async (req: Request) => {
     return json({ skipped: true, reason: "No eligible creators" });
   }
 
-  const limit = body.max_creators && body.max_creators > 0 && body.max_creators <= MAX_CREATORS_PER_DISPATCH
-    ? body.max_creators
-    : MAX_CREATORS_PER_DISPATCH;
-  const batch = (creators as any[]).slice(0, limit);
+  // one_chunk: excluir las que YA tienen entry de IG hoy (Bogotá) → una sola
+  // pasada por creadora, sin re-escanear; el cron frecuente cubre al resto.
+  let eligible = creators as any[];
+  if (oneChunk) {
+    const todayBogota = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+    const { data: scanned } = await (sb as any)
+      .from("promolog_entries")
+      .select("creator_id")
+      .eq("network", "instagram")
+      .gte("date", `${todayBogota}T00:00:00-05:00`)
+      .lte("date", `${todayBogota}T23:59:59-05:00`);
+    const scannedSet = new Set((scanned ?? []).map((r: any) => r.creator_id));
+    eligible = eligible.filter((c) => !scannedSet.has(c.id));
+    if (eligible.length === 0) {
+      return json({ done: true, reason: "Todas las creadoras ya tienen scan de hoy" });
+    }
+  }
+
+  const limit = oneChunk
+    ? CREATORS_PER_APIFY_RUN
+    : (body.max_creators && body.max_creators > 0 && body.max_creators <= MAX_CREATORS_PER_DISPATCH
+        ? body.max_creators
+        : MAX_CREATORS_PER_DISPATCH);
+  const batch = eligible.slice(0, limit);
 
   // ── Multi-cuenta: cuentas IG EXTRA por creadora ─────────────────────────
   // Cada modelo puede tener varias cuentas de IG. El handle principal vive en
