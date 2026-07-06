@@ -35,21 +35,13 @@ const ViewAsCloserPicker = ({ value, onChange }: Props) => {
   const { data: closers = [], isLoading } = useQuery({
     queryKey: ["tenant-closers-list"],
     queryFn: async () => {
-      // user_roles.role text contains "closer". Hacemos un join manual
-      // contra profiles para traer el nombre.
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "closer");
+      // Roster vía RPC SECURITY DEFINER: user_roles en RLS solo es legible por
+      // 'admin', así que leerlo directo dejaba la lista vacía para
+      // manager/supervisor/Team Leader ("Sin closers en el tenant"). La RPC
+      // get_closers_roster gatea por supervisor_or_above y trae id+nombre.
+      const { data, error } = await (supabase as any).rpc("get_closers_roster");
       if (error) throw error;
-      const ids = (roles ?? []).map((r: any) => r.user_id).filter(Boolean);
-      if (ids.length === 0) return [] as CloserOption[];
-      const { data: profs, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
-      if (pErr) throw pErr;
-      return ((profs ?? []) as CloserOption[]).sort((a, b) =>
+      return ((data ?? []) as CloserOption[]).sort((a, b) =>
         (a.full_name ?? "").localeCompare(b.full_name ?? ""),
       );
     },
