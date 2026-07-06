@@ -374,6 +374,22 @@ const InboxPage = () => {
 
   const selected = allConversations.find((c) => c.id === selectedId) ?? null;
 
+  // Resolver el @IG del LEAD por teléfono: wa_contacts.instagram_handle está vacío,
+  // pero el número (phone_e164) matchea al lead en el pipeline → traemos su IG
+  // (RPC get_wa_contact_ig). 1 llamada por conversación abierta, cacheada.
+  const { data: resolvedIg = null } = useQuery({
+    queryKey: ["wa-contact-ig", selected?.contact?.id ?? null],
+    enabled: !!selected?.contact?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_wa_contact_ig", { p_contact_id: selected!.contact!.id });
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+  });
+  // IG a mostrar: el del contacto si algún día se llena, si no el resuelto por teléfono.
+  const igHandle = (selected?.contact?.instagram_handle || resolvedIg || "").replace(/^@/, "");
+
   // Al abrir una conversación con no-leídos, marcarla leída (resetea el bubble).
   // Via RPC porque la policy UPDATE de wa_conversations está gateada por permiso.
   useEffect(() => {
@@ -996,11 +1012,18 @@ const InboxPage = () => {
                   <p className="truncate text-sm font-semibold">{contactLabel(selected.contact)}</p>
                 )}
                 <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                  {selected.contact?.instagram_handle && (
-                    <>
-                      <Instagram className="h-3 w-3" />
-                      @{selected.contact.instagram_handle.replace(/^@/, "")}
-                    </>
+                  {igHandle && (
+                    <a
+                      href={`https://instagram.com/${igHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted/60 px-1.5 py-0.5 transition-colors hover:bg-primary/15 hover:text-primary"
+                      title="Abrir Instagram del lead"
+                    >
+                      <Instagram className="h-3 w-3 shrink-0" />
+                      @{igHandle}
+                    </a>
                   )}
                 </p>
               </div>
@@ -1325,11 +1348,17 @@ const InboxPage = () => {
                     <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="tabular-nums">{jidToNumber(selected?.contact?.wa_jid) ?? "Número oculto (LID)"}</span>
                   </div>
-                  {selected?.contact?.instagram_handle && (
-                    <div className="flex items-center gap-2">
-                      <Instagram className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>@{selected.contact.instagram_handle.replace(/^@/, "")}</span>
-                    </div>
+                  {igHandle && (
+                    <a
+                      href={`https://instagram.com/${igHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-foreground hover:text-primary hover:underline"
+                      title="Abrir Instagram del lead"
+                    >
+                      <Instagram className="h-4 w-4 shrink-0" />
+                      <span>@{igHandle}</span>
+                    </a>
                   )}
                   <div className="flex items-center gap-2">
                     <Radio className="h-4 w-4 shrink-0 text-muted-foreground" />
