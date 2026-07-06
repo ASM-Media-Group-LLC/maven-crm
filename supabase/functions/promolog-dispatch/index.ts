@@ -247,7 +247,18 @@ async function launchChunk(
     ],
     sessionCookie: env.IG_SESSION,
     includeHighlights: false,
-    proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
+    // Proxy residencial. Se puede FIJAR el país con PROMOLOG_IG_PROXY_COUNTRY
+    // (ISO-2, ej. "CO" o "US"). Sin fijarlo, Apify rota IPs por todo el mundo →
+    // la MISMA sesión de IG se ve desde muchos países en minutos = "viaje
+    // imposible" → IG responde 401 (justo lo que veíamos en el log del actor).
+    // Fijarlo al país donde vive la cuenta de IG reduce esos 401.
+    proxyConfiguration: {
+      useApifyProxy: true,
+      apifyProxyGroups: ["RESIDENTIAL"],
+      ...(Deno.env.get("PROMOLOG_IG_PROXY_COUNTRY")
+        ? { apifyProxyCountry: Deno.env.get("PROMOLOG_IG_PROXY_COUNTRY") }
+        : {}),
+    },
   };
 
   const { data: run, error: rErr } = await (sb as any)
