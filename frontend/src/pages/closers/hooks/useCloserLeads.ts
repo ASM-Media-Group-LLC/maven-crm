@@ -165,7 +165,7 @@ export const useCloserLeads = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isAdmin, isManager, role } = useUserRole();
+  const { isAdmin, isManager, isSupervisor, role } = useUserRole();
 
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("todas");
@@ -186,7 +186,12 @@ export const useCloserLeads = () => {
   // deben tratarlo como NO-admin y forzar el assigned_to a su id.
   const effectiveIsAdmin = viewAsCloserId ? false : isAdmin;
   const effectiveIsManager = viewAsCloserId ? false : isManager;
+  const effectiveIsSupervisor = viewAsCloserId ? false : isSupervisor;
   const effectiveUserId = viewAsCloserId ?? user?.id;
+  // "Ve TODO el pipeline" = admin/manager/supervisor (incluye Team Leader, que es
+  // supervisor_or_above). Espeja la RLS "Supervisors+ view all closer_creators".
+  // Cuando impersona (viewAsCloserId) queda false → ve exactamente lo del closer.
+  const canSeeAll = effectiveIsAdmin || effectiveIsManager || effectiveIsSupervisor;
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
   const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
@@ -314,7 +319,7 @@ export const useCloserLeads = () => {
 
       // Role-based filter: closers only see assigned. Si el admin está
       // viendo "como" un closer (viewAsCloserId), también restringimos.
-      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+      if (!canSeeAll && effectiveUserId) {
         query = query.eq("assigned_to", effectiveUserId);
       }
 
@@ -437,7 +442,7 @@ export const useCloserLeads = () => {
         .select("id, passed_date, assigned_to")
         .eq("stage", "Asignada")
         .not("passed_date", "is", null);
-      if (!effectiveIsAdmin && !effectiveIsManager && targetUserId) {
+      if (!canSeeAll && targetUserId) {
         creatorsQ = creatorsQ.eq("assigned_to", targetUserId);
       } else if (viewAsCloserId) {
         // Admin viendo como un closer específico
@@ -489,7 +494,7 @@ export const useCloserLeads = () => {
       // etc.) quedaban truncados a ~1000. fetchAllRows trae TODAS con .range().
       const rows = await fetchAllRows((from, to) => {
         let q = supabase.from("closer_creators").select("stage");
-        if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+        if (!canSeeAll && effectiveUserId) {
           q = q.eq("assigned_to", effectiveUserId);
         }
         if (applyCreatorDate) {
@@ -559,7 +564,7 @@ export const useCloserLeads = () => {
         .from("closer_creators")
         .select("estimated_monetization, passed_date")
         .in("stage", ["Completada", "Confirmada"]);
-      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+      if (!canSeeAll && effectiveUserId) {
         q = q.eq("assigned_to", effectiveUserId);
       }
       if (applyCreatorDate) {
@@ -758,6 +763,7 @@ export const useCloserLeads = () => {
     claimLead,
     isAdmin,
     isManager,
+    isSupervisor,
     viewAsCloserId,
     viewAsCloserName,
     setViewAsCloser: (id: string | null, name: string | null) => {

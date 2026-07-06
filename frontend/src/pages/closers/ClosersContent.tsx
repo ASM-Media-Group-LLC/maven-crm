@@ -49,7 +49,7 @@ const ClosersContent = () => {
     dateTo, setDateTo,
     dateField, setDateField,
     updateField, updateStage, assignCreator, claimLead,
-    isAdmin, isManager,
+    isAdmin, isManager, isSupervisor,
     viewAsCloserId, viewAsCloserName, setViewAsCloser,
   } = useCloserLeads();
 
@@ -114,8 +114,8 @@ const ClosersContent = () => {
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
 
   const TABS = useMemo(() =>
-    (isAdmin || isManager) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
-    [isAdmin, isManager]
+    (isAdmin || isManager || isSupervisor) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
+    [isAdmin, isManager, isSupervisor]
   );
 
   const sourceAccounts = useMemo(() =>
@@ -146,7 +146,7 @@ const ClosersContent = () => {
                   placeholder="Seleccionar fechas"
                 />
               )}
-              {(isAdmin || isManager) && (
+              {(isAdmin || isManager || isSupervisor) && (
                 <ViewAsCloserPicker
                   value={viewAsCloserId}
                   onChange={(id, name) => setViewAsCloser(id, name)}

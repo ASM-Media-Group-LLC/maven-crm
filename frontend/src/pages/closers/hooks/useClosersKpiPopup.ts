@@ -71,7 +71,7 @@ export function useClosersKpiPopup(
   opts?: { dateFrom?: Date; dateTo?: Date; dateField?: string; viewAsCloserId?: string | null },
 ) {
   const { user } = useAuth();
-  const { isAdmin, isManager, role } = useUserRole();
+  const { isAdmin, isManager, isSupervisor, role } = useUserRole();
   const userId = user?.id;
 
   const { dateFrom, dateTo, dateField, viewAsCloserId } = opts ?? {};
@@ -81,7 +81,10 @@ export function useClosersKpiPopup(
   // y forzamos assigned_to = viewAsCloserId.
   const effectiveIsAdmin = viewAsCloserId ? false : isAdmin;
   const effectiveIsManager = viewAsCloserId ? false : isManager;
+  const effectiveIsSupervisor = viewAsCloserId ? false : isSupervisor;
   const effectiveUserId = viewAsCloserId ?? userId;
+  // Ve todo el pipeline: admin/manager/supervisor (incluye Team Leader).
+  const canSeeAll = effectiveIsAdmin || effectiveIsManager || effectiveIsSupervisor;
 
   return useQuery<ClosersKpiPopupResult>({
     queryKey: ["closers-kpi-popup", state, userId, role, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
@@ -104,7 +107,7 @@ export function useClosersKpiPopup(
           if (stages && stages.length > 0) {
             q = stages.length === 1 ? q.eq("stage", stages[0]) : q.in("stage", stages);
           }
-          if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+          if (!canSeeAll && effectiveUserId) {
             q = q.eq("assigned_to", effectiveUserId);
           }
           if (applyCreatorDate) {
