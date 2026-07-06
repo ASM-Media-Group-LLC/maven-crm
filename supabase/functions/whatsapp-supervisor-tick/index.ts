@@ -532,6 +532,27 @@ async function checkUnannouncedAbsence(
   }
 }
 
+// Resume el ÚLTIMO contacto de un lead para el digest del supervisor: canal +
+// resultado + nota (pedido de Luis: que el bot "vea el canal y las notas", no
+// solo cuente). `rows` viene ordenado por contact_date DESC. Ignora la nota
+// placeholder '(auto)' (los contactos auto de la bandeja no tienen nota real).
+function lastContactSummary(
+  rows: Array<{ channel: string | null; result: string | null; notes: string | null; contact_date: string }>,
+  nowMs: number,
+): string {
+  if (!rows || rows.length === 0) return "sin contactos aún";
+  const last = rows[0];
+  const d = Math.floor((nowMs - new Date(last.contact_date).getTime()) / 86_400_000);
+  const when = d <= 0 ? "hoy" : `hace ${d}d`;
+  const parts: string[] = [];
+  if (last.channel) parts.push(last.channel);
+  if (last.result) parts.push(`"${last.result}"`);
+  let s = `último ${when}${parts.length ? " · " + parts.join(" · ") : ""}`;
+  const note = String(last.notes ?? "").trim();
+  if (note && note !== "(auto)") s += ` · nota: "${note.slice(0, 80)}"`;
+  return s;
+}
+
 async function checkCommitmentFollowups(
   sb: SupabaseClient,
   group: GroupInfo,
@@ -639,6 +660,10 @@ async function checkCommitmentFollowups(
   // Cadencia 1,3,5,8,15,29 días desde passed_date. En vez de 1 ping por lead
   // vencido (era spam: ~27 de una), agrupamos por closer y mandamos UN solo
   // resumen con la lista → acotado a 1 mensaje/closer/día (dedup por checkKey).
+  //
+  // Pedido de Luis: el supervisor no solo cuenta — para cada lead vencido trae
+  // el ÚLTIMO contacto (canal + resultado + nota) leyendo closer_contact_history,
+  // así el closer ve de un vistazo en qué quedó cada gestión.
   const cadence = [1, 3, 5, 8, 15, 29];
   const { data: assigned } = await sb
     .from("closer_creators")
@@ -646,7 +671,7 @@ async function checkCommitmentFollowups(
     .eq("stage", "Asignada")
     .not("assigned_to", "is", null)
     .not("passed_date", "is", null);
-  const overdueByCloser = new Map<string, string[]>();
+  const overdueByCloser = new Map<string, Array<{ handle: string; detail: string }>>();
   for (const cc of (assigned ?? []) as Array<{
     id: string;
     instagram_handle: string | null;
@@ -656,19 +681,23 @@ async function checkCommitmentFollowups(
     if (!cc.passed_date || !cc.assigned_to) continue;
     const passedMs = new Date(cc.passed_date + "T00:00:00-05:00").getTime();
     const daysSince = Math.floor((now - passedMs) / 86_400_000);
-    const { count: contactsDone } = await sb
+    // Traemos las filas (no solo el count) → count = rows.length y además el
+    // último contacto con su canal/resultado/nota. Un lead tiene ≤6 contactos.
+    const { data: histRows } = await sb
       .from("closer_contact_history")
-      .select("id", { count: "exact", head: true })
-      .eq("creator_id", cc.id);
-    const done = contactsDone ?? 0;
+      .select("channel, result, notes, contact_date")
+      .eq("creator_id", cc.id)
+      .order("contact_date", { ascending: false });
+    const hist = (histRows ?? []) as Array<{ channel: string | null; result: string | null; notes: string | null; contact_date: string }>;
+    const done = hist.length;
     if (done >= 6) continue;
     const nextDay = cadence[done];
     if (nextDay == null || daysSince <= nextDay) continue;
     const list = overdueByCloser.get(cc.assigned_to) ?? [];
-    list.push(cc.instagram_handle ?? "(sin handle)");
+    list.push({ handle: cc.instagram_handle ?? "(sin handle)", detail: lastContactSummary(hist, now) });
     overdueByCloser.set(cc.assigned_to, list);
   }
-  for (const [closerId, handles] of overdueByCloser) {
+  for (const [closerId, leads] of overdueByCloser) {
     const { data: prof } = await sb
       .from("profiles")
       .select("whatsapp_push_name, full_name")
@@ -676,10 +705,11 @@ async function checkCommitmentFollowups(
       .maybeSingle();
     // Nombre REAL primero (full_name), no el apodo de WhatsApp.
     const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
-    const top = handles.slice(0, 8);
-    const lista = top.map((h) => `· ${igLink(h)}`).join("\n");
-    const extra = handles.length > top.length ? `\n…y ${handles.length - top.length} más` : "";
-    const msg = `@${closerName}, tenés ${handles.length} lead${handles.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy?`;
+    // 6 con detalle (canal/resultado/nota) para no pasarnos de largo en el grupo.
+    const top = leads.slice(0, 6);
+    const lista = top.map((l) => `· ${igLink(l.handle)} — ${l.detail}`).join("\n");
+    const extra = leads.length > top.length ? `\n…y ${leads.length - top.length} más` : "";
+    const msg = `@${closerName}, tenés ${leads.length} lead${leads.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy? Si ya los tocaste, registrá el contacto (canal + resultado).`;
     await sendFollowup(sb, group, `closer_contact_digest:${closerId}`, msg);
   }
 

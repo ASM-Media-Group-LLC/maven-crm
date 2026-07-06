@@ -2,7 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp } from "lucide-react";
+import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp, Activity } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
@@ -10,6 +10,7 @@ import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
 import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
 import ViewAsCloserPicker from "./components/ViewAsCloserPicker";
+import ClosersActivityDashboard from "./components/ClosersActivityDashboard";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -63,8 +64,8 @@ const ClosersContent = () => {
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
   const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup, { dateFrom, dateTo, dateField, viewAsCloserId });
-  // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
-  const [viewTab, setViewTab] = useState<"dashboard" | "operaciones" | "oportunidades">("dashboard");
+  // Subtab top-level — Dashboard (KPI cards) vs Actividad (contactos por empleado) vs Operaciones (tabs/filtros/tabla)
+  const [viewTab, setViewTab] = useState<"dashboard" | "actividad" | "operaciones" | "oportunidades">("dashboard");
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
@@ -204,6 +205,13 @@ const ClosersContent = () => {
                 Dashboard
               </SubtabNavItem>
               <SubtabNavItem
+                active={viewTab === "actividad"}
+                onClick={() => setViewTab("actividad")}
+              >
+                <Activity className="mr-1.5 h-4 w-4" />
+                Actividad
+              </SubtabNavItem>
+              <SubtabNavItem
                 active={viewTab === "operaciones"}
                 onClick={() => setViewTab("operaciones")}
               >
@@ -233,6 +241,20 @@ const ClosersContent = () => {
                 dateTo={dateTo}
                 onPipelineClick={(key) => setKpiPopup({ kind: "pipeline", key })}
                 onRevenueClick={(platform) => setKpiPopup({ kind: "revenue", platform })}
+              />
+            </div>
+          )}
+
+          {/* ACTIVIDAD — dashboard diario de contactos hechos por cada empleado
+              (manual del chip N/6 + auto de la bandeja WA/TG), filtrable por
+              fecha. El gate por rol (admin/manager ven a todos; el closer solo a
+              sí mismo) vive en las RPCs get_closer_activity*. */}
+          {viewTab === "actividad" && (
+            <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
+              <ClosersActivityDashboard
+                isAdmin={isAdmin}
+                isManager={isManager}
+                viewAsCloserId={viewAsCloserId}
               />
             </div>
           )}
