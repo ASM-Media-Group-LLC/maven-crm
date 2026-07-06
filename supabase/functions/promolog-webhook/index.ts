@@ -286,6 +286,10 @@ Deno.serve(async (req: Request) => {
   // Creadoras (de las despachadas) que terminaron con AL MENOS una entry. Las
   // que no queden acá reciben una entry "No / sin historia" en el sweep final.
   const creatorsWithEntries = new Set<string>();
+  // Creadoras de las que se leyó AL MENOS una historia REAL (media obtenida).
+  // Señal de que el scraper funcionó para este lote → discrimina en el sweep
+  // entre "no publicó" (No legítimo) y "no se pudo leer" (proxy/sesión caída).
+  const creatorsWithRealStory = new Set<string>();
 
   for (const [handle, stories] of itemsByHandle) {
     const creatorId = handleToCreator.get(handle);
@@ -295,7 +299,7 @@ Deno.serve(async (req: Request) => {
       const limitedStories = stories.slice(0, MAX_STORIES_PER_CREATOR);
 
       if (limitedStories.length === 0) {
-        await insertEmptyEntry(sb, {
+        await insertNoDataEntry(sb, {
           creator_id: creatorId,
           dispatch_run_id: dispatchRunId,
           apify_run_id: apifyRunId,
@@ -337,6 +341,7 @@ Deno.serve(async (req: Request) => {
           } else if (r && r.inserted) {
             entriesCreated++;
             creatorsWithEntries.add(creatorId);
+            creatorsWithRealStory.add(creatorId); // se obtuvo media real → el scraper funcionó
           }
         }
       }
@@ -354,17 +359,49 @@ Deno.serve(async (req: Request) => {
   // así que "sin items" = "no subió historia" = "No" legítimo. En un PARCIAL/timeout,
   // las que faltan NO fueron escaneadas (Apify se cortó) → NO las marcamos "No"
   // (sería falso); quedan sin entry y el poll las reintenta (retryFallen).
+  // DISCRIMINADOR clave (fix falso negativo tipo danyancat): si el run leyó AL
+  // MENOS una historia real, el scraper funcionó para este lote → las despachadas
+  // sin entry realmente no subieron historia = "No" legítimo (insertEmptyEntry).
+  // Si el run NO leyó NINGUNA historia real, el lote entero cayó (proxy/sesión de
+  // IG bloqueada) → NO afirmamos "no promocionó": marcamos "sin datos"
+  // (insertNoDataEntry) y avisamos a los managers. El actor devuelve un item
+  // "profile" vacío por perfil bloqueado, indistinguible por-item de "0 historias",
+  // pero a nivel run "0 historias reales en todo el lote" = fallo del scraper.
+  const runGotAnyRealStory = creatorsWithRealStory.size > 0;
   if (!isPartial) {
     for (const cid of creatorIds) {
       if (creatorsWithEntries.has(cid)) continue;
-      await insertEmptyEntry(sb, {
-        creator_id: cid,
-        dispatch_run_id: dispatchRunId,
-        apify_run_id: apifyRunId,
-        scan_date: scanDate,
-      });
+      // Sin NINGUNA historia leída (story_count=0) = NO sabemos si publicó: el
+      // actor devuelve un item "profile" vacío tanto si el fetch falló (proxy/401,
+      // incluso por-perfil dentro de un lote que sí funcionó) como si no había
+      // historias — indistinguibles. Marcamos "sin datos", NUNCA "no promocionó".
+      // "No promocionó" solo se afirma cuando SÍ se leyeron historias y ninguna era
+      // promo (eso lo inserta processStory con story_count>0, no acá).
+      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: dispatchRunId, apify_run_id: apifyRunId, scan_date: scanDate });
       creatorsWithEntries.add(cid);
       entriesCreated++;
+    }
+
+    // Alerta de scraper caído: un lote no trivial que no devolvió NINGUNA historia
+    // real es casi siempre bloqueo de proxy/sesión de IG. Avisar a managers (1/día
+    // vía automation_key) para refrescar la sesión / revisar el proveedor.
+    if (!runGotAnyRealStory && creatorIds.length >= 5) {
+      try {
+        await sb.from("notifications").upsert({
+          user_id: null,
+          role_target: "manager",
+          visibility_scope: "team",
+          type: "promolog_scraper_down",
+          title: "Promolog: el scraper de IG no leyó historias",
+          message: `Un lote de ${creatorIds.length} creadoras no devolvió ninguna historia (posible bloqueo de proxy/sesión de Instagram). Las historias marcadas hoy pueden estar incompletas — quedaron como "sin datos", no como "no promocionó".`,
+          module_origin: "promolog",
+          priority: "high",
+          deep_link_url: "/promolog",
+          automation_key: `promolog_scraper_down:${scanDate.slice(0, 10)}`,
+        }, { onConflict: "automation_key", ignoreDuplicates: true });
+      } catch (e) {
+        console.error("scraper-down alert failed:", (e as Error).message);
+      }
     }
   }
 
@@ -1040,6 +1077,34 @@ async function insertEmptyEntry(
     ai_confidence: 1.0,
     ai_reasoning: "El perfil no tenía historias subidas en el momento del escaneo; no se registró ninguna promoción.",
     story_count: 0,
+  });
+}
+
+// "Sin datos": el scraper NO devolvió media para este perfil en un run donde el
+// lote entero falló (proxy/sesión de IG). A diferencia de insertEmptyEntry, NO
+// afirma "no promocionó" — se marca promoted='pending' + error_reason para que
+// NO cuente como "No" en el tablero (evita el falso negativo tipo danyancat).
+// needs_review=false para no inundar la cola de "revisar manual" con 50+/día.
+async function insertNoDataEntry(
+  sb: any,
+  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string; scan_date: string },
+): Promise<void> {
+  await sb.from("promolog_entries").insert({
+    tenant_id: TENANT_ID,
+    creator_id: args.creator_id,
+    date: args.scan_date,
+    promoted: "pending",
+    network: "Instagram",
+    platform: "Ninguna",
+    has_buy_link: false,
+    notes: "[SIN DATOS] No se pudieron leer las historias (el scraper no devolvió media — posible bloqueo de proxy/sesión de Instagram). NO confirma que la creadora no haya publicado.",
+    dispatch_run_id: args.dispatch_run_id,
+    apify_run_id: args.apify_run_id,
+    analyzed_by_ai: false,
+    ai_reasoning: "Scan sin media: el scraper no devolvió historias para este perfil en este run (fallo de lectura, no ausencia confirmada).",
+    story_count: 0,
+    needs_review: false,
+    error_reason: "scrape_no_media",
   });
 }
 
