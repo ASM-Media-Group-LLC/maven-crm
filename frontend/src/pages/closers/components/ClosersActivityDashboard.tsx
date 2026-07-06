@@ -29,7 +29,7 @@ type Estado = "sin_gestion" | "atrasado" | "al_dia" | "sin_leads";
 const estadoOf = (r: CloserActivityRow): Estado => {
   if (r.leads_assigned === 0) return "sin_leads";
   if (r.leads_overdue === 0) return "al_dia";
-  if (r.leads_overdue >= r.leads_assigned) return "sin_gestion"; // todos vencidos
+  if (r.leads_overdue / r.leads_assigned >= 0.75) return "sin_gestion"; // ≥75% del pipeline vencido
   return "atrasado";
 };
 
@@ -170,7 +170,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
       {/* Leyenda */}
       <p className="text-[11px] text-muted-foreground">
         <span className="font-medium text-foreground/80">Estado:</span>{" "}
-        <span className="text-rose-500">● Sin gestión</span> (todos sus leads asignados están vencidos) ·{" "}
+        <span className="text-rose-500">● Sin gestión</span> (≥75% de sus leads asignados vencidos) ·{" "}
         <span className="text-amber-500">● Atrasado</span> (algunos leads con contacto vencido por cadencia) ·{" "}
         <span className="text-emerald-500">● Al día</span> (sin vencidos).{"  "}
         <span className="font-medium text-foreground/80">Auto</span> = contacto registrado solo al escribir desde la bandeja WA/TG.
