@@ -23,11 +23,14 @@ import {
 // ── Estado del closer (semáforo de supervisión) ──────────────────────────
 type Estado = "sin_gestion" | "atrasado" | "al_dia" | "sin_leads";
 
+// El estado se basa en el pipeline ACTUAL (leads asignados + vencidos por
+// cadencia), NO en la actividad del rango — si dependiera del rango, elegir
+// "Hoy" (casi siempre 0 contactos) marcaba a todos como "Sin gestión".
 const estadoOf = (r: CloserActivityRow): Estado => {
-  if (r.leads_assigned > 0 && r.total_contacts === 0) return "sin_gestion";
-  if (r.leads_overdue > 0) return "atrasado";
-  if (r.leads_assigned > 0) return "al_dia";
-  return "sin_leads";
+  if (r.leads_assigned === 0) return "sin_leads";
+  if (r.leads_overdue === 0) return "al_dia";
+  if (r.leads_overdue >= r.leads_assigned) return "sin_gestion"; // todos vencidos
+  return "atrasado";
 };
 
 const ESTADO_META: Record<Estado, { label: string; variant: BadgeProps["variant"]; prio: number }> = {
@@ -161,15 +164,15 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
         <KpiCard label="Contactos" value={totals.contacts} icon={Activity} color="bg-blue-500" subtitle="Registrados en el rango" />
         <KpiCard label="Leads tocados" value={totals.touched} icon={Users} color="bg-violet-500" subtitle="Leads distintos contactados" />
         <KpiCard label="Leads vencidos" value={totals.overdue} icon={AlertTriangle} color="bg-rose-500" subtitle="Contacto fuera de cadencia" />
-        <KpiCard label="Closers sin gestión" value={totals.sinGestion} icon={UserX} color="bg-amber-500" subtitle="Con leads y 0 contactos" />
+        <KpiCard label="Closers sin gestión" value={totals.sinGestion} icon={UserX} color="bg-amber-500" subtitle="Todos sus leads vencidos" />
       </div>
 
       {/* Leyenda */}
       <p className="text-[11px] text-muted-foreground">
         <span className="font-medium text-foreground/80">Estado:</span>{" "}
-        <span className="text-rose-500">● Sin gestión</span> (tiene leads asignados y no los tocó) ·{" "}
-        <span className="text-amber-500">● Atrasado</span> (leads con contacto vencido por cadencia) ·{" "}
-        <span className="text-emerald-500">● Al día</span>.{"  "}
+        <span className="text-rose-500">● Sin gestión</span> (todos sus leads asignados están vencidos) ·{" "}
+        <span className="text-amber-500">● Atrasado</span> (algunos leads con contacto vencido por cadencia) ·{" "}
+        <span className="text-emerald-500">● Al día</span> (sin vencidos).{"  "}
         <span className="font-medium text-foreground/80">Auto</span> = contacto registrado solo al escribir desde la bandeja WA/TG.
       </p>
 
