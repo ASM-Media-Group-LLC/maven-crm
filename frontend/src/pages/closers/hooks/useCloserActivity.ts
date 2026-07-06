@@ -28,6 +28,9 @@ export interface CloserActivityDetailRow {
   contact_date: string;
   lead_id: string;
   lead_handle: string | null;
+  lead_stage: string | null;
+  lead_category: string | null;
+  lead_monetization: number | null;
   channel: string | null;
   result: string | null;
   notes: string | null;
