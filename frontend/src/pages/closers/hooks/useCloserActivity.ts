@@ -18,6 +18,8 @@ export interface CloserActivityRow {
   leads_touched: number;
   auto_contacts: number;
   manual_contacts: number;
+  leads_assigned: number;   // leads en stage 'Asignada' (pipeline activo del closer)
+  leads_overdue: number;    // de esos, vencidos por cadencia
   by_channel: Record<string, number>;
   by_result: Record<string, number>;
   last_activity: string | null;

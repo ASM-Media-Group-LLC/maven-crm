@@ -132,22 +132,27 @@ const ClosersContent = () => {
           subtitle="Pipeline de cierre de modelos"
           actions={
             <>
-              <DateRangePicker
-                from={dateFrom}
-                to={dateTo}
-                onApply={(from, to) => {
-                  setDateFrom(from);
-                  setDateTo(to);
-                }}
-                placeholder="Seleccionar fechas"
-              />
+              {/* En "Actividad" no mostramos este date-picker ni "Asignar":
+                  esa vista tiene su propio filtro de fecha (evita el doble
+                  selector confuso) y asignar leads no aplica ahí. */}
+              {viewTab !== "actividad" && (
+                <DateRangePicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onApply={(from, to) => {
+                    setDateFrom(from);
+                    setDateTo(to);
+                  }}
+                  placeholder="Seleccionar fechas"
+                />
+              )}
               {(isAdmin || isManager) && (
                 <ViewAsCloserPicker
                   value={viewAsCloserId}
                   onChange={(id, name) => setViewAsCloser(id, name)}
                 />
               )}
-              {(isAdmin || isManager || canAssignCloser) && (
+              {viewTab !== "actividad" && (isAdmin || isManager || canAssignCloser) && (
                 <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
                   <UserPlus className="h-4 w-4 mr-1" /> Asignar
                 </Button>
