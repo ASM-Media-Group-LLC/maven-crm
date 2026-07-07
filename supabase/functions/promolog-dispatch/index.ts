@@ -54,6 +54,13 @@ const CREATORS_PER_APIFY_RUN = 12;
 // ahorrar un par de run-starts. Con ~57 creadoras → ~10 runs secuenciales.
 const CREATORS_PER_STAGGERED_RUN = 6;
 
+// Reintentos por creadora/día en modo escalonado. Una "sin datos" viene casi
+// siempre del UPSTREAM504 del proxy CO (falla de transporte, ni llega a IG) →
+// reintentar es SEGURO (no estresa la sesión con IG). El tope evita re-loguear
+// la sesión sin fin (cada run hace 1 auth-init) y acota el costo: con ~50% de
+// éxito por intento, 3 intentos ≈ 87% de cobertura.
+const MAX_ATTEMPTS_PER_DAY = 3;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -168,21 +175,35 @@ Deno.serve(async (req: Request) => {
     return json({ skipped: true, reason: "No eligible creators" });
   }
 
-  // one_chunk: excluir las que YA tienen entry de IG hoy (Bogotá) → una sola
-  // pasada por creadora, sin re-escanear; el cron frecuente cubre al resto.
+  // one_chunk: escalonado con REINTENTO de "sin datos".
+  //   - Creadora LEÍDA con éxito hoy (story_count>0) → lista, no se re-escanea.
+  //   - Creadora "sin datos" (scrape_no_media = el proxy CO tiró UPSTREAM504 y ni
+  //     llegó a IG) → se REINTENTA, con tope MAX_ATTEMPTS_PER_DAY (cada fila
+  //     scrape_no_media del día = 1 intento; el webhook inserta 1 por intento).
+  //   Ordenamos por menos-intentos primero: se cubre a todas una vez y recién
+  //   después se reintentan las que fallaron por proxy.
   let eligible = creators as any[];
   if (oneChunk) {
     const todayBogota = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
-    const { data: scanned } = await (sb as any)
+    const { data: entriesToday } = await (sb as any)
       .from("promolog_entries")
-      .select("creator_id")
+      .select("creator_id, story_count, error_reason")
       .eq("network", "instagram")
       .gte("date", `${todayBogota}T00:00:00-05:00`)
       .lte("date", `${todayBogota}T23:59:59-05:00`);
-    const scannedSet = new Set((scanned ?? []).map((r: any) => r.creator_id));
-    eligible = eligible.filter((c) => !scannedSet.has(c.id));
+    const readOk = new Set<string>();
+    const attempts = new Map<string, number>();
+    for (const r of (entriesToday ?? []) as any[]) {
+      if ((r.story_count ?? 0) > 0) readOk.add(r.creator_id);
+      if (r.error_reason === "scrape_no_media") {
+        attempts.set(r.creator_id, (attempts.get(r.creator_id) ?? 0) + 1);
+      }
+    }
+    eligible = eligible
+      .filter((c) => !readOk.has(c.id) && (attempts.get(c.id) ?? 0) < MAX_ATTEMPTS_PER_DAY)
+      .sort((a, b) => (attempts.get(a.id) ?? 0) - (attempts.get(b.id) ?? 0));
     if (eligible.length === 0) {
-      return json({ done: true, reason: "Todas las creadoras ya tienen scan de hoy" });
+      return json({ done: true, reason: "Todas leídas o al tope de reintentos" });
     }
   }
 
