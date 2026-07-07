@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const {
   BLU_JWT,
+  BLU_JWT_MASSIVE,   // seed de la 2ª cuenta-agencia (Kash Massive); si falta, Massive NO se corre
   BLU_WS_URL = "wss://of.unlok.me/",
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
@@ -41,16 +42,19 @@ function jwtExpMs(token) {
   } catch { return null; }
 }
 
-// ── token de sesión: blu_session (refrescado) → BLU_JWT (seed) ──
-async function getToken() {
+// ── token de sesión POR CUENTA: blu_session[id] (refrescado) → seed inicial ──
+// id 1 = plus (Kash Plus), id 2 = massive (Kash Massive). Cada cuenta tiene su
+// fila propia + su seed (BLU_JWT / BLU_JWT_MASSIVE) y se auto-refresca sola. El
+// id discrimina la cuenta (no hace falta columna extra en blu_session).
+async function getToken(id, seed) {
   try {
-    const { data } = await sb().from("blu_session").select("token").eq("id", 1).maybeSingle();
+    const { data } = await sb().from("blu_session").select("token").eq("id", id).maybeSingle();
     if (data?.token) return data.token;
-  } catch (e) { console.error("[blu-bridge] getToken falló, uso BLU_JWT:", e.message); }
-  return BLU_JWT;
+  } catch (e) { console.error(`[blu-bridge] getToken(id=${id}) falló, uso seed:`, e.message); }
+  return seed;
 }
-async function saveToken(token) {
-  const { error } = await sb().from("blu_session").upsert({ id: 1, token, refreshed_at: new Date().toISOString() });
+async function saveToken(id, token) {
+  const { error } = await sb().from("blu_session").upsert({ id, token, refreshed_at: new Date().toISOString() });
   if (error) console.error("[blu-bridge] saveToken:", error.message);
 }
 
@@ -62,7 +66,7 @@ const chunk = (arr, size) => { const out = []; for (let i = 0; i < arr.length; i
 
 // Marca de tiempo del último resync PESADO (90 días). Las corridas livianas intermedias solo
 // refrescan el mes en curso; cada RESYNC_EVERY_HOURS se hace uno pesado para corregir reembolsos.
-let lastFullResyncMs = 0;
+const lastFullResyncMs = {};   // por cuenta (id → ms del último resync pesado)
 
 // ── WS: auth (captura el token fresco del auth:ok) + pedir reportes día a día ──
 async function fetchEarningsWS(token, days) {
@@ -374,11 +378,12 @@ async function ingest(rows) {
   return data;
 }
 
-async function runOnce(firstRun = false) {
+async function runOnce(acct, firstRun = false) {
   requireEnv();
-  let token = await getToken();
+  let token = await getToken(acct.id, acct.seed);
+  if (!token) { console.error(`[blu-bridge:${acct.account}] sin token (ni blu_session ni seed) → salto.`); return { rows: 0 }; }
   const expMs = jwtExpMs(token);
-  if (expMs && Date.now() >= expMs) throw Object.assign(new Error("token de sesión vencido"), { expired: true });
+  if (expMs && Date.now() >= expMs) throw Object.assign(new Error(`token de sesión vencido (${acct.account})`), { expired: true });
 
   // DOS NIVELES (para correr seguido sin gastar): corrida LIVIANA = solo el mes en curso
   // (barata). RESYNC PESADO = los últimos RESYNC_DAYS, para que un reembolso/chargeback en un
@@ -387,20 +392,20 @@ async function runOnce(firstRun = false) {
   // PRIMER run, si BACKFILL_DAYS>0, se extiende más atrás (histórico, 1 sola vez). Chunks de
   // 30 días → 1 conexión WS por chunk: resiliente (un chunk que falla no tumba el resto).
   const baseDays = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);   // mes en curso
-  const doFull = firstRun || (Date.now() - lastFullResyncMs >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000);
-  if (doFull) lastFullResyncMs = Date.now();
+  const doFull = firstRun || (Date.now() - (lastFullResyncMs[acct.id] || 0) >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000);
+  if (doFull) lastFullResyncMs[acct.id] = Date.now();
   const rolling = doFull ? Math.max(baseDays, Number(RESYNC_DAYS) || 0) : baseDays;
   const backfill = firstRun ? Number(BACKFILL_DAYS) || 0 : 0;
   const allDays = daysBack(Math.max(rolling, backfill));
   const chunks = chunk(allDays, 30);
-  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}… ${doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
+  console.log(`[blu-bridge:${acct.account}] conectando WS ${BLU_WS_URL}… ${doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
 
   let totalRows = 0, sawCreators = false;
   for (let ci = 0; ci < chunks.length; ci++) {
     const c = chunks[ci];
     try {
       const { results, freshToken } = await fetchEarningsWS(token, c);
-      if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+      if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
       if (!sawCreators && results[0]) { console.log(`[blu-bridge] ≈${results[0].payload?.creators?.length ?? 0} creadoras/día.`); sawCreators = true; }
       const rows = transform(results);
       if (rows.length) await ingest(rows);
@@ -420,7 +425,7 @@ async function runOnce(firstRun = false) {
     const fanStart = allDays[0];                       // más viejo
     const fanEnd = allDays[allDays.length - 1];        // hoy
     const { results: fanModels, freshToken } = await fetchFanReportsWS(token, fanStart, fanEnd);
-    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
     const rows = transformFans(fanModels);
     for (const batch of chunk(rows, 2000)) {
       const { error } = await sb().rpc("import_blu_fans", { p_rows: batch });
@@ -451,13 +456,16 @@ async function runOnce(firstRun = false) {
     console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
   }
 
+  // Chatters/chatter-daily SOLO en la cuenta principal (plus): employee-reports es a nivel AGENCIA
+  // y import_blu_chatters es snapshot (delete+insert) → correrlo por 2 cuentas se pisaría.
+  if (acct.account === "plus") {
   // Chatters (employee-reports): snapshot del MES EN CURSO. Aislado: si falla, no afecta el resto.
   try {
     const now2 = new Date();
     const chFrom = ymd(new Date(Date.UTC(now2.getUTCFullYear(), now2.getUTCMonth(), 1)));
     const chTo = ymd(now2);
     const { employees, freshToken } = await fetchEmployeeReports(token, chFrom, chTo);
-    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
     const chRows = transformChatters(employees);
     if (chRows.length) {
       const { error } = await sb().rpc("import_blu_chatters", { p_rows: chRows, p_from: chFrom, p_to: chTo });
@@ -475,7 +483,7 @@ async function runOnce(firstRun = false) {
   try {
     const chatterDays = daysBack(45);   // mes en curso + margen
     const { results, freshToken } = await fetchEmployeeReportsDaily(token, chatterDays);
-    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
     const dRows = transformChatterDaily(results);
     for (const batch of chunk(dRows, 2000)) {
       const { error } = await sb().rpc("import_blu_chatter_daily", { p_rows: batch });
@@ -487,24 +495,36 @@ async function runOnce(firstRun = false) {
     console.error(`[blu-bridge] employee-reports diario falló (no afecta el resto): ${e.message}`);
   }
 
+  } // fin chatters/chatter-daily (solo plus)
+
   return { rows: totalRows, fanRows };
 }
 
-function warnIfExpired(e) {
-  console.error("[blu-bridge] error:", e.message);
-  if (e.expired) console.error("[blu-bridge] ⚠ Renová BLU_JWT desde BLU y actualizá el secreto en Dokploy (re-seed).");
+function warnIfExpired(acct, e) {
+  console.error(`[blu-bridge:${acct?.account ?? "?"}] error:`, e.message);
+  if (e.expired) console.error(`[blu-bridge:${acct?.account ?? "?"}] ⚠ Renová el JWT (${acct?.account === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}) desde BLU y re-seedeá el secreto en Dokploy.`);
+}
+
+// Cuentas a correr: plus SIEMPRE (seed BLU_JWT). Massive SOLO si hay seed BLU_JWT_MASSIVE
+// → hasta que el owner lo setee en Dokploy, no se toca nada de Massive.
+function buildAccounts() {
+  const accts = [{ id: 1, account: "plus", seed: BLU_JWT }];
+  if (BLU_JWT_MASSIVE) accts.push({ id: 2, account: "massive", seed: BLU_JWT_MASSIVE });
+  return accts;
+}
+async function runAllAccounts(firstRun) {
+  for (const acct of buildAccounts()) {
+    try { await runOnce(acct, firstRun); }
+    catch (e) { warnIfExpired(acct, e); }
+  }
 }
 
 async function main() {
-  if (RUN_ONCE) {
-    try { await runOnce(true); process.exit(0); }
-    catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); }
-    return;
-  }
-  await runOnce(true).catch(warnIfExpired);   // primer run: pesado (90d) + backfill histórico si BACKFILL_DAYS>0
+  if (RUN_ONCE) { await runAllAccounts(true); process.exit(0); return; }
+  await runAllAccounts(true);   // primer run: pesado (90d) + backfill si BACKFILL_DAYS>0, por cuenta
   const hours = Math.max(1, Math.min(Number(RUN_EVERY_HOURS) || 3, 12));   // 1–12h; < 24h para refrescar el token
-  console.log(`[blu-bridge] próxima corrida en ${hours}h (livianas; resync pesado cada ${Math.max(1, Number(RESYNC_EVERY_HOURS) || 12)}h)`);
-  setInterval(() => runOnce(false).catch(warnIfExpired), hours * 3600000);   // livianas (mes actual) + pesado periódico
+  console.log(`[blu-bridge] próxima corrida en ${hours}h (cuentas: ${buildAccounts().map((a) => a.account).join(", ")})`);
+  setInterval(() => runAllAccounts(false), hours * 3600000);
 }
 
 main();
