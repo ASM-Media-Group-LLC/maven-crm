@@ -48,6 +48,12 @@ const MAX_CREATORS_PER_DISPATCH = 100;
 // cambio al actor logueado (stories en vivo, no posts). Tuneable.
 const CREATORS_PER_APIFY_RUN = 12;
 
+// En modo escalonado (one_chunk) usamos un lote MÁS CHICO: cada Apify run es una
+// ráfaga corta (pocas cuentas) desde una sola IP residencial, y termina rápido
+// (menos chance de solaparse con el siguiente tick). Proteger la cuenta de IG >
+// ahorrar un par de run-starts. Con ~57 creadoras → ~10 runs secuenciales.
+const CREATORS_PER_STAGGERED_RUN = 6;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -113,6 +119,27 @@ Deno.serve(async (req: Request) => {
   // concurrencia era la causa del no_story_media masivo; validado: run solo lee bien).
   const oneChunk = body.one_chunk === true;
 
+  // ── Guard anti-concurrencia (solo escalonado) ────────────────────────────
+  // NUNCA lanzar un run si ya hay uno en vuelo: dos runs simultáneos usan la
+  // MISMA sessionCookie de IG desde 2+ IPs residenciales → IG lo lee como
+  // "viaje imposible" y flaguea/banea la cuenta (fue exactamente lo que quemó
+  // la sesión anterior). Con esto el scan queda estrictamente 1-run-a-la-vez.
+  // Ventana de 15 min = timeout del actor; si un run quedó colgado, tras 15 min
+  // el guard se libera solo (poll-stuck jobid 24 lo marca failed).
+  if (oneChunk) {
+    const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { data: inflight } = await (sb as any)
+      .from("promolog_dispatch_runs")
+      .select("id")
+      .eq("tenant_id", TENANT_ID)
+      .in("status", ["pending", "running"])
+      .gte("created_at", cutoff)
+      .limit(1);
+    if (inflight && inflight.length > 0) {
+      return json({ skipped: true, reason: "Run en vuelo; espero (guard anti-concurrencia)" });
+    }
+  }
+
   // ── Rate-limit: no más de 1 run/día (no aplica a one_chunk, que escalona) ─
   if (!body.force && !oneChunk) {
     const { data: already } = await (sb as any).rpc("promolog_dispatched_today", {
@@ -160,7 +187,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const limit = oneChunk
-    ? CREATORS_PER_APIFY_RUN
+    ? CREATORS_PER_STAGGERED_RUN
     : (body.max_creators && body.max_creators > 0 && body.max_creators <= MAX_CREATORS_PER_DISPATCH
         ? body.max_creators
         : MAX_CREATORS_PER_DISPATCH);
