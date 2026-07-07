@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Plus, StickyNote, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -113,44 +115,62 @@ const errorReasonLabel = (r?: string | null): string => {
   return r ? `Necesita revisión manual (${r}).` : "Necesita revisión manual: la IA no pudo leer la evidencia.";
 };
 
+// Celda de notas. La versión vieja se volvía un input de UNA línea al click →
+// incómodo para leer/editar notas largas. Ahora, igual que en el pipeline de
+// closers (InlineText de LeadTable): preview de hasta 2 líneas y al hacer clic
+// abre un Popover con un Textarea cómodo (⌘/Ctrl+Enter guarda, Esc cancela).
 const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | null) => void }) => {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(value || "");
 
-  useEffect(() => { setText(value); }, [value]);
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
-  const handleSave = () => {
-    setEditing(false);
-    const trimmed = text.trim();
-    if (trimmed !== value) {
-      onSave(trimmed || null);
-    }
+  const save = () => {
+    const v = text.trim();
+    if (v !== (value || "")) onSave(v || null);
+    setOpen(false);
   };
 
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setText(value); setEditing(false); } }}
-        className="w-full min-w-[120px] bg-transparent border-b border-primary text-sm outline-none py-0.5"
-        onClick={(e) => e.stopPropagation()}
-      />
-    );
-  }
-
   return (
-    <span
-      className="text-sm text-muted-foreground truncate max-w-[200px] block cursor-pointer hover:text-foreground"
-      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      title={value || "Click para agregar nota"}
-    >
-      {value || "—"}
-    </span>
+    <Popover open={open} onOpenChange={(o) => { if (o) setText(value || ""); setOpen(o); }} modal={true}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={value || undefined}
+          className="group flex w-full max-w-[220px] items-start gap-1.5 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted/60"
+        >
+          {value ? (
+            <>
+              <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" />
+              <span className="line-clamp-2 leading-snug text-muted-foreground">{value}</span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 group-hover:text-muted-foreground">
+              <Plus className="h-3 w-3" /> Nota
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="bottom" className="w-80 p-3" onClick={(e) => e.stopPropagation()}>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+            if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+          }}
+          autoFocus
+          rows={5}
+          placeholder="Escribí una nota…"
+          className="resize-none text-sm"
+        />
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
+          <div className="flex gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
