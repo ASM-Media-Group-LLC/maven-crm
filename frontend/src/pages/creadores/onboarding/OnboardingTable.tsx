@@ -51,7 +51,9 @@ const OnboardingTable = ({ data, onManage }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding"] });
+      // La lista usa queryKey ["onboarding-creators"] (ver useOnboarding). Invalidar
+      // ["onboarding"] no refetcheaba → el registro borrado quedaba hasta refrescar.
+      queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
       toast.success("Registro de onboarding eliminado");
       setDeletingItem(null);
     },
