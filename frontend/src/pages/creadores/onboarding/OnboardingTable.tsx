@@ -42,7 +42,12 @@ const OnboardingTable = ({ data, onManage }: Props) => {
 
   const deleteOnboarding = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("creator_onboardings" as any).delete().eq("id", id);
+      // El onboarding NO es una tabla aparte: cada fila es un `creators` (con status
+      // pendiente/onboarding/etc.). La tabla `creator_onboardings` no existe → el delete
+      // tiraba "Could not find the table ... in the schema cache". Borramos el creator.
+      // (Las deps son CASCADE/SET NULL; las de Promolog son NO ACTION pero una creadora
+      // en onboarding no tiene entries porque Promolog solo escanea las 'active'.)
+      const { error } = await supabase.from("creators").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
