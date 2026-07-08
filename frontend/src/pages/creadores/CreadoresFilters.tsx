@@ -39,8 +39,8 @@ const CreadoresFilters = ({
   hasActiveFilters,
   onClear,
 }: Props) => (
-  <div className="flex items-center gap-3">
-    <div className="relative w-48">
+  <div className="flex flex-wrap items-center gap-3">
+    <div className="relative w-48 shrink-0">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         placeholder="Buscar creador…"
@@ -128,7 +128,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
-      <SelectTrigger className="w-[140px]">
+      <SelectTrigger className="w-[140px] shrink-0">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
