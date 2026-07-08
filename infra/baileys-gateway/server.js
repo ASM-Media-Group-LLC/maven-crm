@@ -320,6 +320,26 @@ function clearAuth(instanceName) {
   return false;
 }
 
+// Reset SEGURO del número DEFAULT: sus credenciales viven SUELTAS en la raíz de
+// AUTH_DIR (creds.json + keys/sessions de useMultiFileAuthState). Borra SOLO esos
+// ARCHIVOS, NUNCA las SUBCARPETAS (cada una es otra línea) → se puede re-vincular la
+// línea principal sin tumbar a las demás. Preserva su config y métricas. Devuelve
+// cuántos archivos borró. (Antes esto estaba prohibido → de ahí 'cannot_reset_default'.)
+function clearDefaultAuthFiles() {
+  const keep = new Set(['manager-config.json', 'metrics.json']);
+  let n = 0;
+  try {
+    for (const entry of fs.readdirSync(AUTH_DIR, { withFileTypes: true })) {
+      if (entry.isFile() && !keep.has(entry.name)) {
+        try { fs.rmSync(`${AUTH_DIR}/${entry.name}`, { force: true }); n++; } catch (_e) { /* sigue con el resto */ }
+      }
+    }
+  } catch (e) {
+    logger.error({ err: e.message }, 'clearDefaultAuthFiles failed');
+  }
+  return n;
+}
+
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
   // Teardown LIMPIO del socket anterior ANTES de abrir uno nuevo. Sin esto, un
@@ -1428,10 +1448,11 @@ app.post('/instance/reconnect/:instance', async (req, res) => {
 // Reset de una línea CAÍDA: cierra el socket, BORRA las credenciales muertas y
 // re-inicia → Baileys emite un QR nuevo (servido en /instance/connect/:instance).
 // Para re-vincular una sesión deslogueada/fallida que no reconecta sola (a
-// diferencia de /reconnect, que reusa las mismas creds). No aplica al default.
+// diferencia de /reconnect, que reusa las mismas creds). El default TAMBIÉN se puede
+// resetear: borra solo SUS archivos de la raíz (clearDefaultAuthFiles), sin tocar las
+// subcarpetas de las otras líneas.
 app.post('/instance/reset/:instance', async (req, res) => {
   const name = (req.params && req.params.instance) || INSTANCE_NAME;
-  if (name === INSTANCE_NAME) return res.status(400).json({ error: 'cannot_reset_default' });
   try {
     const s = getSession(name);
     // Quitamos los listeners del socket viejo ANTES de cerrarlo para que su evento
@@ -1440,7 +1461,8 @@ app.post('/instance/reset/:instance', async (req, res) => {
     s.sock = null;
     s.qrRaw = null; s.qrDataUrl = null; s.connection = 'connecting';
     s.reconnectCount = 0; s.lastError = null;
-    const cleared = clearAuth(name);
+    // Default → borra solo sus archivos de la raíz (preserva otras líneas). Adicionales → borra su subcarpeta.
+    const cleared = name === INSTANCE_NAME ? (clearDefaultAuthFiles() > 0) : clearAuth(name);
     startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'reset re-init failed'));
     return res.json({ message: 'reset', cleared, instance: name, connectUrl: `/instance/connect/${name}` });
   } catch (e) {
