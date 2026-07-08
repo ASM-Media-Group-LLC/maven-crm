@@ -71,13 +71,25 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
 
+    // Teléfono: el PhoneInput trabaja con el número COMPLETO ("+<cc> <numero>"). Acá lo
+    // separamos en las columnas reales country_code + phone. Antes se guardaba el string
+    // combinado en `phone` (y country_code quedaba sin setear) → PhoneInput no encontraba
+    // el "+", ponía +57 por default y truncaba los primeros dígitos → PISABA el número real.
+    // Si el valor viene enmascarado (con "•", no-admin que no editó), stripMaskedPii lo dropea.
+    const phRaw = (step1.phone || "").trim();
+    const phM = phRaw.match(/^(\+\d+)\s+(.*)$/);
+    const ph = phM
+      ? { country_code: phM[1], phone: phM[2].replace(/\s+/g, "") || null }
+      : { country_code: null, phone: phRaw.replace(/\s+/g, "") || null };
+
     // PII: para no-admin el form se pre-llenó con email/phone ENMASCARADOS (vienen de la
     // vista). stripMaskedPii dropea cualquier PII con "•" para no pisar el valor real al
     // guardar. Si el no-admin escribe uno NUEVO (sin "•"), se guarda. El admin ve/escribe real.
     return stripMaskedPii({
       name: step1.name || "Borrador",
       email: step1.email || null,
-      phone: step1.phone || null,
+      phone: ph.phone,
+      country_code: ph.country_code,
       age: step1.age ? Number(step1.age) : null,
       country: step1.country || null,
       city: step1.city || null,
@@ -231,7 +243,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
         setStep1({
           name: c.name || "", segundoNombre: (c as any).segundo_nombre || extraData.segundoNombre || "",
-          email: c.email || "", phone: c.phone || "",
+          // phone se carga COMBINADO con el country_code ("+593 995572386") para que el
+          // PhoneInput lo parsee bien (dial + número). Al guardar se vuelve a separar.
+          email: c.email || "", phone: [(c as any).country_code, c.phone].filter(Boolean).join(" ").trim(),
           age: c.age ? String(c.age) : "", country: c.country || "", city: c.city || "",
           direccion: (c as any).direccion || extraData.direccion || "",
           timezone: (c as any).timezone || extraData.timezone || "",
