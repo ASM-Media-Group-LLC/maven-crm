@@ -1127,8 +1127,12 @@ serve(async (req) => {
   });
 
   // Si es mensaje del bot, no corremos nada (no detectamos compromisos
-  // en lo que nosotros mismos pedimos).
-  if (inserted && !msg.isFromBot) {
+  // en lo que nosotros mismos pedimos). Y si el grupo es bot_mode='off'
+  // (solo-envío, ej. el grupo de Managers que solo recibe el digest de
+  // Promolog), NO corremos NADA proactivo: ni transcribir/analizar media,
+  // ni extraer compromisos, ni quick-commands, ni invocar al agente. Queda
+  // inerte; solo el envío explícito (whatsapp-send) entra a esos grupos.
+  if (inserted && !msg.isFromBot && group.bot_mode !== "off") {
     if (msg.msgType === "audio" && msg.mediaUrl) {
       // Audios: primero transcribir (con prioridad alta porque el
       // media_url caduca rápido), después la transcripción dispara

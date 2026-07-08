@@ -98,7 +98,7 @@ async function enqueueFollowups(): Promise<number> {
       committed_by_text,
       committed_by_member_id,
       member:whatsapp_members!whatsapp_commitments_committed_by_member_id_fkey(display_name),
-      group:whatsapp_groups!inner(bot_enabled, active)
+      group:whatsapp_groups!inner(bot_enabled, active, bot_mode, wa_bot_id)
     `)
     .eq("status", "overdue")
     .lt("followup_count", 2)
@@ -112,10 +112,14 @@ async function enqueueFollowups(): Promise<number> {
 
   if (!rows || rows.length === 0) return 0;
 
-  // Filtrar solo grupos con bot habilitado.
+  // Filtrar solo grupos con bot habilitado y de department='sales' (el follow-up de
+  // closers no aplica a otros departamentos como Managers).
+  const { data: nonSalesBots } = await sb.from("wa_bots").select("id").neq("department", "sales");
+  const excludeBotIds = new Set((nonSalesBots ?? []).map((b: any) => b.id));
   const eligible = rows.filter((r) => {
-    const g = r.group as unknown as { bot_enabled: boolean; active: boolean } | null;
-    return g?.bot_enabled === true && g?.active === true;
+    const g = r.group as unknown as { bot_enabled: boolean; active: boolean; bot_mode: string; wa_bot_id: string | null } | null;
+    return g?.bot_enabled === true && g?.active === true && g?.bot_mode !== "off" &&
+      !(g?.wa_bot_id && excludeBotIds.has(g.wa_bot_id));
   });
 
   if (eligible.length === 0) return 0;

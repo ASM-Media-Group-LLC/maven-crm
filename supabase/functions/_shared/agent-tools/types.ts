@@ -7,7 +7,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export type ToolScope = "read" | "write";
-export type ToolDomain = "promolog" | "ventas" | "leads" | "monetizacion" | "qa" | "equipo";
+export type ToolDomain = "promolog" | "ventas" | "leads" | "monetizacion" | "qa" | "equipo" | "managers";
 
 // Contexto que recibe cada handler: cliente service-role + tenant + quién pregunta
 // (para permisos/auditoría) + grupo si viene de WhatsApp.

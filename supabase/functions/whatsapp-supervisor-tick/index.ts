@@ -836,11 +836,21 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
   if (now.weekday === 0) return { checked: 0, sent: 0 };
 
   // Grupos activos con bot_enabled=true. Si bot_enabled=false NO se manda nada.
-  const { data: groups } = await sb
+  const { data: groupsRaw } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, bot_enabled, external_id")
+    .select("id, tenant_id, bot_enabled, external_id, bot_mode, wa_bot_id")
     .eq("active", true)
     .eq("bot_enabled", true);
+  // El supervisor de closers/LLG SOLO corre en grupos de ventas. Excluir:
+  //   - bot_mode='off' (solo-envío)
+  //   - grupos cuyo bot NO es de department='sales' (ej. Managers = 'manager', que
+  //     tiene su propio supervisor promolog-manager-tick). Evita que los checks de
+  //     closers se cuelen en otros departamentos.
+  const { data: nonSalesBots } = await sb.from("wa_bots").select("id").neq("department", "sales");
+  const excludeBotIds = new Set((nonSalesBots ?? []).map((b: any) => b.id));
+  const groups = (groupsRaw ?? []).filter(
+    (g: any) => g.bot_mode !== "off" && !(g.wa_bot_id && excludeBotIds.has(g.wa_bot_id)),
+  );
   if (!groups || groups.length === 0) return { checked: 0, sent: 0 };
 
   // Por tenant, sacar users en schedule hoy con sus profile data.
