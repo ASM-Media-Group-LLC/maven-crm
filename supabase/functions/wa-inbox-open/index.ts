@@ -188,11 +188,20 @@ Deno.serve(async (req) => {
     const lead = leadRows && leadRows[0];
     if (lead) {
       if (!lead.assigned_to) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: claimed } = await (sb as any).from("closer_creators")
-          .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
-          .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
-        if (claimed) { leadIdForContact = lead.id; leadOwner = userId; }
+        // NO auto-reclamar si quien abre es admin/supervisor: abren la bandeja para
+        // TRIAJE/supervisión, no para quedarse el lead. Solo un closer regular "toma"
+        // el lead al abrir. (Bug: un admin viendo conversaciones se auto-asignaba modelos
+        // sin haberlo hecho — p.ej. Jhon terminó con kloe/andreaesoto asignadas.)
+        const { data: isSupOrAbove } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
+        if (isSupOrAbove) {
+          leadIdForContact = lead.id;   // ligar para ver la conversación, SIN reclamar
+        } else {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: claimed } = await (sb as any).from("closer_creators")
+            .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
+            .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
+          if (claimed) { leadIdForContact = lead.id; leadOwner = userId; }
+        }
       } else if (lead.assigned_to === userId) {
         leadIdForContact = lead.id; leadOwner = userId;
       }

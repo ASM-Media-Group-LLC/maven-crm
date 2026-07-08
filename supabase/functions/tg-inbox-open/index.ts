@@ -152,11 +152,19 @@ serve(async (req) => {
     const lead = leadRows && leadRows[0];
     if (lead) {
       if (!lead.assigned_to) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: claimed } = await (sb as any).from("closer_creators")
-          .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
-          .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
-        if (claimed) leadIdForConv = lead.id;          // lo tomaste vos
+        // NO auto-reclamar si quien abre es admin/supervisor (triaje/supervisión). Solo un
+        // closer regular "toma" el lead al abrir. (Mismo bug que wa-inbox-open: un admin
+        // viendo conversaciones se auto-asignaba modelos.)
+        const { data: isSupOrAbove } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
+        if (isSupOrAbove) {
+          leadIdForConv = lead.id;                      // ligar para ver, sin reclamar
+        } else {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: claimed } = await (sb as any).from("closer_creators")
+            .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
+            .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
+          if (claimed) leadIdForConv = lead.id;          // lo tomaste vos
+        }
       } else if (lead.assigned_to === userId) {
         leadIdForConv = lead.id;                        // ya es tuyo → ligar para registrar
       }
