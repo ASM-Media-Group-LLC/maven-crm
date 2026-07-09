@@ -1365,63 +1365,22 @@ async function resolveMembersByName(
 ): Promise<Array<{ id: string; display_name: string; user_id: string | null; role: string | null; full_name: string | null }>> {
   const trimmed = name.trim();
   if (!trimmed) return [];
-  const safe = trimmed.replace(/[%_]/g, (m) => `\\${m}`);
 
-  const { data: byDisplay } = await sb
-    .from("whatsapp_members")
-    .select("id, display_name, user_id, role, last_seen_at")
-    .eq("group_id", groupId)
-    .ilike("display_name", `%${safe}%`)
-    .order("last_seen_at", { ascending: false, nullsFirst: false })
-    .limit(limit);
+  // Resolución insensible a MAYÚSCULAS y ACENTOS vía RPC (extensions.unaccent). Matchea:
+  //  (1) miembros del grupo por display_name, y
+  //  (2) perfiles de Maven por full_name — AUNQUE no sean miembros de este grupo (para
+  //      consultar stats de cualquier integrante del equipo; las tools solo usan user_id).
+  // El equipo escribe los nombres SIN acentos ("maria de los angeles", "miguel garcia") y
+  // en Maven están CON acentos → sin unaccent el bot devolvía falso "no lo encuentro".
+  const { data, error } = await sb.rpc("resolve_wa_member", { p_group_id: groupId, p_name: trimmed });
+  if (error || !Array.isArray(data)) return [];
 
-  const { data: matchingProfiles } = await sb
-    .from("profiles")
-    .select("id, full_name")
-    .ilike("full_name", `%${safe}%`)
-    .limit(limit);
-  let byFullName: typeof byDisplay = [];
-  let unlinkedProfiles: Array<{ id: string; full_name: string | null }> = [];
-  if (matchingProfiles && matchingProfiles.length > 0) {
-    const userIds = matchingProfiles.map((p) => p.id);
-    const { data: linkedMembers } = await sb
-      .from("whatsapp_members")
-      .select("id, display_name, user_id, role, last_seen_at")
-      .eq("group_id", groupId)
-      .in("user_id", userIds)
-      .order("last_seen_at", { ascending: false, nullsFirst: false })
-      .limit(limit);
-    byFullName = linkedMembers ?? [];
-    // Perfiles que matchean por nombre pero NO son miembros de ESTE grupo (o sin member
-    // linkeado): igual los devolvemos como entradas sintéticas por user_id. Las tools de
-    // stats (get_member_maven_activity, etc.) solo necesitan el user_id, no el wpp_member
-    // — así se puede consultar la actividad de cualquier miembro del equipo aunque no esté
-    // en este grupo (ej. un closer que vive en el grupo de closers, no en el de managers).
-    const linkedIds = new Set(byFullName.map((m) => m.user_id).filter(Boolean));
-    unlinkedProfiles = matchingProfiles.filter((p) => !linkedIds.has(p.id));
-  }
-
-  // Mergear todo, deduplicar por member.id / user_id
-  const merged = new Map<string, typeof byDisplay[number]>();
-  for (const m of byDisplay ?? []) merged.set(m.id, m);
-  for (const m of byFullName) {
-    if (!merged.has(m.id)) merged.set(m.id, m);
-  }
-  const seenUsers = new Set(Array.from(merged.values()).map((m) => m.user_id).filter(Boolean));
-  for (const p of unlinkedProfiles) {
-    if (seenUsers.has(p.id)) continue;
-    seenUsers.add(p.id);
-    merged.set(`profile:${p.id}`, {
-      id: `profile:${p.id}`, display_name: p.full_name ?? "", user_id: p.id, role: null, last_seen_at: null,
-    } as typeof byDisplay[number]);
-  }
-
-  // Cargar full_name de cada user_id
-  const userIds = Array.from(merged.values()).map((m) => m.user_id).filter((u): u is string => Boolean(u));
-  const profilesMap = new Map<string, string | null>();
-  if (userIds.length > 0) {
-    const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", userIds);
-    for (const p of profs ?? []) profilesMap.set(p.id, p.full_name);
+  // Dedup por user_id (preferir la fila que TIENE member del grupo).
+  const merged = new Map<string, { member_id: string | null; display_name: string; user_id: string | null; member_role: string | null; full_name: string | null; last_seen_at: string | null }>();
+  for (const r of data as any[]) {
+    const key = r.user_id ? `u:${r.user_id}` : `m:${r.member_id}`;
+    const prev = merged.get(key);
+    if (!prev || (!prev.member_id && r.member_id)) merged.set(key, r);
   }
 
   return Array.from(merged.values())
@@ -1432,12 +1391,12 @@ async function resolveMembersByName(
       return tb - ta;
     })
     .slice(0, limit)
-    .map((m) => ({
-      id: m.id,
-      display_name: m.display_name,
-      user_id: m.user_id,
-      role: m.role,
-      full_name: m.user_id ? profilesMap.get(m.user_id) ?? null : null,
+    .map((r) => ({
+      id: r.member_id ?? `profile:${r.user_id}`,
+      display_name: r.display_name,
+      user_id: r.user_id,
+      role: r.member_role,
+      full_name: r.full_name,
     }));
 }
 
