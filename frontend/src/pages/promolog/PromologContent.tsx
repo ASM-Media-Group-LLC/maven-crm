@@ -417,6 +417,7 @@ const PromologContent = () => {
           buy_link_type: e.buy_link_type,
           ai_confidence: e.ai_confidence,
           notes: e.notes,
+          needs_review: e.needs_review,
         })),
       );
       // Resultado del día ESTRICTAMENTE binario: Sí si promocionó en alguna story; si no, No.

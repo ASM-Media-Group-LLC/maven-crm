@@ -42,6 +42,7 @@ export interface ScoreInput {
   buy_link_type?: string | null;
   ai_confidence?: number | null;
   notes?: string | null;
+  needs_review?: boolean; // la IA la marcó para revisión manual (link/plataforma ambiguos)
 }
 
 // Plataformas que la agencia MANEJA → solo estas suman al score (decisión del dueño
@@ -104,7 +105,10 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 export function qualityForEntry(e: ScoreInput): number {
   if (!e.promoted) return 0;
   // Promocionó pero a una plataforma que NO manejamos (Fansly/Piclink/…) → no suma.
-  if (!isManagedPromo(e)) return 0;
+  // EXCEPCIÓN: si está marcada "revisar manual", la asumimos promo válida (OF) y SÍ le
+  // damos calidad hasta que un humano la revise. Si en la revisión la marcan No,
+  // promoted pasa a false y la calidad vuelve a 0 automáticamente.
+  if (!isManagedPromo(e) && !e.needs_review) return 0;
   const net = canonicalNetwork(e.network);
   const notes = (e.notes || "").toLowerCase();
   const hasLink = e.has_buy_link === true || !!e.buy_link_type || /(onlyfans|enlace|\blink\b|fans)/.test(notes);

@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
   const ids = incoming.map((c) => c.creator_id).filter(Boolean);
   const metaById = new Map<string, any>();
   if (ids.length) {
-    const { data: crows } = await (sb as any).from("creators").select("id, instagram_handle, onlyfans_url, piclink_url").in("id", ids);
+    const { data: crows } = await (sb as any).from("creators").select("id, instagram_handle, onlyfans_url, piclink_url, name, artistic_name").in("id", ids);
     for (const r of (crows ?? [])) metaById.set(r.id, r);
   }
 
@@ -113,6 +113,7 @@ Deno.serve(async (req) => {
     const creatorCtx: CreatorCtx = {
       creatorId: cid, sourceHandle: handle, ofNicks: nick ? [nick] : [],
       knownPlatform, knownFunnelHosts: [funnelHost(meta.onlyfans_url), funnelHost(meta.piclink_url)].filter(Boolean),
+      name: meta.artistic_name || meta.name || null,
     };
     const r = await analyzeStoryItems(sb, creatorCtx, items, runCtx);
     entries += r.entriesCreated;

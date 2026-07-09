@@ -254,6 +254,7 @@ Deno.serve(async (req: Request) => {
     const creatorCtx: CreatorCtx = {
       creatorId: c.id, sourceHandle: handle, ofNicks: nick ? [nick] : [],
       knownPlatform, knownFunnelHosts: [funnelHost(fu.onlyfans_url), funnelHost(fu.piclink_url)].filter(Boolean),
+      name: c.artistic_name || c.name || null,
     };
 
     const st = await igFetch(`feed/user/${igId}/story/`, IG_SESSION, igClient);

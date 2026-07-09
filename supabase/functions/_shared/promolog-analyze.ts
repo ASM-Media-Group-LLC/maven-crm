@@ -46,6 +46,7 @@ export interface CreatorCtx {
   ofNicks: string[];
   knownPlatform: string | null;
   knownFunnelHosts: string[];
+  name?: string | null; // nombre/artístico — para matchear su dominio funnel propio
 }
 
 export interface RunCtx {
@@ -478,8 +479,21 @@ async function processStory(args: {
   const storyLinkUrl = linkClass.decoded || null;
   const linkIsCasino = linkClass.tier === "casino";
   const linkIsPromo = linkClass.tier === "paid" || linkClass.tier === "aggregator";
+  // Las modelos NO pueden poner link directo a OnlyFans en IG (está prohibido) → usan su
+  // PROPIA página / dominio custom (ej. danikmichell.co, aynaraeder.cl) como funnel hacia OF.
+  // Un link sticker a un dominio desconocido (tier 'unknown') QUE CONTIENE su handle/nick es
+  // casi seguro ese funnel → cuenta como PROMO, aunque la visión no haya visto el sticker en
+  // el thumbnail. OJO: exigimos el match con la creadora para NO marcar afiliados/productos
+  // (thecbdperfection.com, solzetech.com…) que también son dominios desconocidos pero NO son
+  // su funnel de OF.
+  const hostNorm = (linkClass.host || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const creatorTokens = [creator.sourceHandle, ...(creator.ofNicks ?? []), ...((creator.name || "").split(/\s+/))]
+    .map((t) => (t || "").toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter((t) => t.length >= 4);
+  const linkMatchesCreator = !!hostNorm && creatorTokens.some((t) => hostNorm.includes(t));
+  const linkIsOwnFunnel = linkClass.tier === "unknown" && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator;
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
-    ? linkClass.platform : (creator.knownPlatform ?? "other");
+    ? linkClass.platform : (creator.knownPlatform ?? (linkIsOwnFunnel ? "onlyfans" : "other"));
 
   if (linkIsCasino) {
     final = {
@@ -487,16 +501,16 @@ async function processStory(args: {
       reasoning: `Link a casino/apuestas (${linkClass.host}) — afiliado, no es contenido pago de la creadora → No. ${final.reasoning ?? ""}`.slice(0, 240),
     };
     analysisLevel += "+casino_discard";
-  } else if (linkIsPromo && !final.promoted) {
+  } else if ((linkIsPromo || linkIsOwnFunnel) && !final.promoted) {
     final = {
       ...final, promoted: true, promotion_type: "direct", has_buy_link: true, buy_link_type: linkPlatform,
       platform_mentioned: final.platform_mentioned && final.platform_mentioned !== "ninguna"
-        ? final.platform_mentioned : (creator.knownPlatform ?? "ninguna"),
-      reasoning: `Sticker de link → ${linkClass.host} (CTA a contenido pago). ${final.reasoning ?? ""}`.slice(0, 240),
+        ? final.platform_mentioned : (creator.knownPlatform ?? "onlyfans"),
+      reasoning: `Sticker de link → ${linkClass.host} (${linkIsPromo ? "CTA a contenido pago" : "página/funnel propio → OF (link directo a OF está prohibido en IG)"}). ${final.reasoning ?? ""}`.slice(0, 240),
     };
-    analysisLevel += "+link_sticker";
+    analysisLevel += linkIsPromo ? "+link_sticker" : "+link_sticker_funnel";
   } else if (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type)) {
-    if (linkIsPromo) final = { ...final, buy_link_type: linkPlatform };
+    if (linkIsPromo || linkIsOwnFunnel) final = { ...final, buy_link_type: linkPlatform };
     else if (linkClass.tier === "none" && creator.knownPlatform) final = { ...final, buy_link_type: creator.knownPlatform };
   }
 
