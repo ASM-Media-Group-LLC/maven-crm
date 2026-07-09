@@ -72,14 +72,16 @@ function authorize(req: Request, provider: "evolution" | "generic"): boolean {
 async function findOrCreateGroup(
   sb: SupabaseClient,
   msg: IncomingMessage,
-): Promise<{ id: string; tenant_id: string; bot_enabled: boolean; bot_mode: string } | null> {
+): Promise<{ id: string; tenant_id: string; bot_enabled: boolean; bot_mode: string; department: string | null } | null> {
   // Buscar por external_id. Si no existe, NO lo creamos automáticamente
   // — esto evita que cualquier grupo random que agreguen al bot empiece
   // a quemar tokens de Claude sin que un admin lo apruebe. Sí lo
   // logueamos para que el admin lo vea en el panel y lo active.
+  // Traemos el department del bot asignado (wa_bots) para decidir el estilo de
+  // trigger: los de supervisión (managers) responden al ser nombrados por nombre.
   const { data, error } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, bot_enabled, active, bot_mode")
+    .select("id, tenant_id, bot_enabled, active, bot_mode, wa_bots(department)")
     .eq("external_id", msg.groupExternalId)
     .maybeSingle();
 
@@ -88,7 +90,12 @@ async function findOrCreateGroup(
     return null;
   }
   if (!data || !data.active) return null;
-  return data;
+  const waBots = (data as any).wa_bots;
+  const department = (Array.isArray(waBots) ? waBots[0]?.department : waBots?.department) ?? null;
+  return {
+    id: data.id, tenant_id: data.tenant_id, bot_enabled: data.bot_enabled,
+    bot_mode: data.bot_mode, department,
+  };
 }
 
 // Match con un user de Maven en orden de confiabilidad:
@@ -879,8 +886,16 @@ function mentionsBotReal(mentions: string[] | undefined): boolean {
 // ¿El bot está siendo aludido? Por TEXTO ("@maven" tipeado) O por MENCIÓN REAL
 // (etiquetado con el "@" picker → mentionedJid). Cubrir ambos es lo que evita
 // que un @mention legítimo quede sin respuesta.
-function isBotAddressed(body: string | null, mentions: string[] | undefined): boolean {
-  return hasMention(body) || mentionsBotReal(mentions);
+// ¿Lo llaman por su NOMBRE "Maven" al inicio del mensaje? (ej. "Maven, ..." /
+// "Maven tenemos..."). Señal de que le hablan directo. Se usa SOLO para bots de
+// SUPERVISIÓN (grupo de managers), donde "Maven" = el bot; en closers/ventas
+// "maven" suele ser el producto → ahí NO cuenta (evita disparos de más).
+function startsWithBotName(body: string | null): boolean {
+  return !!body && /^\s*maven\b/i.test(body);
+}
+
+function isBotAddressed(body: string | null, mentions: string[] | undefined, nameCountsAsAddress = false): boolean {
+  return hasMention(body) || mentionsBotReal(mentions) || (nameCountsAsAddress && startsWithBotName(body));
 }
 
 // Decide si invocar al agent y por qué motivo. Devuelve null si no hay que
@@ -893,7 +908,7 @@ function isBotAddressed(body: string | null, mentions: string[] | undefined): bo
 // nocturnos / fines de semana sin miembros activos.
 async function resolveAgentTrigger(
   sb: SupabaseClient,
-  group: { id: string; bot_enabled: boolean; bot_mode: string },
+  group: { id: string; bot_enabled: boolean; bot_mode: string; department?: string | null },
   body: string | null,
   isFromBot: boolean,
   mentions?: string[],
@@ -902,7 +917,12 @@ async function resolveAgentTrigger(
   if (isFromBot) return null; // nunca respondemos a nuestros propios mensajes
   if (group.bot_mode === "off") return null;
 
-  if (isBotAddressed(body, mentions)) return "mention";
+  // Bots de SUPERVISIÓN (managers): además de @-mención, responden cuando los
+  // nombran "Maven ..." al inicio, a CUALQUIER hora. El grupo de managers no tiene
+  // turnos de closers, así que el gate de horario los dejaba mudos salvo @-mención
+  // real — por eso un "Maven, ..." de un manager quedaba sin respuesta.
+  const supervisorBot = group.department === "manager";
+  if (isBotAddressed(body, mentions, supervisorBot)) return "mention";
 
   // En modo always, el agent se invoca con cualquier mensaje y decide él
   // si vale la pena responder. Filtros baratos en el ingest para no quemar

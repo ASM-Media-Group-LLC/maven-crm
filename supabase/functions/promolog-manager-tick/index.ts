@@ -4,8 +4,8 @@ import { adminClient, authorizeCronOrJwt, whatsappCors } from "../_shared/whatsa
 // promolog-manager-tick — SUPERVISOR PROACTIVO del grupo de MANAGERS (agente distinto
 // del whatsapp-agent de closers/LLG que vive en Marketing/Ventas).
 //
-// Cerebro: get_manager_growth_feed cruza PROMOCIÓN (Promolog 14d, respetando #818) ×
-// INGRESO (creator_daily_earnings, 7d vs 7d previos) por modelo ACTIVA y la ubica en un
+// Cerebro: get_manager_growth_feed cruza PROMOCIÓN (Promolog mes a la fecha, respetando #818) ×
+// INGRESO (creator_daily_earnings, mes a la fecha vs mismo día del mes pasado) por modelo ACTIVA y la ubica en un
 // cuadrante accionable. Agrupa por la manager responsable y arma un mensaje que:
 //   - le hace @-mención real a cada manager con SUS modelos en alerta,
 //   - separa 🔴 no-crece+no-promociona / 🟠 promociona-pero-cae(calidad) / 🟡 riesgo,
@@ -42,9 +42,10 @@ interface GrowthRow {
   manager_phone: string | null;
   promo_days: number;
   covered_days: number;
-  income_7d: number;
-  income_prev7d: number;
+  income_mtd: number;
+  income_prev_mtd: number;
   income_trend_pct: number | null;
+  mtd_day?: number;
   quadrant: string; // critico | calidad | riesgo
   priority: number;
   diagnosis: string;
@@ -79,12 +80,12 @@ interface Composed {
   counts: { total: number; critico: number; calidad: number; riesgo: number; managers: number };
 }
 
-function compose(rows: GrowthRow[], lorenaPhone: string | null, promoWindow: number): Composed {
+function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
   const mentions = new Set<string>();
   const bullet = (r: GrowthRow) => {
     const link = igUrl(r.instagram_handle);
     const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
-    return `   • ${label}\n     promo ${r.promo_days}/${promoWindow} · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_7d)})`;
+    return `   • ${label}\n     promo ${r.promo_days}/${r.mtd_day ?? "?"} este mes · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})`;
   };
 
   // Agrupar por manager preservando el orden del feed (ya viene por prioridad + ingreso desc).
@@ -105,7 +106,7 @@ function compose(rows: GrowthRow[], lorenaPhone: string | null, promoWindow: num
 
   const lines: string[] = [
     `🎯 *Supervisión de crecimiento* — ${rows.length} modelos necesitan atención`,
-    `_Promoción × ingresos, últimos ${promoWindow} días_`,
+    `_Promoción × ingresos, mes a la fecha (vs mismo tramo del mes pasado)_`,
     "",
   ];
 
@@ -166,15 +167,13 @@ serve(async (req) => {
     income_drop_pct?: number;
   };
   const dryRun = body?.dry_run === true;
-  const promoWindow = Number(body?.promo_window ?? 14);
 
   const sb = adminClient();
 
   // Cerebro.
   const { data: feed, error: feedErr } = await sb.rpc("get_manager_growth_feed", {
     p_tenant: TENANT_ID,
-    p_promo_window: promoWindow,
-    p_low_promo_days: Number(body?.low_promo_days ?? 4),
+    p_low_promo_rate: Number(body?.low_promo_rate ?? 0.40),
     p_income_drop_pct: Number(body?.income_drop_pct ?? 15),
   });
   if (feedErr) return json({ ok: false, error: feedErr.message }, 500);
@@ -187,7 +186,7 @@ serve(async (req) => {
     lorenaPhone = lp?.phone_e164 ?? null;
   }
 
-  const { message, mentions, counts } = compose(rows, lorenaPhone, promoWindow);
+  const { message, mentions, counts } = compose(rows, lorenaPhone);
   if (!message) return json({ ok: true, sent: false, reason: "nada_que_reportar", counts });
 
   if (dryRun) return json({ ok: true, dry_run: true, counts, mentions, message });

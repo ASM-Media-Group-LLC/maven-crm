@@ -119,6 +119,32 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+// persistTweetImage — baja la imagen del tweet y la sube a nuestro bucket privado
+// (signed URL durable). Las URL de pbs.twimg.com caducan / bloquean hotlink → no
+// renderizaban en la UI (evidencia "fantasma"). Igual patrón que IG. Best-effort:
+// si falla devolvemos null y el caller cae a la URL original.
+const EVIDENCE_BUCKET = "promolog-evidence";
+async function persistTweetImage(sb: any, imageUrl: string, key: string): Promise<string | null> {
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const resp = await fetch(imageUrl, { signal: ac.signal });
+    clearTimeout(t);
+    if (!resp.ok) return null;
+    const mime = (resp.headers.get("content-type") || "image/jpeg").split(";")[0];
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+    const safeKey = key.replace(/[^a-zA-Z0-9/_-]/g, "_");
+    const path = `${TENANT_ID}/x/${safeKey}.${ext}`;
+    const { error } = await sb.storage.from(EVIDENCE_BUCKET).upload(path, bytes, { contentType: mime, upsert: true });
+    if (error) return null;
+    const { data } = await sb.storage.from(EVIDENCE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
+    return data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function visionIsOfPromo(imageUrl: string, apiKey: string, text: string): Promise<{ promoted: boolean; reason: string }> {
   let dataUri: string;
   try {
@@ -325,13 +351,23 @@ Deno.serve(async (req: Request) => {
         if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
       }
       if (promoted) promotedCount++;
-      const evidence = firstImage || permalink || null;
+      // Dedup ESTABLE por el PERMALINK del tweet (único e inmutable). La URL de imagen de
+      // pbs.twimg.com cambia entre scans → no sirve de clave (duplicaba el mismo tweet).
+      const dedupKey = permalink || firstImage || null;
       if (dryRun) continue;
-      if (!evidence) { skipped++; continue; }
+      if (!dedupKey) { skipped++; continue; }
 
       const { data: dupe } = await sb.from("promolog_entries")
-        .select("id").eq("creator_id", c.id).eq("network", "X").eq("evidence_url", evidence).limit(1);
+        .select("id").eq("creator_id", c.id).eq("network", "X").eq("story_link_url", dedupKey).limit(1);
       if (dupe && dupe.length) { skipped++; continue; }
+
+      // Evidencia DURABLE: bajamos la imagen del tweet a nuestro bucket. Fallback a la
+      // URL original si el persist falla, y al permalink si el tweet no tiene imagen.
+      let evidenceUrl: string = firstImage || permalink;
+      if (firstImage) {
+        const durable = await persistTweetImage(sb, firstImage, `${c.id}/${String(it?.id || it?.tweetId || i)}`);
+        if (durable) evidenceUrl = durable;
+      }
 
       const when = parseTweetDate(it?.createdAt || it?.created_at);
       const { error: insErr } = await sb.from("promolog_entries").insert({
@@ -342,7 +378,9 @@ Deno.serve(async (req: Request) => {
         network: "X",
         platform: promoted ? "OnlyFans" : "Ninguna",
         notes: ((it?.text || it?.fullText || "") as string).slice(0, 2000) || null,
-        evidence_url: evidence,
+        evidence_url: evidenceUrl,
+        story_media_url: firstImage || null,
+        story_link_url: dedupKey,
         analyzed_by_ai: true,
         ai_model: "regla-texto-x",
         ai_reasoning: reason,

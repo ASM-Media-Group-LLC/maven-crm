@@ -70,7 +70,7 @@ const AGGREGATOR: Record<string, string> = {
   "carrd.co": "carrd",
   "komi.io": "komi",
   "stan.store": "stanstore",
-  "piclink.me": "piclink",
+  "piclink.me": "onlyfans", // pedido del owner: piclink embuda a OF → contarlo/etiquetarlo como OnlyFans
   "link.me": "linkme",
   "unlok.me": "unlok", // funnel propio de la agencia (marca Unlok) → embuda a OF
   "unlok.com": "unlok",

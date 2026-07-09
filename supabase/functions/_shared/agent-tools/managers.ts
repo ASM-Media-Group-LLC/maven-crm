@@ -7,10 +7,10 @@ export const managersTools: AgentTool[] = [
   {
     name: "get_manager_growth_feed",
     description:
-      "Radar de crecimiento por creadora ACTIVA con manager: cruza promoción (Promolog 14d) × ingreso " +
-      "(BLU, 7d vs 7d previos) y devuelve solo las accionables con su cuadrante — 'critico' (no promociona + " +
+      "Radar de crecimiento por creadora ACTIVA con manager: cruza promoción (Promolog mes a la fecha) × ingreso " +
+      "(BLU, mes a la fecha vs mismo día del mes pasado) y devuelve solo las accionables con su cuadrante — 'critico' (no promociona + " +
       "ingreso cae), 'calidad' (promociona pero igual cae → revisar CÓMO promociona), 'riesgo' (promo baja, " +
-      "ingreso aún ok). Incluye manager responsable, días de promo, ingreso 7d/previo, % de tendencia y un " +
+      "ingreso aún ok). Incluye manager responsable, días de promo, ingreso del mes/mes pasado, % de tendencia y un " +
       "diagnóstico. Filtrá por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece.",
     input_schema: {
       type: "object",
