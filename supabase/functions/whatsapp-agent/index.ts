@@ -1381,6 +1381,7 @@ async function resolveMembersByName(
     .ilike("full_name", `%${safe}%`)
     .limit(limit);
   let byFullName: typeof byDisplay = [];
+  let unlinkedProfiles: Array<{ id: string; full_name: string | null }> = [];
   if (matchingProfiles && matchingProfiles.length > 0) {
     const userIds = matchingProfiles.map((p) => p.id);
     const { data: linkedMembers } = await sb
@@ -1391,13 +1392,28 @@ async function resolveMembersByName(
       .order("last_seen_at", { ascending: false, nullsFirst: false })
       .limit(limit);
     byFullName = linkedMembers ?? [];
+    // Perfiles que matchean por nombre pero NO son miembros de ESTE grupo (o sin member
+    // linkeado): igual los devolvemos como entradas sintéticas por user_id. Las tools de
+    // stats (get_member_maven_activity, etc.) solo necesitan el user_id, no el wpp_member
+    // — así se puede consultar la actividad de cualquier miembro del equipo aunque no esté
+    // en este grupo (ej. un closer que vive en el grupo de closers, no en el de managers).
+    const linkedIds = new Set(byFullName.map((m) => m.user_id).filter(Boolean));
+    unlinkedProfiles = matchingProfiles.filter((p) => !linkedIds.has(p.id));
   }
 
-  // Mergear ambas, deduplicar por member.id
+  // Mergear todo, deduplicar por member.id / user_id
   const merged = new Map<string, typeof byDisplay[number]>();
   for (const m of byDisplay ?? []) merged.set(m.id, m);
   for (const m of byFullName) {
     if (!merged.has(m.id)) merged.set(m.id, m);
+  }
+  const seenUsers = new Set(Array.from(merged.values()).map((m) => m.user_id).filter(Boolean));
+  for (const p of unlinkedProfiles) {
+    if (seenUsers.has(p.id)) continue;
+    seenUsers.add(p.id);
+    merged.set(`profile:${p.id}`, {
+      id: `profile:${p.id}`, display_name: p.full_name ?? "", user_id: p.id, role: null, last_seen_at: null,
+    } as typeof byDisplay[number]);
   }
 
   // Cargar full_name de cada user_id
