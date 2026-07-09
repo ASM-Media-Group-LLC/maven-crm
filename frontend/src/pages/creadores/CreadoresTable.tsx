@@ -86,6 +86,18 @@ const getFlagEmoji = (countryCode: string | null) => {
 
 type SortKey = "name" | "category" | "status" | "country" | "agency";
 
+// Agencia CANÓNICA — solo 3 valores: "Kash Plus" / "Kash Massive" (OnlyFans; el tier
+// lo setea BLU vía kash_type) y "Atomick" (Unlok). "Kash" = Kash sin tier aún (se
+// completa solo cuando el micro lo tagea). "" = sin agencia cargada (a asignar).
+function canonicalAgency(cb: any): string {
+  const kt = cb?.kash_type;
+  if (kt === "Plus" || kt === "Massive") return `Kash ${kt}`;
+  const raw = `${cb?.company?.name ?? ""} ${cb?.assigned_agency ?? ""}`.toLowerCase();
+  if (/atomick|unlok/.test(raw)) return "Atomick";
+  if (/kash/.test(raw)) return "Kash";
+  return "";
+}
+
 interface Props {
   creators: CreatorWithBusiness[];
 }
@@ -184,8 +196,8 @@ const CreadoresTable = ({ creators }: Props) => {
         vb = `${b.country ?? ""} ${b.city ?? ""}`;
         break;
       case "agency":
-        va = a.creator_business?.company?.name ?? a.creator_business?.assigned_agency ?? "";
-        vb = b.creator_business?.company?.name ?? b.creator_business?.assigned_agency ?? "";
+        va = canonicalAgency(a.creator_business);
+        vb = canonicalAgency(b.creator_business);
         break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
@@ -226,9 +238,7 @@ const CreadoresTable = ({ creators }: Props) => {
             .toUpperCase();
 
           const flag = showRealLocation ? getFlagEmoji(c.country_code) : "";
-          const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
-          const kashType = c.creator_business?.kash_type;
-          const agencyLabel = [agency, kashType].filter(Boolean).join(" · ");
+          const agencyLabel = canonicalAgency(c.creator_business);
 
           return (
             <TableRow key={c.id}>
