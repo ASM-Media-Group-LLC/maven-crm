@@ -401,6 +401,7 @@ async function runOnce(acct, firstRun = false) {
   console.log(`[blu-bridge:${acct.account}] conectando WS ${BLU_WS_URL}… ${doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
 
   let totalRows = 0, sawCreators = false;
+  const bluNamesSeen = new Set(); // nombres BLU vistos en ESTA cuenta → marcar kash_type (Massive/Plus)
   for (let ci = 0; ci < chunks.length; ci++) {
     const c = chunks[ci];
     try {
@@ -408,6 +409,7 @@ async function runOnce(acct, firstRun = false) {
       if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
       if (!sawCreators && results[0]) { console.log(`[blu-bridge] ≈${results[0].payload?.creators?.length ?? 0} creadoras/día.`); sawCreators = true; }
       const rows = transform(results);
+      for (const r of rows) if (r.blu_name) bluNamesSeen.add(r.blu_name);
       if (rows.length) await ingest(rows);
       totalRows += rows.length;
       console.log(`[blu-bridge] chunk ${ci + 1}/${chunks.length} (${c[c.length - 1]}..${c[0]}): ${rows.length} filas.`);
@@ -417,6 +419,19 @@ async function runOnce(acct, firstRun = false) {
     }
   }
   console.log(`[blu-bridge] OK: ${totalRows} filas de ingresos ingestadas.`);
+
+  // Marca la AGENCIA (kash_type) de las creadoras de ESTA cuenta: las que trajeron data
+  // de la cuenta Massive → "Massive"; de la principal → "Plus". Llena sola la columna
+  // "Agencia" del Listado. Best-effort: si falla, no tumba la corrida de ingresos.
+  try {
+    const tier = acct.account === "massive" ? "Massive" : "Plus";
+    if (bluNamesSeen.size) {
+      const { data: kn, error: kErr } = await sb().rpc("set_creator_kash_type_by_blu",
+        { p_blu_names: [...bluNamesSeen], p_kash_type: tier });
+      if (kErr) console.error(`[blu-bridge:${acct.account}] set_kash_type falló: ${kErr.message}`);
+      else console.log(`[blu-bridge:${acct.account}] kash_type=${tier} marcado en ${kn} creadora(s).`);
+    }
+  } catch (e) { console.error(`[blu-bridge:${acct.account}] set_kash_type error: ${e.message}`); }
 
   // ── Fans (fan-reports:model): activeFans/newFans por creadora/día sobre TODO el rango.
   //    1 conexión WS, 1 call por modelo. Aislado: si falla, NO afecta los ingresos ya guardados.
