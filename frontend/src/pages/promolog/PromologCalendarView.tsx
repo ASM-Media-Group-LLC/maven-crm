@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, startOfMonth, isSameMonth, isToday, isAfter, startOfDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, X as XIcon, Minus, CircleDashed } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X as XIcon, CircleDashed } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import type { PromologEntry } from "./PromologEntryCard";
 import { computeDayScore, type DayScore } from "./promoScore";
+import { promotedToResult } from "./promoResult";
 import PromoQualityBar from "./PromoQualityBar";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
@@ -48,28 +49,17 @@ const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-type DayStatus = "promo" | "partial" | "no" | "none";
-
-const promotedToResult = (promoted: string | null): string => {
-  switch (promoted) {
-    case "true": return "Sí";
-    case "false": return "No";
-    case "partial": return "Parcial";
-    case "pending": return "Pendiente";
-    default: return "Pendiente";
-  }
-};
+// Resultado del día BINARIO: promo / no / none (sin análisis). promotedToResult → ./promoResult.
+type DayStatus = "promo" | "no" | "none";
 
 const STATUS_STYLES: Record<DayStatus, string> = {
   promo: "bg-success/10 border-success/40 hover:bg-success/20",
-  partial: "bg-warning/10 border-warning/40 hover:bg-warning/20",
   no: "bg-destructive/10 border-destructive/40 hover:bg-destructive/20",
   none: "bg-muted/20 border-border",
 };
 
 const StatusDot = ({ status }: { status: DayStatus }) => {
   if (status === "promo") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-white"><Check className="h-3.5 w-3.5" /></span>;
-  if (status === "partial") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning text-white"><Minus className="h-3.5 w-3.5" /></span>;
   if (status === "no") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"><XIcon className="h-3.5 w-3.5" /></span>;
   return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground"><CircleDashed className="h-3.5 w-3.5" /></span>;
 };
@@ -160,14 +150,13 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
 
   // Agrupa las stories por día (key YYYY-MM-DD en TZ del user).
   const dayMap = useMemo(() => {
-    const map = new Map<string, { total: number; trueCount: number; partialCount: number; raw: any[] }>();
+    const map = new Map<string, { total: number; trueCount: number; raw: any[] }>();
     for (const e of monthEntries as any[]) {
       const key = dayKeyInTz(e.date, userTz);
       if (!key) continue;
-      const bucket = map.get(key) ?? { total: 0, trueCount: 0, partialCount: 0, raw: [] };
+      const bucket = map.get(key) ?? { total: 0, trueCount: 0, raw: [] };
       bucket.total += 1;
-      if (e.promoted === "true") bucket.trueCount += 1;
-      else if (e.promoted === "partial") bucket.partialCount += 1;
+      if (e.promoted === "true" || e.promoted === "yes" || e.promoted === "partial") bucket.trueCount += 1;
       bucket.raw.push(e);
       map.set(key, bucket);
     }
@@ -247,10 +236,9 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     return markers;
   }, [incomeByDay, year, month, isPastMonth]);
 
-  const statusFor = (bucket?: { total: number; trueCount: number; partialCount: number }): DayStatus => {
+  const statusFor = (bucket?: { total: number; trueCount: number }): DayStatus => {
     if (!bucket || bucket.total === 0) return "none";
     if (bucket.trueCount > 0) return "promo";
-    if (bucket.partialCount > 0) return "partial";
     return "no";
   };
 
@@ -276,11 +264,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     const stories = [...seen.values()].sort((a, b) => (a.story_index ?? 1e9) - (b.story_index ?? 1e9));
     const rep = all.find((s) => s.result === "Sí") ?? all[0];
     // El resultado del día refleja TODAS las entries del día (no solo la galería).
-    const dayResult = all.some((s) => s.result === "Sí")
-      ? "Sí"
-      : all.some((s) => s.result === "No")
-      ? "No"
-      : rep?.result ?? "Pendiente";
+    const dayResult = all.some((s) => s.result === "Sí") ? "Sí" : "No";
     // Agrupado POR RED para que el popup muestre una sección por red (igual que el
     // subtab Promos) — así queda claro de qué red es cada screenshot.
     const NET_ORDER = ["instagram", "telegram", "x", "twitter", "tiktok", "facebook", "reddit", "youtube"];
@@ -320,16 +304,15 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
   const today = startOfDay(new Date());
 
   const monthSummary = useMemo(() => {
-    let promo = 0, partial = 0, no = 0, none = 0;
+    let promo = 0, no = 0, none = 0;
     for (const d of gridDays) {
       if (!isSameMonth(d, cursor) || isAfter(startOfDay(d), today)) continue;
       const st = statusFor(dayMap.get(format(d, "yyyy-MM-dd")));
       if (st === "promo") promo++;
-      else if (st === "partial") partial++;
       else if (st === "no") no++;
       else none++;
     }
-    return { promo, partial, no, none };
+    return { promo, no, none };
   }, [gridDays, dayMap, cursor, today]);
 
   // Promedio de calidad del mes = promedio de los scores diarios de los días ESCANEADOS
@@ -438,7 +421,6 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <LegendChip status="promo" label="Promocionó" />
-              <LegendChip status="partial" label="Parcial" />
               <LegendChip status="no" label="No promocionó" />
               <LegendChip status="none" label="Sin análisis" />
               <span className="text-xs text-muted-foreground">· 🔥 {isPastMonth ? "top 5 días del mes" : "mejor día (cada 5)"} · 👑 mejor del mes</span>
@@ -502,7 +484,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                           <StatusDot status={status} />
                           {bucket && bucket.total > 0 && (
                             <span className="text-[10px] tabular-nums text-muted-foreground">
-                              {bucket.trueCount + bucket.partialCount}/{bucket.total}
+                              {bucket.trueCount}/{bucket.total}
                             </span>
                           )}
                         </div>
@@ -535,7 +517,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
         entry={dialogData?.rep ?? null}
         dayStories={dialogData?.stories ?? []}
         dayNetworks={dialogData?.dayNetworks ?? []}
-        dayResult={dialogData?.dayResult ?? "Pendiente"}
+        dayResult={dialogData?.dayResult ?? "No"}
         onSetVerdict={handleSetVerdict}
         savingId={savingId}
         onEdit={onEditEntry ? (e) => { setOpenDayKey(null); onEditEntry(e); } : undefined}

@@ -4,6 +4,7 @@ import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X
 import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
 import { summarizeStories } from "./storyEvidence";
+import { resultBadgeVariant } from "./promoResult";
 
 // Galería de evidencia: muestra las historias del día de una creadora, cada una con
 // su thumbnail, veredicto (promovió/no), confianza y razonamiento de la IA. El
@@ -11,17 +12,10 @@ import { summarizeStories } from "./storyEvidence";
 // al cambiarlo se persiste y el resultado del día se recalcula (Sí si CUALQUIER
 // historia es Sí). Al clickear una imagen abre un LIGHTBOX para verla en grande.
 
-const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"> = {
-  "Sí": "success-soft",
-  "No": "destructive-soft",
-  "Parcial": "warning-soft",
-  "Pendiente": "secondary-soft",
-};
-
+// Resultado SIEMPRE binario: Sí (verde/check) o No (rojo/equis). Pending/otros → No.
 const ResultIcon = ({ result }: { result: string }) => {
   if (result === "Sí") return <Check className="h-3 w-3" />;
-  if (result === "No") return <XMark className="h-3 w-3" />;
-  return null;
+  return <XMark className="h-3 w-3" />;
 };
 
 // Toggle Sí/No del veredicto de una historia. Segmentado, con la opción activa
@@ -41,9 +35,9 @@ const VerdictToggle = ({
 }) => {
   if (!onSetVerdict) {
     return (
-      <Badge variant={resultVariant[story.result] || "secondary-soft"} className="gap-0.5 text-[10px]">
+      <Badge variant={resultBadgeVariant(story.result)} className="gap-0.5 text-[10px]">
         <ResultIcon result={story.result} />
-        {story.result}
+        {story.result === "Sí" ? "Sí" : "No"}
       </Badge>
     );
   }
@@ -65,7 +59,7 @@ const VerdictToggle = ({
         type="button"
         disabled={saving}
         onClick={(e) => { e.stopPropagation(); onSetVerdict(story, "No"); }}
-        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "No" ? "bg-destructive text-white" : `${idle} hover:text-destructive`}`}
+        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result !== "Sí" ? "bg-destructive text-white" : `${idle} hover:text-destructive`}`}
       >
         <XMark className="h-3 w-3" /> No
       </button>

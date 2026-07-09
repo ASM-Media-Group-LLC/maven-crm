@@ -78,8 +78,10 @@ export function summarizeStories(stories: PromologEntry[]): StoryGallerySummary 
   let promoted = 0;
   let notPromoted = 0;
   for (const s of stories) {
+    // Binario: Sí promocionó; cualquier otro (No / pending / desconocido) cuenta como No,
+    // así promoted + notPromoted siempre reconcilia con el total.
     if (s.result === "Sí") promoted++;
-    else if (s.result === "No") notPromoted++;
+    else notPromoted++;
   }
   return { total: stories.length, promoted, notPromoted };
 }

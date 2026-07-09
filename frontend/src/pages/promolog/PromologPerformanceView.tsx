@@ -93,15 +93,14 @@ const PromologPerformanceView = ({ profiles }: Props) => {
     };
   }), [agentEntries, now]);
 
-  // Result distribution
+  // Result distribution — BINARIO Sí/No. Sí = promocionó ('true'/'yes'/'partial');
+  // No = todo lo demás (incl. 'false'/'pending'/null), para que si + no === total.
   const resultDist = useMemo(() => {
-    const si = agentEntries.filter(e => e.promoted === "true").length;
-    const no = agentEntries.filter(e => e.promoted === "false").length;
-    const parcial = agentEntries.filter(e => e.promoted === "partial").length;
+    const si = agentEntries.filter(e => e.promoted === "true" || e.promoted === "yes" || e.promoted === "partial").length;
+    const no = agentEntries.filter(e => e.promoted !== "true" && e.promoted !== "yes" && e.promoted !== "partial").length;
     const total = agentEntries.length || 1;
     return [
       { label: "Sí", count: si, pct: Math.round((si / total) * 100), color: "bg-success" },
-      { label: "Parcial", count: parcial, pct: Math.round((parcial / total) * 100), color: "bg-warning" },
       { label: "No", count: no, pct: Math.round((no / total) * 100), color: "bg-destructive" },
     ];
   }, [agentEntries]);

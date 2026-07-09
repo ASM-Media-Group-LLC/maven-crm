@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { computeDayScore } from "./promoScore";
+import { promotedToResult, isUnverified } from "./promoResult";
 import {
   Users,
   Search,
@@ -105,24 +106,10 @@ const contactTypeOptions = [
   { value: "mensaje_voz", label: "Mensaje de Voz" },
 ] as const;
 
-const promotedToResult = (promoted: string | null): string => {
-  switch (promoted) {
-    case "true": return "Sí";
-    case "false": return "No";
-    case "partial": return "Parcial";
-    case "pending": return "Pendiente";
-    default: return "Pendiente";
-  }
-};
+// Resultado BINARIO Sí/No + marca "no verificado" (pending) → ./promoResult.
 
-const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft" => {
-  switch (result) {
-    case "Sí": return "success-soft";
-    case "No": return "destructive-soft";
-    case "Parcial": return "warning-soft";
-    default: return "secondary-soft";
-  }
-};
+const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" =>
+  result === "Sí" ? "success-soft" : "destructive-soft";
 
 // agentsData is now computed dynamically via useMemo inside the component
 
@@ -371,6 +358,7 @@ const PromologContent = () => {
         rawDate: pe.date ?? null,
         source_handle: pe.source_handle ?? null,
         needs_review: pe.needs_review === true,
+        is_pending: isUnverified(pe.promoted),
       };
     });
     if (!dayKeys) return mapped;
@@ -431,9 +419,13 @@ const PromologContent = () => {
           notes: e.notes,
         })),
       );
+      // Resultado del día ESTRICTAMENTE binario: Sí si promocionó en alguna story; si no, No.
       // needs_review del día = true si CUALQUIER entry del grupo lo tiene (no solo la "best").
-      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores,
+      // is_pending (día) = No + ninguna lectura confirmada (todo el grupo fue pending) →
+      // se muestra "No · no verificado".
+      result.push({ ...best, result: promoted.length > 0 ? "Sí" : "No", networks, promotedNetworks, dayScore, networkScores,
         needs_review: group.some((e) => e.needs_review === true),
+        is_pending: promoted.length === 0 && group.length > 0 && group.every((e) => e.is_pending === true),
         error_reason: (group.find((e) => e.error_reason)?.error_reason) ?? best.error_reason ?? null });
     }
     return result;
@@ -579,7 +571,7 @@ const PromologContent = () => {
   const dayResult = useMemo(() => {
     if (selectedDayStories.some((s) => s.result === "Sí")) return "Sí";
     if (selectedDayStories.some((s) => s.result === "No")) return "No";
-    return selectedEntry?.result ?? "Pendiente";
+    return selectedEntry?.result === "Sí" ? "Sí" : "No";
   }, [selectedDayStories, selectedEntry]);
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
@@ -867,7 +859,7 @@ const PromologContent = () => {
 
   const kpiModalEntries = useMemo(() => {
     if (!kpiModalType) return [];
-    if (kpiModalType === "no_chequeadas") return dedupedEntries.filter(e => e.result === "Pendiente");
+    if (kpiModalType === "no_chequeadas") return dedupedEntries.filter(e => e.needs_review || e.is_pending);
     if (kpiModalType === "completadas") return dedupedEntries.filter(e => e.result === "Sí");
     return dedupedEntries;
   }, [dedupedEntries, kpiModalType]);
@@ -882,8 +874,11 @@ const PromologContent = () => {
     return dedupedEntries.filter((entry) => {
       if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
       if (selectedStatus !== "") {
-        const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
-        if (entry.result !== statusMap[selectedStatus]) return false;
+        // Resultado binario Sí/No + filtros aditivos: "no verificado" (pending) y "revisar".
+        if (selectedStatus === "si_promociono" && entry.result !== "Sí") return false;
+        if (selectedStatus === "no_promociono" && entry.result !== "No") return false;
+        if (selectedStatus === "pendiente" && !entry.is_pending) return false;
+        if (selectedStatus === "revisar" && !entry.needs_review) return false;
       }
       if (selectedNetwork !== "" && !(entry.networks ?? [entry.network]).includes(selectedNetwork)) return false;
       if (selectedCardPlatform !== "" && !(entry.platform || "").toLowerCase().includes(selectedCardPlatform)) return false;
@@ -1046,8 +1041,8 @@ const PromologContent = () => {
                   <SelectItem value="__all__">Todos</SelectItem>
                   <SelectItem value="si_promociono">Sí</SelectItem>
                   <SelectItem value="no_promociono">No</SelectItem>
-                  <SelectItem value="parcial">Parcial</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="revisar">A revisar</SelectItem>
+                  <SelectItem value="pendiente">No verificado</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>

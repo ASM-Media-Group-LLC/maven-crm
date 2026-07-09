@@ -36,6 +36,7 @@ function mapReelItem(it: any): StoryItem {
     caption: it?.caption?.text ?? null,
     linkUrl: it?.story_link_stickers?.[0]?.story_link?.url ?? it?.story_cta?.[0]?.links?.[0]?.webUri ?? null,
     timestamp: Number.isFinite(Number(it?.taken_at)) && Number(it?.taken_at) > 0 ? new Date(Number(it.taken_at) * 1000).toISOString() : null,
+    pk: it?.pk != null ? String(it.pk) : (it?.id != null ? String(it.id) : null),
   };
 }
 
@@ -84,12 +85,21 @@ Deno.serve(async (req) => {
     }
     const rawItems: any[] = Array.isArray(c.reel_items) ? c.reel_items : [];
     if (rawItems.length === 0) {
+      // Reel vacío. Solo afirmamos "No" (sin historias) si CONFIRMAMOS que la cuenta es
+      // legible para la sesión: pública, o privada que SÍ seguimos. Si no pudimos
+      // confirmar (el friendship check falló → is_private/following nulos), NO afirmamos
+      // "No" — sería un falso negativo tipo javibelen. Va a read_failed (re-intentable,
+      // se muestra como "No · no verificado").
+      const isReadable = c.is_private === false || (c.is_private === true && c.following === true);
       if (c.is_private === true && c.following !== true) {
         await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "follow_pending" });
         pending++; results.push({ handle, outcome: "pending", reason: "follow_pending" });
-      } else {
+      } else if (isReadable) {
         await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate });
         no++; results.push({ handle, outcome: "no", story_items: 0 });
+      } else {
+        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "read_failed" });
+        pending++; results.push({ handle, outcome: "pending", reason: "unconfirmed_empty" });
       }
       continue;
     }

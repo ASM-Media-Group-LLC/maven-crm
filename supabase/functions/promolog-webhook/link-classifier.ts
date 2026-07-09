@@ -86,6 +86,7 @@ const AGGREGATOR: Record<string, string> = {
   "shorby.com": "shorby",
   "shor.by": "shorby",
   "taplink.cc": "taplink",
+  "supalink.ai": "supalink", // link-in-bio/smart-link → embuda a OF
   "flowcode.com": "flowpage",
   "flow.page": "flowpage",
   "mtr.bio": "metricool",

@@ -27,6 +27,7 @@ export interface StoryItem {
   caption: string | null;
   linkUrl: string | null;    // sticker de link (destino)
   timestamp: string | null;  // hora real de posteo (ISO)
+  pk?: string | null;        // id estable de la historia en IG (dedup entre re-runs)
 }
 
 export interface StoryAnalysis {
@@ -150,6 +151,22 @@ function parseModelJson(text: string): any | null {
     v = tryParse(noFences.slice(first, last + 1));
     if (v) return v;
   }
+  // 4º intento — RESCATE de respuesta PARCIAL/truncada: Gemini a veces corta el JSON
+  // (thinking se come el presupuesto de tokens) y queda inválido, PERO los campos clave
+  // van al inicio y están completos. Los sacamos por regex en vez de tirar todo a "revisar".
+  const grab = (re: RegExp): string | null => { const m = noFences.match(re); return m ? m[1] : null; };
+  const prom = grab(/"promoted"\s*:\s*(true|false)/i);
+  if (prom !== null) {
+    return {
+      promoted: prom === "true",
+      promotion_type: grab(/"promotion_type"\s*:\s*"(direct|indirect|none)"/i) ?? (prom === "true" ? "direct" : "none"),
+      has_buy_link: /"has_buy_link"\s*:\s*true/i.test(noFences),
+      buy_link_type: grab(/"buy_link_type"\s*:\s*"([^"]*)"/i),
+      platform_mentioned: grab(/"platform_mentioned"\s*:\s*"([^"]*)"/i) ?? "ninguna",
+      confidence: Number(grab(/"confidence"\s*:\s*([0-9.]+)/i) ?? "0.75"),
+      reasoning: (grab(/"reasoning"\s*:\s*"([^"]*)"/i) ?? "veredicto recuperado de respuesta parcial de la IA").slice(0, 500),
+    };
+  }
   return null;
 }
 
@@ -162,7 +179,9 @@ async function callOpenRouter(
     messages: [{ role: "user", content }],
     response_format: { type: "json_object" },
     temperature: 0.1,
-    max_tokens: 2048,
+    // 8192 (era 2048): Gemini 2.5 Flash usa "thinking" que consume del presupuesto de
+    // tokens → con 2048 truncaba el JSON de salida → json_parse fail → todo a "revisar".
+    max_tokens: 8192,
   };
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), LLM_TIMEOUT_MS);
@@ -251,13 +270,32 @@ async function analyzeVideoStory(
   return callOpenRouter(content, apiKey);
 }
 
+// Ventana de dedup: dos corridas dentro de este lapso se consideran "el mismo día de
+// escaneo". IG expira las historias en 24h; 20h cubre "otro run 10h después" sin pisar
+// el día siguiente. Ojo: la columna `date` es un TIMESTAMP por-corrida y `network` se
+// guarda en minúscula ('instagram'), así que dedup va por `created_at` + ilike.
+const DEDUP_WINDOW_MS = 20 * 60 * 60 * 1000;
+const dedupSince = () => new Date(Date.now() - DEDUP_WINDOW_MS).toISOString();
+
+// ¿La creadora ya tiene ALGUNA entry de IG reciente? Se usa para que un re-run no agregue
+// una fila "sin historias"/"sin datos" cuando ya hay registros de este mismo día.
+async function creatorHasInstagramEntry(sb: any, creatorId: string): Promise<boolean> {
+  const { data } = await sb.from("promolog_entries").select("id")
+    .eq("creator_id", creatorId).ilike("network", "instagram")
+    .gte("created_at", dedupSince()).limit(1);
+  return !!(data && data.length);
+}
+
 async function persistEvidence(
   sb: any,
-  args: { bytes: Uint8Array; mime: string; dispatchRunId: string; creatorId: string; storyIndex: number },
+  args: { bytes: Uint8Array; mime: string; creatorId: string; key: string },
 ): Promise<string | null> {
   try {
     const ext = args.mime.includes("png") ? "png" : args.mime.includes("webp") ? "webp" : "jpg";
-    const path = `${TENANT_ID}/${args.dispatchRunId}/${args.creatorId}-${args.storyIndex}.${ext}`;
+    // Path ESTABLE por (creadora, historia) — NO por run. Así un re-run del mismo día
+    // pisa la misma imagen (upsert) en vez de acumular una copia por cada corrida.
+    const safeKey = args.key.replace(/[^a-zA-Z0-9_-]/g, "") || "0";
+    const path = `${TENANT_ID}/${args.creatorId}/${safeKey}.${ext}`;
     const { error } = await sb.storage.from(EVIDENCE_BUCKET).upload(path, args.bytes, {
       contentType: args.mime, upsert: true,
     });
@@ -280,6 +318,7 @@ async function insertAnalyzedEntry(
     scraped_at: string | null; scan_date: string; analysis: StoryAnalysis;
     analysis_level?: string; needs_review?: boolean; story_link_url?: string | null;
     is_video?: boolean; source_handle?: string; known_platform?: string | null;
+    story_pk?: string | null;
   },
 ): Promise<boolean> {
   const platformMap: Record<string, string> = {
@@ -305,6 +344,7 @@ async function insertAnalyzedEntry(
     story_index: args.story_index, story_count: args.story_count, story_media_url: args.media_url,
     story_link_url: args.story_link_url ?? null, scraped_at: args.scraped_at,
     source_handle: args.source_handle ?? null, needs_review: args.needs_review ?? false,
+    story_pk: args.story_pk ?? null,
   });
   if (error) { console.error("insert entry failed:", error.message); return false; }
   return true;
@@ -316,6 +356,7 @@ async function insertUnreadableEntry(
     creator_id: string; dispatch_run_id: string; apify_run_id: string | null;
     story_index: number; story_count: number; media_url: string; evidence_url: string;
     scraped_at: string | null; scan_date: string; reason: string; is_video?: boolean;
+    story_pk?: string | null;
   },
 ): Promise<boolean> {
   const videoTag = args.is_video ? " · video" : "";
@@ -329,7 +370,7 @@ async function insertUnreadableEntry(
     apify_run_id: args.apify_run_id, analyzed_by_ai: true, ai_model: LLM_MODEL,
     ai_confidence: 0, ai_reasoning: notes, story_index: args.story_index,
     story_count: args.story_count, story_media_url: args.media_url, scraped_at: args.scraped_at,
-    needs_review: true, error_reason: reason,
+    needs_review: true, error_reason: reason, story_pk: args.story_pk ?? null,
   });
   if (error) { console.error("insert unreadable entry failed:", error.message); return false; }
   return true;
@@ -341,6 +382,9 @@ export async function insertEmptyEntry(
   sb: any,
   args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string },
 ): Promise<void> {
+  // Idempotencia: si ya hay una entry de IG hoy (p.ej. un run anterior leyó historias),
+  // no agregamos un "sin historias" que la contradiga ni duplique.
+  if (await creatorHasInstagramEntry(sb, args.creator_id)) return;
   await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,
     promoted: "false", network: "Instagram", platform: "Ninguna", has_buy_link: false,
@@ -359,6 +403,9 @@ export async function insertNoDataEntry(
   args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string; reason?: string },
 ): Promise<void> {
   const reason = args.reason ?? "read_failed";
+  // Idempotencia: no agregues un "sin datos" si ya hay una entry de IG hoy para la
+  // creadora (un run que sí leyó gana; el pending no debe duplicar ni pisar).
+  if (await creatorHasInstagramEntry(sb, args.creator_id)) return;
   const notes = reason === "follow_pending"
     ? "[SIN DATOS] La cuenta es privada y el follow de la sesión está PENDIENTE de aprobación — no se pudo leer. NO confirma que no haya publicado."
     : reason === "no_ig_id"
@@ -388,18 +435,29 @@ async function processStory(args: {
   const videoUrl = story.videoUrl;
   const caption = story.caption;
 
+  // Idempotencia: si esta MISMA historia (por su pk de IG) ya fue analizada hoy, no la
+  // re-analizamos (ahorra Gemini) ni duplicamos la fila/imagen. Devolvemos el veredicto
+  // previo para que promotedAny siga siendo correcto.
+  if (story.pk) {
+    const { data: dup } = await args.sb.from("promolog_entries").select("promoted")
+      .eq("creator_id", creator.creatorId).eq("story_pk", story.pk)
+      .gte("created_at", dedupSince()).limit(1);
+    if (dup && dup.length) return { inserted: false, promoted: dup[0].promoted === "true" };
+  }
+  const evidenceKey = story.pk ?? `${run.dispatchRunId}-${args.storyIndex}`;
+
   const l1 = await analyzeImageStory(mediaUrl, caption, run.openrouterKey, creator.ofNicks);
   if ("error" in l1) {
     if (l1.imageBytes && l1.mime) {
       const durableUrl = await persistEvidence(args.sb, {
-        bytes: l1.imageBytes, mime: l1.mime, dispatchRunId: run.dispatchRunId,
-        creatorId: creator.creatorId, storyIndex: args.storyIndex,
+        bytes: l1.imageBytes, mime: l1.mime,
+        creatorId: creator.creatorId, key: evidenceKey,
       });
       const inserted = await insertUnreadableEntry(args.sb, {
         creator_id: creator.creatorId, dispatch_run_id: run.dispatchRunId, apify_run_id: run.apifyRunId,
         story_index: args.storyIndex, story_count: args.storyCount, media_url: mediaUrl,
         evidence_url: durableUrl ?? mediaUrl, scraped_at: story.timestamp, scan_date: run.scanDate,
-        reason: l1.error, is_video: isVideo,
+        reason: l1.error, is_video: isVideo, story_pk: story.pk ?? null,
       });
       return { inserted };
     }
@@ -448,8 +506,8 @@ async function processStory(args: {
       (linkClass.tier === "nonpaid" || linkClass.tier === "unknown")));
 
   const durableUrl = await persistEvidence(args.sb, {
-    bytes: l1.imageBytes, mime: l1.mime, dispatchRunId: run.dispatchRunId,
-    creatorId: creator.creatorId, storyIndex: args.storyIndex,
+    bytes: l1.imageBytes, mime: l1.mime,
+    creatorId: creator.creatorId, key: evidenceKey,
   });
 
   const inserted = await insertAnalyzedEntry(args.sb, {
@@ -458,7 +516,7 @@ async function processStory(args: {
     evidence_url: durableUrl ?? mediaUrl, scraped_at: story.timestamp, scan_date: run.scanDate,
     analysis: final, analysis_level: analysisLevel, needs_review: needsReview,
     story_link_url: storyLinkUrl, is_video: isVideo, source_handle: creator.sourceHandle,
-    known_platform: creator.knownPlatform,
+    known_platform: creator.knownPlatform, story_pk: story.pk ?? null,
   });
   return { inserted, promoted: final.promoted };
 }

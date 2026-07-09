@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Clock, User, Pencil, Check, X as XMark, ExternalLink, Upload } from "lucide-react";
+import { AlertTriangle, Clock, User, Pencil, Check, X as XMark, ExternalLink, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import type { NetworkScore } from "./promoScore";
+import { resultBadgeVariant } from "./promoResult";
 
 export interface PromologEntry {
   id: string;
@@ -74,6 +75,10 @@ export interface PromologEntry {
   source_handle?: string | null;
   // La IA la marcó para revisión manual (baja confianza / veredicto ilegible).
   needs_review?: boolean;
+  // "No verificado": la lectura NO se pudo confirmar (falló / cuenta privada sin follow
+  // / IA ilegible → promoted='pending'). Se muestra como "No" pero con una marca; NO
+  // confirma que la creadora no haya publicado. Derivado con isUnverified(promoted).
+  is_pending?: boolean;
   // Motivo técnico del fallo de scan (json_parse, openrouter_timeout, etc.) cuando
   // needs_review=true → la fila se pinta "A revisar" con el motivo en tooltip.
   error_reason?: string | null;
@@ -113,21 +118,15 @@ const networkLabel = (network: string) => {
   return "X";
 };
 
-const resultBadgeVariant = (result: string): "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft" => {
-  switch (result) {
-    case "Sí": return "success-soft";
-    case "No": return "destructive-soft";
-    case "Parcial": return "warning-soft";
-    default: return "secondary-soft";
-  }
-};
-
-const ResultIcon = ({ result }: { result: string }) => {
-  if (result === "Sí") return <Check className="h-3.5 w-3.5 text-success" />;
-  if (result === "No") return <XMark className="h-3.5 w-3.5 text-destructive" />;
-  if (result === "Parcial") return <Check className="h-3.5 w-3.5 text-warning" />;
-  return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
-};
+// Resultado SIEMPRE binario (Sí/No): el icono verde es solo para "Sí"; cualquier
+// otro valor (No / pending / desconocido) muestra la X roja de "No". La variante de
+// color del badge se importa de ./promoResult (fuente única de verdad).
+const ResultIcon = ({ result }: { result: string }) =>
+  result === "Sí" ? (
+    <Check className="h-3.5 w-3.5 text-success" />
+  ) : (
+    <XMark className="h-3.5 w-3.5 text-destructive" />
+  );
 
 const getInitials = (name: string) => {
   return name
@@ -197,9 +196,20 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             <Badge variant="outline" className="text-xs font-mono">
               {entry.ticketNumber}
             </Badge>
-            <Badge variant={resultBadgeVariant(entry.result)} className="text-xs">
-              {entry.result}
-            </Badge>
+            {/* Resultado SIEMPRE binario (Sí/No). "revisar" y "no verificado" son
+                marcas AL LADO, nunca reemplazan el resultado. */}
+            <div className="flex items-center gap-1">
+              <Badge variant={resultBadgeVariant(entry.result)} className="text-xs">
+                {entry.result === "Sí" ? "Sí" : "No"}
+              </Badge>
+              {entry.needs_review ? (
+                <span title={entry.error_reason ?? "Revisar manual"} className="text-warning" aria-label="Revisar manual">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                </span>
+              ) : entry.is_pending ? (
+                <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+              ) : null}
+            </div>
           </div>
 
           {/* Row 2: Result icon + Name */}

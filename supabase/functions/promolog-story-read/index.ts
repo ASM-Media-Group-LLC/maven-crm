@@ -96,6 +96,7 @@ function mapReelItem(it: any): StoryItem {
     caption: it?.caption?.text ?? null,
     linkUrl,
     timestamp: Number.isFinite(takenAt) && takenAt > 0 ? new Date(takenAt * 1000).toISOString() : null,
+    pk: it?.pk != null ? String(it.pk) : (it?.id != null ? String(it.id) : null),
   };
 }
 

@@ -5,12 +5,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import type { PromologEntry } from "./PromologEntryCard";
+import { resultBadgeVariant } from "./promoResult";
 
 interface Props {
   open: boolean;
@@ -33,13 +35,6 @@ const networkLabel: Record<string, string> = {
   tiktok: "TikTok",
   x: "X / Twitter",
   telegram: "Telegram",
-};
-
-const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"> = {
-  "Sí": "success-soft",
-  "No": "destructive-soft",
-  "Parcial": "warning-soft",
-  "Pendiente": "secondary-soft",
 };
 
 const ViewPromologEntryModal = ({ open, onOpenChange, entry }: Props) => {
@@ -95,12 +90,22 @@ const ViewPromologEntryModal = ({ open, onOpenChange, entry }: Props) => {
             </div>
           </div>
 
-          {/* Result */}
+          {/* Result — SIEMPRE binario (Sí/No). "revisar" y "no verificado" son
+              marcas AL LADO, nunca reemplazan el resultado. */}
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground font-medium">Resultado</p>
-            <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs mt-1">
-              {entry.result}
-            </Badge>
+            <div className="flex items-center gap-1 mt-1">
+              <Badge variant={resultBadgeVariant(entry.result)} className="text-xs">
+                {entry.result === "Sí" ? "Sí" : "No"}
+              </Badge>
+              {entry.needs_review ? (
+                <span title={entry.error_reason ?? "Revisar manual"} className="text-warning" aria-label="Revisar manual">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                </span>
+              ) : entry.is_pending ? (
+                <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+              ) : null}
+            </div>
           </div>
 
           {/* Agent */}

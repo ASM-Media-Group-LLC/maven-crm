@@ -97,11 +97,9 @@ const networkLabel: Record<string, string> = {
   youtube: "YouTube",
 };
 
-const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"> = {
+const resultVariant: Record<string, "success-soft" | "destructive-soft"> = {
   "Sí": "success-soft",
   "No": "destructive-soft",
-  "Parcial": "warning-soft",
-  "Pendiente": "secondary-soft",
 };
 
 // Motivo legible del fallo de scan (para el tooltip de la fila "A revisar").
@@ -308,15 +306,20 @@ const PromologTable = ({
               )}
             </TableCell>
             <TableCell>
-              {entry.needs_review ? (
-                <Badge variant="warning-soft" className="gap-1 text-xs" title={errorReasonLabel(entry.error_reason)}>
-                  <AlertTriangle className="h-3 w-3" /> A revisar
+              {/* Resultado SIEMPRE binario (Sí/No). "revisar" y "no verificado" son
+                  marcas AL LADO, nunca reemplazan el resultado. */}
+              <div className="flex items-center gap-1">
+                <Badge variant={resultVariant[entry.result] || "destructive-soft"} className="text-xs">
+                  {entry.result === "Sí" ? "Sí" : "No"}
                 </Badge>
-              ) : (
-                <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">
-                  {entry.result}
-                </Badge>
-              )}
+                {entry.needs_review ? (
+                  <span title={errorReasonLabel(entry.error_reason)} className="text-warning" aria-label="Revisar manual">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  </span>
+                ) : entry.is_pending ? (
+                  <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+                ) : null}
+              </div>
             </TableCell>
             <TableCell className="min-w-[150px]">
               {entry.networkScores?.length ? (

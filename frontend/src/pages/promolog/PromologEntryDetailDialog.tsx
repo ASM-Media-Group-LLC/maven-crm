@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Facebook } from "lucide-react";
+import { AlertTriangle, Check, ExternalLink, Facebook } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
 import { displayPlatform } from "./promoScore";
+import { resultBadgeVariant } from "./promoResult";
 import type { PromologEntry } from "./PromologEntryCard";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
@@ -44,15 +45,6 @@ const detailNetworkLabel = (n: string): string =>
 // evidencia con el veredicto EDITABLE por historia (toggle Sí/No) cuando se
 // pasa `onSetVerdict`. El resultado del día (`dayResult`) se recalcula afuera
 // (Sí si CUALQUIER historia quedó en Sí) y se pasa como prop.
-
-const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft" => {
-  switch (result) {
-    case "Sí": return "success-soft";
-    case "No": return "destructive-soft";
-    case "Parcial": return "warning-soft";
-    default: return "secondary-soft";
-  }
-};
 
 interface Props {
   open: boolean;
@@ -202,9 +194,18 @@ const PromologEntryDetailDialog = ({
             </div>
             <div>
               <span className="text-muted-foreground">Resultado:</span>{" "}
-              <Badge variant={resultToBadgeVariant(dayResult)} className="ml-1 text-xs">
-                {dayResult}
-              </Badge>
+              <span className="ml-1 inline-flex items-center gap-1">
+                <Badge variant={resultBadgeVariant(dayResult)} className="text-xs">
+                  {dayResult === "Sí" ? "Sí" : "No"}
+                </Badge>
+                {entry.needs_review ? (
+                  <span title={entry.error_reason || "Revisar manual"} className="text-warning" aria-label="Revisar manual">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  </span>
+                ) : entry.is_pending ? (
+                  <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+                ) : null}
+              </span>
             </div>
             <div>
               <span className="text-muted-foreground">Agente:</span>{" "}
@@ -360,7 +361,7 @@ const PromologEntryDetailDialog = ({
                     {accts.length > 0 && (
                       <span className="text-xs text-muted-foreground">· {accts.map((a) => `@${a}`).join(", ")}</span>
                     )}
-                    <Badge variant={dn.promoted ? "success-soft" : "secondary-soft"} className="text-[10px]">
+                    <Badge variant={dn.promoted ? "success-soft" : "destructive-soft"} className="text-[10px]">
                       {dn.promoted ? "Promocionó" : "Revisada · sin promo"}
                     </Badge>
                   </div>

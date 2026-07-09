@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Search, Check, Minus, X, TrendingUp, Table2, Users, BarChart3, Clock } from "lucide-react";
+import { ArrowLeft, Search, Check, X, TrendingUp, Table2, Users, BarChart3, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import type { PromologEntry } from "./PromologEntryCard";
 import ViewPromologEntryModal from "./ViewPromologEntryModal";
+import { promotedToResult } from "./promoResult";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram" },
@@ -33,16 +34,6 @@ const networkOptions = [
   { value: "telegram", label: "Telegram" },
 ];
 
-const promotedToResult = (promoted: string | null): string => {
-  switch (promoted) {
-    case "true": return "Sí";
-    case "false": return "No";
-    case "partial": return "Parcial";
-    case "pending": return "Pendiente";
-    default: return "Pendiente";
-  }
-};
-
 interface PromologAgentDetailViewProps {
   agent: { id: string; name: string };
   onBack: () => void;
@@ -50,7 +41,6 @@ interface PromologAgentDetailViewProps {
 
 const COLORS = {
   si: "hsl(var(--success))",
-  parcial: "hsl(var(--warning))",
   no: "hsl(var(--destructive))",
   primary: "hsl(var(--primary))",
   accent: "hsl(var(--accent))",
@@ -72,7 +62,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("promos");
-  type KpiKey = "total" | "si" | "parcial" | "no" | "exito" | "avg" | "hoy";
+  type KpiKey = "total" | "si" | "no" | "exito" | "avg" | "hoy";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterNetwork, setFilterNetwork] = useState("");
@@ -181,24 +171,25 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   // KPIs
   const totalEntries = entries.length;
   const siCount = entries.filter(e => e.result === "Sí").length;
-  const parcialCount = entries.filter(e => e.result === "Parcial").length;
-  const noCount = entries.filter(e => e.result === "No").length;
+  const noCount = entries.filter(e => e.result !== "Sí").length;
   const successRate = totalEntries > 0 ? Math.round((siCount / totalEntries) * 100) : 0;
 
   // Performance data
   const promosByDay = useMemo(() => {
-    const days: { date: string; total: number; si: number; parcial: number; no: number }[] = [];
+    const days: { date: string; total: number; si: number; no: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const dayStr = format(d, "yyyy-MM-dd");
       const dayLabel = format(d, "EEE d", { locale: es });
       const dayEntries = rawEntries.filter((e: any) => (e.date?.split("T")[0] ?? "") === dayStr);
+      // Sí = promocionó ('true'/'yes'/'partial'); No = todo lo demás (incl. 'pending'/'false'),
+      // así si + no === total y las barras apiladas cuadran con el total del día.
+      const si = dayEntries.filter((e: any) => e.promoted === "true" || e.promoted === "yes" || e.promoted === "partial").length;
       days.push({
         date: dayLabel,
         total: dayEntries.length,
-        si: dayEntries.filter((e: any) => e.promoted === "true").length,
-        parcial: dayEntries.filter((e: any) => e.promoted === "partial").length,
-        no: dayEntries.filter((e: any) => e.promoted === "false").length,
+        si,
+        no: dayEntries.length - si,
       });
     }
     return days;
@@ -228,9 +219,8 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
 
   const resultDistribution = useMemo(() => [
     { name: "Sí", value: siCount, color: COLORS.si },
-    { name: "Parcial", value: parcialCount, color: COLORS.parcial },
     { name: "No", value: noCount, color: COLORS.no },
-  ], [siCount, parcialCount, noCount]);
+  ], [siCount, noCount]);
 
   const avgPerDay = useMemo(() => {
     const daySet = new Set(rawEntries.map((e: any) => e.date?.split("T")[0]));
@@ -297,10 +287,9 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         <>
           {/* KPI Cards — clickeables, abren modal con detalle */}
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[240px] opacity-100 pb-2"}`}>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <KpiCard label="Total" value={String(totalEntries)} icon={Table2} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
               <KpiCard label="Sí" value={String(siCount)} icon={Check} color="bg-success" onClick={() => setKpiPopup("si")} />
-              <KpiCard label="Parcial" value={String(parcialCount)} icon={Minus} color="bg-warning" onClick={() => setKpiPopup("parcial")} />
               <KpiCard label="No" value={String(noCount)} icon={X} color="bg-destructive" onClick={() => setKpiPopup("no")} />
               <KpiCard label="Éxito" value={`${successRate}%`} icon={TrendingUp} color="bg-violet-500" onClick={() => setKpiPopup("exito")} />
             </div>
@@ -395,7 +384,6 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
                     <Tooltip contentStyle={{ fontSize: 12 }} />
                     <Bar dataKey="si" stackId="a" fill={COLORS.si} name="Sí" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="parcial" stackId="a" fill={COLORS.parcial} name="Parcial" />
                     <Bar dataKey="no" stackId="a" fill={COLORS.no} name="No" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -480,7 +468,6 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           switch (kpiPopup) {
             case "total": return `Total Promos — ${totalEntries}`;
             case "si": return `Promos con Sí — ${siCount}`;
-            case "parcial": return `Promos Parciales — ${parcialCount}`;
             case "no": return `Promos con No — ${noCount}`;
             case "exito": return `Tasa de Éxito — ${successRate}%`;
             case "avg": return `Promedio por día — ${avgPerDay}`;
@@ -493,21 +480,19 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           if (!kpiPopup) return [];
           let list: any[] = rawEntries;
           if (kpiPopup === "si") list = rawEntries.filter((e: any) => e.result === "Sí");
-          else if (kpiPopup === "parcial") list = rawEntries.filter((e: any) => e.result === "Parcial");
           else if (kpiPopup === "no") list = rawEntries.filter((e: any) => e.result === "No");
           else if (kpiPopup === "hoy") list = rawEntries.filter((e: any) => isToday(new Date(e.date)));
           else if (kpiPopup === "exito" || kpiPopup === "avg") {
             return [
               { primary: "Total entradas", right: String(totalEntries) },
               { primary: "Resultados Sí", right: String(siCount), rightTone: "success" as const },
-              { primary: "Resultados Parcial", right: String(parcialCount), rightTone: "warning" as const },
               { primary: "Resultados No", right: String(noCount), rightTone: "destructive" as const },
               { primary: "Promedio por día", right: String(avgPerDay) },
               { primary: "Tasa de éxito", right: `${successRate}%`, rightTone: Number(successRate) >= 50 ? "success" as const : "warning" as const },
             ];
           }
           const tone = (result: string): KpiRow["rightTone"] =>
-            result === "Sí" ? "success" : result === "No" ? "destructive" : result === "Parcial" ? "warning" : "default";
+            result === "Sí" ? "success" : "destructive";
           return list.slice(0, 100).map((e: any): KpiRow => ({
             primary: e.creator_name ?? e.creator_handle ?? "Sin creador",
             secondary: `${e.network ?? "—"} · ${e.date ? new Date(e.date).toLocaleDateString("es") : "—"}`,

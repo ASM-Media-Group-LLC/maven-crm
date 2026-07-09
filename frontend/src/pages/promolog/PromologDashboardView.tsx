@@ -141,8 +141,10 @@ const PromologDashboardView = ({
   const promoSi = useMemo(() => filteredEntries.filter(e => e.result === "Sí"), [filteredEntries]);
   const promosCount = promoSi.length;
   const successRate = totalEntries > 0 ? Math.round((promosCount / totalEntries) * 100) : 0;
-  // "Sin revisar" = pendientes de la IA + las que marcó para revisión manual (needs_review).
-  const pendingCount = dedupedEntries.filter(e => e.result === "Pendiente" || e.needs_review).length;
+  // "Sin revisar" = cola de atención: marcadas para revisión manual (needs_review) o
+  // lecturas NO confirmadas (is_pending). El resultado ya es binario Sí/No, así que
+  // no filtramos por result: apuntamos a las señales reales de "necesita atención".
+  const pendingCount = dedupedEntries.filter(e => e.needs_review || e.is_pending).length;
 
   // Tipo de promo: DIRECTA (link de compra visible) vs INDIRECTA (CTA sin link).
   // Es la distinción clave para OF (las creadoras evitan links explícitos por el ban
@@ -291,8 +293,10 @@ const PromologDashboardView = ({
       const key = (e.rawDate || "").slice(0, 10);
       if (!key) continue;
       const slot = byDay.get(key) ?? { si: 0, no: 0 };
+      // Resultado binario: Sí suma verde; TODO lo demás (No / no verificado) suma rojo,
+      // así si + no === total de entries del día y las barras cuadran.
       if (e.result === "Sí") slot.si += 1;
-      else if (e.result === "No") slot.no += 1;
+      else slot.no += 1;
       byDay.set(key, slot);
     }
     return days.map((d) => {
@@ -338,10 +342,11 @@ const PromologDashboardView = ({
     recs.sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
     return recs;
   }, [filteredEntries, activeCreators]);
-  // (2) Entries pendientes de revisar (status="Pendiente" — la AI no
-  // pudo clasificar con confianza, o el humano aún no revisó).
+  // (2) Cola de revisión: la AI la marcó para revisión manual (needs_review) o la
+  // lectura no se pudo confirmar (is_pending). El resultado ya es binario Sí/No, así
+  // que la cola se arma con esas señales, no con un result "Pendiente" (ya no existe).
   const pendingEntries = useMemo(() => {
-    return dedupedEntries.filter(e => e.result === "Pendiente" || e.needs_review).slice(0, 5);
+    return dedupedEntries.filter(e => e.needs_review || e.is_pending).slice(0, 5);
   }, [dedupedEntries]);
 
   // ── Render helpers ──────────────────────────────────────────────────
