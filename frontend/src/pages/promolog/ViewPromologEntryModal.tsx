@@ -13,6 +13,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import type { PromologEntry } from "./PromologEntryCard";
 import { resultBadgeVariant } from "./promoResult";
+import { displayPlatform } from "./promoScore";
 
 interface Props {
   open: boolean;
@@ -85,7 +86,7 @@ const ViewPromologEntryModal = ({ open, onOpenChange, entry }: Props) => {
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground font-medium">Plataforma</p>
               <Badge variant="primary-soft" className="text-xs mt-1">
-                {entry.platform}
+                {displayPlatform(entry) ?? "—"}
               </Badge>
             </div>
           </div>

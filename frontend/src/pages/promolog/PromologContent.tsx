@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { computeDayScore } from "./promoScore";
+import { computeDayScore, displayPlatform } from "./promoScore";
 import { promotedToResult, isUnverified } from "./promoResult";
 import {
   Users,
@@ -1756,7 +1756,7 @@ const PromologContent = () => {
                   <span className="w-12 font-mono text-xs text-muted-foreground">{entry.ticketNumber || "—"}</span>
                   <span className="flex-1 font-medium text-sm truncate">{entry.name}</span>
                   <span className="w-20 capitalize text-xs">{entry.network}</span>
-                  <span className="w-24 text-xs">{entry.platform}</span>
+                  <span className="w-24 text-xs">{displayPlatform(entry) ?? "—"}</span>
                   <span className="w-20">
                     <Badge variant={resultToBadgeVariant(entry.result)} className="text-[10px]">{entry.result}</Badge>
                   </span>

@@ -190,7 +190,7 @@ const PromologEntryDetailDialog = ({
             </div>
             <div>
               <span className="text-muted-foreground">Plataforma destino:</span>{" "}
-              <span className="font-medium">{displayPlatform(entry) || entry.platform || "—"}</span>
+              <span className="font-medium">{displayPlatform(entry) ?? "—"}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Resultado:</span>{" "}

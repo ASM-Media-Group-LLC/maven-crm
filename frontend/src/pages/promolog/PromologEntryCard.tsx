@@ -18,7 +18,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
-import type { NetworkScore } from "./promoScore";
+import { displayPlatform, type NetworkScore } from "./promoScore";
 import { resultBadgeVariant } from "./promoResult";
 
 export interface PromologEntry {
@@ -232,9 +232,11 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
               <NetworkIcon network={entry.network} />
               {networkLabel(entry.network)}
             </Badge>
-            <Badge variant="primary-soft" className="text-xs">
-              {entry.platform}
-            </Badge>
+            {displayPlatform(entry) && (
+              <Badge variant="primary-soft" className="text-xs">
+                {displayPlatform(entry)}
+              </Badge>
+            )}
           </div>
 
           {/* Row 5: Time + Agent */}

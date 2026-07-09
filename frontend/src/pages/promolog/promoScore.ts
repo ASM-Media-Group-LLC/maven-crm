@@ -61,24 +61,27 @@ export function isManagedPromo(e: ScoreInput): boolean {
   return true; // OF explícito o promo indirecta sin plataforma → asumimos OF (default del negocio)
 }
 
-/** Nombre lindo de la plataforma para la UI (o null si no se identificó plataforma). */
+/**
+ * Plataforma para la UI: SOLO "Unlok" u "OnlyFans" (o null si no hay promo/plataforma).
+ * Regla del owner: el negocio solo tiene OnlyFans (Kash) y Unlok (Atomick). Si NO se ve
+ * claramente Unlok, se toma como OnlyFans. Nunca "Otra"/"Fansly"/"Piclink"/"Linktree".
+ */
 export function displayPlatform(e: {
   platform?: string | null;
   buy_link_type?: string | null;
   ai_reasoning?: string | null;
   has_buy_link?: boolean;
+  result?: string | null;
 }): string | null {
   const p = (e.platform || "").toLowerCase();
   const b = (e.buy_link_type || "").toLowerCase();
   const r = (e.ai_reasoning || "").toLowerCase();
-  if (p === "onlyfans" || b === "onlyfans") return "OnlyFans";
+  // Unlok SOLO si es claramente Unlok (plataforma/link/nombre en el reasoning).
   if (p === "unlok" || b === "unlok" || /unlok/.test(r)) return "Unlok";
-  if (p === "fansly" || b === "fansly") return "Fansly";
-  if (p === "piclink" || b === "piclink") return "Piclink";
-  if (p === "linktree" || b === "linktree") return "Linktree";
-  if (e.has_buy_link && b === "other") return "Otra";
-  if (p && p !== "ninguna" && p !== "otra") return e.platform!;
-  return null; // sin plataforma identificada
+  // ¿Hay señal de promo/plataforma? (promocionó, o hay link/plataforma de cualquier tipo)
+  const noise = new Set(["", "ninguna", "none"]);
+  const hasSignal = e.result === "Sí" || e.has_buy_link === true || !noise.has(b) || !noise.has(p);
+  return hasSignal ? "OnlyFans" : null; // cualquier cosa que no sea Unlok → OnlyFans
 }
 
 export interface NetworkScore {
