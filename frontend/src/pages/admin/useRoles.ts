@@ -152,10 +152,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Operaciones", "Promolog", ["Promos", "Promobot"]),
   // LeadGen: vistas internas + acciones de crear/eliminar entradas.
   def("Operaciones", "LeadGen", ["Dashboard", "Lista", "Agentes", "Supervisores", "Rendimiento"], ["Crear Entrada", "Eliminar Entradas"]),
-  // Closers: solo 2 subtabs reales (Dashboard / Operaciones) + Oportunidades + acciones.
-  // (Los antiguos "Ver Todas/Nuevo/…" eran filtros de estado dentro de Operaciones, NO subtabs,
-  //  y nunca se gateaban — se quitaron para no ensuciar el modal con toggles muertos.)
-  def("Operaciones", "Closers", ["Dashboard", "Operaciones", "Oportunidades"],
+  // Closers: subtabs de navegación (Dashboard / Actividad / Operaciones / Oportunidades) + acciones.
+  // (Los antiguos "Ver Todas/Nuevo/…" eran filtros de estado dentro de Operaciones, NO subtabs.)
+  def("Operaciones", "Closers", ["Dashboard", "Actividad", "Operaciones", "Oportunidades"],
     ["Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora"]),
   // Teléfonos (cloud phones): Dashboard (uso/stats) + Dispositivos (grilla).
   def("Operaciones", "Telefonos", ["Dashboard", "Dispositivos"]),

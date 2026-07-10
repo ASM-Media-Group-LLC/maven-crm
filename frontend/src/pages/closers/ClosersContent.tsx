@@ -209,13 +209,15 @@ const ClosersContent = () => {
                 <LayoutDashboard className="mr-1.5 h-4 w-4" />
                 Dashboard
               </SubtabNavItem>
-              <SubtabNavItem
-                active={viewTab === "actividad"}
-                onClick={() => setViewTab("actividad")}
-              >
-                <Activity className="mr-1.5 h-4 w-4" />
-                Actividad
-              </SubtabNavItem>
+              {canAccess("Closers", "Actividad") && (
+                <SubtabNavItem
+                  active={viewTab === "actividad"}
+                  onClick={() => setViewTab("actividad")}
+                >
+                  <Activity className="mr-1.5 h-4 w-4" />
+                  Actividad
+                </SubtabNavItem>
+              )}
               <SubtabNavItem
                 active={viewTab === "operaciones"}
                 onClick={() => setViewTab("operaciones")}
@@ -254,7 +256,7 @@ const ClosersContent = () => {
               (manual del chip N/6 + auto de la bandeja WA/TG), filtrable por
               fecha. El gate por rol (admin/manager ven a todos; el closer solo a
               sí mismo) vive en las RPCs get_closer_activity*. */}
-          {viewTab === "actividad" && (
+          {viewTab === "actividad" && canAccess("Closers", "Actividad") && (
             <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
               <ClosersActivityDashboard
                 isAdmin={isAdmin}
