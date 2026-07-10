@@ -838,6 +838,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className={stickyBase}>Motivo</TableHead>
             <TableHead className={stickyBase}>Detalle</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "nuevo":
@@ -1119,6 +1120,19 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+            <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada", c._source)}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Volver a Asignada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         );

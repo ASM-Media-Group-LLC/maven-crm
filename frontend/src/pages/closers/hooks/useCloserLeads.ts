@@ -651,7 +651,15 @@ export const useCloserLeads = () => {
       // lead pasaba a "Asignada", entonces el reporte de closers contaba
       // 0 asignadas en cualquier rango. Ahora se setea igual que
       // confirmed_date/completed_date al cambiar de stage.
-      if (stage === "Asignada") updates.passed_date = new Date().toISOString().slice(0, 10);
+      if (stage === "Asignada") {
+        updates.passed_date = new Date().toISOString().slice(0, 10);
+        // Reactivación: limpiar las marcas del stage cerrado (No interesada) para que el
+        // lead vuelva "limpio" y no cuente como evento de cierre en reportes ni arrastre
+        // el motivo viejo. (En Confirmada/Completada estos campos ya son null → no afecta.)
+        updates.no_interesada_date = null;
+        updates.close_reason_code = null;
+        updates.rejection_reason = null;
+      }
       if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
       if (stage === "Completada") updates.completed_date = new Date().toISOString();
       // No interesada también es transición — necesitamos la fecha para
