@@ -86,15 +86,25 @@ function expandedLinks(it: any): string[] {
   return out;
 }
 
+// Publicidad de MARCA/tienda (Shein, Temu, cupón, "publicidad pagada") — un ad pagado a
+// un tercero NO es promo de su OF, aunque el CTA genérico ("descuento"/"link") matchee.
+function isBrandAd(haystack: string): boolean {
+  return /\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test((haystack || "").toLowerCase());
+}
+
 // Promo SOLO con señal explícita de OF (link/mención/agregador/CTA) — igual que FB
 // e IG. Se quitó "cualquier foto = promo": daba falsos positivos (fútbol, marcas,
 // memes). Si no hay señal de texto pero hay imagen, la VISIÓN decide (en el loop).
-function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: string } {
+// Excepción: un ad de MARCA sin señal OF fuerte → No firme (no cuenta ni pasa a visión).
+function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: string; brandAd: boolean } {
   const text: string = it?.text || it?.fullText || "";
   const links = expandedLinks(it);
-  const sig = ofSignals(text + " " + links.join(" "), ofHandles);
-  if (sig.length) return { promoted: true, reason: sig.join("+") };
-  return { promoted: false, reason: "sin-senal-of" };
+  const hay = text + " " + links.join(" ");
+  const sig = ofSignals(hay, ofHandles);
+  const hasStrong = sig.some((x) => x === "onlyfans" || x === "of_handle" || x === "link_agg");
+  if (isBrandAd(hay) && !hasStrong) return { promoted: false, reason: "brand_ad", brandAd: true };
+  if (sig.length) return { promoted: true, reason: sig.join("+"), brandAd: false };
+  return { promoted: false, reason: "sin-senal-of", brandAd: false };
 }
 
 // ── Visión: ¿la IMAGEN del tweet promociona OF? Solo se llama si el texto no dio
@@ -338,13 +348,14 @@ Deno.serve(async (req: Request) => {
     const visionTweets: Array<{ promoted: boolean; reason: string; text: string }> = [];
     for (let i = 0; i < tweets.length; i++) {
       const it = tweets[i];
-      let { promoted, reason } = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
+      const clsX = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
+      let { promoted, reason } = clsX;
       const srcHandle = normHandle(it?.author?.userName || it?.author?.username || it?.username || "") || null;
       const permalink: string = it?.url || it?.twitterUrl || "";
       const { firstImage } = tweetMedia(it);
       // Visión SOLO si no hubo señal de texto pero hay imagen (el promo puede estar
       // quemado en el arte). El modelo decide; una foto/meme personal → No.
-      if (!promoted && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
+      if (!promoted && !clsX.brandAd && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
         visionUsed++;
         const v = await visionIsOfPromo(firstImage, OPENROUTER_API_KEY, it?.text || it?.fullText || "");
         if (dryRun) visionTweets.push({ promoted: v.promoted, reason: v.reason.slice(0, 140), text: ((it?.text || it?.fullText || "") as string).slice(0, 80) });

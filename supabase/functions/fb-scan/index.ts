@@ -41,16 +41,27 @@ function ofHandleFromUrl(url: string): string {
   return m ? m[1].toLowerCase() : "";
 }
 
-// Misma heurística que x-scan/telegram-scan.
-function ofSignals(haystack: string, ofHandles: string[]): string[] {
+// Señales separadas POR FUERZA (antes iban todas juntas y cualquiera marcaba "sí"):
+//  · strong = específicas de OF (link a OF/agregador adulto, mención onlyfans, nick OF) → promo de su funnel sin ambigüedad.
+//  · weakOf = CTA con sabor OF/+18 (contenido exclusivo, suscríbete, sin censura, +18) → casi nunca en un ad de marca.
+//  · brand  = publicidad de una MARCA/tienda (Shein, Temu, cupón, "publicidad pagada") → NO es su OF.
+// Se sacó el CTA genérico de comercio ("link en bio / descuento / oferta / cómprame") como señal que
+// promociona POR SÍ SOLA: aparece igual en un ad de Shein que en una promo de OF → generaba falsos
+// "sí" (caso real: "cupón de descuento" de Shein marcado como promo de OnlyFans).
+function ofSignals(haystack: string, ofHandles: string[]): { strong: string[]; weakOf: string[]; brand: string[] } {
   const raw = (haystack || "").toLowerCase();
-  const s: string[] = [];
-  if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) s.push("onlyfans");
-  // Cualquier nickname de OF (principal + secundarias) cuenta como señal.
-  if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) s.push("of_handle");
-  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) s.push("link_agg");
-  if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|ya fuiste|checa mi|mira mi|te espero en|mi contenido|contenido (exclusivo|completo|nuevo)|suscr[ií]b|\bsub a mi\b|premium|\bvip\b|descuento|oferta|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18|18\+)/i.test(raw)) s.push("promo");
-  return s;
+  const strong: string[] = [];
+  const weakOf: string[] = [];
+  const brand: string[] = [];
+  if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) strong.push("onlyfans");
+  // Cualquier nickname de OF (principal + secundarias) cuenta como señal fuerte.
+  if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) strong.push("of_handle");
+  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) strong.push("link_agg");
+  // CTA con sabor OF/+18 (no aparece en un ad de ropa/tienda genérico).
+  if (/(contenido (exclusivo|completo|nuevo|premium|caliente)|suscr[ií]b|\bvip\b|sin censura|\+18\b|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
+  // Publicidad de MARCA / tienda → NO es promo de su OF (aunque tenga cupón/descuento/CTA).
+  if (/\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(raw)) brand.push("brand_ad");
+  return { strong, weakOf, brand };
 }
 
 // Texto del post (el shape de apify/facebook-posts-scraper varía → probamos varias claves).
@@ -79,23 +90,28 @@ const postLinks = (it: any): string[] => {
   return out;
 };
 
-function classifyFb(it: any, ofHandles: string[]): { promoted: boolean; reason: string } {
-  // FB ≠ X: en Facebook las creadoras suben contenido personal/normal (FB restringe
-  // OF). Una foto NO es promo por sí sola → exige señal EXPLÍCITA de OF (link a OF/
-  // agregador, mención de onlyfans, o CTA de promo). Sin señal → No, aunque haya foto.
+function classifyFb(it: any, ofHandles: string[]): { promoted: boolean; reason: string; brandAd: boolean } {
+  // FB ≠ X: en Facebook las creadoras suben contenido personal/normal Y publicidad de
+  // marcas (Shein, Temu…). Una foto NO es promo por sí sola. Reglas en orden:
+  //  1) Publicidad de marca SIN señal OF fuerte → No (aunque tenga foto o cupón/descuento).
+  //  2) Señal OF fuerte (onlyfans / nick OF / agregador adulto) → Sí.
+  //  3) CTA con sabor OF/+18 → Sí.
+  //  4) Nada de lo anterior → No por texto (si hay foto, decide la visión más abajo).
   const text = postText(it);
   const links = postLinks(it);
   const sig = ofSignals(text + " " + links.join(" "), ofHandles);
-  if (sig.length) return { promoted: true, reason: sig.join("+") };
-  return { promoted: false, reason: "sin-senal-of" };
+  if (sig.brand.length && !sig.strong.length) return { promoted: false, reason: `brand:${sig.brand.join("+")}`, brandAd: true };
+  if (sig.strong.length) return { promoted: true, reason: sig.strong.join("+"), brandAd: false };
+  if (sig.weakOf.length) return { promoted: true, reason: sig.weakOf.join("+"), brandAd: false };
+  return { promoted: false, reason: "sin-senal-of", brandAd: false };
 }
 
 // ── Visión: ¿la IMAGEN del post promociona OF? (el promo de FB suele ir quemado
 // en el arte: flyer con link, "onlyfans", CTA). SOLO se llama cuando el texto no
 // dio señal pero hay imagen → distingue un flyer-promo de una foto personal.
-const FB_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de Facebook de una creadora y decí si el POST PROMOCIONA su OnlyFans.
-Marcá promoted=true SOLO si hay una señal CLARA de promo a contenido pago EN la imagen o el texto: un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA explícito ("link in bio", "suscríbete", "mi contenido exclusivo", precio/descuento).
-NO marques promoted=true por ser una foto sugerente, una selfie o contenido personal/familiar sin esas señales — en Facebook las creadoras suben contenido normal.
+const FB_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de Facebook de una creadora y decí si el POST PROMOCIONA SU PROPIO OnlyFans (su contenido pago de adultos).
+Marcá promoted=true SOLO si hay una señal CLARA de promo a SU contenido pago de adultos: un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA de contenido +18 ("suscríbete a mi contenido exclusivo", "contenido sin censura", "mi VIP").
+NO marques promoted=true por: (a) una foto sugerente, selfie o contenido personal/familiar; (b) PUBLICIDAD DE UNA MARCA O TIENDA — Shein, Temu, ropa, maquillaje, un cupón o código de descuento de una tienda, "publicidad pagada", #ad. Un precio o descuento de una TIENDA NO es promo de OnlyFans.
 Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -326,7 +342,8 @@ Deno.serve(async (req: Request) => {
           if (dupe && dupe.length) { skipped++; continue; }
         }
 
-        let { promoted, reason } = classifyFb(it, ofNicksByCreator.get(c.id) ?? []);
+        const cls = classifyFb(it, ofNicksByCreator.get(c.id) ?? []);
+        let { promoted, reason } = cls;
 
         // Bytes de la imagen: se bajan UNA vez y se reusan para visión Y para subir.
         let imgBytes: Uint8Array | null = null;
@@ -336,9 +353,10 @@ Deno.serve(async (req: Request) => {
           if (f) { imgBytes = f.bytes; imgMime = f.mime; }
         }
 
-        // Visión SOLO si el texto no dio señal pero hay imagen: el promo de OF puede
-        // estar QUEMADO en el arte. El modelo decide (una selfie personal → No).
-        if (!promoted && OPENROUTER_API_KEY && imgBytes && visionUsed < MAX_VISION_PER_RUN) {
+        // Visión SOLO si el texto no dio señal, NO es un ad de marca, y hay imagen: el
+        // promo de OF puede estar QUEMADO en el arte. El modelo decide (selfie personal
+        // o flyer de tienda → No). Los ads de marca se saltan (ya son No firme por texto).
+        if (!promoted && !cls.brandAd && OPENROUTER_API_KEY && imgBytes && visionUsed < MAX_VISION_PER_RUN) {
           visionUsed++;
           const v = await visionIsOfPromo(`data:${imgMime};base64,${bytesToBase64(imgBytes)}`, OPENROUTER_API_KEY, postText(it));
           if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }

@@ -51,7 +51,12 @@ function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; 
   if (ofHandles.some((h) => h && t.includes(h.toLowerCase()))) signals.push("of_handle");
   if (/\bfansly\b|\bfanvue\b|\bfans\b/i.test(raw)) signals.push("plataforma");
   if (/promo|promoci[oó]n|descuento|oferta|\b\d{1,3}\s?%|\b\d+\s?(usd|\$|d[oó]lares)|suscr[ií]b|\bsub\b|link\s+(en|abajo|aqu[ií]|bio)|mi\s+link|c[oó]mprame|contenido\s+(exclusivo|nuevo)/i.test(raw)) signals.push("promo");
-  const promoted = signals.includes("onlyfans") || signals.includes("of_handle") || signals.includes("plataforma") || signals.includes("promo");
+  // Publicidad de MARCA/tienda (Shein, Temu, cupón, "publicidad pagada") → NO es su OF,
+  // aunque el CTA genérico ("descuento"/"link") matchee. Solo si no hay señal OF fuerte.
+  const brandAd = /\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(t);
+  const hasStrong = signals.includes("onlyfans") || signals.includes("of_handle") || signals.includes("plataforma");
+  if (brandAd && !hasStrong) return { promoted: false, reason: "brand_ad" };
+  const promoted = hasStrong || signals.includes("promo");
   return { promoted, reason: signals.join("+") || "sin-señales" };
 }
 
