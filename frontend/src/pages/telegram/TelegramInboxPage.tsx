@@ -8,7 +8,7 @@
 // REALTIME: esta página solo escucha tg_conversations; los INSERT de tg_messages los maneja
 // la suscripción GLOBAL única de useTgInboxNotifications (AppShell), como WhatsApp.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -126,6 +126,11 @@ const TelegramInboxPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  // "← Volver" cuando se llegó desde otra pantalla (Contactos/Creadoras/Closers) vía el
+  // TgChatButton, que pasa { backTo, backLabel } en el state (igual que WhatsApp).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const backNav = (location.state as { backTo?: string; backLabel?: string } | null) ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos" | "favoritos">("todos");
@@ -440,6 +445,14 @@ const TelegramInboxPage = () => {
       <div className="flex min-h-0 flex-1">
         {/* Lista */}
         <aside className={cn(selectedId ? "hidden md:flex" : "flex", "w-full flex-col border-r md:w-80")}>
+          {backNav?.backTo && (
+            <button
+              onClick={() => navigate(backNav.backTo!)}
+              className="flex items-center gap-1.5 border-b border-border px-4 py-2 text-xs font-medium text-primary hover:bg-muted/50"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Volver a {backNav.backLabel || "atrás"}
+            </button>
+          )}
           <div className="relative px-3 pb-2 pt-3">
             <Search className="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -452,7 +465,7 @@ const TelegramInboxPage = () => {
 
           {/* Filtro por CANAL (línea) — solo si hay más de una. Ortogonal a los chips de abajo. */}
           {channels.length > 1 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin-x px-3 pb-2">
               <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">{t("tg.channel")}</span>
               <button
                 type="button"
@@ -477,7 +490,7 @@ const TelegramInboxPage = () => {
           )}
 
           {/* Filtros (chips): presets + archivados. */}
-          <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin-x px-3 pb-3">
             {([["todos", "common.all"], ["no_leidos", "tg.unread"], ["favoritos", "tg.favorites"]] as const).map(([key, lkey]) => (
               <button
                 key={key}

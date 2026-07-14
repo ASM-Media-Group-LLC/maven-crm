@@ -455,8 +455,31 @@ app.post("/resolve", apiGuard, async (req, res) => {
           lastName: "",
         })],
       }));
+      // DIAGNÓSTICO — por qué un número NO resuelve desde cierta línea. Telegram distingue
+      // casos que antes colapsábamos todos en "not_on_telegram":
+      //   · users con el objeto        → OK, resolvió.
+      //   · imported con user_id        → Telegram matcheó el número a un usuario.
+      //   · retryContacts con entradas  → la cuenta está THROTTLEADA (típico de líneas RECIÉN
+      //                                    vinculadas): pide reintentar más tarde. NO es que el
+      //                                    número no exista.
+      //   · todo vacío                  → el número no está en Telegram, o su privacidad
+      //                                    ("¿quién me encuentra por número?") bloquea el frío.
+      const usersN = (imported && imported.users && imported.users.length) || 0;
+      const importedN = (imported && imported.imported && imported.imported.length) || 0;
+      const retryN = (imported && imported.retryContacts && imported.retryContacts.length) || 0;
+      console.log(`[resolve] acct=${accountId} phone=${phone} → users=${usersN} imported=${importedN} retryContacts=${retryN}`);
       entity = imported && imported.users && imported.users[0];
-      if (!entity) return res.json({ ok: false, error: "not_on_telegram", phone });
+      if (!entity) {
+        if (retryN > 0) {
+          // Throttle de cuenta nueva: Telegram devolvió el número en retryContacts en vez de
+          // resolverlo. Se distingue del "no existe" para dar un mensaje honesto en Maven.
+          console.warn(`[resolve] acct=${accountId} THROTTLE cuenta nueva/flood — phone=${phone} retryContacts=${retryN}; reintentar más tarde`);
+          return res.json({ ok: false, error: "rate_limited_new_account", phone });
+        }
+        console.warn(`[resolve] acct=${accountId} NOT_ON_TELEGRAM phone=${phone} (users=0 imported=${importedN} retry=0) — número no está en Telegram o privacidad cerrada al frío`);
+        return res.json({ ok: false, error: "not_on_telegram", phone });
+      }
+      console.log(`[resolve] acct=${accountId} OK phone=${phone} → peer_id=${entity.id != null ? String(entity.id) : "?"} username=${entity.username || "-"}`);
     } else {
       // Username / t.me link / id numérico.
       const handle = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
@@ -473,7 +496,12 @@ app.post("/resolve", apiGuard, async (req, res) => {
       name,
       phone: (entity && entity.phone) || null,
     });
-  } catch (e) { res.status(404).json({ ok: false, error: String((e && e.message) || e) }); }
+  } catch (e) {
+    // Errores que Telegram LANZA (FLOOD_WAIT_x, PEER_FLOOD, sesión inválida, etc.) — antes no
+    // se logueaban, así que un fallo se veía en Maven como "no pude abrir" sin rastro del motivo.
+    console.error(`[resolve] ERROR to=${to} acct=${(req.body && req.body.accountId) || "default"}: ${String((e && e.message) || e)}`);
+    res.status(404).json({ ok: false, error: String((e && e.message) || e) });
+  }
 });
 
 // ── Dashboard /manager ────────────────────────────────────────────────────────

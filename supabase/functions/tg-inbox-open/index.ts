@@ -186,6 +186,9 @@ serve(async (req) => {
       body: JSON.stringify({ to, name: displayName, accountId: reqAccountId }),
     });
     resolved = await r.json().catch(() => ({}));
+    if (resolved?.error === "rate_limited_new_account") {
+      return json({ ok: false, error: "Esta línea es muy nueva y Telegram todavía limita el contacto en frío. Probá de nuevo en unas horas, o que la persona escriba primero a esta línea." }, 200);
+    }
     if (resolved?.error === "not_on_telegram") {
       return json({ ok: false, error: "Este número no está en Telegram (o su privacidad no permite contactarlo)." }, 200);
     }
