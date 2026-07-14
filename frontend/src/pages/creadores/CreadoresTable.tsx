@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2 } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -33,6 +33,7 @@ import { buildSocialUrl } from "@/lib/utils";
 import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 import ChangeStatusModal from "./ChangeStatusModal";
+import SellPlatformDialog from "./SellPlatformDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
@@ -109,6 +110,8 @@ const CreadoresTable = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const [deletingCreator, setDeletingCreator] = useState<CreatorWithBusiness | null>(null);
+  // Creadora a la que se le va a vender una plataforma (deal_type=venta_plataforma).
+  const [sellingCreator, setSellingCreator] = useState<CreatorWithBusiness | null>(null);
   // Toggle de Blu/Infloww: { creator, nextState } — modal confirma en
   // ambas direcciones (marcar y desmarcar).
   const [bluToggleTarget, setBluToggleTarget] = useState<{ creator: CreatorWithBusiness; nextState: boolean } | null>(null);
@@ -128,6 +131,9 @@ const CreadoresTable = ({ creators }: Props) => {
   // del padre Creadores (sembrado en DB) → preservamos accesos
   // existentes; admin la puede revocar a roles específicos.
   const canDeleteCreator = canAccess("Creadores", "Eliminar Creator");
+  // "Vender plataforma": manda a la creadora al pipeline de closers como deal de
+  // venta. Mismo permiso que asignar en Closers (lo exige el RPC).
+  const canSellPlatform = canAccess("Closers", "Asignar Closer");
 
   const toggleBluMutation = useMutation({
     mutationFn: async ({ id, nextState }: { id: string; nextState: boolean }) => {
@@ -430,6 +436,23 @@ const CreadoresTable = ({ creators }: Props) => {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {canSellPlatform && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-primary"
+                            onClick={() => setSellingCreator(c)}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Vender plataforma</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   {!isCloser && (c.status === "leaving" || c.status === "terminated") && (
                     <TooltipProvider>
                       <Tooltip>
@@ -500,6 +523,16 @@ const CreadoresTable = ({ creators }: Props) => {
         onOpenChange={(open) => {
           if (!open) setStatusChangeCreator(null);
         }}
+      />
+    )}
+
+    {sellingCreator && (
+      <SellPlatformDialog
+        open={!!sellingCreator}
+        onOpenChange={(open) => { if (!open) setSellingCreator(null); }}
+        creatorId={sellingCreator.id}
+        instagramHandle={sellingCreator.instagram_handle ?? ""}
+        creatorName={sellingCreator.name}
       />
     )}
 
