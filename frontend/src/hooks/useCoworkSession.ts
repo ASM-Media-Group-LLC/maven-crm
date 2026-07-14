@@ -8,6 +8,7 @@ export interface CoworkRoom {
   name: string;
   livekit_room_name: string;
   sort_order: number;
+  preview_mode?: "video" | "avatars";
 }
 
 export interface CoworkMembership {
@@ -173,6 +174,12 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId });
   }, []);
 
+  // Gestión de salas (host): añadir, renombrar / cambiar modo de preview, cerrar.
+  const addRoom = useCallback(async (name: string) => invokeCowork("addRoom", { sessionId, name }), [sessionId]);
+  const updateRoom = useCallback(async (roomId: string, patch: { name?: string; previewMode?: "video" | "avatars" }) =>
+    invokeCowork("updateRoom", { roomId, ...patch }), []);
+  const closeRoom = useCallback(async (roomId: string) => invokeCowork("closeRoom", { roomId }), []);
+
   const getHostCode = useCallback(async () => {
     if (!sessionId) throw new Error("No session");
     return invokeCowork("getHostCode", { sessionId });
@@ -253,7 +260,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
-    createSession, joinSession,
+    createSession, joinSession, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
     listMyActiveSessions, endSessionById,

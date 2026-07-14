@@ -37,6 +37,7 @@ interface LKGrants {
   canPublishData: boolean;
   canPublishSources?: string[];
   roomAdmin?: boolean;
+  hidden?: boolean; // observador invisible: se suscribe pero no aparece en la lista de participantes
 }
 
 async function createLKToken(apiKey: string, apiSecret: string, identity: string, name: string, grants: LKGrants, ttl = 86400): Promise<string> {
@@ -288,6 +289,21 @@ serve(async (req) => {
         return json({ token, url: lkUrl, room: room.livekit_room_name, roomId: targetRoomId });
       }
 
+      // PREVIEW: el host se suscribe a una sala en modo SOLO-LECTURA para ver el video en
+      // vivo en la miniatura del dashboard, SIN publicar (canPublish:false) y como observador
+      // OCULTO (hidden:true → no aparece en la lista de participantes de la sala). Identity
+      // distinta (`${userId}__preview`) para no colisionar si el host también "Entra" a la sala.
+      if (purpose === "preview_room") {
+        if (!isHost) return err("Only hosts can preview rooms", 403);
+        if (!roomId) return err("roomId required");
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
+        if (!room) return err("Room not found");
+        const token = await createLKToken(lkKey, lkSecret, `${userId}__preview`, userName, {
+          roomJoin: true, room: room.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
+        }, 3600);
+        return json({ token, url: lkUrl, room: room.livekit_room_name });
+      }
+
       return err("Invalid purpose");
     }
 
@@ -495,6 +511,72 @@ serve(async (req) => {
       if (!session) return err("Session not found");
 
       return json({ hostCode: session.host_invite_code });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ADD ROOM (host añade una sala a una sesión existente)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "addRoom") {
+      const { sessionId, name } = body;
+      if (!sessionId || !name?.trim()) return err("sessionId and name required");
+      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+
+      const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", sessionId);
+      if (count !== null && count >= 10) return err("Máximo 10 salas por sesión");
+
+      const { data: last } = await admin.from("cowork_rooms").select("sort_order").eq("session_id", sessionId).order("sort_order", { ascending: false }).limit(1).maybeSingle();
+      const nextOrder = (last?.sort_order ?? -1) + 1;
+      // LiveKit room name único (sufijo aleatorio, no índice: las salas se pueden borrar).
+      const lkName = `cowork_${sessionId.slice(0, 8)}_${crypto.randomUUID().slice(0, 8)}`;
+
+      const { data: room, error: rErr } = await admin.from("cowork_rooms").insert({
+        session_id: sessionId, name: String(name).trim().slice(0, 80), livekit_room_name: lkName, sort_order: nextOrder,
+      }).select().single();
+      if (rErr) return err(rErr.message, 500);
+      return json({ room });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // UPDATE ROOM (renombrar y/o cambiar preview_mode) — host only
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "updateRoom") {
+      const { roomId, name, previewMode } = body;
+      if (!roomId) return err("roomId required");
+      const { data: room } = await admin.from("cowork_rooms").select("session_id").eq("id", roomId).single();
+      if (!room) return err("Room not found");
+      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", room.session_id).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+
+      const patch: Record<string, unknown> = {};
+      if (typeof name === "string" && name.trim()) patch.name = name.trim().slice(0, 80);
+      if (previewMode === "video" || previewMode === "avatars") patch.preview_mode = previewMode;
+      if (!Object.keys(patch).length) return err("Nothing to update");
+
+      const { data: updated, error: uErr } = await admin.from("cowork_rooms").update(patch).eq("id", roomId).select().single();
+      if (uErr) return err(uErr.message, 500);
+      return json({ room: updated });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CLOSE ROOM (borra la sala + desasigna a sus participantes) — host only
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "closeRoom") {
+      const { roomId } = body;
+      if (!roomId) return err("roomId required");
+      const { data: room } = await admin.from("cowork_rooms").select("session_id").eq("id", roomId).single();
+      if (!room) return err("Room not found");
+      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", room.session_id).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+
+      const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", room.session_id);
+      if (count !== null && count <= 1) return err("No podés cerrar la última sala de la sesión");
+
+      // Sacar a los participantes asignados (su asignación queda inactiva) y borrar la sala.
+      await admin.from("cowork_room_assignments").update({ is_active: false }).eq("room_id", roomId).eq("is_active", true);
+      const { error: dErr } = await admin.from("cowork_rooms").delete().eq("id", roomId);
+      if (dErr) return err(dErr.message, 500);
+      return json({ ok: true });
     }
 
     return err("Unknown action: " + action);

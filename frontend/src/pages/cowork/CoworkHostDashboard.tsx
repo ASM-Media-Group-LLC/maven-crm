@@ -7,14 +7,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
-  Mic, MicOff, Video, VideoOff, ArrowLeft,
+  Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import CoworkRoomPreview from "./CoworkRoomPreview";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
-import type { useCoworkSession } from "@/hooks/useCoworkSession";
+import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -39,6 +48,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const oneOnOneSeenInListRef = useRef(false);
+  // Gestión de salas (añadir / editar / cerrar)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [editRoom, setEditRoom] = useState<CoworkRoom | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editVideo, setEditVideo] = useState(true);
+  const [closeTarget, setCloseTarget] = useState<CoworkRoom | null>(null);
+  const [roomBusy, setRoomBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -132,6 +149,53 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     r => r.status !== "resolved" && r.id !== oneOnOneRequestId
   );
   const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
+
+  const handleAddRoom = async () => {
+    const name = addName.trim();
+    if (!name) return;
+    setRoomBusy(true);
+    try {
+      await cowork.addRoom(name);
+      await cowork.refetch(true);
+      toast.success("Sala añadida");
+      setAddOpen(false);
+      setAddName("");
+    } catch (e: any) { toast.error(e?.message || "No se pudo añadir la sala"); }
+    finally { setRoomBusy(false); }
+  };
+
+  const openEdit = (room: CoworkRoom) => {
+    setEditRoom(room);
+    setEditName(room.name);
+    setEditVideo((room.preview_mode ?? "video") === "video");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editRoom) return;
+    setRoomBusy(true);
+    try {
+      await cowork.updateRoom(editRoom.id, {
+        name: editName.trim() || editRoom.name,
+        previewMode: editVideo ? "video" : "avatars",
+      });
+      await cowork.refetch(true);
+      toast.success("Sala actualizada");
+      setEditRoom(null);
+    } catch (e: any) { toast.error(e?.message || "No se pudo actualizar la sala"); }
+    finally { setRoomBusy(false); }
+  };
+
+  const handleCloseRoom = async () => {
+    if (!closeTarget) return;
+    setRoomBusy(true);
+    try {
+      await cowork.closeRoom(closeTarget.id);
+      await cowork.refetch(true);
+      toast.success("Sala cerrada");
+      setCloseTarget(null);
+    } catch (e: any) { toast.error(e?.message || "No se pudo cerrar la sala"); }
+    finally { setRoomBusy(false); }
+  };
 
   return (
     <div className="flex h-screen bg-background text-foreground relative">
@@ -360,22 +424,54 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         ) : (
           <div className="flex-1 overflow-auto p-4 pt-14 md:p-6">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Seleccione sala para ingresar</h3>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Seleccione sala para ingresar</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 rounded-full h-8 shrink-0"
+                onClick={() => { setAddName(""); setAddOpen(true); }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Añadir sala
+              </Button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
               {cowork.rooms.map((room) => {
                 const participants = getRoomParticipants(room.id);
                 return (
                   <div key={room.id} className="bg-card border border-border rounded-2xl overflow-hidden">
                     <div className="p-4 pb-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">{room.name}</span>
-                        <Badge variant="secondary" className="text-[10px] rounded-full">
-                          {participants.length} <Users2 className="h-2.5 w-2.5 ml-0.5" />
-                        </Badge>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground truncate">{room.name}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge variant="secondary" className="text-[10px] rounded-full">
+                            {participants.length} <Users2 className="h-2.5 w-2.5 ml-0.5" />
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-lg"
+                            title="Editar sala"
+                            onClick={() => openEdit(room)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive rounded-lg"
+                            title="Cerrar sala"
+                            onClick={() => setCloseTarget(room)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     <div className="p-4 pt-1 space-y-3">
-                      {participants.length > 0 ? (
+                      {participants.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground/50 italic">Sin participantes</p>
+                      ) : (room.preview_mode ?? "video") === "avatars" ? (
                         <div className="grid grid-cols-2 gap-2">
                           {participants.map((a) => {
                             const fullName = cowork.profiles[a.user_id] || "User";
@@ -406,7 +502,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           })}
                         </div>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground/50 italic">Sin participantes</p>
+                        <div className="h-36 rounded-xl overflow-hidden bg-black/40 border border-border">
+                          <CoworkRoomPreview roomId={room.id} issueToken={cowork.issueLiveKitToken} />
+                        </div>
                       )}
 
                       <div className="flex gap-1">
@@ -515,6 +613,77 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         </div>
       )}
+
+      {/* Añadir sala */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Añadir sala</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="cowork-add-room">Nombre de la sala</Label>
+            <Input
+              id="cowork-add-room"
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              placeholder="Ej. Sala 3"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddRoom(); }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAddRoom} disabled={roomBusy || !addName.trim()} className="gap-1">
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Añadir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar sala (nombre + modo de preview) */}
+      <Dialog open={!!editRoom} onOpenChange={(o) => { if (!o) setEditRoom(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Editar sala</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-2">
+              <Label htmlFor="cowork-edit-room">Nombre</Label>
+              <Input id="cowork-edit-room" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-border p-3 gap-3">
+              <div>
+                <div className="text-sm font-medium text-foreground">Mostrar video en vivo</div>
+                <div className="text-xs text-muted-foreground">Si lo apagás, la miniatura muestra solo los participantes (sin video).</div>
+              </div>
+              <Switch checked={editVideo} onCheckedChange={setEditVideo} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditRoom(null)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={roomBusy}>
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cerrar sala (confirmación) */}
+      <AlertDialog open={!!closeTarget} onOpenChange={(o) => { if (!o) setCloseTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar la sala «{closeTarget?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la sala y los participantes que estén dentro quedarán sin asignación. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={roomBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleCloseRoom(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cerrar sala"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
