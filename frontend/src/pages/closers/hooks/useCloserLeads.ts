@@ -168,6 +168,10 @@ export const useCloserLeads = () => {
   const { isAdmin, isManager, isSupervisor, role } = useUserRole();
 
   const [search, setSearch] = useState("");
+  // Valor "debounced" del buscador: la query solo se dispara cuando el
+  // usuario deja de escribir (~350ms). Sin esto, cada tecla cambiaba el
+  // queryKey → un fetch por pulsación + el prefetch ×7 de las otras tabs.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState("todas");
   const [page, setPage] = useState(0);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
@@ -200,8 +204,14 @@ export const useCloserLeads = () => {
   const handleSetDateFrom = (v: Date | undefined) => { setDateFrom(v); setPage(0); };
   const handleSetDateTo = (v: Date | undefined) => { setDateTo(v); setPage(0); };
 
-  // Normalize search for server-side filtering
-  const normalizedSearch = search ? normalizeHandle(search) : "";
+  // Debounce del término de búsqueda (~350ms) antes de tocar la red.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Normalize search for server-side filtering (sobre el valor debounced)
+  const normalizedSearch = debouncedSearch ? normalizeHandle(debouncedSearch) : "";
 
   // Extraído como función con `tab` + `pageNum` parametrizados para poder
   // prefetchear las otras tabs cuando se monta el componente — así al
@@ -404,6 +414,10 @@ export const useCloserLeads = () => {
   // en el primer ingreso a cada tab. Se reactiva cuando cambian filtros.
   useEffect(() => {
     if (!user?.id || !role) return;
+    // No prefetchear las otras tabs mientras hay búsqueda activa: cada tab
+    // repetiría el ilike + count exact sobre toda la tabla en cada tecla.
+    // El prefetch solo tiene sentido para navegar entre tabs sin filtro.
+    if (normalizedSearch) return;
     const otherTabs = Object.keys(TAB_STAGE_MAP).filter((t) => t !== activeTab);
     for (const t of otherTabs) {
       queryClient.prefetchQuery({
