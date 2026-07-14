@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -25,18 +25,27 @@ export function useUnreadChatCount() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Listen for new messages to refresh count
+  // Realtime: el callback lee siempre el refresh actual vía ref, así la suscripción se
+  // arma UNA vez por user.id (string estable) y no en cada cambio de identidad del objeto
+  // `user` (refresh de token). IMPORTANTE — nombre de canal ÚNICO: un nombre FIJO se dedupea
+  // por topic en supabase-js; si el efecto se re-ejecutaba (cambio de `user`), la 2ª
+  // suscripción al mismo nombre quedaba muerta y el badge dejaba de actualizarse hasta un
+  // refresh de la página. Mismo fix que useWaInboxNotifications/useTgInboxNotifications.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const userId = user?.id ?? null;
+
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const channel = supabase
-      .channel("unread-count-global")
+      .channel("chat-unread-" + Math.random().toString(36).slice(2))
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
         (payload) => {
-          if (payload.new && (payload.new as any).sender_id !== user.id) {
-            refresh();
+          if (payload.new && (payload.new as any).sender_id !== userId) {
+            void refreshRef.current();
           }
         }
       )
@@ -44,15 +53,15 @@ export function useUnreadChatCount() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_participants" },
         (payload) => {
-          if (payload.new && (payload.new as any).user_id === user.id) {
-            refresh();
+          if (payload.new && (payload.new as any).user_id === userId) {
+            void refreshRef.current();
           }
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user, refresh]);
+  }, [userId]);
 
   return count;
 }
