@@ -712,6 +712,34 @@ export function useChat() {
       .then();
   }, [user]);
 
+  // Silenciar / reactivar una conversación (contacto o grupo) para el usuario actual.
+  // Actualiza chat_participants.is_muted; el hook global useMessengerNotifications lo respeta
+  // para NO sonar/avisar en conversaciones silenciadas (los recibos ✓✓ siguen igual).
+  const toggleMute = useCallback((conversationId: string, muted: boolean) => {
+    if (!user) return;
+
+    // Optimista: refleja el cambio en la fila de mi participante al instante.
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId
+          ? {
+              ...c,
+              participants: c.participants.map((p) =>
+                p.user_id === user.id ? { ...p, is_muted: muted } : p
+              ),
+            }
+          : c
+      )
+    );
+
+    supabase
+      .from("chat_participants")
+      .update({ is_muted: muted })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id)
+      .then();
+  }, [user]);
+
   return {
     conversations,
     loading,
@@ -721,6 +749,7 @@ export function useChat() {
     deleteConversation,
     loadConversations,
     markConversationRead,
+    toggleMute,
   };
 }
 

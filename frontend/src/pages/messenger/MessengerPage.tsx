@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
@@ -11,7 +12,7 @@ import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
-import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import { useNotificationPermission } from "@/hooks/useBrowserNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { useSpaces } from "@/hooks/useSpaces";
@@ -32,11 +33,10 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 }
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead } = useChat();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
   useNotificationPermission();
-  const { notify } = useBrowserNotifications();
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin } = usePinnedChats();
@@ -57,18 +57,30 @@ export default function MessengerPage() {
     if (chatId) markConversationRead(chatId);
   }, [markConversationRead]);
 
+  // Abrir una conversación al llegar desde una notificación (/messenger?c=<id>): en cuanto
+  // la conversación esté cargada, la seleccionamos y limpiamos el parámetro.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const c = searchParams.get("c");
+    if (!c) return;
+    if (conversations.some((x) => x.id === c)) {
+      selectChat(c);
+      searchParams.delete("c");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, conversations, selectChat, setSearchParams]);
+
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
 
   const handleNewMessage = useCallback((msg: ChatMessage) => {
+    // El sonido + notificación del navegador los maneja el hook global
+    // useMessengerNotifications (montado en AppShell), para que funcionen en toda Maven y
+    // respeten el silenciado por conversación. Acá sólo marcamos leída la conversación
+    // activa cuando llega un mensaje mientras la estamos mirando.
     if (activeChatIdRef.current === msg.conversation_id) {
       markConversationRead(msg.conversation_id);
-      return;
     }
-    const senderName = profiles[msg.sender_id]?.full_name || "Nuevo mensaje";
-    notify(senderName, msg.content || "📎 Archivo", () => {
-      selectChat(msg.conversation_id);
-    });
-  }, [profiles, notify, selectChat, markConversationRead]);
+  }, [markConversationRead]);
 
   const {
     messages, loading: msgsLoading, typingUsers,
@@ -177,6 +189,7 @@ export default function MessengerPage() {
               onTogglePin={togglePin}
               isArchived={isArchived}
               onToggleArchive={toggleArchive}
+              onToggleMute={toggleMute}
               spaces={spaces}
               onCreateSpace={createSpace}
               onDeleteSpace={deleteSpace}

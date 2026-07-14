@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive, MoreVertical, Trash2 } from "lucide-react";
+import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -54,6 +54,7 @@ interface ChatSidebarProps {
   onTogglePin: (id: string) => void;
   isArchived: (id: string) => boolean;
   onToggleArchive: (id: string) => void;
+  onToggleMute: (id: string, muted: boolean) => void;
   spaces: ChatSpace[];
   onCreateSpace: (name: string) => Promise<string | null>;
   onDeleteSpace: (id: string) => Promise<boolean>;
@@ -81,7 +82,7 @@ function truncate(text: string, max: number) {
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms,
   onSelectContact, onDeleteChat, loading, profiles,
-  isPinned, onTogglePin, isArchived, onToggleArchive,
+  isPinned, onTogglePin, isArchived, onToggleArchive, onToggleMute,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
   onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
@@ -209,7 +210,11 @@ export default function ChatSidebar({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      {/* [&_[data-radix-scroll-area-viewport]>div]: Radix envuelve el contenido en un div
+          display:table; min-width:100% que crece más que el viewport (nombres largos, URLs)
+          y se comía el borde derecho (timestamps, badge de no-leídos). Forzarlo a block lo
+          clampa al ancho del viewport y deja que truncate/min-w-0 funcionen. */}
+      <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
         <div className="pb-6">
           {/* Quick access section */}
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
@@ -282,6 +287,7 @@ export default function ChatSidebar({
                       onTogglePin={() => onTogglePin(conv.id)}
                       onArchive={() => onToggleArchive(conv.id)}
                       isArchivedChat={isArchived(conv.id)}
+                      onToggleMute={onToggleMute}
                       onDragStart={(e) => handleDragStart(e, conv.id)}
                       onDragEnd={handleDragEnd}
                       spaces={spaces}
@@ -446,7 +452,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
@@ -455,6 +461,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   onTogglePin: () => void;
   onArchive: () => void;
   isArchivedChat: boolean;
+  onToggleMute: (id: string, muted: boolean) => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   spaces: ChatSpace[];
@@ -464,6 +471,8 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const { user } = useAuth();
   const isGroup = conversation.type === "group";
   const { isOnline, getStatus } = useOnlinePresence();
+  const isMuted = conversation.participants.find(p => p.user_id === user?.id)?.is_muted ?? false;
+  const handleToggleMute = () => onToggleMute(conversation.id, !isMuted);
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
@@ -543,9 +552,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 {conversation.displayName}
               </span>
               <span className={cn(
-                "text-[10px] shrink-0 ml-2 mr-5",
+                "text-[10px] shrink-0 ml-2 mr-5 flex items-center gap-1",
                 hasUnread ? "text-primary font-semibold" : "text-muted-foreground"
               )}>
+                {isMuted && <BellOff className="h-3 w-3 text-muted-foreground" />}
                 {formatTime(conversation.lastMessage?.created_at)}
               </span>
             </div>
@@ -584,6 +594,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 <Archive className="h-3.5 w-3.5 mr-2" />
                 {isArchivedChat ? "Desarchivar" : "Archivar"}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleToggleMute}>
+                {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
+                {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
+              </DropdownMenuItem>
               {spaces.length > 0 && (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>Agregar a espacio</DropdownMenuSubTrigger>
@@ -617,6 +631,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         <ContextMenuItem onClick={onArchive}>
           <Archive className="h-3.5 w-3.5 mr-2" />
           {isArchivedChat ? "Desarchivar" : "Archivar"}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleToggleMute}>
+          {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
+          {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
         </ContextMenuItem>
         {spaces.length > 0 && (
           <ContextMenuSub>

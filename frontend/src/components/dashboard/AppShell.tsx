@@ -9,7 +9,7 @@ import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
-import { useMessengerDelivery } from "@/hooks/useMessengerDelivery";
+import { useMessengerNotifications } from "@/hooks/useMessengerNotifications";
 
 // Persistent shell for protected pages. Mounting Sidebar + Topbar (plus
 // global overlays like the ClariAi FAB and announcement popups) at the
@@ -26,9 +26,9 @@ const AppShell = () => {
   // funcione donde funcione el usuario dentro de Maven (no solo en las bandejas).
   useWaInboxNotifications();
   useTgInboxNotifications();
-  // Ack "entregado" global del Messenger interno: marca los mensajes recibidos como
-  // entregados aunque el usuario no esté en /messenger, para que el remitente vea ✓✓ gris.
-  useMessengerDelivery();
+  // Messenger interno global: ack "entregado" (✓✓ gris aunque no estés en /messenger) +
+  // sonido y notificación del navegador al llegar un mensaje (salvo conversación silenciada).
+  useMessengerNotifications();
 
   return (
     <SidebarProvider>
