@@ -39,6 +39,7 @@ const ALL_TABS = [
 const ClosersContent = () => {
   const {
     creators, isLoading, statusCounts, alertCounts, platformRevenue, platformSalesByCreator, ofMonetizationTotal,
+    subscriptionRevenueTotal,
     totalCount, totalPages, page, setPage,
     search, setSearch,
     activeTab, setActiveTab,
@@ -244,6 +245,7 @@ const ClosersContent = () => {
                 statusCounts={statusCounts}
                 platformRevenue={platformRevenue}
                 ofMonetizationTotal={ofMonetizationTotal}
+                subscriptionRevenueTotal={subscriptionRevenueTotal}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
                 onPipelineClick={(key) => setKpiPopup({ kind: "pipeline", key })}

@@ -699,7 +699,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedCreators.map((c) => {
-              const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+              const isPlatformDeal = c.deal_type === "venta_plataforma";
+              const revenue = isPlatformDeal
+                ? Number(c.subscription_amount || 0)
+                : (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               // Estado de alertas: vencido (rojo) o decisión pendiente (naranja).
               // Espejo de la lógica de check_closer_contact_alerts() en SQL.
               const contactOverdue = isContactOverdue(c.passed_date, c.contact_count);
@@ -712,7 +715,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
                       <ExternalLink className="h-3 w-3" />
                     </a>
-                    <Badge variant={stageVariant(c.stage)} className="text-[10px]">{c.stage}</Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={stageVariant(c.stage)} className="text-[10px]">{c.stage}</Badge>
+                      {isPlatformDeal && (
+                        <Badge variant="primary-soft" className="text-[9px] h-4" title="Venta de plataforma (suscripción mensual)">
+                          Venta{c.main_platform ? `: ${c.main_platform}` : ""}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -869,7 +879,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   };
 
   const renderRow = (c: CloserCreatorRow, idx: number) => {
-    const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+    const isPlatformDeal = c.deal_type === "venta_plataforma";
+    const revenue = isPlatformDeal
+      ? Number(c.subscription_amount || 0)
+      : (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
     // Estado de alertas: rojo (vencido) o naranja (decisión pendiente).
     // Calculado en el cliente para no esperar el cron — el cron sólo se
     // encarga de la notificación en la campanita, el badge visual es
@@ -881,11 +894,18 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     const isCloser = isCloserRow(c);
 
     const igLink = (
-      <a href={`https://instagram.com/${c.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
-        className="text-primary hover:underline flex items-center gap-1 font-medium">
-        {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
-        <ExternalLink className="h-3 w-3" />
-      </a>
+      <>
+        <a href={`https://instagram.com/${c.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+          className="text-primary hover:underline flex items-center gap-1 font-medium">
+          {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+        {isPlatformDeal && (
+          <Badge variant="primary-soft" className="text-[9px] h-4 whitespace-nowrap" title="Venta de plataforma (suscripción mensual, sin comisión %)">
+            Venta{c.main_platform ? `: ${c.main_platform}` : ""}
+          </Badge>
+        )}
+      </>
     );
 
     switch (activeTab) {
@@ -980,10 +1000,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               </TableCell>
               <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
               <TableCell className="align-top">
-                <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
+                {isPlatformDeal
+                  ? <InlineNumber value={c.subscription_amount} prefix="$" onSave={(v) => onFieldChange(c.id, "subscription_amount", v)} disabled={!canEditComisiones} />
+                  : <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />}
               </TableCell>
               <TableCell className="align-top">
-                <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />
+                {isPlatformDeal
+                  ? <span className="text-xs text-muted-foreground" title="Venta de plataforma: suscripción fija, sin comisión %">— susc.</span>
+                  : <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />}
               </TableCell>
               <TableCell className="align-top">
                 <InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} disabled={!canEditComisiones} />
@@ -1047,8 +1071,16 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <OfLink url={c.onlyfans_url} />
               </div>
             </TableCell>
-            <TableCell className="align-top"><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} /></TableCell>
-            <TableCell className="align-top"><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} /></TableCell>
+            <TableCell className="align-top">
+              {isPlatformDeal
+                ? <InlineNumber value={c.subscription_amount} prefix="$" onSave={(v) => onFieldChange(c.id, "subscription_amount", v)} disabled={!canEditComisiones} />
+                : <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />}
+            </TableCell>
+            <TableCell className="align-top">
+              {isPlatformDeal
+                ? <span className="text-xs text-muted-foreground" title="Venta de plataforma: suscripción fija, sin comisión %">— susc.</span>
+                : <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />}
+            </TableCell>
             <TableCell
               className="cursor-pointer hover:bg-muted/50 rounded align-top"
               onClick={() => setPlatformModalId(c.id)}

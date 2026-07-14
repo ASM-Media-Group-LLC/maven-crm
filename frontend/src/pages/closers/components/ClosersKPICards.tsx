@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown } from "lucide-react";
+import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown, Repeat } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { es } from "date-fns/locale";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -12,6 +12,7 @@ interface Props {
   statusCounts: Record<string, number>;
   platformRevenue: Record<string, number>;
   ofMonetizationTotal: number;
+  subscriptionRevenueTotal: number;
   dateFrom?: Date;
   dateTo?: Date;
   onPipelineClick?: (key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas") => void;
@@ -41,6 +42,7 @@ const ClosersKPICards = ({
   statusCounts,
   platformRevenue,
   ofMonetizationTotal,
+  subscriptionRevenueTotal,
   dateFrom,
   dateTo,
   onPipelineClick,
@@ -68,7 +70,7 @@ const ClosersKPICards = ({
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
-  const revTotal = ofMonetizationTotal + revPlataformas;
+  const revTotal = ofMonetizationTotal + revPlataformas + subscriptionRevenueTotal;
 
   const pipelineCards = [
     { key: "total" as const, label: "Total", count: total, icon: Users, color: "bg-slate-500" },
@@ -83,6 +85,7 @@ const ClosersKPICards = ({
   const heroRevenue = [
     { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
     { label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" },
+    { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
     { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
   ];
 
@@ -166,7 +169,7 @@ const ClosersKPICards = ({
         <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
           Revenue
         </h3>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {heroRevenue.map((card) => (
             <KpiCard
               key={card.label}

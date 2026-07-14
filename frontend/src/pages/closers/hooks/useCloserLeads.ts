@@ -28,6 +28,10 @@ export interface CloserCreatorRow {
   monthly_monetization: number | null;
   main_platform: string | null;
   extras: number | null;
+  // Tipo de deal: 'reclutamiento' (comisión % sobre OF) | 'venta_plataforma'
+  // (creadora existente que paga una suscripción mensual fija).
+  deal_type: string;
+  subscription_amount: number | null;
   created_at: string;
   updated_at: string;
   leadgen_entry_id: string | null;
@@ -594,6 +598,33 @@ export const useCloserLeads = () => {
     staleTime: 30_000,
   });
 
+  // Ingreso por SUSCRIPCIÓN — deals de venta de plataforma a creadoras
+  // existentes (deal_type='venta_plataforma'): monto MENSUAL fijo, sin
+  // comisión %. Bucket separado del revenue de reclutamiento (OF × %).
+  const { data: subscriptionRevenueTotal = 0 } = useQuery({
+    queryKey: ["closer-subscription-revenue", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryFn: async () => {
+      let q = supabase
+        .from("closer_creators")
+        .select("subscription_amount, passed_date")
+        .eq("deal_type", "venta_plataforma")
+        .in("stage", ["Completada", "Confirmada"]);
+      if (!canSeeAll && effectiveUserId) {
+        q = q.eq("assigned_to", effectiveUserId);
+      }
+      if (applyCreatorDate) {
+        const fromStr = dateFrom!.toISOString().split("T")[0];
+        const toStr = dateTo!.toISOString().split("T")[0];
+        q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).reduce((s, r) => s + Number((r as any).subscription_amount || 0), 0);
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+  });
+
   // Platform sales grouped by creator (for completadas badges)
   const { data: platformSalesByCreator = {} } = useQuery({
     queryKey: ["closer-platform-sales-all", user?.id, role, applySalesDate ? dateFromStr : null, applySalesDate ? dateToStr : null, viewAsCloserId],
@@ -768,6 +799,7 @@ export const useCloserLeads = () => {
     platformRevenue,
     platformSalesByCreator,
     ofMonetizationTotal,
+    subscriptionRevenueTotal,
     totalCount,
     totalPages,
     page, setPage,
