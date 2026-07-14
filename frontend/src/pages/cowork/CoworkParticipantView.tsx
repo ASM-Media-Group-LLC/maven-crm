@@ -158,6 +158,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
             setHasScreenShareAccess(true);
             screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
+            // Desempatar el render: la pantalla va a la sala GRUPAL, nunca a una 1:1.
+            setOneOnOneRoom(null);
+            setOneOnOneRequestId(null);
             setConnectedLkRoom(null);
             setTimeout(() => setConnectedLkRoom(result.room), 300);
           }
@@ -184,7 +187,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
   useEffect(() => {
-    if (oneOnOneRequestId || pendingOneOnOneRef.current) return;
+    // No secuestrar al participante a una 1:1 mientras está pidiendo / tiene / va a recibir
+    // permiso de compartir pantalla: una solicitud 1:1 vieja no debe robarlo al aprobar la pantalla.
+    if (oneOnOneRequestId || pendingOneOnOneRef.current || hasScreenShareAccess || !!mySSReq || screenShareTokenRef.current) return;
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
@@ -193,7 +198,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
       setConnectedLkRoom(null);
     }
-  }, [cowork.hostRequests, userId, oneOnOneRequestId]);
+  }, [cowork.hostRequests, userId, oneOnOneRequestId, hasScreenShareAccess, mySSReq]);
 
   const dismissedActiveRequest = cowork.hostRequests.find(
     r => r.user_id === userId
@@ -205,7 +210,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const getToken = useCallback(async () => {
     const ssToken = screenShareTokenRef.current;
     if (ssToken) {
-      screenShareTokenRef.current = null;
+      // NO limpiar el ref acá: un reintento de conexión (abort/StrictMode) debe reusar el MISMO
+      // token de pantalla; si cayera a "join_room" el participante perdería el permiso de
+      // screenShare. Se limpia cuando el permiso termina (handleMediaStateChange / salir / cambio de sala).
       return { token: ssToken.token, url: ssToken.url };
     }
     const result = await cowork.issueLiveKitToken("join_room");
@@ -353,15 +360,19 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
       {/* Video area */}
       <div className="flex-1 min-h-0">
-        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
+        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId && !hasScreenShareAccess ? (
           <LiveKitCallView
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
             callDisplayName="Llamada privada con coordinador"
             isAdmin={false}
-            onLeave={() => {
-              dismissedRequestRef.current = oneOnOneRequestId;
+            onLeave={async () => {
+              const reqId = oneOnOneRequestId;
+              dismissedRequestRef.current = reqId;
+              // Resolver la solicitud 1:1 para que NO quede abierta en la BD y vuelva a
+              // secuestrar al participante tras recargar o al aprobarle una pantalla.
+              if (reqId) { try { await cowork.resolveHostRequest(reqId); } catch { /* best-effort */ } }
               reconnectToMainRoom();
             }}
             hideShareLink

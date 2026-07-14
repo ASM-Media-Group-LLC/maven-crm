@@ -251,7 +251,11 @@ const ROOM_OPTIONS: RoomOptions = {
     ],
     videoCodec: "vp9",
   },
-  disconnectOnPageLeave: true,
+  // NO desconectar al pasar la pestaña a segundo plano / congelarse (cambiar de ventana o app):
+  // esto tiraba a los participantes cuando se iban a hacer otra cosa. El cierre REAL de la
+  // pestaña ya lo maneja el beforeunload de LiveKitCallView y el pagehide de CoworkParticipantView;
+  // ante un corte de red, la reconnectPolicy de abajo reconecta de forma transparente.
+  disconnectOnPageLeave: false,
   // Reconnection resilience — Google Meet reconnects transparently
   reconnectPolicy: {
     nextRetryDelayInMs: (context) => {

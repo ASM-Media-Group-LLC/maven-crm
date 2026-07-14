@@ -382,13 +382,16 @@ serve(async (req) => {
       const { requestId } = body;
       if (!requestId) return err("requestId required");
 
-      // Get request to verify session
-      const { data: hostReq } = await admin.from("cowork_host_requests").select("session_id").eq("id", requestId).single();
+      // Get request to verify session + ownership
+      const { data: hostReq } = await admin.from("cowork_host_requests").select("session_id, user_id").eq("id", requestId).single();
       if (!hostReq) return err("Request not found");
 
-      // Verify host
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", hostReq.session_id).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      const isHostMember = hostCheck?.role === "host";
+      const isRequester = hostReq.user_id === userId;
+      // Ack: solo host. Resolve: host O el que hizo la solicitud (para cerrar su propia 1:1).
+      if (action === "ackHostRequest" && !isHostMember) return err("Only hosts", 403);
+      if (action === "resolveHostRequest" && !isHostMember && !isRequester) return err("Not authorized", 403);
 
       if (action === "ackHostRequest") {
         const { error: upErr } = await admin.from("cowork_host_requests").update({ status: "acknowledged", acked_by: userId, acked_at: new Date().toISOString() }).eq("id", requestId);
@@ -468,8 +471,12 @@ serve(async (req) => {
       if (ssReq.user_id !== userId) return err("Not your request", 403);
       if (ssReq.status !== "approved") return err("Request is not approved");
 
-      // Mark as claimed to prevent reuse
-      await admin.from("cowork_screenshare_requests").update({ status: "claimed" }).eq("id", requestId);
+      // Marcar como usada para sacarla de la lista activa (fetchData solo trae pending/approved).
+      // OJO: el CHECK de la tabla NO permite 'claimed' (solo pending/approved/denied/expired) →
+      // usar 'claimed' fallaba en silencio y la request quedaba 'approved' para siempre,
+      // re-disparando el reclamo en cada montaje. Usamos 'expired'.
+      const { error: claimErr } = await admin.from("cowork_screenshare_requests").update({ status: "expired" }).eq("id", requestId);
+      if (claimErr) console.error("claimScreenShareToken status update:", claimErr.message);
 
       // Issue token with full publish permissions (including screen share)
       const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
