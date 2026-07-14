@@ -7,7 +7,7 @@ import CoworkLobby from "./CoworkLobby";
 import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
-import { Plus, Users2 } from "lucide-react";
+import { Plus, Users2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CoworkPage() {
@@ -19,12 +19,38 @@ export default function CoworkPage() {
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
+  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string }>>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
 
   const cowork = useCoworkSession(sessionId);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
+
+  // Cargar "Tus sesiones activas" en la pantalla de inicio (sin ?session= en la URL),
+  // para no perder el acceso a una sesión en curso al navegar a otro menú y volver.
+  useEffect(() => {
+    if (sessionId) return;
+    let alive = true;
+    setLoadingSessions(true);
+    cowork.listMyActiveSessions()
+      .then((s) => { if (alive) setMySessions(s); })
+      .catch(() => { /* noop */ })
+      .finally(() => { if (alive) setLoadingSessions(false); });
+    return () => { alive = false; };
+  }, [sessionId, cowork.listMyActiveSessions]);
+
+  const handleEndFromList = async (sid: string) => {
+    if (!window.confirm("¿Finalizar esta sesión para todos los participantes?")) return;
+    try {
+      await cowork.endSessionById(sid);
+      setMySessions((prev) => prev.filter((s) => s.id !== sid));
+      toast.success("Sesión finalizada");
+    } catch {
+      toast.error("No se pudo finalizar la sesión");
+    }
+  };
 
   // Auto-join from invite URL params
   useEffect(() => {
@@ -66,7 +92,48 @@ export default function CoworkPage() {
   // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-6 p-4 md:p-6">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-4 md:p-6">
+        {!loadingSessions && mySessions.length > 0 && (
+          <div className="w-full max-w-lg flex flex-col gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+              Tus sesiones activas
+            </h2>
+            {mySessions.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3"
+              >
+                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
+                  <Users2 className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-foreground truncate">{s.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.role === "host" ? "Host" : "Participante"} · {s.members} {s.members === 1 ? "miembro" : "miembros"}
+                  </div>
+                </div>
+                {s.role === "host" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive rounded-full"
+                    onClick={() => handleEndFromList(s.id)}
+                  >
+                    Finalizar
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  className="rounded-full gap-1 shrink-0"
+                  onClick={() => setSearchParams({ session: s.id })}
+                >
+                  Volver <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12 max-w-lg w-full">
           <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
             <Users2 className="h-8 w-8 md:h-10 md:w-10 text-primary" />
@@ -75,7 +142,9 @@ export default function CoworkPage() {
             Sala Cowork
           </h1>
           <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
-            Crea una sesión cowork con múltiples salas y colabora en tiempo real.
+            {mySessions.length > 0
+              ? "Volvé a una de tus salas activas o crea una nueva sesión."
+              : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."}
           </p>
           <Button
             onClick={() => setShowCreate(true)}

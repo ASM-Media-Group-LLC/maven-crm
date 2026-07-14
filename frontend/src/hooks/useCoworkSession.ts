@@ -222,11 +222,40 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("leaveRoom", { sessionId });
   }, [sessionId]);
 
+  // Lista las sesiones cowork ACTIVAS donde el usuario es miembro (host o participante).
+  // Puro cliente: el RLS `is_cowork_member` permite leer las propias membresías y sus
+  // sesiones. El conteo de miembros es exacto (los miembros ven toda la membresía de su
+  // sesión); NO devolvemos conteo de salas porque un participante solo ve su sala por RLS.
+  const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string }>> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data: mems } = await supabase.from("cowork_memberships").select("session_id, role").eq("user_id", user.id);
+    const roleBy = new Map<string, string>();
+    (mems as Array<{ session_id: string; role: string }> | null)?.forEach((m) => roleBy.set(m.session_id, m.role));
+    const ids = [...roleBy.keys()];
+    if (!ids.length) return [];
+    const { data: sess } = await supabase.from("cowork_sessions")
+      .select("id, name, description, created_at")
+      .in("id", ids).eq("status", "active").order("created_at", { ascending: false });
+    if (!sess?.length) return [];
+    const sessIds = (sess as Array<{ id: string }>).map((s) => s.id);
+    const { data: allMems } = await supabase.from("cowork_memberships").select("session_id").in("session_id", sessIds);
+    const memCount = new Map<string, number>();
+    (allMems as Array<{ session_id: string }> | null)?.forEach((m) => memCount.set(m.session_id, (memCount.get(m.session_id) || 0) + 1));
+    return (sess as Array<{ id: string; name: string; description: string | null; created_at: string }>).map((s) => ({
+      ...s, role: roleBy.get(s.id) || "participant", members: memCount.get(s.id) || 1,
+    }));
+  }, []);
+
+  // Finalizar una sesión por id (para el botón de la pantalla de inicio, sin sessionId activo).
+  const endSessionById = useCallback(async (sid: string) => invokeCowork("endSession", { sessionId: sid }), []);
+
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
+    listMyActiveSessions, endSessionById,
   };
 }
