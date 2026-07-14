@@ -28,6 +28,7 @@ import {
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
+  { value: "ventas", label: "Ventas" },
   { value: "antiguos", label: "Antiguos" },
   { value: "nuevo", label: "Nuevo" },
   { value: "asignadas", label: "Asignaciones" },
@@ -283,6 +284,7 @@ const ClosersContent = () => {
               {TABS.map((tab) => {
                 const stageKey =
                   tab.value === "todas" ? "" :
+                  tab.value === "ventas" ? "ventas" :
                   tab.value === "antiguos" ? "Antiguos" :
                   tab.value === "nuevo" ? "Nuevo" :
                   tab.value === "asignadas" ? "Asignada" :

@@ -63,6 +63,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
   todas: [],
+  ventas: [],
   antiguos: ["Nuevo"],
   nuevo: ["Nuevo"],
   asignadas: ["Asignada"],
@@ -210,7 +211,7 @@ export const useCloserLeads = () => {
 
   // Debounce del término de búsqueda (~350ms) antes de tocar la red.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    const t = setTimeout(() => setDebouncedSearch(search), 220);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -314,6 +315,11 @@ export const useCloserLeads = () => {
         query = query.eq("stage", stageFilter[0]);
       } else if (stageFilter.length > 1) {
         query = query.in("stage", stageFilter);
+      }
+
+      // Tab "Ventas": deals de venta de plataforma a creadoras (cross-stage).
+      if (tab === "ventas") {
+        query = query.eq("deal_type", "venta_plataforma");
       }
 
       // Server-side search filter
@@ -511,7 +517,7 @@ export const useCloserLeads = () => {
       // techo (>2500), así que sin paginar los conteos por stage (No interesada,
       // etc.) quedaban truncados a ~1000. fetchAllRows trae TODAS con .range().
       const rows = await fetchAllRows((from, to) => {
-        let q = supabase.from("closer_creators").select("stage");
+        let q = supabase.from("closer_creators").select("stage, deal_type");
         if (!canSeeAll && effectiveUserId) {
           q = q.eq("assigned_to", effectiveUserId);
         }
@@ -523,9 +529,10 @@ export const useCloserLeads = () => {
         return q.order("id", { ascending: true }).range(from, to);
       });
       const counts: Record<string, number> = {};
-      for (const row of rows as Array<{ stage: string | null }>) {
+      for (const row of rows as Array<{ stage: string | null; deal_type: string | null }>) {
         const s = row.stage || "Sin stage";
         counts[s] = (counts[s] || 0) + 1;
+        if (row.deal_type === "venta_plataforma") counts["ventas"] = (counts["ventas"] || 0) + 1;
       }
       // (B) Pool SIN asignar partido por antigüedad (Nuevo ≤30d / Antiguos
       // >30d). Va aparte de (A) porque NO se filtra por assigned_to (todos
