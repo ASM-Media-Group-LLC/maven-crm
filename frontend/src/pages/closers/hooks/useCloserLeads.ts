@@ -7,6 +7,12 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeHandle } from "@/lib/handle-utils";
 
+export interface ContactNote {
+  contact_date: string;
+  channel: string | null;
+  notes: string | null;
+}
+
 export interface CloserCreatorRow {
   id: string;
   instagram_handle: string;
@@ -39,6 +45,8 @@ export interface CloserCreatorRow {
   // Joined fields
   agent_name: string | null;
   contact_count: number;
+  // Notas por contacto (de closer_contact_history), ordenadas por fecha.
+  contact_notes: ContactNote[];
   // Resolved WhatsApp phone (with country code)
   resolved_whatsapp_phone: string | null;
   // Source indicator
@@ -93,32 +101,45 @@ export const CLOSE_REASON_LABELS: Record<string, string> = Object.fromEntries(
   CLOSE_REASONS.map((r) => [r.code, r.label]),
 );
 
-// Cadencia de contactos: días desde passed_date donde el closer debe
-// haber realizado cada contacto. Espejada en SQL en la función
-// public.check_closer_contact_alerts() — si cambia, actualizar ambos.
+// Cadencia de contactos (días acumulados): el 1er contacto se espera 1 día
+// después de la asignación, el 2º a los 3, etc. Espejada en SQL en la función
+// public.check_closer_contact_alerts() — si cambia, actualizar AMBOS.
 const CONTACT_SEQUENCE = [1, 3, 5, 8, 15, 29];
 
-export const getNextContactDate = (passedDate: string | null, contactCount: number): Date | null => {
+// Próxima fecha en que el closer debe contactar.
+//  - Sin contactos aún → passed_date + CONTACT_SEQUENCE[0] (1 día).
+//  - Con ≥1 contacto → se RE-ANCLA al último contacto: el próximo vence según
+//    el gap de la cadencia contado desde que contactó por última vez. Así,
+//    contactar "pone al día" el lead (antes se anclaba a passed_date fijo, por
+//    lo que un lead viejo seguía "Vencido" aunque lo contactaras hoy).
+export const getNextContactDate = (
+  passedDate: string | null,
+  contactCount: number,
+  lastContactDate?: string | null,
+): Date | null => {
   if (!passedDate || contactCount >= 6) return null;
-  const base = new Date(passedDate);
-  const dayOffset = CONTACT_SEQUENCE[contactCount] || 29;
+  if (contactCount === 0) {
+    const next = new Date(passedDate);
+    next.setDate(next.getDate() + CONTACT_SEQUENCE[0]);
+    return next;
+  }
+  const gap = (CONTACT_SEQUENCE[contactCount] ?? 29) - (CONTACT_SEQUENCE[contactCount - 1] ?? 0);
+  const base = lastContactDate ? new Date(lastContactDate) : new Date(passedDate);
   const next = new Date(base);
-  next.setDate(next.getDate() + dayOffset);
+  next.setDate(next.getDate() + gap);
   return next;
 };
 
-// Devuelve true si el próximo contacto de la cadencia ya venció.
-// Definición: deadline = medianoche al final del día N (passed_date + N).
-// Pasada esa medianoche (current_date > passed_date + N), está vencido.
-// Mismo cálculo que el SQL cron — ver migration 20260516170000.
+// Devuelve true si el próximo contacto ya venció (current_date > deadline,
+// comparando fechas a medianoche). Mismo cálculo que el SQL cron (20260516170000).
 export const isContactOverdue = (
   passedDate: string | null,
   contactCount: number,
+  lastContactDate?: string | null,
 ): boolean => {
   if (!passedDate || contactCount >= 6) return false;
-  const next = getNextContactDate(passedDate, contactCount);
+  const next = getNextContactDate(passedDate, contactCount, lastContactDate);
   if (!next) return false;
-  // current_date > deadline_date (comparación de fechas, ignorando hora)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const deadline = new Date(next);
@@ -294,6 +315,7 @@ export const useCloserLeads = () => {
           main_platform: c.main_platform ?? null,
           agent_name: c.created_by ? (createdByMap[c.created_by] || null) : null,
           contact_count: 0,
+          contact_notes: [],
           source_contact_id: c.source_contact_id ?? null,
           resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
           _source: "closer" as const,
@@ -368,7 +390,7 @@ export const useCloserLeads = () => {
           ? supabase.from("profiles").select("id, full_name").in("id", agentIds)
           : Promise.resolve({ data: [] }),
         creatorIds.length > 0
-          ? supabase.from("closer_contact_history").select("creator_id").in("creator_id", creatorIds)
+          ? supabase.from("closer_contact_history").select("creator_id, contact_date, channel, notes").in("creator_id", creatorIds).order("contact_date", { ascending: true })
           : Promise.resolve({ data: [] }),
         sourceContactIds.length > 0
           ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
@@ -381,8 +403,15 @@ export const useCloserLeads = () => {
       }
 
       const contactCountMap: Record<string, number> = {};
+      const contactNotesMap: Record<string, ContactNote[]> = {};
       for (const c of contactsResult.data || []) {
-        contactCountMap[(c as any).creator_id] = (contactCountMap[(c as any).creator_id] || 0) + 1;
+        const cid = (c as any).creator_id;
+        contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
+        (contactNotesMap[cid] = contactNotesMap[cid] || []).push({
+          contact_date: (c as any).contact_date,
+          channel: (c as any).channel ?? null,
+          notes: (c as any).notes ?? null,
+        });
       }
 
       const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
@@ -399,6 +428,7 @@ export const useCloserLeads = () => {
         main_platform: c.main_platform ?? null,
         agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
         contact_count: contactCountMap[c.id] || 0,
+        contact_notes: contactNotesMap[c.id] || [],
         source_contact_id: c.source_contact_id ?? null,
         resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
         _source: "closer" as const,

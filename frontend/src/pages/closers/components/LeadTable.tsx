@@ -26,7 +26,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, ExternalLink, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
-import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
+import { CloserCreatorRow, ContactNote, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
@@ -526,11 +526,30 @@ const relDays = (d: string | null | undefined): string => {
 // registro) + últ/próx + badges Vencido/Decidir/Último intento. Consolida las viejas
 // columnas # Contactos + Último contacto + Alertas. No cambia el flujo: la cadencia
 // (1/3/5/8/15/29 días) y los badges se derivan de passed_date + contact_count como siempre.
+// Lista read-only de las notas hechas en cada contacto (closer_contact_history),
+// para mostrar debajo de la nota libre del lead en la columna "Notas".
+const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
+  const withNote = (notes || [])
+    .map((n, i) => ({ ...n, idx: i + 1 }))
+    .filter((n) => (n.notes || "").trim().length > 0);
+  if (withNote.length === 0) return null;
+  return (
+    <div className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1">
+      {withNote.map((n) => (
+        <p key={n.idx} className="text-[10px] leading-snug text-muted-foreground">
+          <span className="text-muted-foreground/60">contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}:</span>{" "}
+          {n.notes}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
-  const overdue = isContactOverdue(c.passed_date, c.contact_count);
+  const overdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
   const decision = needsContactDecision(c.stage, c.contact_count);
   const lastAttempt = c.contact_count >= 6;
-  const next = getNextContactDate(c.passed_date, c.contact_count);
+  const next = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <ContactCountCell creatorId={c.id} count={c.contact_count} />
@@ -705,7 +724,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 : (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               // Estado de alertas: vencido (rojo) o decisión pendiente (naranja).
               // Espejo de la lógica de check_closer_contact_alerts() en SQL.
-              const contactOverdue = isContactOverdue(c.passed_date, c.contact_count);
+              const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
               const decisionPending = needsContactDecision(c.stage, c.contact_count);
               return (
                 <div key={c.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 hover:bg-white/10 hover:border-primary/40 transition-colors">
@@ -887,10 +906,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     // Calculado en el cliente para no esperar el cron — el cron sólo se
     // encarga de la notificación en la campanita, el badge visual es
     // instantáneo.
-    const contactOverdue = isContactOverdue(c.passed_date, c.contact_count);
+    const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
     const decisionPending = needsContactDecision(c.stage, c.contact_count);
     const isLastAttempt = c.contact_count >= 6;
-    const nextDate = getNextContactDate(c.passed_date, c.contact_count);
+    const nextDate = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);
     const isCloser = isCloserRow(c);
 
     const igLink = (
@@ -954,6 +973,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">
@@ -1025,6 +1045,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="font-semibold text-sm align-top tabular-nums">${revenue.toLocaleString()}</TableCell>
               <TableCell className="align-top">
                 <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
               </TableCell>
               <TableCell className="align-top">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
@@ -1105,6 +1126,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1152,6 +1174,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1190,6 +1213,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1241,6 +1265,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              <ContactNotesList notes={c.contact_notes} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">

@@ -51,7 +51,13 @@ export const useContactHistory = (creatorId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-contact-history", creatorId] });
-      queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
+      // Refrescar el listado del pipeline, los contadores y las alertas: al
+      // registrar un contacto cambia el contact_count / last_contact_date, y
+      // con eso el badge "Vencido". La key anterior (["closer-creators"]) no
+      // matcheaba NINGUNA query → la fila quedaba stale y el vencido no se iba.
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-alert-counts"] });
       toast({ title: "Contacto registrado" });
     },
     onError: (e: Error) => {

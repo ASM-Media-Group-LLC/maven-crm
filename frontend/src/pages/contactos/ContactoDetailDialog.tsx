@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History } from "lucide-react";
 import ContactHistoryView from "./ContactHistoryView";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -43,6 +45,26 @@ interface Props {
 // + grid de stats + botones de acción.
 const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Notas hechas en cada contacto del closer (closer_contact_history), vía el
+  // closer_creator vinculado por source_contact_id. Read-only.
+  const { data: contactNotes = [] } = useQuery({
+    queryKey: ["contacto-contact-notes", contacto?.id],
+    enabled: open && !!contacto?.id,
+    queryFn: async () => {
+      const { data: cr } = await supabase
+        .from("closer_creators").select("id").eq("source_contact_id", contacto!.id).maybeSingle();
+      if (!cr?.id) return [] as { channel: string | null; notes: string | null; contact_date: string }[];
+      const { data } = await supabase
+        .from("closer_contact_history").select("channel, notes, contact_date")
+        .eq("creator_id", cr.id).order("contact_date", { ascending: true });
+      return (data || []) as { channel: string | null; notes: string | null; contact_date: string }[];
+    },
+  });
+  const notesWithText = contactNotes
+    .map((n, i) => ({ ...n, idx: i + 1 }))
+    .filter((n) => (n.notes || "").trim().length > 0);
+
   if (!contacto) return null;
   const c = contacto;
   const cleanHandle = c.instagram.replace(/^@/, "");
@@ -189,6 +211,29 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {notesWithText.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              Notas de contacto
+            </p>
+            <div className="space-y-1.5">
+              {notesWithText.map((n) => (
+                <div key={n.idx} className="rounded-lg border border-border bg-card px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">
+                      contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                      {n.contact_date ? format(parseISO(n.contact_date), "dd MMM yy", { locale: es }) : ""}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{n.notes}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
