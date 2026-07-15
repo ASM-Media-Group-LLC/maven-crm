@@ -87,13 +87,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   }, [profileLoaded, cowork.session?.host_hub_livekit_room]);
 
   // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
-  // UNA vez al activar el master y cada sala publica un clon (CoworkRoomMonitor). Al activar el
-  // broadcast se PAUSA el Hub, para no publicar tu voz en el Hub y en las salas a la vez.
+  // UNA vez al activar el master y cada sala publica un clon (CoworkRoomMonitor). El Coordinador
+  // Hub queda INDEPENDIENTE (no se corta al togglear el micro global): su mic está apagado por
+  // defecto, así que no hay conflicto de captura ni doble publicación de tu voz.
   useEffect(() => {
     if (!globalMic) return;
     let cancelled = false;
     let track: MediaStreamTrack | null = null;
-    setHubConnected(false);
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
