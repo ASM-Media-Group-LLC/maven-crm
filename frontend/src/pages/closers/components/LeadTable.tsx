@@ -1,4 +1,4 @@
-import { useState, memo, useMemo, useCallback } from "react";
+import { useState, memo, useMemo, useCallback, type ReactNode } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,8 +115,8 @@ InlineNumber.displayName = "InlineNumber";
 // un preview legible de hasta 2 líneas (con ícono), y al hacer clic abre un Popover con un
 // Textarea cómodo (multilínea, ⌘/Ctrl+Enter para guardar, Esc para cancelar). Estado vacío
 // con una pista clara ("+ Nota") en vez de un guión mudo.
-const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Nota" }: {
-  value: string | null; onSave: (v: string | null) => void; placeholder?: string; emptyLabel?: string;
+const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Nota", footer }: {
+  value: string | null; onSave: (v: string | null) => void; placeholder?: string; emptyLabel?: string; footer?: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(value || "");
@@ -160,6 +160,7 @@ const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Not
           placeholder={`Escribí ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
           className="resize-none text-sm"
         />
+        {footer}
         <div className="mt-2 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
           <div className="flex gap-1.5">
@@ -972,8 +973,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">
@@ -1044,8 +1044,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               </TableCell>
               <TableCell className="font-semibold text-sm align-top tabular-nums">${revenue.toLocaleString()}</TableCell>
               <TableCell className="align-top">
-                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
               </TableCell>
               <TableCell className="align-top">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
@@ -1125,8 +1124,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
             </TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1173,8 +1171,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} emptyLabel="Motivo" />
             </TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1212,8 +1209,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <DropdownMenu>
@@ -1264,8 +1260,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top"><SeguimientoCell c={c} /></TableCell>
             <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              <ContactNotesList notes={c.contact_notes} />
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} />
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
               <div className="flex items-center justify-end gap-1">
