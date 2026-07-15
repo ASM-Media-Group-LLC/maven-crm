@@ -304,6 +304,22 @@ serve(async (req) => {
         return json({ token, url: lkUrl, room: room.livekit_room_name });
       }
 
+      // MONITOR: el host, desde el dashboard, se conecta al audio de una sala para ESCUCHARLA
+      // y, cuando quiere, HABLARLE (publica su micro). A diferencia de preview_room, NO es
+      // hidden (para que los participantes lo escuchen/vean como "📢 Coordinador") y solo puede
+      // publicar micrófono (nunca cámara/pantalla). Identity distinta para no colisionar con
+      // "Entrar" a la sala (que usa userId).
+      if (purpose === "monitor_room") {
+        if (!isHost) return err("Only hosts can monitor rooms", 403);
+        if (!roomId) return err("roomId required");
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
+        if (!room) return err("Room not found");
+        const token = await createLKToken(lkKey, lkSecret, `${userId}__monitor`, `📢 ${userName}`, {
+          roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: false, canPublishSources: ["microphone"],
+        }, 3600);
+        return json({ token, url: lkUrl, room: room.livekit_room_name });
+      }
+
       return err("Invalid purpose");
     }
 

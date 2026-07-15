@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
-  Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil,
+  Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
-import CoworkRoomPreview from "./CoworkRoomPreview";
+import CoworkRoomMonitor from "./CoworkRoomMonitor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -56,6 +56,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [editVideo, setEditVideo] = useState(true);
   const [closeTarget, setCloseTarget] = useState<CoworkRoom | null>(null);
   const [roomBusy, setRoomBusy] = useState(false);
+  // Central de audio del coordinador: master del micro + escuchar/hablar por sala + micro compartido.
+  const [globalMic, setGlobalMic] = useState(false);
+  const [roomHear, setRoomHear] = useState<Record<string, boolean>>({});
+  const [roomMic, setRoomMic] = useState<Record<string, boolean>>({});
+  const [micBaseTrack, setMicBaseTrack] = useState<MediaStreamTrack | null>(null);
+  const hearFor = (roomId: string) => roomHear[roomId] ?? true;   // por defecto se escuchan todas
+  const broadcastFor = (roomId: string) => globalMic && (roomMic[roomId] ?? false); // hablar = master && sala
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -78,6 +85,33 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setHubConnected(true);
     }
   }, [profileLoaded, cowork.session?.host_hub_livekit_room]);
+
+  // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
+  // UNA vez al activar el master y cada sala publica un clon (CoworkRoomMonitor). Al activar el
+  // broadcast se PAUSA el Hub, para no publicar tu voz en el Hub y en las salas a la vez.
+  useEffect(() => {
+    if (!globalMic) return;
+    let cancelled = false;
+    let track: MediaStreamTrack | null = null;
+    setHubConnected(false);
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        track = stream.getAudioTracks()[0] || null;
+        if (cancelled) { track?.stop(); return; }
+        setMicBaseTrack(track);
+      } catch {
+        if (!cancelled) { toast.error("No pude acceder al micrófono"); setGlobalMic(false); }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setMicBaseTrack(null);
+      try { track?.stop(); } catch { /* noop */ }
+    };
+  }, [globalMic]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
@@ -424,16 +458,28 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         ) : (
           <div className="flex-1 overflow-auto p-4 pt-14 md:p-6">
-            <div className="flex items-center justify-between mb-4 gap-2">
+            <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Seleccione sala para ingresar</h3>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1 rounded-full h-8 shrink-0"
-                onClick={() => { setAddName(""); setAddOpen(true); }}
-              >
-                <Plus className="h-3.5 w-3.5" /> Añadir sala
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant={globalMic ? "default" : "outline"}
+                  className={`gap-1.5 rounded-full h-8 ${globalMic ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  title={globalMic ? "Micrófono activo: tu voz va a las salas que tengan el 🎤 encendido. Tocá para silenciar todo." : "Activá tu micrófono para poder hablarle a las salas (después elegí a cuáles con el 🎤 de cada sala)."}
+                  onClick={() => setGlobalMic((v) => !v)}
+                >
+                  {globalMic ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  {globalMic ? "Micrófono activo" : "Mi micrófono"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 rounded-full h-8 shrink-0"
+                  onClick={() => { setAddName(""); setAddOpen(true); }}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Añadir sala
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
               {cowork.rooms.map((room) => {
@@ -471,40 +517,86 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     <div className="p-4 pt-1 space-y-3">
                       {participants.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground/50 italic">Sin participantes</p>
-                      ) : (room.preview_mode ?? "video") === "avatars" ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          {participants.map((a) => {
-                            const fullName = cowork.profiles[a.user_id] || "User";
-                            const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-                            const online = isOnline(a.user_id);
-                            return (
-                              <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
-                                <div className="relative">
-                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
-                                    {initials}
-                                  </div>
-                                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-success" : "bg-muted-foreground/30"}`} />
-                                </div>
-                                <span className="text-[11px] text-muted-foreground truncate w-full">{fullName}</span>
-                                {(() => {
-                                  const ms = mediaStates[a.user_id];
-                                  if (!ms) return null;
+                      ) : (
+                        <>
+                          {(room.preview_mode ?? "video") === "avatars" ? (
+                            <>
+                              <div className="grid grid-cols-2 gap-2">
+                                {participants.map((a) => {
+                                  const fullName = cowork.profiles[a.user_id] || "User";
+                                  const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                                  const online = isOnline(a.user_id);
                                   return (
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
-                                      {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
-                                      {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
+                                    <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
+                                      <div className="relative">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
+                                          {initials}
+                                        </div>
+                                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-success" : "bg-muted-foreground/30"}`} />
+                                      </div>
+                                      <span className="text-[11px] text-muted-foreground truncate w-full">{fullName}</span>
+                                      {(() => {
+                                        const ms = mediaStates[a.user_id];
+                                        if (!ms) return null;
+                                        return (
+                                          <div className="flex items-center gap-1.5 mt-0.5">
+                                            {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
+                                            {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
+                                            {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   );
-                                })()}
+                                })}
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="h-36 rounded-xl overflow-hidden bg-black/40 border border-border">
-                          <CoworkRoomPreview roomId={room.id} issueToken={cowork.issueLiveKitToken} />
-                        </div>
+                              {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
+                              <CoworkRoomMonitor
+                                roomId={room.id}
+                                issueToken={cowork.issueLiveKitToken}
+                                showVideo={false}
+                                hearOn={hearFor(room.id)}
+                                broadcastOn={broadcastFor(room.id)}
+                                micBaseTrack={micBaseTrack}
+                              />
+                            </>
+                          ) : (
+                            <div className="h-36 rounded-xl overflow-hidden bg-black/40 border border-border">
+                              <CoworkRoomMonitor
+                                roomId={room.id}
+                                issueToken={cowork.issueLiveKitToken}
+                                showVideo
+                                hearOn={hearFor(room.id)}
+                                broadcastOn={broadcastFor(room.id)}
+                                micBaseTrack={micBaseTrack}
+                              />
+                            </div>
+                          )}
+
+                          {/* Central de audio por sala: escuchar (🔊) y hablarle (🎤) */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
+                              title={hearFor(room.id) ? "Escuchando esta sala. Tocá para silenciar su audio." : "Sala silenciada (no la oís). Tocá para escuchar."}
+                              onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
+                            >
+                              {hearFor(room.id) ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                              {hearFor(room.id) ? "Escuchando" : "Silenciada"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${broadcastFor(room.id) ? "text-success" : "text-muted-foreground/50"}`}
+                              title={globalMic ? (broadcastFor(room.id) ? "Tu voz va a esta sala. Tocá para dejar de hablarle." : "Tocá para hablarle a esta sala.") : "Activá 'Mi micrófono' arriba para poder hablarle a las salas."}
+                              onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+                            >
+                              {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                              {broadcastFor(room.id) ? "Hablando" : "Hablar"}
+                            </Button>
+                          </div>
+                        </>
                       )}
 
                       <div className="flex gap-1">
