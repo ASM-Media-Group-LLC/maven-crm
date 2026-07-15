@@ -960,6 +960,71 @@ function fireAgent(messageId: string, groupId: string, reason: "mention" | "auto
   });
 }
 
+// Bot privado (Clari 1:1): rutea un DM de un remitente WHITELISTED al agente de IA.
+// Modela el chat privado como un "pseudo-grupo" (whatsapp_groups.is_direct=true con
+// external_id = el jid del usuario) → reusa TODO el motor. La respuesta sale por
+// reply_to_group → whatsapp-send → ese external_id = DM de vuelta al usuario.
+// Devuelve un "kind" para logear. NO responde a números fuera de la whitelist.
+async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Promise<string> {
+  if (msg.msgType !== "text") return "dm_agent_skip_non_text";
+  const digits = (msg.senderExternalId || "").replace(/@.*/, "").replace(/\D/g, "");
+  if (!digits) return "dm_agent_no_digits";
+  if ((msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
+
+  const { data: allow } = await sb
+    .from("wa_dm_allowlist")
+    .select("label")
+    .eq("tenant_id", TENANT_ID)
+    .eq("phone_digits", digits)
+    .eq("active", true)
+    .maybeSingle();
+  if (!allow) return "dm_agent_not_whitelisted";
+
+  const externalId = msg.senderExternalId;
+  let groupId: string;
+  const { data: existing } = await sb
+    .from("whatsapp_groups")
+    .select("id")
+    .eq("external_id", externalId)
+    .maybeSingle();
+  if (existing) {
+    groupId = existing.id;
+  } else {
+    const { data: bot } = await sb
+      .from("wa_bots")
+      .select("id")
+      .eq("tenant_id", TENANT_ID)
+      .eq("department", "private")
+      .eq("active", true)
+      .maybeSingle();
+    const { data: created, error } = await sb
+      .from("whatsapp_groups")
+      .insert({
+        tenant_id: TENANT_ID,
+        external_id: externalId,
+        name: `DM · ${msg.senderDisplayName ?? allow.label ?? digits}`,
+        provider: "evolution",
+        is_direct: true,
+        bot_enabled: true,
+        bot_mode: "always",
+        active: true,
+        wa_bot_id: bot?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !created) {
+      console.warn("maybeRouteDmToAgent create group:", error?.message);
+      return "dm_agent_group_error";
+    }
+    groupId = created.id;
+  }
+
+  const memberId = await upsertMember(sb, { id: groupId, tenant_id: TENANT_ID }, msg);
+  const { id: messageId, inserted } = await insertMessage(sb, { id: groupId, tenant_id: TENANT_ID }, memberId, msg);
+  if (inserted) fireAgent(messageId, groupId, "mention");
+  return inserted ? "dm_agent_fired" : "dm_agent_duplicate";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: whatsappCors });
@@ -1077,7 +1142,26 @@ serve(async (req) => {
         body_preview: (msg.body ?? "").slice(0, 100),
       },
     });
-    return new Response(JSON.stringify({ ok: true, kind: result.kind }), {
+
+    // Bot privado (Clari 1:1): si el DM NO fue una verificación (mensaje normal) y el
+    // remitente está en la whitelist, ruteamos al agente de IA vía pseudo-grupo. Los
+    // números fuera de la whitelist siguen sin respuesta (auth-only, como antes).
+    let agentKind: string | null = null;
+    if (result.kind === "dm_received_no_code") {
+      agentKind = await maybeRouteDmToAgent(sb, msg).catch((e) => {
+        console.warn("maybeRouteDmToAgent:", (e as Error).message);
+        return "dm_agent_exception";
+      });
+      if (agentKind && agentKind !== "dm_agent_not_whitelisted") {
+        await logEvent(sb, {
+          tenantId: TENANT_ID,
+          kind: agentKind,
+          payload: { sender: msg.senderDisplayName ?? msg.senderExternalId, digits: (msg.senderExternalId || "").replace(/@.*/, "") },
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, kind: result.kind, agent: agentKind }), {
       status: 200,
       headers: { ...whatsappCors, "Content-Type": "application/json" },
     });
