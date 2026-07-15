@@ -148,19 +148,23 @@ const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Not
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" side="bottom" className="w-80 p-3">
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
-            if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
-          }}
-          autoFocus
-          rows={5}
-          placeholder={`Escribí ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
-          className="resize-none text-sm"
-        />
-        {footer}
+        {/* Nota editable + notas por contacto (footer) en un mismo recuadro:
+            arriba el textarea, abajo las notas de contacto en gris (no editable). */}
+        <div className="overflow-hidden rounded-md border border-input focus-within:ring-1 focus-within:ring-ring">
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+              if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+            }}
+            autoFocus
+            rows={4}
+            placeholder={`Escribí ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
+            className="resize-none rounded-none border-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+          {footer}
+        </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
           <div className="flex gap-1.5">
@@ -535,10 +539,10 @@ const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
     .filter((n) => (n.notes || "").trim().length > 0);
   if (withNote.length === 0) return null;
   return (
-    <div className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1">
+    <div className="space-y-1 border-t border-border bg-muted/40 px-3 py-2">
       {withNote.map((n) => (
-        <p key={n.idx} className="text-[10px] leading-snug text-muted-foreground">
-          <span className="text-muted-foreground/60">contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}:</span>{" "}
+        <p key={n.idx} className="text-xs leading-snug text-muted-foreground">
+          <span className="font-medium">Contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}:</span>{" "}
           {n.notes}
         </p>
       ))}
