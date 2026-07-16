@@ -141,9 +141,11 @@ serve(async (req) => {
   // ── Persistir el saliente + metadata ────────────────────────────────────────
   const nowIso = new Date().toISOString();
   const preview = payload.caption?.trim() || `[${mediaType}]`;
+  // UPSERT por (conversation_id, external_id): si el eco fromMe de este envío ya entró por el
+  // ingest como 'external', lo corregimos a 'maven' + sender (evita la carrera → 500).
   const { data: msg, error: mErr } = await sb
     .from("wa_conversation_messages")
-    .insert({
+    .upsert({
       tenant_id: TENANT_ID,
       conversation_id: conversationId,
       direction: "out",
@@ -153,8 +155,9 @@ serve(async (req) => {
       msg_type: mediaType === "gif" ? "video" : mediaType, // gif se renderiza como video
       media_url: mediaUrl,
       status: "sent",
+      source: "maven",
       sent_at: nowIso,
-    })
+    }, { onConflict: "conversation_id,external_id" })
     .select("id")
     .single();
   if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);

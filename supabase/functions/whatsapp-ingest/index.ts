@@ -395,7 +395,13 @@ function canonicalJid(jid: string): string {
 }
 
 async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Promise<void> {
-  if (!msg.isDirect || msg.isFromBot) return;
+  if (!msg.isDirect) return;
+  // Los fromMe (SALIENTES enviados por FUERA de Maven: celular / WhatsApp Web con la misma
+  // línea) también se capturan, como salientes con source='external'. Los enviados DESDE Maven
+  // (wa-inbox-send) llegan como eco fromMe pero deduplican por (conversation_id, external_id) y
+  // quedan como 'maven'. En DM, senderExternalId = el contacto (el otro lado) incluso si es
+  // fromMe, así que la conversación se resuelve igual.
+  const isOut = msg.isFromBot === true;
   const rawJid = msg.senderExternalId;
   if (!rawJid) return;
 
@@ -482,18 +488,21 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   // 3) Mensaje: insert idempotente por (conversation_id, external_id).
   const isMedia = ["audio", "image", "video", "document", "sticker"].includes(msg.msgType);
   const preview = (msg.body ?? `[${msg.msgType}]`).slice(0, 120);
+  const msgRow: Record<string, unknown> = {
+    tenant_id: TENANT_ID,
+    conversation_id: conversationId,
+    direction: isOut ? "out" : "in",
+    external_id: msg.externalId,
+    body: msg.body,
+    msg_type: msg.msgType,
+    media_url: null, // la media se baja + sube a Storage en 3b
+    sent_at: msg.sentAt,
+  };
+  // Saliente enviado por fuera de Maven → marcar external + status enviado (sender_user_id queda null).
+  if (isOut) { msgRow.source = "external"; msgRow.status = "sent"; }
   const { data: inserted, error: mErr } = await sb
     .from("wa_conversation_messages")
-    .insert({
-      tenant_id: TENANT_ID,
-      conversation_id: conversationId,
-      direction: "in",
-      external_id: msg.externalId,
-      body: msg.body,
-      msg_type: msg.msgType,
-      media_url: null, // la media entrante se baja + sube a Storage en 3b
-      sent_at: msg.sentAt,
-    })
+    .insert(msgRow)
     .select("id")
     .maybeSingle();
   if (mErr) {
@@ -513,14 +522,19 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
     }
   }
 
-  // 4) Metadata + no-leídos (+1). Antes solo seteaba last_message_* y el contador
-  //    de no-leídos quedaba en 0 (sin bubbles en el inbox). wa_bump_unread lo
-  //    incrementa de forma atómica (RPC SECURITY DEFINER).
-  await sb.rpc("wa_bump_unread", {
-    p_conversation_id: conversationId,
-    p_preview: preview,
-    p_sent_at: msg.sentAt,
-  });
+  // 4) Metadata. Entrante → +1 no-leído (wa_bump_unread, atómico). Saliente enviado por
+  //    fuera de Maven → NO marca la conversación como no leída; solo actualiza last_message_*.
+  if (isOut) {
+    await sb.from("wa_conversations")
+      .update({ last_message_at: msg.sentAt, last_message_preview: preview })
+      .eq("id", conversationId);
+  } else {
+    await sb.rpc("wa_bump_unread", {
+      p_conversation_id: conversationId,
+      p_preview: preview,
+      p_sent_at: msg.sentAt,
+    });
+  }
 }
 
 // Detecta si el mensaje es un "check-in" del usuario al inicio del turno.

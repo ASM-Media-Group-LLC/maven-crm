@@ -75,6 +75,7 @@ interface MsgRow {
   status: string | null;
   deleted_at: string | null;
   sender_user_id: string | null; // closer (usuario Maven) que mandó el saliente; null si entrante o bot
+  source: string | null; // 'maven' | 'external' (enviado por fuera: celular/WA Web) | 'ai' | null (entrante)
 }
 
 // Palomitas de WhatsApp para los mensajes SALIENTES según el estado de entrega:
@@ -270,7 +271,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status, deleted_at, sender_user_id")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status, deleted_at, sender_user_id, source")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -1093,6 +1094,9 @@ const InboxPage = () => {
                     // Etiqueta "quién lo mandó" en CADA saliente con emisor conocido (mensajes viejos
                     // o enviados desde el propio teléfono no tienen sender_user_id → sin nombre, es correcto).
                     const showSender = isOut && !isDeleted && !!m.sender_user_id;
+                    // Saliente enviado por FUERA de Maven (celular / WhatsApp Web con la misma
+                    // línea): no tiene emisor conocido → lo marcamos como externo.
+                    const sentOutsideMaven = isOut && !isDeleted && m.source === "external";
                     return (
                       <div key={m.id} className={cn("group flex flex-col", isOut ? "items-end" : "items-start")}>
                         <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
@@ -1105,11 +1109,15 @@ const InboxPage = () => {
                               m.agent_reaction && "mb-2",
                             )}
                           >
-                            {showSender && (
+                            {showSender ? (
                               <div className="mb-0.5 text-[11px] font-semibold text-white/85">
                                 {firstName(m.sender_user_id)}
                               </div>
-                            )}
+                            ) : sentOutsideMaven ? (
+                              <div className="mb-0.5 inline-flex items-center gap-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/90">
+                                ↗ Externo · fuera de Maven
+                              </div>
+                            ) : null}
                             {m.reply_to_message_id && (
                               <div
                                 className={cn(

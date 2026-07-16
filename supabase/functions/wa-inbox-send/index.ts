@@ -153,7 +153,7 @@ serve(async (req) => {
     await sb.from("wa_conversation_messages").insert({
       tenant_id: TENANT_ID, conversation_id: conversationId, direction: "out",
       sender_user_id: userId, external_id: null, body: text, msg_type: "text",
-      status: "failed", sent_at: nowIso, reply_to_message_id: replyToId ?? null,
+      status: "failed", source: "maven", sent_at: nowIso, reply_to_message_id: replyToId ?? null,
     });
     await sb.from("wa_conversations")
       .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
@@ -169,9 +169,12 @@ serve(async (req) => {
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
   const nowIso = new Date().toISOString();
+  // UPSERT (no insert) por (conversation_id, external_id): si el ECO fromMe de este mismo
+  // envío ya llegó por el ingest y lo insertó como 'external', acá lo corregimos a 'maven'
+  // + sender. Sin esto habría una carrera que devolvía 500 y dejaba el saliente mal etiquetado.
   const { data: msg, error: mErr } = await sb
     .from("wa_conversation_messages")
-    .insert({
+    .upsert({
       tenant_id: TENANT_ID,
       conversation_id: conversationId,
       direction: "out",
@@ -180,9 +183,10 @@ serve(async (req) => {
       body: text,
       msg_type: "text",
       status: "sent",
+      source: "maven",
       sent_at: nowIso,
       reply_to_message_id: replyToId ?? null,
-    })
+    }, { onConflict: "conversation_id,external_id" })
     .select("id")
     .single();
   if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);
