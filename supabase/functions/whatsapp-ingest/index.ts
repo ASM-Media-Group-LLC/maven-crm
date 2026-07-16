@@ -947,6 +947,13 @@ async function resolveAgentTrigger(
     const trimmed = (body ?? "").trim();
     if (trimmed.length < 4) return null;
 
+    // Bots de SUPERVISIÓN (managers) se invocan 24/7: NO dependen del horario
+    // laboral (los managers no tienen turnos cargados en whatsapp_user_schedules,
+    // así que el gate SIEMPRE daba false → el bot quedaba mudo). Se invoca en cada
+    // mensaje sustantivo y es el PROMPT del bot el que decide si el mensaje va
+    // dirigido a él (regla "CUÁNDO CALLARTE") — igual que el bot de marketing.
+    if (supervisorBot) return "auto";
+
     const { data: inHours, error } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: group.id });
     if (error) {
       console.warn("business_hours RPC failed, defaulting to active:", error.message);

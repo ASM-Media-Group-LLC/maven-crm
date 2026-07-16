@@ -402,16 +402,25 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   //   - off:     nunca
   const { data: group } = await sb
     .from("whatsapp_groups")
-    .select("bot_enabled, bot_mode")
+    .select("bot_enabled, bot_mode, wa_bots(department)")
     .eq("id", msg.group_id)
     .maybeSingle();
+  const groupWaBots = (group as any)?.wa_bots;
+  const groupDept = (Array.isArray(groupWaBots) ? groupWaBots[0]?.department : groupWaBots?.department) ?? null;
+  const supervisorBot = groupDept === "manager";
   if (group?.bot_enabled && group?.bot_mode !== "off") {
     if (audioMentionsBot(result.text)) {
       fireAgent(msg.id, msg.group_id, "audio_mention");
     } else if (group.bot_mode === "always" && result.text.trim().length >= 4) {
-      // Gate por horario laboral — mismo criterio que el ingest de texto.
-      const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });
-      if (inHours) fireAgent(msg.id, msg.group_id, "auto");
+      // Bots supervisores (managers) se invocan 24/7 (sin gate de horario); el
+      // prompt decide si el mensaje va dirigido a ellos. El resto sigue el gate
+      // por horario laboral — mismo criterio que el ingest de texto.
+      if (supervisorBot) {
+        fireAgent(msg.id, msg.group_id, "auto");
+      } else {
+        const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });
+        if (inHours) fireAgent(msg.id, msg.group_id, "auto");
+      }
     }
   }
 
