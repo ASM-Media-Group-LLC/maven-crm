@@ -232,7 +232,7 @@ export const useCloserLeads = () => {
 
   // Debounce del término de búsqueda (~350ms) antes de tocar la red.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 220);
+    const t = setTimeout(() => setDebouncedSearch(search), 90);
     return () => clearTimeout(t);
   }, [search]);
 
