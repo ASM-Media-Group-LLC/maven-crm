@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -281,48 +281,9 @@ export const useCloserLeads = () => {
         const { data, error, count } = await query;
         if (error) throw error;
 
-        const rawRows = (data || []) as any[];
-
-        // Fetch created_by profiles and source contacts in parallel
-        const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
-        const sourceContactIds = [...new Set(rawRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
-
-        const [profilesRes, sourceContactsRes] = await Promise.all([
-          createdByIds.length > 0
-            ? supabase.from("profiles").select("id, full_name").in("id", createdByIds)
-            : Promise.resolve({ data: [] }),
-          sourceContactIds.length > 0
-            ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
-            : Promise.resolve({ data: [] }),
-        ]);
-
-        let createdByMap: Record<string, string> = {};
-        for (const p of profilesRes.data || []) {
-          createdByMap[(p as any).id] = (p as any).full_name || "Sin nombre";
-        }
-
-        const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
-        for (const sc of sourceContactsRes.data || []) {
-          sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
-        }
-
-        const rows: CloserCreatorRow[] = rawRows.map((c: any) => ({
-          ...c,
-          leadgen_entry_id: c.leadgen_entry_id ?? null,
-          estimated_monetization: c.estimated_monetization ?? 0,
-          agency_commission: c.agency_commission ?? 0,
-          extras: c.extras ?? 0,
-          main_platform: c.main_platform ?? null,
-          agent_name: c.created_by ? (createdByMap[c.created_by] || null) : null,
-          contact_count: 0,
-          contact_notes: [],
-          source_contact_id: c.source_contact_id ?? null,
-          resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
-          _source: "closer" as const,
-          _lg_status: null,
-        }));
-
-        return { creators: rows, total: count || 0 };
+        // 1ª ola: solo la página cruda. El enriquecimiento (perfiles/historial/
+        // teléfonos) se hace aparte y progresivo para que la lista pinte ya.
+        return { rows: (data || []) as any[], total: count || 0 };
       }
 
       // ── All other tabs: fetch from closer_creators ──
@@ -378,64 +339,9 @@ export const useCloserLeads = () => {
       const { data, error, count } = await query;
       if (error) throw error;
 
-      const closerRows = (data || []) as any[];
-
-      // Fetch profiles, contact counts, and source contacts in parallel
-      const agentIds = [...new Set(closerRows.map((c) => c.assigned_to).filter(Boolean))] as string[];
-      const creatorIds = closerRows.map((c) => c.id);
-      const sourceContactIds = [...new Set(closerRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
-
-      const [profilesResult, contactsResult, sourceContactsResult] = await Promise.all([
-        agentIds.length > 0
-          ? supabase.from("profiles").select("id, full_name").in("id", agentIds)
-          : Promise.resolve({ data: [] }),
-        creatorIds.length > 0
-          ? supabase.from("closer_contact_history").select("creator_id, contact_date, channel, notes").in("creator_id", creatorIds).order("contact_date", { ascending: true })
-          : Promise.resolve({ data: [] }),
-        sourceContactIds.length > 0
-          ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const profilesMap: Record<string, string> = {};
-      for (const p of profilesResult.data || []) {
-        profilesMap[(p as any).id] = (p as any).full_name || "Sin nombre";
-      }
-
-      const contactCountMap: Record<string, number> = {};
-      const contactNotesMap: Record<string, ContactNote[]> = {};
-      for (const c of contactsResult.data || []) {
-        const cid = (c as any).creator_id;
-        contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
-        (contactNotesMap[cid] = contactNotesMap[cid] || []).push({
-          contact_date: (c as any).contact_date,
-          channel: (c as any).channel ?? null,
-          notes: (c as any).notes ?? null,
-        });
-      }
-
-      const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
-      for (const sc of sourceContactsResult.data || []) {
-        sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
-      }
-
-      const enriched: CloserCreatorRow[] = closerRows.map((c) => ({
-        ...c,
-        leadgen_entry_id: c.leadgen_entry_id ?? null,
-        estimated_monetization: c.estimated_monetization ?? 0,
-        agency_commission: c.agency_commission ?? 0,
-        extras: c.extras ?? 0,
-        main_platform: c.main_platform ?? null,
-        agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
-        contact_count: contactCountMap[c.id] || 0,
-        contact_notes: contactNotesMap[c.id] || [],
-        source_contact_id: c.source_contact_id ?? null,
-        resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
-        _source: "closer" as const,
-        _lg_status: null,
-      }));
-
-      return { creators: enriched, total: count || 0 };
+      // 1ª ola: solo la página cruda (ver useMemo `creators` + query de
+      // enriquecimiento más abajo para el patrón progresivo).
+      return { rows: (data || []) as any[], total: count || 0 };
   };
 
   const buildCreatorsListKey = (tab: string, pageNum: number) =>
@@ -469,9 +375,73 @@ export const useCloserLeads = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, role, activeTab, dateFrom, dateTo, dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId]);
 
-  const creators = creatorsData?.creators || [];
+  const rawRows = (creatorsData?.rows ?? []) as any[];
   const totalCount = creatorsData?.total || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // ── Enriquecimiento PROGRESIVO (2ª ola) ──
+  // La lista pinta con la página cruda (1ª ola); esta query rellena agente /
+  // X-6 / notas / teléfono cuando resuelve, sin bloquear el pintado. Mismo
+  // patrón que Contactos (query principal + hooks de enriquecimiento aparte).
+  const rawIds = rawRows.map((c) => c.id as string);
+  const { data: enrichment } = useQuery({
+    queryKey: ["closer-list-enrichment", rawIds.join(",")],
+    enabled: rawIds.length > 0,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const profileIds = [...new Set(rawRows.flatMap((c: any) => [c.assigned_to, c.created_by]).filter(Boolean))] as string[];
+      const sourceContactIds = [...new Set(rawRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
+      const [profilesRes, historyRes, contactsRes] = await Promise.all([
+        profileIds.length > 0
+          ? supabase.from("profiles").select("id, full_name").in("id", profileIds)
+          : Promise.resolve({ data: [] }),
+        rawIds.length > 0
+          ? supabase.from("closer_contact_history").select("creator_id, contact_date, channel, notes").in("creator_id", rawIds).order("contact_date", { ascending: true })
+          : Promise.resolve({ data: [] }),
+        sourceContactIds.length > 0
+          ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const profilesMap: Record<string, string> = {};
+      for (const p of profilesRes.data || []) profilesMap[(p as any).id] = (p as any).full_name || "Sin nombre";
+      const contactCountMap: Record<string, number> = {};
+      const contactNotesMap: Record<string, ContactNote[]> = {};
+      for (const h of historyRes.data || []) {
+        const cid = (h as any).creator_id;
+        contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
+        (contactNotesMap[cid] = contactNotesMap[cid] || []).push({
+          contact_date: (h as any).contact_date,
+          channel: (h as any).channel ?? null,
+          notes: (h as any).notes ?? null,
+        });
+      }
+      const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
+      for (const sc of contactsRes.data || []) sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
+      return { profilesMap, contactCountMap, contactNotesMap, sourceContactMap };
+    },
+  });
+
+  const creators = useMemo<CloserCreatorRow[]>(() => {
+    const profilesMap = enrichment?.profilesMap ?? {};
+    const contactCountMap = enrichment?.contactCountMap ?? {};
+    const contactNotesMap = enrichment?.contactNotesMap ?? {};
+    const sourceContactMap = enrichment?.sourceContactMap ?? {};
+    return rawRows.map((c: any) => ({
+      ...c,
+      leadgen_entry_id: c.leadgen_entry_id ?? null,
+      estimated_monetization: c.estimated_monetization ?? 0,
+      agency_commission: c.agency_commission ?? 0,
+      extras: c.extras ?? 0,
+      main_platform: c.main_platform ?? null,
+      agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : (c.created_by ? (profilesMap[c.created_by] || null) : null),
+      contact_count: contactCountMap[c.id] || 0,
+      contact_notes: contactNotesMap[c.id] || [],
+      source_contact_id: c.source_contact_id ?? null,
+      resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
+      _source: "closer" as const,
+      _lg_status: null,
+    }));
+  }, [rawRows, enrichment]);
 
   // Los 4 queries de KPI respetan dateFrom/dateTo cuando dateField =
   // "passed_date" — match con lo que hace el listado de Operaciones.
@@ -706,11 +676,11 @@ export const useCloserLeads = () => {
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
       buildCreatorsListKey(activeTab, page),
-      (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
+      (old: { rows: any[]; total: number } | undefined) => {
         if (!old) return old;
         return {
           ...old,
-          creators: old.creators.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+          rows: old.rows.map((c) => (c.id === id ? { ...c, ...updates } : c)),
         };
       }
     );
