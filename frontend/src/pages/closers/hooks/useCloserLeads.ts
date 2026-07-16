@@ -688,9 +688,19 @@ export const useCloserLeads = () => {
     staleTime: 30_000,
   });
 
-  const agentList = [...new Map(
-    creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
-  )].map(([id, name]) => ({ id, name }));
+  // Lista de agentes para el filtro "Agente": TODOS los que tienen al menos un
+  // lead asignado (vía RPC get_closer_agents), no solo los presentes en la
+  // página cargada — antes se derivaba de `creators` y faltaban closers.
+  const { data: agentList = [] } = useQuery({
+    queryKey: ["closer-agents-list"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_closer_agents");
+      if (error) throw error;
+      return (data || []) as { id: string; name: string }[];
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 5 * 60_000,
+  });
 
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
