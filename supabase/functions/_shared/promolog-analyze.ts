@@ -7,7 +7,7 @@
 // de la creadora. Salida: inserta 1 promolog_entry por historia (o 1 "No/sin
 // historia" / "sin datos" cuando corresponde) y devuelve el conteo.
 
-import { classifyLinkDestination } from "../promolog-webhook/link-classifier.ts";
+import { classifyLinkDestination } from "./link-classifier.ts";
 
 export const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 export const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";

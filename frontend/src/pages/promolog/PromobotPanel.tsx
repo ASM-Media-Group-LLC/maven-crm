@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 
 // PromobotPanel — control manual del pipeline de verificación de Promolog.
-// El cron diario (promolog-dispatch) corre solo; acá un admin puede:
+// IG se escanea desde la extensión de Chrome (promolog-ingest-stories), que corre
+// en el navegador del operador y NO se dispara desde acá. Este panel dispara los
+// scanners server-side de X/Telegram/Facebook. Un admin puede:
 //   1. Lanzar un análisis AHORA (todas las elegibles o un subconjunto).
 //   2. Ver las corridas recientes con su estado en vivo.
 // (La edición del horario del cron llega en una sección aparte que necesita
@@ -93,10 +95,11 @@ const fmtTime = (iso: string) => {
 const creatorLabel = (c: EligibleCreator) =>
   c.artistic_name || c.name || c.instagram_handle;
 
-// Redes que se pueden escanear a mano + la edge function de cada una. IG usa
-// promolog-dispatch (only_handles); las demás su scanner con only_creator_ids.
+// Redes que se pueden escanear a mano + la edge function de cada una. IG NO tiene
+// fn: se escanea desde la extensión de Chrome (promolog-ingest-stories) y este panel
+// solo informa. Las demás corren su scanner server-side con only_creator_ids.
 const NET_OPTIONS: Array<{ key: string; label: string; fn: string }> = [
-  { key: "instagram", label: "Instagram", fn: "promolog-dispatch" },
+  { key: "instagram", label: "Instagram (extensión)", fn: "" },
   { key: "x", label: "X", fn: "x-scan" },
   { key: "telegram", label: "Telegram", fn: "telegram-scan" },
   { key: "facebook", label: "Facebook", fn: "fb-scan" },
@@ -284,8 +287,9 @@ const PromobotPanel = () => {
   };
 
   // Caídas: creadoras de corridas timeout/failed de HOY que quedaron SIN entry
-  // (anti-join payload.creator_ids ↔ escaneadas hoy). Son las que el bot perdió en
-  // silencio y se pueden reescanear con only_handles (la maquinaria ya existe).
+  // (anti-join payload.creator_ids ↔ escaneadas hoy). Con el scan por extensión las
+  // corridas cierran en "succeeded", así que esto normalmente queda vacío; si aparece,
+  // el reescaneo se hace volviendo a correr la extensión (no hay dispatch server-side).
   const fallen = useMemo(() => {
     if (!health) return [] as string[];
     const startToday = new Date();
@@ -307,42 +311,49 @@ const PromobotPanel = () => {
   }, [runs, health]);
 
   // ── Lanzar análisis (multi-red) ─────────────────────────────────────────
-  // Dispara la edge function de CADA red seleccionada. IG (promolog-dispatch) usa
-  // only_handles; X/Telegram/Facebook usan su scanner con only_creator_ids. Los
-  // scanners no-IG corren sincrónicos (Apify/gateway) y pueden tardar — los lanzamos
+  // Dispara la edge function server-side de cada red seleccionada. IG YA NO se
+  // dispara desde acá: su scan vive en la extensión de Chrome (promolog-ingest-
+  // stories), que corre en el navegador del operador y no se puede lanzar por el
+  // server — si está seleccionado solo avisamos (no se gasta ninguna corrida de
+  // Apify). X/Telegram/Facebook corren sincrónicos y pueden tardar — los lanzamos
   // sin bloquear (fire-and-forget); las entries aparecen al terminar.
   const launch = async (scope: "all" | "selected" | "fallen") => {
     setConfirmScope(null);
     setLaunching(true);
-    // "fallen" (reescanear caídas) es siempre del pipeline de IG.
+    // "fallen" (reescanear caídas) es del pipeline de IG → hoy vive en la extensión.
     const nets = scope === "fallen" ? ["instagram"] : Array.from(selectedNetworks);
-    const only_handles = scope === "selected" ? Array.from(selected) : scope === "fallen" ? fallen : undefined;
     const only_creator_ids = scope === "selected"
       ? creators.filter((c) => selected.has(c.instagram_handle)).map((c) => c.id)
       : undefined;
 
-    for (const net of nets) {
-      if (net === "instagram") {
+    const igSelected = nets.includes("instagram");
+    const serverNets = nets.filter((n) => n !== "instagram");
+
+    for (const net of serverNets) {
+      const fn = NET_OPTIONS.find((n) => n.key === net)?.fn;
+      if (fn) {
         supabase.functions
-          .invoke("promolog-dispatch", { body: { force: true, ...(only_handles ? { only_handles } : {}) } })
-          .catch((e) => console.warn("promolog-dispatch:", e?.message));
-      } else {
-        const fn = NET_OPTIONS.find((n) => n.key === net)?.fn;
-        if (fn) {
-          supabase.functions
-            .invoke(fn, { body: { ...(only_creator_ids ? { only_creator_ids } : {}) } })
-            .catch((e) => console.warn(`${fn}:`, e?.message));
-        }
+          .invoke(fn, { body: { ...(only_creator_ids ? { only_creator_ids } : {}) } })
+          .catch((e) => console.warn(`${fn}:`, e?.message));
       }
     }
 
     if (scope === "selected") setSelected(new Set());
     setTimeout(() => { fetchRuns(); fetchHealth(); }, 1200);
     setLaunching(false);
-    toast({
-      title: "Análisis lanzado",
-      description: `Redes: ${nets.map((n) => NET_LABEL[n] ?? n).join(", ")}. IG aparece en "Corridas recientes"; X/Telegram/Facebook insertan al terminar (pueden tardar unos minutos).`,
-    });
+
+    if (igSelected && serverNets.length === 0) {
+      toast({
+        title: "Instagram se escanea desde la extensión",
+        description: 'El scan de IG corre en la extensión de Chrome (su botón "Escanear"), no desde este panel. No se disparó ninguna corrida de Apify.',
+      });
+    } else {
+      const serverLabels = serverNets.map((n) => NET_LABEL[n] ?? n).join(", ");
+      toast({
+        title: "Análisis lanzado",
+        description: `Redes: ${serverLabels}. Insertan al terminar (pueden tardar unos minutos).${igSelected ? " IG se escanea aparte desde la extensión de Chrome." : ""}`,
+      });
+    }
   };
 
   const selectedCount = selected.size;

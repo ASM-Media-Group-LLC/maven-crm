@@ -75,6 +75,10 @@ async function scanInPage(targets) {
 async function runScan(trigger = "manual") {
   const { mavenUrl, extToken } = await cfg();
   if (!extToken) { await setStatus("⚠ Falta el token — configuralo en Opciones."); return; }
+  // Keepalive MV3: sin esto Chrome mata el service worker a los ~30s de "idle" a mitad
+  // del loop (el scan dura ~3 min) y el scan queda congelado en "Escaneando… N/56". Un
+  // chrome.* barato cada 20s resetea el timer de idle. clearInterval SIEMPRE (finally).
+  const keepAlive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {} }, 20000);
   await setStatus(`Preparando… (${trigger})`);
   try {
     const igTab = await ensureIgTab();
@@ -131,6 +135,8 @@ async function runScan(trigger = "manual") {
     await setStatus(`✔ Listo ${new Date().toLocaleString()} · ${done} creadoras · ✅${si} ❌${no} ⏳${pending}`);
   } catch (e) {
     await setStatus(`⚠ Error: ${String(e).slice(0, 120)}`);
+  } finally {
+    clearInterval(keepAlive);
   }
 }
 

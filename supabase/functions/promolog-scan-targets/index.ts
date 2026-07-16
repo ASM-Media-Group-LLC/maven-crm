@@ -33,10 +33,24 @@ Deno.serve(async (req) => {
     for (const r of (cached ?? [])) idByCreator.set(r.creator_id, r.ig_user_id);
   }
 
+  // Estado del scan de HOY para ordenar: nunca-escaneada (0) → pendiente/reintentable (1)
+  // → definitiva Sí/No (2). Así una corrida parcial de la extensión ataca la cola sin
+  // escanear en vez de re-leer siempre el principio. Si el RPC falla, se cae al orden de
+  // la vista (todas rank 0 = orden por c.id) → cero pérdida de cobertura.
+  const definitive = new Set<string>();
+  const scannedAny = new Set<string>();
+  try {
+    const { data: st } = await (sb as any).rpc("promolog_ig_scan_state_today");
+    for (const r of (st ?? [])) { scannedAny.add(r.creator_id); if (r.has_definitive === true) definitive.add(r.creator_id); }
+  } catch (_) { /* fallback: orden de la vista (c.id) */ }
+  const rank = (cid: string) => !scannedAny.has(cid) ? 0 : (definitive.has(cid) ? 2 : 1);
+
   const targets = (creators ?? [])
     .map((c: any) => ({ creator_id: c.id, handle: norm(c.instagram_handle), ig_user_id: idByCreator.get(c.id) ?? null,
       name: c.artistic_name || c.name }))
-    .filter((t: any) => t.handle);
+    .filter((t: any) => t.handle)
+    // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
+    .sort((a: any, b: any) => rank(a.creator_id) - rank(b.creator_id));
 
   return json({ ok: true, count: targets.length, targets });
 });

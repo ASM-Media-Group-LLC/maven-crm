@@ -75,3 +75,9 @@ verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Rolli
 
 [functions.wa-contact-avatar]
 verify_jwt = false  # foto de perfil del contacto (proxy al gateway /profile/picture, auth propia).
+
+[functions.promolog-scan-targets]
+verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (NO manda JWT) — NO cambiar o el scan queda 401
+
+[functions.promolog-ingest-stories]
+verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (NO manda JWT) — NO cambiar o la ingesta queda 401

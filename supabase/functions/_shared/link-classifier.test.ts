@@ -1,6 +1,6 @@
 // Tests del clasificador de destino de link-sticker. Batería = casos reales
 // (ennidwong, elizabeth, leona) + red-team de parsing (workflow 2026-06-24).
-// Correr: deno test supabase/functions/promolog-webhook/link-classifier.test.ts
+// Correr: deno test supabase/functions/_shared/link-classifier.test.ts
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { classifyLinkDestination, type LinkTier } from "./link-classifier.ts";
 
