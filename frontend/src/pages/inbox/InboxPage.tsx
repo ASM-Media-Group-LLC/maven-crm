@@ -60,7 +60,7 @@ interface ConvRow {
   favorite: boolean;
   manually_unread: boolean;
   labels: { label_id: string }[] | null;
-  contact: { id: string; display_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
+  contact: { id: string; display_name: string | null; manual_name: string | null; resolved_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
 }
 
 interface MsgRow {
@@ -101,7 +101,11 @@ const fmtTime = (iso: string | null): string => {
   }
 };
 
+// Prioridad de nombre: rename manual del usuario > nombre resuelto contra Maven
+// (creadora/contacto por teléfono) > push-name de WhatsApp > @IG > placeholder.
 const contactLabel = (c: ConvRow["contact"]): string =>
+  c?.manual_name ||
+  c?.resolved_name ||
   c?.display_name ||
   (c?.instagram_handle ? "@" + c.instagram_handle.replace(/^@/, "") : "") ||
   "(sin nombre)";
@@ -209,7 +213,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -232,7 +236,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
         )
         .eq("id", selectedId)
         .maybeSingle();
@@ -642,12 +646,16 @@ const InboxPage = () => {
   const saveContactName = async (contactId: string | undefined, name: string) => {
     if (!contactId) return;
     setSavingName(true);
+    // wa_contacts no tiene policy UPDATE (RLS solo SELECT) → un UPDATE directo tocaba
+    // 0 filas SIN error y el nombre no persistía. Se escribe vía RPC SECURITY DEFINER
+    // (manual_name), gateada por la misma visibilidad que el SELECT.
     const { error } = await (supabase as any)
-      .from("wa_contacts").update({ display_name: name.trim() || null }).eq("id", contactId);
+      .rpc("wa_set_contact_display_name", { p_contact_id: contactId, p_name: name.trim() || null });
     setSavingName(false);
     if (error) { toast({ title: "No se pudo guardar el nombre", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Nombre actualizado" });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversation-one"] });
   };
 
   // ── Acciones del menú de click derecho de la lista de chats ──────────────
@@ -1003,7 +1011,7 @@ const InboxPage = () => {
                 {isAdmin ? (
                   <button
                     type="button"
-                    onClick={() => { setNameDraft(selected.contact?.display_name ?? ""); setContactPanelOpen(true); }}
+                    onClick={() => { setNameDraft(selected.contact?.manual_name ?? ""); setContactPanelOpen(true); }}
                     className="truncate text-left text-sm font-semibold hover:underline"
                     title="Ver info del contacto"
                   >
@@ -1331,19 +1339,19 @@ const InboxPage = () => {
                     <img src={contactAvatar} alt="" className="h-20 w-20 rounded-full object-cover" />
                   ) : (
                     <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-semibold text-primary">
-                      {(selected?.contact?.display_name || selected?.contact?.instagram_handle || "?").slice(0, 1).toUpperCase()}
+                      {(contactLabel(selected?.contact ?? null).replace(/^[@(]/, "") || "?").slice(0, 1).toUpperCase()}
                     </div>
                   )}
                   <div className="flex w-full items-center gap-1">
                     <Input
                       value={nameDraft}
                       onChange={(e) => setNameDraft(e.target.value)}
-                      placeholder="Nombre del contacto"
+                      placeholder={selected?.contact?.resolved_name || selected?.contact?.display_name || "Nombre del contacto"}
                       className="h-9 text-center"
                     />
                     <Button
                       size="icon" variant="outline" className="h-9 w-9 shrink-0"
-                      disabled={savingName || nameDraft === (selected?.contact?.display_name ?? "")}
+                      disabled={savingName || nameDraft.trim() === (selected?.contact?.manual_name ?? "")}
                       onClick={() => saveContactName(selected?.contact?.id, nameDraft)}
                       title="Guardar nombre"
                     >
