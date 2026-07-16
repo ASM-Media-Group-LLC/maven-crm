@@ -1403,7 +1403,7 @@ async function resolveMembersByName(
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -3091,6 +3091,7 @@ async function executeTool(
             tenantId: ctx.tenantId,
             userId: ctx.senderUserId,
             groupId: ctx.groupId,
+            department: ctx.department ?? null,
           });
           return { result };
         } catch (e) {
@@ -3642,12 +3643,12 @@ async function runAgent(req: AgentRequest): Promise<{
   // botCfg = null y todo cae al comportamiento legacy (SYSTEM_PROMPT completo +
   // bot_persona, todas las tools, pickModel).
   let botCfg:
-    | { manualPrompt: string | null; model: string | null; allow: string[] | null; deny: string[] | null }
+    | { manualPrompt: string | null; model: string | null; allow: string[] | null; deny: string[] | null; department: string | null }
     | null = null;
   if (group.wa_bot_id) {
     const { data: bot } = await sb
       .from("wa_bots")
-      .select("manual_prompt, model, tool_allowlist, tool_denylist, active")
+      .select("manual_prompt, model, tool_allowlist, tool_denylist, active, department")
       .eq("id", group.wa_bot_id)
       .single();
     if (bot && bot.active) {
@@ -3656,6 +3657,7 @@ async function runAgent(req: AgentRequest): Promise<{
         model: bot.model ?? null,
         allow: Array.isArray(bot.tool_allowlist) ? bot.tool_allowlist as string[] : null,
         deny: Array.isArray(bot.tool_denylist) ? bot.tool_denylist as string[] : null,
+        department: (bot.department as string | null) ?? null,
       };
     }
   }
@@ -3834,6 +3836,7 @@ async function runAgent(req: AgentRequest): Promise<{
           isOwner: senderCtx.isOwner,
           senderUserId: senderCtx.senderUserId,
           messageId: senderCtx.messageId,
+          department: botCfg?.department ?? null,
         },
       );
       if (t.name === "reply_to_group") {

@@ -15,13 +15,48 @@
 // (visión Gemini/OpenRouter, vía wa-inbox-analyze-image) de la bandeja se leen desde
 // `body`. La media que todavía no se procesó (o que es irrecuperable) se marca como
 // "[tipo — sin transcribir]" para que el bot sepa que hay algo que aún no puede leer.
-import type { AgentTool } from "./types.ts";
+import type { AgentCtx, AgentTool } from "./types.ts";
 
 const MAX_MESSAGES = 30;
 const MAX_CHARS_PER_MSG = 600;
 
 function sanitize(q: string): string {
   return q.replace(/^@+/, "").replace(/[,()%]/g, " ").trim();
+}
+
+// Nombre a mostrar de un contacto de la bandeja: rename manual > nombre resuelto
+// contra Maven (creadora/contacto por teléfono) > push-name de WhatsApp > @IG.
+function contactName(ct: {
+  manual_name?: string | null; resolved_name?: string | null;
+  display_name?: string | null; instagram_handle?: string | null;
+} | null | undefined): string {
+  if (!ct) return "(sin nombre)";
+  return (ct.manual_name || ct.resolved_name || ct.display_name ||
+    (ct.instagram_handle ? "@" + ct.instagram_handle.replace(/^@/, "") : "") || "(sin nombre)");
+}
+
+// Últimos mensajes de una conversación en orden cronológico. La media aún no
+// transcrita/analizada queda marcada "[tipo — sin transcribir]".
+async function fetchMessages(sb: AgentCtx["sb"], conversationId: string) {
+  const { data: rows } = await sb
+    .from("wa_conversation_messages")
+    .select("direction, body, msg_type, sent_at")
+    .eq("conversation_id", conversationId)
+    .is("deleted_at", null)
+    .order("sent_at", { ascending: false })
+    .limit(MAX_MESSAGES);
+  return (rows ?? [])
+    .slice()
+    .reverse()
+    .map((m: { direction: string; body: string | null; msg_type: string; sent_at: string }) => {
+      const b = (m.body ?? "").trim();
+      const placeholder = !b || /^\[(audio|imagen|image|video|sticker|documento|document)[^\]]*\]$/i.test(b);
+      return {
+        de: m.direction === "out" ? "nosotros" : "contacto",
+        cuando: m.sent_at,
+        texto: placeholder ? `[${m.msg_type} — sin transcribir]` : b.slice(0, MAX_CHARS_PER_MSG),
+      };
+    });
 }
 
 export const inboxTools: AgentTool[] = [
@@ -101,41 +136,22 @@ export const inboxTools: AgentTool[] = [
       const conv = convs[0] as { id: string; channel_id: string | null; last_message_at: string | null; status: string | null; summary: string | null; summary_updated_at: string | null };
 
       let canalMarca: string | null = null;
+      let canalDept: string | null = null;
       if (conv.channel_id) {
         const { data: ch } = await ctx.sb
-          .from("wa_channels").select("label").eq("id", conv.channel_id).maybeSingle();
+          .from("wa_channels").select("label, department").eq("id", conv.channel_id).maybeSingle();
         canalMarca = (ch as { label?: string } | null)?.label ?? null;
+        canalDept = (ch as { department?: string } | null)?.department ?? null;
       }
 
       // 4) Últimos N mensajes (orden cronológico). Audio/imagen aún no transcritos → marcados.
-      const { data: rows } = await ctx.sb
-        .from("wa_conversation_messages")
-        .select("direction, body, msg_type, sent_at")
-        .eq("conversation_id", conv.id)
-        .is("deleted_at", null)
-        .order("sent_at", { ascending: false })
-        .limit(MAX_MESSAGES);
-
-      const mensajes = (rows ?? [])
-        .slice()
-        .reverse()
-        .map((m: { direction: string; body: string | null; msg_type: string; sent_at: string }) => {
-          // body trae el texto (text) o la transcripción/descripción (audio/imagen, vía
-          // wa-inbox-transcribe). Si sigue vacío o es placeholder "[tipo...]", la media
-          // todavía no se procesó.
-          const b = (m.body ?? "").trim();
-          const placeholder = !b || /^\[(audio|imagen|image|video|sticker|documento|document)[^\]]*\]$/i.test(b);
-          return {
-            de: m.direction === "out" ? "nosotros" : "modelo",
-            cuando: m.sent_at,
-            texto: placeholder ? `[${m.msg_type} — sin transcribir]` : b.slice(0, MAX_CHARS_PER_MSG),
-          };
-        });
+      const mensajes = await fetchMessages(ctx.sb, conv.id);
 
       return {
         found: true,
         modelo: displayName ?? q,
         canal_marca: canalMarca,
+        departamento: canalDept,
         ultimo_mensaje: conv.last_message_at,
         estado_conversacion: conv.status,
         // Resumen rolling (narrativa de toda la relación, generado por wa-conversation-summarize).
@@ -146,6 +162,97 @@ export const inboxTools: AgentTool[] = [
         mensajes,
         nota: "Incluye texto, transcripción de audios (Whisper) y descripción/OCR de imágenes (visión). " +
           "Lo que aparezca como '[tipo — sin transcribir]' es media que aún no se procesó.",
+      };
+    },
+  },
+  {
+    name: "get_department_conversations",
+    description:
+      "Lee la BANDEJA de WhatsApp de una LÍNEA/DEPARTAMENTO (ej. la línea de las Managers), con el " +
+      "nombre REAL de cada contacto ya resuelto contra Maven. A diferencia de get_model_whatsapp_context " +
+      "(que sólo encuentra modelos linkeadas del pipeline), esta ve TODAS las conversaciones de la línea, " +
+      "incluidas las que no están vinculadas a una creadora. Sin `contact` → lista las conversaciones " +
+      "recientes de la línea (nombre, marca, último mensaje, no leídos). Con `contact` → trae los últimos " +
+      "mensajes de ESA conversación. Por defecto usa TU departamento (el del bot); pasá `department` para otro.",
+    input_schema: {
+      type: "object",
+      properties: {
+        department: { type: "string", description: "manager | closer | sales… Por defecto el departamento del bot." },
+        contact: { type: "string", description: "opcional: nombre/@handle (o parte) para abrir UNA conversación y leer sus mensajes" },
+        limit: { type: "number", description: "máximo de conversaciones a listar (default 20, tope 50)" },
+      },
+      additionalProperties: false,
+    },
+    domain: "leads",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const dept = String(args.department ?? ctx.department ?? "").trim();
+      if (!dept) {
+        return { found: false, reason: "sin_departamento",
+          nota: "Especificá `department` (este bot no tiene department asignado)." };
+      }
+
+      // Canales (líneas) de ese departamento.
+      const { data: chans } = await ctx.sb
+        .from("wa_channels").select("id, label").eq("department", dept).eq("active", true);
+      if (!chans?.length) return { found: false, reason: "sin_lineas_para_ese_departamento", department: dept };
+      const chanIds = (chans as Array<{ id: string }>).map((c) => c.id);
+      const labelOf = new Map((chans as Array<{ id: string; label: string | null }>).map((c) => [c.id, c.label]));
+
+      const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+      const { data: convs } = await ctx.sb
+        .from("wa_conversations")
+        .select("id, contact_id, channel_id, last_message_at, last_message_preview, unread_count, status")
+        .in("channel_id", chanIds)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (!convs?.length) return { found: false, reason: "sin_conversaciones", department: dept };
+
+      // Nombres resueltos (columnas ya cacheadas por el trigger de resolución).
+      const contactIds = (convs as Array<{ contact_id: string | null }>).map((c) => c.contact_id).filter(Boolean) as string[];
+      const { data: cts } = await ctx.sb
+        .from("wa_contacts")
+        .select("id, manual_name, resolved_name, display_name, instagram_handle")
+        .in("id", contactIds);
+      const ctById = new Map((cts ?? []).map((c: { id: string }) => [c.id, c]));
+      const nameOf = (id: string | null) => contactName(id ? ctById.get(id) as any : null);
+
+      // Modo "abrir una conversación puntual": matchea por nombre resuelto.
+      const contactQ = sanitize(String(args.contact ?? ""));
+      if (contactQ) {
+        const needle = contactQ.toLowerCase();
+        const match = (convs as Array<{ id: string; contact_id: string | null; channel_id: string | null; last_message_at: string | null }>)
+          .find((c) => nameOf(c.contact_id).toLowerCase().includes(needle));
+        if (!match) {
+          return { found: false, reason: "contacto_no_encontrado_en_la_linea", department: dept, query: contactQ };
+        }
+        const mensajes = await fetchMessages(ctx.sb, match.id);
+        return {
+          found: true, department: dept,
+          linea: match.channel_id ? labelOf.get(match.channel_id) ?? null : null,
+          contacto: nameOf(match.contact_id),
+          ultimo_mensaje: match.last_message_at,
+          mensajes_traidos: mensajes.length,
+          mensajes,
+          nota: "Nombre resuelto contra Maven. '[tipo — sin transcribir]' = media aún sin procesar.",
+        };
+      }
+
+      // Modo lista.
+      return {
+        found: true,
+        department: dept,
+        lineas: (chans as Array<{ label: string | null }>).map((c) => c.label).filter(Boolean),
+        total: convs.length,
+        conversaciones: (convs as Array<{ contact_id: string | null; channel_id: string | null; last_message_at: string | null; last_message_preview: string | null; unread_count: number | null; status: string | null }>).map((c) => ({
+          contacto: nameOf(c.contact_id),
+          linea: c.channel_id ? labelOf.get(c.channel_id) ?? null : null,
+          ultimo_mensaje: c.last_message_at,
+          preview: (c.last_message_preview ?? "").slice(0, 160),
+          no_leidos: c.unread_count ?? 0,
+          estado: c.status,
+        })),
+        nota: "Para leer los mensajes de una conversación puntual, llamá de nuevo con `contact`=<nombre>.",
       };
     },
   },

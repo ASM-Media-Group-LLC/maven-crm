@@ -10,12 +10,15 @@ export type ToolScope = "read" | "write";
 export type ToolDomain = "promolog" | "ventas" | "leads" | "monetizacion" | "qa" | "equipo" | "managers";
 
 // Contexto que recibe cada handler: cliente service-role + tenant + quién pregunta
-// (para permisos/auditoría) + grupo si viene de WhatsApp.
+// (para permisos/auditoría) + grupo si viene de WhatsApp + department del bot
+// (para que las tools de bandeja se auto-scopeen a la línea del equipo: un bot
+// de managers lee la línea de managers sin que nadie se lo diga).
 export interface AgentCtx {
   sb: SupabaseClient;
   tenantId: string;
   userId?: string | null;
   groupId?: string | null;
+  department?: string | null;
 }
 
 export interface AgentTool {
