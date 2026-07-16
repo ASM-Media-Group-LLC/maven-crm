@@ -237,7 +237,13 @@ export const useCloserLeads = () => {
   }, [search]);
 
   // Normalize search for server-side filtering (sobre el valor debounced)
-  const normalizedSearch = debouncedSearch ? normalizeHandle(debouncedSearch) : "";
+  // Sólo filtramos con ≥3 caracteres: es el mínimo que usa el índice trigram
+  // (pg_trgm) y evita que, al borrar+reescribir un nombre, los estados
+  // intermedios de 1-2 letras disparen queries anchas (cientos de matches,
+  // poco útiles) que multiplican los round-trips y hacen sentir "frozen" el
+  // filtro. Con <3 chars mostramos la lista completa (sin filtro).
+  const rawNormalizedSearch = debouncedSearch ? normalizeHandle(debouncedSearch) : "";
+  const normalizedSearch = rawNormalizedSearch.length >= 3 ? rawNormalizedSearch : "";
 
   // Extraído como función con `tab` + `pageNum` parametrizados para poder
   // prefetchear las otras tabs cuando se monta el componente — así al
