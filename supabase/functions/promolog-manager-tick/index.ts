@@ -51,6 +51,21 @@ interface GrowthRow {
   diagnosis: string;
 }
 
+// Señal de "contacto": creadora a la que la manager no le escribe hace >= N días
+// POR LA LÍNEA de las Managers Y que además no promociona (get_manager_silent_no_promo).
+interface SilentRow {
+  creator_id: string;
+  name: string | null;
+  instagram_handle: string | null;
+  manager_profile_id: string | null;
+  manager_name: string | null;
+  manager_phone: string | null;
+  promo_days: number;
+  mtd_day: number;
+  days_since_contact: number;
+  last_contact_at: string | null;
+}
+
 // +573012282569 → "573012282569" (token de @-mención sin el "+", y base del JID).
 const phoneToken = (e164: string | null | undefined): string =>
   String(e164 ?? "").replace(/[^\d]/g, "");
@@ -77,16 +92,31 @@ const RIESGO_CAP = 3; // por manager, para no hacer el mensaje eterno
 interface Composed {
   message: string | null;
   mentions: string[];
-  counts: { total: number; critico: number; calidad: number; riesgo: number; managers: number };
+  counts: { total: number; critico: number; calidad: number; riesgo: number; silent: number; managers: number };
 }
 
-function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
+function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string | null): Composed {
   const mentions = new Set<string>();
   const bullet = (r: GrowthRow) => {
     const link = igUrl(r.instagram_handle);
     const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
     return `   • ${label}\n     promo ${r.promo_days}/${r.mtd_day ?? "?"} este mes · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})`;
   };
+  const silentBullet = (r: SilentRow) => {
+    const link = igUrl(r.instagram_handle);
+    const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
+    return `   • ${label}\n     hace ${r.days_since_contact}d sin escribirle + no promociona (${r.promo_days}/${r.mtd_day}) → escribile e incentivá promo`;
+  };
+
+  // Las creadoras "sin contacto + sin promo" se muestran en su propia sección 📵
+  // (acción más directa) y se sacan de los cuadrantes para no listarlas dos veces.
+  const silentIds = new Set(silentRows.map((s) => s.creator_id));
+  const silentByMgr = new Map<string, SilentRow[]>();
+  for (const s of silentRows) {
+    const k = s.manager_profile_id ?? "sin_manager";
+    if (!silentByMgr.has(k)) silentByMgr.set(k, []);
+    silentByMgr.get(k)!.push(s);
+  }
 
   // Agrupar por manager preservando el orden del feed (ya viene por prioridad + ingreso desc).
   const order: string[] = [];
@@ -96,12 +126,15 @@ function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
     if (!byMgr.has(k)) { byMgr.set(k, []); order.push(k); }
     byMgr.get(k)!.push(r);
   }
+  // Managers que sólo aparecen por la señal de contacto (sin filas en el feed) — improbable
+  // (silent ⊆ low_promo ⊆ feed) pero lo cubrimos para no perder el aviso.
+  for (const k of silentByMgr.keys()) if (!byMgr.has(k)) { byMgr.set(k, []); order.push(k); }
 
   const critTotal = rows.filter((r) => r.quadrant === "critico").length;
   const calTotal = rows.filter((r) => r.quadrant === "calidad").length;
   const riesgoTotal = rows.filter((r) => r.quadrant === "riesgo").length;
-  if (!rows.length) {
-    return { message: null, mentions: [], counts: { total: 0, critico: 0, calidad: 0, riesgo: 0, managers: 0 } };
+  if (!rows.length && !silentRows.length) {
+    return { message: null, mentions: [], counts: { total: 0, critico: 0, calidad: 0, riesgo: 0, silent: 0, managers: 0 } };
   }
 
   const lines: string[] = [
@@ -112,16 +145,22 @@ function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
 
   for (const k of order) {
     const g = byMgr.get(k)!;
-    const mgrName = firstName(g[0].manager_name);
-    const mgrPhone = g[0].manager_phone;
+    const sil = silentByMgr.get(k) ?? [];
+    // Datos de la manager desde el feed o, si sólo aparece por la señal de contacto, desde ahí.
+    const head = g[0] ?? sil[0];
+    if (!head) continue;
+    const mgrName = firstName(head.manager_name);
+    const mgrPhone = head.manager_phone;
     const tag = mgrPhone ? `@${phoneToken(mgrPhone)}` : mgrName;
     if (mgrPhone) mentions.add(jidOf(mgrPhone));
 
-    lines.push(`👤 ${tag} *${mgrName}* — ${g.length} en alerta`);
+    // Los cuadrantes NO repiten a las creadoras que van en la sección 📵.
+    const crit = g.filter((r) => r.quadrant === "critico" && !silentIds.has(r.creator_id));
+    const cal = g.filter((r) => r.quadrant === "calidad" && !silentIds.has(r.creator_id));
+    const rie = g.filter((r) => r.quadrant === "riesgo" && !silentIds.has(r.creator_id));
+    const alertCount = crit.length + cal.length + rie.length + sil.length;
 
-    const crit = g.filter((r) => r.quadrant === "critico");
-    const cal = g.filter((r) => r.quadrant === "calidad");
-    const rie = g.filter((r) => r.quadrant === "riesgo");
+    lines.push(`👤 ${tag} *${mgrName}* — ${alertCount} en alerta`);
 
     if (crit.length) {
       lines.push(`🔴 No crece + no promociona (${crit.length}):`);
@@ -135,6 +174,10 @@ function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
       lines.push(`🟡 Riesgo, súbele promo (${rie.length}):`);
       lines.push(...rie.slice(0, RIESGO_CAP).map(bullet));
       if (rie.length > RIESGO_CAP) lines.push(`   • …y ${rie.length - RIESGO_CAP} más`);
+    }
+    if (sil.length) {
+      lines.push(`📵 Sin contacto + sin promo (${sil.length}) — escribiles:`);
+      lines.push(...sil.map(silentBullet));
     }
     lines.push("");
   }
@@ -152,7 +195,7 @@ function compose(rows: GrowthRow[], lorenaPhone: string | null): Composed {
   return {
     message: lines.join("\n").trim(),
     mentions: [...mentions],
-    counts: { total: rows.length, critico: critTotal, calidad: calTotal, riesgo: riesgoTotal, managers: order.length },
+    counts: { total: rows.length, critico: critTotal, calidad: calTotal, riesgo: riesgoTotal, silent: silentRows.length, managers: order.length },
   };
 }
 
@@ -164,7 +207,9 @@ serve(async (req) => {
     dry_run?: boolean;
     promo_window?: number;
     low_promo_days?: number;
+    low_promo_rate?: number;
     income_drop_pct?: number;
+    silent_days?: number;
   };
   const dryRun = body?.dry_run === true;
 
@@ -179,6 +224,16 @@ serve(async (req) => {
   if (feedErr) return json({ ok: false, error: feedErr.message }, 500);
   const rows = (feed ?? []) as GrowthRow[];
 
+  // Señal de contacto: creadoras sin escribir hace >= N días por la línea de Managers
+  // Y sin promo (get_manager_silent_no_promo). La línea se conectó 2026-07-16 → esto se
+  // va "calentando" a medida que entran conversaciones; hoy devuelve vacío (sin falsos).
+  const { data: silentData } = await sb.rpc("get_manager_silent_no_promo", {
+    p_tenant: TENANT_ID,
+    p_days: Number(body?.silent_days ?? 3),
+    p_low_promo_rate: Number(body?.low_promo_rate ?? 0.40),
+  });
+  const silentRows = (silentData ?? []) as SilentRow[];
+
   // Teléfono de Lorena (perfil estable, teléfono actual).
   let lorenaPhone: string | null = null;
   {
@@ -186,7 +241,7 @@ serve(async (req) => {
     lorenaPhone = lp?.phone_e164 ?? null;
   }
 
-  const { message, mentions, counts } = compose(rows, lorenaPhone);
+  const { message, mentions, counts } = compose(rows, silentRows, lorenaPhone);
   if (!message) return json({ ok: true, sent: false, reason: "nada_que_reportar", counts });
 
   if (dryRun) return json({ ok: true, dry_run: true, counts, mentions, message });
