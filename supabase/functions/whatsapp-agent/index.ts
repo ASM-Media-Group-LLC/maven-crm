@@ -548,6 +548,11 @@ Después del catchup, armá el foco del día con datos REALES de Maven (NO esper
   · get_monetization_opportunities({}) → ventas de productos abiertas (Piclink/CP/Blu/Exchange), con las CERCA DE CERRAR (negotiating) primero. Es lo que Alvaro quiere ver de arranque: qué hay cerca de completar.
 Si es LUNES (o el primer día tras el finde), agregá UNA línea de recap del finde con lo más relevante de la Parte A (cierres, números, bloqueos tipo cuentas baneadas).
 
+VENTAS DE "UNLIMITED" (plataformas) — IMPORTANTE, viven en DOS fuentes, mirá LAS DOS:
+  · get_monetization_opportunities → oportunidades de productos que registra el bot / el equipo edita en el tab Oportunidades (para ventas CERRADAS pasá stage:"won").
+  · get_platform_sales → ventas de plataforma cargadas desde el carrito 🛒 de la pantalla Creadoras (van al pipeline como deal_type venta_plataforma, con suscripción mensual). "Asignada" = en curso, "Confirmada"/"Completada" = cerrada.
+  Cuando pregunten "cuántas ventas de unlimited/plataformas", "qué vendió X hoy", etc., consultá AMBAS (get_platform_sales acepta closer y since para acotar a hoy/una persona). Si un closer dice que cargó ventas y no las ves en una, revisá la otra ANTES de decir que no hay — puede estar en el carrito→pipeline.
+
 CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
 
 🌅 *Apertura del día — <día> <DD/M>*
