@@ -90,4 +90,33 @@ export const managersTools: AgentTool[] = [
       };
     },
   },
+  {
+    name: "get_promo_month_comparison",
+    description:
+      "Compara los DÍAS DE PROMO del tramo del mes ACTUAL (día 1 → hoy) contra el MISMO TRAMO de un mes anterior " +
+      "(por defecto el mes pasado), por creadora ACTIVA con manager. Úsala para 'promo de julio vs junio', " +
+      "'¿quién bajó la promoción respecto al mes pasado?', comparaciones mes-contra-mes. El histórico SÍ existe " +
+      "en el sistema. Filtrá por manager con manager_name. months_back: 1 = mes pasado (default), 2 = el anterior, etc. " +
+      "Devuelve, por creadora, días de promo del mes actual vs el previo + delta (negativo = bajó) + las fechas exactas " +
+      "de cada tramo. Ordenado por mayor caída primero.",
+    input_schema: {
+      type: "object",
+      properties: {
+        manager_name: { type: "string", description: "opcional: filtra a las creadoras de esa manager (ilike, ej 'Carolina', 'Fabi')" },
+        months_back: { type: "number", description: "cuántos meses atrás comparar (default 1 = mes pasado; 2 = antepasado)" },
+      },
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const monthsBack = Math.max(1, Math.min(Number(args?.months_back ?? 1) || 1, 12));
+      const mgr = String(args?.manager_name ?? "").trim() || null;
+      const { data, error } = await ctx.sb.rpc("get_promo_month_comparison", {
+        p_tenant: ctx.tenantId, p_months_back: monthsBack, p_manager_name: mgr,
+      });
+      if (error) throw new Error(`get_promo_month_comparison: ${error.message}`);
+      return data ?? [];
+    },
+  },
 ];
