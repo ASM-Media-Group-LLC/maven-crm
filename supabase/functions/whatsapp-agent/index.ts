@@ -1241,11 +1241,12 @@ const TOOLS: Array<{
   {
     name: "get_monetization_opportunities",
     description:
-      "Lee las OPORTUNIDADES DE MONETIZACIÓN abiertas (venta de productos a creadoras: interested/offered/negotiating) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Usala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades de monetización hay?' / '¿qué ventas hay cerca de completar?' / '¿cómo venimos con los productos?'. Devuelve handle, producto, etapa, dueño y si el seguimiento ya vence. NO incluye won ni lost.",
+      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Usala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasá stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtrá won y mirá last_touch_at); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó acá.",
     input_schema: {
       type: "object",
       properties: {
-        only_due: { type: "boolean", description: "si true, solo las con seguimiento vencido (next_followup_at <= ahora). Default false (todas las abiertas)." },
+        only_due: { type: "boolean", description: "si true, solo las con seguimiento vencido (next_followup_at <= ahora). Default false." },
+        stage: { type: "string", description: "opcional: filtra por etapa — 'interested'|'offered'|'negotiating'|'won'|'lost'. 'open' (default) = las 3 abiertas; 'all' = todas. Usá 'won' para ventas cerradas." },
         limit: { type: "number", description: "máx a devolver (default 15)" },
       },
     },
@@ -2500,11 +2501,20 @@ async function executeTool(
       const onlyDue = input.only_due === true;
       const limit = Math.min(Math.max(Math.floor(Number(input.limit ?? 15)) || 15, 1), 50);
       const nowIso = new Date().toISOString();
+      // Etapas: default = las 3 abiertas; 'won'/'lost'/etc. = esa; 'all' = todas.
+      const OPEN_STAGES = ["interested", "offered", "negotiating"];
+      const ALL_STAGES = ["interested", "offered", "negotiating", "won", "lost"];
+      const stageArg = String(input.stage ?? "").trim().toLowerCase();
+      const stages = !stageArg || stageArg === "open"
+        ? OPEN_STAGES
+        : stageArg === "all"
+          ? ALL_STAGES
+          : ALL_STAGES.includes(stageArg) ? [stageArg] : OPEN_STAGES;
       let q = sb
         .from("monetization_opportunities")
-        .select("creator_handle, product, stage, assigned_to, next_followup_at")
+        .select("creator_handle, product, stage, assigned_to, next_followup_at, last_touch_at")
         .eq("tenant_id", ctx.tenantId)
-        .in("stage", ["interested", "offered", "negotiating"]);
+        .in("stage", stages);
       if (onlyDue) q = q.not("next_followup_at", "is", null).lte("next_followup_at", nowIso);
       const { data: rows, error } = await q.limit(200);
       if (error) return { error: "read_failed", detail: error.message };
@@ -2516,15 +2526,16 @@ async function executeTool(
           ownerName.set(p.id, p.whatsapp_push_name ?? p.full_name?.split(" ")[0] ?? "?");
         }
       }
-      const STAGE_RANK: Record<string, number> = { negotiating: 0, offered: 1, interested: 2 };
+      const STAGE_RANK: Record<string, number> = { negotiating: 0, offered: 1, interested: 2, won: 3, lost: 4 };
       const sorted = ((rows ?? []) as Array<{
         creator_handle: string | null;
         product: string;
         stage: string;
         assigned_to: string | null;
         next_followup_at: string | null;
+        last_touch_at: string | null;
       }>).slice().sort((a, b) => {
-        const ra = STAGE_RANK[a.stage] ?? 3, rb = STAGE_RANK[b.stage] ?? 3;
+        const ra = STAGE_RANK[a.stage] ?? 5, rb = STAGE_RANK[b.stage] ?? 5;
         if (ra !== rb) return ra - rb;
         const fa = a.next_followup_at ? Date.parse(a.next_followup_at) : Infinity;
         const fb = b.next_followup_at ? Date.parse(b.next_followup_at) : Infinity;
@@ -2535,9 +2546,15 @@ async function executeTool(
         product: r.product,
         stage: r.stage,
         owner: r.assigned_to ? (ownerName.get(r.assigned_to) ?? "?") : null,
+        last_touch_at: r.last_touch_at,
         followup_due: r.next_followup_at ? (Date.parse(r.next_followup_at) <= Date.now()) : false,
       }));
-      return { total_open: (rows ?? []).length, near_close: out.filter((o) => o.stage === "negotiating").length, opportunities: out };
+      return {
+        total: (rows ?? []).length,
+        near_close: out.filter((o) => o.stage === "negotiating").length,
+        won: out.filter((o) => o.stage === "won").length,
+        opportunities: out,
+      };
     }
 
     case "get_closer_pipeline_status": {
