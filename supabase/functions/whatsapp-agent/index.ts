@@ -548,10 +548,15 @@ Después del catchup, armá el foco del día con datos REALES de Maven (NO esper
   · get_monetization_opportunities({}) → ventas de productos abiertas (Piclink/CP/Blu/Exchange), con las CERCA DE CERRAR (negotiating) primero. Es lo que Alvaro quiere ver de arranque: qué hay cerca de completar.
 Si es LUNES (o el primer día tras el finde), agregá UNA línea de recap del finde con lo más relevante de la Parte A (cierres, números, bloqueos tipo cuentas baneadas).
 
-VENTAS DE "UNLIMITED" (plataformas) — IMPORTANTE, viven en DOS fuentes, mirá LAS DOS:
-  · get_monetization_opportunities → oportunidades de productos que registra el bot / el equipo edita en el tab Oportunidades (para ventas CERRADAS pasá stage:"won").
-  · get_platform_sales → ventas de plataforma cargadas desde el carrito 🛒 de la pantalla Creadoras (van al pipeline como deal_type venta_plataforma, con suscripción mensual). "Asignada" = en curso, "Confirmada"/"Completada" = cerrada.
-  Cuando pregunten "cuántas ventas de unlimited/plataformas", "qué vendió X hoy", etc., consultá AMBAS (get_platform_sales acepta closer y since para acotar a hoy/una persona). Si un closer dice que cargó ventas y no las ves en una, revisá la otra ANTES de decir que no hay — puede estar en el carrito→pipeline.
+QUÉ ES "UNLIMITED" (aprendételo — es un concepto central del negocio):
+  · "Unlimited" NO es un producto puntual: es el PARAGUAS de la venta de PLATAFORMAS a creadoras. Incluye TODAS las plataformas que vende la agencia: Trafix, Blu, Piclink, Content Protector, ORA, Let's Shoot, Exchange, etc. "Ventas de unlimited" = ventas de cualquiera de esas plataformas (cada una con su suscripción mensual).
+  · Vive en DOS fuentes y SIEMPRE tenés que mirar LAS DOS:
+     - get_monetization_opportunities → oportunidades de producto que registra el bot / el equipo edita en el tab Oportunidades (para ventas CERRADAS pasá stage:"won").
+     - get_platform_sales → ventas de plataforma cargadas desde el carrito 🛒 de la pantalla Creadoras (pipeline, deal_type venta_plataforma, suscripción mensual). "Asignada" = en curso · "Confirmada"/"Completada" = cerrada. Acepta closer y since (ej. hoy) para acotar.
+  · REGLAS de unlimited:
+     1) Para "cuántas ventas de unlimited / qué vendió X / MRR de plataformas" → SUMÁ ambas fuentes (no te quedes con una).
+     2) Si un closer dice que cargó ventas y NO las ves en una fuente, revisá la OTRA antes de decir que no hay — casi siempre están en el carrito→pipeline (get_platform_sales).
+     3) LLEVÁ TRACKING: en la Apertura del día reportá SIEMPRE las ventas de unlimited cargadas hoy (get_platform_sales since=hoy) — cuántas, qué plataformas y el MRR sumado.
 
 CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
 
@@ -567,6 +572,10 @@ CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
 
   *💰 Ventas de productos — cerca de cerrar*  [solo si hay oportunidades abiertas; omití toda la sección si 0]
     · @handle — <producto> (<etapa>, <dueño>)   ← priorizá las negotiating; máx 3-4
+
+  *🛒 Unlimited de hoy — plataformas cargadas*  [get_platform_sales since=hoy; omití la sección si 0]
+    · @handle — <plataforma> $<susc>/mes (<closer>)   ← máx 5
+    · Total: <N> ventas · $<MRR>/mes
 
   *📋 LLGs — meta de hoy: <N> números*
     Equipo, repórtense con su corte cuando arranquen 💪
@@ -3453,7 +3462,7 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
-    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde. PRIORIZÁ POR VALOR: handles_by_stage de get_closer_pipeline_status ahora trae monthly_usd por confirmada — listalas de MAYOR a menor facturación (NO por antigüedad), y cualquier confirmada/lead de ≥$10k USD/mes marcala como 🔥 FOCO del día. Una creadora de $24k pesa muchísimo más que una de $900: que se note en el orden y el énfasis. NUNCA @menciones (mention_lids) a alguien que NO esté en la tabla MIEMBROS DEL GRUPO — si querés nombrar a un externo (Luis, Alvaro, etc.), escribí el nombre SIN @ ni ping.");
+    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_platform_sales (con since = hoy en formato YYYY-MM-DD) para las ventas de UNLIMITED (plataformas) cargadas hoy — reportá cuántas, qué plataformas y el MRR sumado (sección 🛒 Unlimited de hoy); get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde. PRIORIZÁ POR VALOR: handles_by_stage de get_closer_pipeline_status ahora trae monthly_usd por confirmada — listalas de MAYOR a menor facturación (NO por antigüedad), y cualquier confirmada/lead de ≥$10k USD/mes marcala como 🔥 FOCO del día. Una creadora de $24k pesa muchísimo más que una de $900: que se note en el orden y el énfasis. NUNCA @menciones (mention_lids) a alguien que NO esté en la tabla MIEMBROS DEL GRUPO — si querés nombrar a un externo (Luis, Alvaro, etc.), escribí el nombre SIN @ ni ping.");
     lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
     lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");
