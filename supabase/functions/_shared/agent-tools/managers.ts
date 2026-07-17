@@ -167,4 +167,183 @@ export const managersTools: AgentTool[] = [
       };
     },
   },
+  {
+    name: "get_manager_contact_activity",
+    description:
+      "Cuántos CONTACTOS hizo cada manager por WhatsApp en un día (default HOY, Bogotá): creadoras DISTINTAS a las " +
+      "que se les escribió por la línea del equipo de Managers, separado por manager. ⚠️ La línea es COMPARTIDA (un " +
+      "solo número), así que la atribución NO es por quién tipeó: es por la cuenta Kash de la creadora — Kash PLUS = " +
+      "Carolina, Kash MASSIVE = Fabiana (creator_business.kash_type, viene de BLU; fallback: manager asignada en el " +
+      "perfil). Cuenta solo mensajes SALIENTES (desde Maven o desde el teléfono/WA Web capturados como externos); los " +
+      "fallidos no cuentan. Devuelve por manager: cuántas creadoras contactó + quiénes (con mensajes por creadora); y " +
+      "aparte los contactos de la línea NO vinculados a una creadora (sin_atribuir). Pasá date (YYYY-MM-DD) para otro " +
+      "día y manager_name para filtrar. Usala para '¿cuántos contactos hizo hoy Carolina y Fabiana?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "opcional: día en YYYY-MM-DD. Default = hoy (Bogotá)." },
+        manager_name: { type: "string", description: "opcional: filtra por manager (ilike, ej 'Carolina', 'Fabi')" },
+      },
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const dateArg = String(args?.date ?? "").trim();
+      // Hoy en Bogotá (UTC-5 fijo, sin DST).
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(dateArg)
+        ? dateArg
+        : new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+      const startIso = `${day}T00:00:00-05:00`;
+      const endIso = new Date(Date.parse(startIso) + 24 * 3600e3).toISOString();
+
+      // 1) Línea(s) del departamento de managers.
+      const { data: chans, error: chErr } = await ctx.sb
+        .from("wa_channels").select("id, label")
+        .eq("department", "manager").eq("active", true);
+      if (chErr) throw new Error(`get_manager_contact_activity: ${chErr.message}`);
+      if (!chans?.length) return { found: false, reason: "sin_lineas_de_managers" };
+
+      const { data: convs, error: cvErr } = await ctx.sb
+        .from("wa_conversations").select("id, contact_id")
+        .in("channel_id", (chans as Array<{ id: string }>).map((c) => c.id))
+        .limit(1000);
+      if (cvErr) throw new Error(`get_manager_contact_activity: ${cvErr.message}`);
+      if (!convs?.length) {
+        return { found: true, fecha: day, total_creadoras_contactadas: 0, por_manager: [], nota: "La línea de managers no tiene conversaciones registradas todavía." };
+      }
+
+      // 2) Salientes del día (Maven + externos). Los failed no cuentan como contacto.
+      const { data: msgs, error: msgErr } = await ctx.sb
+        .from("wa_conversation_messages")
+        .select("conversation_id, source, status, sent_at")
+        .in("conversation_id", (convs as Array<{ id: string }>).map((c) => c.id))
+        .eq("direction", "out").is("deleted_at", null)
+        .gte("sent_at", startIso).lt("sent_at", endIso)
+        .limit(5000);
+      if (msgErr) throw new Error(`get_manager_contact_activity: ${msgErr.message}`);
+      const sent = ((msgs ?? []) as Array<{ conversation_id: string; source: string | null; status: string | null; sent_at: string }>)
+        .filter((m) => m.status !== "failed");
+      if (!sent.length) {
+        return {
+          found: true, fecha: day, total_creadoras_contactadas: 0, por_manager: [],
+          nota: `Sin mensajes salientes el ${day} en la línea de managers. OJO: la línea se conectó a Maven el 2026-07-16 — antes de esa fecha no hay historial.`,
+        };
+      }
+
+      // 3) Agregar por contacto.
+      const convContact = new Map((convs as Array<{ id: string; contact_id: string | null }>).map((c) => [c.id, c.contact_id]));
+      const perContact = new Map<string, { mensajes: number; maven: number; externos: number; ultimo: string }>();
+      for (const m of sent) {
+        const ctId = convContact.get(m.conversation_id);
+        if (!ctId) continue;
+        const agg = perContact.get(ctId) ?? { mensajes: 0, maven: 0, externos: 0, ultimo: m.sent_at };
+        agg.mensajes++;
+        if (m.source === "external") agg.externos++; else agg.maven++;
+        if (m.sent_at > agg.ultimo) agg.ultimo = m.sent_at;
+        perContact.set(ctId, agg);
+      }
+
+      const { data: cts } = await ctx.sb
+        .from("wa_contacts")
+        .select("id, phone_e164, manual_name, resolved_name, display_name")
+        .in("id", [...perContact.keys()]);
+
+      // 4) Match contacto→creadora por últimos 10 dígitos (los tel. de Maven vienen sucios).
+      const d10 = (s: unknown) => {
+        const d = String(s ?? "").replace(/\D/g, "");
+        return d.length >= 10 ? d.slice(-10) : "";
+      };
+      const { data: creators } = await ctx.sb
+        .from("creators")
+        .select("id, name, artistic_name, instagram_handle, phone_e164, whatsapp_number, phone, assigned_manager_profile_id")
+        .eq("status", "active");
+      type CreatorRow = { id: string; name: string | null; artistic_name: string | null; instagram_handle: string | null; phone_e164: string | null; whatsapp_number: string | null; phone: string | null; assigned_manager_profile_id: string | null };
+      const creatorByD10 = new Map<string, CreatorRow>();
+      for (const cr of (creators ?? []) as CreatorRow[]) {
+        const key = d10(cr.phone_e164 || cr.whatsapp_number || cr.phone);
+        if (!key) continue;
+        const prev = creatorByD10.get(key);
+        if (!prev || (!prev.assigned_manager_profile_id && cr.assigned_manager_profile_id)) creatorByD10.set(key, cr);
+      }
+
+      // 5) Atribución por manager: la línea es COMPARTIDA → se atribuye por la cuenta
+      // Kash de la creadora (creator_business.kash_type, viene de BLU): Plus=Carolina,
+      // Massive=Fabiana. Fallback: manager asignada en el perfil (profiles.full_name).
+      const creatorIds = [...new Set([...creatorByD10.values()].map((c) => c.id))];
+      const kashByCreator = new Map<string, string>();
+      if (creatorIds.length) {
+        const { data: biz } = await ctx.sb
+          .from("creator_business").select("creator_id, kash_type").in("creator_id", creatorIds);
+        for (const b of (biz ?? []) as Array<{ creator_id: string; kash_type: string | null }>) {
+          if (b.kash_type) kashByCreator.set(b.creator_id, b.kash_type);
+        }
+      }
+      const KASH_MANAGER: Record<string, string> = { Plus: "Carolina (Kash Plus)", Massive: "Fabiana (Kash Massive)" };
+      const mgrIds = [...new Set([...creatorByD10.values()].map((c) => c.assigned_manager_profile_id).filter((x): x is string => Boolean(x)))];
+      const mgrName = new Map<string, string>();
+      if (mgrIds.length) {
+        const { data: profs } = await ctx.sb.from("profiles").select("id, full_name").in("id", mgrIds);
+        for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) mgrName.set(p.id, p.full_name ?? "?");
+      }
+      // El fallback por perfil debe caer en el MISMO bucket que el de kash_type (si no,
+      // "Fabiana Durán" y "Fabiana (Kash Massive)" salen como dos grupos distintos).
+      const groupLabel = (fullName: string): string => {
+        const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+        if (first === "carolina") return KASH_MANAGER.Plus;
+        if (first === "fabiana") return KASH_MANAGER.Massive;
+        return fullName;
+      };
+
+      const byMgr = new Map<string, Array<{ creadora: string; instagram: string | null; mensajes: number; desde_maven: number; desde_telefono: number; ultimo_mensaje: string }>>();
+      const sinAtribuir: Array<{ contacto: string; mensajes: number }> = [];
+      let totalMsgs = 0;
+      for (const ct of (cts ?? []) as Array<{ id: string; phone_e164: string | null; manual_name: string | null; resolved_name: string | null; display_name: string | null }>) {
+        const agg = perContact.get(ct.id);
+        if (!agg) continue;
+        totalMsgs += agg.mensajes;
+        const cr = creatorByD10.get(d10(ct.phone_e164));
+        if (cr) {
+          const kash = kashByCreator.get(cr.id);
+          const grupo = (kash && KASH_MANAGER[kash])
+            || (cr.assigned_manager_profile_id ? groupLabel(mgrName.get(cr.assigned_manager_profile_id) ?? "(manager desconocida)") : "(sin manager)");
+          if (!byMgr.has(grupo)) byMgr.set(grupo, []);
+          byMgr.get(grupo)!.push({
+            creadora: cr.artistic_name || cr.name || "(sin nombre)",
+            instagram: cr.instagram_handle,
+            mensajes: agg.mensajes,
+            desde_maven: agg.maven,
+            desde_telefono: agg.externos,
+            ultimo_mensaje: agg.ultimo,
+          });
+        } else {
+          sinAtribuir.push({ contacto: ct.manual_name || ct.resolved_name || ct.display_name || "(sin nombre)", mensajes: agg.mensajes });
+        }
+      }
+
+      let porManager = [...byMgr.entries()]
+        .map(([manager, rows]) => ({
+          manager,
+          creadoras_contactadas: rows.length,
+          mensajes: rows.reduce((a, r) => a + r.mensajes, 0),
+          creadoras: rows.sort((a, b) => b.mensajes - a.mensajes),
+        }))
+        .sort((a, b) => b.creadoras_contactadas - a.creadoras_contactadas);
+      const filtro = String(args?.manager_name ?? "").trim().toLowerCase();
+      if (filtro) porManager = porManager.filter((g) => g.manager.toLowerCase().includes(filtro));
+
+      return {
+        found: true,
+        fecha: day,
+        lineas: (chans as Array<{ label: string | null }>).map((c) => c.label).filter(Boolean),
+        total_creadoras_contactadas: porManager.reduce((a, g) => a + g.creadoras_contactadas, 0),
+        total_mensajes_salientes: totalMsgs,
+        por_manager: porManager,
+        sin_atribuir: { contactos: sinAtribuir.length, detalle: sinAtribuir.sort((a, b) => b.mensajes - a.mensajes) },
+        nota: "Contacto = creadora DISTINTA con ≥1 mensaje saliente ese día por la línea de Managers (Maven + teléfono/externos; fallidos no cuentan). " +
+          "Atribución por cuenta Kash de la creadora (Plus=Carolina, Massive=Fabiana; la línea es compartida, no se sabe quién tipeó). " +
+          "La línea se conectó a Maven el 2026-07-16: días anteriores no tienen historial.",
+      };
+    },
+  },
 ];
