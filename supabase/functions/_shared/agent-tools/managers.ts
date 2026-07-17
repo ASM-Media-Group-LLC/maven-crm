@@ -119,4 +119,52 @@ export const managersTools: AgentTool[] = [
       return data ?? [];
     },
   },
+  {
+    name: "get_promo_day_breakdown",
+    description:
+      "Cuántas CREADORAS promocionaron en un DÍA (por defecto HOY, Bogotá), separado por manager. " +
+      "⚠️ 'cuántas promociones' = cuántas CREADORAS promocionaron, NO cantidad de stories. Cuenta creadoras con " +
+      "promo OF detectada ese día (promoted='true'); ignora las que solo tuvieron stories sin promo y las pendientes " +
+      "de scan. Úsala para '¿cuántas promocionaron hoy?', 'separá las de Carolina y Fabiana', '¿quiénes promocionaron " +
+      "el 14?'. Pasá date (YYYY-MM-DD) para otro día y manager_name para filtrar. Devuelve por manager: cuántas " +
+      "creadoras promocionaron + quiénes (con nº de stories de promo y redes). Nota: refleja lo scaneado hasta el " +
+      "momento — el promolog scanea a lo largo del día, así que a media jornada puede faltar gente por scanear.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "opcional: día en YYYY-MM-DD. Default = hoy (Bogotá)." },
+        manager_name: { type: "string", description: "opcional: filtra a las creadoras de esa manager (ilike)" },
+      },
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const date = String(args?.date ?? "").trim() || null;
+      const mgr = String(args?.manager_name ?? "").trim() || null;
+      const { data, error } = await ctx.sb.rpc("get_promo_day_breakdown", {
+        p_tenant: ctx.tenantId, p_date: date, p_manager_name: mgr,
+      });
+      if (error) throw new Error(`get_promo_day_breakdown: ${error.message}`);
+      const rows = (data ?? []) as Array<{ manager_name: string | null; handle: string | null; promo_stories: number; networks: string | null }>;
+      const byMgr = new Map<string, typeof rows>();
+      for (const r of rows) {
+        const k = r.manager_name ?? "(sin manager)";
+        if (!byMgr.has(k)) byMgr.set(k, []);
+        byMgr.get(k)!.push(r);
+      }
+      const por_manager = [...byMgr.entries()]
+        .map(([manager, rs]) => ({
+          manager,
+          creadoras_promocionaron: rs.length,
+          creadoras: rs.map((r) => ({ handle: r.handle, stories_promo: r.promo_stories, redes: r.networks })),
+        }))
+        .sort((a, b) => b.creadoras_promocionaron - a.creadoras_promocionaron);
+      return {
+        total_creadoras_promocionaron: rows.length,
+        por_manager,
+        nota: "Cuenta CREADORAS con promo OF detectada (promoted=true), no cantidad de stories. Refleja lo scaneado hasta ahora (el promolog corre a lo largo del día).",
+      };
+    },
+  },
 ];
