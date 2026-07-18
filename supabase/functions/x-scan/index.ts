@@ -291,11 +291,20 @@ Deno.serve(async (req: Request) => {
   // 1) Traer tweets en lotes.
   const tweetsByCreator = new Map<string, any[]>(); // creatorId → tweets
   const runStats: unknown[] = [];
+  // Creadoras cuyo lote de Apify FALLÓ → "no pude leer", NO "no tuiteó". Si no las
+  // separáramos, 0 tweets por lote caído se registraba como "sin-actividad" (No falso):
+  // exactamente lo que dejó a creadoras que SÍ promocionaban (ej. elizabethloaiza)
+  // figurando "sin actividad" en X. Espejo del fix #818 de IG (leer falló → pending).
+  const failedCreatorIds = new Set<string>();
   const handles = [...byHandle.keys()];
   for (let i = 0; i < handles.length; i += HANDLES_PER_RUN) {
     const chunk = handles.slice(i, i + HANDLES_PER_RUN);
     try {
-      const items = await runApify(APIFY_TOKEN, chunk, start, chunk.length * 10);
+      // Presupuesto por handle: sort "Latest" reparte maxItems entre TODOS los handles del
+      // lote → un handle de alto volumen podía comerse el cupo y dejar a otros en 0 (falso
+      // "sin actividad"). ×15 (con el filtro `start`=últimas `hours`) da holgura sin volar
+      // el costo (casi nadie tuitea >15/día).
+      const items = await runApify(APIFY_TOKEN, chunk, start, chunk.length * 15);
       for (const it of items) {
         const uname = normHandle(it?.author?.userName || it?.author?.username || it?.username || "");
         const c = byHandle.get(uname);
@@ -307,6 +316,8 @@ Deno.serve(async (req: Request) => {
       }
       runStats.push({ chunk: chunk.length, tweets: items.length });
     } catch (e) {
+      // Marcá como "no leída" a TODA creadora con al menos un handle en este lote caído.
+      for (const h of chunk) { const c = byHandle.get(h); if (c) failedCreatorIds.add(c.id); }
       runStats.push({ chunk: chunk.length, error: String((e as Error)?.message || e) });
     }
   }
@@ -321,15 +332,27 @@ Deno.serve(async (req: Request) => {
       return da - db;
     });
     if (!tweets.length) {
-      // Marker "revisada · sin actividad": deja constancia de que SÍ la chequeamos
-      // en X hoy (aunque no tuiteó) → la columna Red Social muestra X en gris.
-      // Idempotente: 1 marker por creadora/día (no pisa si ya hay entry de X hoy).
+      // Dos casos MUY distintos con 0 tweets:
+      //  · lote de Apify caído → NO pudimos leer → pending/"sin datos" (re-intentable),
+      //    NUNCA "No" (no afirmamos ausencia de actividad).
+      //  · lote OK y sin tweets → "revisada · sin actividad" (promoted='false'): deja
+      //    constancia de que SÍ la chequeamos (columna Red Social muestra X en gris).
+      // Idempotente: 1 marker por creadora/día (no pisa si ya hay entry de X hoy → si un
+      // scan posterior lee bien, sus tweets entran como filas propias y el día recalcula).
+      const failed = failedCreatorIds.has(c.id);
       if (!dryRun) {
         const today = new Date().toISOString().slice(0, 10);
         const { data: ex } = await sb.from("promolog_entries")
           .select("id").eq("creator_id", c.id).eq("network", "X").gte("date", today).limit(1);
         if (!ex || !ex.length) {
-          await sb.from("promolog_entries").insert({
+          await sb.from("promolog_entries").insert(failed ? {
+            tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
+            promoted: "pending", network: "X", platform: "Ninguna",
+            notes: "[SIN DATOS] No se pudo leer X (Apify falló). NO confirma que no haya tuiteado.",
+            evidence_url: null, analyzed_by_ai: false, ai_model: "regla-texto-x",
+            ai_reasoning: "Lectura de X fallida (apify): no ausencia confirmada.",
+            error_reason: "x_read_failed", needs_review: false, scraped_at: new Date().toISOString(),
+          } : {
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
             promoted: "false", network: "X", platform: "Ninguna",
             notes: null, evidence_url: null,
@@ -338,7 +361,7 @@ Deno.serve(async (req: Request) => {
           });
         }
       }
-      results.push({ creator: c.name, tweets: 0, marker: true });
+      results.push({ creator: c.name, tweets: 0, marker: failed ? "pending" : "sin-actividad" });
       continue;
     }
 
