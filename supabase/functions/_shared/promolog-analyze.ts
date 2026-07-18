@@ -63,7 +63,7 @@ Tu job: decidir si en ESTA story la creadora está PROMOCIONANDO su contenido pa
 REGLA CENTRAL: "promocionar" = hay un PUNTERO o LLAMADO A LA ACCIÓN concreto hacia contenido PAGO. Que la foto sea sexy o sugestiva NO es promoción por sí sola — una creadora puede postear lencería/bikini sin promocionar nada. Lo que define la promoción es que DIRIJA al fan a comprar/ver contenido pago (un link, un sticker, una mención de su plataforma, o una invitación clara). NO infieras promoción solo de la apariencia (ropa, pose, cuerpo).
 
 Tres categorías:
-1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con un handle o URL de plataforma de pago.
+1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con una URL de plataforma de pago (ej. "onlyfans.com/nick") o con un nick JUNTO a la palabra/logo de la plataforma (ej. "OF: @nick").
 2) INDIRECTA (promotion_type="indirect", promoted=true): NO hay link visible, pero el TEXTO tiene un llamado a la acción claro hacia contenido pago: "escríbeme por mi contenido", "más en mi página / mi OF", "contenido exclusivo / VIP / premium", "suscribite", "DM para el link", o redirección a una cuenta "premium/+18". Tiene que haber una INVITACIÓN a ir a otro lado o comprar — NO alcanza con una foto linda + un emoji.
 3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar.
 
@@ -83,6 +83,7 @@ GUÍA:
 - ⚠️ DISTINCIÓN CLAVE — "ganar dinero" NO es promoción de su contenido: un CTA a GANAR PLATA / hacer dinero / "gana aquí" / "ganancias de $X diarios" / oportunidad / negocio / referido / afiliado / trabajá desde casa apunta a que el FAN gane dinero (reclutamiento/afiliados), NO a comprar el contenido pago de ELLA. Eso es promoted=false, promotion_type="none" (aunque haya un link/sticker visible), SALVO que ADEMÁS haya señal real de su contenido (su nick de OnlyFans, "mi contenido / suscribite / VIP / contenido exclusivo / +18"). Promocionar = vender SU contenido, no ofrecer una forma de ganar plata.
 - Si platform_mentioned="ninguna" Y has_buy_link=false Y el texto no tiene ningún CTA → promoted=false (none). NO la marques "indirect" solo por verse sugerente.
 - Los emojis (🍑🔥💦😈🥵) por sí solos NO son promoción; solo cuentan si acompañan un CTA real.
+- ⚠️ WATERMARK/FIRMA ≠ PROMO: las creadoras firman sus fotos/stories con su @usuario de Instagram como marca de agua. Un @handle suelto (watermark/overlay/sticker de mención) NO es promoción por sí solo, SALVO que se cumpla alguna: (a) al lado trae la palabra OnlyFans/OF, su logo, o una URL de plataforma de pago; (b) ES uno de los NICKNAMES DE ONLYFANS listados abajo Y ese bloque de abajo te dice EXPRESAMENTE que ese nick cuenta suelto (los nicks que son iguales a su @ de Instagram NO cuentan sueltos). Casos que NUNCA son promo por sí solos: su PROPIO @ de Instagram como firma; y un handle atribuido a OTRA red ("Twitter @x", "X @x", "TikTok @x", "Telegram @x") → apunta a esa red, NO a contenido pago → promoted=false. Ante la duda de si un @handle suelto es su nick de OF o su firma de IG → promoted=false. Manda lo que diga el bloque de NICKNAMES de abajo sobre esta GUÍA.
 - En "reasoning" citá la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, decilo ("solo una selfie en lencería, sin link ni CTA").
 - Si la imagen está borrosa o el texto ilegible y NO podés saber si hay un link/CTA, poné confidence < 0.6 para revisión manual — pero NO marques promoted=true por las dudas: marcá lo que efectivamente ves.`;
 
@@ -106,12 +107,34 @@ export function ofNickFromUrl(url: string): string {
   return s.replace(/^@+/, "").toLowerCase().trim();
 }
 
-function ofNicksClause(nicks: string[]): string {
-  const clean = (nicks || []).filter(Boolean);
+// Compara nick vs @ de IG despojando separadores (puntos/guiones/underscore): así
+// "anadevin13" (nick de OF crudo de la URL) y "ana.devin13" (@ de IG con punto) se
+// reconocen como EL MISMO nombre → ambiguo. Sin esto, una variante de puntuación del
+// mismo nombre caía como "fuerte" y reactivaba el FP de firma de IG (caso Anadevinvip).
+const bareName = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function ofNicksClause(nicks: string[], igHandle = ""): string {
+  const clean = [...new Set((nicks || []).filter(Boolean).map((n) => n.toLowerCase()))];
   if (!clean.length) return "";
-  const list = clean.map((n) => `@${n}`).join(", ");
-  return `\n\nNICKNAMES DE ONLYFANS DE ESTA CREADORA: ${list}.\n` +
-    `Si ves CUALQUIERA de estos nombres EXACTOS en la imagen/video (watermark, overlay, sticker, texto sobreimpreso) o en el caption, contá eso como un PUNTERO a contenido pago aunque NO haya link clickeable: poné has_buy_link=true, buy_link_type="onlyfans", platform_mentioned="onlyfans", promoted=true, promotion_type="direct", y citá el nick visto en "reasoning". OJO: tiene que ser el NICK como texto/watermark visible, NO inferirlo de que la foto se parece a ella.`;
+  const ig = normalizeHandle(igHandle);
+  const igBare = bareName(ig);
+  // Un nick de OF que ADEMÁS es el @ de IG escaneado es ambiguo: como watermark suelto
+  // es la firma normal de IG (elizabethloaiza puso su @ en todas las fotos y NO era
+  // promo). Solo los nicks DISTINTOS del @ de IG cuentan "a secas"; los iguales exigen
+  // contexto de plataforma de pago al lado. Match por nombre pelado (sin puntuación).
+  const strong = clean.filter((n) => bareName(n) !== igBare);
+  const ambiguous = clean.filter((n) => bareName(n) === igBare);
+  // El encabezado lista SOLO los nicks fuertes como "los que cuentan sueltos" (la GUÍA
+  // los exceptúa); los ambiguos se nombran aparte con su propia advertencia. Así el
+  // carve-out "salvo que esté en la lista" del prompt no licencia la firma de IG.
+  let out = `\n\nNICKNAMES DE ONLYFANS DE ESTA CREADORA: ${clean.map((n) => `@${n}`).join(", ")}. La cuenta de Instagram escaneada es @${ig || "desconocida"}.`;
+  if (strong.length) {
+    out += `\nSi ves ${strong.map((n) => `@${n}`).join(" o ")} EXACTO en la imagen/video (watermark, overlay, sticker, texto sobreimpreso) o en el caption, contá eso como un PUNTERO a contenido pago aunque NO haya link clickeable: poné has_buy_link=true, buy_link_type="onlyfans", platform_mentioned="onlyfans", promoted=true, promotion_type="direct", y citá el nick visto en "reasoning". DOS excepciones: (1) NO lo infieras de que la foto se parece a ella, tiene que ser el NICK como texto/watermark visible; (2) si el nick aparece atribuido EXPLÍCITAMENTE a otra red (ej. "Twitter ${strong.map((n) => `@${n}`)[0]}", "TikTok …"), apunta a esa red, NO a OF → promoted=false.`;
+  }
+  if (ambiguous.length) {
+    out += `\n⚠️ ${ambiguous.map((n) => `@${n}`).join(", ")} es TAMBIÉN su @ de Instagram: si aparece suelto como watermark/firma NO cuenta como promo (es la firma normal de IG). Solo contalo si aparece CON contexto de plataforma de pago al lado: la palabra "OnlyFans"/"OF", su logo, una URL (onlyfans.com/…), o un CTA a contenido pago.`;
+  }
+  return out;
 }
 
 export function normalizeHandle(h: string): string {
@@ -228,6 +251,7 @@ async function analyzeImageStory(
   caption: string | null,
   apiKey: string,
   ofNicks: string[] = [],
+  igHandle = "",
 ): Promise<
   | { analysis: StoryAnalysis; imageBytes: Uint8Array; mime: string }
   | { error: string; imageBytes?: Uint8Array; mime?: string }
@@ -247,7 +271,7 @@ async function analyzeImageStory(
     return { error: `image_fetch: ${(e as Error).message}` };
   }
   const dataUri = `data:${mime};base64,${bytesToBase64(imageBytes)}`;
-  const promptText = VISION_PROMPT + ofNicksClause(ofNicks);
+  const promptText = VISION_PROMPT + ofNicksClause(ofNicks, igHandle);
   const content = [
     { type: "text", text: caption ? `Caption de la story: "${caption}"\n\n${promptText}` : promptText },
     { type: "image_url", image_url: { url: dataUri } },
@@ -262,8 +286,9 @@ async function analyzeVideoStory(
   caption: string | null,
   apiKey: string,
   ofNicks: string[] = [],
+  igHandle = "",
 ): Promise<{ analysis: StoryAnalysis } | { error: string }> {
-  const promptText = VISION_PROMPT + ofNicksClause(ofNicks);
+  const promptText = VISION_PROMPT + ofNicksClause(ofNicks, igHandle);
   const content = [
     { type: "text", text: caption ? `Caption de la story: "${caption}"\n\n${promptText}` : promptText },
     { type: "video_url", video_url: { url: videoUrl } },
@@ -447,7 +472,7 @@ async function processStory(args: {
   }
   const evidenceKey = story.pk ?? `${run.dispatchRunId}-${args.storyIndex}`;
 
-  const l1 = await analyzeImageStory(mediaUrl, caption, run.openrouterKey, creator.ofNicks);
+  const l1 = await analyzeImageStory(mediaUrl, caption, run.openrouterKey, creator.ofNicks, creator.sourceHandle);
   if ("error" in l1) {
     if (l1.imageBytes && l1.mime) {
       const durableUrl = await persistEvidence(args.sb, {
@@ -468,7 +493,7 @@ async function processStory(args: {
   let final = l1.analysis;
   let analysisLevel = "thumbnail_only";
   if (isVideo && videoUrl && l1.analysis.confidence < VIDEO_REANALYZE_THRESHOLD) {
-    const l2 = await analyzeVideoStory(videoUrl, caption, run.openrouterKey, creator.ofNicks);
+    const l2 = await analyzeVideoStory(videoUrl, caption, run.openrouterKey, creator.ofNicks, creator.sourceHandle);
     if (!("error" in l2)) {
       if (l2.analysis.confidence > l1.analysis.confidence) { final = l2.analysis; analysisLevel = "video_full"; }
       else analysisLevel = "video_tried_lower_conf";
@@ -514,8 +539,22 @@ async function processStory(args: {
     else if (linkClass.tier === "none" && creator.knownPlatform) final = { ...final, buy_link_type: creator.knownPlatform };
   }
 
+  // Red de seguridad watermark: la IA dice que HAY buy-link a plataforma MANEJADA (OF)
+  // pero NINGÚN sticker de link real lo respalda (ni promo ni funnel propio) → la única
+  // evidencia es VISUAL (watermark/overlay/texto). Puede ser un "Sí" legítimo (nick de
+  // OF real, gorra "ONLYFANS"), así que el resultado se respeta pero se marca para
+  // revisión humana: acá vivían los FP de firma de IG (elizabethloaiza, Anadevinvip,
+  // SaritaC). NO dependemos de story.linkUrl: un sticker a un destino NO-promo (YouTube,
+  // afiliado) no valida un buy-link visual → seguiría siendo solo-visual. Y solo para
+  // claim MANEJADO: si la IA dijo Fansly/Piclink, no nos interesa (score 0) y no inunda
+  // la cola marcándola needs_review (qualityForEntry trata needs_review como OF-válida).
+  const claimedManaged = ["onlyfans", "piclink"].includes((final.buy_link_type || "").toLowerCase()) ||
+    ["onlyfans", "piclink", "unlok"].includes((final.platform_mentioned || "").toLowerCase());
+  const visualLinkOnly = final.promoted && final.has_buy_link && claimedManaged &&
+    !linkIsPromo && !linkIsOwnFunnel;
   const needsReview = !linkIsCasino && (
     final.confidence < NEEDS_REVIEW_THRESHOLD ||
+    visualLinkOnly ||
     (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type) &&
       (linkClass.tier === "nonpaid" || linkClass.tier === "unknown")));
 

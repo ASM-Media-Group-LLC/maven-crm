@@ -711,9 +711,14 @@ const PromologContent = () => {
   const handleSetStoryVerdict = async (story: PromologEntry, verdict: "Sí" | "No") => {
     if (story.result === verdict) return;
     setVerdictSavingId(story.id);
+    // Un humano fijó el veredicto → sale de la cola de revisión (needs_review es un flag
+    // de una sola vía; si no lo apagamos acá la entry queda "A revisar" para siempre aunque
+    // ya la hayan confirmado). El spread del patch suprime el chequeo de excess-property de
+    // TS (needs_review aún no está en los tipos generados), mismo idioma que el resto del módulo.
+    const verdictPatch = { promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id, needs_review: false };
     const { error } = await supabase
       .from("promolog_entries")
-      .update({ promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id })
+      .update({ ...verdictPatch })
       .eq("id", story.id);
     setVerdictSavingId(null);
     if (error) {

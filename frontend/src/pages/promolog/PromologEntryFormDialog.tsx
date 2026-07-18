@@ -363,6 +363,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
             platform: isSi ? platformValue : null,
             action_taken: isSi ? strategy || null : null,
             notes: notes || null,
+            // Editada/confirmada por un humano → sale de la cola "A revisar".
+            needs_review: false,
           };
           const promotedStr = isSi ? "true" : "false";
           const photoIds = new Set(ph.filter((p) => p.id).map((p) => p.id as string));
