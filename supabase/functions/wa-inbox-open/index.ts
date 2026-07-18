@@ -58,6 +58,21 @@ function joinCc(cc: unknown, phone: unknown): string | null {
   return cleanE164(merged);
 }
 
+// Multi-asignado: al auto-asignar una conversación (setear assigned_to = el
+// "principal") hay que reflejarlo TAMBIÉN en la tabla N:N wa_conversation_assignees,
+// que es la fuente de verdad del multi-asignado. Sin esto el principal quedaba
+// como dueño pero fuera de la lista de asignados. Idempotente (mismo patrón que
+// whatsapp-ingest al crear conversaciones nuevas). Best-effort: si falla, no
+// tumba el open (la RLS/UI ya toleran el fallback por assigned_to).
+async function syncAssigneeJoin(sb: any, conversationId: string, userId: string | null) {
+  if (!userId) return;
+  const { error } = await sb.from("wa_conversation_assignees").upsert(
+    { conversation_id: conversationId, user_id: userId },
+    { onConflict: "conversation_id,user_id", ignoreDuplicates: true },
+  );
+  if (error) console.warn("wa-inbox-open assignee join sync:", error.message);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
 
@@ -269,6 +284,7 @@ Deno.serve(async (req) => {
       // contacto, la conversación (creada por un inbound previo) quedaba sin asignar y la
       // RLS estricta del closer NO se la mostraba → el deep-link caía en panel vacío.
       await (sb as any).from("wa_conversations").update({ assigned_to: ownerForConv }).eq("id", convId);
+      await syncAssigneeJoin(sb, convId, ownerForConv);
     } else if (assignedTo !== ownerForConv) {
       // Asignada a OTRA persona: el closer solo ve lo suyo (RLS), así que mandarlo al
       // chat sería un panel en blanco. Si no puede ver todo (no es supervisor+/admin),
@@ -290,6 +306,7 @@ Deno.serve(async (req) => {
     }).select("id").single();
     if (vErr) return json({ ok: false, error: "conversation_create_failed: " + vErr.message }, 500);
     convId = newConv.id;
+    await syncAssigneeJoin(sb, convId, ownerForConv);
   }
 
   return json({ ok: true, conversation_id: convId });
