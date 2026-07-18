@@ -11,14 +11,17 @@
 // {status:"fail"} con HTTP 200 para lecturas de navegador. De paso: menos permisos
 // (fuera scripting/tabs) y sin pestaña fantasma de IG.
 //
-// Anti-soft-block (portado de v1.1.0, NO se debe perder): IG limita la sesión si lee
-// muchas historias muy seguido. El bloqueo tiene DOS caras y las cubrimos las dos:
+// Anti-soft-block (v1.2.1): IG limita la sesión si lee muchas historias muy seguido.
+// El bloqueo tiene DOS caras y las cubrimos las dos:
 //  1) EXPLÍCITA: HTTP 401/403/429 o soft-fail (HTTP 200 + json.status:"fail") → igGet
-//     lo marca error → el ingest lo guarda "pending/sin datos" (NO "no promocionó").
-//  2) SILENCIOSA: HTTP 200 + status:"ok" + reel VACÍO en racha (indistinguible per-
-//     request de "no tiene historias"). Se detecta por RACHA: tras leer bien, N vacías
-//     seguidas = bloqueo → se marcan throttled (pending) y tras 3 se ABORTA el scan
-//     (dejar de martillar la sesión evita escalar a checkpoint/challenge de la cuenta).
+//     lo marca error → el ingest lo guarda "pending/sin datos" (NO "no promocionó");
+//     una racha de estos (BLOCKED_ABORT) corta el scan.
+//  2) SILENCIOSA: HTTP 200 + status:"ok" + reel VACÍO (indistinguible per-request de
+//     "no tiene historias"). Los vacíos NO EXPLICADOS (públicas; una privada sin
+//     follow viene vacía SIEMPRE y no cuenta) se RETIENEN sin postear; la racha se
+//     resuelve leyendo historias de otra (→ eran "No" reales) o VERIFICANDO contra la
+//     última creadora que sí tuvo historias (→ bloqueo confirmado → corte, todo a
+//     pending). Invariante: un soft-block no escribe NI UN "No promocionó" falso.
 
 const IG_APP_ID = "936619743392459";
 const CHUNK = 6;          // creadoras por POST a Maven (acota el tiempo de análisis por request)
@@ -27,9 +30,37 @@ const CHUNK = 6;          // creadoras por POST a Maven (acota el tiempo de aná
 // el soft-block (mismos números que v1.1.0; NO acelerar sin medir el bloqueo).
 const MIN_DELAY = 1500, MAX_DELAY = 3500;
 const CHUNK_PAUSE = 2500;
-// Racha de lecturas vacías (tras haber leído historias OK) que dispara la sospecha /
-// el corte de soft-block silencioso.
-const EMPTY_SUSPECT = 2, EMPTY_ABORT = 3;
+// ── Detección de soft-block silencioso ──────────────────────────────────────
+// "Vacío NO explicado" = pública (o estado desconocido) que vino vacía. Una privada
+// que NO seguimos viene vacía SIEMPRE (bloqueada o no) y no dice nada de la sesión →
+// no cuenta (v1.2.0 la contaba → una cuenta scanner nueva, que no sigue a las
+// privadas, disparaba el corte "IG limitó la sesión" en falso a los 3 vacíos;
+// agravado porque scan-targets sirve primero las pendientes = muchas privadas).
+//
+// INVARIANTE: un soft-block silencioso no puede escribir NI UN "No promocionó" falso.
+// Por eso los vacíos no explicados de la racha abierta se RETIENEN sin postear:
+//   - la racha se rompe con una lectura CON historias → eran vacíos reales → pasan como "No";
+//   - la racha llega a EMPTY_VERIFY → VERIFICAMOS re-leyendo a la última creadora que
+//     SÍ tuvo historias hace minutos: ¿siguen visibles? sesión sana (vacíos genuinos,
+//     pasan como "No") / ¿vacía o falla? bloqueo confirmado → corte, todo a pending.
+// ⚠️ Los vacíos NO son independientes (la cola pending-first concentra públicas
+// inactivas) — un umbral probabilístico solo se cortaría en falso; la verificación
+// hace el corte casi determinístico.
+// ⚠️ Supuesto de la verificación (a validar en un bloqueo real): re-leer un reel visto
+// hace minutos falla igual que uno nuevo cuando la sesión está limitada (el límite es
+// por sesión, no por target). Si IG sirviera cacheado lo recién leído, la verificación
+// pasaría en falso. El espejo (historias del prover expiradas → verificación falla en
+// sano) degrada a pending — dirección segura.
+// Garantía REAL del invariante: ningún vacío crudo se postea sin una lectura CON
+// historias POSTERIOR a él; un bloqueo que empieza Y termina dentro de una misma
+// ventana retenida puede filtrar ≤EMPTY_VERIFY "No" por episodio (irresoluble a
+// posteriori; aceptado y documentado).
+const EMPTY_VERIFY = 6;      // racha (con sesión ya probada esta corrida) → verificar-antes-de-abortar
+const EMPTY_ABORT_COLD = 10; // racha sin sesión probada esta corrida → verificar contra el prover persistido, o frenar
+// Racha de bloqueos EXPLÍCITOS (softFail / 401 / 429) sin ninguna lectura CON
+// historias en el medio: sesión limitada de entrada (cuota quemada) → frenar. v1.2.0
+// no tenía corte para esto y martillaba las 55 igual. (http_0/red NO cuenta acá.)
+const BLOCKED_ABORT = 8;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jitter = () => MIN_DELAY + Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY));
@@ -71,7 +102,7 @@ async function resolveId(handle) {
     if (softFail || r.status === 401 || r.status === 403 || r.status === 429) return { id: null, blocked: true };
     if (!r.ok) return { id: null, blocked: false }; // 404 u otro → handle roto, no bloqueo
     return { id: j?.data?.user?.id ?? null, blocked: false };
-  } catch { return { id: null, blocked: true }; }
+  } catch { return { id: null, blocked: false, net: true }; } // red caída ≠ bloqueo de IG
 }
 
 // Recorta cada item de historia a lo que Maven necesita (paths que lee mapReelItem).
@@ -104,7 +135,7 @@ async function scanOne(t) {
   if (!id) {
     const res = await resolveId(t.handle);
     id = res.id;
-    if (!id) return { creator_id: t.creator_id, handle: t.handle, error: res.blocked ? "throttled" : "no_ig_id" };
+    if (!id) return { creator_id: t.creator_id, handle: t.handle, error: res.net ? "http_0" : (res.blocked ? "throttled" : "no_ig_id") };
   }
 
   const st = await igGet(`feed/user/${id}/story/`);
@@ -129,15 +160,24 @@ async function scanOne(t) {
   };
 }
 
+// Mutex simple: dos scans a la vez (doble click / alarm + manual) duplican el ritmo de
+// lecturas y rompen el pacing anti-bloqueo. Estado de módulo: si el SW muere, se
+// resetea solo (el lock nunca queda pegado).
+let scanRunning = false;
+
 async function runScan(trigger = "manual") {
+  if (scanRunning) { await setStatus("⏳ Ya hay un scan corriendo — esperá a que termine."); return; }
+  scanRunning = true;
+  let keepAlive = null;
+  try {
   const { mavenUrl, extToken } = await cfg();
   if (!extToken) { await setStatus("⚠ Falta el token — configuralo en Opciones."); return; }
   // Keepalive MV3: sin esto Chrome puede matar el service worker a los ~30s de "idle" a
   // mitad del loop (scans de varios minutos quedaban congelados en "Escaneando… N/56").
   // Un chrome.* barato cada 20s resetea el timer de idle. clearInterval SIEMPRE (finally).
-  const keepAlive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {} }, 20000);
+  keepAlive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {} }, 20000);
   await setStatus(`Escaneando… (${trigger})`);
-  try {
+
     const post = (creators) => fetch(`${mavenUrl}/functions/v1/promolog-ingest-stories`, {
       method: "POST", headers: { "x-ext-token": extToken, "Content-Type": "application/json" },
       body: JSON.stringify({ creators }),
@@ -153,45 +193,121 @@ async function runScan(trigger = "manual") {
 
     const acc = { si: 0, no: 0, pending: 0 };
     let done = 0;
-    // Circuit-breaker de soft-block silencioso: tras leer historias OK alguna vez
-    // (gotStoriesEver), una racha de lecturas vacías sin error = sesión limitada.
-    let gotStoriesEver = false, emptyStreak = 0;
-    for (let i = 0; i < targets.length; i += CHUNK) {
-      const chunk = targets.slice(i, i + CHUNK);
-      const out = [];
-      for (const t of chunk) {
-        const r = await scanOne(t);
-        const hasStories = Array.isArray(r.reel_items) && r.reel_items.length > 0;
-        if (hasStories) { gotStoriesEver = true; emptyStreak = 0; }
-        else if (!r.error && gotStoriesEver) emptyStreak += 1;
-        // Ya sospechamos bloqueo (racha ≥ EMPTY_SUSPECT) → una lectura vacía SIN error
-        // NO es "no tiene historias", es la sesión limitada → throttled (pending), no "No".
-        out.push(gotStoriesEver && emptyStreak >= EMPTY_SUSPECT && !hasStories && !r.error
-          ? { creator_id: r.creator_id, handle: r.handle, error: "throttled" }
-          : r);
-        await sleep(jitter());
-      }
-      await tally(await post(out), acc);
-      done += chunk.length;
-      await setStatus(`Escaneando… ${done}/${targets.length} · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}`);
+    // Breakers de sesión limitada, DOS caras (ver constantes arriba):
+    //  - emptyStreak + held: soft-block SILENCIOSO. Los vacíos no explicados de la
+    //    racha abierta se RETIENEN (held) sin postear hasta saber si eran bloqueo
+    //    (→ throttled/pending) o casualidad (→ "No" reales).
+    //  - blockedStreak: bloqueo EXPLÍCITO (softFail/401/429 encadenados). Solo una
+    //    lectura CON historias lo resetea — un vacío silencioso NO prueba sesión sana
+    //    (un bloqueo mixto explícito+silencioso burlaba los dos breakers).
+    let gotStoriesEver = false, emptyStreak = 0, blockedStreak = 0;
+    let held = [];   // vacíos no explicados de la racha abierta (sin postear)
+    let out = [];    // resultados listos para postear
+    let abort = null; // null | "explicita" | "confirmada" | "fria"
+    const throttledOf = (x) => ({ creator_id: x.creator_id, handle: x.handle, error: "throttled" });
+    const hasReel = (x) => Array.isArray(x?.reel_items) && x.reel_items.length > 0;
+    const flush = async () => { if (out.length) { await tally(await post(out), acc); out = []; } };
 
-      // Corte duro: EMPTY_ABORT vacías seguidas tras haber leído bien = bloqueo casi
-      // seguro. Dejamos de martillar la sesión (evita escalar a checkpoint/challenge de
-      // la cuenta), marcamos el RESTO como throttled (pending, se retoma en otro scan) y
-      // avisamos, en vez de escribir decenas de "No promocionó" falsos.
-      if (gotStoriesEver && emptyStreak >= EMPTY_ABORT) {
-        const rest = targets.slice(i + CHUNK).map((t) => ({ creator_id: t.creator_id, handle: t.handle, error: "throttled" }));
-        if (rest.length) { await tally(await post(rest), acc); done += rest.length; }
-        await setStatus(`⚠ IG limitó la sesión — frené para no marcar falsos "No". ${done}/${targets.length} · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}. Reintentá en un rato.`);
-        return;
+    // Prover: la última creadora vista CON historias. Se persiste ENTRE corridas para
+    // que una racha fría (desde la lectura #1) también pueda VERIFICAR en vez de
+    // abortar a ciegas (sin esto, un corte frío dejaba todo pending en el mismo orden
+    // → el reintento repetía idéntico → livelock del scanner con sesión sana).
+    let lastStoryTarget = (await chrome.storage.local.get("lastStoryBearer")).lastStoryBearer || null;
+
+    for (const t of targets) {
+      const r = await scanOne(t);
+      done += 1;
+      const hasStories = hasReel(r);
+      // Vacío EXPLICADO: privada que NO seguimos → reel vacío SIEMPRE (bloqueada o no).
+      // No dice nada de la sesión → no suma racha; el ingest la marca follow_pending.
+      const explainedEmpty = !hasStories && !r.error && r.is_private === true && r.following !== true;
+
+      if (r.error === "throttled") {
+        blockedStreak += 1;
+        // Evidencia EXPLÍCITA de sesión limitada con racha abierta → racha contaminada:
+        // los retenidos van a pending (no pueden pasar como "No" con un bloqueo a la vista).
+        if (held.length) { out.push(...held.map(throttledOf)); held = []; emptyStreak = 0; }
+      } else if (hasStories) blockedStreak = 0;
+
+      if (hasStories) {
+        gotStoriesEver = true; emptyStreak = 0;
+        lastStoryTarget = t;
+        chrome.storage.local.set({ lastStoryBearer: t }).catch(() => {}); // prover entre corridas
+        out.push(...held, r); held = []; // racha rota con sesión sana → eran vacíos reales ("No")
+      } else if (r.error || explainedEmpty) {
+        out.push(r);
+      } else {
+        emptyStreak += 1;
+        held.push(r); // retener: todavía no sabemos si es "sin historias" o bloqueo
       }
-      if (i + CHUNK < targets.length) await sleep(CHUNK_PAUSE);
+
+      if (blockedStreak >= BLOCKED_ABORT) {
+        abort = "explicita";
+      } else if (emptyStreak >= (gotStoriesEver ? EMPTY_VERIFY : EMPTY_ABORT_COLD)) {
+        if (lastStoryTarget) {
+          // Verificar antes de abortar: re-leemos a la última creadora QUE TUVO
+          // historias. ¿Siguen visibles? → sesión sana, la racha era casualidad (los
+          // retenidos pasan como "No" reales y seguimos). ¿Vacía o falla? → bloqueo.
+          // (Lectura local: NO se postea → no duplica nada en Maven.)
+          await sleep(jitter());
+          const v = await scanOne(lastStoryTarget);
+          if (hasReel(v)) {
+            gotStoriesEver = true; emptyStreak = 0; blockedStreak = 0;
+            out.push(...held); held = [];
+          } else {
+            abort = gotStoriesEver ? "confirmada" : "fria";
+          }
+        } else {
+          abort = "fria"; // nunca vimos historias (ni en corridas previas): no hay a quién re-leer
+        }
+      }
+      if (abort) break;
+
+      if (out.length >= CHUNK) await flush();
+      if (done % CHUNK === 0) {
+        await setStatus(`Escaneando… ${done}/${targets.length} · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}`);
+        if (done < targets.length) await sleep(CHUNK_PAUSE);
+      }
+      await sleep(jitter());
     }
-    await setStatus(`✔ Listo ${new Date().toLocaleString()} · ${done} creadoras · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}`);
+
+    if (abort) {
+      // Corte: seguir martillando una sesión limitada escala a checkpoint/challenge.
+      // Lo retenido va como throttled (pending) — NUNCA "No" falsos.
+      const scanned = done;
+      out.push(...held.map(throttledOf)); held = [];
+      if (abort === "fria") {
+        // Corte frío = NO verificado (puede ser sesión sana con racha de inactivas).
+        // La cola NO se postea: sin entry siguen rank 0 y el reintento arranca por
+        // targets frescos (rompe el livelock) — y el mensaje no culpa a IG en falso.
+        await flush();
+        await setStatus(`⚠ No pude confirmar la sesión (${EMPTY_ABORT_COLD} vacíos seguidos sin ver historias) — frené por precaución en ${scanned}/${targets.length} · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}. Lo no escaneado queda para el próximo intento.`);
+      } else {
+        out.push(...targets.slice(done).map(throttledOf));
+        await flush(); // tally ya cuenta la cola en acc.pending
+        await setStatus(`⚠ IG limitó la sesión — frené para no marcar falsos "No" en ${scanned}/${targets.length} · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}. Reintentá en un rato.`);
+      }
+      return;
+    }
+
+    // Racha abierta al terminar: verificamos UNA vez para decidir la cola retenida —
+    // sesión sana → "No" reales; sin prueba de sesión (o falla) → pending (nunca "No" a ciegas).
+    let tailNote = "";
+    if (held.length) {
+      const heldCount = held.length;
+      await sleep(jitter());
+      const v = lastStoryTarget ? await scanOne(lastStoryTarget) : null;
+      if (hasReel(v)) out.push(...held);
+      else { out.push(...held.map(throttledOf)); tailNote = ` (⏳${heldCount} sin confirmar — la verificación final vino vacía; esperá antes de reintentar)`; }
+      held = [];
+    }
+    await flush();
+    await setStatus(`✔ Listo ${new Date().toLocaleString()} · ${done} creadoras · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}${tailNote}`);
   } catch (e) {
     await setStatus(`⚠ Error: ${String(e).slice(0, 120)}`);
   } finally {
-    clearInterval(keepAlive);
+    if (keepAlive) clearInterval(keepAlive);
+    scanRunning = false;
   }
 }
 
