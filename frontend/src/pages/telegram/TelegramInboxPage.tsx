@@ -17,13 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import {
   ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign, UserCheck, Search,
   Reply, Trash2, Smile, Mic, Maximize2, X as XIcon, FileText,
-  Pin, Star, Archive, MailOpen, Eraser,
+  Pin, Star, Archive, MailOpen, Eraser, Instagram,
 } from "lucide-react";
+import { AssigneePicker } from "@/pages/inbox/AssigneePicker";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from "@/components/ui/context-menu";
@@ -92,8 +90,10 @@ const kindForMime = (mime: string) =>
 const isImageType = (t: string) => t === "photo" || t === "image" || t === "sticker";
 
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
+// assignees = multi-asignado N:N (tg_conversation_assignees); assigned_to queda
+// como "principal" (primero del set), igual que en WhatsApp.
 const CONV_COLS =
-  "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, manually_unread, created_at";
+  "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, manually_unread, created_at, assignees:tg_conversation_assignees(user_id)";
 const MSG_COLS =
   "id, direction, body, msg_type, media_url, sent_at, status, sender_user_id, reply_to_message_id, reply_to_external_id, reaction, deleted_at";
 
@@ -101,6 +101,7 @@ interface TgConv {
   id: string; account_id: string; peer_id: string;
   peer_name: string | null; peer_username: string | null;
   status: string | null; assigned_to: string | null;
+  assignees: { user_id: string }[] | null;
   last_message_at: string | null; last_message_preview: string | null;
   unread_count: number; archived: boolean; pinned: boolean; favorite: boolean;
   manually_unread: boolean; created_at: string;
@@ -236,16 +237,105 @@ const TelegramInboxPage = () => {
   // Nombre corto del closer que mandó un saliente (para etiquetar la burbuja: "quién lo mandó").
   const firstName = (id: string | null) => { const n = userName(id); return n ? n.split(/\s+/)[0] : null; };
 
-  const assignConversation = async (userId: string | null) => {
-    if (!selectedId) return;
-    setAssignOpen(false);
-    const { error } = await (supabase as any).rpc("tg_assign_conversation", {
-      p_conversation_id: selectedId, p_assignee: userId,
-    });
-    if (error) { toast({ title: t("tg.couldNotAssign"), description: error.message, variant: "destructive" }); return; }
+  // Asignados de la conversación abierta, con el principal (assigned_to) primero:
+  // ese orden se manda al RPC (p_user_ids[1] = nuevo principal). El fallback sin
+  // fila N:N cubre datos viejos escritos solo en assigned_to. Espejo de WhatsApp.
+  const selectedAssigneeIds = useMemo(() => {
+    if (!selected) return [] as string[];
+    const ids = (selected.assignees ?? []).map((a) => a.user_id);
+    const p = selected.assigned_to;
+    if (!p) return ids;
+    return [p, ...ids.filter((x) => x !== p)];
+  }, [selected]);
+  // Etiqueta corta del botón del header: "Nombre" o "Nombre +N".
+  const assigneeSummary =
+    selectedAssigneeIds.length === 0
+      ? null
+      : selectedAssigneeIds.length === 1
+        ? userName(selectedAssigneeIds[0])
+        : `${userName(selectedAssigneeIds[0])} +${selectedAssigneeIds.length - 1}`;
+  const assigneeNames = selectedAssigneeIds.map((id) => userName(id)).filter(Boolean).join(", ");
+
+  // ── Multi-asignado ────────────────────────────────────────────────────────
+  // Espejo del pump de WhatsApp (InboxPage): cada toggle actualiza el SET
+  // OBJETIVO por conversación y un único loop en vuelo lo drena mandando
+  // siempre el último set (coalescing). Evita RPCs concurrentes de set-completo
+  // (último-gana → pierde asignados) y toggles calculados sobre un cache pisado
+  // por un refetch en vuelo.
+  const assignDesiredRef = useRef(new Map<string, string[]>());
+  const assignUnsentRef = useRef(new Set<string>());
+  const assignPumpingRef = useRef(false);
+
+  const pumpAssignees = async () => {
+    if (assignPumpingRef.current) return;
+    assignPumpingRef.current = true;
+    let failed: string | null = null;
+    while (assignUnsentRef.current.size > 0) {
+      const convId = assignUnsentRef.current.values().next().value as string;
+      const ids = assignDesiredRef.current.get(convId) ?? [];
+      // Se saca de la cola ANTES de mandar: si llega otro toggle en vuelo,
+      // re-encola la conv y el loop re-manda el set más nuevo.
+      assignUnsentRef.current.delete(convId);
+      const { error } = await (supabase as any).rpc("tg_conversation_set_assignees", {
+        p_conversation_id: convId,
+        p_user_ids: ids,
+      });
+      if (error) {
+        // Dropear SOLO la conv que falló (ya salió de la cola arriba) y seguir
+        // drenando el resto: un error en A no debe descartar el toggle pendiente
+        // de B. El invalidate final revierte el patch optimista de la que falló.
+        failed = error.message;
+        continue;
+      }
+    }
+    // Sin awaits entre el fin del loop y acá → ningún toggle puede intercalarse.
+    assignDesiredRef.current.clear();
+    assignPumpingRef.current = false;
+    if (failed) toast({ title: t("tg.couldNotAssign"), description: failed, variant: "destructive" });
     qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
-    toast({ title: userId ? t("tg.assignedTo", { name: userName(userId) ?? "" }) : t("tg.assignmentRemoved") });
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversation-one"] });
   };
+
+  const setAssignees = async (ids: string[]) => {
+    if (!selectedId) return;
+    const convId = selectedId;
+    assignDesiredRef.current.set(convId, ids);
+    assignUnsentRef.current.add(convId);
+    // Cancelar los fetches en vuelo ANTES del patch optimista: si no, un refetch
+    // viejo resuelve después y "des-marca" solo el checkbox recién tocado.
+    await Promise.all([
+      qc.cancelQueries({ queryKey: ["tg-inbox-conversations"] }),
+      qc.cancelQueries({ queryKey: ["tg-inbox-conversation-one", convId] }),
+    ]);
+    const patch = (c: TgConv) =>
+      c.id === convId
+        ? { ...c, assigned_to: ids[0] ?? null, assignees: ids.map((user_id) => ({ user_id })) }
+        : c;
+    qc.setQueryData(["tg-inbox-conversations"], (rows: TgConv[] | undefined) => rows?.map(patch));
+    qc.setQueryData(["tg-inbox-conversation-one", convId], (c: TgConv | null | undefined) => (c ? patch(c) : c));
+    void pumpAssignees();
+  };
+
+  const toggleAssignee = (userId: string) => {
+    if (!selectedId) return;
+    // Base = set objetivo pendiente si hay edición en vuelo; si no, el del cache.
+    const base = assignDesiredRef.current.get(selectedId) ?? selectedAssigneeIds;
+    setAssignees(base.includes(userId) ? base.filter((x) => x !== userId) : [...base, userId]);
+  };
+
+  // @IG del lead resuelto por teléfono (peer_phone está revocado → RPC SECURITY
+  // DEFINER que devuelve SOLO el handle), espejo del botón de IG de WhatsApp (#822).
+  const { data: resolvedIg = null } = useQuery({
+    queryKey: ["tg-contact-ig", selectedId],
+    enabled: !!selectedId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_tg_contact_ig", { p_conversation_id: selectedId });
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+  });
+  const igHandle = (resolvedIg || "").replace(/^@/, "");
 
   // ── Acciones de la LISTA (click derecho): fijar / archivar / favorito / marcar no leído ──
   const toggleFlag = async (id: string, flag: "archived" | "pinned" | "favorite" | "manually_unread", value: boolean) => {
@@ -634,37 +724,56 @@ const TelegramInboxPage = () => {
                       <><AtSign className="h-3 w-3" />{selected.peer_username}<span className="mx-0.5">·</span></>
                     )}
                     <span>{channelLabel(selected.account_id)}</span>
+                    {igHandle && (
+                      <>
+                        <span className="mx-0.5">·</span>
+                        <a
+                          href={`https://instagram.com/${igHandle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted/60 px-1.5 py-0.5 transition-colors hover:bg-primary/15 hover:text-primary"
+                          title={t("tg.openInstagram")}
+                        >
+                          <Instagram className="h-3 w-3 shrink-0" />
+                          @{igHandle}
+                        </a>
+                      </>
+                    )}
                   </div>
                 </div>
                 {canAssign ? (
                   <Popover open={assignOpen} onOpenChange={setAssignOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title={t("tg.assignConversation")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto h-7 gap-1 text-xs"
+                        title={assigneeNames ? `${t("tg.assignedToLabel")}: ${assigneeNames}` : t("tg.assignConversation")}
+                      >
                         <UserCheck className="h-3.5 w-3.5" />
-                        {userName(selected.assigned_to) ?? t("tg.assign")}
+                        {assigneeSummary ?? t("tg.assign")}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-56 p-0">
-                      <Command>
-                        <CommandInput placeholder={t("common.searchPerson")} className="h-9" />
-                        <CommandList>
-                          <CommandEmpty>{t("common.noResults")}</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>{t("common.unassigned")}</CommandItem>
-                            {users.map((u) => (
-                              <CommandItem key={u.id} value={u.full_name || u.id} onSelect={() => assignConversation(u.id)}>
-                                {u.full_name || u.id.slice(0, 8)}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
+                      <AssigneePicker
+                        users={users}
+                        assignedIds={selectedAssigneeIds}
+                        onToggle={toggleAssignee}
+                        onClear={() => setAssignees([])}
+                        searchPlaceholder={t("common.searchPerson")}
+                        emptyText={t("common.noResults")}
+                        clearText={t("common.removeAllAssignees")}
+                      />
                     </PopoverContent>
                   </Popover>
                 ) : (
-                  <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title={t("tg.assignmentReadOnly")}>
+                  <span
+                    className="ml-auto flex items-center gap-1 text-xs text-muted-foreground"
+                    title={assigneeNames ? `${t("tg.assignedToLabel")}: ${assigneeNames}` : t("tg.assignmentReadOnly")}
+                  >
                     <UserCheck className="h-3.5 w-3.5" />
-                    {userName(selected.assigned_to) ?? t("common.unassigned")}
+                    {assigneeSummary ?? t("common.unassigned")}
                   </span>
                 )}
               </div>

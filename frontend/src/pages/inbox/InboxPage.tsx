@@ -33,7 +33,6 @@ import {
   ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ContextMenuCheckboxItem,
 } from "@/components/ui/context-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
@@ -44,6 +43,7 @@ import { GifPicker } from "./GifPicker";
 import { StickerPicker } from "./StickerPicker";
 import { MediaLightbox, type LightboxItem } from "./MediaLightbox";
 import { WaContactAvatar } from "./WaContactAvatar";
+import { AssigneePicker } from "./AssigneePicker";
 
 interface ConvRow {
   id: string;
@@ -60,6 +60,9 @@ interface ConvRow {
   favorite: boolean;
   manually_unread: boolean;
   labels: { label_id: string }[] | null;
+  // Multi-asignado N:N (wa_conversation_assignees). assigned_to = el "principal"
+  // (primero del set); acá vienen TODOS, incluido el principal.
+  assignees: { user_id: string }[] | null;
   contact: { id: string; display_name: string | null; manual_name: string | null; resolved_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
 }
 
@@ -213,7 +216,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), assignees:wa_conversation_assignees(user_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -236,7 +239,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), assignees:wa_conversation_assignees(user_id), contact:wa_contacts(id, display_name, manual_name, resolved_name, instagram_handle, wa_jid)",
         )
         .eq("id", selectedId)
         .maybeSingle();
@@ -378,6 +381,25 @@ const InboxPage = () => {
   }, [allConversations, search, chatFilter, labelFilter, showArchived, channelFilter]);
 
   const selected = allConversations.find((c) => c.id === selectedId) ?? null;
+
+  // Asignados de la conversación abierta, con el principal (assigned_to) primero:
+  // ese orden es el que se manda al RPC (p_user_ids[1] = nuevo principal). El
+  // fallback sin fila N:N cubre datos viejos escritos solo en assigned_to.
+  const selectedAssigneeIds = useMemo(() => {
+    if (!selected) return [] as string[];
+    const ids = (selected.assignees ?? []).map((a) => a.user_id);
+    const p = selected.assigned_to;
+    if (!p) return ids;
+    return [p, ...ids.filter((x) => x !== p)];
+  }, [selected]);
+  // Etiqueta corta del botón del header: "Nombre" o "Nombre +N".
+  const assigneeSummary =
+    selectedAssigneeIds.length === 0
+      ? null
+      : selectedAssigneeIds.length === 1
+        ? userName(selectedAssigneeIds[0])
+        : `${userName(selectedAssigneeIds[0])} +${selectedAssigneeIds.length - 1}`;
+  const assigneeNames = selectedAssigneeIds.map((id) => userName(id)).filter(Boolean).join(", ");
 
   // Resolver el @IG del LEAD por teléfono: wa_contacts.instagram_handle está vacío,
   // pero el número (phone_e164) matchea al lead en el pipeline → traemos su IG
@@ -729,19 +751,73 @@ const InboxPage = () => {
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
-  const assignConversation = async (userId: string | null) => {
-    if (!selectedId) return;
-    setAssignOpen(false);
-    const { error } = await (supabase as any).rpc("wa_assign_conversation", {
-      p_conversation_id: selectedId,
-      p_assignee: userId,
-    });
-    if (error) {
-      toast({ title: "No se pudo asignar", description: error.message, variant: "destructive" });
-      return;
+  // ── Multi-asignado ────────────────────────────────────────────────────────
+  // Cada toggle actualiza el SET OBJETIVO por conversación y un único loop en
+  // vuelo lo drena mandando siempre el último set (coalescing). Esto evita dos
+  // races reales (review adversarial del PR): (a) RPCs concurrentes de
+  // set-completo que commitean fuera de orden y pierden asignados (el RPC hace
+  // DELETE+INSERT, último-gana en bloque), y (b) toggles calculados sobre un
+  // cache pisado por un refetch en vuelo — el objetivo vive en el ref, no en el
+  // cache. desired conserva el set hasta confirmar que el server lo tiene.
+  const assignDesiredRef = useRef(new Map<string, string[]>());
+  const assignUnsentRef = useRef(new Set<string>());
+  const assignPumpingRef = useRef(false);
+
+  const pumpAssignees = async () => {
+    if (assignPumpingRef.current) return;
+    assignPumpingRef.current = true;
+    let failed: string | null = null;
+    while (assignUnsentRef.current.size > 0) {
+      const convId = assignUnsentRef.current.values().next().value as string;
+      const ids = assignDesiredRef.current.get(convId) ?? [];
+      // Se saca de la cola ANTES de mandar: si llega otro toggle en vuelo,
+      // re-encola la conv y el loop re-manda el set más nuevo.
+      assignUnsentRef.current.delete(convId);
+      const { error } = await (supabase as any).rpc("wa_conversation_set_assignees", {
+        p_conversation_id: convId,
+        p_user_ids: ids,
+      });
+      if (error) {
+        // Dropear SOLO la conv que falló (ya salió de la cola arriba) y seguir
+        // drenando el resto: un error en A no debe descartar el toggle pendiente
+        // de B. El invalidate final revierte el patch optimista de la que falló.
+        failed = error.message;
+        continue;
+      }
     }
+    // Sin awaits entre el fin del loop y acá → ningún toggle puede intercalarse.
+    assignDesiredRef.current.clear();
+    assignPumpingRef.current = false;
+    if (failed) toast({ title: "No se pudo asignar", description: failed, variant: "destructive" });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
-    toast({ title: userId ? `Asignada a ${userName(userId)}` : "Asignación quitada" });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversation-one"] });
+  };
+
+  const setAssignees = async (ids: string[]) => {
+    if (!selectedId) return;
+    const convId = selectedId;
+    assignDesiredRef.current.set(convId, ids);
+    assignUnsentRef.current.add(convId);
+    // Cancelar los fetches en vuelo ANTES del patch optimista: si no, un refetch
+    // viejo resuelve después y "des-marca" solo el checkbox recién tocado.
+    await Promise.all([
+      qc.cancelQueries({ queryKey: ["wa-inbox-conversations"] }),
+      qc.cancelQueries({ queryKey: ["wa-inbox-conversation-one", convId] }),
+    ]);
+    const patch = (c: ConvRow) =>
+      c.id === convId
+        ? { ...c, assigned_to: ids[0] ?? null, assignees: ids.map((user_id) => ({ user_id })) }
+        : c;
+    qc.setQueryData(["wa-inbox-conversations"], (rows: ConvRow[] | undefined) => rows?.map(patch));
+    qc.setQueryData(["wa-inbox-conversation-one", convId], (c: ConvRow | null | undefined) => (c ? patch(c) : c));
+    void pumpAssignees();
+  };
+
+  const toggleAssignee = (userId: string) => {
+    if (!selectedId) return;
+    // Base = set objetivo pendiente si hay edición en vuelo; si no, el del cache.
+    const base = assignDesiredRef.current.get(selectedId) ?? selectedAssigneeIds;
+    setAssignees(base.includes(userId) ? base.filter((x) => x !== userId) : [...base, userId]);
   };
 
   return (
@@ -1039,38 +1115,32 @@ const InboxPage = () => {
               {canAssign ? (
                 <Popover open={assignOpen} onOpenChange={setAssignOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto h-7 gap-1 text-xs"
+                      title={assigneeNames ? `Asignada a: ${assigneeNames}` : "Asignar conversación"}
+                    >
                       <UserCheck className="h-3.5 w-3.5" />
-                      {userName(selected.assigned_to) ?? "Asignar"}
+                      {assigneeSummary ?? "Asignar"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-56 p-0">
-                    <Command>
-                      <CommandInput placeholder="Buscar persona…" className="h-9" />
-                      <CommandList>
-                        <CommandEmpty>Sin resultados.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>
-                            Sin asignar
-                          </CommandItem>
-                          {users.map((u) => (
-                            <CommandItem
-                              key={u.id}
-                              value={u.full_name || u.id}
-                              onSelect={() => assignConversation(u.id)}
-                            >
-                              {u.full_name || u.id.slice(0, 8)}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
+                    <AssigneePicker
+                      users={users}
+                      assignedIds={selectedAssigneeIds}
+                      onToggle={toggleAssignee}
+                      onClear={() => setAssignees([])}
+                    />
                   </PopoverContent>
                 </Popover>
               ) : (
-                <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title="Asignación (solo lectura)">
+                <span
+                  className="ml-auto flex items-center gap-1 text-xs text-muted-foreground"
+                  title={assigneeNames ? `Asignada a: ${assigneeNames}` : "Asignación (solo lectura)"}
+                >
                   <UserCheck className="h-3.5 w-3.5" />
-                  {userName(selected.assigned_to) ?? "Sin asignar"}
+                  {assigneeSummary ?? "Sin asignar"}
                 </span>
               )}
               <Badge
@@ -1382,30 +1452,24 @@ const InboxPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <UserCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate">{userName(selected?.assigned_to ?? null) ?? "Sin asignar"}</span>
-                    <Popover open={assignPanelOpen} onOpenChange={setAssignPanelOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7">Reasignar</Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-56 p-0">
-                        <Command>
-                          <CommandInput placeholder="Buscar persona…" className="h-9" />
-                          <CommandList>
-                            <CommandEmpty>Sin resultados.</CommandEmpty>
-                            <CommandGroup>
-                              <CommandItem value="sin asignar" onSelect={() => { assignConversation(null); setAssignPanelOpen(false); }}>
-                                Sin asignar
-                              </CommandItem>
-                              {users.map((u) => (
-                                <CommandItem key={u.id} value={u.full_name ?? u.id} onSelect={() => { assignConversation(u.id); setAssignPanelOpen(false); }}>
-                                  {u.full_name ?? u.id.slice(0, 8)}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <span className="min-w-0 flex-1 break-words" title={assigneeNames || undefined}>
+                      {assigneeNames || "Sin asignar"}
+                    </span>
+                    {canAssign && (
+                      <Popover open={assignPanelOpen} onOpenChange={setAssignPanelOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7">Reasignar</Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-56 p-0">
+                          <AssigneePicker
+                            users={users}
+                            assignedIds={selectedAssigneeIds}
+                            onToggle={toggleAssignee}
+                            onClear={() => setAssignees([])}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 pt-1">
                     {(["open", "pending", "closed"] as const).map((st) => (

@@ -80,6 +80,7 @@ const translations = {
   "common.delete": { es: "Eliminar", en: "Delete" },
   "common.searchPerson": { es: "Buscar persona…", en: "Search person…" },
   "common.unassigned": { es: "Sin asignar", en: "Unassigned" },
+  "common.removeAllAssignees": { es: "Quitar todos", en: "Unassign all" },
 
   // Composer compartido (ChatComposer + pickers)
   "composer.recordAudio": { es: "Grabar audio", en: "Record audio" },
@@ -128,8 +129,8 @@ const translations = {
   "tg.assign": { es: "Asignar", en: "Assign" },
   "tg.assignmentReadOnly": { es: "Asignación (solo lectura)", en: "Assignment (read-only)" },
   "tg.couldNotAssign": { es: "No se pudo asignar", en: "Couldn't assign" },
-  "tg.assignedTo": { es: "Asignada a {name}", en: "Assigned to {name}" },
-  "tg.assignmentRemoved": { es: "Asignación quitada", en: "Assignment removed" },
+  "tg.assignedToLabel": { es: "Asignada a", en: "Assigned to" },
+  "tg.openInstagram": { es: "Abrir Instagram del lead", en: "Open lead's Instagram" },
   "tg.noMessages": { es: "Sin mensajes.", en: "No messages." },
   "tg.notDelivered": { es: "no entregado", en: "not delivered" },
   "tg.unreadOne": { es: "No leído", en: "Unread" },
