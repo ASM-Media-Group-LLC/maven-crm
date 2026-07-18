@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History } from "lucide-react";
+import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History, Phone } from "lucide-react";
 import ContactHistoryView from "./ContactHistoryView";
+import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +47,17 @@ interface Props {
 // + grid de stats + botones de acción.
 const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { isAdmin } = useUserRole();
+  const { permissions } = usePermissions();
+  // Teléfono visible: admin, o rol con el permiso EXPLÍCITO Contactos/Ver
+  // Teléfonos (mismo criterio default-deny que can_see_contact_phone() en la BD;
+  // no usamos canAccess() por su fallback bool_or). El server ya manda el número
+  // real solo a estos; para el resto la vista lo enmascara.
+  const canSeePhone =
+    isAdmin ||
+    permissions.some(
+      (p) => p.module === "Contactos" && p.submodule === "Ver Teléfonos" && p.can_access,
+    );
 
   // Notas hechas en cada contacto del closer (closer_contact_history), vía el
   // closer_creator vinculado por source_contact_id. Read-only.
@@ -83,6 +96,11 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     .toUpperCase() || "?";
   const recordType = (c as unknown as { record_type?: string }).record_type;
   const tipo = recordType === "reactivado" ? "Reactivado" : "Nuevo";
+  // Número completo (país + teléfono). El "•" indica que la vista lo enmascaró
+  // (no privilegiado) → no lo mostramos como si fuera el real.
+  const phoneText = (c.whatsapp || c.phone || "").trim();
+  const showPhone = canSeePhone && !!phoneText && !phoneText.includes("•");
+  const phoneDigits = phoneText.replace(/[^0-9+]/g, "");
   const stats: { label: string; value: React.ReactNode; full?: boolean }[] = [
     { label: "Creación", value: c.creacion || "—" },
     { label: "Registro", value: c.ticket || "—" },
@@ -117,9 +135,21 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
       label: "Contacto",
       full: true,
       value: (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <WaChatButton contactId={c.id} name={c.nombre} />
-          <TgChatButton contactId={c.id} name={c.nombre} />
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <WaChatButton contactId={c.id} name={c.nombre} />
+            <TgChatButton contactId={c.id} name={c.nombre} />
+          </div>
+          {showPhone && (
+            <a
+              href={`tel:${phoneDigits}`}
+              className="inline-flex items-center gap-1.5 text-sm text-foreground hover:underline"
+              title="Llamar / copiar número"
+            >
+              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="tabular-nums select-all">{phoneText}</span>
+            </a>
+          )}
         </div>
       ),
     },

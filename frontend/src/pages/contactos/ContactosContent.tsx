@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
@@ -37,6 +38,7 @@ import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
+import SellPlatformContactDialog from "./SellPlatformContactDialog";
 import CategoryAuditLog from "./CategoryAuditLog";
 import DataTableShell from "@/components/ui/data-table-shell";
 
@@ -115,11 +117,17 @@ const ContactosContent = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
+  const [sellOpen, setSellOpen] = useState(false);
+  const [sellContacto, setSellContacto] = useState<Contacto | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [page, setPage] = useState(restored.page ?? 1);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, isManager } = useUserRole();
+  const { canAccess } = usePermissions();
+  // "Vender plataforma" (mismo gate que el carrito de Creadoras): manda el
+  // contacto al pipeline de closers como deal de venta.
+  const canSellPlatform = canAccess("Closers", "Asignar Closer");
   // Canales de venta: visibles para TODOS los que pueden abrir Contactos (la ruta ya
   // gatea por permiso). Antes era solo admin/manager; ahora todo el equipo ve si una
   // creadora ya fue contactada y por qué línea. El RPC expone label de canal, no PII.
@@ -607,6 +615,7 @@ const ContactosContent = () => {
                   onView={handleView}
                   onEdit={handleEdit}
                   onConvert={handleConvert}
+                  onSellPlatform={canSellPlatform ? (c) => { setSellContacto(c); setSellOpen(true); } : undefined}
                   onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined}
                   channelsByContact={canSeeChannels ? salesChannels.byContactId : undefined}
                   statuses={contactStatuses}
@@ -636,6 +645,15 @@ const ContactosContent = () => {
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
+      {sellContacto && (
+        <SellPlatformContactDialog
+          open={sellOpen}
+          onOpenChange={setSellOpen}
+          contactId={sellContacto.id}
+          contactName={sellContacto.nombre}
+          instagramHandle={sellContacto.instagram}
+        />
+      )}
 
       {/* Auditoría — dialog liviano con SOLO el log de cambios de categoría
           (antes abría la analítica completa como popup, redundante con el Dashboard inline). */}

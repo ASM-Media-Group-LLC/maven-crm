@@ -127,7 +127,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Menú", "Messenger"),
   def("Menú", "Cowork"),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
-  def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto"]),
+  def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.
   def("Menú", "Tareas", ["List", "Kanban", "Analytics", "Docs"], ["Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"]),
   // Eventos: tabs del detalle del evento + acciones.

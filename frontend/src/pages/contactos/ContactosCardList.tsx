@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Trash2, ShoppingCart } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ interface Props {
   onView?: (contacto: Contacto) => void;
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
+  onSellPlatform?: (contacto: Contacto) => void;
   onDelete?: (contacto: Contacto) => void;
   // Mapa closers_contacts.id → canales de venta (provisto por ContactosContent).
   channelsByContact?: Map<string, ContactChannel[]>;
@@ -41,7 +42,7 @@ const ROW_BG: Record<ContactStatus, string> = {
 // Lista de cajones clickeables — mismo patrón que Pareto / Creator Reports
 // en Dashboard 2. Cada card muestra avatar IG, nombre, badge categoría,
 // fecha y links rápidos. Click abre popup detalle.
-const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, channelsByContact, statuses }: Props) => {
+const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatform, onDelete, channelsByContact, statuses }: Props) => {
   if (contactos.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
@@ -151,6 +152,11 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, cha
                     <DropdownMenuItem onClick={() => onConvert?.(c)}>
                       <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                     </DropdownMenuItem>
+                    {onSellPlatform && (
+                      <DropdownMenuItem onClick={() => onSellPlatform(c)}>
+                        <ShoppingCart className="mr-2 h-4 w-4" /> Vender plataforma
+                      </DropdownMenuItem>
+                    )}
                     {cleanHandle && (
                       <DropdownMenuItem onClick={() => window.open(`https://instagram.com/${cleanHandle}`, "_blank", "noopener,noreferrer")}>
                         <ExternalLink className="mr-2 h-4 w-4" /> Abrir Instagram

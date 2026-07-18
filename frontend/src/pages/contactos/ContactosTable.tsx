@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2 } from "lucide-react";
+import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2, ShoppingCart } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
@@ -39,6 +39,7 @@ interface Props {
   onView?: (contacto: Contacto) => void;
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
+  onSellPlatform?: (contacto: Contacto) => void;
   onDelete?: (contacto: Contacto) => void;
 }
 
@@ -50,7 +51,7 @@ const getAgentInitials = (name: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
-const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
+const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, onDelete }: Props) => {
   // Permisos: editar y eliminar contactos. Default heredado del padre
   // "Contactos" (sembrado en DB) → roles que tenían acceso al tab
   // siguen pudiendo editar/eliminar a menos que admin revoque.
@@ -208,6 +209,11 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                       <DropdownMenuItem onClick={() => onConvert?.(c)}>
                         <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                       </DropdownMenuItem>
+                      {onSellPlatform && (
+                        <DropdownMenuItem onClick={() => onSellPlatform(c)}>
+                          <ShoppingCart className="mr-2 h-4 w-4" /> Vender plataforma
+                        </DropdownMenuItem>
+                      )}
                       {onDelete && canDeleteContacto && (
                         <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" /> Eliminar
