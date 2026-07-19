@@ -45,12 +45,14 @@ export interface ScoreInput {
   needs_review?: boolean; // la IA la marcó para revisión manual (link/plataforma ambiguos)
 }
 
-// Plataformas que la agencia MANEJA → solo estas suman al score (decisión del dueño
-// 2026-06-11: OnlyFans + Unlok; las demás, ej. Fansly/Piclink, no las manejamos).
-const MANAGED = new Set(["onlyfans", "unlok"]);
-const KNOWN_UNMANAGED = new Set(["fansly", "piclink", "linktree"]);
+// Plataformas/funnels que la agencia MANEJA → solo estas suman al score.
+// Decisión del dueño 2026-06-11: OnlyFans + Unlok. Ampliada 2026-07-18: Piclink y
+// Linktree TAMBIÉN cuentan — son funnels de las creadoras hacia OF (piclink_url vive
+// en la ficha de la creadora), no plataformas rivales. Fansly sigue afuera.
+const MANAGED = new Set(["onlyfans", "unlok", "piclink", "linktree"]);
+const KNOWN_UNMANAGED = new Set(["fansly"]);
 
-/** ¿La promo es a una plataforma que manejamos (OF o Unlok)? Solo esas suman. */
+/** ¿La promo es a una plataforma/funnel que manejamos? Solo esas suman al score. */
 export function isManagedPromo(e: ScoreInput): boolean {
   const p = (e.platform || "").toLowerCase();
   const b = (e.buy_link_type || "").toLowerCase();

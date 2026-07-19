@@ -257,7 +257,9 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     const all = bucket.raw.map(mapEntry);
     const seen = new Map<string, PromologEntry>();
     for (const s of all) {
-      if (!s.evidence_url) continue;
+      // Sin foto normalmente no entra a la galería — EXCEPTO los "Sí": una promo que
+      // disparó el día no puede quedar invisible (la galería muestra "Sin imagen").
+      if (!s.evidence_url && s.result !== "Sí") continue;
       const key = s.apify_run_id && s.story_index != null ? `${s.apify_run_id}:${s.story_index}` : `id:${s.id}`;
       const prev = seen.get(key);
       if (!prev || (!prev.evidence_url && s.evidence_url)) seen.set(key, s);
@@ -278,7 +280,8 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     const dayNetworks = [...byNet.entries()].map(([network, netAll]) => {
       const seenN = new Map<string, PromologEntry>();
       for (const s of netAll) {
-        if (!s.evidence_url) continue;
+        // Igual que arriba: los "Sí" entran aunque no tengan foto (tile "Sin imagen").
+        if (!s.evidence_url && s.result !== "Sí") continue;
         const key = s.apify_run_id && s.story_index != null ? `${s.apify_run_id}:${s.story_index}` : `id:${s.id}`;
         const prev = seenN.get(key);
         if (!prev || (!prev.evidence_url && s.evidence_url)) seenN.set(key, s);

@@ -557,7 +557,15 @@ const PromologContent = () => {
         const stories = collectDayStories(entries, rep).filter(
           (s) => (s.network || "").toLowerCase() === network,
         );
-        return { network, stories, promoted: list.some((e) => e.result === "Sí") };
+        // collectDayStories (rama bot) ancla la galería al RUN del rep — pero el dedup
+        // por story_pk del backend reparte las historias del día en VARIOS runs (cada
+        // re-scan solo inserta las NUEVAS). Una promo del primer scan del día quedaba
+        // INVISIBLE si el rep era de otro run: día "Sí" con todas las tiles en "No"
+        // (caso lapameli 18-jul). Los "Sí" del día entran SIEMPRE — la galería ya
+        // renderiza "Sin imagen" si la entry no tiene evidencia.
+        const seen = new Set(stories.map((s) => s.id));
+        const missingSi = list.filter((e) => e.result === "Sí" && !seen.has(e.id));
+        return { network, stories: [...stories, ...missingSi], promoted: list.some((e) => e.result === "Sí") };
       })
       .sort((a, b) => {
         const ia = ORDER.indexOf(a.network), ib = ORDER.indexOf(b.network);
