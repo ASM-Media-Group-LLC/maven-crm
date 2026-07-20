@@ -283,12 +283,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     r => r.status !== "resolved" && r.id !== oneOnOneRequestId
   );
 
-  // Quién está compartiendo pantalla en una sala (presence de media). Compartir ya
-  // es directo para todos — el dashboard solo lo MUESTRA, no lo aprueba.
-  const getRoomSharers = (roomId: string) =>
-    getRoomParticipants(roomId)
-      .filter(a => mediaStates[a.user_id]?.screenShareOn)
-      .map(a => cowork.profiles[a.user_id] || "User");
+  // Quién comparte pantalla en cada sala — VERDAD de LiveKit reportada por cada
+  // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
+  // mostraba "nadie comparte" aunque alguien lo estuviera haciendo).
+  const [roomSharers, setRoomSharers] = useState<Record<string, string[]>>({});
+  const getRoomSharers = (roomId: string) => roomSharers[roomId] ?? [];
 
   const handleAddRoom = async () => {
     const name = addName.trim();
@@ -650,6 +649,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
                                 enabled={activeRoomId !== room.id}
+                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
                               />
                             </>
                           ) : (
@@ -662,6 +662,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
                                 enabled={activeRoomId !== room.id}
+                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
                               />
                             </div>
                           )}

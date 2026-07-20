@@ -18,6 +18,8 @@ interface Props {
   // Cuando el coordinador ENTRÓ a esta misma sala, el monitor se apaga: si no, aparecería
   // dos veces (📢 monitor + él mismo como participante). Default true.
   enabled?: boolean;
+  // Reporta quién está compartiendo pantalla en esta sala (verdad de LiveKit, no presence).
+  onSharersChange?: (names: string[]) => void;
 }
 
 // Adjunta un track de video remoto a un <video>.
@@ -48,12 +50,14 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true }: Props) {
+export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange }: Props) {
   const [videoTracks, setVideoTracks] = useState<Array<{ sid: string; track: any }>>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   const [status, setStatus] = useState<"connecting" | "ready" | "error">("connecting");
   const roomRef = useRef<Room | null>(null);
   const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
+  const onSharersRef = useRef(onSharersChange);
+  onSharersRef.current = onSharersChange;
 
   const getToken = useCallback(async () => {
     const r = await issueToken("monitor_room", roomId);
@@ -63,7 +67,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   // Conexión (una sola vez por sala). Si el coordinador entró a esta sala, NO conectamos
   // el monitor (evita la doble presencia 📢-monitor + participante real).
   useEffect(() => {
-    if (!enabled) { setStatus("connecting"); return; }
+    if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); return; }
     let cancelled = false;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
@@ -80,9 +84,27 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
       setAudioTracks((prev) => prev.filter((t) => t.sid !== track.sid));
     };
 
+    // Verdad de LiveKit: escanea las publicaciones de la sala y reporta quién comparte
+    // pantalla (source=ScreenShare). Más confiable que el presence auto-reportado.
+    const recomputeSharers = () => {
+      if (!roomRef.current) return;
+      const names: string[] = [];
+      roomRef.current.remoteParticipants.forEach((p: any) => {
+        const sharing = Array.from(p.trackPublications.values()).some(
+          (pub: any) => pub.source === Track.Source.ScreenShare && pub.kind === Track.Kind.Video,
+        );
+        if (sharing) names.push(p.name || p.identity || "Alguien");
+      });
+      onSharersRef.current?.(names);
+    };
+
     room
-      .on(RoomEvent.TrackSubscribed, (t: any, p: any) => addTrack(t, p))
-      .on(RoomEvent.TrackUnsubscribed, (t: any) => rmTrack(t))
+      .on(RoomEvent.TrackSubscribed, (t: any, p: any) => { addTrack(t, p); recomputeSharers(); })
+      .on(RoomEvent.TrackUnsubscribed, (t: any) => { rmTrack(t); recomputeSharers(); })
+      .on(RoomEvent.TrackPublished, () => recomputeSharers())
+      .on(RoomEvent.TrackUnpublished, () => recomputeSharers())
+      .on(RoomEvent.ParticipantConnected, () => recomputeSharers())
+      .on(RoomEvent.ParticipantDisconnected, () => recomputeSharers())
       .on(RoomEvent.Disconnected, () => { if (!cancelled) setStatus("error"); });
 
     (async () => {
@@ -95,6 +117,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
         room.remoteParticipants.forEach((p: any) => {
           p.trackPublications.forEach((pub: any) => { if (pub.track && pub.isSubscribed) addTrack(pub.track, pub); });
         });
+        recomputeSharers();
       } catch {
         if (!cancelled) setStatus("error");
       }
@@ -102,6 +125,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
 
     return () => {
       cancelled = true;
+      onSharersRef.current?.([]);
       setVideoTracks([]);
       setAudioTracks([]);
       const clone = publishedCloneRef.current;
