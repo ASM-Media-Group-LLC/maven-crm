@@ -444,14 +444,22 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   // De ahí deriva la visibilidad por membresía; si la instancia no está
   // registrada todavía, queda null (solo admin lo ve, hasta que se mapee).
   let channelId: string | null = null;
+  let channelDept: string | null = null;
   let channelDefaults: string[] = []; // usuarios auto-asignados a conversaciones nuevas de esta línea
   if (channelJid) {
     const { data: ch } = await sb
-      .from("wa_channels").select("id, default_assignees")
+      .from("wa_channels").select("id, department, default_assignees")
       .eq("tenant_id", TENANT_ID).eq("evolution_instance", channelJid).maybeSingle();
     channelId = ch?.id ?? null;
+    channelDept = (ch?.department as string | undefined) ?? null;
     channelDefaults = Array.isArray(ch?.default_assignees) ? (ch!.default_assignees as string[]) : [];
   }
+  // Departamento de la conversación = el de la LÍNEA (misma whitelist que
+  // wa-inbox-open). Antes se hardcodeaba "closer" → las conversaciones de la
+  // línea Managers quedaban department='closer' y la visibilidad por
+  // departamento (wa_supervises_department) se las mostraba a los supervisores
+  // de closers.
+  const dept = ["closer", "manager", "recruitment"].includes(channelDept ?? "") ? channelDept! : "closer";
 
   // 2) Conversación: la del contacto EN ESTA LÍNEA (canal). Antes buscaba por
   //    (contacto + department) SIN canal → un contacto que escribía a 2 líneas
@@ -461,7 +469,7 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   let conversationId: string;
   let convQ = sb
     .from("wa_conversations").select("id")
-    .eq("contact_id", contactId).eq("department", "closer");
+    .eq("contact_id", contactId).eq("department", dept);
   if (channelId) convQ = convQ.eq("channel_id", channelId);
   else if (channelJid) convQ = convQ.eq("channel_jid", channelJid);
   const { data: convs } = await convQ.order("created_at", { ascending: false }).limit(1);
@@ -470,7 +478,7 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   } else {
     const { data: created, error } = await sb
       .from("wa_conversations")
-      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, channel_id: channelId, department: "closer", status: "open",
+      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, channel_id: channelId, department: dept, status: "open",
                 // Auto-asignación por LÍNEA: el "principal" es el 1° de la lista (null si no hay).
                 assigned_to: channelDefaults[0] ?? null })
       .select("id").single();
