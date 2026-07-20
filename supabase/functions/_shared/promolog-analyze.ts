@@ -144,6 +144,35 @@ export function normalizeHandle(h: string): string {
   return raw.replace(/\/$/, "").toLowerCase();
 }
 
+// ¿El link (dominio desconocido) es el funnel PROPIO de la creadora? Regla del owner:
+// un link que contiene su @/nick de OF o su nombre = promo a OF (las modelos no pueden
+// linkear OF directo en IG → usan página propia: bybio.co/bysaritac, mariajose.co…).
+// ⚠️ Match por SEGMENTOS alfanuméricos (host labels + partes del path), NUNCA contra el
+// URL concatenado: "shop.com/ariadna" fusionado sería "shopcomariadna" y matchearía
+// "maria" en falso (borde .com↔path). Reglas anti-falso-positivo:
+//  · IDENTIDAD (handle IG + nicks de OF): son slugs distintivos → substring dentro de
+//    cualquier segmento (host o path). "saritac" ⊆ "bysaritac" ✓. Tokens de 4 chars
+//    exigen segmento EXACTO (un nick corto genérico no debe pescar /california).
+//  · NOMBRE real (más colisionable: maria/laura/…): solo contra segmentos del HOST y
+//    con ≥5 chars → "mariajose.co" cuenta; "/maria-collection" en un afiliado NO.
+export function matchesCreatorFunnel(
+  decoded: string | null | undefined,
+  host: string | null | undefined,
+  handle: string | null | undefined,
+  ofNicks: string[] = [],
+  name?: string | null,
+): boolean {
+  const norm = (t: string) => (t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const segs = String(decoded || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const hostSegs = String(host || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const idTokens = [handle, ...(ofNicks ?? [])].map(norm).filter((t) => t.length >= 4);
+  const nameTokens = String(name || "").split(/\s+/).map(norm).filter((t) => t.length >= 5);
+  const idHit = idTokens.some((t) =>
+    segs.some((s) => (t.length >= 5 ? s.includes(t) : s === t)));
+  const nameHit = nameTokens.some((t) => hostSegs.some((s) => s.includes(t)));
+  return idHit || nameHit;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
   const chunk = 0x8000;
@@ -506,16 +535,17 @@ async function processStory(args: {
   const linkIsPromo = linkClass.tier === "paid" || linkClass.tier === "aggregator";
   // Las modelos NO pueden poner link directo a OnlyFans en IG (está prohibido) → usan su
   // PROPIA página / dominio custom (ej. danikmichell.co, aynaraeder.cl) como funnel hacia OF.
-  // Un link sticker a un dominio desconocido (tier 'unknown') QUE CONTIENE su handle/nick es
-  // casi seguro ese funnel → cuenta como PROMO, aunque la visión no haya visto el sticker en
-  // el thumbnail. OJO: exigimos el match con la creadora para NO marcar afiliados/productos
+  // Un link sticker QUE CONTIENE su handle/nick/nombre es casi seguro ese funnel → cuenta
+  // como PROMO, aunque la visión no haya visto el sticker en el thumbnail.
+  // ⚠️ Matcheamos contra TODO el link (host + path), no solo el host: el nombre suele ir en
+  // el path (bybio.co/bysaritac, link.me/x/saritac) → con host-only se perdía (caso SaritaC
+  // 2026-07-19). OJO: exigimos el match con la creadora para NO marcar afiliados/productos
   // (thecbdperfection.com, solzetech.com…) que también son dominios desconocidos pero NO son
   // su funnel de OF.
-  const hostNorm = (linkClass.host || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const creatorTokens = [creator.sourceHandle, ...(creator.ofNicks ?? []), ...((creator.name || "").split(/\s+/))]
-    .map((t) => (t || "").toLowerCase().replace(/[^a-z0-9]/g, ""))
-    .filter((t) => t.length >= 4);
-  const linkMatchesCreator = !!hostNorm && creatorTokens.some((t) => hostNorm.includes(t));
+  const linkMatchesCreator = matchesCreatorFunnel(
+    linkClass.decoded || story.linkUrl, linkClass.host,
+    creator.sourceHandle, creator.ofNicks, creator.name,
+  );
   const linkIsOwnFunnel = linkClass.tier === "unknown" && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator;
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
     ? linkClass.platform : (creator.knownPlatform ?? (linkIsOwnFunnel ? "onlyfans" : "other"));
@@ -526,17 +556,28 @@ async function processStory(args: {
       reasoning: `Link a casino/apuestas (${linkClass.host}) — afiliado, no es contenido pago de la creadora → No. ${final.reasoning ?? ""}`.slice(0, 240),
     };
     analysisLevel += "+casino_discard";
-  } else if ((linkIsPromo || linkIsOwnFunnel) && !final.promoted) {
+  } else if (linkIsPromo || linkIsOwnFunnel) {
+    // Hay un sticker de link a promo/funnel propio → es PROMO. Idempotente: corre AUNQUE
+    // la visión ya haya dicho Sí, para normalizar has_buy_link/buy_link_type y anotar el
+    // link — si no, quedaban filas "promoted=true con razonamiento 'no hay ningún link'"
+    // (caso SaritaC: la visión no vio el sticker en el thumbnail). Solo respetamos el
+    // razonamiento de la visión si ya describía un buy-link real (no lo pisamos).
+    const keepReason = final.promoted && final.has_buy_link;
     final = {
-      ...final, promoted: true, promotion_type: "direct", has_buy_link: true, buy_link_type: linkPlatform,
+      ...final,
+      promoted: true,
+      promotion_type: final.promoted && final.promotion_type !== "none" ? final.promotion_type : "direct",
+      has_buy_link: true,
+      buy_link_type: (final.buy_link_type && final.buy_link_type !== "other") ? final.buy_link_type : linkPlatform,
       platform_mentioned: final.platform_mentioned && final.platform_mentioned !== "ninguna"
         ? final.platform_mentioned : (creator.knownPlatform ?? "onlyfans"),
-      reasoning: `Sticker de link → ${linkClass.host} (${linkIsPromo ? "CTA a contenido pago" : "página/funnel propio → OF (link directo a OF está prohibido en IG)"}). ${final.reasoning ?? ""}`.slice(0, 240),
+      reasoning: keepReason
+        ? final.reasoning
+        : `Sticker de link → ${linkClass.host} (${linkIsPromo ? "CTA a contenido pago" : "página/funnel propio → OF (link directo a OF está prohibido en IG)"}).`.slice(0, 240),
     };
     analysisLevel += linkIsPromo ? "+link_sticker" : "+link_sticker_funnel";
   } else if (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type)) {
-    if (linkIsPromo || linkIsOwnFunnel) final = { ...final, buy_link_type: linkPlatform };
-    else if (linkClass.tier === "none" && creator.knownPlatform) final = { ...final, buy_link_type: creator.knownPlatform };
+    if (linkClass.tier === "none" && creator.knownPlatform) final = { ...final, buy_link_type: creator.knownPlatform };
   }
 
   // Red de seguridad watermark: la IA dice que HAY buy-link a plataforma MANEJADA (OF)

@@ -92,3 +92,9 @@ Deno.test("funnel propio custom (host no listado)", () => {
   // el mismo dominio SIN ser su funnel → unknown
   assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Fmi-dominio-custom.xyz%2Fx&e=AT"), "unknown");
 });
+
+Deno.test("bybio.co es link-in-bio conocido → aggregator/onlyfans (caso SaritaC)", () => {
+  const c = classifyLinkDestination("https://l.instagram.com/?u=https%3A%2F%2Fbybio.co%2Fbysaritac&e=AT");
+  assertEquals(c.tier, "aggregator");
+  assertEquals(c.platform, "onlyfans");
+});

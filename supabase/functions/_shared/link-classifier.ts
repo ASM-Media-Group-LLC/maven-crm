@@ -102,6 +102,9 @@ const AGGREGATOR: Record<string, string> = {
   // pero raros en estas modelos; se tratan como funnel (baja frecuencia).
   "fanlink.to": "fanlink",
   "lnk.to": "lnkto",
+  // bybio.co — link-in-bio (literal "by bio"); las modelos lo usan de funnel a OF
+  // (caso SaritaC 2026-07-19: bybio.co/bysaritac). Como piclink → etiqueta OnlyFans.
+  "bybio.co": "onlyfans",
 };
 
 // ── Dominios NO-PAGOS (host → ) — link acá NO es promo ───────────────────────
