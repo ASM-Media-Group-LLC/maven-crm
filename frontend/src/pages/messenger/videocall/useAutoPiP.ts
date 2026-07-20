@@ -69,6 +69,9 @@ export function useAutoPiP(getRoom: () => Room | null, enabled: boolean) {
     let entering = false;
     const enterPiP = async () => {
       if (entering || document.pictureInPictureElement) return;
+      // Si ya hay una ventana Document-PiP abierta (ej. el Hub popped-out), no abrimos
+      // además el PiP de video: chocarían.
+      if ((window as { documentPictureInPicture?: { window?: Window | null } }).documentPictureInPicture?.window) return;
       const track = pickTrack();
       if (!track) return; // llamada solo-audio → no hay nada que mostrar
       entering = true;

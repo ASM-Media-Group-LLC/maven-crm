@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +9,12 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
-  Pin, PinOff, PhoneOff,
+  Pin, PinOff, PhoneOff, PictureInPicture2,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
+import { usePipWindow } from "./usePipWindow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -54,6 +56,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   });
   const [hubPinned, setHubPinned] = useState<boolean>(() => localStorage.getItem("cowork.hub.pinned") !== "0");
   const hubPanelRef = useRef<HTMLDivElement | null>(null);
+  // Tamaño manual de la ventanita in-page (resize por la esquina). null = tamaño default.
+  const [hubSize, setHubSize] = useState<{ w: number; h: number } | null>(() => {
+    try { const raw = localStorage.getItem("cowork.hub.size"); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  // Ventana FLOTANTE del SO (Document PiP): always-on-top real + mover a otro monitor +
+  // resize nativo. El botón pin la abre; si el navegador no la soporta, cae al pin z-index.
+  const hubPip = usePipWindow();
 
   const toggleHubPinned = () => {
     setHubPinned(p => {
@@ -61,6 +70,41 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       try { localStorage.setItem("cowork.hub.pinned", next ? "1" : "0"); } catch { /* noop */ }
       return next;
     });
+  };
+
+  // Abre el Hub como ventana flotante del SO (pop-out). Fallback: toggle z-index.
+  const popOutHub = async () => {
+    if (hubPip.pipWindow) { hubPip.closePip(); return; }
+    if (hubPip.supported) {
+      const ok = await hubPip.openPip({ width: hubSize?.w ?? 480, height: hubSize?.h ?? 420 });
+      if (!ok) { toast.error("No pude abrir la ventana flotante"); toggleHubPinned(); }
+    } else {
+      toast.info("Tu navegador no soporta ventana flotante multi-monitor (usá Chrome/Edge). Fijo al frente dentro de Maven.");
+      toggleHubPinned();
+    }
+  };
+
+  // Resize de la ventanita in-page desde la esquina inferior derecha.
+  const startHubResize = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const panel = hubPanelRef.current;
+    if (!panel) return;
+    // Anclar a top-left (si estaba en la esquina por default) para que crezca natural.
+    const rect = panel.getBoundingClientRect();
+    if (!hubPos) setHubPos({ x: rect.left, y: rect.top });
+    const startX = e.clientX, startY = e.clientY, startW = rect.width, startH = rect.height;
+    const onMove = (ev: PointerEvent) => {
+      const w = Math.min(Math.max(280, startW + (ev.clientX - startX)), window.innerWidth - 16);
+      const h = Math.min(Math.max(220, startH + (ev.clientY - startY)), window.innerHeight - 16);
+      setHubSize({ w, h });
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setHubSize(s => { if (s) { try { localStorage.setItem("cowork.hub.size", JSON.stringify(s)); } catch { /* noop */ } } return s; });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
 
   // Drag genérico desde la barra de título de una ventana flotante (Hub o Sala).
@@ -730,9 +774,42 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         </div>
       )}
 
-      {/* Floating Host Hub pop-up — arrastrable (barra de título) + pin always-on-top +
-          colgar explícito. Sobrevive a navegar entre salas (no se desconecta al entrar). */}
-      {hubConnected && cowork.session?.host_hub_livekit_room && (
+      {/* HUB EN VENTANA FLOTANTE DEL SO (Document PiP): always-on-top real, movible a
+          cualquier monitor, resize nativo. Portalizamos el call view a esa ventana. */}
+      {hubConnected && cowork.session?.host_hub_livekit_room && hubPip.pipWindow && createPortal(
+        <div className="w-full h-screen flex flex-col bg-card text-foreground">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
+            <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium">
+              <Headphones className="h-3 w-3" /> Coordinador Hub
+            </div>
+            <div className="flex gap-1">
+              <Button variant="secondary" size="sm" className="h-6 gap-1 rounded-full px-2.5 text-[11px]" onClick={hubPip.closePip} title="Traer de vuelta a Maven">
+                <ArrowLeft className="h-3 w-3" /> A Maven
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive/80" onClick={() => { hubPip.closePip(); setHubConnected(false); }} title="Colgar llamada">
+                <PhoneOff className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <LiveKitCallView
+              roomName={cowork.session.host_hub_livekit_room}
+              displayName={displayName}
+              callDisplayName="Coordinador Hub"
+              isAdmin={true}
+              onLeave={() => { hubPip.closePip(); setHubConnected(false); }}
+              hideShareLink hideLeaveButton suppressLeaveToast
+              initialMicOn={false} initialCamOn={false}
+              getToken={getHubToken}
+            />
+          </div>
+        </div>,
+        hubPip.pipWindow.document.body,
+      )}
+
+      {/* Ventanita del Hub DENTRO de Maven (cuando NO está en ventana flotante).
+          Arrastrable, redimensionable por la esquina, y con pop-out a ventana del SO. */}
+      {hubConnected && cowork.session?.host_hub_livekit_room && !hubPip.pipWindow && (
         <div
           className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${
             hubPos && !hubMaximized ? "" : "bottom-4 right-4"
@@ -752,12 +829,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           )}
           <div
             ref={hubPanelRef}
-            className={`rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
+            className={`relative rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
               hubMaximized
                 ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
-                : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
+                : hubSize ? "" : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
             } ${hubMinimized ? "hidden" : ""}`}
-            style={!hubMaximized ? { height: "380px" } : undefined}
+            style={hubMaximized ? undefined : {
+              ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 380 }),
+            }}
           >
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
               <div
@@ -772,11 +851,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubPinned ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
-                  onClick={toggleHubPinned}
-                  title={hubPinned ? "Fijado al frente (click para soltar)" : "Fijar al frente (always on top)"}
+                  className={`h-5 w-5 ${hubPinned && !hubPip.supported ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={popOutHub}
+                  title={hubPip.supported
+                    ? "Ventana flotante: siempre al frente y movible a otro monitor"
+                    : (hubPinned ? "Fijado al frente (click para soltar)" : "Fijar al frente")}
                 >
-                  {hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+                  {hubPip.supported ? <PictureInPicture2 className="h-3 w-3" /> : (hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />)}
                 </Button>
                 <Button
                   variant="ghost"
@@ -823,6 +904,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 compact={!hubMaximized}
               />
             </div>
+            {/* Handle de resize (esquina inferior derecha), solo en modo ventanita. */}
+            {!hubMaximized && (
+              <div
+                onPointerDown={startHubResize}
+                title="Arrastrá para cambiar el tamaño"
+                className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none z-10"
+                style={{ background: "linear-gradient(135deg, transparent 50%, hsl(var(--muted-foreground)/0.5) 50%)" }}
+              />
+            )}
           </div>
         </div>
       )}
