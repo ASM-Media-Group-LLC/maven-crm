@@ -605,6 +605,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 hearOn={hearFor(room.id)}
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
+                                enabled={activeRoomId !== room.id}
                               />
                             </>
                           ) : (
@@ -616,6 +617,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 hearOn={hearFor(room.id)}
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
+                                enabled={activeRoomId !== room.id}
                               />
                             </div>
                           )}

@@ -15,6 +15,9 @@ interface Props {
   // track base compartido para no capturar el micro N veces.
   broadcastOn: boolean;
   micBaseTrack: MediaStreamTrack | null;
+  // Cuando el coordinador ENTRÓ a esta misma sala, el monitor se apaga: si no, aparecería
+  // dos veces (📢 monitor + él mismo como participante). Default true.
+  enabled?: boolean;
 }
 
 // Adjunta un track de video remoto a un <video>.
@@ -45,7 +48,7 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack }: Props) {
+export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true }: Props) {
   const [videoTracks, setVideoTracks] = useState<Array<{ sid: string; track: any }>>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   const [status, setStatus] = useState<"connecting" | "ready" | "error">("connecting");
@@ -57,8 +60,10 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
     return { token: r.token, url: r.url };
   }, [roomId, issueToken]);
 
-  // Conexión (una sola vez por sala).
+  // Conexión (una sola vez por sala). Si el coordinador entró a esta sala, NO conectamos
+  // el monitor (evita la doble presencia 📢-monitor + participante real).
   useEffect(() => {
+    if (!enabled) { setStatus("connecting"); return; }
     let cancelled = false;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
@@ -108,7 +113,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
       try { room.disconnect(); } catch { /* noop */ }
       roomRef.current = null;
     };
-  }, [getToken]);
+  }, [getToken, enabled]);
 
   // Publicar / dejar de publicar el micro según broadcastOn + micBaseTrack.
   useEffect(() => {
