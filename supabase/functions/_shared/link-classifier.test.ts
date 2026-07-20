@@ -2,7 +2,7 @@
 // (ennidwong, elizabeth, leona) + red-team de parsing (workflow 2026-06-24).
 // Correr: deno test supabase/functions/_shared/link-classifier.test.ts
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { classifyLinkDestination, type LinkTier } from "./link-classifier.ts";
+import { classifyLinkDestination, isShortener, type LinkTier } from "./link-classifier.ts";
 
 function tier(raw: string | null | undefined, funnelHosts: string[] = []): LinkTier {
   return classifyLinkDestination(raw, funnelHosts).tier;
@@ -97,4 +97,12 @@ Deno.test("bybio.co es link-in-bio conocido → aggregator/onlyfans (caso Sarita
   const c = classifyLinkDestination("https://l.instagram.com/?u=https%3A%2F%2Fbybio.co%2Fbysaritac&e=AT");
   assertEquals(c.tier, "aggregator");
   assertEquals(c.platform, "onlyfans");
+});
+
+Deno.test("isShortener — acortadores sí, funnels/dominios no", () => {
+  assertEquals(isShortener("rebrand.ly"), true);   // caso carolinaromo (→ STOCKITY, no OF)
+  assertEquals(isShortener("bit.ly"), true);
+  assertEquals(isShortener("bybio.co"), false);     // link-in-bio, no acortador
+  assertEquals(isShortener("aynaraeder.cl"), false);// funnel custom propio
+  assertEquals(isShortener("t.me"), false);
 });

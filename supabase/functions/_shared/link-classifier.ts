@@ -150,6 +150,14 @@ function matchSuffix(host: string, domains: Iterable<string>): string | null {
   return null;
 }
 
+// ¿El host es un acortador genérico (bit.ly, rebrand.ly, cutt.ly…)? Un acortador OCULTA
+// el destino real → un nombre/handle en su path NO prueba que sea el funnel de OF de la
+// creadora (ej. rebrand.ly/carolinaromo_4_ig apuntaba a STOCKITY, un afiliado de trading).
+// La regla del funnel propio NO debe volcar estos a "promo OF" solo por el nombre.
+export function isShortener(host: string | null | undefined): boolean {
+  return !!matchSuffix(String(host || "").toLowerCase(), SHORTENERS);
+}
+
 // new URL tolerante: reintenta con https:// si falta el esquema (el actor a veces
 // devuelve el link ya desenvuelto y sin http → "piclink.me/x").
 function safeUrl(s: string): URL | null {

@@ -7,7 +7,7 @@
 // de la creadora. Salida: inserta 1 promolog_entry por historia (o 1 "No/sin
 // historia" / "sin datos" cuando corresponde) y devuelve el conteo.
 
-import { classifyLinkDestination } from "./link-classifier.ts";
+import { classifyLinkDestination, isShortener } from "./link-classifier.ts";
 
 export const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 export const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";
@@ -546,7 +546,11 @@ async function processStory(args: {
     linkClass.decoded || story.linkUrl, linkClass.host,
     creator.sourceHandle, creator.ofNicks, creator.name,
   );
-  const linkIsOwnFunnel = linkClass.tier === "unknown" && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator;
+  // ⚠️ NO cuenta como funnel propio si el host es un ACORTADOR: oculta el destino, y las
+  // modelos marcan sus links de AFILIADO con su propio nombre (rebrand.ly/carolinaromo_4_ig
+  // → STOCKITY, trading). El nombre en el path de un acortador no prueba que sea su OF.
+  const linkIsOwnFunnel = linkClass.tier === "unknown" && !isShortener(linkClass.host)
+    && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator;
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
     ? linkClass.platform : (creator.knownPlatform ?? (linkIsOwnFunnel ? "onlyfans" : "other"));
 
