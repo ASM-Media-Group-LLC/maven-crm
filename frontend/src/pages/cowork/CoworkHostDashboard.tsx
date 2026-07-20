@@ -54,7 +54,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   });
   const [hubPinned, setHubPinned] = useState<boolean>(() => localStorage.getItem("cowork.hub.pinned") !== "0");
   const hubPanelRef = useRef<HTMLDivElement | null>(null);
-  const hubDragRef = useRef<{ dx: number; dy: number } | null>(null);
 
   const toggleHubPinned = () => {
     setHubPinned(p => {
@@ -64,28 +63,31 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     });
   };
 
-  // Drag desde la barra de título (no cuando está maximizada). Clampeado al viewport.
-  const onHubDragStart = (e: React.PointerEvent) => {
-    if (hubMaximized) return;
-    const rect = hubPanelRef.current?.getBoundingClientRect();
+  // Drag genérico desde la barra de título de una ventana flotante (Hub o Sala).
+  // Clampeado al viewport; persiste la posición al soltar.
+  const startWindowDrag = (
+    e: React.PointerEvent,
+    panelRef: React.MutableRefObject<HTMLDivElement | null>,
+    setPos: (p: { x: number; y: number } | null) => void,
+    storageKey: string,
+  ) => {
+    const rect = panelRef.current?.getBoundingClientRect();
     if (!rect) return;
-    hubDragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    const dx = e.clientX - rect.left;
+    const dy = e.clientY - rect.top;
+    let last: { x: number; y: number } | null = null;
     const onMove = (ev: PointerEvent) => {
-      const drag = hubDragRef.current;
-      const panel = hubPanelRef.current;
-      if (!drag || !panel) return;
-      const x = Math.min(Math.max(8, ev.clientX - drag.dx), window.innerWidth - panel.offsetWidth - 8);
-      const y = Math.min(Math.max(8, ev.clientY - drag.dy), window.innerHeight - panel.offsetHeight - 8);
-      setHubPos({ x, y });
+      const panel = panelRef.current;
+      if (!panel) return;
+      const x = Math.min(Math.max(8, ev.clientX - dx), window.innerWidth - panel.offsetWidth - 8);
+      const y = Math.min(Math.max(8, ev.clientY - dy), window.innerHeight - panel.offsetHeight - 8);
+      last = { x, y };
+      setPos(last);
     };
     const onUp = () => {
-      hubDragRef.current = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      setHubPos(p => {
-        if (p) { try { localStorage.setItem("cowork.hub.pos", JSON.stringify(p)); } catch { /* noop */ } }
-        return p;
-      });
+      if (last) { try { localStorage.setItem(storageKey, JSON.stringify(last)); } catch { /* noop */ } }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -93,7 +95,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // 1:1 state
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
+  const [oneOnOneName, setOneOnOneName] = useState<string | null>(null);
   const oneOnOneSeenInListRef = useRef(false);
+  // Ventana persistente de la SALA activa (mismo patrón que el Hub): entrar a una sala
+  // abre la llamada MAXIMIZADA; restaurar/minimizar la deja viva en una ventanita.
+  // Colgar SOLO con el botón rojo (como Google) — navegar no corta la llamada.
+  const [roomWinMinimized, setRoomWinMinimized] = useState(false);
+  const [roomWinMaximized, setRoomWinMaximized] = useState(true);
+  const [roomPos, setRoomPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem("cowork.room.pos");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const roomPanelRef = useRef<HTMLDivElement | null>(null);
   // Gestión de salas (añadir / editar / cerrar)
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -167,10 +182,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // El viejo "liberar el micrófono" ya no aplica: cada call view captura su propio
     // track solo al activarlo, y la central de audio ya publica clones a varias salas.
     setHubMaximized(false);
+    // Si ya estoy conectado a ESTA sala, solo restaurar la ventana (no reconectar).
+    if (activeRoomId === roomId) {
+      setRoomWinMinimized(false);
+      setRoomWinMaximized(true);
+      return;
+    }
+    const switching = !!activeRoomId;
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
-  }, [cowork.rooms]);
+    setRoomWinMinimized(false);
+    setRoomWinMaximized(true);
+    // Cambiar de sala = moverse: la anterior se cuelga (no se puede estar en dos salas).
+    if (switching) toast.info(`Te moviste a ${room.name}`);
+  }, [cowork.rooms, activeRoomId]);
 
   const getHubToken = useCallback(async () => {
     const result = await cowork.issueLiveKitToken("join_host_hub");
@@ -182,10 +208,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken, activeRoomId]);
 
+  // COLGAR la sala (único camino para desconectarse — navegar no cuelga).
   const leaveActiveRoom = useCallback(() => {
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
+    setRoomWinMinimized(false);
+    setRoomWinMaximized(true);
     // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
     // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
   }, []);
@@ -196,6 +225,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     }
     setOneOnOneRoom(null);
     setOneOnOneRequestId(null);
+    setOneOnOneName(null);
   }, [oneOnOneRequestId, cowork.resolveHostRequest]);
 
   useEffect(() => {
@@ -208,10 +238,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!oneOnOneSeenInListRef.current) return;
     if (!req || req.status === "resolved") {
       leaveOneOnOne();
-      leaveActiveRoom();
       toast.info("Llamada privada finalizada");
     }
-  }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne, leaveActiveRoom]);
+  }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne]);
 
   const getOneOnOneToken = useCallback(async () => {
     if (!oneOnOneRequestId) throw new Error("No 1:1 request");
@@ -404,9 +433,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             await cowork.ackHostRequest(req.id);
                             setOneOnOneRequestId(req.id);
                             setOneOnOneRoom(req.oneone_livekit_room!);
-                            setActiveRoomLk(req.oneone_livekit_room!);
-                            setActiveRoomId(null);
-                            setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
+                            setOneOnOneName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                             setHubMinimized(true);
                           } else {
                             if (req.room_id) enterRoom(req.room_id);
@@ -420,9 +447,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <Button size="sm" variant="ghost" className="h-5 text-[10px] text-primary rounded-full" onClick={() => {
                           setOneOnOneRequestId(req.id);
                           setOneOnOneRoom(req.oneone_livekit_room!);
-                          setActiveRoomLk(req.oneone_livekit_room!);
-                          setActiveRoomId(null);
-                          setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
+                          setOneOnOneName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                           setHubMinimized(true);
                         }}>
                           Unirse a llamada privada
@@ -459,28 +484,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         </ScrollArea>
       </div>
 
-      {/* Main content area */}
+      {/* Main content area — solo las llamadas 1:1 viven acá; las SALAS viven en su
+          ventana persistente (abajo) para que navegar no las cuelgue. */}
       <div className="flex-1 flex flex-col min-h-0">
-        {activeRoomLk ? (
+        {oneOnOneRoom && oneOnOneRequestId ? (
           <div className="flex-1 min-h-0">
             <LiveKitCallView
-              key={activeRoomLk}
-              roomName={activeRoomLk}
+              key={oneOnOneRoom}
+              roomName={oneOnOneRoom}
               displayName={displayName}
-              callDisplayName={activeRoomName || undefined}
-              isAdmin={!oneOnOneRoom}
-              onLeave={() => {
-                if (oneOnOneRoom) {
-                  leaveOneOnOne();
-                }
-                leaveActiveRoom();
-              }}
+              callDisplayName={oneOnOneName || "Llamada privada"}
+              isAdmin={false}
+              onLeave={() => { leaveOneOnOne(); }}
               hideShareLink
               suppressLeaveToast
-              autoLeaveOnEmpty={oneOnOneRoom ? 3000 : undefined}
+              autoLeaveOnEmpty={3000}
               initialMicOn={false}
               initialCamOn={false}
-              getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
+              getToken={getOneOnOneToken}
               leaveLabel="Regresar a dashboard"
               leaveIcon={ArrowLeft}
             />
@@ -673,6 +694,93 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         )}
       </div>
 
+      {/* Ventana PERSISTENTE de la sala activa (como Google: navegar no cuelga; solo el
+          botón rojo cuelga). Abre maximizada; restaurar la deja flotante y arrastrable. */}
+      {activeRoomLk && activeRoomId && (
+        <div
+          className={`fixed flex flex-col items-start z-[110] ${roomPos && !roomWinMaximized ? "" : "bottom-4 left-4"}`}
+          style={roomPos && !roomWinMaximized ? { left: roomPos.x, top: roomPos.y } : undefined}
+        >
+          {roomWinMinimized && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5 shadow-lg border border-border bg-card hover:bg-muted text-primary rounded-full"
+              onClick={() => setRoomWinMinimized(false)}
+            >
+              <DoorOpen className="h-3.5 w-3.5" />
+              {activeRoomName || "Sala"}
+            </Button>
+          )}
+          <div
+            ref={roomPanelRef}
+            className={`rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
+              roomWinMaximized
+                ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
+                : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
+            } ${roomWinMinimized ? "hidden" : ""}`}
+            style={!roomWinMaximized ? { height: "380px" } : undefined}
+          >
+            <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
+              <div
+                className={`flex flex-1 items-center gap-1.5 text-xs text-primary font-medium select-none ${roomWinMaximized ? "" : "cursor-move touch-none"}`}
+                onPointerDown={(e) => { if (!roomWinMaximized) startWindowDrag(e, roomPanelRef, setRoomPos, "cowork.room.pos"); }}
+                title={roomWinMaximized ? undefined : "Arrastrá para mover la ventana"}
+              >
+                <DoorOpen className="h-3 w-3" />
+                {activeRoomName || "Sala"}
+              </div>
+              <div className="flex gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  onClick={() => { setRoomWinMinimized(true); setRoomWinMaximized(false); }}
+                  title="Minimizar (la llamada sigue)"
+                >
+                  <span className="text-xs leading-none">−</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setRoomWinMaximized(!roomWinMaximized)}
+                  title={roomWinMaximized ? "Restaurar (la llamada sigue en la ventanita)" : "Maximizar"}
+                >
+                  {roomWinMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-destructive hover:text-destructive/80"
+                  onClick={leaveActiveRoom}
+                  title="Colgar llamada"
+                >
+                  <PhoneOff className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0">
+              <LiveKitCallView
+                key={activeRoomLk}
+                roomName={activeRoomLk}
+                displayName={displayName}
+                callDisplayName={activeRoomName || undefined}
+                isAdmin={true}
+                onLeave={leaveActiveRoom}
+                hideShareLink
+                suppressLeaveToast
+                initialMicOn={false}
+                initialCamOn={false}
+                getToken={getActiveRoomToken}
+                compact={!roomWinMaximized}
+                leaveLabel="Colgar"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Host Hub pop-up — arrastrable (barra de título) + pin always-on-top +
           colgar explícito. Sobrevive a navegar entre salas (no se desconecta al entrar). */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
@@ -705,7 +813,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
               <div
                 className={`flex flex-1 items-center gap-1.5 text-xs text-amber-500 font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
-                onPointerDown={onHubDragStart}
+                onPointerDown={(e) => { if (!hubMaximized) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
                 title={hubMaximized ? undefined : "Arrastrá para mover la ventana"}
               >
                 <Headphones className="h-3 w-3" />
