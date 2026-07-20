@@ -48,24 +48,15 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
   const [closerId, setCloserId] = useState<string>(POOL);
 
   // Lista de closers a los que asignar (mismo patrón que AssignCloserDialog).
-  // Los roles en BD son case-sensitive.
+  // RPC SECURITY DEFINER: leer user_roles directo solo andaba para admins (la RLS
+  // le devolvía 0 filas a cualquier otro rol → lista vacía).
   const { data: closers = [] } = useQuery({
     queryKey: ["closers-list-only"],
     enabled: open,
     queryFn: async () => {
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .in("role", ["closer", "Closer Supervisor", "admin"]);
+      const { data, error } = await (supabase as any).rpc("get_assignable_closers");
       if (error) throw error;
-      const ids = [...new Set((roles || []).map((r: any) => r.user_id))];
-      if (ids.length === 0) return [] as { id: string; full_name: string }[];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids)
-        .order("full_name", { ascending: true });
-      return (profiles || []) as { id: string; full_name: string }[];
+      return (data || []) as { id: string; full_name: string }[];
     },
   });
 

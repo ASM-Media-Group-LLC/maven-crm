@@ -46,23 +46,12 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
   const { data: closers = [] } = useQuery({
     queryKey: ["closers-list-only"],
     queryFn: async () => {
-      // OJO: los roles en BD son case-sensitive. Closer Supervisor (con
-      // espacio + Mayúsculas) es el role real, no "supervisor". Incluimos
-      // todas las variantes que pueden ser asignadas como responsable de
-      // un cierre: closer (LLG sin supervisor), Closer Supervisor, y admin.
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .in("role", ["closer", "Closer Supervisor", "admin"]);
+      // RPC SECURITY DEFINER (closer + Closer Supervisor + admin): leer user_roles
+      // directo solo funcionaba para admins — la RLS le devolvía 0 filas a un team
+      // leader y el diálogo quedaba "No se encontró ningún closer".
+      const { data, error } = await (supabase as any).rpc("get_assignable_closers");
       if (error) throw error;
-      const userIds = Array.from(new Set(data.map((r) => r.user_id)));
-      if (userIds.length === 0) return [];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", userIds)
-        .order("full_name", { ascending: true });
-      return profiles || [];
+      return (data || []) as { id: string; full_name: string }[];
     },
     enabled: open,
   });
