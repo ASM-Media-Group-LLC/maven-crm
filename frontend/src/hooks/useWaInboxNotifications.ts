@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
-import { getInboxSoundMuted } from "@/hooks/useInboxSoundMuted";
+import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
   useBrowserNotifications,
   useNotificationPermission,
@@ -129,7 +129,7 @@ export function useWaInboxNotifications() {
           const now = Date.now();
           const soundOk =
             s.sound_enabled !== false &&
-            !getInboxSoundMuted(userId) &&
+            !getChannelSoundMuted("wa", userId) &&
             now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
 

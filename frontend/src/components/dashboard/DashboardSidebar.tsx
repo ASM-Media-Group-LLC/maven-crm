@@ -29,7 +29,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useInboxSoundMuted } from "@/hooks/useInboxSoundMuted";
+import { useChannelSoundMuted, type MuteChannel } from "@/hooks/useChannelSoundMuted";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -37,6 +37,35 @@ import { cn } from "@/lib/utils";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-3 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
+// Cuando una fila de menú tiene su botón de mute (WhatsApp/Telegram/Messenger),
+// el NavLink reserva espacio a la derecha para que ni el título ni el badge se
+// metan debajo del botón (posicionado absoluto sobre la fila).
+const LINK_CLASS_WITH_MUTE = `${LINK_CLASS} pr-9`;
+
+// Botón para SILENCIAR el sonido de las notificaciones de UN canal (WhatsApp,
+// Telegram o Messenger). Va a la derecha de la fila del tab. Es un botón aparte
+// del NavLink (no navega): stopPropagation + preventDefault por si el gesto
+// burbujea. VolumeX rojo = silenciado; Volume2 tenue = con sonido. Oculto en el
+// sidebar colapsado (icon-only) por falta de espacio.
+const ChannelMuteButton = ({ channel }: { channel: MuteChannel }) => {
+  const { muted, toggle } = useChannelSoundMuted(channel);
+  const label = muted ? "Activar sonido de notificaciones" : "Silenciar sonido de notificaciones";
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
+      title={label}
+      aria-label={label}
+      aria-pressed={muted}
+      className={cn(
+        "absolute right-1.5 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-colors hover:bg-foreground/10 group-data-[collapsible=icon]:hidden",
+        muted ? "text-destructive" : "text-muted-foreground/60 hover:text-foreground",
+      )}
+    >
+      {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+    </button>
+  );
+};
 
 // Picks the URL with the LONGEST prefix match against `pathname`. Sin
 // esto, dos items hermanos cuyas URLs se solapan (ej: /hr/horarios y
@@ -64,10 +93,10 @@ const DashboardSidebar = () => {
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount } = useSidebarBadges();
 
-  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
+  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
-    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
+    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
@@ -102,13 +131,13 @@ const DashboardSidebar = () => {
     canAccess("Creator Sales", item.submodule),
   );
 
-  const operationsMenuAll = [
-    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined as string | undefined },
+  const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined; muteChannel?: MuteChannel }[] = [
+    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined },
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
-    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined as string | undefined },
-    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined as string | undefined },
+    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined, muteChannel: "wa" },
+    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined, muteChannel: "tg" },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
@@ -355,7 +384,7 @@ const DashboardSidebar = () => {
               {mainMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
@@ -365,6 +394,7 @@ const DashboardSidebar = () => {
                       )}
                     </NavLink>
                   </SidebarMenuButton>
+                  {item.muteChannel && <ChannelMuteButton channel={item.muteChannel} />}
                 </SidebarMenuItem>
               ))}
 
@@ -406,7 +436,7 @@ const DashboardSidebar = () => {
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                    <NavLink to={item.url} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
@@ -416,6 +446,7 @@ const DashboardSidebar = () => {
                       )}
                     </NavLink>
                   </SidebarMenuButton>
+                  {item.muteChannel && <ChannelMuteButton channel={item.muteChannel} />}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -744,15 +775,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const profileQ = useMyProfile();
-  const { canAccess } = usePermissions();
-  // Mute del sonido de notificaciones de las bandejas/chats: WhatsApp + Telegram +
-  // Messenger. Messenger es universal, así que en la práctica el botón se ve para
-  // todos; el OR deja explícito el alcance.
-  const { muted: inboxSoundMuted, toggle: toggleInboxSound } = useInboxSoundMuted();
-  const canMuteInbox = canAccess("WhatsApp") || canAccess("Telegram") || canAccess("Messenger");
-  const muteTitle = inboxSoundMuted
-    ? "Activar sonido de WhatsApp, Telegram y Messenger"
-    : "Silenciar sonido de WhatsApp, Telegram y Messenger";
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -813,22 +835,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         )}
-        {canMuteInbox && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-8 w-8 rounded-full",
-              inboxSoundMuted ? "text-destructive" : "text-muted-foreground",
-            )}
-            onClick={toggleInboxSound}
-            title={muteTitle}
-            aria-label={muteTitle}
-            aria-pressed={inboxSoundMuted}
-          >
-            {inboxSoundMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </Button>
-        )}
         <Button
           variant="ghost"
           size="icon"
@@ -876,23 +882,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
             title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        )}
-        {/* Silenciar sonido de WhatsApp + Telegram + Messenger (mute per-dispositivo). */}
-        {canMuteInbox && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-8 w-8 shrink-0 rounded-full",
-              inboxSoundMuted ? "text-destructive" : "text-muted-foreground",
-            )}
-            onClick={toggleInboxSound}
-            title={muteTitle}
-            aria-label={muteTitle}
-            aria-pressed={inboxSoundMuted}
-          >
-            {inboxSoundMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </Button>
         )}
         {/* Settings — icon button al lado del theme toggle.
