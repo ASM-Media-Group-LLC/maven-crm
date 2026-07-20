@@ -97,18 +97,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const [oneOnOneName, setOneOnOneName] = useState<string | null>(null);
   const oneOnOneSeenInListRef = useRef(false);
-  // Ventana persistente de la SALA activa (mismo patrón que el Hub): entrar a una sala
-  // abre la llamada MAXIMIZADA; restaurar/minimizar la deja viva en una ventanita.
-  // Colgar SOLO con el botón rojo (como Google) — navegar no corta la llamada.
-  const [roomWinMinimized, setRoomWinMinimized] = useState(false);
-  const [roomWinMaximized, setRoomWinMaximized] = useState(true);
-  const [roomPos, setRoomPos] = useState<{ x: number; y: number } | null>(() => {
-    try {
-      const raw = localStorage.getItem("cowork.room.pos");
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
-  const roomPanelRef = useRef<HTMLDivElement | null>(null);
+  // La SALA activa se muestra a pantalla completa mientras estás en ella; salir
+  // ("Volver al dashboard" o el rojo) la cuelga. La ÚNICA ventana miniatura es la
+  // del Coordinador Hub (pedido del owner) — los videos de las salas ya se ven en
+  // vivo en las cards del dashboard.
   // Gestión de salas (añadir / editar / cerrar)
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -182,18 +174,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // El viejo "liberar el micrófono" ya no aplica: cada call view captura su propio
     // track solo al activarlo, y la central de audio ya publica clones a varias salas.
     setHubMaximized(false);
-    // Si ya estoy conectado a ESTA sala, solo restaurar la ventana (no reconectar).
-    if (activeRoomId === roomId) {
-      setRoomWinMinimized(false);
-      setRoomWinMaximized(true);
-      return;
-    }
+    // Ya estoy en esta sala → nada que hacer.
+    if (activeRoomId === roomId) return;
     const switching = !!activeRoomId;
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
-    setRoomWinMinimized(false);
-    setRoomWinMaximized(true);
     // Cambiar de sala = moverse: la anterior se cuelga (no se puede estar en dos salas).
     if (switching) toast.info(`Te moviste a ${room.name}`);
   }, [cowork.rooms, activeRoomId]);
@@ -208,13 +194,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken, activeRoomId]);
 
-  // COLGAR la sala (único camino para desconectarse — navegar no cuelga).
+  // Salir de la sala (Volver al dashboard o el botón rojo) = colgar ESA sala.
   const leaveActiveRoom = useCallback(() => {
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
-    setRoomWinMinimized(false);
-    setRoomWinMaximized(true);
     // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
     // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
   }, []);
@@ -694,100 +678,52 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         )}
       </div>
 
-      {/* Ventana PERSISTENTE de la sala activa (como Google: navegar no cuelga; solo el
-          botón rojo cuelga). Abre maximizada; restaurar la deja flotante y arrastrable. */}
+      {/* Sala activa a PANTALLA COMPLETA. Salir ("Volver al dashboard" o el rojo) la
+          cuelga — sin ventanita de sala: la única miniatura es la del Hub, y los videos
+          de las salas ya se ven en vivo en las cards del dashboard. */}
       {activeRoomLk && activeRoomId && (
-        <div
-          className={`fixed flex flex-col items-start z-[110] ${roomPos && !roomWinMaximized ? "" : "bottom-4 left-4"}`}
-          style={roomPos && !roomWinMaximized ? { left: roomPos.x, top: roomPos.y } : undefined}
-        >
-          {roomWinMinimized && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-1.5 shadow-lg border border-border bg-card hover:bg-muted text-primary rounded-full"
-              onClick={() => setRoomWinMinimized(false)}
-            >
-              <DoorOpen className="h-3.5 w-3.5" />
+        <div className="fixed inset-4 z-[110] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
+            <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
+              <DoorOpen className="h-3 w-3" />
               {activeRoomName || "Sala"}
-            </Button>
-          )}
-          <div
-            ref={roomPanelRef}
-            className={`rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
-              roomWinMaximized
-                ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
-                : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
-            } ${roomWinMinimized ? "hidden" : ""}`}
-            style={!roomWinMaximized ? { height: "380px" } : undefined}
-          >
-            <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
-              <div
-                className={`flex flex-1 items-center gap-1.5 text-xs text-primary font-medium select-none ${roomWinMaximized ? "" : "cursor-move touch-none"}`}
-                onPointerDown={(e) => { if (!roomWinMaximized) startWindowDrag(e, roomPanelRef, setRoomPos, "cowork.room.pos"); }}
-                title={roomWinMaximized ? undefined : "Arrastrá para mover la ventana"}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-6 gap-1 rounded-full px-2.5 text-[11px]"
+                onClick={leaveActiveRoom}
+                title="Salir de la sala y volver al dashboard"
               >
-                <DoorOpen className="h-3 w-3" />
-                {activeRoomName || "Sala"}
-              </div>
-              <div className="flex items-center gap-0.5">
-                {roomWinMaximized && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-6 gap-1 rounded-full px-2.5 text-[11px] mr-1"
-                    onClick={() => setRoomWinMaximized(false)}
-                    title="Volver al dashboard — la llamada sigue en una ventanita"
-                  >
-                    <ArrowLeft className="h-3 w-3" /> Volver al dashboard
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={() => { setRoomWinMinimized(true); setRoomWinMaximized(false); }}
-                  title="Minimizar (la llamada sigue)"
-                >
-                  <span className="text-xs leading-none">−</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={() => setRoomWinMaximized(!roomWinMaximized)}
-                  title={roomWinMaximized ? "Restaurar (la llamada sigue en la ventanita)" : "Maximizar"}
-                >
-                  {roomWinMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-destructive hover:text-destructive/80"
-                  onClick={leaveActiveRoom}
-                  title="Colgar llamada"
-                >
-                  <PhoneOff className="h-3 w-3" />
-                </Button>
-              </div>
+                <ArrowLeft className="h-3 w-3" /> Volver al dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-destructive hover:text-destructive/80"
+                onClick={leaveActiveRoom}
+                title="Colgar llamada"
+              >
+                <PhoneOff className="h-3 w-3" />
+              </Button>
             </div>
-            <div className="flex-1 min-h-0">
-              <LiveKitCallView
-                key={activeRoomLk}
-                roomName={activeRoomLk}
-                displayName={displayName}
-                callDisplayName={activeRoomName || undefined}
-                isAdmin={true}
-                onLeave={leaveActiveRoom}
-                hideShareLink
-                suppressLeaveToast
-                initialMicOn={false}
-                initialCamOn={false}
-                getToken={getActiveRoomToken}
-                compact={!roomWinMaximized}
-                leaveLabel="Colgar"
-              />
-            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <LiveKitCallView
+              key={activeRoomLk}
+              roomName={activeRoomLk}
+              displayName={displayName}
+              callDisplayName={activeRoomName || undefined}
+              isAdmin={true}
+              onLeave={leaveActiveRoom}
+              hideShareLink
+              suppressLeaveToast
+              initialMicOn={false}
+              initialCamOn={false}
+              getToken={getActiveRoomToken}
+              leaveLabel="Colgar"
+            />
           </div>
         </div>
       )}
