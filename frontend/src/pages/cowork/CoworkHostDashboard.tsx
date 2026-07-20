@@ -730,7 +730,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <DoorOpen className="h-3 w-3" />
                 {activeRoomName || "Sala"}
               </div>
-              <div className="flex gap-0.5">
+              <div className="flex items-center gap-0.5">
+                {roomWinMaximized && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-6 gap-1 rounded-full px-2.5 text-[11px] mr-1"
+                    onClick={() => setRoomWinMaximized(false)}
+                    title="Volver al dashboard — la llamada sigue en una ventanita"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Volver al dashboard
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
