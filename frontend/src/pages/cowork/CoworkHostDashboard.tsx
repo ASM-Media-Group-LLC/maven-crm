@@ -8,6 +8,7 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
+  Pin, PinOff, PhoneOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -44,6 +45,51 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
+  // Ventana del Hub: arrastrable (posición persistida) + pin "always on top".
+  const [hubPos, setHubPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem("cowork.hub.pos");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const [hubPinned, setHubPinned] = useState<boolean>(() => localStorage.getItem("cowork.hub.pinned") !== "0");
+  const hubPanelRef = useRef<HTMLDivElement | null>(null);
+  const hubDragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  const toggleHubPinned = () => {
+    setHubPinned(p => {
+      const next = !p;
+      try { localStorage.setItem("cowork.hub.pinned", next ? "1" : "0"); } catch { /* noop */ }
+      return next;
+    });
+  };
+
+  // Drag desde la barra de título (no cuando está maximizada). Clampeado al viewport.
+  const onHubDragStart = (e: React.PointerEvent) => {
+    if (hubMaximized) return;
+    const rect = hubPanelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    hubDragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    const onMove = (ev: PointerEvent) => {
+      const drag = hubDragRef.current;
+      const panel = hubPanelRef.current;
+      if (!drag || !panel) return;
+      const x = Math.min(Math.max(8, ev.clientX - drag.dx), window.innerWidth - panel.offsetWidth - 8);
+      const y = Math.min(Math.max(8, ev.clientY - drag.dy), window.innerHeight - panel.offsetHeight - 8);
+      setHubPos({ x, y });
+    };
+    const onUp = () => {
+      hubDragRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setHubPos(p => {
+        if (p) { try { localStorage.setItem("cowork.hub.pos", JSON.stringify(p)); } catch { /* noop */ } }
+        return p;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
   // 1:1 state
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
@@ -116,9 +162,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
     if (!room) return;
-    // Disconnect Hub to free the microphone — the browser tab can only reliably
-    // publish a single mic track to a single LiveKit room at a time.
-    setHubConnected(false);
+    // El Hub NO se desconecta al entrar a una sala (pedido 2026-07-20: navegar entre
+    // meets sin colgar — la pantalla compartida del Hub sigue viva en la ventanita).
+    // El viejo "liberar el micrófono" ya no aplica: cada call view captura su propio
+    // track solo al activarlo, y la central de audio ya publica clones a varias salas.
     setHubMaximized(false);
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
@@ -139,13 +186,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
-    // Reconnect to the Coordinator Hub when leaving a room
-    if (cowork.session?.host_hub_livekit_room) {
-      setHubConnected(true);
-      setHubMinimized(false);
-      toast.info("Volviendo al Coordinador Hub");
-    }
-  }, [cowork.session?.host_hub_livekit_room]);
+    // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
+    // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
+  }, []);
 
   const leaveOneOnOne = useCallback(async () => {
     if (oneOnOneRequestId) {
@@ -309,9 +352,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Radio className={`h-3 w-3 ${hubConnected ? "text-success" : "text-muted-foreground/50"}`} />
               <span>Coordinador Hub</span>
-              {activeRoomLk ? (
-                <span className="text-[10px] text-warning/80 italic">en pausa (en sala)</span>
-              ) : hubConnected ? (
+              {hubConnected ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -632,9 +673,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         )}
       </div>
 
-      {/* Floating Host Hub pop-up */}
+      {/* Floating Host Hub pop-up — arrastrable (barra de título) + pin always-on-top +
+          colgar explícito. Sobrevive a navegar entre salas (no se desconecta al entrar). */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
+        <div
+          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${
+            hubPos && !hubMaximized ? "" : "bottom-4 right-4"
+          }`}
+          style={hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
+        >
           {hubMinimized && (
             <Button
               variant="secondary"
@@ -647,6 +694,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </Button>
           )}
           <div
+            ref={hubPanelRef}
             className={`rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
               hubMaximized
                 ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
@@ -655,7 +703,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             style={!hubMaximized ? { height: "380px" } : undefined}
           >
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
-              <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium">
+              <div
+                className={`flex flex-1 items-center gap-1.5 text-xs text-amber-500 font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
+                onPointerDown={onHubDragStart}
+                title={hubMaximized ? undefined : "Arrastrá para mover la ventana"}
+              >
                 <Headphones className="h-3 w-3" />
                 Coordinador Hub
               </div>
@@ -663,8 +715,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className={`h-5 w-5 ${hubPinned ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={toggleHubPinned}
+                  title={hubPinned ? "Fijado al frente (click para soltar)" : "Fijar al frente (always on top)"}
+                >
+                  {hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   onClick={() => setHubMinimized(true)}
+                  title="Minimizar"
                 >
                   <span className="text-xs leading-none">−</span>
                 </Button>
@@ -682,8 +744,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="icon"
                   className="h-5 w-5 text-destructive hover:text-destructive/80"
                   onClick={() => { setHubConnected(false); setHubMaximized(false); }}
+                  title="Colgar llamada"
                 >
-                  <X className="h-3 w-3" />
+                  <PhoneOff className="h-3 w-3" />
                 </Button>
               </div>
             </div>
