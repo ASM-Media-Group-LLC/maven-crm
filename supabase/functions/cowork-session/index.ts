@@ -276,14 +276,14 @@ serve(async (req) => {
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", targetRoomId).single();
         if (!room) return err("Room not found");
 
-        // Participants: no screen share by default
-        const canPublishSources = isHost ? undefined : ["camera", "microphone"];
-
+        // TODOS los miembros de la sala pueden compartir pantalla directo (pedido del
+        // owner 2026-07-20). Antes el token de participante excluía screen_share
+        // (canPublishSources: camera+mic) y forzaba el flujo pedir-permiso→aprobar→
+        // token especial — el botón "no hacía nada" para no-supervisores.
         const identity = userId;
         const grants: LKGrants = {
           roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: isHost,
         };
-        if (canPublishSources) (grants as any).canPublishSources = canPublishSources;
 
         const token = await createLKToken(lkKey, lkSecret, identity, userName, grants);
         return json({ token, url: lkUrl, room: room.livekit_room_name, roomId: targetRoomId });

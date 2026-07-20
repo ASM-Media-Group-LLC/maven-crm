@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut } from "lucide-react";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -15,8 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type TokenResult = { token: string; url: string; room?: string } | null;
-
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
@@ -28,10 +26,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [displayName, setDisplayName] = useState("User");
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
-  const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
-  const claimedRequestRef = useRef<string | null>(null);
   const prevRoomIdRef = useRef<string | null>(null);
-  const screenShareTokenRef = useRef<TokenResult>(null);
   const dismissedRequestRef = useRef<string | null>(null);
   const pendingOneOnOneRef = useRef(false);
   const oneOnOneSeenInListRef = useRef(false);
@@ -43,25 +38,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
 
   const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
-  const prevScreenShareRef = useRef(false);
+  // Compartir pantalla ya es DIRECTO (el token de sala lo permite para todos) —
+  // acá solo reportamos el estado de media para que el dashboard lo muestre.
   const handleMediaStateChange = useCallback(
     (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
       trackMediaState(state);
-      // Auto-revoke screen share permission when participant stops sharing.
-      // Forces them to request approval again from the host for next share.
-      if (prevScreenShareRef.current && !state.screenShareOn && hasScreenShareAccess) {
-        setHasScreenShareAccess(false);
-        screenShareTokenRef.current = null;
-        toast.info("Permiso de pantalla finalizado. Solicítalo nuevamente si lo necesitas.");
-        if (myRoom?.livekit_room_name) {
-          const roomName = myRoom.livekit_room_name;
-          setConnectedLkRoom(null);
-          setTimeout(() => setConnectedLkRoom(roomName), 300);
-        }
-      }
-      prevScreenShareRef.current = state.screenShareOn;
     },
-    [trackMediaState, hasScreenShareAccess, myRoom?.livekit_room_name]
+    [trackMediaState]
   );
 
   const reconnectToMainRoom = useCallback(() => {
@@ -127,8 +110,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
-      setHasScreenShareAccess(false);
-      screenShareTokenRef.current = null;
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
@@ -141,35 +122,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const myOpenRequest = cowork.hostRequests.find(
     r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
   );
-  const mySSReq = cowork.screenShareRequests.find(
-    r => r.user_id === userId && r.status === "pending"
-  );
-
-  useEffect(() => {
-    const approvedReq = cowork.screenShareRequests.find(
-      r => r.user_id === userId && (r as any).status === "approved"
-    );
-    if (approvedReq && claimedRequestRef.current !== approvedReq.id) {
-      claimedRequestRef.current = approvedReq.id;
-      (async () => {
-        try {
-          const result = await cowork.claimScreenShareToken(approvedReq.id);
-          if (result?.token && result?.url && result?.room) {
-            toast.success("Pantalla compartida aprobada. Reconectando...");
-            setHasScreenShareAccess(true);
-            screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
-            // Desempatar el render: la pantalla va a la sala GRUPAL, nunca a una 1:1.
-            setOneOnOneRoom(null);
-            setOneOnOneRequestId(null);
-            setConnectedLkRoom(null);
-            setTimeout(() => setConnectedLkRoom(result.room), 300);
-          }
-        } catch (e: any) {
-          toast.error(e.message || "Error al reclamar permisos de pantalla");
-        }
-      })();
-    }
-  }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
   useEffect(() => {
     if (!oneOnOneRequestId) {
@@ -187,9 +139,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
   useEffect(() => {
-    // No secuestrar al participante a una 1:1 mientras está pidiendo / tiene / va a recibir
-    // permiso de compartir pantalla: una solicitud 1:1 vieja no debe robarlo al aprobar la pantalla.
-    if (oneOnOneRequestId || pendingOneOnOneRef.current || hasScreenShareAccess || !!mySSReq || screenShareTokenRef.current) return;
+    if (oneOnOneRequestId || pendingOneOnOneRef.current) return;
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
@@ -198,7 +148,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
       setConnectedLkRoom(null);
     }
-  }, [cowork.hostRequests, userId, oneOnOneRequestId, hasScreenShareAccess, mySSReq]);
+  }, [cowork.hostRequests, userId, oneOnOneRequestId]);
 
   const dismissedActiveRequest = cowork.hostRequests.find(
     r => r.user_id === userId
@@ -208,13 +158,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   );
 
   const getToken = useCallback(async () => {
-    const ssToken = screenShareTokenRef.current;
-    if (ssToken) {
-      // NO limpiar el ref acá: un reintento de conexión (abort/StrictMode) debe reusar el MISMO
-      // token de pantalla; si cayera a "join_room" el participante perdería el permiso de
-      // screenShare. Se limpia cuando el permiso termina (handleMediaStateChange / salir / cambio de sala).
-      return { token: ssToken.token, url: ssToken.url };
-    }
+    // El token de sala ya permite compartir pantalla a todos (sin flujo de permisos).
     const result = await cowork.issueLiveKitToken("join_room");
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken]);
@@ -269,15 +213,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   };
 
-  const handleRequestScreenShare = async () => {
-    try {
-      await cowork.requestScreenShare(myAssignment.room_id);
-      toast.info("Solicitud de pantalla enviada, esperando aprobación...");
-    } catch (e: any) {
-      toast.error(e.message);
-    }
-  };
-
   const handleReconnectPrivateCall = () => {
     if (!dismissedActiveRequest) return;
     dismissedRequestRef.current = null;
@@ -317,12 +252,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
             <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada coordinador"}
           </Button>
-          {!hasScreenShareAccess && (
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!mySSReq} onClick={handleRequestScreenShare}>
-              <Monitor className="h-4 w-4" />
-              {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
-            </Button>
-          )}
+          {/* Compartir pantalla ahora es DIRECTO desde los controles de la llamada
+              (abajo), sin pedir permiso — el token de sala lo habilita para todos. */}
         </div>
 
         {/* Mobile actions dropdown */}
@@ -347,12 +278,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <Phone className="h-4 w-4 mr-2" />
                 {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
               </DropdownMenuItem>
-              {!hasScreenShareAccess && (
-                <DropdownMenuItem onClick={handleRequestScreenShare} disabled={!!mySSReq}>
-                  <Monitor className="h-4 w-4 mr-2" />
-                  {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
-                </DropdownMenuItem>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -360,7 +285,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
       {/* Video area */}
       <div className="flex-1 min-h-0">
-        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId && !hasScreenShareAccess ? (
+        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
           <LiveKitCallView
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
@@ -394,8 +319,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={async () => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
-              setHasScreenShareAccess(false);
-              screenShareTokenRef.current = null;
               // Release the assignment server-side so the host dashboard updates,
               // then navigate out of Cowork to prevent the auto-rejoin effect.
               try {
@@ -408,7 +331,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             }}
             hideShareLink
             suppressLeaveToast
-            hideScreenShare={!hasScreenShareAccess}
             initialMicOn={false}
             initialCamOn={false}
             getToken={getToken}

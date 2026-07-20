@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
-  Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
+  X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -182,7 +182,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const openHostRequests = cowork.hostRequests.filter(
     r => r.status !== "resolved" && r.id !== oneOnOneRequestId
   );
-  const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
+
+  // Quién está compartiendo pantalla en una sala (presence de media). Compartir ya
+  // es directo para todos — el dashboard solo lo MUESTRA, no lo aprueba.
+  const getRoomSharers = (roomId: string) =>
+    getRoomParticipants(roomId)
+      .filter(a => mediaStates[a.user_id]?.screenShareOn)
+      .map(a => cowork.profiles[a.user_id] || "User");
 
   const handleAddRoom = async () => {
     const name = addName.trim();
@@ -388,44 +394,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             )}
           </div>
 
-          {/* Screen Share Requests */}
+          {/* Pantallas compartidas EN VIVO por sala (ya no hay aprobaciones: compartir
+              es directo para todos; acá solo se ve quién está compartiendo y dónde). */}
           <div className="p-3 border-t border-border/50 space-y-2">
             <h3 className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1">
-              <Monitor className="h-3 w-3" /> Screen Share ({pendingSSRequests.length})
+              <Monitor className="h-3 w-3" /> Pantallas en vivo
             </h3>
-            {pendingSSRequests.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-1">Sin solicitudes de pantalla</p>
-            ) : (
-              pendingSSRequests.map((req) => {
-                const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
-                return (
-                  <div key={req.id} className="bg-primary/5 rounded-xl p-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-foreground/80">{cowork.profiles[req.user_id] || "User"}</span>
-                      <Badge variant="outline" className="text-[9px] border-primary/30 text-primary rounded-full">{roomName}</Badge>
-                    </div>
-                    <div className="flex gap-1 mt-1">
-                      <Button
-                        size="sm" variant="ghost" className="h-5 text-[10px] text-success gap-0.5 rounded-full"
-                        onClick={async () => {
-                          try { await cowork.approveScreenShare(req.id, true); toast.success("Aprobado"); } catch (e: any) { toast.error(e.message); }
-                        }}
-                      >
-                        <Check className="h-2.5 w-2.5" /> Aprobar
-                      </Button>
-                      <Button
-                        size="sm" variant="ghost" className="h-5 text-[10px] text-destructive gap-0.5 rounded-full"
-                        onClick={async () => {
-                          try { await cowork.approveScreenShare(req.id, false); toast.info("Denegado"); } catch (e: any) { toast.error(e.message); }
-                        }}
-                      >
-                        <X className="h-2.5 w-2.5" /> Denegar
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+            {(() => {
+              const sharing = cowork.rooms
+                .map(room => ({ room, sharers: getRoomSharers(room.id) }))
+                .filter(x => x.sharers.length > 0);
+              if (sharing.length === 0) {
+                return <p className="text-xs text-muted-foreground px-1">Nadie está compartiendo pantalla</p>;
+              }
+              return sharing.map(({ room, sharers }) => (
+                <div key={room.id} className="bg-primary/5 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                  <span className="text-xs text-foreground/80 truncate">{sharers.join(", ")}</span>
+                  <Badge variant="outline" className="text-[9px] border-primary/30 text-primary rounded-full shrink-0">{room.name}</Badge>
+                </div>
+              ));
+            })()}
           </div>
         </ScrollArea>
       </div>
@@ -484,8 +472,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
               {cowork.rooms.map((room) => {
                 const participants = getRoomParticipants(room.id);
+                const sharers = getRoomSharers(room.id);
                 return (
-                  <div key={room.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div key={room.id} className={`bg-card border rounded-2xl overflow-hidden ${sharers.length ? "border-primary/50" : "border-border"}`}>
                     <div className="p-4 pb-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{room.name}</span>
@@ -512,6 +501,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
+                      </div>
+                      {/* Estado de pantalla compartida de la sala, con quién comparte. */}
+                      <div className="mt-1 flex items-center gap-1.5">
+                        {sharers.length > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium">
+                            <Monitor className="h-3 w-3" /> Compartiendo: {sharers.join(", ")}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                            <Monitor className="h-3 w-3" /> Sin pantalla compartida
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="p-4 pt-1 space-y-3">
