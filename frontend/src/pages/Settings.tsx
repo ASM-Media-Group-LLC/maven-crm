@@ -41,7 +41,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProfile, useResendWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar } from "@/hooks/useUserProfile";
+import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 // Settings page — left rail with the user's role banner + tab list,
@@ -220,8 +220,11 @@ const WhatsappPhoneCard = ({
   // pasarle el value tal cual funciona.
   const [value, setValue] = useState("");
   const [dirty, setDirty] = useState(false);
+  // Código de verificación vigente (flujo iniciado por el usuario: él le manda
+  // el código al bot — el bot NO manda DMs en frío, eso tumbó la línea el 20/7).
+  const [verif, setVerif] = useState<VerificationCode | null>(null);
   const updateMut = useUpdateMyPhone();
-  const resendMut = useResendWhatsappVerification();
+  const requestMut = useRequestWhatsappVerification();
 
   useEffect(() => {
     if (!dirty) setValue(currentValue ?? "");
@@ -254,7 +257,7 @@ const WhatsappPhoneCard = ({
       setValue(normalized);
       setDirty(false);
       toast.success("Número de WhatsApp guardado", {
-        description: "El bot ya te puede reconocer cuando escribas en los grupos.",
+        description: "Ahora tocá \"Verificar por WhatsApp\" y envíale el código al bot.",
       });
     } catch (e) {
       const msg = (e as Error).message;
@@ -276,14 +279,18 @@ const WhatsappPhoneCard = ({
   const isVerified = Boolean(verifiedAt);
   const hasChanges = dirty && toE164(value) !== (currentValue ?? "");
 
-  const handleResend = async () => {
+  // Genera el código y abre WhatsApp con el mensaje pre-escrito hacia el bot.
+  // VOS iniciás el chat (el bot nunca escribe primero a un número nuevo).
+  const handleVerify = async () => {
     try {
-      await resendMut.mutateAsync();
-      toast.success("Te mandamos un mensaje", {
-        description: "Revisá tu WhatsApp y respondé SI para confirmar.",
+      const data = await requestMut.mutateAsync();
+      setVerif(data);
+      window.open(data.wa_link, "_blank", "noopener,noreferrer");
+      toast.success("Código generado", {
+        description: "Se abrió WhatsApp con el mensaje listo — solo tocá enviar.",
       });
     } catch (e) {
-      toast.error("No se pudo enviar", { description: (e as Error).message });
+      toast.error("No se pudo generar el código", { description: (e as Error).message });
     }
   };
 
@@ -349,7 +356,9 @@ const WhatsappPhoneCard = ({
           </p>
         </div>
 
-        {/* Estado de verificación cuando ya hay número guardado. */}
+        {/* Estado de verificación cuando ya hay número guardado. El flujo lo inicia
+            SIEMPRE el usuario: genera un código y se lo manda al bot por WhatsApp
+            (botón wa.me pre-escrito). El bot no manda DMs en frío. */}
         {isLinked && (
           <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2 max-w-md">
             {isVerified ? (
@@ -361,47 +370,61 @@ const WhatsappPhoneCard = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  El bot ya te reconoce cuando escribís en los grupos. Si cambiás
-                  el nombre que mostrás en WhatsApp, hacé click en "Re-enviar verificación"
-                  y respondé SI de nuevo.
+                  El bot ya te reconoce cuando escribís en los grupos. Si cambiaste
+                  el nombre que mostrás en WhatsApp, re-verificá: generás un código
+                  nuevo y se lo enviás al bot.
                 </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleResend}
-                  disabled={resendMut.isPending}
+                  onClick={handleVerify}
+                  disabled={requestMut.isPending}
                   className="h-7 text-xs"
                 >
-                  {resendMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                  Re-enviar verificación
+                  {requestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                  Re-verificar por WhatsApp
                 </Button>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-xs">
                   <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <span className="font-medium">Esperando confirmación por WhatsApp</span>
+                  <span className="font-medium">Falta verificar tu número</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Te mandamos un DM al <code className="px-1 rounded bg-muted">{currentValue}</code>{" "}
-                  de parte de <strong>Maven Asistente</strong>. Respondé <strong>SI</strong> al
-                  mensaje para confirmar y completar la vinculación.
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  ¿No te llegó? Asegurate de tener guardado el contacto del bot
-                  (<code className="px-1 rounded bg-muted">+57 322 521 8180</code>) o pediles
-                  reenviarlo:
+                  Tocá el botón: se abre tu WhatsApp con un código listo para enviarle a{" "}
+                  <strong>Maven Asistente</strong>. Cuando lo envíes, el bot te confirma
+                  con un ✅ y quedás vinculado. (El chat lo iniciás vos — el bot no te
+                  escribe primero.)
                 </p>
                 <Button
-                  variant="outline"
                   size="sm"
-                  onClick={handleResend}
-                  disabled={resendMut.isPending}
-                  className="h-7 text-xs"
+                  onClick={handleVerify}
+                  disabled={requestMut.isPending}
+                  className="h-8 text-xs"
                 >
-                  {resendMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
-                  Re-enviar DM
+                  {requestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MessageCircle className="h-3 w-3 mr-1" />}
+                  Verificar por WhatsApp
                 </Button>
+                {verif && (
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 space-y-1">
+                    <p className="text-[11px] text-muted-foreground">
+                      Tu código: <code className="px-1.5 py-0.5 rounded bg-muted font-semibold tracking-widest">{verif.code}</code>
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      ¿No se abrió WhatsApp?{" "}
+                      <a
+                        href={verif.wa_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline text-emerald-600"
+                      >
+                        Abrir de nuevo
+                      </a>{" "}
+                      o mandale el código a <code className="px-1 rounded bg-muted">+{verif.bot_phone}</code> a mano.
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </div>

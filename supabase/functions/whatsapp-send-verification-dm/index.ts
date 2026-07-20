@@ -2,20 +2,23 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
 
-// whatsapp-send-verification-dm — manda un DM privado a un user que recién
-// cargó su phone_e164 en Settings, con un código de verificación único.
+// whatsapp-send-verification-dm — v2 INICIADA POR EL USUARIO: genera el código de
+// verificación y lo DEVUELVE para que el front lo muestre con un botón wa.me.
+// El USUARIO le manda el código al bot; el ingest lo matchea
+// (claim_whatsapp_verification_code) y vincula LID+pushName al profile.
 //
-// Por qué el código: WhatsApp moderno (post-2025) anonimiza los DMs
-// entrantes con @lid igual que en grupos. Cuando el user responde, el
-// remoteJid NO trae el teléfono — solo el LID anónimo. Sin código, no
-// podemos saber qué profile responde. Con código, hacemos el match
-// inequívoco por la tabla whatsapp_verification_codes.
+// ⚠️ YA NO ENVÍA NINGÚN DM. La v1 mandaba un mensaje EN FRÍO con el código al
+// número recién cargado — el 2026-07-20 eso tumbó/flageó la línea del bot
+// (anti-spam de WhatsApp: texto con código desde un número desconocido).
+// Regla desde entonces: la línea del bot NUNCA inicia conversación con un
+// número que no le escribió primero. (Frío de verdad → Cloud API oficial.)
+//
+// Por qué el código: WhatsApp moderno anonimiza los DMs entrantes con @lid —
+// cuando el user escribe, el remoteJid no trae el teléfono. El código hace el
+// match inequívoco user↔LID.
 
-const EVOLUTION_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
-const EVOLUTION_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
-const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven-bot";
-// v1: { number, options, textMessage:{text} } ; v2: { number, text }
-const EVOLUTION_API_VERSION = Deno.env.get("WHATSAPP_EVOLUTION_API_VERSION") ?? "v1";
+// Número de la línea del bot (para armar el link wa.me en el front).
+const BOT_PHONE = (Deno.env.get("WHATSAPP_BOT_PHONE") ?? "573225218180").replace(/[^\d]/g, "");
 
 interface RequestBody {
   user_id?: string;
@@ -30,8 +33,8 @@ interface ProfileRow {
   whatsapp_verified_at: string | null;
 }
 
-// Genera un código de 6 chars sin caracteres confusos (sin O/0, I/1, B/8, etc).
-// Alphabet de 28 chars × 6 positions = 481M combos — colisión casi imposible.
+// Código de 6 chars sin caracteres confusos (sin O/0, I/1, B/8, etc). Debe
+// mantenerse en sync con CODE_REGEX del ingest.
 const CODE_ALPHABET = "ACDEFGHJKLMNPQRTUVWXY3479";
 
 function generateCode(): string {
@@ -40,10 +43,13 @@ function generateCode(): string {
   return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
-// Inserta un código nuevo, retryando si hay colisión con un código activo.
-// El unique partial index nos protege de duplicados; si una inserción falla
-// por colisión, generamos otro.
+// Inserta un código nuevo (invalidando los pendientes previos del user para no
+// acumular códigos activos), retryando si hay colisión.
 async function generateAndPersistCode(sb: SupabaseClient, userId: string, phone: string): Promise<string | null> {
+  await sb.from("whatsapp_verification_codes")
+    .delete()
+    .eq("user_id", userId)
+    .is("used_at", null);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateCode();
     const { error } = await sb.from("whatsapp_verification_codes").insert({
@@ -52,7 +58,6 @@ async function generateAndPersistCode(sb: SupabaseClient, userId: string, phone:
       phone_e164: phone,
     });
     if (!error) return code;
-    // Si es violación de unique, retryar. Cualquier otro error → fail.
     if (!error.message.includes("duplicate") && !error.message.includes("unique")) {
       console.warn("generateAndPersistCode error:", error.message);
       return null;
@@ -61,61 +66,20 @@ async function generateAndPersistCode(sb: SupabaseClient, userId: string, phone:
   return null;
 }
 
-function buildMessage(fullName: string | null, code: string): string {
-  const greeting = fullName ? `Hola ${fullName.split(" ")[0]} 👋` : "Hola 👋";
-  return [
-    greeting,
-    "",
-    "Soy *Maven Asistente*. Vi que vinculaste este número a tu cuenta en Maven CRM.",
-    "",
-    "Para confirmar que sos vos, respondé este mensaje con el código:",
-    "",
-    `*${code}*`,
-    "",
-    "Una vez confirmado, te voy a poder reconocer cuando escribas en los grupos del equipo.",
-  ].join("\n");
-}
-
-async function sendDm(phoneE164: string, text: string): Promise<{ ok: boolean; error?: string }> {
-  if (!EVOLUTION_URL || !EVOLUTION_KEY) {
-    return { ok: false, error: "evolution_not_configured" };
-  }
-  const numberDigits = phoneE164.replace(/^\+/, "");
-  // v1 wrapper vs v2 plano según EVOLUTION_API_VERSION.
-  const payload = EVOLUTION_API_VERSION === "v2"
-    ? { number: numberDigits, text }
-    : { number: numberDigits, options: { delay: 0, presence: "composing" }, textMessage: { text } };
-  try {
-    const resp = await fetch(`${EVOLUTION_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": EVOLUTION_KEY },
-      body: JSON.stringify(payload),
-    });
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      return { ok: false, error: `evolution ${resp.status}: ${errText.slice(0, 200)}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...whatsappCors, "Content-Type": "application/json" },
+  });
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
-  if (!authorizeCronOrJwt(req)) {
-    return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
-      status: 401, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
-  }
+  if (!authorizeCronOrJwt(req)) return json({ ok: false, error: "unauthorized" }, 401);
 
   let body: RequestBody;
   try { body = await req.json() as RequestBody; }
-  catch {
-    return new Response(JSON.stringify({ ok: false, error: "invalid_json" }), {
-      status: 400, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
-  }
+  catch { return json({ ok: false, error: "invalid_json" }, 400); }
 
   const sb = adminClient();
 
@@ -129,58 +93,43 @@ serve(async (req) => {
       .eq("phone_e164", body.phone_e164).maybeSingle();
     profile = (data as ProfileRow | null) ?? null;
   } else {
-    return new Response(JSON.stringify({ ok: false, error: "missing user_id or phone_e164" }), {
-      status: 400, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
+    return json({ ok: false, error: "missing user_id or phone_e164" }, 400);
   }
 
-  if (!profile) {
-    return new Response(JSON.stringify({ ok: false, error: "profile_not_found" }), {
-      status: 404, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
-  }
-  if (!profile.phone_e164) {
-    return new Response(JSON.stringify({ ok: false, error: "profile_has_no_phone" }), {
-      status: 400, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
-  }
+  if (!profile) return json({ ok: false, error: "profile_not_found" }, 404);
+  if (!profile.phone_e164) return json({ ok: false, error: "profile_has_no_phone" }, 400);
   if (profile.whatsapp_verified_at && !body.force) {
-    return new Response(JSON.stringify({ ok: true, skipped: "already_verified" }), {
-      status: 200, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
+    return json({ ok: true, skipped: "already_verified" });
   }
 
-  // Generar y guardar código único.
   const code = await generateAndPersistCode(sb, profile.id, profile.phone_e164);
   if (!code) {
     await logEvent(sb, {
       tenantId: null,
-      kind: "verification_dm_failed",
+      kind: "verification_code_failed",
       payload: { user_id: profile.id, error: "could_not_generate_code" },
     });
-    return new Response(JSON.stringify({ ok: false, error: "could_not_generate_code" }), {
-      status: 500, headers: { ...whatsappCors, "Content-Type": "application/json" },
-    });
+    return json({ ok: false, error: "could_not_generate_code" }, 500);
   }
-
-  const text = buildMessage(profile.full_name, code);
-  const result = await sendDm(profile.phone_e164, text);
 
   await logEvent(sb, {
     tenantId: null,
-    kind: result.ok ? "verification_dm_sent" : "verification_dm_failed",
+    kind: "verification_code_issued",
     payload: {
       user_id: profile.id,
       full_name: profile.full_name,
       phone_e164: profile.phone_e164,
       code,
       force: body.force ?? false,
-      error: result.error,
+      flow: "user_initiated",
     },
   });
 
-  return new Response(JSON.stringify({ ok: result.ok, error: result.error, code }), {
-    status: result.ok ? 200 : 500,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
+  // El front arma el botón: el USUARIO le manda el código al bot (cero frío).
+  return json({
+    ok: true,
+    code,
+    bot_phone: BOT_PHONE,
+    wa_link: `https://wa.me/${BOT_PHONE}?text=${encodeURIComponent(code)}`,
   });
 });

@@ -38,20 +38,31 @@ export const useMyProfile = () =>
     },
   });
 
-// Reenvía manualmente el DM de verificación. Usa force=true para que la
-// edge function lo mande aunque el user ya esté verificado (útil si el
-// pushName cambió o el user perdió el mensaje).
-export const useResendWhatsappVerification = () =>
+// Pide un código de verificación NUEVO. Flujo iniciado por el usuario: la edge
+// genera el código y lo devuelve (junto con el link wa.me al bot) — el USUARIO
+// se lo manda al bot por WhatsApp y el ingest lo matchea. El bot ya NO manda
+// DMs en frío (el 2026-07-20 un DM frío de verificación tumbó la línea).
+// force=true regenera aunque ya esté verificado (útil si cambió el pushName).
+export interface VerificationCode {
+  code: string;
+  bot_phone: string;
+  wa_link: string;
+}
+
+export const useRequestWhatsappVerification = () =>
   useMutation({
-    mutationFn: async (): Promise<void> => {
+    mutationFn: async (): Promise<VerificationCode> => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       const uid = userData.user?.id;
       if (!uid) throw new Error("No autenticado");
-      const { error } = await supabase.functions.invoke("whatsapp-send-verification-dm", {
+      const { data, error } = await supabase.functions.invoke("whatsapp-send-verification-dm", {
         body: { user_id: uid, force: true },
       });
-      if (error) throw new Error(error.message ?? "No se pudo enviar el DM");
+      if (error) throw new Error(error.message ?? "No se pudo generar el código");
+      const resp = data as { ok: boolean; code?: string; bot_phone?: string; wa_link?: string; error?: string };
+      if (!resp?.ok || !resp.code) throw new Error(resp?.error ?? "No se pudo generar el código");
+      return { code: resp.code, bot_phone: resp.bot_phone ?? "", wa_link: resp.wa_link ?? "" };
     },
   });
 
