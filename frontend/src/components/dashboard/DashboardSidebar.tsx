@@ -3,6 +3,7 @@ import {
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell,
+  Volume2, VolumeX,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -28,6 +29,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useInboxSoundMuted } from "@/hooks/useInboxSoundMuted";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -742,6 +744,15 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const profileQ = useMyProfile();
+  const { canAccess } = usePermissions();
+  // Mute del sonido de notificaciones de las bandejas/chats: WhatsApp + Telegram +
+  // Messenger. Messenger es universal, así que en la práctica el botón se ve para
+  // todos; el OR deja explícito el alcance.
+  const { muted: inboxSoundMuted, toggle: toggleInboxSound } = useInboxSoundMuted();
+  const canMuteInbox = canAccess("WhatsApp") || canAccess("Telegram") || canAccess("Messenger");
+  const muteTitle = inboxSoundMuted
+    ? "Activar sonido de WhatsApp, Telegram y Messenger"
+    : "Silenciar sonido de WhatsApp, Telegram y Messenger";
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -802,6 +813,22 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         )}
+        {canMuteInbox && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-8 w-8 rounded-full",
+              inboxSoundMuted ? "text-destructive" : "text-muted-foreground",
+            )}
+            onClick={toggleInboxSound}
+            title={muteTitle}
+            aria-label={muteTitle}
+            aria-pressed={inboxSoundMuted}
+          >
+            {inboxSoundMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -849,6 +876,23 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
             title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        )}
+        {/* Silenciar sonido de WhatsApp + Telegram + Messenger (mute per-dispositivo). */}
+        {canMuteInbox && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-8 w-8 shrink-0 rounded-full",
+              inboxSoundMuted ? "text-destructive" : "text-muted-foreground",
+            )}
+            onClick={toggleInboxSound}
+            title={muteTitle}
+            aria-label={muteTitle}
+            aria-pressed={inboxSoundMuted}
+          >
+            {inboxSoundMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </Button>
         )}
         {/* Settings — icon button al lado del theme toggle.

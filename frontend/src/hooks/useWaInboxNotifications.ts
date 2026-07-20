@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { getInboxSoundMuted } from "@/hooks/useInboxSoundMuted";
 import {
   useBrowserNotifications,
   useNotificationPermission,
@@ -123,10 +124,13 @@ export function useWaInboxNotifications() {
 
           const body = previewOf(m.body ?? null, m.msg_type ?? "text");
 
-          // Sonido: respeta el ajuste y se limita a 1 cada 1.5s en ráfagas.
+          // Sonido: respeta el ajuste global, el mute PROPIO de bandejas (WhatsApp+
+          // Telegram, botón del sidebar) y se limita a 1 cada 1.5s en ráfagas.
           const now = Date.now();
           const soundOk =
-            s.sound_enabled !== false && now - lastSoundRef.current > 1500;
+            s.sound_enabled !== false &&
+            !getInboxSoundMuted(userId) &&
+            now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
 
           notifyRef.current(
