@@ -10,6 +10,7 @@ import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
 import RoomAudioSink from "./RoomAudioSink";
+import { useAutoPiP } from "./useAutoPiP";
 
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,27 @@ interface LiveKitCallViewProps {
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
+
+  // PiP automático estilo Google Meet: al cambiar de pestaña/ventana, la llamada
+  // aparece en la ventanita flotante del navegador (pantalla compartida o hablante).
+  useAutoPiP(lk.getRoom, true);
+
+  // Modo compacto AUTOMÁTICO cuando el contenedor es chico (ventana angosta/baja):
+  // mismos controles que Google Meet a tamaño mini. Se suma al prop `compact`.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [autoCompact, setAutoCompact] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      setAutoCompact(r.width < 640 || r.height < 480);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [lk.connectionState]);
+  const effectiveCompact = compact || autoCompact;
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
@@ -224,8 +246,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     : "grid-cols-3 md:grid-cols-4";
 
   return (
-    <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)]">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={compact} />
+    <div ref={rootRef} className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)]">
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-[hsl(40_96%_50%/0.15)] text-[hsl(40_96%_60%)] text-xs font-medium">
@@ -296,7 +318,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         hideLeaveButton={hideLeaveButton}
         leaveLabel={leaveLabel}
         leaveIcon={leaveIcon}
-        compact={compact}
+        compact={effectiveCompact}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
       />
