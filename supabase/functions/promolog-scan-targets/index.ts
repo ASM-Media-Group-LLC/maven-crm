@@ -45,12 +45,45 @@ Deno.serve(async (req) => {
   } catch (_) { /* fallback: orden de la vista (c.id) */ }
   const rank = (cid: string) => !scannedAny.has(cid) ? 0 : (definitive.has(cid) ? 2 : 1);
 
-  const targets = (creators ?? [])
-    .map((c: any) => ({ creator_id: c.id, handle: norm(c.instagram_handle), ig_user_id: idByCreator.get(c.id) ?? null,
-      name: c.artistic_name || c.name }))
-    .filter((t: any) => t.handle)
-    // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
-    .sort((a: any, b: any) => rank(a.creator_id) - rank(b.creator_id));
+  // Cuentas de IG ADICIONALES (creator_social_accounts) — igual que x-scan/fb-scan/
+  // telegram-scan, que SÍ escanean las cuentas extra. La vista solo trae el
+  // instagram_handle PRINCIPAL, así que sin esto una 2ª/3ª cuenta de IG quedaba sin
+  // escanear (sub-conteo; caso jacqueenriquez: promociona en una 2ª cuenta invisible).
+  const extraByCreator = new Map<string, string[]>();
+  if (ids.length) {
+    const { data: extra } = await (sb as any).from("creator_social_accounts")
+      .select("creator_id, username").eq("network", "instagram").eq("active", true).in("creator_id", ids);
+    for (const a of (extra ?? [])) {
+      const h = norm(a.username);
+      if (!h) continue;
+      const arr = extraByCreator.get(a.creator_id) ?? [];
+      if (!arr.includes(h)) arr.push(h);
+      extraByCreator.set(a.creator_id, arr);
+    }
+  }
+
+  // Handle principal (con ig_user_id cacheado) + cada cuenta EXTRA. La extra va con
+  // ig_user_id=null a propósito: el cache de promolog_ig_identity es de la cuenta
+  // PRINCIPAL, así que la extensión debe resolver el id de la 2ª cuenta desde su handle.
+  // Dedupe por (creator_id, handle) → la principal, que también aparece en
+  // creator_social_accounts, no se duplica.
+  const rows: Array<{ creator_id: string; handle: string; ig_user_id: string | null; name: string }> = [];
+  const seen = new Set<string>();
+  const push = (creator_id: string, handle: string, ig_user_id: string | null, name: string) => {
+    if (!handle) return;
+    const k = `${creator_id}:${handle}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    rows.push({ creator_id, handle, ig_user_id, name });
+  };
+  for (const c of (creators ?? [])) {
+    const primary = norm(c.instagram_handle);
+    const name = c.artistic_name || c.name;
+    push(c.id, primary, idByCreator.get(c.id) ?? null, name);
+    for (const h of (extraByCreator.get(c.id) ?? [])) if (h !== primary) push(c.id, h, null, name);
+  }
+  // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
+  const targets = rows.sort((a, b) => rank(a.creator_id) - rank(b.creator_id));
 
   return json({ ok: true, count: targets.length, targets });
 });
