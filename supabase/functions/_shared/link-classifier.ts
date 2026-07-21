@@ -158,6 +158,27 @@ export function isShortener(host: string | null | undefined): boolean {
   return !!matchSuffix(String(host || "").toLowerCase(), SHORTENERS);
 }
 
+// Extrae el @handle público de un link de Telegram (t.me/telegram.me), o null si no es
+// TG / es un invite privado / es una ruta reservada. Tolerante a wrappers de IG
+// (l.instagram.com/?u=…t.me…) y a percent-encoding. Se usa para el puente IG→Telegram:
+// una historia de IG que apunta a t.me/<handle> gatilla la VERIFICACIÓN de ese Telegram
+// (el link en sí NO es promo de OF; sólo cuenta si el scan de TG encuentra promo).
+const TG_RESERVED = new Set(["s", "joinchat", "share", "proxy", "addstickers", "iv", "socks", "login", "addlist", "c"]);
+export function telegramHandleFromLink(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let s = String(raw);
+  try { s = decodeURIComponent(s); } catch { /* deja el crudo */ }
+  s = s.toLowerCase();
+  // invite privado (t.me/+xxxx o t.me/joinchat/…) → no hay username público → null
+  if (/(?:^|[/.])(?:t|telegram)\.me\/\+/.test(s)) return null;
+  // host t.me/telegram.me (precedido por / o . = borde de host, evita "list.me")
+  const m = s.match(/(?:^|[/.])(?:t|telegram)\.me\/(?:s\/)?@?([a-z0-9_]{4,32})/);
+  if (!m) return null;
+  const h = m[1];
+  if (TG_RESERVED.has(h)) return null;
+  return h;
+}
+
 // new URL tolerante: reintenta con https:// si falta el esquema (el actor a veces
 // devuelve el link ya desenvuelto y sin http → "piclink.me/x").
 function safeUrl(s: string): URL | null {

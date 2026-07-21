@@ -2,7 +2,7 @@
 // (ennidwong, elizabeth, leona) + red-team de parsing (workflow 2026-06-24).
 // Correr: deno test supabase/functions/_shared/link-classifier.test.ts
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { classifyLinkDestination, isShortener, type LinkTier } from "./link-classifier.ts";
+import { classifyLinkDestination, isShortener, telegramHandleFromLink, type LinkTier } from "./link-classifier.ts";
 
 function tier(raw: string | null | undefined, funnelHosts: string[] = []): LinkTier {
   return classifyLinkDestination(raw, funnelHosts).tier;
@@ -105,4 +105,16 @@ Deno.test("isShortener — acortadores sí, funnels/dominios no", () => {
   assertEquals(isShortener("bybio.co"), false);     // link-in-bio, no acortador
   assertEquals(isShortener("aynaraeder.cl"), false);// funnel custom propio
   assertEquals(isShortener("t.me"), false);
+});
+
+Deno.test("telegramHandleFromLink — extrae @handle público, ignora invites/reservadas", () => {
+  assertEquals(telegramHandleFromLink("t.me/suzymedinita1"), "suzymedinita1");
+  assertEquals(telegramHandleFromLink("https://t.me/suzymedinita1/123"), "suzymedinita1");
+  assertEquals(telegramHandleFromLink("https://l.instagram.com/?u=https%3A%2F%2Ft.me%2Fbysaritac&e=AT"), "bysaritac");
+  assertEquals(telegramHandleFromLink("https://t.me/s/durovchannel"), "durovchannel");
+  assertEquals(telegramHandleFromLink("t.me/+AbCdEfGhIjK"), null);   // invite privado
+  assertEquals(telegramHandleFromLink("https://t.me/joinchat/AAAA"), null);
+  assertEquals(telegramHandleFromLink("https://list.me/foo"), null); // NO es t.me (borde de host)
+  assertEquals(telegramHandleFromLink("https://www.youtube.com/watch?v=x"), null);
+  assertEquals(telegramHandleFromLink("@LAPAMELI"), null);           // QR/texto: no es un link t.me
 });

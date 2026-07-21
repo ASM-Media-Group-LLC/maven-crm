@@ -18,6 +18,7 @@ import {
   analyzeStoryItems, insertEmptyEntry, insertNoDataEntry, ofNickFromUrl, funnelHost,
   TENANT_ID, type StoryItem, type CreatorCtx, type RunCtx,
 } from "../_shared/promolog-analyze.ts";
+import { telegramHandleFromLink } from "../_shared/link-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,12 +68,13 @@ Deno.serve(async (req) => {
   const ids = incoming.map((c) => c.creator_id).filter(Boolean);
   const metaById = new Map<string, any>();
   if (ids.length) {
-    const { data: crows } = await (sb as any).from("creators").select("id, instagram_handle, onlyfans_url, piclink_url, name, artistic_name").in("id", ids);
+    const { data: crows } = await (sb as any).from("creators").select("id, instagram_handle, onlyfans_url, piclink_url, name, artistic_name, telegram_handle").in("id", ids);
     for (const r of (crows ?? [])) metaById.set(r.id, r);
   }
 
   let si = 0, no = 0, pending = 0, entries = 0;
   const results: any[] = [];
+  const tgDiscovered = new Map<string, string>(); // creator_id → @handle de Telegram visto en su IG
   for (const c of incoming) {
     const cid = c.creator_id;
     if (!cid || !metaById.has(cid)) { results.push({ handle: c.handle, outcome: "skip_no_creator" }); continue; }
@@ -84,6 +86,15 @@ Deno.serve(async (req) => {
       pending++; results.push({ handle, outcome: "pending", reason: String(c.error).slice(0, 60) }); continue;
     }
     const rawItems: any[] = Array.isArray(c.reel_items) ? c.reel_items : [];
+    // Puente IG→Telegram: si alguna historia apunta a t.me/<handle>, es la SEÑAL para ir a
+    // VERIFICAR ese Telegram. El link en IG NO cuenta como promo de OF (la entry de IG sigue
+    // su curso normal → "No"); sólo cuenta si el scan de TG encuentra promo. Guardamos el
+    // handle; el registro + disparo van después del loop.
+    for (const it of rawItems) {
+      const lk = it?.story_link_stickers?.[0]?.story_link?.url ?? it?.story_cta?.[0]?.links?.[0]?.webUri ?? null;
+      const tg = telegramHandleFromLink(lk);
+      if (tg) { tgDiscovered.set(cid, tg); break; }
+    }
     if (rawItems.length === 0) {
       // Reel vacío. Solo afirmamos "No" (sin historias) si CONFIRMAMOS que la cuenta es
       // legible para la sesión: pública, o privada que SÍ seguimos. Si no pudimos
@@ -119,6 +130,40 @@ Deno.serve(async (req) => {
     entries += r.entriesCreated;
     if (r.promotedAny) si++; else no++;
     results.push({ handle, outcome: r.promotedAny ? "si" : "no", story_items: items.length, entries: r.entriesCreated });
+  }
+
+  // ── Puente IG→Telegram: verificar el TG que la creadora promociona en su IG ──────
+  // Regla del owner: el story a TG NO cuenta por sí solo; se VERIFICA el Telegram y sólo
+  // cuenta si TG tiene promo. Acá: (auto)registramos el handle si está vacío (nunca
+  // pisamos uno existente) y disparamos telegram-scan (best-effort). Backstop de
+  // correctitud: el cron de telegram-scan (2×/día) igual cubre a la creadora una vez
+  // registrada, aunque este disparo se corte.
+  if (tgDiscovered.size) {
+    const CRON = Deno.env.get("CRON_INTERNAL_TOKEN");
+    const SB_URL = Deno.env.get("SUPABASE_URL")!;
+    const toScan: string[] = [];
+    for (const [cid, tgHandle] of tgDiscovered) {
+      const meta = metaById.get(cid);
+      if (!meta) continue;
+      if (!String(meta.telegram_handle ?? "").trim()) {
+        // registrar sólo si estaba vacío (el guard JS ya lo confirma; no pisamos nada)
+        await (sb as any).from("creators").update({ telegram_handle: tgHandle }).eq("id", cid);
+      }
+      // no re-disparar si ya hay una lectura de TG reciente (ventana 20h) → no martillar el gateway
+      const { data: tgRecent } = await (sb as any).from("promolog_entries").select("id")
+        .eq("creator_id", cid).ilike("network", "telegram")
+        .gte("created_at", new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()).limit(1);
+      if (!tgRecent || !tgRecent.length) toScan.push(cid);
+    }
+    if (toScan.length && CRON) {
+      // best-effort, sin bloquear la respuesta a la extensión; el cron es el backstop.
+      fetch(`${SB_URL}/functions/v1/telegram-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-cron-token": CRON },
+        body: JSON.stringify({ only_creator_ids: toScan }),
+      }).catch((e) => console.warn("ig→tg verify:", e?.message));
+    }
+    results.push({ ig_to_tg: [...tgDiscovered.entries()].map(([id, h]) => ({ creator_id: id, tg: h })) });
   }
 
   await (sb as any).from("promolog_dispatch_runs").update({
