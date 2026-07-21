@@ -2628,44 +2628,66 @@ async function executeTool(
         });
       }
 
-      // Leads Asignadas: traer minimum data + contar contactos history → flag overdue.
+      // Leads Asignadas → overdue por cadencia RE-ANCLADA al último contacto (mismo
+      // criterio que el frontend isContactOverdue / el SQL cron: contactar "pone al
+      // día" el lead). ⚠️ ANTES esto se anclaba a passed_date FIJO → falsos positivos
+      // masivos: un lead viejo contactado ayer seguía "vencido" (ej. María daba 53
+      // overdue cuando en realidad eran 3). El deadline del próximo contacto es:
+      //   sin contactos → passed_date + 1 día ; con ≥1 → último_contacto + gap de cadencia.
       let asignadasQ = sb
         .from("closer_creators")
-        .select("id, instagram_handle, passed_date, assigned_to, created_at")
+        .select("id, instagram_handle, passed_date")
         .eq("stage", "Asignada");
       if (closerUserId) asignadasQ = asignadasQ.eq("assigned_to", closerUserId);
       const { data: asignadas } = await asignadasQ;
+      const asignadasList = (asignadas ?? []) as Array<{ id: string; instagram_handle: string | null; passed_date: string | null }>;
+
+      // Historial de contactos de TODAS esas leads en UNA query (antes: N queries de
+      // count, uno por lead). Agregamos count + último contacto por lead.
+      const contactCountByLead: Record<string, number> = {};
+      const lastContactByLead: Record<string, string> = {};
+      const asignadaIds = asignadasList.map((a) => a.id);
+      if (asignadaIds.length) {
+        const { data: hist } = await sb
+          .from("closer_contact_history")
+          .select("creator_id, contact_date")
+          .in("creator_id", asignadaIds);
+        for (const h of (hist ?? []) as Array<{ creator_id: string; contact_date: string | null }>) {
+          contactCountByLead[h.creator_id] = (contactCountByLead[h.creator_id] ?? 0) + 1;
+          if (h.contact_date && (!lastContactByLead[h.creator_id] || h.contact_date > lastContactByLead[h.creator_id])) {
+            lastContactByLead[h.creator_id] = h.contact_date;
+          }
+        }
+      }
+
+      // Todo en fecha de Bogotá (YYYY-MM-DD) para no depender del TZ del runtime.
+      const bogotaDate = (ms: number) => new Date(ms - 5 * 3_600_000).toISOString().slice(0, 10);
+      const addDays = (dateStr: string, n: number) =>
+        new Date(new Date(dateStr + "T00:00:00Z").getTime() + n * 86_400_000).toISOString().slice(0, 10);
+      const todayBog = bogotaDate(Date.now());
+
       const overdue: Array<{ handle: string; days_since: number; next_contact_day: number; contacts_done: number }> = [];
       const staleAsignadas: Array<{ handle: string; days_since: number }> = [];
 
-      for (const a of (asignadas ?? []) as Array<{
-        id: string;
-        instagram_handle: string | null;
-        passed_date: string | null;
-        assigned_to: string | null;
-        created_at: string;
-      }>) {
+      for (const a of asignadasList) {
         if (!a.passed_date) continue;
-        const passed = new Date(a.passed_date + "T00:00:00Z").getTime();
-        const days = Math.floor((Date.now() - passed) / 86_400_000);
-        const { count: doneCount } = await sb
-          .from("closer_contact_history")
-          .select("id", { count: "exact", head: true })
-          .eq("creator_id", a.id);
-        const contactsDone = doneCount ?? 0;
-        if (contactsDone < 6) {
-          const nextIdx = contactsDone; // 0-indexed
-          const deadlineDay = cadence[nextIdx];
-          if (deadlineDay != null && days > deadlineDay) {
-            overdue.push({
-              handle: a.instagram_handle ?? "(sin handle)",
-              days_since: days,
-              next_contact_day: deadlineDay,
-              contacts_done: contactsDone,
-            });
+        const pd = a.passed_date.slice(0, 10);
+        const days = Math.floor((Date.parse(todayBog) - Date.parse(pd)) / 86_400_000);
+        const count = contactCountByLead[a.id] ?? 0;
+        if (count < 6) {
+          let deadline: string;
+          if (count === 0) {
+            deadline = addDays(pd, cadence[0]); // 1 día tras la asignación
+          } else {
+            const gap = (cadence[count] ?? 29) - (cadence[count - 1] ?? 0);
+            const base = lastContactByLead[a.id] ? bogotaDate(Date.parse(lastContactByLead[a.id])) : pd;
+            deadline = addDays(base, gap);
+          }
+          if (todayBog > deadline) {
+            overdue.push({ handle: a.instagram_handle ?? "(sin handle)", days_since: days, next_contact_day: cadence[count] ?? 29, contacts_done: count });
           }
         }
-        if (days > 30 && contactsDone === 0) {
+        if (days > 30 && count === 0) {
           staleAsignadas.push({ handle: a.instagram_handle ?? "(sin handle)", days_since: days });
         }
       }
