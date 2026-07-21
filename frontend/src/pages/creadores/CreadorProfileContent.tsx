@@ -6,13 +6,13 @@ import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } 
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildSocialUrl, displayHandle } from "@/lib/utils";
 import { useCreadorById } from "./useCreadores";
+import ProfilePhotoEditor from "./ProfilePhotoEditor";
 import InfoTabContent from "./InfoTabContent";
 import LineamientosTabContent from "./LineamientosTabContent";
 import RedesTabContent from "./RedesTabContent";
@@ -186,10 +186,13 @@ const CreadorProfileContent = () => {
 
       <div className="mx-6 relative z-10 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-6">
         <div className="flex items-start gap-6">
-          <Avatar className="h-24 w-24 shrink-0">
-            {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-            <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
-          </Avatar>
+          <ProfilePhotoEditor
+            creatorId={c.id}
+            photoUrl={c.profile_photo_url}
+            initials={initials}
+            instagramHandle={c.instagram_handle}
+            canEdit={!isAgent}
+          />
 
           <div className="flex-1 min-w-0 space-y-2">
             <h1 className="text-2xl font-bold tracking-wide uppercase">{displayName}</h1>
