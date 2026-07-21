@@ -3230,6 +3230,7 @@ async function buildInitialUserMessage(args: {
   groupName: string;
   timezone: string;
   isOwner: boolean;
+  department?: string | null;
 }): Promise<string> {
   const lines: string[] = [];
   lines.push(`Grupo: ${args.groupName}`);
@@ -3484,8 +3485,18 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
-    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_platform_sales (con since = hoy en formato YYYY-MM-DD) para las ventas de UNLIMITED (plataformas) cargadas hoy — reportá cuántas, qué plataformas y el MRR sumado (sección 🛒 Unlimited de hoy); get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde. PRIORIZÁ POR VALOR: handles_by_stage de get_closer_pipeline_status ahora trae monthly_usd por confirmada — listalas de MAYOR a menor facturación (NO por antigüedad), y cualquier confirmada/lead de ≥$10k USD/mes marcala como 🔥 FOCO del día. Una creadora de $24k pesa muchísimo más que una de $900: que se note en el orden y el énfasis. NUNCA @menciones (mention_lids) a alguien que NO esté en la tabla MIEMBROS DEL GRUPO — si querés nombrar a un externo (Luis, Alvaro, etc.), escribí el nombre SIN @ ni ping.");
-    lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
+    if (args.department === "manager") {
+      // Apertura del bot SUPERVISOR DE MANAGERS: SOLO dominio de managers (promoción ×
+      // ingreso de creadoras). PROHIBIDO meter cosas del equipo de VENTAS/closers:
+      // nada de oportunidades de productos, ventas de unlimited/plataformas, leads,
+      // pipeline de closers ni @Miguel — eso es de OTRO grupo/bot.
+      lines.push("PARTE B (apertura de MANAGERS, SIEMPRE con sustancia): traé el foco del día del equipo de managers con datos reales — get_manager_growth_feed({}) para el radar de crecimiento por creadora (promoción × ingreso, mes a la fecha vs el MISMO tramo del mes pasado), agrupado por su manager (Carolina/Fabiana; Lorena para estrategia); get_promo_day_breakdown({}) para cuántas creadoras promocionaron HOY por manager. Priorizá las 🔴 más urgentes (no crece + no promociona). En el radar, CADA creadora con el MISMO formato: 'N/<días> promo, -X% ingreso ($actual vs $anterior)' — mostrá SIEMPRE los dos montos, no en unas sí y en otras no.");
+      lines.push("⛔ PROHIBIDO en la apertura de managers: oportunidades de productos, ventas de unlimited/plataformas, pipeline de closers, leads sin asignar, @Miguel o cualquier closer. Ese contenido es del grupo Marketing/Ventas, NO de este grupo. Si lo metés es un error grave de cruce de info entre equipos.");
+      lines.push("AL FINAL: UNA sola llamada a reply_to_group con la apertura de managers (recap pausa opcional + radar de crecimiento por manager + promo de hoy + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar'.");
+    } else {
+      lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_platform_sales (con since = hoy en formato YYYY-MM-DD) para las ventas de UNLIMITED (plataformas) cargadas hoy — reportá cuántas, qué plataformas y el MRR sumado (sección 🛒 Unlimited de hoy); get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde. PRIORIZÁ POR VALOR: handles_by_stage de get_closer_pipeline_status ahora trae monthly_usd por confirmada — listalas de MAYOR a menor facturación (NO por antigüedad), y cualquier confirmada/lead de ≥$10k USD/mes marcala como 🔥 FOCO del día. Una creadora de $24k pesa muchísimo más que una de $900: que se note en el orden y el énfasis. NUNCA @menciones (mention_lids) a alguien que NO esté en la tabla MIEMBROS DEL GRUPO — si querés nombrar a un externo (Luis, Alvaro, etc.), escribí el nombre SIN @ ni ping.");
+      lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
+    }
     lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");
   }
@@ -3756,6 +3767,7 @@ async function runAgent(req: AgentRequest): Promise<{
     groupName: group.name,
     timezone: group.timezone,
     isOwner: senderCtx.isOwner,
+    department: botCfg?.department ?? null,
   });
 
   // Loop messages array per Anthropic spec.
