@@ -9,9 +9,15 @@ import { Button } from "@/components/ui/button";
 //   - fromHR: true → "Volver al Dashboard HR" (/hr)
 // Universal — vive en AppShell así no hay que tocar cada página.
 const BackToDashboardBar = () => {
-  const { state } = useLocation();
+  const { pathname, state } = useLocation();
   const navigate = useNavigate();
   const s = state as { fromDashboard?: boolean; fromHR?: boolean } | null;
+
+  // El Messenger es un destino primario del sidebar, no una sub-página a la que te
+  // "manden" desde un dashboard. Nada en RR.HH. enlaza al Messenger, así que la barra
+  // "Volver al Dashboard HR" que aparecía ahí venía de estado de navegación pegado y no
+  // tenía sentido. La ocultamos en /messenger (al abrirlo desde el tab no debe salir).
+  if (pathname === "/messenger" || pathname.startsWith("/messenger/")) return null;
 
   if (!s?.fromDashboard && !s?.fromHR) return null;
 
