@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { Settings, Bell, Radio, Layers, BarChart3, FileText, Moon, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import HRLayout from "@/pages/hr/HRLayout";
 import GeneralTab from "./notificaciones/GeneralTab";
 import CanalesTab from "./notificaciones/CanalesTab";
 import EventosTab from "./notificaciones/EventosTab";
@@ -35,7 +34,8 @@ const NotificacionesSettings = () => {
   const ActiveComponent = TAB_CONTENT[activeTab];
 
   return (
-    <HRLayout>
+    <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden">
       <div className="h-full flex flex-col">
         {/* Fixed Header */}
         <div className="shrink-0 border-b border-border bg-background px-6 py-4">
@@ -107,7 +107,8 @@ const NotificacionesSettings = () => {
           </div>
         </div>
       </div>
-    </HRLayout>
+      </div>
+    </div>
   );
 };
 

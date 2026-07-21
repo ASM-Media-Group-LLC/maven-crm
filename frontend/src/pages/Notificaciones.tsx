@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { resolveDeepLink, MODULE_OPTIONS, MODULE_PERMISSION_MAP, PRIORITY_OPTIONS, STATUS_OPTIONS } from "@/lib/notificationHelpers";
 import NotificationItem from "@/components/notifications/NotificationItem";
 import type { Notification } from "@/hooks/useNotifications";
-import HRLayout from "@/pages/hr/HRLayout";
 import { CheckCheck, Archive, Bell, Settings } from "lucide-react";
 
 const Notificaciones = () => {
@@ -57,7 +56,8 @@ const Notificaciones = () => {
   const hasFilters = moduleFilter || priorityFilter || statusFilter;
 
   return (
-    <HRLayout>
+    <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 overflow-hidden">
       <div className="h-full flex flex-col">
         {/* Fixed Header + Filters */}
         <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-4 py-4 md:px-6 space-y-4">
@@ -142,7 +142,8 @@ const Notificaciones = () => {
           </div>
         </div>
       </div>
-    </HRLayout>
+      </div>
+    </div>
   );
 };
 
