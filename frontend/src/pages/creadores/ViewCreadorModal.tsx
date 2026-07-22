@@ -120,6 +120,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
+  const igUrl = c.instagram_handle ? buildSocialUrl("instagram", c.instagram_handle) : null;
 
   const deleteCreator = useMutation({
     mutationFn: async (id: string) => {
@@ -143,12 +144,43 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-8">
-            <Avatar className="h-16 w-16">
-              {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-            </Avatar>
+            {igUrl ? (
+              <a
+                href={igUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 rounded-full transition-opacity hover:opacity-80"
+                title="Ver Instagram"
+                aria-label="Ver Instagram"
+              >
+                <Avatar className="h-16 w-16 cursor-pointer">
+                  {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
+                  <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+                </Avatar>
+              </a>
+            ) : (
+              <Avatar className="h-16 w-16">
+                {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
+                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+              </Avatar>
+            )}
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-xl">{c.artistic_name || c.name}</DialogTitle>
+              <DialogTitle className="text-xl">
+                {igUrl ? (
+                  <a
+                    href={igUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 hover:text-primary transition-colors"
+                    title="Ver Instagram"
+                  >
+                    {c.artistic_name || c.name}
+                    <InstagramIcon className="h-4 w-4 opacity-70" />
+                  </a>
+                ) : (
+                  c.artistic_name || c.name
+                )}
+              </DialogTitle>
               <DialogDescription className="mt-0.5">
                 {c.artistic_name ? c.name : ""}
               </DialogDescription>
