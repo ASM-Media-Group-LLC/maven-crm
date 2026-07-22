@@ -82,7 +82,11 @@ Deno.serve(async (req) => {
     const handle = String(meta.instagram_handle ?? c.handle ?? "").toLowerCase();
 
     if (c.error) {
-      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "read_failed" });
+      // Etiqueta REAL de la extensión (throttled | http_0 | no_ig_id | http_XXX) → queda
+      // en error_reason/notas. Antes todo se aplanaba a "read_failed" y era IMPOSIBLE
+      // distinguir throttle de IG vs red vs handle roto al diagnosticar los ⏳.
+      const errLabel = String(c.error).toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24) || "read_failed";
+      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: errLabel });
       pending++; results.push({ handle, outcome: "pending", reason: String(c.error).slice(0, 60) }); continue;
     }
     const rawItems: any[] = Array.isArray(c.reel_items) ? c.reel_items : [];

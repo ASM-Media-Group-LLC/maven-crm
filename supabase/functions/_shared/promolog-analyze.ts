@@ -224,7 +224,23 @@ function parseModelJson(text: string): any | null {
   return null;
 }
 
+// Reintento ÚNICO para fallas NO-determinísticas del modelo/red (JSON truncado/ilegible,
+// respuesta vacía, timeout, 429/5xx): un segundo intento resuelve la gran mayoría.
+// Caso real 2026-07-22 (EnnidWong): 1 story con json_parse → el día entero quedó ⏳.
+// Errores firmes (4xx de imagen, key inválida) NO se reintentan.
 async function callOpenRouter(
+  content: unknown[],
+  apiKey: string,
+): Promise<{ analysis: StoryAnalysis } | { error: string }> {
+  const first = await callOpenRouterOnce(content, apiKey);
+  if (!("error" in first)) return first;
+  if (/^(json_parse|openrouter_empty|openrouter_call|openrouter_429|openrouter_5\d\d)/.test(first.error)) {
+    return await callOpenRouterOnce(content, apiKey);
+  }
+  return first;
+}
+
+async function callOpenRouterOnce(
   content: unknown[],
   apiKey: string,
 ): Promise<{ analysis: StoryAnalysis } | { error: string }> {
@@ -466,6 +482,10 @@ export async function insertNoDataEntry(
     ? "[SIN DATOS] La cuenta es privada y el follow de la sesión está PENDIENTE de aprobación — no se pudo leer. NO confirma que no haya publicado."
     : reason === "no_ig_id"
     ? "[SIN DATOS] No se pudo resolver el usuario de IG (handle posiblemente roto/renombrado). NO confirma que no haya publicado."
+    : reason === "throttled"
+    ? "[SIN DATOS] IG limitó la sesión al leer (throttle) — se reintenta en el próximo scan. NO confirma que no haya publicado."
+    : reason === "http_0"
+    ? "[SIN DATOS] Falla de red al leer — se reintenta en el próximo scan. NO confirma que no haya publicado."
     : "[SIN DATOS] No se pudo leer la historia (sesión/red). NO confirma que la creadora no haya publicado.";
   await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,

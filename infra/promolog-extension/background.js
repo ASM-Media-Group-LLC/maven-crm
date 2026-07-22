@@ -185,6 +185,11 @@ async function runScan(trigger = "manual") {
   if (scanRunning) { await setStatus("⏳ Ya hay un scan corriendo — esperá a que termine."); return; }
   scanRunning = true;
   let keepAlive = null;
+  // Lecturas FALLIDAS re-intentables de esta corrida (throttled/http_*/no_ig_id) — al
+  // final se agenda UN repaso automático solo sobre ellas (ver bloque en finally).
+  // follow_pending NO entra (re-leer no arregla un follow pendiente).
+  let targets = [];
+  const failedIds = new Set();
   try {
   const { mavenUrl, extToken } = await cfg();
   if (!extToken) { await setStatus("⚠ Falta el token — configuralo en Opciones."); return; }
@@ -202,9 +207,18 @@ async function runScan(trigger = "manual") {
       if (res && res.ok) { const j = await res.json().catch(() => ({})); acc.si += j.si || 0; acc.no += j.no || 0; acc.pending += j.pending || 0; }
     };
 
-    const tRes = await fetchMaven(`${mavenUrl}/functions/v1/promolog-scan-targets`, { headers: { "x-ext-token": extToken } });
-    if (!tRes.ok) { await setStatus(`⚠ targets HTTP ${tRes.status} (¿token/URL?)`); return; }
-    const { targets = [] } = await tRes.json();
+    if (trigger === "followup") {
+      // Repaso: SOLO las que fallaron en la corrida anterior (guardadas en storage).
+      // No re-lee a todas — mismo pacing, cero carga extra sobre la sesión.
+      const st = await chrome.storage.local.get("followupTargets");
+      targets = Array.isArray(st.followupTargets) ? st.followupTargets : [];
+      await chrome.storage.local.remove("followupTargets");
+      if (!targets.length) return;
+    } else {
+      const tRes = await fetchMaven(`${mavenUrl}/functions/v1/promolog-scan-targets`, { headers: { "x-ext-token": extToken } });
+      if (!tRes.ok) { await setStatus(`⚠ targets HTTP ${tRes.status} (¿token/URL?)`); return; }
+      targets = (await tRes.json()).targets || [];
+    }
     if (!targets.length) { await setStatus("Sin creadoras que escanear."); return; }
 
     const acc = { si: 0, no: 0, pending: 0 };
@@ -242,8 +256,10 @@ async function runScan(trigger = "manual") {
         blockedStreak += 1;
         // Evidencia EXPLÍCITA de sesión limitada con racha abierta → racha contaminada:
         // los retenidos van a pending (no pueden pasar como "No" con un bloqueo a la vista).
-        if (held.length) { out.push(...held.map(throttledOf)); held = []; emptyStreak = 0; }
+        if (held.length) { held.forEach((h) => failedIds.add(h.creator_id)); out.push(...held.map(throttledOf)); held = []; emptyStreak = 0; }
       } else if (hasStories) blockedStreak = 0;
+      // Toda lectura con error re-intentable entra al repaso (follow_pending no es error).
+      if (r.error) failedIds.add(r.creator_id);
 
       if (hasStories) {
         gotStoriesEver = true; emptyStreak = 0;
@@ -291,6 +307,9 @@ async function runScan(trigger = "manual") {
       // Corte: seguir martillando una sesión limitada escala a checkpoint/challenge.
       // Lo retenido va como throttled (pending) — NUNCA "No" falsos.
       const scanned = done;
+      held.forEach((h) => failedIds.add(h.creator_id));
+      // La cola NO escaneada también va al repaso (throttled o sin postear, según el corte).
+      targets.slice(done).forEach((t) => failedIds.add(t.creator_id));
       out.push(...held.map(throttledOf)); held = [];
       if (abort === "fria") {
         // Corte frío = NO verificado (puede ser sesión sana con racha de inactivas).
@@ -314,7 +333,7 @@ async function runScan(trigger = "manual") {
       await sleep(jitter());
       const v = lastStoryTarget ? await scanOne(lastStoryTarget) : null;
       if (hasReel(v)) out.push(...held);
-      else { out.push(...held.map(throttledOf)); tailNote = ` (⏳${heldCount} sin confirmar — la verificación final vino vacía; esperá antes de reintentar)`; }
+      else { held.forEach((h) => failedIds.add(h.creator_id)); out.push(...held.map(throttledOf)); tailNote = ` (⏳${heldCount} sin confirmar — la verificación final vino vacía; esperá antes de reintentar)`; }
       held = [];
     }
     await flush();
@@ -322,6 +341,20 @@ async function runScan(trigger = "manual") {
   } catch (e) {
     await setStatus(`⚠ Error: ${String(e).slice(0, 120)}`);
   } finally {
+    // Repaso automático: si quedaron lecturas fallidas re-intentables (throttled/red/
+    // cola sin escanear), agendamos UNA re-pasada en 50 min SOLO sobre esas — no se
+    // re-lee a todas (mismo pacing por creadora, cero martilleo extra; 50 min deja
+    // enfriar un throttle). "followup" no re-encadena: máx 1 repaso por corrida — lo
+    // que siga fallando queda ⏳ y el próximo scan normal lo toma primero (orden #871).
+    try {
+      if (trigger !== "followup" && failedIds.size) {
+        const followupTargets = targets.filter((t) => failedIds.has(t.creator_id));
+        if (followupTargets.length) {
+          await chrome.storage.local.set({ followupTargets });
+          chrome.alarms.create("followup-scan", { delayInMinutes: 50 });
+        }
+      }
+    } catch (_) { /* best-effort */ }
     if (keepAlive) clearInterval(keepAlive);
     scanRunning = false;
   }
@@ -335,4 +368,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("daily-scan", { periodInMinutes: 24 * 60, delayInMinutes: 1 });
 });
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === "daily-scan") runScan("cron"); });
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === "daily-scan") runScan("cron");
+  else if (a.name === "followup-scan") runScan("followup");
+});
