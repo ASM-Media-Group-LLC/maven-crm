@@ -58,15 +58,35 @@ function ofSignals(haystack: string, ofHandles: string[]): string[] {
   // solo cuenta en posesivo inequívoco ("mi/tu/su OF", "mi Only"). Mismo fix que
   // telegram-scan #927. Un tweet-promo real sin estas palabras igual cae por link_agg,
   // of_handle, CTA o visión (foto sugerente + link = funnel, regla de X).
-  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) s.push("onlyfans");
+  // Emoji en el medio permitido (\W{1,4}): "mi 🔥 Only" es fraseo real (red-team).
+  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:\W{1,4}\s*)?(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) s.push("onlyfans");
   // Cualquiera de sus nicknames de OF (principal + secundarias) cuenta como señal.
   if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) s.push("of_handle");
-  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.store|linkin\.bio/i.test(raw)) s.push("link_agg");
-  // + suscripci[óo]n: "Mi Only está con 50% en Suscripción" salía "sin-senal-of" (FN real
-  // 3 días seguidos) — "suscr[ií]b" no matchea "suscripción". (N% suelto NO se agrega:
-  // "100% team dulces" daría falso Sí; ese tweet ya cae por "mi Only" + "suscripción".)
-  if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|ya fuiste|checa mi|mira mi|te espero en|mi contenido|contenido (exclusivo|completo|nuevo)|suscr[ií]b|suscripci[óo]n|\bsub a mi\b|premium|\bvip\b|descuento|oferta|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18|18\+)/i.test(raw)) s.push("promo");
+  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.?\s?store|linkin\.bio/i.test(raw)) s.push("link_agg");
+  // CTAs de funnel — CONTEXTUALIZADOS tras el red-team 2026-07-22: los sueltos daban FP
+  // reales ("zona vip del estadio", "spotify premium", "40% de descuento en el súper",
+  // "oferta de trabajo", "¿ya fuiste a votar?", "mira mi tatuaje", "+18 confirmados
+  // para la parrillada"). Fuera: premium/vip/descuento/oferta/ya fuiste/checa mi/mira mi
+  // pelados. "vip"/"premium" exigen contexto propio; contenido (exclusivo…) tolera un
+  // emoji en el medio y conjugaciones (nuevecito). + suscripci[óo]n (FN real "Mi Only
+  // 50% en Suscripción"). Un promo real que solo decía "oferta"/"descuento" cae a la
+  // VISIÓN (foto sugerente + invitación = funnel de X) — no se pierde, se repesca.
+  if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|(mira|checa|revisa) mi (of|only|link|p[áa]gina|contenido|perfil|vip)|te espero en mi|mi contenido|contenido\s*\W{0,4}\s*(exclusiv|complet|nuev|calient)\w*|contenido premium|suscr[ií]b|suscripci[óo]n|\bsub a mi\b|(mi|tu)\s+vip\b|acceso\s+vip\s+a\s+mi|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18\b(?!\s*(confirmad|person|invitad|amig|a[ñn]os))|\b18\+)/i.test(raw)) s.push("promo");
   return s;
+}
+
+// Casino / apuestas / trading / "gana dinero" = link de AFILIADO, NO su contenido pago
+// (misma regla que telegram-scan #925 y la visión de IG). Red-team: "Regístrate en
+// RojaBet…link en bio" y "grupo VIP de señales de trading" salían Sí por el CTA.
+function isMoneyMaking(haystack: string): boolean {
+  return /casino|apuest|rojabet|1xbet|betplay|bet365|codere|\bstake\b|\btrading\b|se[ñn]ales de (trading|forex)|gana(r|ncias)?\s+(dinero|plata)|dinero (f[áa]cil|extra)|referid|afiliad|trabaj[aá] desde casa|oportunidad de negocio/i.test((haystack || "").toLowerCase());
+}
+
+// Destino GRATUITO nombrado (YouTube/Twitch/Spotify/…): "suscríbanse a mi canal de
+// youtube" NO es promo de OF — el CTA apunta a una plataforma gratuita explícita.
+// Solo aplica sin señal OF fuerte (si además nombra su OF/funnel, la fuerte manda).
+function isFreeDest(haystack: string): boolean {
+  return /youtube|youtu\.be|\btwitch\b|spotify|soundcloud|apple music|deezer|mercado\s?libre/i.test((haystack || "").toLowerCase());
 }
 
 // Media + links expandidos del tweet (el shape de apidojo).
@@ -98,7 +118,10 @@ function expandedLinks(it: any): string[] {
 // Publicidad de MARCA/tienda (Shein, Temu, cupón, "publicidad pagada") — un ad pagado a
 // un tercero NO es promo de su OF, aunque el CTA genérico ("descuento"/"link") matchee.
 function isBrandAd(haystack: string): boolean {
-  return /\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test((haystack || "").toLowerCase());
+  // Lookbehind: "MI código de descuento PROMO50 y desbloquea mi página" es SU descuento
+  // (promo real, red-team) — no publicidad de marca. Ídem "mi wishlist de Amazon" +
+  // "contenido exclusivo" (economía de fans, no ad de Amazon).
+  return /\bshein\b|\btemu\b|\baliexpress\b|(?<!wishlist de |lista de deseos de )\bamazon\b|mercado\s?libre|\bcup[óo]n\b|(?<!mi )c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test((haystack || "").toLowerCase());
 }
 
 // Promo SOLO con señal explícita de OF (link/mención/agregador/CTA) — igual que FB
@@ -111,7 +134,12 @@ function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: s
   const hay = text + " " + links.join(" ");
   const sig = ofSignals(hay, ofHandles);
   const hasStrong = sig.some((x) => x === "onlyfans" || x === "of_handle" || x === "link_agg");
+  // Guards (solo sin señal fuerte; brandAd:true además GATEA la visión — un ad de marca,
+  // un casino o un CTA hacia YouTube no deben ir a repesca visual):
   if (isBrandAd(hay) && !hasStrong) return { promoted: false, reason: "brand_ad", brandAd: true };
+  if (isMoneyMaking(hay) && !hasStrong) return { promoted: false, reason: "money_making", brandAd: true };
+  if (hasStrong) return { promoted: true, reason: sig.join("+"), brandAd: false };
+  if (isFreeDest(hay)) return { promoted: false, reason: "free_dest", brandAd: true };
   if (sig.length) return { promoted: true, reason: sig.join("+"), brandAd: false };
   return { promoted: false, reason: "sin-senal-of", brandAd: false };
 }
@@ -121,7 +149,9 @@ function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: s
 // MAX_VISION para no hacer timeout a volumen de X (las promos reales suelen tener
 // el link en el texto, así que la visión es un repesca acotada).
 const VISION_MODEL = "google/gemini-2.5-flash";
-const MAX_VISION_PER_RUN = 30;
+// 30→60 (2026-07-22): con las corridas livianas (#935 persistir solo promos) hay
+// presupuesto para repescar el doble de tweets "mudos de texto pero con foto".
+const MAX_VISION_PER_RUN = 60;
 const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. CÓMO SE PROMOCIONA EN X (Twitter): el link a su OnlyFans/funnel vive en la BIO del perfil, y los posts (selfies, fotos sugerentes, frases coquetas o personales acompañadas de un link) son el ANZUELO para mandar al fan a ese link. Por eso, en X, casi TODO post de la creadora con un link o una invitación APUNTA a su contenido pago — el link suele ser un acortado t.co que redirige a su bio/funnel.
 Mirá la imagen + el texto de este post de X de una creadora y decidí si promociona su contenido pago.
 promoted=true si se cumple CUALQUIERA:

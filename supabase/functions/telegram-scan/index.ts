@@ -74,6 +74,46 @@ function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; 
   return { promoted, reason: signals.join("+") || "sin-señales" };
 }
 
+// ── Segunda opinión de IA (SOLO texto, SOLO para "sin-señales") ─────────────────
+// Telegram era la única red 100% heurística sin red de seguridad de IA (la media viene
+// protegida → no hay visión). La heurística pierde obfuscaciones que un humano lee al
+// vuelo: "𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺" estilizado, typos ("onlifans"), referencias fraseadas raro.
+// Repesca: un post que la heurística dejó en "sin-señales" pasa por Gemini con la MISMA
+// regla estricta del dueño (solo puntero a OF/pago/funnel; canal VIP/packs/DM ≠ OF).
+// La IA solo puede subir No→Sí con puntero explícito; NUNCA baja un Sí heurístico.
+// Cap por corrida + best-effort: si la IA falla, queda el veredicto heurístico.
+const LLM_MODEL = "google/gemini-2.5-flash";
+const LLM_CAP_PER_RUN = 40;
+const TG_LLM_PROMPT = `Sos analista de una agencia de OnlyFans. REGLA ESTRICTA del dueño: un post del canal de Telegram de una creadora cuenta como PROMOCIÓN DE SU ONLYFANS solo si APUNTA a su contenido de pago FUERA de Telegram: menciona OnlyFans (incluye typos, leet o letras estilizadas: 0nlyfans, onlifans, 𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺, "mi OF", "mi Only"), otra plataforma de pago (Fansly, Fanvue, ManyVids), un funnel/link-in-bio (linktr.ee, bybio, beacons, piclink, stan store, allmylinks), o el nick de OF de la creadora.
+NO cuenta (promoted=false): promocionar su propio canal/grupo VIP de Telegram, vender packs por DM ("escríbeme", "mp"), contenido +18/🔞 SIN destino de pago nombrado, publicidad de marcas/tiendas, casino/apuestas/trading/"gana dinero", saludos y vida diaria. Si la referencia es ambigua o implícita sin destino claro → promoted=false.
+Respondé SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
+
+async function llmSecondOpinion(text: string, ofHandles: string[], apiKey: string): Promise<{ promoted: boolean; reason: string }> {
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 12000);
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://maven.asmtech.me", "X-Title": "Maven Promolog TG" },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        messages: [{ role: "user", content: `${TG_LLM_PROMPT}\n\nNicks de OF de ESTA creadora: ${ofHandles.filter(Boolean).join(", ") || "(ninguno)"}\nPost del canal:\n"""${(text || "").slice(0, 1200)}"""` }],
+        response_format: { type: "json_object" }, temperature: 0, max_tokens: 200,
+      }),
+      signal: ac.signal,
+    });
+    clearTimeout(t);
+    if (!resp.ok) return { promoted: false, reason: `or_${resp.status}` };
+    const raw = ((await resp.json()) as any)?.choices?.[0]?.message?.content ?? "";
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch { try { parsed = JSON.parse(String(raw).replace(/```(?:json)?/gi, "").trim()); } catch { /* noop */ } }
+    if (!parsed) return { promoted: false, reason: "llm_parse" };
+    return { promoted: parsed.promoted === true, reason: String(parsed.reason || "").slice(0, 160) };
+  } catch (e) {
+    return { promoted: false, reason: `llm:${String((e as Error)?.message || e).slice(0, 60)}` };
+  }
+}
+
 function jsonResponse(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
@@ -156,6 +196,9 @@ Deno.serve(async (req: Request) => {
     for (const u of tgExtraByCreator.get(c.id) ?? []) targets.push({ c, handle: u });
   }
 
+  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+  let llmUsed = 0; // cap de costo/tiempo por corrida (solo repesca de "sin-señales")
+
   const results: unknown[] = [];
   for (const t of targets) {
     const c = t.c;
@@ -174,7 +217,16 @@ Deno.serve(async (req: Request) => {
       let inserted = 0, promotedCount = 0, skipped = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
-        const { promoted, reason } = classifyPromo(p.text, ofNicksByCreator.get(c.id) ?? []);
+        const nicks = ofNicksByCreator.get(c.id) ?? [];
+        let { promoted, reason } = classifyPromo(p.text, nicks);
+        let aiModel = "heuristic-of-v1";
+        // Repesca IA: solo cuando la heurística NO vio nada ("sin-señales" — un guard
+        // como brand_ad/money_making es un No FIRME y no se repesca) y hay texto real.
+        if (!promoted && reason === "sin-señales" && OPENROUTER_API_KEY && llmUsed < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
+          llmUsed++;
+          const v = await llmSecondOpinion(p.text, nicks, OPENROUTER_API_KEY);
+          if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
+        }
         if (promoted) promotedCount++;
         if (dryRun) continue;
 
@@ -197,7 +249,7 @@ Deno.serve(async (req: Request) => {
           notes: (p.text || "").slice(0, 2000) || null,
           evidence_url: p.permalink || null,
           analyzed_by_ai: true,
-          ai_model: "heuristic-of-v1",
+          ai_model: aiModel,
           ai_reasoning: reason,
           source_handle: (handle || "").trim() || null,
           story_index: i,

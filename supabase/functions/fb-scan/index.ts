@@ -56,22 +56,37 @@ function ofSignals(haystack: string, ofHandles: string[]): { strong: string[]; w
   // "onlyfans"/"only fans" (+ leet) SIEMPRE; la abreviatura "OF"/"Only" SOLO en posesivo
   // ("mi/tu/su OF", "mi Only") — el "of" INGLÉS daba falsos Sí reales en X ("Fourth Of
   // July") con este mismo regex. Igual fix que telegram-scan #927 y x-scan.
-  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) strong.push("onlyfans");
+  // Emoji en el medio permitido (\W{1,4}): "mi 🔥 Only" es fraseo real (red-team).
+  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:\W{1,4}\s*)?(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) strong.push("onlyfans");
   // Cualquier nickname de OF (principal + secundarias) cuenta como señal fuerte.
   if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) strong.push("of_handle");
-  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.store|linkin\.bio/i.test(raw)) strong.push("link_agg");
-  // CTA con sabor OF/+18 (no aparece en un ad de ropa/tienda genérico). "vip" NO suelto
-  // (regla del dueño: "evento VIP"/"zona VIP" ≠ OF) → exige contexto de contenido/acceso
-  // propio. + suscripci[óo]n (FN real en X: "Mi Only está con 50% en Suscripción").
-  if (/(contenido (exclusivo|completo|nuevo|premium|caliente)|suscr[ií]b|suscripci[óo]n|(mi|acceso|contenido)\s+vip\b|sin censura|\+18\b|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
-  // "Checa el primer comentario" / "link en comentarios" = técnica CLÁSICA de FB: el
-  // link de OF va en el 1er comentario (FB baja el alcance de posts con link externo).
-  // El scraper NO lee comentarios → sin esta regla el post salía "sin-senal-of" y solo
-  // la visión lo pescaba a veces (cap MAX_VISION). Caso real: Lina Gallego 01-jul.
-  if (/(chec[aá]|mir[aá]|revis[aá]|busc[aá])\w*\s+(el\s+)?primer\s+comentario|link\s+en\s+(el\s+|los\s+)?(primer\s+)?comentario/i.test(raw)) weakOf.push("primer_comentario");
+  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.?\s?store|linkin\.bio/i.test(raw)) strong.push("link_agg");
+  // CTA con sabor OF/+18. "vip" exige contexto PROPIO: "mi/tu vip", "acceso vip A MI",
+  // "contenido vip" — el red-team pescó "Gracias @ArenaCDMX por el acceso VIP al
+  // concierto" (tercero) con la versión anterior. "contenido nuev*" tolera conjugación
+  // ("nuevecito") y un emoji en el medio ("contenido 🍑 exclusivo").
+  if (/(contenido\s*\W{0,4}\s*(exclusiv|complet|nuev|premium|calient)\w*|suscr[ií]b|suscripci[óo]n|(mi|tu)\s+vip\b|acceso\s+vip\s+a\s+mi|contenido\s+vip\b|sin censura|\+18\b(?!\s*(confirmad|person|invitad|amig|a[ñn]os))|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
+  // "Primer comentario" = técnica CLÁSICA de FB (el link de OF va en el 1er comentario;
+  // el scraper NO lee comentarios). Red-team: la versión anterior exigía imperativo
+  // singular + "primer" literal → perdía "chequen"/"está en el…"/"1er"/"link en MI
+  // primer…"/"comentario fijado". Ahora: cualquier mención de primer/1er comentario o
+  // comentario fijado/anclado, o "link (está) en (los) comentarios". EXCEPTO cuando el
+  // post le PIDE el link a la audiencia ("dejen el link en comentarios porfa").
+  const audienceAsk = /(dejen|d[ée]jenme|manden|m[áa]ndenme|pasen|p[áa]senme|env[ií]en\w*|alguien\s+(tiene|sabe|pasa))\s+(el\s+|la\s+|me\s+)?(link|enlace)/i.test(raw);
+  if (!audienceAsk && /(primer|1er\.?|1ro|1º)\s+comentario|comentario\s+(fijado|anclado|destacado)|link\s+(est[áa]\s+)?en\s+(el\s+|los\s+|mi\s+)?(primer(os)?\s+|1er\s+)?comentarios?\b/i.test(raw)) weakOf.push("primer_comentario");
   // Publicidad de MARCA / tienda → NO es promo de su OF (aunque tenga cupón/descuento/CTA).
-  if (/\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(raw)) brand.push("brand_ad");
+  // Lookbehind: "MI código de descuento" es SU promo; "mi wishlist de Amazon" no es ad.
+  if (/\bshein\b|\btemu\b|\baliexpress\b|(?<!wishlist de |lista de deseos de )\bamazon\b|mercado\s?libre|\bcup[óo]n\b|(?<!mi )c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(raw)) brand.push("brand_ad");
   return { strong, weakOf, brand };
+}
+
+// Casino/apuestas/trading = afiliado, NO su OF (regla del dueño; igual que X y Telegram).
+function isMoneyMakingFb(haystack: string): boolean {
+  return /casino|apuest|rojabet|1xbet|betplay|bet365|codere|\bstake\b|\btrading\b|se[ñn]ales de (trading|forex)|gana(r|ncias)?\s+(dinero|plata)|dinero (f[áa]cil|extra)|referid|afiliad|trabaj[aá] desde casa|oportunidad de negocio/i.test((haystack || "").toLowerCase());
+}
+// Destino GRATUITO nombrado ("les dejo el link en comentarios… video en YouTube") ≠ OF.
+function isFreeDestFb(haystack: string): boolean {
+  return /youtube|youtu\.be|\btwitch\b|spotify|soundcloud|apple music|deezer|mercado\s?libre/i.test((haystack || "").toLowerCase());
 }
 
 // Texto del post (el shape de apify/facebook-posts-scraper varía → probamos varias claves).
@@ -109,9 +124,12 @@ function classifyFb(it: any, ofHandles: string[]): { promoted: boolean; reason: 
   //  4) Nada de lo anterior → No por texto (si hay foto, decide la visión más abajo).
   const text = postText(it);
   const links = postLinks(it);
-  const sig = ofSignals(text + " " + links.join(" "), ofHandles);
+  const hay = text + " " + links.join(" ");
+  const sig = ofSignals(hay, ofHandles);
   if (sig.brand.length && !sig.strong.length) return { promoted: false, reason: `brand:${sig.brand.join("+")}`, brandAd: true };
+  if (isMoneyMakingFb(hay) && !sig.strong.length) return { promoted: false, reason: "money_making", brandAd: true };
   if (sig.strong.length) return { promoted: true, reason: sig.strong.join("+"), brandAd: false };
+  if (isFreeDestFb(hay)) return { promoted: false, reason: "free_dest", brandAd: true };
   if (sig.weakOf.length) return { promoted: true, reason: sig.weakOf.join("+"), brandAd: false };
   return { promoted: false, reason: "sin-senal-of", brandAd: false };
 }
