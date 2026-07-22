@@ -419,10 +419,15 @@ Deno.serve(async (req: Request) => {
         .select("id").eq("creator_id", c.id).eq("network", "X").eq("story_link_url", dedupKey).limit(1);
       if (dupe && dupe.length) { skipped++; continue; }
 
-      // Evidencia DURABLE: bajamos la imagen del tweet a nuestro bucket. Fallback a la
-      // URL original si el persist falla, y al permalink si el tweet no tiene imagen.
+      // Evidencia DURABLE: guardamos la imagen en nuestro bucket SOLO para los tweets que
+      // SÍ son promo (la evidencia que de verdad importa). Bajar+subir la foto de CADA
+      // tweet — incluidos los cientos de "No" — era el grueso del tiempo por corrida
+      // (300-400 fotos, una por una) y por eso el scan se cortaba sin cubrir a todas.
+      // Los "No" usan la URL original del tweet (se ve mientras Twitter la sirve; si expira
+      // no importa, es un "No" sin valor de evidencia). El dedup NO depende de esto (usa el
+      // permalink del tweet), así que sigue igual.
       let evidenceUrl: string = firstImage || permalink;
-      if (firstImage) {
+      if (promoted && firstImage) {
         const durable = await persistTweetImage(sb, firstImage, `${c.id}/${String(it?.id || it?.tweetId || i)}`);
         if (durable) evidenceUrl = durable;
       }
