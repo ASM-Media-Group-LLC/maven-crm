@@ -185,6 +185,23 @@ const fmtCorte = (iso: string) => {
   return `${fmtDia(dayKey(d))} ${d.toISOString().slice(11, 16)}`;
 };
 
+// Pide data FRESCA a BLU antes de calcular: encola en blu_sync_requests y espera
+// hasta ~75s a que el micro blu-bridge (pollea la cola cada 20s) corra su sync
+// QUICK (hoy+ayer, ~10-20s). Best-effort: si no llega a tiempo (micro caído u
+// ocupado), seguimos con lo que hay — el corte del mensaje siempre dice la verdad.
+async function requestFreshBlu(sb: any, why: string): Promise<"fresh" | "timeout" | "error"> {
+  const { data, error } = await sb.from("blu_sync_requests").insert({ requested_by: why }).select("id").single();
+  if (error || !data) return "error";
+  const deadline = Date.now() + 75_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 4000));
+    const { data: row } = await sb.from("blu_sync_requests").select("status").eq("id", data.id).maybeSingle();
+    if (row?.status === "done") return "fresh";
+    if (row?.status === "error" || row?.status === "expired") return "error";
+  }
+  return "timeout";
+}
+
 // ── Mensajes ──────────────────────────────────────────────────────────────────
 async function buildDailyQuality(sb: any): Promise<string> {
   const today = bogToday();
@@ -196,23 +213,27 @@ async function buildDailyQuality(sb: any): Promise<string> {
   return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n_% = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`;
 }
 
+// "Hasta ahora": sync fresco de BLU + total del día al momento del reporte, SIN
+// comparación con ayer (pedido del dueño 2026-07-23 — ayer-completo vs hoy-parcial
+// daba ↓ falsos que confundían).
 async function buildDailyIncome(sb: any): Promise<string> {
-  const today = bogToday(), yest = bogShift(-1);
+  const fresh = await requestFreshBlu(sb, "daily_income");
+  const today = bogToday();
   const names = await activeNames(sb);
   const hoy = await incomeTop(sb, today, today, names);
-  const ayer = await incomeTop(sb, yest, yest, names);
-  const ayerMap = new Map(ayer.top);
+  const hhmm = bogNow().toISOString().slice(11, 16);
   const top5 = hoy.top.slice(0, 5);
-  if (!top5.length) return `💰 *Top ingresos de hoy ${fmtDia(today)}*\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte) || "s/d"}).`;
-  const lines = top5.map(([cid, v], i) => {
-    const y = ayerMap.get(cid) ?? 0;
-    const trend = y > 0 ? (v >= y ? `↑ ${Math.round((v - y) / y * 100)}%` : `↓ ${Math.round((y - v) / y * 100)}%`) : "nuevo";
-    return `${medals[i]} *${names.get(cid)}* — ${money(v)}  (ayer ${money(y)} · ${trend})`;
-  });
-  return `💰 *Top ingresos de hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n_Corte BLU: ${fmtCorte(hoy.corte)} — lo posterior entra en el próximo sync_`;
+  const head = `💰 *Top ingresos de hoy ${fmtDia(today)} — hasta las ${hhmm}*`;
+  if (!top5.length) return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte) || "s/d"}).`;
+  const lines = top5.map(([cid, v], i) => `${medals[i]} *${names.get(cid)}* — ${money(v)}`);
+  const nota = fresh === "fresh"
+    ? `_Data BLU recién sincronizada (${fmtCorte(hoy.corte)})_`
+    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo_`;
+  return `${head}\n\n${lines.join("\n")}\n\n${nota}`;
 }
 
 async function buildWeekly(sb: any): Promise<string> {
+  const fresh = await requestFreshBlu(sb, "weekly");
   const monday = bogMonday(), today = bogToday();
   const names = await activeNames(sb);
   const rows = await fetchEntries(sb, monday);
@@ -234,7 +255,9 @@ async function buildWeekly(sb: any): Promise<string> {
     `💰 *Top ingresos de la semana*`,
     ...iLines,
     ``,
-    `_Corte BLU: ${fmtCorte(inc.corte)} — sync ~3×/día_`,
+    fresh === "fresh"
+      ? `_Data BLU recién sincronizada (${fmtCorte(inc.corte)})_`
+      : `_Corte BLU: ${fmtCorte(inc.corte)} — no se pudo refrescar a tiempo_`,
   ].join("\n");
 }
 

@@ -378,7 +378,7 @@ async function ingest(rows) {
   return data;
 }
 
-async function runOnce(acct, firstRun = false) {
+async function runOnce(acct, firstRun = false, quickDays = null) {
   requireEnv();
   let token = await getToken(acct.id, acct.seed);
   if (!token) { console.error(`[blu-bridge:${acct.account}] sin token (ni blu_session ni seed) → salto.`); return { rows: 0 }; }
@@ -391,14 +391,17 @@ async function runOnce(acct, firstRun = false) {
   // PRIMER run y luego cada RESYNC_EVERY_HOURS; las corridas intermedias son livianas. En el
   // PRIMER run, si BACKFILL_DAYS>0, se extiende más atrás (histórico, 1 sola vez). Chunks de
   // 30 días → 1 conexión WS por chunk: resiliente (un chunk que falla no tumba el resto).
+  // TERCER nivel (quickDays): sync ON-DEMAND ultra-liviano — solo hoy+ayer, disparado por
+  // la cola blu_sync_requests (reportes que necesitan data fresca YA). No toca el
+  // bookkeeping del resync pesado.
   const baseDays = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);   // mes en curso
-  const doFull = firstRun || (Date.now() - (lastFullResyncMs[acct.id] || 0) >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000);
+  const doFull = quickDays == null && (firstRun || (Date.now() - (lastFullResyncMs[acct.id] || 0) >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000));
   if (doFull) lastFullResyncMs[acct.id] = Date.now();
   const rolling = doFull ? Math.max(baseDays, Number(RESYNC_DAYS) || 0) : baseDays;
-  const backfill = firstRun ? Number(BACKFILL_DAYS) || 0 : 0;
-  const allDays = daysBack(Math.max(rolling, backfill));
+  const backfill = firstRun && quickDays == null ? Number(BACKFILL_DAYS) || 0 : 0;
+  const allDays = quickDays != null ? daysBack(quickDays) : daysBack(Math.max(rolling, backfill));
   const chunks = chunk(allDays, 30);
-  console.log(`[blu-bridge:${acct.account}] conectando WS ${BLU_WS_URL}… ${doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
+  console.log(`[blu-bridge:${acct.account}] conectando WS ${BLU_WS_URL}… ${quickDays != null ? "QUICK on-demand" : doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
 
   let totalRows = 0, sawCreators = false;
   const bluNamesSeen = new Set(); // nombres BLU vistos en ESTA cuenta → marcar kash_type (Massive/Plus)
@@ -527,19 +530,62 @@ function buildAccounts() {
   if (BLU_JWT_MASSIVE) accts.push({ id: 2, account: "massive", seed: BLU_JWT_MASSIVE });
   return accts;
 }
+// Mutex simple: que un sync programado y uno on-demand no corran a la vez (dos WS
+// simultáneos a BLU con el mismo token = comportamiento no probado; mejor secuencial).
+let busy = false;
 async function runAllAccounts(firstRun) {
-  for (const acct of buildAccounts()) {
-    try { await runOnce(acct, firstRun); }
-    catch (e) { warnIfExpired(acct, e); }
-  }
+  if (busy) { console.log("[blu-bridge] corrida programada saltada (hay un sync en curso)."); return; }
+  busy = true;
+  try {
+    for (const acct of buildAccounts()) {
+      try { await runOnce(acct, firstRun); }
+      catch (e) { warnIfExpired(acct, e); }
+    }
+  } finally { busy = false; }
+}
+
+// ── Sync ON-DEMAND (cola blu_sync_requests) ──────────────────────────────────
+// promolog-highlights (u otro caller service-role) inserta una fila 'pending' →
+// acá la vemos (poll cada 20s), corremos una pasada QUICK (hoy+ayer, ~10-20s) y
+// marcamos done/error. Pedidos viejos (>10 min) se marcan 'expired' (el caller ya
+// no está esperando). Sin puertos HTTP: el micro solo habla con Supabase.
+async function pollSyncRequests() {
+  if (busy) return;
+  let req = null;
+  try {
+    const tenMinAgo = new Date(Date.now() - 10 * 60000).toISOString();
+    await sb().from("blu_sync_requests").update({ status: "expired", finished_at: new Date().toISOString() })
+      .eq("status", "pending").lt("requested_at", tenMinAgo);
+    const { data } = await sb().from("blu_sync_requests")
+      .select("id").eq("status", "pending").gte("requested_at", tenMinAgo)
+      .order("id", { ascending: true }).limit(1);
+    req = data && data[0];
+  } catch (e) { console.error("[blu-bridge] poll sync requests:", e.message); return; }
+  if (!req) return;
+  busy = true;
+  console.log(`[blu-bridge] sync on-demand #${req.id} → QUICK (hoy+ayer)…`);
+  try {
+    await sb().from("blu_sync_requests").update({ status: "running", started_at: new Date().toISOString() }).eq("id", req.id);
+    for (const acct of buildAccounts()) {
+      try { await runOnce(acct, false, 1); }   // quickDays=1 → hoy + ayer
+      catch (e) { warnIfExpired(acct, e); }
+    }
+    await sb().from("blu_sync_requests").update({ status: "done", finished_at: new Date().toISOString() }).eq("id", req.id);
+    console.log(`[blu-bridge] sync on-demand #${req.id} done.`);
+  } catch (e) {
+    await sb().from("blu_sync_requests").update({ status: "error", finished_at: new Date().toISOString(), note: String(e.message || e).slice(0, 200) }).eq("id", req.id)
+      .then(() => {}, () => {});
+    console.error(`[blu-bridge] sync on-demand #${req.id} error:`, e.message);
+  } finally { busy = false; }
 }
 
 async function main() {
   if (RUN_ONCE) { await runAllAccounts(true); process.exit(0); return; }
   await runAllAccounts(true);   // primer run: pesado (90d) + backfill si BACKFILL_DAYS>0, por cuenta
   const hours = Math.max(1, Math.min(Number(RUN_EVERY_HOURS) || 3, 12));   // 1–12h; < 24h para refrescar el token
-  console.log(`[blu-bridge] próxima corrida en ${hours}h (cuentas: ${buildAccounts().map((a) => a.account).join(", ")})`);
+  console.log(`[blu-bridge] próxima corrida en ${hours}h (cuentas: ${buildAccounts().map((a) => a.account).join(", ")}) · cola on-demand cada 20s`);
   setInterval(() => runAllAccounts(false), hours * 3600000);
+  setInterval(pollSyncRequests, 20000);
 }
 
 main();
