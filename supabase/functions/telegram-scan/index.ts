@@ -51,15 +51,22 @@ function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; 
   const raw = text || "";
   const t = raw.toLowerCase();
   const signals: string[] = [];
-  if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) signals.push("onlyfans");
+  // OnlyFans: la palabra "onlyfans"/"only fans" (+ leet 0nly/f4ns) SIEMPRE cuenta. La
+  // abreviatura "OF" NO se matchea suelta porque el "of" INGLÉS aparece por todos lados
+  // ("Booty OF the day", "House OF CB", "50% OF", "GAME OF THRONES") → sobre-conteo. Solo
+  // cuenta la abreviatura en contexto posesivo ("mi/tu/su OF"), que es inequívoco.
+  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:nuev[oa]\s+)?[o0]\.?f\b/i.test(raw)) signals.push("onlyfans");
   // Cualquier nickname de OF (principal + secundarias) cuenta como señal.
   if (ofHandles.some((h) => h && t.includes(h.toLowerCase()))) signals.push("of_handle");
   // Otras plataformas de pago / funnels nombrados. NO "fans" suelto (da FP "hola fans").
-  if (/\bfansly\b|\bfanvue\b|\bpiclink\b|\bunlok\b|\blinktr\b|\bmanyvids\b/i.test(raw)) signals.push("plataforma");
+  // "linktr(ee)" cubre tanto "linktr.ee" como la palabra "Linktree".
+  if (/\bfansly\b|\bfanvue\b|\bpiclink\b|\bunlok\b|\blinktr(?:ee)?\b|\bmanyvids\b/i.test(raw)) signals.push("plataforma");
   // URL/funnel: link en tier PAGO o AGREGADOR (onlyfans, piclink, linktr.ee, bybio…) =
   // puntero a contenido pago. OJO: t.me es NONPAID en el link-classifier → un link a SU
   // canal de Telegram NO cuenta como promo de OF. Reusa la lógica ya vetada del classifier.
-  const urls = raw.match(/https?:\/\/[^\s]+|\b(?:t|telegram)\.me\/[^\s]+|\b[a-z0-9-]+\.(?:co|com|me|link|bio|store|to|ai|ly)\/[^\s]+/gi) || [];
+  // Captura subdominios completos (\b(?:label\.)+tld) para no perder el host de wrappers
+  // sin esquema (l.instagram.com/?u=… → si tomáramos solo "instagram.com" no se desenvuelve).
+  const urls = raw.match(/https?:\/\/[^\s]+|\b(?:t|telegram)\.me\/[^\s]+|\b(?:[a-z0-9-]+\.)+(?:co|com|me|link|bio|store|to|ai|ly)\/[^\s]+/gi) || [];
   if (urls.some((u) => { const tier = classifyLinkDestination(u).tier; return tier === "paid" || tier === "aggregator"; })) signals.push("of_link");
   // Todas las señales de arriba son "fuertes" (apuntan a OF / pago / funnel). Si no hay
   // ninguna, es actividad de Telegram genérica (o venta del propio canal) → NO promo de OF.
