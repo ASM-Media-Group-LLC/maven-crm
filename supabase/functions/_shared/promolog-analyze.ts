@@ -65,7 +65,7 @@ REGLA CENTRAL: "promocionar" = hay un PUNTERO o LLAMADO A LA ACCIÓN concreto ha
 Tres categorías:
 1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con una URL de plataforma de pago (ej. "onlyfans.com/nick") o con un nick JUNTO a la palabra/logo de la plataforma (ej. "OF: @nick").
 2) INDIRECTA (promotion_type="indirect", promoted=true): NO hay link visible, pero el TEXTO tiene un llamado a la acción claro hacia contenido pago: "escríbeme por mi contenido", "más en mi página / mi OF", "contenido exclusivo / VIP / premium", "suscribite", "DM para el link", o una invitación EXPLÍCITA por TEXTO a ir a su cuenta "premium/+18" (esas palabras — o 🔞 / "cuenta de adultos/explícita" — tienen que estar escritas). Tiene que haber una INVITACIÓN a ir a otro lado o comprar — NO alcanza con una foto linda + un emoji, NI con un simple @tag/mención a otra cuenta de IG: un @ suelto NO es "redirección a una cuenta premium/+18" salvo que el texto traiga esas palabras al lado (ver la regla de @MENCIÓN en la GUÍA).
-3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar.
+3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar. ⚠️ Y también: un CTA genérico tipo "VIDEO COMPLETO AQUÍ" / "CONTEXTO COMPLETO AQUÍ" / "míralo completo" que claramente apunta a contenido NO-adulto — un show, comedia, un evento, un vlog, un canal de YouTube/Twitch, una entrevista — NO es promo de contenido pago aunque tenga sticker de link: es promoción de su contenido GRATUITO (caso real: creadora de comedia con "VIDEO COMPLETO AQUÍ" de su show → NO). Solo cuenta como INDIRECTA/DIRECTA si el contexto es de contenido pago (+18/sugerente) o nombra plataforma de pago.
 
 Devolvé SOLO JSON con esta forma:
 {
@@ -616,6 +616,25 @@ async function processStory(args: {
   // la cola marcándola needs_review (qualityForEntry trata needs_review como OF-válida).
   const claimedManaged = ["onlyfans", "piclink"].includes((final.buy_link_type || "").toLowerCase()) ||
     ["onlyfans", "piclink", "unlok"].includes((final.platform_mentioned || "").toLowerCase());
+
+  // CTA sin NINGUNA evidencia de pago → NO cuenta (regla del dueño: promo = puntero a
+  // OF/pago/funnel). La visión a veces marca Sí por un CTA genérico ("VIDEO COMPLETO
+  // AQUÍ") aunque ella misma reporte plataforma "ninguna" y el buy-link quede en "other"
+  // sin knownPlatform que lo respalde, y ningún sticker real apunte a pago/funnel.
+  // Resultado visible: "Sí" con calidad 0% — contradicción (caso wanderslover 2026-07-22,
+  // creadora de comedia: el CTA era de su show). Las creadoras CON onlyfans_url
+  // registrado no pasan por acá (su buy_link_type ya se elevó a knownPlatform arriba).
+  const noPaidEvidence = final.promoted && !linkIsPromo && !linkIsOwnFunnel && !claimedManaged &&
+    (final.buy_link_type === "other" || !final.buy_link_type) &&
+    ["ninguna", ""].includes((final.platform_mentioned || "").toLowerCase());
+  if (noPaidEvidence) {
+    final = {
+      ...final, promoted: false, promotion_type: "none",
+      reasoning: `CTA sin destino de pago identificable (plataforma "ninguna", link no-pago/inexistente) → no cuenta como promo de OF. ${final.reasoning ?? ""}`.slice(0, 240),
+    };
+    analysisLevel += "+no_paid_evidence";
+  }
+
   const visualLinkOnly = final.promoted && final.has_buy_link && claimedManaged &&
     !linkIsPromo && !linkIsOwnFunnel;
   const needsReview = !linkIsCasino && (
