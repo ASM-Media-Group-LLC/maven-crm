@@ -29,8 +29,15 @@ export async function initPWA() {
     // to fetch as a URL and rejects with a CORS/scheme error.
     // @ts-expect-error - virtual module resolved by vite-plugin-pwa
     const { registerSW } = await import("virtual:pwa-register");
-    registerSW({
+    const updateSW = registerSW({
+      // Las pestañas de Maven viven abiertas por DÍAS (SPA, sin navegaciones) y el
+      // navegador solo chequea el SW al navegar → el banner de update no aparecía
+      // nunca en pestañas longevas. Chequeo explícito cada hora.
+      onRegisteredSW(_swUrl: string, r: ServiceWorkerRegistration | undefined) {
+        if (r) setInterval(() => { r.update().catch(() => {}); }, 60 * 60 * 1000);
+      },
       onNeedRefresh() {
+        if (document.getElementById("pwa-update-banner")) return; // no duplicar
         const banner = document.createElement("div");
         banner.id = "pwa-update-banner";
         banner.style.cssText =
@@ -42,7 +49,12 @@ export async function initPWA() {
           '<button id="pwa-reload-btn" style="background:#6366f1;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px">Recargar</button>';
         document.body.appendChild(banner);
         document.getElementById("pwa-reload-btn")?.addEventListener("click", () => {
-          window.location.reload();
+          // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
+          // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
+          // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
+          // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
+          // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
+          updateSW(true).catch(() => window.location.reload());
         });
       },
       onOfflineReady() {},
