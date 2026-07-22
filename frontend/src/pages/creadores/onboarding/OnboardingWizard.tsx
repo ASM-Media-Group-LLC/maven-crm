@@ -191,7 +191,13 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     if (!step1.name.trim()) return; // Need at least a name
     setIsSavingAuto(true);
     try {
-      const payload = buildCreatorPayload(true);
+      const payload = buildCreatorPayload(true) as any;
+      // ⚠️ NO degradar el status de una creadora que ya avanzó: el autosave
+      // siempre arma el payload como borrador, y al EDITAR una creadora activa/
+      // onboarding la mandaba de vuelta a 'borrador' (la sacaba de Promolog).
+      if (autoSaveIdRef.current && creatorStatus && !["borrador", "pendiente"].includes(creatorStatus)) {
+        delete payload.status;
+      }
       if (autoSaveIdRef.current) {
         // Update existing
         await supabase
@@ -215,7 +221,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     } finally {
       setIsSavingAuto(false);
     }
-  }, [buildCreatorPayload, step1.name]);
+  }, [buildCreatorPayload, step1.name, creatorStatus]);
 
   // 30-second autosave interval
   useEffect(() => {
@@ -444,9 +450,42 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
     // If editing or autosaved, update instead of insert
     const currentId = editCreatorId || autoSaveIdRef.current;
+
+    // Duplicado / REINGRESO por handle de IG (mismo patrón que el check por
+    // email). Si ya existe una creadora VIVA con ese handle (distinta de la que
+    // estamos editando) → bloquear el duplicado. Si existió y fue BORRADA
+    // (creator_status_history) → permitir pero marcar rejoined_at/rejoined_from
+    // para que Maven y los bots sepan que es reingresada.
+    const igHandle = (step3Doc.instagramHandle || "").trim();
+    let rejoinFrom: string | null = null;
+    if (igHandle) {
+      const { data: matches } = await (supabase as any).rpc("find_creator_history_by_handle", { p_handle: igHandle });
+      const rows = (matches ?? []) as Array<{ creator_id: string; name: string | null; status: string; source: string }>;
+      const live = rows.find((r) => r.source === "creators" && r.creator_id !== currentId);
+      if (live) {
+        toast({
+          title: "Ya existe una creadora con ese Instagram",
+          description: `@${igHandle.replace(/^@/, "")} ya está en Creadoras como "${live.name ?? "?"}" (status: ${live.status}). Editá o reactivá ese perfil en vez de crear un duplicado.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      const del = rows.find((r) => r.source === "history");
+      if (del && !editCreatorId) rejoinFrom = del.creator_id;
+    }
+
     if (currentId) {
       try {
         const payload = buildPayload(isDraft);
+        // ⚠️ Guardar borrador sobre una creadora que ya avanzó NO debe
+        // degradarle el status (misma protección que el autosave).
+        if (isDraft && creatorStatus && !["borrador", "pendiente"].includes(creatorStatus)) {
+          delete (payload.creator as any).status;
+        }
+        if (rejoinFrom) {
+          (payload.creator as any).rejoined_at = new Date().toISOString();
+          (payload.creator as any).rejoined_from = rejoinFrom;
+        }
         const { error } = await supabase
           .from("creators")
           .update(payload.creator as any)
@@ -488,7 +527,12 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     }
 
     try {
-      const createdId = await addCreador.mutateAsync(buildPayload(isDraft));
+      const newPayload = buildPayload(isDraft);
+      if (rejoinFrom) {
+        (newPayload.creator as any).rejoined_at = new Date().toISOString();
+        (newPayload.creator as any).rejoined_from = rejoinFrom;
+      }
+      const createdId = await addCreador.mutateAsync(newPayload);
       if (!isDraft && createdId) {
         await supabase.from("notifications").insert({
           type: "onboarding_complete",

@@ -81,9 +81,30 @@ const ClosersContent = () => {
     }
   }, []);
 
+  // Match de historial para detectar duplicado/REINGRESO al convertir:
+  // fila viva en creators (activa u operativa → no duplicar; terminated/leaving/
+  // paused → ofrecer Reactivar) o registro BORRADO en creator_status_history
+  // (→ convertir marcando reingreso). null = creadora nueva de verdad.
+  const [convertMatch, setConvertMatch] = useState<{ creator_id: string; name: string | null; status: string; source: string } | null>(null);
+  const [convertCheckLoading, setConvertCheckLoading] = useState(false);
+  const REACTIVATABLE = ["terminated", "leaving", "paused"];
+
   // Click en "Convertir a Creadora" → abre el popup de confirmación
-  // (antes convertía de una, sin preguntar).
-  const handleConvertToCreator = (c: CloserCreatorRow) => setConvertTarget(c);
+  // (antes convertía de una, sin preguntar) y chequea historial del handle.
+  const handleConvertToCreator = (c: CloserCreatorRow) => {
+    setConvertTarget(c);
+    setConvertMatch(null);
+    setConvertCheckLoading(true);
+    (supabase as any)
+      .rpc("find_creator_history_by_handle", { p_handle: c.instagram_handle ?? "" })
+      .then(({ data }: { data: Array<{ creator_id: string; name: string | null; status: string; source: string }> | null }) => {
+        const rows = data ?? [];
+        // Prioridad: fila viva > registro borrado del historial.
+        setConvertMatch(rows.find((r) => r.source === "creators") ?? rows.find((r) => r.source === "history") ?? null);
+      })
+      .catch(() => setConvertMatch(null))
+      .finally(() => setConvertCheckLoading(false));
+  };
 
   // Conversión real, recién al confirmar en el popup: inserta en creators.
   const doConvertToCreator = async () => {
@@ -93,18 +114,54 @@ const ClosersContent = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No se pudo obtener el usuario autenticado");
-      const { error } = await supabase.from("creators").insert({
-        name: c.instagram_handle,
-        instagram_handle: c.instagram_handle,
-        category: c.category,
-        phone: c.phone,
-        notes: c.notes,
-        closer_responsible_id: c.assigned_to,
-        created_by: user.id,
-      });
-      if (error) throw error;
-      toast({ title: "Creadora creada", description: `${c.instagram_handle} fue convertida a creadora.` });
+
+      // Rama 1: YA existe viva y operativa (active/onboarding/borrador/…) → no duplicar.
+      if (convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status)) {
+        toast({
+          title: "Ya existe como creadora",
+          description: `${c.instagram_handle} ya está en Creadoras (status: ${convertMatch.status}). No se creó un duplicado.`,
+        });
+        setConvertTarget(null);
+        return;
+      }
+
+      // Rama 2: fue creadora (terminated/leaving/paused) → REACTIVAR el registro
+      // existente como reingreso (RPC quirúrgica: los closers no tienen UPDATE
+      // amplio sobre creators).
+      if (convertMatch && convertMatch.source === "creators") {
+        const { data, error } = await (supabase as any).rpc("reactivate_creator", {
+          p_creator_id: convertMatch.creator_id,
+          p_closer_responsible: c.assigned_to ?? user.id,
+        });
+        if (error) throw error;
+        if (!data || (Array.isArray(data) && data.length === 0)) {
+          throw new Error("No se pudo reactivar (el status actual no es reactivable)");
+        }
+        toast({ title: "Creadora reactivada (reingreso)", description: `${c.instagram_handle} vuelve a la agencia — su perfil existente pasó a onboarding, marcada como reingresada.` });
+      } else {
+        // Rama 3: nueva, o reingreso de un registro BORRADO → insert con marca.
+        const isRejoin = convertMatch?.source === "history";
+        const { error } = await supabase.from("creators").insert({
+          name: c.instagram_handle,
+          instagram_handle: c.instagram_handle,
+          category: c.category,
+          phone: c.phone,
+          notes: c.notes,
+          closer_responsible_id: c.assigned_to,
+          created_by: user.id,
+          status: "onboarding",
+          ...(isRejoin ? { rejoined_at: new Date().toISOString(), rejoined_from: convertMatch!.creator_id } : {}),
+        } as any);
+        if (error) throw error;
+        toast({
+          title: isRejoin ? "Creadora creada (reingreso)" : "Creadora creada",
+          description: isRejoin
+            ? `${c.instagram_handle} vuelve a la agencia — quedó marcada como reingresada (onboarding).`
+            : `${c.instagram_handle} fue convertida a creadora (onboarding).`,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["creators"] });
       setConvertTarget(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -474,13 +531,27 @@ const ClosersContent = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Convertir a creadora?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a crear una creadora a partir de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>. Se creará un perfil en el módulo de Creadoras. El lead seguirá en el pipeline de closers.
+              {convertCheckLoading ? (
+                <>Verificando historial de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>…</>
+              ) : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? (
+                <>⚠️ <strong>{convertTarget?.instagram_handle}</strong> ya existe en Creadoras como "{convertMatch.name ?? "?"}" (status: {convertMatch.status}). No se va a crear un duplicado.</>
+              ) : convertMatch && convertMatch.source === "creators" ? (
+                <>🔄 <strong>{convertTarget?.instagram_handle}</strong> ya fue creadora de la agencia (status: {convertMatch.status}). Se va a <strong>reactivar su perfil existente</strong> como reingreso (pasa a onboarding, sin duplicados). El lead seguirá en el pipeline.</>
+              ) : convertMatch ? (
+                <>🔄 <strong>{convertTarget?.instagram_handle}</strong> fue creadora antes (registro dado de baja). Se creará de nuevo <strong>marcada como reingreso</strong> (onboarding). El lead seguirá en el pipeline.</>
+              ) : (
+                <>Vas a crear una creadora a partir de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>. Se creará un perfil en el módulo de Creadoras (onboarding). El lead seguirá en el pipeline de closers.</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={converting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); doConvertToCreator(); }} disabled={converting}>
-              {converting ? "Convirtiendo…" : "Convertir a Creadora"}
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); doConvertToCreator(); }} disabled={converting || convertCheckLoading}>
+              {converting ? "Procesando…"
+                : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? "Entendido"
+                : convertMatch && convertMatch.source === "creators" ? "Reactivar (reingreso)"
+                : convertMatch ? "Convertir (reingreso)"
+                : "Convertir a Creadora"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

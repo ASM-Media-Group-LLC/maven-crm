@@ -6,7 +6,8 @@ export const creadorasTools: AgentTool[] = [
     name: "search_creator",
     description:
       "Busca una creadora ACTIVA por nombre o handle de Instagram. Devuelve nombre, categoría, " +
-      "Instagram, OnlyFans y otras redes cargadas.",
+      "Instagram, OnlyFans y otras redes cargadas. Si `rejoined_at` viene con fecha, la creadora " +
+      "es REINGRESADA (ya había sido creadora de la agencia antes y volvió) — mencionalo si es relevante.",
     input_schema: {
       type: "object",
       properties: { query: { type: "string", description: "nombre o @handle a buscar" } },
@@ -21,7 +22,7 @@ export const creadorasTools: AgentTool[] = [
       if (!q) return [];
       const { data, error } = await ctx.sb
         .from("creators")
-        .select("name, artistic_name, category, status, instagram_handle, onlyfans_url")
+        .select("name, artistic_name, category, status, instagram_handle, onlyfans_url, rejoined_at")
         .eq("status", "active")
         .or(`name.ilike.%${q}%,artistic_name.ilike.%${q}%,instagram_handle.ilike.%${q}%`)
         .limit(10);
