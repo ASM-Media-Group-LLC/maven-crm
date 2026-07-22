@@ -993,13 +993,14 @@ const TOOLS: Array<{
   {
     name: "get_member_maven_activity",
     description:
-      "Dado el nombre como aparece en el grupo, devuelve la ACTIVIDAD REAL del usuario en Maven en las últimas N horas/días: leads cargados Y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Usar para preguntas tipo: '¿Miguel ya cargó los 2 contactos que prometió?', '¿qué hizo Sofi hoy en Maven?', '¿cuántos NÚMEROS trajo Yeison este mes/año?' (números = leads con teléfono cargado). Pasá `since_days` para windows largas (hasta 365 días = un año); `since_hours` solo para windows cortas (hasta 30 días). Si pasás ambos, gana since_days. Requiere que el wpp_member esté linkeado a un user de Maven — si no está linkeado, devuelve member_not_linked.",
+      "Dado el nombre como aparece en el grupo, devuelve la ACTIVIDAD REAL del usuario en Maven: leads cargados Y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Usar para preguntas tipo: '¿Miguel ya cargó los 2 contactos que prometió?', '¿qué hizo Sofi hoy en Maven?', '¿cuántos contactos hice hoy?', '¿cuántos NÚMEROS trajo Yeison este mes/año?' (números = leads con teléfono cargado). ⚠️ VENTANA: por DEFAULT cuenta HOY = día calendario en hora Colombia (desde las 00:00, NO las últimas 24h). Para '¿cuántos hoy?' NO pases ventana (o pasá today:true). `since_hours` = ventana MÓVIL en horas (solo si piden explícito 'últimas 24h/3h'). `since_days` = ventana móvil en días para 'este mes' (30) / 'este año' (~365); gana sobre since_hours. Requiere que el wpp_member esté linkeado a un user de Maven — si no, devuelve member_not_linked.",
     input_schema: {
       type: "object",
       properties: {
         display_name: { type: "string", description: "nombre del miembro tal como aparece en el grupo (ilike, podés pasar solo el nombre)" },
-        since_hours: { type: "number", description: "ventana en horas, máx 30 días * 24 = 720. Default 24." },
-        since_days: { type: "number", description: "ventana en DÍAS (gana sobre since_hours), máx 365. Usalo para 'este mes' (30), 'este año' (~365 o desde inicio de año)." },
+        today: { type: "boolean", description: "true = actividad de HOY (día calendario, hora Colombia, desde las 00:00). Es el DEFAULT si no pasás since_hours/since_days. Usalo para '¿cuántos contactos hice hoy?', '¿qué hizo X hoy?'." },
+        since_hours: { type: "number", description: "ventana MÓVIL en horas (ej. 'últimas 24h', 'últimas 3h'), máx 720. NO la uses para 'hoy' — para 'hoy' usá today:true o no pases ventana." },
+        since_days: { type: "number", description: "ventana MÓVIL en DÍAS (gana sobre since_hours), máx 365. Usalo para 'este mes' (30), 'este año' (~365). NO para 'hoy'." },
       },
       required: ["display_name"],
     },
@@ -1574,15 +1575,33 @@ async function executeTool(
     case "get_member_maven_activity": {
       const displayName = String(input.display_name ?? "").trim();
       if (!displayName) return { error: "missing_display_name" };
-      // since_days gana si vino. Cap 365 días para "este año".
-      // Si solo viene since_hours, cap a 30 días * 24 = 720h.
+      // Ventana. DEFAULT = HOY (día calendario en hora Colombia, America/Bogota,
+      // UTC-5 sin DST), desde las 00:00 — NO una ventana móvil de 24h. La
+      // pregunta típica es "¿cuántos hice HOY?"; antes respondíamos las últimas
+      // 24h (rodante) → desajuste al preguntar por "hoy". since_hours/since_days
+      // = ventanas MÓVILES explícitas (gana since_days).
       const rawDays = input.since_days !== undefined ? Number(input.since_days) : null;
-      const rawHours = Number(input.since_hours ?? 24);
-      const effectiveHours = rawDays !== null && Number.isFinite(rawDays)
-        ? Math.min(Math.max(rawDays, 1), 365) * 24
-        : Math.min(Math.max(rawHours, 1), 24 * 30);
-      const sinceHours = effectiveHours;
-      const since = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+      const hasExplicitWindow = (rawDays !== null && Number.isFinite(rawDays)) || input.since_hours !== undefined;
+      const wantToday = input.today === true || !hasExplicitWindow;
+
+      let since: string;
+      let windowMode: string;
+      let sinceHours: number;
+      if (wantToday) {
+        // Inicio de hoy en Bogota = Y-M-D 00:00 -05:00 = Y-M-D 05:00 UTC.
+        const bnow = new Date(Date.now() - 5 * 3600 * 1000);
+        const startUtcMs = Date.UTC(bnow.getUTCFullYear(), bnow.getUTCMonth(), bnow.getUTCDate(), 5, 0, 0);
+        since = new Date(startUtcMs).toISOString();
+        windowMode = "today_bogota";
+        sinceHours = Math.round((Date.now() - startUtcMs) / 3_600_000 * 10) / 10;
+      } else {
+        const effectiveHours = rawDays !== null && Number.isFinite(rawDays)
+          ? Math.min(Math.max(rawDays, 1), 365) * 24
+          : Math.min(Math.max(Number(input.since_hours ?? 24), 1), 24 * 30);
+        sinceHours = effectiveHours;
+        since = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
+        windowMode = "rolling";
+      }
 
       // 1. Buscar via helper (wpp display_name OR profiles full_name).
       const members = await resolveMembersByName(sb, ctx.groupId, displayName);
@@ -1671,6 +1690,10 @@ async function executeTool(
           roles: (roles ?? []).map((r) => r.role),
         },
         window: {
+          mode: windowMode,
+          label: windowMode === "today_bogota"
+            ? "hoy (hora Colombia, desde las 00:00)"
+            : `últimas ${Math.round(sinceHours * 10) / 10}h`,
           since_hours: sinceHours,
           since_iso: since,
           window_days: Math.round(sinceHours / 24 * 10) / 10,
