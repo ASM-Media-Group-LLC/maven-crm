@@ -257,6 +257,30 @@ Deno.serve(async (req: Request) => {
   if (cErr) return json({ error: cErr.message }, 500);
 
   let list = creators || [];
+
+  // Rotación JUSTA (anti tail-starvation — mismo problema que IG en #871): cada corrida
+  // procesa hasta agotar su presupuesto (~13 creadoras de 34), y sin orden las mismas
+  // quedaban siempre primero → la cola (ej. berenaa) pasaba +3 días sin escanear.
+  // Ordenamos por ÚLTIMO scan de X ASCENDENTE: nunca-escaneada / más atrasada PRIMERO.
+  // Ventana de 10 días acotada para no chocar con el cap de 1000 filas de PostgREST;
+  // las creadoras SIN scan en la ventana ordenan como "" = máxima prioridad.
+  if (list.length && !(onlyIds && onlyIds.length)) {
+    const ids = list.map((c) => c.id);
+    const since10 = new Date(Date.now() - 10 * 86400 * 1000).toISOString().slice(0, 10);
+    const { data: recent } = await sb.from("promolog_entries")
+      .select("creator_id, date")
+      .in("creator_id", ids).eq("network", "X").eq("analyzed_by_ai", true)
+      .gte("date", since10).order("date", { ascending: false });
+    const lastByCreator = new Map<string, string>();
+    for (const r of (recent ?? []) as Array<{ creator_id: string; date: string }>) {
+      if (!lastByCreator.has(r.creator_id)) lastByCreator.set(r.creator_id, r.date);
+    }
+    list = [...list].sort((a, b) => {
+      const da = lastByCreator.get(a.id) || ""; // "" = sin scan en la ventana → primero
+      const db = lastByCreator.get(b.id) || "";
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+  }
   if (limit > 0) list = list.slice(0, limit);
 
   // Mapa handle→creadora (para asignar cada tweet).
