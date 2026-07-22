@@ -93,17 +93,26 @@ jobs:
 
       - name: Deploy
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ "${{ steps.changes.outputs.deploy_all }}" = "true" ]; then
-            echo "== Deploy de TODAS las funciones (verify_jwt desde config.toml) =="
-            supabase functions deploy --project-ref "$PROJECT_REF"
-            exit 0
+            echo "== Deploy de TODAS las funciones con source local =="
+            # Enumeramos los dirs locales (NO 'supabase functions deploy' bare: ese
+            # itera config.toml e intenta funciones sin source en el repo, ej.
+            # wa-instance-manage, y aborta). Saltamos dirs que empiezan con '_'.
+            FUNCS=""
+            for d in supabase/functions/*/; do
+              fn="$(basename "$d")"
+              case "$fn" in _*) continue;; esac
+              [ -f "$d/index.ts" ] && FUNCS="$FUNCS $fn"
+            done
+          else
+            FUNCS="${{ steps.changes.outputs.funcs }}"
           fi
-          FUNCS="${{ steps.changes.outputs.funcs }}"
           if [ -z "${FUNCS// /}" ]; then
             echo "Nada que deployar (no cambió ninguna función)."
             exit 0
           fi
+          echo "Funciones a deployar:$FUNCS"
           FAILED=""
           for fn in $FUNCS; do
             if [ ! -f "supabase/functions/$fn/index.ts" ]; then
