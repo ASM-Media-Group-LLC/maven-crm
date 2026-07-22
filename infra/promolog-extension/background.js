@@ -71,6 +71,22 @@ async function cfg() {
 }
 async function setStatus(s) { await chrome.storage.local.set({ status: s, statusAt: Date.now() }); }
 
+// fetch a Maven con reintentos: un blip de red ("TypeError: Failed to fetch") NO debe
+// matar una corrida entera (pasó 2026-07-22: un POST de flush falló transitorio y se
+// perdió el run completo con el scan por la mitad). Solo reintenta el THROW de red —
+// un HTTP 4xx/5xx es una response normal y la decide el caller. Backoff ~2s/4s.
+// Si igual muere tras N intentos, el error dice QUÉ endpoint falló (diagnosticable
+// desde el popup, sin abrir el service worker).
+async function fetchMaven(url, init, tries = 3) {
+  for (let i = 1; ; i++) {
+    try { return await fetch(url, init); }
+    catch (e) {
+      if (i >= tries) throw new Error(`${String(e).slice(0, 60)} → ${url.split("/functions/v1/")[1] || url} (${tries} intentos)`);
+      await sleep(i * 2000 + Math.floor(Math.random() * 500));
+    }
+  }
+}
+
 // GET a la API de IG con la sesión del navegador (cookies auto por host_permissions).
 // Usamos www.instagram.com y NO i.instagram.com: el host móvil `i.` viene devolviendo
 // {status:"fail","Se ha producido un error"} con HTTP 200 para lecturas desde el
@@ -178,7 +194,7 @@ async function runScan(trigger = "manual") {
   keepAlive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {} }, 20000);
   await setStatus(`Escaneando… (${trigger})`);
 
-    const post = (creators) => fetch(`${mavenUrl}/functions/v1/promolog-ingest-stories`, {
+    const post = (creators) => fetchMaven(`${mavenUrl}/functions/v1/promolog-ingest-stories`, {
       method: "POST", headers: { "x-ext-token": extToken, "Content-Type": "application/json" },
       body: JSON.stringify({ creators }),
     });
@@ -186,7 +202,7 @@ async function runScan(trigger = "manual") {
       if (res && res.ok) { const j = await res.json().catch(() => ({})); acc.si += j.si || 0; acc.no += j.no || 0; acc.pending += j.pending || 0; }
     };
 
-    const tRes = await fetch(`${mavenUrl}/functions/v1/promolog-scan-targets`, { headers: { "x-ext-token": extToken } });
+    const tRes = await fetchMaven(`${mavenUrl}/functions/v1/promolog-scan-targets`, { headers: { "x-ext-token": extToken } });
     if (!tRes.ok) { await setStatus(`⚠ targets HTTP ${tRes.status} (¿token/URL?)`); return; }
     const { targets = [] } = await tRes.json();
     if (!targets.length) { await setStatus("Sin creadoras que escanear."); return; }
