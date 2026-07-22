@@ -22,6 +22,7 @@
 //   CRON_INTERNAL_TOKEN     → token del cron (igual que las otras fns)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { classifyLinkDestination } from "../_shared/link-classifier.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (igual que promolog-dispatch)
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
@@ -40,8 +41,12 @@ function ofHandleFromUrl(url: string): string {
 // Regla de Jhon: "promo en Telegram = todo lo que haga referencia a su OnlyFans".
 // Heurística conservadora sobre el texto del post (gratis, sin LLM):
 //   - link/palabra de onlyfans, o su handle de OF (de creators.onlyfans_url)
-//   - otras plataformas de contenido (fansly/fanvue)
-//   - señales claras de promo (promo/descuento/precio/suscribite/"link abajo")
+//   - otras plataformas de pago / funnels nombrados (fansly/fanvue/piclink/unlok/manyvids)
+//   - un link cuyo DESTINO es OF / pago / funnel (link-classifier tier paid|aggregator)
+// NO cuenta como promo de OnlyFans (regla explícita del dueño, 2026-07-21): promocionar
+// el PROPIO canal/grupo VIP de Telegram, ni vender packs por Telegram/DM. Sin un puntero
+// a OF/pago/funnel, un CTA genérico ("suscríbete", "acceso VIP", "packs", "🔞 contenido",
+// "mi canal privado") es venta del canal de Telegram, no de OF → NO cuenta.
 function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; reason: string } {
   const raw = text || "";
   const t = raw.toLowerCase();
@@ -49,14 +54,16 @@ function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; 
   if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) signals.push("onlyfans");
   // Cualquier nickname de OF (principal + secundarias) cuenta como señal.
   if (ofHandles.some((h) => h && t.includes(h.toLowerCase()))) signals.push("of_handle");
-  if (/\bfansly\b|\bfanvue\b|\bfans\b/i.test(raw)) signals.push("plataforma");
-  if (/promo|promoci[oó]n|descuento|oferta|\b\d{1,3}\s?%|\b\d+\s?(usd|\$|d[oó]lares)|suscr[ií]b|\bsub\b|link\s+(en|abajo|aqu[ií]|bio)|mi\s+link|c[oó]mprame|contenido\s+(exclusivo|nuevo)/i.test(raw)) signals.push("promo");
-  // Publicidad de MARCA/tienda (Shein, Temu, cupón, "publicidad pagada") → NO es su OF,
-  // aunque el CTA genérico ("descuento"/"link") matchee. Solo si no hay señal OF fuerte.
-  const brandAd = /\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(t);
-  const hasStrong = signals.includes("onlyfans") || signals.includes("of_handle") || signals.includes("plataforma");
-  if (brandAd && !hasStrong) return { promoted: false, reason: "brand_ad" };
-  const promoted = hasStrong || signals.includes("promo");
+  // Otras plataformas de pago / funnels nombrados. NO "fans" suelto (da FP "hola fans").
+  if (/\bfansly\b|\bfanvue\b|\bpiclink\b|\bunlok\b|\blinktr\b|\bmanyvids\b/i.test(raw)) signals.push("plataforma");
+  // URL/funnel: link en tier PAGO o AGREGADOR (onlyfans, piclink, linktr.ee, bybio…) =
+  // puntero a contenido pago. OJO: t.me es NONPAID en el link-classifier → un link a SU
+  // canal de Telegram NO cuenta como promo de OF. Reusa la lógica ya vetada del classifier.
+  const urls = raw.match(/https?:\/\/[^\s]+|\b(?:t|telegram)\.me\/[^\s]+|\b[a-z0-9-]+\.(?:co|com|me|link|bio|store|to|ai|ly)\/[^\s]+/gi) || [];
+  if (urls.some((u) => { const tier = classifyLinkDestination(u).tier; return tier === "paid" || tier === "aggregator"; })) signals.push("of_link");
+  // Todas las señales de arriba son "fuertes" (apuntan a OF / pago / funnel). Si no hay
+  // ninguna, es actividad de Telegram genérica (o venta del propio canal) → NO promo de OF.
+  const promoted = signals.length > 0;
   return { promoted, reason: signals.join("+") || "sin-señales" };
 }
 
