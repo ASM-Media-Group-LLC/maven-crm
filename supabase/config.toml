@@ -229,3 +229,5 @@ verify_jwt = true
 
 [functions.creator-avatar-fetch]
 verify_jwt = true
+[functions.promolog-highlights]
+verify_jwt = false  # crons de destacados (7pm calidad / 11pm ingresos / sáb 2pm semanal); check interno de X-Cron-Token
