@@ -53,12 +53,17 @@ function ofSignals(haystack: string, ofHandles: string[]): { strong: string[]; w
   const strong: string[] = [];
   const weakOf: string[] = [];
   const brand: string[] = [];
-  if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) strong.push("onlyfans");
+  // "onlyfans"/"only fans" (+ leet) SIEMPRE; la abreviatura "OF"/"Only" SOLO en posesivo
+  // ("mi/tu/su OF", "mi Only") — el "of" INGLÉS daba falsos Sí reales en X ("Fourth Of
+  // July") con este mismo regex. Igual fix que telegram-scan #927 y x-scan.
+  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) strong.push("onlyfans");
   // Cualquier nickname de OF (principal + secundarias) cuenta como señal fuerte.
   if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) strong.push("of_handle");
-  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) strong.push("link_agg");
-  // CTA con sabor OF/+18 (no aparece en un ad de ropa/tienda genérico).
-  if (/(contenido (exclusivo|completo|nuevo|premium|caliente)|suscr[ií]b|\bvip\b|sin censura|\+18\b|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
+  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.store|linkin\.bio/i.test(raw)) strong.push("link_agg");
+  // CTA con sabor OF/+18 (no aparece en un ad de ropa/tienda genérico). "vip" NO suelto
+  // (regla del dueño: "evento VIP"/"zona VIP" ≠ OF) → exige contexto de contenido/acceso
+  // propio. + suscripci[óo]n (FN real en X: "Mi Only está con 50% en Suscripción").
+  if (/(contenido (exclusivo|completo|nuevo|premium|caliente)|suscr[ií]b|suscripci[óo]n|(mi|acceso|contenido)\s+vip\b|sin censura|\+18\b|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
   // "Checa el primer comentario" / "link en comentarios" = técnica CLÁSICA de FB: el
   // link de OF va en el 1er comentario (FB baja el alcance de posts con link externo).
   // El scraper NO lee comentarios → sin esta regla el post salía "sin-senal-of" y solo

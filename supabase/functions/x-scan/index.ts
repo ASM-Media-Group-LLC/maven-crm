@@ -52,11 +52,20 @@ function ofHandleFromUrl(url: string): string {
 function ofSignals(haystack: string, ofHandles: string[]): string[] {
   const raw = (haystack || "").toLowerCase();
   const s: string[] = [];
-  if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) s.push("onlyfans");
+  // "onlyfans"/"only fans" (+ leet 0nly/f4ns) SIEMPRE. La abreviatura "OF"/"Only" NO se
+  // matchea suelta: el "of" INGLÉS está por todos lados en estas cuentas bilingües y
+  // generaba FALSOS Sí reales en prod ("Fourth Of July", "dream of me", "cover of...");
+  // solo cuenta en posesivo inequívoco ("mi/tu/su OF", "mi Only"). Mismo fix que
+  // telegram-scan #927. Un tweet-promo real sin estas palabras igual cae por link_agg,
+  // of_handle, CTA o visión (foto sugerente + link = funnel, regla de X).
+  if (/(?:0|o)nly\s?f[a4]ns|\b(?:mi|tu|su)\s+(?:nuev[oa]\s+)?(?:[o0]\.?f\.?|only)\b/i.test(raw)) s.push("onlyfans");
   // Cualquiera de sus nicknames de OF (principal + secundarias) cuenta como señal.
   if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) s.push("of_handle");
-  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) s.push("link_agg");
-  if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|ya fuiste|checa mi|mira mi|te espero en|mi contenido|contenido (exclusivo|completo|nuevo)|suscr[ií]b|\bsub a mi\b|premium|\bvip\b|descuento|oferta|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18|18\+)/i.test(raw)) s.push("promo");
+  if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello|bybio\.co|stan\.store|linkin\.bio/i.test(raw)) s.push("link_agg");
+  // + suscripci[óo]n: "Mi Only está con 50% en Suscripción" salía "sin-senal-of" (FN real
+  // 3 días seguidos) — "suscr[ií]b" no matchea "suscripción". (N% suelto NO se agrega:
+  // "100% team dulces" daría falso Sí; ese tweet ya cae por "mi Only" + "suscripción".)
+  if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|ya fuiste|checa mi|mira mi|te espero en|mi contenido|contenido (exclusivo|completo|nuevo)|suscr[ií]b|suscripci[óo]n|\bsub a mi\b|premium|\bvip\b|descuento|oferta|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18|18\+)/i.test(raw)) s.push("promo");
   return s;
 }
 
