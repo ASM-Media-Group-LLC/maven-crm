@@ -336,21 +336,31 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
   const goPrev = () => setCursor(new Date(year, month - 1, 1));
   const goNext = () => setCursor(new Date(year, month + 1, 1));
 
-  // Override manual del veredicto de una historia (igual que en Promos):
-  // persiste `promoted`, marca review humano y refresca el calendario + la
-  // query global para que ambos reflejen el cambio.
+  // Override manual del veredicto de una historia. Update OPTIMISTA: el calendario se
+  // repinta AL INSTANTE (flipeamos `promoted` en el cache de la query del mes → mapEntry
+  // y dayMap recomputan solos), y el guardado va por detrás. Si falla, se revierte al
+  // estado previo. Antes esperaba el round-trip + re-fetch del mes entero → se sentía lento.
   const handleSetVerdict = async (story: PromologEntry, verdict: "Sí" | "No") => {
     if (story.result === verdict) return;
+    const calKey = ["promolog-calendar", creatorId, year, month, userTz];
+    const promotedVal = verdict === "Sí" ? "true" : "false";
     setSavingId(story.id);
+    await queryClient.cancelQueries({ queryKey: calKey });
+    const prev = queryClient.getQueryData(calKey);
+    queryClient.setQueryData(calKey, (old: any) => Array.isArray(old)
+      ? old.map((e: any) => (e.id === story.id ? { ...e, promoted: promotedVal, reviewed_by: user?.id } : e))
+      : old);
     const { error } = await supabase
       .from("promolog_entries")
-      .update({ promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id })
+      .update({ promoted: promotedVal, reviewed_by: user?.id })
       .eq("id", story.id);
     setSavingId(null);
     if (error) {
+      queryClient.setQueryData(calKey, prev); // rollback
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
+    // Reconciliar en background (la UI ya refleja el cambio).
     queryClient.invalidateQueries({ queryKey: ["promolog-calendar"] });
     queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
   };

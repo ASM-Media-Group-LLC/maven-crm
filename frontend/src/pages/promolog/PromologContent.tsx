@@ -718,21 +718,32 @@ const PromologContent = () => {
   // (Sí si CUALQUIER historia quedó en Sí).
   const handleSetStoryVerdict = async (story: PromologEntry, verdict: "Sí" | "No") => {
     if (story.result === verdict) return;
-    setVerdictSavingId(story.id);
     // Un humano fijó el veredicto → sale de la cola de revisión (needs_review es un flag
     // de una sola vía; si no lo apagamos acá la entry queda "A revisar" para siempre aunque
     // ya la hayan confirmado). El spread del patch suprime el chequeo de excess-property de
     // TS (needs_review aún no está en los tipos generados), mismo idioma que el resto del módulo.
     const verdictPatch = { promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id, needs_review: false };
+    // Update OPTIMISTA: la lista se repinta AL INSTANTE (flipeamos la fila en el cache;
+    // el dedup/result recomputa solo) y el guardado va por detrás. Si falla, se revierte.
+    // Antes esperaba el update + re-fetch de TODO el rango → se sentía lento / "hay que refrescar".
+    const listKey = ["promolog-entries", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()];
+    setVerdictSavingId(story.id);
+    await queryClient.cancelQueries({ queryKey: listKey });
+    const prev = queryClient.getQueryData(listKey);
+    queryClient.setQueryData(listKey, (old: any) => Array.isArray(old)
+      ? old.map((e: any) => (e.id === story.id ? { ...e, ...verdictPatch } : e))
+      : old);
     const { error } = await supabase
       .from("promolog_entries")
       .update({ ...verdictPatch })
       .eq("id", story.id);
     setVerdictSavingId(null);
     if (error) {
+      queryClient.setQueryData(listKey, prev); // rollback
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
+    // Reconciliar en background (la UI ya refleja el cambio).
     queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
   };
 
