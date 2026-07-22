@@ -59,6 +59,11 @@ function ofSignals(haystack: string, ofHandles: string[]): { strong: string[]; w
   if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) strong.push("link_agg");
   // CTA con sabor OF/+18 (no aparece en un ad de ropa/tienda genérico).
   if (/(contenido (exclusivo|completo|nuevo|premium|caliente)|suscr[ií]b|\bvip\b|sin censura|\+18\b|\b18\+|\bmi of\b|te espero en mi|aqu[ií] me lo dejo)/i.test(raw)) weakOf.push("promo_of");
+  // "Checa el primer comentario" / "link en comentarios" = técnica CLÁSICA de FB: el
+  // link de OF va en el 1er comentario (FB baja el alcance de posts con link externo).
+  // El scraper NO lee comentarios → sin esta regla el post salía "sin-senal-of" y solo
+  // la visión lo pescaba a veces (cap MAX_VISION). Caso real: Lina Gallego 01-jul.
+  if (/(chec[aá]|mir[aá]|revis[aá]|busc[aá])\w*\s+(el\s+)?primer\s+comentario|link\s+en\s+(el\s+|los\s+)?(primer\s+)?comentario/i.test(raw)) weakOf.push("primer_comentario");
   // Publicidad de MARCA / tienda → NO es promo de su OF (aunque tenga cupón/descuento/CTA).
   if (/\bshein\b|\btemu\b|\baliexpress\b|\bamazon\b|mercado\s?libre|\bcup[óo]n\b|c[óo]digo de descuento|descarga la app|tiendas favoritas|env[íi]o gratis|publicidad\s*pagada|#ad\b|\bsponsored\b|colaboraci[óo]n con|link de compra/i.test(raw)) brand.push("brand_ad");
   return { strong, weakOf, brand };
@@ -254,6 +259,28 @@ Deno.serve(async (req: Request) => {
   if (cErr) return json({ error: cErr.message }, 500);
 
   let list = creators || [];
+
+  // Rotación JUSTA (anti tail-starvation — mismo fix que x-scan #934, acá es PEOR):
+  // fb-scan corre el actor de Apify POR CREADORA (~60-120s c/u) → la edge muere tras
+  // ~2 y, sin orden, eran SIEMPRE las mismas 2 (Lina Gallego diaria; 9 de 11 con +3
+  // días sin scan). Orden: último scan de facebook ASC → nunca-escaneada primero.
+  if (list.length && !(onlyIds && onlyIds.length)) {
+    const ids = list.map((c) => c.id);
+    const since10 = new Date(Date.now() - 10 * 86400 * 1000).toISOString().slice(0, 10);
+    const { data: recent } = await sb.from("promolog_entries")
+      .select("creator_id, date")
+      .in("creator_id", ids).eq("network", "facebook").eq("analyzed_by_ai", true)
+      .gte("date", since10).order("date", { ascending: false });
+    const lastByCreator = new Map<string, string>();
+    for (const r of (recent ?? []) as Array<{ creator_id: string; date: string }>) {
+      if (!lastByCreator.has(r.creator_id)) lastByCreator.set(r.creator_id, r.date);
+    }
+    list = [...list].sort((a, b) => {
+      const da = lastByCreator.get(a.id) || "";
+      const db = lastByCreator.get(b.id) || "";
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+  }
   if (limit > 0) list = list.slice(0, limit);
   const capped = list.length > MAX_CREATORS;
   list = list.slice(0, MAX_CREATORS);
