@@ -81,3 +81,151 @@ verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (N
 
 [functions.promolog-ingest-stories]
 verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (NO manda JWT) — NO cambiar o la ingesta queda 401
+
+# ---------------------------------------------------------------------------
+# COMPLETADO 2026-07-22: verify_jwt EXPLÍCITO para TODAS las funciones.
+# Motivo: el CI de auto-deploy (.github/workflows/deploy-edge-functions.yml)
+# deploya sin --no-verify-jwt → el valor sale de ESTE archivo. Si una función
+# false NO estaba declarada, el CLI la default-eaba a true y la rompía (fue la
+# causa de que whatsapp-agent quedara mal deployado). Fuente: estado vivo en
+# prod al 2026-07-22. ⚠️ Al CREAR una función nueva, agregá su entry acá.
+# ---------------------------------------------------------------------------
+
+# --- Bot de WhatsApp / grupos (webhook o X-Cron-Token, sin JWT) ---
+[functions.whatsapp-agent]
+verify_jwt = false  # motor del bot; llamado por whatsapp-ingest/transcribe. NO cambiar o el bot deja de responder (da 401)
+
+[functions.whatsapp-send]
+verify_jwt = false  # envía a grupos; auth propia (X-Cron-Token o Bearer)
+
+[functions.whatsapp-supervisor-tick]
+verify_jwt = false  # cron (closers); check interno de X-Cron-Token
+
+[functions.whatsapp-followup-tick]
+verify_jwt = false  # cron (seguimientos); check interno de X-Cron-Token
+
+[functions.whatsapp-extract-commitments]
+verify_jwt = false  # cron; check interno de X-Cron-Token
+
+[functions.whatsapp-transcribe-audio]
+verify_jwt = false  # transcribe audios de grupo (Whisper); auth propia
+
+[functions.whatsapp-analyze-image]
+verify_jwt = false  # analiza imágenes de grupo; auth propia
+
+[functions.whatsapp-send-verification-dm]
+verify_jwt = false  # genera código de verificación (NO manda DM en frío); auth propia
+
+[functions.whatsapp-audit-history]
+verify_jwt = false  # auditoría de historial; auth propia
+
+[functions.promolog-manager-tick]
+verify_jwt = false  # cron digest managers 5pm; check interno de X-Cron-Token
+
+[functions.ai-orchestrator]
+verify_jwt = false  # Clari orquestador; auth propia (Bearer del usuario)
+
+# --- Bandeja de WhatsApp ---
+[functions.wa-inbox-suggest]
+verify_jwt = false  # sugerencia IA de respuesta; auth propia (getUser + permiso)
+
+[functions.wa-instance-manage]
+verify_jwt = false  # gestión de instancias del gateway; auth propia
+
+# --- Telegram ---
+[functions.telegram-scan]
+verify_jwt = false  # cron de scan de canales; check interno de token
+
+[functions.tg-inbox-action]
+verify_jwt = false  # reaccionar/eliminar en bandeja TG; auth propia
+
+[functions.tg-inbox-send-media]
+verify_jwt = false  # envía media en bandeja TG; auth propia
+
+# --- Scouter / social scan ---
+[functions.x-scan]
+verify_jwt = false  # scan de X/Twitter; auth propia
+
+[functions.fb-scan]
+verify_jwt = false  # scan de Facebook; auth propia
+
+[functions.scrape-profile-deep]
+verify_jwt = false  # scrape profundo (dispara Apify); auth propia
+
+[functions.scrape-profile-deep-callback]
+verify_jwt = false  # callback de Apify (sin JWT); auth propia
+
+[functions.profile-analyses-poll]
+verify_jwt = false  # poll de análisis; auth propia
+
+# --- Promolog (extensión Chrome / cron / callbacks, sin JWT) ---
+[functions.promolog-hiker-scan]
+verify_jwt = false  # scan vía Hiker; auth propia
+
+[functions.promolog-handle-check]
+verify_jwt = false  # chequeo de handles rotos; auth propia
+
+[functions.promolog-story-read]
+verify_jwt = false  # lectura de stories; auth propia
+
+# --- Chatter / QA / BLU / ventas ---
+[functions.supercontact-ai]
+verify_jwt = false  # IA de super-contactos; auth propia
+
+[functions.qa-analyze]
+verify_jwt = false  # análisis QA; auth propia
+
+[functions.qa-chat-mike]
+verify_jwt = false  # chat QA (Mike); auth propia
+
+[functions.chatter-public]
+verify_jwt = false  # endpoint público del chatter workspace
+
+[functions.chatter-mp-ingest]
+verify_jwt = false  # ingesta MercadoPago chatter; webhook sin JWT
+
+[functions.chatter-qa-analyze]
+verify_jwt = false  # análisis QA de chatters; auth propia
+
+[functions.chatter-masivos-analyze]
+verify_jwt = false  # análisis QA masivos; auth propia
+
+[functions.blu-mp]
+verify_jwt = false  # ingesta BLU (MercadoPago); webhook sin JWT
+
+[functions.creators-avatar-sync]
+verify_jwt = false  # sync de avatares de creadoras; auth propia
+
+# ---------------------------------------------------------------------------
+# verify_jwt = TRUE (requieren JWT válido del usuario). Declaradas explícito
+# para que el CI NUNCA las voltee a false por accidente.
+# ---------------------------------------------------------------------------
+[functions.qa-transcribe]
+verify_jwt = true
+
+[functions.clari-help]
+verify_jwt = true
+
+[functions.qa-fetch-ig-avatar]
+verify_jwt = true
+
+[functions.qa-lookup-by-ig]
+verify_jwt = true
+
+[functions.send-notification-email]
+verify_jwt = true
+
+[functions.scouter-spam-account-scan]
+verify_jwt = true
+
+[functions.scouter-company-fill]
+verify_jwt = true
+
+[functions.scouter-embed-leads]
+verify_jwt = true
+
+[functions.cloudphone]
+verify_jwt = true
+
+[functions.creator-avatar-fetch]
+verify_jwt = true
