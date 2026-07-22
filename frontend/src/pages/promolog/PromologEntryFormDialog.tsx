@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, X, Upload, Facebook, Youtube, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,8 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import type { PromologEntry } from "./PromologEntryCard";
 import { displayPlatform } from "./promoScore";
+import { promotedToResult } from "./promoResult";
+import { useTimezone, dayKeyInTz } from "@/hooks/useTimezone";
 
 // ── Form de Registrar/Editar Promoción ────────────────────────────────────────
 // AGREGAR (add): el operario puede marcar VARIAS redes; por cada red marca si la
@@ -234,6 +236,41 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         { label: "Otra", icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
       ].filter((c) => c.url)
     : [];
+
+  // ── Aviso "ya registrado hoy" (solo modo ADD) ────────────────────────────────
+  // Muchas cargas manuales eran redundantes: el bot YA había marcado esa red hoy y
+  // el manager no lo veía, así que la volvía a cargar. Traemos lo de hoy de esta
+  // creadora (bot o manual) para avisar por red — informativo, no bloquea (si el
+  // manager quiere corregir un "No" del bot, igual puede seguir).
+  const { timezone: userTz } = useTimezone();
+  const { data: todayEntries } = useQuery({
+    queryKey: ["promolog-today-by-creator", creatorId, userTz],
+    enabled: open && mode === "add" && !!creatorId,
+    queryFn: async () => {
+      // Ventana ±36h para cubrir bordes de timezone; el filtro fino es por día en TZ.
+      const since = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
+      const { data } = await supabase
+        .from("promolog_entries")
+        .select("network, promoted, date, analyzed_by_ai")
+        .eq("creator_id", creatorId!)
+        .gte("date", since);
+      return data ?? [];
+    },
+  });
+  const alreadyToday = useMemo(() => {
+    const todayKey = dayKeyInTz(new Date().toISOString(), userTz);
+    const m = new Map<string, { promoted: boolean; byBot: boolean }>();
+    for (const e of todayEntries ?? []) {
+      if (dayKeyInTz(e.date, userTz) !== todayKey) continue;
+      const net0 = (e.network || "otra").toLowerCase();
+      const net = net0 === "twitter" ? "x" : net0;
+      const cur = m.get(net) ?? { promoted: false, byBot: false };
+      if (promotedToResult(e.promoted) === "Sí") cur.promoted = true;
+      if (e.analyzed_by_ai === true) cur.byBot = true;
+      m.set(net, cur);
+    }
+    return m;
+  }, [todayEntries, userTz]);
 
   // Sube archivos al bucket y devuelve las signed URLs durables.
   const uploadFiles = async (files: File[]): Promise<string[]> => {
@@ -457,6 +494,33 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 abajo quedó como legacy muerto (nunca se renderiza). */}
             {(mode === "add" || mode === "edit") ? (
               <>
+                {/* Aviso: qué registró YA el bot hoy para esta creadora (evita recargas
+                    manuales redundantes). Informativo — no bloquea el override. */}
+                {mode === "add" && alreadyToday.size > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                      Ya registrado hoy — normalmente no hace falta volver a cargarlo:
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {[...alreadyToday.entries()].map(([net, v]) => {
+                        const opt = networkOptions.find((o) => o.value === net);
+                        const Icon = opt?.icon;
+                        return (
+                          <span key={net} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px]">
+                            {Icon ? <Icon className="h-3 w-3" /> : null}
+                            {opt?.label ?? net}
+                            {v.promoted ? (
+                              <span className="inline-flex items-center gap-0.5 font-semibold text-success"><Check className="h-3 w-3" />Sí</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 font-semibold text-destructive"><X className="h-3 w-3" />No</span>
+                            )}
+                            {v.byBot && <span className="text-muted-foreground">· bot</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/* Multi-select de redes */}
                 <div className="space-y-2">
                   <span className="text-sm font-medium">Redes Sociales <span className="text-destructive">*</span></span>
@@ -468,6 +532,9 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                       return (
                         <button key={opt.value} type="button" onClick={() => toggleNet(opt.value)} className={`relative flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                           {isSelected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-2.5 w-2.5" /></span>}
+                          {mode === "add" && !isSelected && alreadyToday.has(opt.value) && (
+                            <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-amber-500" title="Ya registrado hoy" />
+                          )}
                           <Icon className="h-5 w-5" />{opt.label}
                         </button>
                       );
