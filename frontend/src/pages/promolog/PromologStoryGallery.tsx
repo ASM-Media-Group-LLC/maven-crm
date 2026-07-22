@@ -125,41 +125,6 @@ const renderTgText = (text: string) =>
       : <span key={i}>{part}</span>,
   );
 
-// "Líneas" que ocupa un post (para empaquetar capturas hasta llenar la pantalla):
-// nº de saltos de línea + ajuste por largo (~34 chars/línea) + 1 fila (nombre/hora).
-const bubbleLines = (b: PromologEntry) => {
-  if (!b.notes) return 2; // media protegida = recuadro pequeño
-  const newlines = (b.notes.match(/\n/g) || []).length + 1;
-  const wrapped = Math.ceil(b.notes.length / 34);
-  return Math.max(newlines, wrapped) + 1;
-};
-
-// Una pantalla de celular cabe ~CAP "líneas" (≈ 7-8 posts de una línea).
-const SCREEN_CAP = 14;
-
-// Reparte los posts (en orden) en capturas BALANCEADAS, cada una ~llena (sin
-// dejar una última captura con un solo post huérfano).
-const packShots = (ordered: PromologEntry[]): PromologEntry[][] => {
-  const total = ordered.reduce((sum, b) => sum + bubbleLines(b), 0);
-  const numShots = Math.max(1, Math.ceil(total / SCREEN_CAP));
-  const target = total / numShots;
-  const shots: PromologEntry[][] = [];
-  let cur: PromologEntry[] = [];
-  let curW = 0;
-  for (const b of ordered) {
-    const w = bubbleLines(b);
-    if (cur.length && curW + w > target && shots.length < numShots - 1) {
-      shots.push(cur);
-      cur = [];
-      curW = 0;
-    }
-    cur.push(b);
-    curW += w;
-  }
-  if (cur.length) shots.push(cur);
-  return shots;
-};
-
 // Una burbuja (post). `big` = versión legible del lightbox (con veredicto editable).
 const TgBubble = ({
   s, channel, big, onSetVerdict, savingId,
@@ -239,104 +204,8 @@ const TgPhone = ({
   );
 };
 
-// Galería de CAPTURAS de Telegram (estilo IG): los posts del día se reparten en
-// capturas que se llenan; cada una marcada Sí si tiene algún promo; click = grande.
-const TelegramScreenshots = ({
-  stories, onSetVerdict, savingId,
-}: {
-  stories: PromologEntry[]; onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null;
-}) => {
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const channel = tgChannelName(stories[0]);
-  const ordered = [...stories].sort((a, b) => (a.story_index ?? 0) - (b.story_index ?? 0));
-  const shots = packShots(ordered);
-  const summary = summarizeStories(stories);
-
-  // Navegación con teclado en el lightbox.
-  useEffect(() => {
-    if (openIdx == null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenIdx(null);
-      else if (e.key === "ArrowRight") setOpenIdx((i) => (i == null ? i : (i + 1) % shots.length));
-      else if (e.key === "ArrowLeft") setOpenIdx((i) => (i == null ? i : (i - 1 + shots.length) % shots.length));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [openIdx, shots.length]);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Evidencia · {shots.length} {shots.length === 1 ? "captura" : "capturas"} · {stories.length} {stories.length === 1 ? "publicación" : "publicaciones"}
-        </p>
-        <div className="flex items-center gap-1.5">
-          {summary.promoted > 0 && <Badge variant="success-soft" className="text-[10px]">{summary.promoted} promovió</Badge>}
-          {summary.notPromoted > 0 && <Badge variant="destructive-soft" className="text-[10px]">{summary.notPromoted} no</Badge>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {shots.map((bubbles, idx) => {
-          const anyPromo = bubbles.some((b) => b.result === "Sí");
-          return (
-            <div key={idx} className="group relative overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/40">
-              {/* Captura a sangre completa (9:16), como las historias de IG */}
-              <button type="button" onClick={() => setOpenIdx(idx)} className="relative block aspect-[9/16] w-full overflow-hidden">
-                <TgPhone channel={channel} bubbles={bubbles} fill />
-                <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                  Captura {idx + 1}
-                </span>
-                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  <Maximize2 className="h-3 w-3" />
-                </span>
-              </button>
-              {/* Captura de 1 post: toggle editable Sí/No idéntico al de IG/Facebook.
-                  Varios posts: contador + badge del agregado (editás cada uno en grande). */}
-              {bubbles.length === 1 ? (
-                <div className="p-1.5">
-                  <VerdictToggle story={bubbles[0]} onSetVerdict={onSetVerdict} saving={savingId === bubbles[0].id} />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-1 p-1.5">
-                  <span className="truncate text-[10px] text-muted-foreground">{bubbles.length} posts</span>
-                  <Badge variant={anyPromo ? "success-soft" : "destructive-soft"} className="gap-0.5 text-[10px]">
-                    {anyPromo ? <><Check className="h-3 w-3" /> Sí</> : <><XMark className="h-3 w-3" /> No</>}
-                  </Badge>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Lightbox: la captura en grande, con veredicto editable por post.
-          Portaleado a document.body: el DialogContent de Radix usa transform, lo
-          que rompería el position:fixed (quedaría relativo al popup, no al viewport). */}
-      {openIdx != null && shots[openIdx] && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 pointer-events-auto" onClick={() => setOpenIdx(null)} role="dialog" aria-modal="true">
-          <button type="button" onClick={() => setOpenIdx(null)} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20" aria-label="Cerrar"><CloseIcon className="h-5 w-5" /></button>
-          {shots.length > 1 && (
-            <>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setOpenIdx((openIdx - 1 + shots.length) % shots.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:left-4" aria-label="Anterior"><ChevronLeft className="h-6 w-6" /></button>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setOpenIdx((openIdx + 1) % shots.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:right-4" aria-label="Siguiente"><ChevronRight className="h-6 w-6" /></button>
-            </>
-          )}
-          <div className="flex max-h-[90vh] w-full max-w-[300px] flex-col items-center gap-2 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-              <TgPhone channel={channel} bubbles={shots[openIdx]} big onSetVerdict={onSetVerdict} savingId={savingId} />
-            </div>
-            <span className="shrink-0 text-xs text-white/60">Captura {openIdx + 1}/{shots.length}</span>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </div>
-  );
-};
-
-// Tile de UN post (caso mixto IG+Telegram en la grilla de IG): el mismo screenshot
-// full-bleed, con un solo post.
+// Tile de UN post en la grilla (estilo IG): el screenshot de teléfono full-bleed,
+// con un solo post.
 const TelegramTile = ({ story }: { story: PromologEntry }) => (
   <TgPhone channel={tgChannelName(story)} bubbles={[story]} fill />
 );
@@ -494,17 +363,21 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
   const activeSlide = active ? (active.story_index != null ? active.story_index + 1 : activeIdx + 1) : 0;
   const activeConf = active?.ai_confidence != null ? Math.round(active.ai_confidence * 100) : null;
 
-  // Si TODAS las historias del día son de Telegram, mostramos las CAPTURAS de
-  // celular (cada una llena de posts, estilo IG) en vez de la grilla de imágenes.
-  if (stories.length > 0 && stories.every(isTgEvidence)) {
-    return <TelegramScreenshots stories={stories} onSetVerdict={onSetVerdict} savingId={savingId} />;
-  }
+  // Telegram y Facebook usan LA MISMA grilla que Instagram: un tile por post, cada uno
+  // con su toggle Sí/No editable + click para agrandar. Antes Telegram tenía una vista de
+  // "capturas" que empaquetaba varios posts en una sola imagen → rompía la paridad con IG
+  // (captura de 1 post = toggle editable; de varios = badge de SOLO LECTURA, había que
+  // abrir el lightbox para marcar cada mensaje). Un tile = un post = un veredicto.
+  const allTgOrFb = stories.length > 0 && stories.every((s) => isTgEvidence(s) || isFb(s));
+  const evidenceNoun = allTgOrFb
+    ? (summary.total === 1 ? "publicación" : "publicaciones")
+    : (summary.total === 1 ? "historia" : "historias");
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Evidencia · {summary.total} {summary.total === 1 ? "historia" : "historias"}
+          Evidencia · {summary.total} {evidenceNoun}
         </p>
         <div className="flex items-center gap-1.5">
           {summary.promoted > 0 && (
