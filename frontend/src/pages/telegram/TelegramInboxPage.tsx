@@ -95,7 +95,7 @@ const isImageType = (t: string) => t === "photo" || t === "image" || t === "stic
 const CONV_COLS =
   "id, account_id, peer_id, peer_name, peer_username, status, assigned_to, last_message_at, last_message_preview, unread_count, archived, pinned, favorite, manually_unread, created_at, assignees:tg_conversation_assignees(user_id)";
 const MSG_COLS =
-  "id, direction, body, msg_type, media_url, sent_at, status, sender_user_id, reply_to_message_id, reply_to_external_id, reaction, deleted_at";
+  "id, direction, body, msg_type, media_url, sent_at, status, sender_user_id, source, reply_to_message_id, reply_to_external_id, reaction, deleted_at";
 
 interface TgConv {
   id: string; account_id: string; peer_id: string;
@@ -110,6 +110,7 @@ interface TgMsg {
   id: string; direction: "in" | "out"; body: string | null;
   msg_type: string; media_url: string | null; sent_at: string | null; status: string | null;
   sender_user_id: string | null; // closer (usuario Maven) que mandó el saliente; null si entrante
+  source: string | null; // 'maven' | 'external' (enviado por fuera: celular/otro disp.) | null (entrante)
   reply_to_message_id: string | null; reply_to_external_id: string | null;
   reaction: string | null; deleted_at: string | null;
 }
@@ -791,6 +792,9 @@ const TelegramInboxPage = () => {
                       const deleted = !!m.deleted_at;
                       // Etiqueta "quién lo mandó" en CADA saliente con emisor conocido.
                       const showSender = isOut && !!m.sender_user_id && !deleted;
+                      // Saliente enviado por FUERA de Maven (celular / Telegram web con la misma
+                      // línea): no tiene emisor Maven → lo marcamos como externo (igual que WhatsApp).
+                      const sentOutsideMaven = isOut && !deleted && m.source === "external";
                       const quoted = m.reply_to_message_id ? messages.find((x) => x.id === m.reply_to_message_id) : null;
                       const hasQuote = !deleted && (!!m.reply_to_message_id || !!m.reply_to_external_id);
                       const mediaShown = !deleted && !!m.media_url;
@@ -805,9 +809,11 @@ const TelegramInboxPage = () => {
                                   ? failed ? "rounded-2xl rounded-br-md bg-destructive/80 text-white" : cn("rounded-2xl rounded-br-md text-white", TG_GRAD)
                                   : "rounded-2xl rounded-bl-md border bg-card",
                             )}>
-                              {showSender && (
+                              {showSender ? (
                                 <div className="mb-0.5 text-[11px] font-semibold text-white/85">{firstName(m.sender_user_id)}</div>
-                              )}
+                              ) : sentOutsideMaven ? (
+                                <div className="mb-0.5 inline-flex items-center gap-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/90">↗ Externo · fuera de Maven</div>
+                              ) : null}
 
                               {hasQuote && (
                                 <div className={cn("mb-1 rounded border-l-2 px-2 py-1 text-xs", isOut ? "border-white/50 bg-black/10" : "border-sky-400 bg-muted/60")}>

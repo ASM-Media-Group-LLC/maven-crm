@@ -168,21 +168,31 @@ async function postIngest(accountId, peer, message) {
   } catch (e) { console.error(`[telegram-gateway] ingest POST falló (${accountId}):`, e.message); }
 }
 
-// Adjunta un handler de mensajes ENTRANTES (solo DMs de usuarios; canales/grupos los
-// sigue manejando Promolog aparte) que postea a la bandeja. Idempotente por cliente.
+// Adjunta un handler de mensajes de DMs (entrantes Y salientes desde otro dispositivo con
+// esta línea; canales/grupos los sigue manejando Promolog aparte) que postea a la bandeja.
+// Idempotente por cliente.
 function attachIngestListener(id, client) {
   if (!client || client.__ingestAttached) return;
   client.__ingestAttached = true;
   client.addEventHandler(async (event) => {
     try {
       const msg = event && event.message;
-      if (!msg || msg.out) return;    // solo entrantes (no lo que enviamos nosotros)
-      if (!event.isPrivate) return;   // solo chats privados (DMs)
-      const sender = await msg.getSender().catch(() => null);
-      const peerId = msg.senderId != null ? String(msg.senderId)
-        : (sender && sender.id != null ? String(sender.id) : null);
+      if (!msg) return;
+      if (!event.isPrivate) return;   // solo chats privados (DMs); canales/grupos = Promolog
+      // out = enviado desde OTRO dispositivo con esta línea (celular / Telegram web). Antes se
+      // descartaba; ahora lo capturamos como saliente 'external' para verlo en la bandeja (igual
+      // que WhatsApp). Los enviados DESDE Maven (tg-inbox-send) también llegan acá como eco, pero
+      // deduplican por (conversation_id, external_id) en el ingest y quedan como 'maven'.
+      const out = msg.out === true;
+      // El "peer" (la otra parte de la conversación): quien ENVÍA si es entrante, o el
+      // DESTINATARIO (el chat) si es saliente. En un DM, getChat() es el otro usuario en ambos.
+      const peer = out ? await msg.getChat().catch(() => null) : await msg.getSender().catch(() => null);
+      if (out && peer && peer.self) return; // "Mensajes guardados" (chat con uno mismo) → ignorar
+      const peerId = peer && peer.id != null ? String(peer.id)
+        : (out ? (msg.chatId != null ? String(msg.chatId) : null)
+               : (msg.senderId != null ? String(msg.senderId) : null));
       if (!peerId) return;
-      const name = sender ? ([sender.firstName, sender.lastName].filter(Boolean).join(" ") || null) : null;
+      const name = peer ? ([peer.firstName, peer.lastName].filter(Boolean).join(" ") || peer.title || null) : null;
       const type = tgMsgType(msg);
 
       // Descargar la media entrante y mandarla en base64 al ingest (que la sube a storage y
@@ -206,15 +216,15 @@ function attachIngestListener(id, client) {
 
       await postIngest(id, {
         id: peerId,
-        username: (sender && sender.username) || null,
+        username: (peer && peer.username) || null,
         name,
-        phone: (sender && sender.phone) || null,
+        phone: (peer && peer.phone) || null,
       }, {
         id: msg.id,
-        direction: "in",
+        direction: out ? "out" : "in",
         text: msg.message || null,
         type,
-        senderId: peerId,
+        senderId: out ? null : peerId,
         date: msg.date,
         replyToExternalId,
         mediaB64,

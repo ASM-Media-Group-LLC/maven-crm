@@ -116,7 +116,7 @@ serve(async (req) => {
     await sb.from("tg_messages").insert({
       tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
       external_id: null, sender_id: null, sender_user_id: userId, body: text, msg_type: "text",
-      status: "failed", sent_at: nowIso,
+      status: "failed", source: "maven", sent_at: nowIso,
       reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
     });
     await sb.from("tg_conversations")
@@ -126,9 +126,12 @@ serve(async (req) => {
   }
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
+  // UPSERT por (conversation_id, external_id): si el ECO de este mismo envío ya llegó por el
+  // listener del gateway y lo insertó como source='external', acá lo CORREGIMOS a 'maven' (con
+  // emisor). external_id null → NULLs distintos en PG → se comporta como insert (igual que WA).
   const { data: msg, error: mErr } = await sb
     .from("tg_messages")
-    .insert({
+    .upsert({
       tenant_id: conv.tenant_id,
       conversation_id: conversationId,
       direction: "out",
@@ -138,10 +141,11 @@ serve(async (req) => {
       body: text,
       msg_type: "text",
       status: "sent",
+      source: "maven",
       sent_at: nowIso,
       reply_to_message_id: replyToMessageId,
       reply_to_external_id: replyToExternalId,
-    })
+    }, { onConflict: "conversation_id,external_id" })
     .select("id")
     .single();
   if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);

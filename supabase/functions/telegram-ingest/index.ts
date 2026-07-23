@@ -156,6 +156,10 @@ serve(async (req) => {
         direction,
         external_id: externalId,
         sender_id: message.senderId != null ? String(message.senderId) : null,
+        // Saliente que llega por el listener = enviado desde OTRO dispositivo (celular/Telegram
+        // web) con esta línea → 'external'. Los enviados por Maven ya se insertaron con
+        // source='maven' (tg-inbox-send upsert) y ignoreDuplicates deja esa fila intacta.
+        source: direction === "out" ? "external" : null,
         body: message.text ?? null,
         msg_type: message.type ?? "text",
         media_url: mediaUrl,

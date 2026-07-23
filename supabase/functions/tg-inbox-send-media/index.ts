@@ -103,19 +103,20 @@ serve(async (req) => {
     await sb.from("tg_messages").insert({
       tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
       external_id: null, sender_id: null, sender_user_id: userId, body: caption || null,
-      msg_type: msgType, media_url: url, status: "failed", sent_at: nowIso,
+      msg_type: msgType, media_url: url, status: "failed", source: "maven", sent_at: nowIso,
       reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
     });
     await sb.from("tg_conversations").update({ last_message_at: nowIso, last_message_preview: preview.slice(0, 120) }).eq("id", conversationId);
     return json({ ok: false, reason: "send_failed", error: gwErr }, 200);
   }
 
-  const { data: msg, error: mErr } = await sb.from("tg_messages").insert({
+  // UPSERT por (conversation_id, external_id): dedup con el eco del gateway (queda 'maven').
+  const { data: msg, error: mErr } = await sb.from("tg_messages").upsert({
     tenant_id: conv.tenant_id, conversation_id: conversationId, direction: "out",
     external_id: externalId, sender_id: null, sender_user_id: userId, body: caption || null,
-    msg_type: msgType, media_url: url, status: "sent", sent_at: nowIso,
+    msg_type: msgType, media_url: url, status: "sent", source: "maven", sent_at: nowIso,
     reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
-  }).select("id").single();
+  }, { onConflict: "conversation_id,external_id" }).select("id").single();
   if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);
 
   await sb.from("tg_conversations").update({ last_message_at: nowIso, last_message_preview: preview.slice(0, 120) }).eq("id", conversationId);
