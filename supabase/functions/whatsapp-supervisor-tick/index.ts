@@ -671,28 +671,57 @@ async function checkCommitmentFollowups(
     .eq("stage", "Asignada")
     .not("assigned_to", "is", null)
     .not("passed_date", "is", null);
-  const overdueByCloser = new Map<string, Array<{ handle: string; detail: string }>>();
-  for (const cc of (assigned ?? []) as Array<{
+  const assignedRows = (assigned ?? []) as Array<{
     id: string;
     instagram_handle: string | null;
     assigned_to: string | null;
     passed_date: string | null;
-  }>) {
-    if (!cc.passed_date || !cc.assigned_to) continue;
-    const passedMs = new Date(cc.passed_date + "T00:00:00-05:00").getTime();
-    const daysSince = Math.floor((now - passedMs) / 86_400_000);
-    // Traemos las filas (no solo el count) → count = rows.length y además el
-    // último contacto con su canal/resultado/nota. Un lead tiene ≤6 contactos.
-    const { data: histRows } = await sb
+  }>;
+
+  // Historial de TODAS las leads en UNA query (antes: 1 query por lead) —
+  // ordenado desc global, agrupado por lead (queda desc por lead también).
+  const histByLead = new Map<string, Array<{ channel: string | null; result: string | null; notes: string | null; contact_date: string }>>();
+  const assignedIds = assignedRows.map((cc) => cc.id);
+  if (assignedIds.length) {
+    const { data: allHist } = await sb
       .from("closer_contact_history")
-      .select("channel, result, notes, contact_date")
-      .eq("creator_id", cc.id)
+      .select("creator_id, channel, result, notes, contact_date")
+      .in("creator_id", assignedIds)
       .order("contact_date", { ascending: false });
-    const hist = (histRows ?? []) as Array<{ channel: string | null; result: string | null; notes: string | null; contact_date: string }>;
+    for (const h of (allHist ?? []) as Array<{ creator_id: string; channel: string | null; result: string | null; notes: string | null; contact_date: string }>) {
+      const arr = histByLead.get(h.creator_id) ?? [];
+      arr.push(h);
+      histByLead.set(h.creator_id, arr);
+    }
+  }
+
+  // Overdue RE-ANCLADO al último contacto (mismo criterio que el frontend
+  // isContactOverdue y whatsapp-agent #917): contactar "pone al día" el lead;
+  // deadline = (sin contactos) passed+1d ; (con ≥1) último_contacto + gap.
+  // ⚠️ ANTES: anclado a passed_date FIJO → falsos positivos masivos (María
+  // "58 vencidas" cuando lo real era 42; Miguel "10" vs 1 — digest 2026-07-23).
+  const bogotaDate = (ms: number) => new Date(ms - 5 * 3_600_000).toISOString().slice(0, 10);
+  const addDays = (dateStr: string, n: number) =>
+    new Date(new Date(dateStr + "T00:00:00Z").getTime() + n * 86_400_000).toISOString().slice(0, 10);
+  const todayBog = bogotaDate(now);
+
+  const overdueByCloser = new Map<string, Array<{ handle: string; detail: string }>>();
+  for (const cc of assignedRows) {
+    if (!cc.passed_date || !cc.assigned_to) continue;
+    const hist = histByLead.get(cc.id) ?? [];
     const done = hist.length;
     if (done >= 6) continue;
-    const nextDay = cadence[done];
-    if (nextDay == null || daysSince <= nextDay) continue;
+    const pd = cc.passed_date.slice(0, 10);
+    let deadline: string;
+    if (done === 0) {
+      deadline = addDays(pd, cadence[0]); // 1 día tras la asignación
+    } else {
+      const gap = (cadence[done] ?? 29) - (cadence[done - 1] ?? 0);
+      const lastMs = Date.parse(hist[0].contact_date); // hist viene desc
+      const base = Number.isFinite(lastMs) ? bogotaDate(lastMs) : pd;
+      deadline = addDays(base, gap);
+    }
+    if (todayBog <= deadline) continue;
     const list = overdueByCloser.get(cc.assigned_to) ?? [];
     list.push({ handle: cc.instagram_handle ?? "(sin handle)", detail: lastContactSummary(hist, now) });
     overdueByCloser.set(cc.assigned_to, list);
