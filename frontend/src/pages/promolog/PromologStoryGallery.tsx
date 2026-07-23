@@ -321,6 +321,63 @@ const FacebookLightbox = ({ story }: { story: PromologEntry }) => {
   );
 };
 
+// ── X (Twitter) — tweet de SOLO TEXTO ────────────────────────────────────────
+// Un tweet sin imagen detectado como promo guarda como evidencia su PERMALINK
+// (x.com/…): la galería lo metía en <img> → recuadro roto que parecía "evidencia
+// faltante" (caso carocancino 2026-07-23: "me quitaron el IG, ya todo por mi OF" —
+// promo real de solo texto). En vez de una imagen rota, RECREAMOS el tweet como
+// tarjeta estilo X (mismo patrón que Telegram/Facebook): texto + @handle + link real.
+// Los tweets CON imagen no pasan por acá (su evidence_url es la foto del bucket).
+const isXUrl = (u?: string | null) => /^https?:\/\/(www\.)?(x|twitter)\.com\//i.test(u || "");
+const isXText = (s: PromologEntry) =>
+  (s.network || "").toLowerCase() === "x" && !!s.evidence_url && isXUrl(s.evidence_url);
+
+const XPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boolean }) => {
+  const handle = (s.source_handle || "").replace(/^@+/, "");
+  const promo = s.result === "Sí";
+  return (
+    <div className={`flex w-full flex-col bg-black text-white ${fill ? "h-full" : ""}`}>
+      <div className={`flex shrink-0 items-center ${big ? "gap-2 px-3 py-2.5" : "gap-1 px-1.5 py-1.5"}`}>
+        <span className={`${big ? "h-9 w-9 text-base" : "h-5 w-5 text-[9px]"} flex shrink-0 items-center justify-center rounded-full bg-white/10 font-bold`}>𝕏</span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className={`truncate font-semibold ${big ? "text-sm" : "text-[8.5px]"}`}>{s.name?.trim() || handle || "X"}</p>
+          {handle && <p className={`truncate text-white/50 ${big ? "text-[11px]" : "text-[6.5px]"}`}>@{handle}</p>}
+        </div>
+        {promo && (
+          <span className={`flex shrink-0 items-center justify-center rounded-full bg-success text-white ${big ? "h-5 w-5" : "h-3.5 w-3.5"}`}>
+            <Check className={big ? "h-3 w-3" : "h-2 w-2"} />
+          </span>
+        )}
+      </div>
+      <div className={`${fill ? "min-h-0 flex-1 overflow-hidden" : ""} ${big ? "px-3 pb-3" : "px-1.5 pb-1.5"}`}>
+        <p className={`whitespace-pre-wrap break-words ${big ? "text-[14px] leading-snug" : "text-[9px] leading-tight"}`}>
+          {big ? renderTgText(s.notes || "") : (s.notes || "")}
+        </p>
+      </div>
+      <div className={`shrink-0 border-t border-white/10 text-white/40 ${big ? "px-3 py-2 text-[11px]" : "px-1.5 py-1 text-[6.5px]"}`}>
+        {s.time || "X"} · tweet de solo texto
+      </div>
+    </div>
+  );
+};
+
+const XTile = ({ story }: { story: PromologEntry }) => <XPost s={story} fill />;
+
+const XLightbox = ({ story }: { story: PromologEntry }) => (
+  <div className="max-h-[82vh] w-full max-w-[380px] overflow-y-auto rounded-xl bg-black shadow-2xl ring-1 ring-white/10">
+    <XPost s={story} big />
+    <a
+      href={story.evidence_url!}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="flex items-center justify-center gap-1 border-t border-white/10 py-2.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/5"
+    >
+      Ver tweet en X <ExternalLink className="h-3 w-3" />
+    </a>
+  </div>
+);
+
 interface Props {
   stories: PromologEntry[];
   selectedId?: string;
@@ -403,7 +460,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
             >
               {/* Imagen — al clickear abre el lightbox (verla en grande) */}
               <button type="button" onClick={() => setLightboxId(s.id)} className="relative block aspect-[9/16] w-full">
-                {isTgEvidence(s) ? <TelegramTile story={s} /> : isFb(s) ? <FbTile story={s} /> : <StoryThumb url={s.evidence_url} />}
+                {isTgEvidence(s) ? <TelegramTile story={s} /> : isFb(s) ? <FbTile story={s} /> : isXText(s) ? <XTile story={s} /> : <StoryThumb url={s.evidence_url} />}
                 {slide > 0 && (
                   <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
                     #{slide}
@@ -476,7 +533,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
           )}
 
           <div className="flex max-h-[90vh] w-full max-w-md flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : isFb(active) ? <FacebookLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
+            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : isFb(active) ? <FacebookLightbox story={active} /> : isXText(active) ? <XLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
             <div className="w-full space-y-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="text-xs tabular-nums text-white/70">
