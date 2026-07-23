@@ -551,7 +551,7 @@ const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
 };
 
 const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
-  const overdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
+  const overdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date, c.stage);
   const decision = needsContactDecision(c.stage, c.contact_count);
   const lastAttempt = c.contact_count >= 6;
   const next = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);
@@ -729,7 +729,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 : (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               // Estado de alertas: vencido (rojo) o decisión pendiente (naranja).
               // Espejo de la lógica de check_closer_contact_alerts() en SQL.
-              const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
+              const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date, c.stage);
               const decisionPending = needsContactDecision(c.stage, c.contact_count);
               return (
                 <div key={c.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 hover:bg-white/10 hover:border-primary/40 transition-colors">
@@ -911,7 +911,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     // Calculado en el cliente para no esperar el cron — el cron sólo se
     // encarga de la notificación en la campanita, el badge visual es
     // instantáneo.
-    const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date);
+    const contactOverdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date, c.stage);
     const decisionPending = needsContactDecision(c.stage, c.contact_count);
     const isLastAttempt = c.contact_count >= 6;
     const nextDate = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);

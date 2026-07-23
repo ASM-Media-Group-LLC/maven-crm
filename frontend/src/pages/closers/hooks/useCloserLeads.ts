@@ -132,11 +132,16 @@ export const getNextContactDate = (
 
 // Devuelve true si el próximo contacto ya venció (current_date > deadline,
 // comparando fechas a medianoche). Mismo cálculo que el SQL cron (20260516170000).
+// La cadencia solo aplica a leads EN GESTIÓN: si se pasa `stage` y no es
+// 'Asignada' (Completada/No interesada/Rechazada/etc.), nunca está vencido —
+// una venta Completada con 0/6 contactos mostraba el badge "Vencido" en la UI.
 export const isContactOverdue = (
   passedDate: string | null,
   contactCount: number,
   lastContactDate?: string | null,
+  stage?: string | null,
 ): boolean => {
+  if (stage !== undefined && stage !== "Asignada") return false;
   if (!passedDate || contactCount >= 6) return false;
   const next = getNextContactDate(passedDate, contactCount, lastContactDate);
   if (!next) return false;
