@@ -233,7 +233,7 @@ Deno.serve(async (req: Request) => {
         // Idempotente: no re-insertar el mismo permalink (re-corridas no duplican).
         if (p.permalink) {
           const { data: dupe } = await sb.from("promolog_entries")
-            .select("id").eq("creator_id", c.id).eq("network", "Telegram").eq("evidence_url", p.permalink).limit(1);
+            .select("id").eq("creator_id", c.id).eq("network", "telegram").eq("evidence_url", p.permalink).limit(1);
           if (dupe && dupe.length) { skipped++; continue; }
         }
 
@@ -244,7 +244,7 @@ Deno.serve(async (req: Request) => {
           // stories que son del día). Así cada promo cae en SU día.
           date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
           promoted: promoted ? "true" : "false",
-          network: "Telegram",
+          network: "telegram",
           platform: promoted ? "OnlyFans" : "Ninguna",
           notes: (p.text || "").slice(0, 2000) || null,
           evidence_url: p.permalink || null,
@@ -264,11 +264,11 @@ Deno.serve(async (req: Request) => {
       if (posts.length === 0 && !dryRun) {
         const today = new Date().toISOString().slice(0, 10);
         const { data: ex } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "Telegram").gte("date", today).limit(1);
+          .select("id").eq("creator_id", c.id).eq("network", "telegram").gte("date", today).limit(1);
         if (!ex || !ex.length) {
           await sb.from("promolog_entries").insert({
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
-            promoted: "false", network: "Telegram", platform: "Ninguna",
+            promoted: "false", network: "telegram", platform: "Ninguna",
             notes: null, evidence_url: null,
             analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad",
             scraped_at: new Date().toISOString(),

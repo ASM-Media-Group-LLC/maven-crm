@@ -308,7 +308,7 @@ Deno.serve(async (req: Request) => {
     const since10 = new Date(Date.now() - 10 * 86400 * 1000).toISOString().slice(0, 10);
     const { data: recent } = await sb.from("promolog_entries")
       .select("creator_id, date")
-      .in("creator_id", ids).eq("network", "X").eq("analyzed_by_ai", true)
+      .in("creator_id", ids).eq("network", "x").eq("analyzed_by_ai", true)
       .gte("date", since10).order("date", { ascending: false });
     const lastByCreator = new Map<string, string>();
     for (const r of (recent ?? []) as Array<{ creator_id: string; date: string }>) {
@@ -406,18 +406,18 @@ Deno.serve(async (req: Request) => {
       if (!dryRun) {
         const today = new Date().toISOString().slice(0, 10);
         const { data: ex } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "X").gte("date", today).limit(1);
+          .select("id").eq("creator_id", c.id).eq("network", "x").gte("date", today).limit(1);
         if (!ex || !ex.length) {
           await sb.from("promolog_entries").insert(failed ? {
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
-            promoted: "pending", network: "X", platform: "Ninguna",
+            promoted: "pending", network: "x", platform: "Ninguna",
             notes: "[SIN DATOS] No se pudo leer X (Apify falló). NO confirma que no haya tuiteado.",
             evidence_url: null, analyzed_by_ai: false, ai_model: "regla-texto-x",
             ai_reasoning: "Lectura de X fallida (apify): no ausencia confirmada.",
             error_reason: "x_read_failed", needs_review: false, scraped_at: new Date().toISOString(),
           } : {
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
-            promoted: "false", network: "X", platform: "Ninguna",
+            promoted: "false", network: "x", platform: "Ninguna",
             notes: null, evidence_url: null,
             analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad",
             scraped_at: new Date().toISOString(),
@@ -455,7 +455,7 @@ Deno.serve(async (req: Request) => {
       if (!dedupKey) { skipped++; continue; }
 
       const { data: dupe } = await sb.from("promolog_entries")
-        .select("id").eq("creator_id", c.id).eq("network", "X").eq("story_link_url", dedupKey).limit(1);
+        .select("id").eq("creator_id", c.id).eq("network", "x").eq("story_link_url", dedupKey).limit(1);
       if (dupe && dupe.length) { skipped++; continue; }
 
       // Evidencia DURABLE: guardamos la imagen en nuestro bucket SOLO para los tweets que
@@ -477,7 +477,7 @@ Deno.serve(async (req: Request) => {
         creator_id: c.id,
         date: (when || new Date()).toISOString(),
         promoted: promoted ? "true" : "false",
-        network: "X",
+        network: "x",
         platform: promoted ? "OnlyFans" : "Ninguna",
         notes: ((it?.text || it?.fullText || "") as string).slice(0, 2000) || null,
         evidence_url: evidenceUrl,
