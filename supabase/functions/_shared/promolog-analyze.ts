@@ -63,7 +63,7 @@ Tu job: decidir si en ESTA story la creadora está PROMOCIONANDO su contenido pa
 REGLA CENTRAL: "promocionar" = hay un PUNTERO o LLAMADO A LA ACCIÓN concreto hacia contenido PAGO. Que la foto sea sexy o sugestiva NO es promoción por sí sola — una creadora puede postear lencería/bikini sin promocionar nada. Lo que define la promoción es que DIRIJA al fan a comprar/ver contenido pago (un link, un sticker, una mención de su plataforma, o una invitación clara). NO infieras promoción solo de la apariencia (ropa, pose, cuerpo).
 
 Tres categorías:
-1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con una URL de plataforma de pago (ej. "onlyfans.com/nick") o con un nick JUNTO a la palabra/logo de la plataforma (ej. "OF: @nick").
+1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con una URL de plataforma de pago (ej. "onlyfans.com/nick") o con un nick JUNTO a la palabra/logo de la plataforma (ej. "OF: @nick"). TAMBIÉN cuenta como DIRECTA un link/sticker/CTA a SU PROPIO TELEGRAM como embudo (ej. sticker o texto "t.me/sunick", "mi Telegram", "únete a mi canal", "detrás de cámara → link"): en IG está prohibido linkear OnlyFans directo, así que muchas usan su canal de Telegram de puente hacia el contenido pago → mandar a su propio Telegram SÍ es promoción. (OJO: esto es en INSTAGRAM. NO confundir con la regla de que, DENTRO de Telegram, promocionar el canal VIP no cuenta — son cosas distintas.)
 2) INDIRECTA (promotion_type="indirect", promoted=true): NO hay link visible, pero el TEXTO tiene un llamado a la acción claro hacia contenido pago: "escríbeme por mi contenido", "más en mi página / mi OF", "contenido exclusivo / VIP / premium", "suscribite", "DM para el link", o una invitación EXPLÍCITA por TEXTO a ir a su cuenta "premium/+18" (esas palabras — o 🔞 / "cuenta de adultos/explícita" — tienen que estar escritas). Tiene que haber una INVITACIÓN a ir a otro lado o comprar — NO alcanza con una foto linda + un emoji, NI con un simple @tag/mención a otra cuenta de IG: un @ suelto NO es "redirección a una cuenta premium/+18" salvo que el texto traiga esas palabras al lado (ver la regla de @MENCIÓN en la GUÍA).
 3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar. ⚠️ Y también: un CTA genérico tipo "VIDEO COMPLETO AQUÍ" / "CONTEXTO COMPLETO AQUÍ" / "míralo completo" que claramente apunta a contenido NO-adulto — un show, comedia, un evento, un vlog, un canal de YouTube/Twitch, una entrevista — NO es promo de contenido pago aunque tenga sticker de link: es promoción de su contenido GRATUITO (caso real: creadora de comedia con "VIDEO COMPLETO AQUÍ" de su show → NO). Solo cuenta como INDIRECTA/DIRECTA si el contexto es de contenido pago (+18/sugerente) o nombra plataforma de pago.
 
@@ -570,8 +570,17 @@ async function processStory(args: {
   // ⚠️ NO cuenta como funnel propio si el host es un ACORTADOR: oculta el destino, y las
   // modelos marcan sus links de AFILIADO con su propio nombre (rebrand.ly/carolinaromo_4_ig
   // → STOCKITY, trading). El nombre en el path de un acortador no prueba que sea su OF.
-  const linkIsOwnFunnel = linkClass.tier === "unknown" && !isShortener(linkClass.host)
-    && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator;
+  // Su propio TELEGRAM como funnel: una historia de IG cuyo sticker apunta a SU canal de
+  // Telegram (t.me/<algo que la matchea>) es empuje a su embudo → cuenta como promo en IG
+  // (decisión del dueño 2026-07-23). t.me es NONPAID en el classifier, así que NO cae en la
+  // rama de arriba (tier unknown); lo detectamos aparte. Los invites privados anónimos
+  // (t.me/+hash) NO matchean a la creadora → quedan afuera solos. El puente IG→Telegram
+  // sigue disparando el scan del canal por separado (allá se cuenta lo que promocione en TG).
+  const linkIsOwnTelegram = /(?:^|\.)(?:t|telegram)\.me$/.test((linkClass.host || "").toLowerCase())
+    && linkMatchesCreator;
+  const linkIsOwnFunnel = (linkClass.tier === "unknown" && !isShortener(linkClass.host)
+    && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator)
+    || linkIsOwnTelegram;
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
     ? linkClass.platform : (creator.knownPlatform ?? (linkIsOwnFunnel ? "onlyfans" : "other"));
 
