@@ -576,11 +576,19 @@ async function processStory(args: {
   // rama de arriba (tier unknown); lo detectamos aparte. Los invites privados anónimos
   // (t.me/+hash) NO matchean a la creadora → quedan afuera solos. El puente IG→Telegram
   // sigue disparando el scan del canal por separado (allá se cuenta lo que promocione en TG).
+  // GUARD: un funnel propio (Telegram o dominio custom) que lleva a un CURSO DE FINANZAS /
+  // TRADING / CASINO / academia NO es promo de OnlyFans, aunque el link sea "suyo".
+  // Caso real: elizabethloaiza pivoteó a "Efecto Messi" (educación financiera) — su
+  // Telegram es el curso, no OF → una historia de IG con sticker a su t.me NO cuenta.
+  // Solo aplica al funnel AMBIGUO (t.me / dominio propio); un link explícito a
+  // onlyfans/fansly (linkIsPromo) no se toca.
+  const nonOfFunnelRe = /trading|forex|cript[oó]|crypto|inversi[óo]n|invertir|se[ñn]ales|\bcurso\b|masterclass|academ|finan(zas|ciera)|educaci[óo]n financiera|casino|apuest|gana(r)?\s+dinero|efecto\s+messi/i;
+  const looksNonOfFunnel = nonOfFunnelRe.test(`${caption ?? ""} ${final.reasoning ?? ""}`);
   const linkIsOwnTelegram = /(?:^|\.)(?:t|telegram)\.me$/.test((linkClass.host || "").toLowerCase())
-    && linkMatchesCreator;
-  const linkIsOwnFunnel = (linkClass.tier === "unknown" && !isShortener(linkClass.host)
+    && linkMatchesCreator && !looksNonOfFunnel;
+  const linkIsOwnFunnel = ((linkClass.tier === "unknown" && !isShortener(linkClass.host)
     && !!(story.linkUrl && story.linkUrl.trim()) && linkMatchesCreator)
-    || linkIsOwnTelegram;
+    || linkIsOwnTelegram) && !looksNonOfFunnel;
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
     ? linkClass.platform : (creator.knownPlatform ?? (linkIsOwnFunnel ? "onlyfans" : "other"));
 
