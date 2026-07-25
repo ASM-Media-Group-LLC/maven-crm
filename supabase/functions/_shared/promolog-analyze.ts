@@ -583,7 +583,15 @@ async function processStory(args: {
   // Solo aplica al funnel AMBIGUO (t.me / dominio propio); un link explícito a
   // onlyfans/fansly (linkIsPromo) no se toca.
   const nonOfFunnelRe = /trading|forex|cript[oó]|crypto|inversi[óo]n|invertir|se[ñn]ales|\bcurso\b|masterclass|academ|finan(zas|ciera)|educaci[óo]n financiera|casino|apuest|gana(r)?\s+dinero|efecto\s+messi/i;
-  const looksNonOfFunnel = nonOfFunnelRe.test(`${caption ?? ""} ${final.reasoning ?? ""}`);
+  // Denylist de funnels que NO son de OF aunque matcheen a la creadora — su contenido no
+  // se ve en cada historia (ej. un VIDEO sin texto de finanzas), así que el regex de arriba
+  // no siempre alcanza. Elizabethloaiza SIGUE siendo top de OF (107 promos reales/mes), pero
+  // su Telegram t.me/elizabethloaizaj es el curso "Efecto Messi", NO su OF. Agregar acá el
+  // handle/host de cualquier funnel-no-OF (finanzas, tienda, etc.) que se detecte.
+  const NON_OF_FUNNELS = ["elizabethloaizaj"];
+  const linkLc = (story.linkUrl || "").toLowerCase();
+  const looksNonOfFunnel = nonOfFunnelRe.test(`${caption ?? ""} ${final.reasoning ?? ""}`)
+    || NON_OF_FUNNELS.some((h) => linkLc.includes(h));
   const linkIsOwnTelegram = /(?:^|\.)(?:t|telegram)\.me$/.test((linkClass.host || "").toLowerCase())
     && linkMatchesCreator && !looksNonOfFunnel;
   const linkIsOwnFunnel = ((linkClass.tier === "unknown" && !isShortener(linkClass.host)
