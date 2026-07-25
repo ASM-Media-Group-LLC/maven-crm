@@ -909,9 +909,10 @@ function mentionsBotReal(mentions: string[] | undefined): boolean {
 // (etiquetado con el "@" picker → mentionedJid). Cubrir ambos es lo que evita
 // que un @mention legítimo quede sin respuesta.
 // ¿Lo llaman por su NOMBRE "Maven" al inicio del mensaje? (ej. "Maven, ..." /
-// "Maven tenemos..."). Señal de que le hablan directo. Se usa SOLO para bots de
-// SUPERVISIÓN (grupo de managers), donde "Maven" = el bot; en closers/ventas
-// "maven" suele ser el producto → ahí NO cuenta (evita disparos de más).
+// "Maven tenemos..."). Señal de que le hablan directo. Cuenta como llamado en
+// TODOS los grupos desde 2026-07-25 (antes solo Managers, y un "maven, ¿...?"
+// en ventas fuera de horario quedaba sin respuesta). Solo al INICIO del body:
+// hablar DEL producto a mitad de frase ("suban todo a maven") NO dispara.
 function startsWithBotName(body: string | null): boolean {
   return !!body && /^\s*maven\b/i.test(body);
 }
@@ -939,12 +940,15 @@ async function resolveAgentTrigger(
   if (isFromBot) return null; // nunca respondemos a nuestros propios mensajes
   if (group.bot_mode === "off") return null;
 
-  // Bots de SUPERVISIÓN (managers): además de @-mención, responden cuando los
-  // nombran "Maven ..." al inicio, a CUALQUIER hora. El grupo de managers no tiene
-  // turnos de closers, así que el gate de horario los dejaba mudos salvo @-mención
-  // real — por eso un "Maven, ..." de un manager quedaba sin respuesta.
+  // "Maven ..." al INICIO del mensaje cuenta como llamado directo en TODOS los
+  // grupos, a CUALQUIER hora (pedido del owner 2026-07-25). Antes solo aplicaba
+  // al bot de supervisión (Managers) por miedo a falsos positivos con "maven"
+  // = el producto — pero en la práctica un "maven, ¿...?" en ventas quedaba SIN
+  // respuesta si caía fuera de horario (pasó con una pregunta a las 12:00:02 de
+  // un sábado). Un falso positivo ocasional lo modera el prompt del bot (regla
+  // "CUÁNDO CALLARTE"); una pregunta directa sin respuesta es peor.
   const supervisorBot = group.department === "manager";
-  if (isBotAddressed(body, mentions, supervisorBot)) return "mention";
+  if (isBotAddressed(body, mentions, true)) return "mention";
 
   // En modo always, el agent se invoca con cualquier mensaje y decide él
   // si vale la pena responder. Filtros baratos en el ingest para no quemar
