@@ -109,6 +109,12 @@ export interface QaCall {
    *  ready (listo), failed (falló — se puede Reintentar). Legacy → 'ready'. */
   status?: string | null;
   error_message?: string | null;
+  /** 'reclutamiento' (default/legacy) o 'venta_servicio' — venta de un servicio
+   *  del portfolio (Kash, Unlimited, …) a una creadora que YA es de la agencia.
+   *  qa-analyze ajusta el rubric/outcome según este tipo. */
+  call_type?: string | null;
+  /** Solo venta_servicio: qué servicio se le intentó vender. */
+  service_sold?: string | null;
 }
 
 /** Row shape returned by the joined list query — calls + flattened
@@ -470,6 +476,8 @@ export interface CreateQaCallInput {
   audio_path?: string | null;
   audio_metrics?: unknown | null;
   status?: string;            // 'processing' para subidas nuevas; default 'ready'
+  call_type?: string;         // 'reclutamiento' (default) | 'venta_servicio'
+  service_sold?: string | null; // solo venta_servicio: servicio ofrecido (Kash, Unlimited, …)
 }
 
 export const useCreateQaCall = () => {
@@ -495,6 +503,8 @@ export const useCreateQaCall = () => {
           audio_metrics: input.audio_metrics ?? null,
           uploaded_by: uploaderId,
           status: input.status ?? "ready",
+          call_type: input.call_type ?? "reclutamiento",
+          service_sold: input.call_type === "venta_servicio" ? (input.service_sold ?? null) : null,
         })
         .select("*")
         .single();

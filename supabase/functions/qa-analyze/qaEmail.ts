@@ -18,6 +18,9 @@ export interface QaEmailPayload {
   callOutcome: string | null;
   callOutcomeLabel: string;
   callOutcomeReason: string | null;
+  // No-null cuando la llamada fue venta de un servicio a una creadora existente
+  // (call_type='venta_servicio'): nombre del servicio ofrecido.
+  serviceLabel: string | null;
   dimensions: { name: string; score: number; feedback: string }[];
   redFlags: { type: string; description: string; quote: string }[];
   keyMoments: { kind: "positivo" | "negativo"; quote: string; why: string }[];
@@ -70,7 +73,7 @@ const fmtScore10 = (score0to100: number): string =>
   (Math.max(0, Math.min(100, score0to100)) / 10).toFixed(1);
 
 export const buildQaEmailSubject = (p: QaEmailPayload): string =>
-  `[Maven QA Closers] ${p.closerName} · ${p.modelName} · ${fmtScore10(p.overallScore)}/10 (${p.callOutcomeLabel})`;
+  `[Maven QA Closers] ${p.closerName} · ${p.modelName}${p.serviceLabel ? ` · Venta: ${p.serviceLabel}` : ""} · ${fmtScore10(p.overallScore)}/10 (${p.callOutcomeLabel})`;
 
 export const buildQaEmailHtml = (p: QaEmailPayload): string => {
   const scoreColor = scoreColorOf(p.overallScore);

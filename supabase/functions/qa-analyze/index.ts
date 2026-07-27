@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SYSTEM_PROMPT } from "./prompt.ts";
+import { SERVICE_SALE_ADDENDUM, SYSTEM_PROMPT } from "./prompt.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPayload } from "./qaEmail.ts";
 
@@ -53,6 +53,10 @@ interface CallRow {
   closer_id: string | null;
   model_id: string | null;
   claude_score: number | null;
+  // 'reclutamiento' (default) | 'venta_servicio' — venta de un servicio del
+  // portfolio a una creadora que YA es de la agencia (reporte de Miguel).
+  call_type: string | null;
+  service_sold: string | null;
   closer: { name: string } | null;
   model: { name: string; category: string | null; country: string | null; ig_url: string | null } | null;
 }
@@ -150,7 +154,7 @@ serve(async (req) => {
     const { data: call, error: callErr } = await supabase
       .from("qa_calls")
       .select(
-        "id, transcript, audio_metrics, closer_id, model_id, claude_score, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country, ig_url)",
+        "id, transcript, audio_metrics, closer_id, model_id, claude_score, call_type, service_sold, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country, ig_url)",
       )
       .eq("id", callId)
       .maybeSingle();
@@ -169,7 +173,15 @@ serve(async (req) => {
     }
 
     // Header con datos del closer / modelo.
+    const isServiceSale = c.call_type === "venta_servicio";
     const headerLines: string[] = [];
+    if (isServiceSale) {
+      headerLines.push(
+        `Tipo de llamada: VENTA DE SERVICIO a una creadora que YA es de la agencia — servicio ofrecido: ${c.service_sold || "no especificado"}`,
+      );
+    } else {
+      headerLines.push("Tipo de llamada: RECLUTAMIENTO (cerrar a la modelo para la agencia)");
+    }
     if (c.closer?.name) headerLines.push(`Closer: ${c.closer.name}`);
     if (c.model?.name) {
       const modelDetails = [
@@ -309,10 +321,18 @@ serve(async (req) => {
       portfolioRows && portfolioRows.length > 0
         ? portfolioRows.map((r: { name: string }) => `  • ${r.name}`).join("\n")
         : "  • (no hay productos registrados; el closer debe seguir sólo con la agencia de OF)";
-    const systemPromptWithPortfolio = SYSTEM_PROMPT.replace(
+    let systemPromptWithPortfolio = SYSTEM_PROMPT.replace(
       "{{PRODUCT_PORTFOLIO}}",
       portfolioList,
     );
+    // Venta de servicio a creadora existente → el addendum ANULA el framing de
+    // reclutamiento (outcome = cierre del servicio, sin red flag cross-portfolio).
+    if (isServiceSale) {
+      systemPromptWithPortfolio += SERVICE_SALE_ADDENDUM.replaceAll(
+        "{{SERVICE_SOLD}}",
+        c.service_sold || "no especificado",
+      );
+    }
 
     // Pick del modelo según category. Premium tier = A++ / A+ (modelos
     // top que justifican el costo extra). Resto va a standard. Si está
@@ -512,6 +532,10 @@ async function sendQaReportEmail(
     callOutcome: outcome,
     callOutcomeLabel: labelForOutcome(outcome),
     callOutcomeReason: a.call_outcome_reason ?? null,
+    serviceLabel:
+      (call.call_type as string | null) === "venta_servicio"
+        ? ((call.service_sold as string | null) || "servicio")
+        : null,
     dimensions: (a.dimensions ?? []).map((d) => ({ name: d.name, score: d.score, feedback: d.feedback })),
     redFlags: (a.red_flags ?? []).map((f) => ({ type: f.type, description: f.description, quote: f.quote })),
     keyMoments: (a.key_moments ?? []).map((k) => ({ kind: k.kind, quote: k.quote, why: k.why })),

@@ -87,6 +87,21 @@ const isAudioFile = (file: File): boolean => {
 
 const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A+", "A", "B+", "B", "C+", "C"];
 
+// Servicios que un closer puede venderle a una creadora que YA es de la agencia
+// (call_type='venta_servicio'). Los que pidió Miguel (Kash/Unlimited) + las
+// plataformas del pipeline de closers (SALE_PLATFORMS de useCloserLeads).
+const QA_SERVICES = [
+  "Kash",
+  "Unlimited",
+  "Trafix",
+  "Blu",
+  "Piclink",
+  "Content Protector",
+  "ORA",
+  "Let's Shoot",
+  "Otro",
+] as const;
+
 const AgencyNewQa = () => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -172,6 +187,12 @@ const AgencyNewQa = () => {
   });
 
   const [callDate, setCallDate] = useState<string>(today());
+  // Tipo de llamada: reclutamiento (default, comportamiento histórico) o venta
+  // de un servicio del portfolio a una creadora que YA es de la agencia.
+  // qa-analyze ajusta el rubric/outcome según esto (pedido de Miguel: la IA
+  // evaluaba las ventas de Unlimited/Kash como reclutamiento fallido).
+  const [callType, setCallType] = useState<"reclutamiento" | "venta_servicio">("reclutamiento");
+  const [serviceSold, setServiceSold] = useState<string>("");
   // Evaluador por defecto: "Claude AI" (la IA es quien hace la evaluación).
   const [evaluatorName, setEvaluatorName] = useState<string>("Claude AI");
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -232,6 +253,7 @@ const AgencyNewQa = () => {
   if (!modelIgUrl.trim()) errors.ig = "Instagram de la modelo requerido";
   if (!callDate) errors.callDate = "Fecha requerida";
   if (!evaluatorName.trim()) errors.evaluator = "Evaluador requerido";
+  if (callType === "venta_servicio" && !serviceSold) errors.service = "Elegí qué servicio se le ofreció";
   if (!audioFile) errors.audio = "Subí el audio de la llamada";
 
   const isValid = Object.keys(errors).length === 0;
@@ -326,6 +348,8 @@ const AgencyNewQa = () => {
         evaluator_name: evaluatorName.trim() || defaultEvaluator,
         audio_path: savedAudioPath,
         status: "processing",
+        call_type: callType,
+        service_sold: callType === "venta_servicio" ? serviceSold : null,
       });
 
       // 5.5 Insertar closers de soporte como participants.
@@ -629,6 +653,51 @@ const AgencyNewQa = () => {
                 Maven: card con accent violeta + lista agrupada. */}
             <IgLookupBanner result={igLookupQ.data} loading={igLookupQ.isFetching} />
 
+
+            {/* Row 2.5: tipo de llamada + servicio (si es venta a creadora existente).
+                La IA evalúa distinto según el tipo (pedido de Miguel: las ventas de
+                Unlimited/Kash a creadoras de la agencia se puntuaban como
+                reclutamiento fallido). */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="call_type">Tipo de llamada *</Label>
+                <Select
+                  value={callType}
+                  onValueChange={(v) => {
+                    setCallType(v as "reclutamiento" | "venta_servicio");
+                    if (v !== "venta_servicio") setServiceSold("");
+                  }}
+                >
+                  <SelectTrigger id="call_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reclutamiento">Reclutamiento (modelo nueva para la agencia)</SelectItem>
+                    <SelectItem value="venta_servicio">Venta de servicio (ya es de la agencia)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {callType === "venta_servicio" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="service_sold">Servicio ofrecido *</Label>
+                  <Select value={serviceSold || undefined} onValueChange={setServiceSold}>
+                    <SelectTrigger id="service_sold">
+                      <SelectValue placeholder="¿Qué se le intentó vender?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QA_SERVICES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.service && (
+                    <p className="text-xs text-destructive">{errors.service}</p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Row 3: fecha + evaluador */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -158,3 +158,22 @@ COMPLICITY_LEVEL — modelo
 - medio: cordial pero formal.
 - bajo: distante, defensiva, en clave de entrevista.
 `;
+
+// Addendum que qa-analyze APPENDEA al SYSTEM_PROMPT cuando la llamada es
+// call_type='venta_servicio': el interlocutor YA es creadora de la agencia y
+// el objetivo es venderle un servicio del portfolio ({{SERVICE_SOLD}}), no
+// reclutarla. Reporte de Miguel 2026-07-27: sin esto la IA evaluaba estas
+// llamadas como reclutamiento fallido (outcome/cross-portfolio/framing mal).
+export const SERVICE_SALE_ADDENDUM = `
+
+[MODO VENTA DE SERVICIO — ANULA EL FRAMING DE RECLUTAMIENTO]
+Esta llamada NO es de reclutamiento: la interlocutora YA ES CREADORA DE LA AGENCIA. El closer intenta venderle un servicio adicional del portfolio: {{SERVICE_SOLD}}.
+
+Ajustes OBLIGATORIOS a la evaluación:
+- "call_outcome" mide si cerró la venta de ESE SERVICIO (o un next step vinculante sobre ese servicio) — NO si firmó con la agencia (ya firmó hace tiempo).
+- NO penalices que no venda el management de OF ni que no "cierre a la modelo para la agencia": eso ya está cerrado. Si la modelo menciona su relación existente con la agencia, es contexto normal, no una señal de reclutamiento.
+- Dimensión 6 (Credibilidad como socio estratégico) y 7 (Propuesta de valor personalizada): evalúalas respecto del SERVICIO ofrecido — el closer debe apoyarse en la relación y los resultados existentes con la agencia para anclar el valor del servicio.
+- Dimensión 12 (Discovery cross-portfolio): esta llamada entera ES una venta de portfolio. Evalúa la calidad del pitch del servicio (diagnóstico del fit, personalización, claridad de pricing/entregables) en lugar de exigir "al menos un intento cross-portfolio". NO uses el red flag "no_intento_cross_portfolio" en este modo. "ceguera_portfolio" solo aplica si la creadora da señales claras de necesitar OTRO servicio distinto y el closer las ignora.
+- El resto del rubric aplica igual (apertura, escucha, 40/60, discovery, objeciones, cierre, tono, protocolo de cámara) — sigue siendo una venta consultiva high-ticket.
+- En "summary" y "call_facts.motivo_principal" deja claro que fue una llamada de venta de servicio ({{SERVICE_SOLD}}) a una creadora existente.
+`;

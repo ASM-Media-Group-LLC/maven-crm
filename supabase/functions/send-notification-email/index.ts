@@ -48,14 +48,36 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.replace("Bearer ", "");
 
-    const authClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user }, error: userError } = await authClient.auth.getUser(token);
-    if (userError || !user?.id) {
-      return json(401, { error: "Unauthorized", reason: "invalid_token" });
+    // Server-to-server: otras edge functions (qa-analyze manda el reporte de
+    // Closers QA desde el server) invocan con la SERVICE KEY. auth.getUser()
+    // no valida ese token (no es un user) → todos esos mails morían en 401
+    // silencioso desde que el envío se movió al server (reporte de Jhon
+    // 2026-07-27: no llegaban los correos de QA).
+    //
+    // Detección por CLAIM, no por igualdad de string: existen variantes
+    // firmadas del mismo rol (el env del runtime ≠ la key del dashboard) y
+    // `token === env` daba falso negativo. Es seguro: esta función corre con
+    // verify_jwt=true → el gateway YA validó la firma del JWT antes de llegar
+    // acá; un token con role=service_role no se puede falsificar. El portador
+    // de la service key ya puede todo en el proyecto, no abre nada nuevo.
+    let isServiceCall = false;
+    try {
+      const b64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/") ?? "";
+      const claims = JSON.parse(atob(b64)) as { role?: string };
+      isServiceCall = claims?.role === "service_role";
+    } catch {
+      // No es un JWT decodificable — lo frena el getUser de abajo.
+    }
+    if (!isServiceCall) {
+      const authClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: { user }, error: userError } = await authClient.auth.getUser(token);
+      if (userError || !user?.id) {
+        return json(401, { error: "Unauthorized", reason: "invalid_token" });
+      }
     }
 
     const body = await req.json().catch(() => null) as

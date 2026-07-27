@@ -376,6 +376,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                             <span className="text-sm font-medium">
                               {call.model.name}
                             </span>
+                            {/* Venta de servicio a creadora existente (≠ reclutamiento) */}
+                            {call.call_type === "venta_servicio" && (
+                              <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
+                                Venta: {call.service_sold || "servicio"}
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">

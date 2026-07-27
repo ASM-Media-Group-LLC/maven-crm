@@ -1561,6 +1561,13 @@ const CallDetailPage = ({
                       {call.evaluator_name}
                     </strong>
                   </span>
+                  {/* Tipo de llamada: la venta de servicio a creadora existente
+                      se evalúa con otro framing (no reclutamiento). */}
+                  {call.call_type === "venta_servicio" && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      Venta: {call.service_sold || "servicio"}
+                    </span>
+                  )}
                 </div>
                 {analysis.call_outcome_reason && (
                   <p className="mt-2 max-w-xl rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs italic leading-relaxed text-muted-foreground">
