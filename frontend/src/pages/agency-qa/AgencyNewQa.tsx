@@ -87,9 +87,17 @@ const isAudioFile = (file: File): boolean => {
 
 const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A+", "A", "B+", "B", "C+", "C"];
 
-// Servicios que un closer puede venderle a una creadora que YA es de la agencia
-// (call_type='venta_servicio'). Los que pidió Miguel (Kash/Unlimited) + las
-// plataformas del pipeline de closers (SALE_PLATFORMS de useCloserLeads).
+// Tipo de llamada. La IA evalúa cada uno con un framing distinto (ver
+// qa-analyze/prompt.ts): reclutar para la agencia · venderle un servicio a una
+// creadora propia · venderle una plataforma a una modelo EXTERNA.
+type CallType = "reclutamiento" | "venta_servicio" | "venta_externa";
+
+// Los dos tipos de venta piden "Servicio ofrecido".
+const isSaleType = (t: CallType) => t === "venta_servicio" || t === "venta_externa";
+
+// Servicios/plataformas que un closer puede vender (a creadora propia o a una
+// modelo externa). Los que pidió Miguel (Kash/Unlimited) + las plataformas del
+// pipeline de closers (SALE_PLATFORMS de useCloserLeads).
 const QA_SERVICES = [
   "Kash",
   "Unlimited",
@@ -191,7 +199,7 @@ const AgencyNewQa = () => {
   // de un servicio del portfolio a una creadora que YA es de la agencia.
   // qa-analyze ajusta el rubric/outcome según esto (pedido de Miguel: la IA
   // evaluaba las ventas de Unlimited/Kash como reclutamiento fallido).
-  const [callType, setCallType] = useState<"reclutamiento" | "venta_servicio">("reclutamiento");
+  const [callType, setCallType] = useState<CallType>("reclutamiento");
   const [serviceSold, setServiceSold] = useState<string>("");
   // Evaluador por defecto: "Claude AI" (la IA es quien hace la evaluación).
   const [evaluatorName, setEvaluatorName] = useState<string>("Claude AI");
@@ -253,7 +261,7 @@ const AgencyNewQa = () => {
   if (!modelIgUrl.trim()) errors.ig = "Instagram de la modelo requerido";
   if (!callDate) errors.callDate = "Fecha requerida";
   if (!evaluatorName.trim()) errors.evaluator = "Evaluador requerido";
-  if (callType === "venta_servicio" && !serviceSold) errors.service = "Elegí qué servicio se le ofreció";
+  if (isSaleType(callType) && !serviceSold) errors.service = "Elegí qué servicio/plataforma se le ofreció";
   if (!audioFile) errors.audio = "Subí el audio de la llamada";
 
   const isValid = Object.keys(errors).length === 0;
@@ -349,7 +357,7 @@ const AgencyNewQa = () => {
         audio_path: savedAudioPath,
         status: "processing",
         call_type: callType,
-        service_sold: callType === "venta_servicio" ? serviceSold : null,
+        service_sold: isSaleType(callType) ? serviceSold : null,
       });
 
       // 5.5 Insertar closers de soporte como participants.
@@ -664,8 +672,9 @@ const AgencyNewQa = () => {
                 <Select
                   value={callType}
                   onValueChange={(v) => {
-                    setCallType(v as "reclutamiento" | "venta_servicio");
-                    if (v !== "venta_servicio") setServiceSold("");
+                    const next = v as CallType;
+                    setCallType(next);
+                    if (!isSaleType(next)) setServiceSold("");
                   }}
                 >
                   <SelectTrigger id="call_type">
@@ -674,12 +683,15 @@ const AgencyNewQa = () => {
                   <SelectContent>
                     <SelectItem value="reclutamiento">Reclutamiento (modelo nueva para la agencia)</SelectItem>
                     <SelectItem value="venta_servicio">Venta de servicio (ya es de la agencia)</SelectItem>
+                    <SelectItem value="venta_externa">Venta de plataforma (modelo externa, no es de la agencia)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {callType === "venta_servicio" && (
+              {isSaleType(callType) && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="service_sold">Servicio ofrecido *</Label>
+                  <Label htmlFor="service_sold">
+                    {callType === "venta_externa" ? "Plataforma ofrecida *" : "Servicio ofrecido *"}
+                  </Label>
                   <Select value={serviceSold || undefined} onValueChange={setServiceSold}>
                     <SelectTrigger id="service_sold">
                       <SelectValue placeholder="¿Qué se le intentó vender?" />

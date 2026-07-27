@@ -1561,11 +1561,17 @@ const CallDetailPage = ({
                       {call.evaluator_name}
                     </strong>
                   </span>
-                  {/* Tipo de llamada: la venta de servicio a creadora existente
-                      se evalúa con otro framing (no reclutamiento). */}
+                  {/* Tipo de llamada: las ventas de servicio/plataforma se evalúan
+                      con otro framing (no reclutamiento). Distinguimos si la
+                      modelo es de la agencia o externa. */}
                   {call.call_type === "venta_servicio" && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                       Venta: {call.service_sold || "servicio"}
+                    </span>
+                  )}
+                  {call.call_type === "venta_externa" && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
+                      Venta externa: {call.service_sold || "plataforma"}
                     </span>
                   )}
                 </div>

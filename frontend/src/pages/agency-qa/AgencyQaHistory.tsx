@@ -376,10 +376,15 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                             <span className="text-sm font-medium">
                               {call.model.name}
                             </span>
-                            {/* Venta de servicio a creadora existente (≠ reclutamiento) */}
+                            {/* Ventas (≠ reclutamiento): a creadora propia vs modelo externa */}
                             {call.call_type === "venta_servicio" && (
                               <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
                                 Venta: {call.service_sold || "servicio"}
+                              </span>
+                            )}
+                            {call.call_type === "venta_externa" && (
+                              <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning whitespace-nowrap">
+                                Externa: {call.service_sold || "plataforma"}
                               </span>
                             )}
                           </div>

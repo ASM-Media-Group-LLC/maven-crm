@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SERVICE_SALE_ADDENDUM, SYSTEM_PROMPT } from "./prompt.ts";
+import {
+  EXTERNAL_SALE_ADDENDUM,
+  SERVICE_SALE_ADDENDUM,
+  SYSTEM_PROMPT,
+  UNSPECIFIED_SERVICE_NOTE,
+} from "./prompt.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPayload } from "./qaEmail.ts";
 
@@ -174,10 +179,24 @@ serve(async (req) => {
 
     // Header con datos del closer / modelo.
     const isServiceSale = c.call_type === "venta_servicio";
+    const isExternalSale = c.call_type === "venta_externa";
+    // "Otro" es la opción catch-all del selector (QA_SERVICES) y las filas
+    // creadas fuera del form (API, cron de QAs stuck) pueden no traer servicio:
+    // en ambos casos el valor no informa nada, así que se lo pedimos al modelo
+    // desde el transcript (UNSPECIFIED_SERVICE_NOTE) en lugar de interpolarlo
+    // como si fuera el nombre real del producto — antes terminaba escrito
+    // "venta de servicio (no especificado)" en el summary que lee el closer.
+    const rawService = (c.service_sold ?? "").trim();
+    const serviceUnspecified = rawService === "" || rawService.toLowerCase() === "otro";
+    const serviceName = serviceUnspecified ? "sin especificar en el formulario" : rawService;
     const headerLines: string[] = [];
     if (isServiceSale) {
       headerLines.push(
-        `Tipo de llamada: VENTA DE SERVICIO a una creadora que YA es de la agencia — servicio ofrecido: ${c.service_sold || "no especificado"}`,
+        `Tipo de llamada: VENTA DE SERVICIO a una creadora que YA es de la agencia — servicio ofrecido: ${serviceName}`,
+      );
+    } else if (isExternalSale) {
+      headerLines.push(
+        `Tipo de llamada: VENTA EXTERNA a una modelo que NO es de la agencia — plataforma ofrecida: ${serviceName}`,
       );
     } else {
       headerLines.push("Tipo de llamada: RECLUTAMIENTO (cerrar a la modelo para la agencia)");
@@ -330,8 +349,20 @@ serve(async (req) => {
     if (isServiceSale) {
       systemPromptWithPortfolio += SERVICE_SALE_ADDENDUM.replaceAll(
         "{{SERVICE_SOLD}}",
-        c.service_sold || "no especificado",
+        serviceName,
       );
+    } else if (isExternalSale) {
+      // Modelo externa: sin relación previa donde apalancarse + el
+      // reclutamiento a la agencia es upside si aparece fit.
+      systemPromptWithPortfolio += EXTERNAL_SALE_ADDENDUM.replaceAll(
+        "{{SERVICE_SOLD}}",
+        serviceName,
+      );
+    }
+    // Doblemente guardado: sólo en ventas y sólo si el servicio no vino
+    // identificado → reclutamiento nunca ve esta nota.
+    if ((isServiceSale || isExternalSale) && serviceUnspecified) {
+      systemPromptWithPortfolio += UNSPECIFIED_SERVICE_NOTE;
     }
 
     // Pick del modelo según category. Premium tier = A++ / A+ (modelos
@@ -397,6 +428,14 @@ serve(async (req) => {
     const dimScores = ((analysis as { dimensions?: Array<{ score?: number }> }).dimensions ?? [])
       .map((d) => Number(d?.score))
       .filter((n) => Number.isFinite(n));
+    // El score es el promedio de las dims → si el modelo devuelve menos de 13,
+    // la escala cambia EN SILENCIO. No lo rechazamos (rompería llamadas que hoy
+    // funcionan), pero queda registrado para poder diagnosticarlo.
+    if (dimScores.length !== 13) {
+      console.warn(
+        `qa-analyze: dimensiones inesperadas (${dimScores.length} en vez de 13) en call ${callId} — el promedio del score cambia de escala.`,
+      );
+    }
     const score = dimScores.length
       ? Math.round(dimScores.reduce((a, b) => a + b, 0) / dimScores.length)
       : (analysis as { overall_score: number }).overall_score;
@@ -533,7 +572,8 @@ async function sendQaReportEmail(
     callOutcomeLabel: labelForOutcome(outcome),
     callOutcomeReason: a.call_outcome_reason ?? null,
     serviceLabel:
-      (call.call_type as string | null) === "venta_servicio"
+      (call.call_type as string | null) === "venta_servicio" ||
+      (call.call_type as string | null) === "venta_externa"
         ? ((call.service_sold as string | null) || "servicio")
         : null,
     dimensions: (a.dimensions ?? []).map((d) => ({ name: d.name, score: d.score, feedback: d.feedback })),
