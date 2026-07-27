@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   EXTERNAL_SALE_ADDENDUM,
+  PRODUCT_CATALOG,
   SERVICE_SALE_ADDENDUM,
   SYSTEM_PROMPT,
   UNSPECIFIED_SERVICE_NOTE,
@@ -332,13 +333,26 @@ serve(async (req) => {
     // Inyectar dinámicamente el portfolio de productos en el system
     // prompt. Si la query falla, usamos un placeholder que evita
     // alucinaciones en lugar de exponer el {{}} crudo.
+    // active=true: la tabla tiene filas viejas desactivadas (p.ej. el slug
+    // legacy "contentprotector" además del vigente "content_protector") y sin
+    // filtrar la IA recibía "Content Protector" DOS veces. El frontend ya filtra
+    // igual (useScouterCompanies). El dedupe por nombre cubre además cualquier
+    // par activo con el mismo label.
     const { data: portfolioRows } = await supabase
       .from("scouter_companies")
       .select("name")
+      .eq("active", true)
       .order("name");
+    const portfolioNames = [
+      ...new Set(
+        ((portfolioRows ?? []) as Array<{ name: string }>)
+          .map((r) => (r.name ?? "").trim())
+          .filter((n) => n.length > 0),
+      ),
+    ];
     const portfolioList =
-      portfolioRows && portfolioRows.length > 0
-        ? portfolioRows.map((r: { name: string }) => `  • ${r.name}`).join("\n")
+      portfolioNames.length > 0
+        ? portfolioNames.map((n) => `  • ${n}`).join("\n")
         : "  • (no hay productos registrados; el closer debe seguir sólo con la agencia de OF)";
     let systemPromptWithPortfolio = SYSTEM_PROMPT.replace(
       "{{PRODUCT_PORTFOLIO}}",
@@ -358,6 +372,12 @@ serve(async (req) => {
         "{{SERVICE_SOLD}}",
         serviceName,
       );
+    }
+    // Catálogo de producto: sólo en modos de venta (es donde hay que juzgar si
+    // explicó bien QUÉ vende). Reclutamiento sigue viendo únicamente la lista de
+    // nombres del portfolio, igual que siempre.
+    if (isServiceSale || isExternalSale) {
+      systemPromptWithPortfolio += PRODUCT_CATALOG;
     }
     // Doblemente guardado: sólo en ventas y sólo si el servicio no vino
     // identificado → reclutamiento nunca ve esta nota.
