@@ -92,14 +92,18 @@ serve(async (req) => {
     return json({ ok, processed: 1, transcribed: ok ? 1 : 0 });
   }
 
-  // Batch: audios de la bandeja sin transcribir (body null) con media en Storage.
+  // Batch: audios de la bandeja SIN transcribir con media en Storage. "Sin transcribir" =
+  // body IS NULL (algunas ingestas dejan null) O body = '[audio]' (otras ingestas —p.ej. la
+  // línea de Managers— insertan ese placeholder literal). Antes solo tomaba `is null` y se
+  // saltaba TODOS los '[audio]' → nunca se transcribían y el bot decía "audio sin transcribir".
+  // OJO: match EXACTO a '[audio]' — NO reprocesar '[audio no transcribible]' (evita loop).
   const limit = Math.min(body.batch_size ?? 10, 25);
   const { data: rows } = await sb
     .from("wa_conversation_messages")
     .select("id, media_url")
     .eq("msg_type", "audio")
     .not("media_url", "is", null)
-    .is("body", null)
+    .or("body.is.null,body.eq.[audio]")
     .is("deleted_at", null)
     .order("sent_at", { ascending: false })
     .limit(limit);
