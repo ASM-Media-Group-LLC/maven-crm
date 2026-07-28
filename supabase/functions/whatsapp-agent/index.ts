@@ -222,6 +222,7 @@ CASOS COMUNES:
    → NO es una regla global del grupo. Otros pueden seguir mandando audios entre ellos sin problema.
    → Vos (el bot) NO mandás audios nunca — no aplica a vos.
    → Respuesta apropiada: "Entendido [Nombre], equipo: si necesitan hablarle a [Nombre] específicamente, mejor por texto. Para coordinación interna entre ustedes pueden seguir usando audio." NO digas "✓ Anotado, de ahora en más respuestas en texto" porque eso ya lo hacés siempre.
+   → ⚠️ VOS SÍ "ESCUCHÁS" LOS AUDIOS: las notas de voz se transcriben solas y las leés como texto (en el contexto aparecen como "[audio] <transcripción>"). PROHIBIDO decir "no puedo escuchar audios" o pedir que te lo pasen a texto — sí podés. Si ves un "[audio]" SIN transcripción todavía (recién llegó, se procesa en ~20s), NO afirmes que no lo oís: decí "dame unos segundos que proceso tu audio 🙏" y esperá; el sistema te reinvoca con el texto.
 
 2. "Decile a X que haga Y" / "@X explicale eso":
    → El autor está delegando a X. NO sos vos quien debe hacer Y.
@@ -3531,7 +3532,7 @@ async function buildInitialUserMessage(args: {
 
   if (args.req.message_id) {
     const sb = adminClient();
-    const { data: msg } = await sb
+    let { data: msg } = await sb
       .from("whatsapp_messages")
       .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
       .eq("id", args.req.message_id)
@@ -3542,13 +3543,44 @@ async function buildInitialUserMessage(args: {
     // inyectamos el marcador [OWNER_MESSAGE] en el prompt.
     const isOwner = args.isOwner;
 
-    const { data: ctx } = await sb
+    let { data: ctx } = await sb
       .from("whatsapp_messages")
       .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
       .eq("group_id", args.groupId)
       .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
       .order("sent_at", { ascending: false })
       .limit(10);
+
+    // ── Esperar transcripción pendiente de audio ──────────────────────────
+    // Bug (28/7): un closer manda un audio y @menciona al bot casi al mismo
+    // tiempo. El mention dispara al agente ANTES de que Whisper termine (tarda
+    // ~1x la duración: un audio de 28s tardó 23s) → el bot ve "[audio]" sin
+    // texto y responde "no puedo escuchar audios". Fix: si hay un audio
+    // RECIENTE (<3min) sin transcribir en el disparador o en el contexto,
+    // esperamos hasta ~24s (12×2s) a que la transcripción esté y re-leemos.
+    {
+      const pendingAudio = (
+        m: { msg_type: string; transcribed_text: string | null; sent_at: string } | null | undefined,
+      ) =>
+        !!m && m.msg_type === "audio" && !m.transcribed_text &&
+        (Date.now() - new Date(m.sent_at).getTime()) < 3 * 60 * 1000;
+      const anyPending = () => pendingAudio(msg) || (ctx ?? []).some(pendingAudio);
+      for (let i = 0; i < 12 && anyPending(); i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        msg = (await sb
+          .from("whatsapp_messages")
+          .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+          .eq("id", args.req.message_id)
+          .single()).data;
+        ctx = (await sb
+          .from("whatsapp_messages")
+          .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+          .eq("group_id", args.groupId)
+          .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
+          .order("sent_at", { ascending: false })
+          .limit(10)).data;
+      }
+    }
 
     // Enriquecer sender_display_name con el full_name del profile cuando el
     // display name de WhatsApp es ambiguo ("#21", número crudo, apodos como
