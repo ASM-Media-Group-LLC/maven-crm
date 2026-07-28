@@ -24,6 +24,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apidojo~tweet-scraper";
 const HANDLES_PER_RUN = 20; // lote por corrida de Apify (acota tiempo/costo)
+// Presupuesto por corrida — evita el 504 de plataforma (~150s). Antes x-scan procesaba
+// TODAS las creadoras (Apify por lote hasta 120s + visión) → hacía timeout y la cobertura
+// quedaba a medias (el comentario de la rotación decía "~13/corrida" pero NUNCA se codeó).
+// Ahora: cap de creadoras por corrida + corte por wall-clock, y AUTO-ENCADENADO (la función
+// se re-invoca con SOLO las diferidas) para cubrir todo en varias corridas acotadas. Best-
+// effort: si el encadenado se cae, la rotación + las crons de repaso convergen igual.
+const MAX_CREATORS_PER_RUN = 10;
+// Headroom bajo el kill de plataforma (~150s): dejamos ~50s para una creadora ya EN VUELO
+// (una llamada de visión ~30s + persist ~15s). Con esto, aunque Apify se coma ~120s, el
+// primer chequeo del loop difiere todo y la función devuelve ~122s < 150s (sin 504).
+const RUN_BUDGET_MS = 100_000;
+const MAX_CHAIN_DEPTH = 8;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -285,6 +297,8 @@ Deno.serve(async (req: Request) => {
   const onlyIds = Array.isArray(body.only_creator_ids) ? body.only_creator_ids as string[] : null;
   const limit = Number(body.limit) || 0; // probar con N creadoras
   const dryRun = body.dry_run === true;
+  const handlerStart = Date.now();                       // para el corte por wall-clock (evita 504)
+  const chainDepth = Number((body as { _chain_depth?: number })._chain_depth) || 0; // auto-encadenado
   const start = new Date(Date.now() - hours * 3600 * 1000).toISOString().slice(0, 10);
 
   let q = sb.from("creators")
@@ -321,6 +335,15 @@ Deno.serve(async (req: Request) => {
     });
   }
   if (limit > 0) list = list.slice(0, limit);
+
+  // Cap por corrida (evita el 504): procesamos hasta MAX_CREATORS_PER_RUN y DIFERIMOS el
+  // resto (la rotación ya puso las más atrasadas primero). No aplica en dry_run ni cuando
+  // el caller fijó `limit` (prueba manual). Las diferidas se re-invocan por auto-encadenado.
+  let deferred: typeof list = [];
+  if (!dryRun && !limit && list.length > MAX_CREATORS_PER_RUN) {
+    deferred = list.slice(MAX_CREATORS_PER_RUN);
+    list = list.slice(0, MAX_CREATORS_PER_RUN);
+  }
 
   // Mapa handle→creadora (para asignar cada tweet).
   const byHandle = new Map<string, { id: string; name: string; onlyfans_url: string }>();
@@ -359,7 +382,19 @@ Deno.serve(async (req: Request) => {
   // exactamente lo que dejó a creadoras que SÍ promocionaban (ej. elizabethloaiza)
   // figurando "sin actividad" en X. Espejo del fix #818 de IG (leer falló → pending).
   const failedCreatorIds = new Set<string>();
-  const handles = [...byHandle.keys()];
+  // UN SOLO lote de Apify por corrida: con el cap de creadoras esto casi siempre ya es ≤20
+  // handles, pero las cuentas X-extra podrían empujar a un 2do lote (hasta +120s → 504 antes
+  // de clasificar). Cortamos a HANDLES_PER_RUN; las creadoras cuyos handles NO entraron (y no
+  // tienen otro handle dentro del lote) van a pending — se re-leen por rotación/encadenado.
+  const allHandles = [...byHandle.keys()];
+  const handles = allHandles.slice(0, HANDLES_PER_RUN);
+  if (allHandles.length > handles.length) {
+    const fetchedCreatorIds = new Set(handles.map((h) => byHandle.get(h)?.id).filter(Boolean));
+    for (const h of allHandles.slice(HANDLES_PER_RUN)) {
+      const c = byHandle.get(h);
+      if (c && !fetchedCreatorIds.has(c.id)) failedCreatorIds.add(c.id);
+    }
+  }
   for (let i = 0; i < handles.length; i += HANDLES_PER_RUN) {
     const chunk = handles.slice(i, i + HANDLES_PER_RUN);
     try {
@@ -388,7 +423,12 @@ Deno.serve(async (req: Request) => {
   // 2) Clasificar + insertar (1 fila por tweet), idempotente por evidence_url.
   const results: unknown[] = [];
   let visionUsed = 0; // cap de costo/tiempo: total de llamadas de visión en la corrida
-  for (const c of list) {
+  const timedOut: typeof list = []; // no alcanzadas por el corte de wall-clock → se difieren
+  for (let __ci = 0; __ci < list.length; __ci++) {
+    const c = list[__ci];
+    // Corte por wall-clock: si nos acercamos al kill de plataforma (~150s), dejamos de
+    // arrancar creadoras nuevas y diferimos las que quedan (las cubre el auto-encadenado).
+    if (Date.now() - handlerStart > RUN_BUDGET_MS) { timedOut.push(...list.slice(__ci)); break; }
     const tweets = (tweetsByCreator.get(c.id) || []).sort((a, b) => {
       const da = parseTweetDate(a?.createdAt || a?.created_at)?.getTime() || 0;
       const db = parseTweetDate(b?.createdAt || b?.created_at)?.getTime() || 0;
@@ -433,6 +473,10 @@ Deno.serve(async (req: Request) => {
     // opaco ya no se marca promo. Cada item = un tweet donde corrió la visión.
     const visionTweets: Array<{ promoted: boolean; reason: string; text: string }> = [];
     for (let i = 0; i < tweets.length; i++) {
+      // Corte a mitad de creadora: si el presupuesto se agotó (p.ej. muchas fotos que fueron
+      // a visión en serie), paramos de procesar sus tweets restantes. La creadora queda
+      // parcial (con lo insertado); el chequeo del loop externo difiere las que siguen.
+      if (Date.now() - handlerStart > RUN_BUDGET_MS) break;
       const it = tweets[i];
       const clsX = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
       let { promoted, reason } = clsX;
@@ -497,5 +541,25 @@ Deno.serve(async (req: Request) => {
     results.push({ creator: c.name, tweets: tweets.length, promoted: promotedCount, inserted, skipped, ...(dryRun ? { dry_run: true, visionTweets } : {}) });
   }
 
-  return json({ ok: true, start, hours, creators: list.length, runStats, results });
+  // Auto-encadenado: si quedaron creadoras sin procesar (cap o corte por wall-clock),
+  // re-invocamos x-scan con SOLO esas hasta cubrir todo — cada corrida acotada (<150s,
+  // sin 504). Best-effort vía EdgeRuntime.waitUntil; si se cae, la rotación + las crons
+  // convergen igual. Guard de profundidad para no encadenar infinito.
+  const deferredIds = [...deferred.map((c) => c.id), ...timedOut.map((c) => c.id)];
+  let chained = false;
+  if (deferredIds.length && chainDepth < MAX_CHAIN_DEPTH && CRON_TOKEN && !dryRun) {
+    const next = fetch(`${SUPABASE_URL}/functions/v1/x-scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-cron-token": CRON_TOKEN },
+      body: JSON.stringify({ hours, only_creator_ids: deferredIds, _chain_depth: chainDepth + 1 }),
+    }).catch(() => {});
+    chained = true;
+    try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(next); } catch { /* fire-and-forget */ }
+  }
+
+  return json({
+    ok: true, start, hours,
+    creators: list.length, deferred: deferredIds.length, chained, chain_depth: chainDepth,
+    runStats, results,
+  });
 });
