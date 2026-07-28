@@ -402,20 +402,24 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   //   - off:     nunca
   const { data: group } = await sb
     .from("whatsapp_groups")
-    .select("bot_enabled, bot_mode, wa_bots(department)")
+    .select("bot_enabled, bot_mode, is_direct, wa_bots(department)")
     .eq("id", msg.group_id)
     .maybeSingle();
   const groupWaBots = (group as any)?.wa_bots;
   const groupDept = (Array.isArray(groupWaBots) ? groupWaBots[0]?.department : groupWaBots?.department) ?? null;
   const supervisorBot = groupDept === "manager";
+  // DMs 1:1 (pseudo-grupos is_direct): el remitente está whitelisted y escribió
+  // directo al bot → siempre responde, sin gate de horario (como los supervisores).
+  const isDirectDm = (group as any)?.is_direct === true;
+  const alwaysFire = supervisorBot || isDirectDm;
   if (group?.bot_enabled && group?.bot_mode !== "off") {
     if (audioMentionsBot(result.text)) {
       fireAgent(msg.id, msg.group_id, "audio_mention");
     } else if (group.bot_mode === "always" && result.text.trim().length >= 4) {
-      // Bots supervisores (managers) se invocan 24/7 (sin gate de horario); el
-      // prompt decide si el mensaje va dirigido a ellos. El resto sigue el gate
+      // Supervisores (managers) y DMs se invocan 24/7 (sin gate de horario); el
+      // prompt decide si el mensaje va dirigido al bot. El resto sigue el gate
       // por horario laboral — mismo criterio que el ingest de texto.
-      if (supervisorBot) {
+      if (alwaysFire) {
         fireAgent(msg.id, msg.group_id, "auto");
       } else {
         const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });

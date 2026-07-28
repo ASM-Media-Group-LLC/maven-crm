@@ -205,11 +205,17 @@ async function processDirectMessage(
   sb: SupabaseClient,
   msg: IncomingMessage,
 ): Promise<{ kind: string; user_id?: string }> {
-  if (msg.msgType !== "text" || !msg.body) {
-    return { kind: "dm_ignored_non_text" };
-  }
   if (msg.isFromBot) {
     return { kind: "dm_ignored_own_message" };
+  }
+  // Audio en DM: una nota de voz no trae código de verificación. La tratamos
+  // como un mensaje normal "sin código" para que caiga en el ruteo al agente
+  // (maybeRouteDmToAgent la transcribe primero, igual que en los grupos).
+  if (msg.msgType === "audio") {
+    return { kind: "dm_received_no_code" };
+  }
+  if (msg.msgType !== "text" || !msg.body) {
+    return { kind: "dm_ignored_non_text" };
   }
 
   const code = extractCode(msg.body);
@@ -993,16 +999,38 @@ function fireAgent(messageId: string, groupId: string, reason: "mention" | "auto
   });
 }
 
+// Dispara whatsapp-transcribe-audio para un mensaje de audio. El transcriptor
+// baja el audio (vía gateway), lo pasa por Whisper, guarda transcribed_text y
+// AL TERMINAR dispara el agente él mismo (mismo pipeline que los audios de
+// grupo). Lo usamos para los DMs de audio: primero transcribir, después responder.
+function fireTranscribe(messageId: string): void {
+  const url = `${PROJECT_URL}/functions/v1/whatsapp-transcribe-audio`;
+  const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Cron-Token": token,
+    },
+    body: JSON.stringify({ message_id: messageId }),
+  }).catch((e) => {
+    console.warn("fireTranscribe failed:", (e as Error).message);
+  });
+}
+
 // Bot privado (Clari 1:1): rutea un DM de un remitente WHITELISTED al agente de IA.
 // Modela el chat privado como un "pseudo-grupo" (whatsapp_groups.is_direct=true con
 // external_id = el jid del usuario) → reusa TODO el motor. La respuesta sale por
 // reply_to_group → whatsapp-send → ese external_id = DM de vuelta al usuario.
 // Devuelve un "kind" para logear. NO responde a números fuera de la whitelist.
 async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Promise<string> {
-  if (msg.msgType !== "text") return "dm_agent_skip_non_text";
+  const isAudio = msg.msgType === "audio";
+  if (msg.msgType !== "text" && !isAudio) return "dm_agent_skip_non_text";
   const digits = (msg.senderExternalId || "").replace(/@.*/, "").replace(/\D/g, "");
   if (!digits) return "dm_agent_no_digits";
-  if ((msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
+  // Para texto exigimos algo sustantivo. El audio se valida DESPUÉS de
+  // transcribir (en whatsapp-transcribe-audio), así que no lo cortamos acá.
+  if (!isAudio && (msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
 
   const { data: allow } = await sb
     .from("wa_dm_allowlist")
@@ -1054,8 +1082,18 @@ async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Pr
 
   const memberId = await upsertMember(sb, { id: groupId, tenant_id: TENANT_ID }, msg);
   const { id: messageId, inserted } = await insertMessage(sb, { id: groupId, tenant_id: TENANT_ID }, memberId, msg);
-  if (inserted) fireAgent(messageId, groupId, "mention");
-  return inserted ? "dm_agent_fired" : "dm_agent_duplicate";
+  if (inserted) {
+    // Audio: primero transcribimos; el transcriptor dispara el agente al
+    // terminar (is_direct → sin gate de horario). Texto: al agente directo.
+    if (isAudio) {
+      fireTranscribe(messageId);
+    } else {
+      fireAgent(messageId, groupId, "mention");
+    }
+  }
+  return inserted
+    ? (isAudio ? "dm_agent_audio_queued" : "dm_agent_fired")
+    : "dm_agent_duplicate";
 }
 
 serve(async (req) => {
