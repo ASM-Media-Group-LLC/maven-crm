@@ -3229,23 +3229,60 @@ async function resolveSenderContext(args: {
   if (!msg?.sender_external_id) {
     return { isOwner: false, senderUserId: null, messageId: args.messageId };
   }
+  const ext = msg.sender_external_id;
   const { data: member } = await sb
     .from("whatsapp_members")
     .select("user_id")
     .eq("group_id", args.groupId)
-    .eq("external_id", msg.sender_external_id)
+    .eq("external_id", ext)
     .maybeSingle();
-  if (!member?.user_id) {
+
+  let resolvedUserId: string | null = member?.user_id ?? null;
+
+  // Fallback GLOBAL de identidad. El linkeo de miembros es POR-GRUPO, así que
+  // una persona puede estar linkeada/verificada en un grupo y no en otro (mismo
+  // LID, distinta fila). Sin esto, el gate de "usuario reconocido" bloquearía a
+  // gente legítima (ej. Álvaro/Luis en Managers). El LID es estable por persona.
+  if (!resolvedUserId && ext) {
+    // 1) Verificado por código (el camino fuerte): profiles.whatsapp_lid.
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("id")
+      .eq("whatsapp_lid", ext)
+      .maybeSingle();
+    if (prof?.id) {
+      resolvedUserId = prof.id;
+    } else {
+      // 2) Linkeado a un user en CUALQUIER grupo con el mismo external_id.
+      const { data: anyMember } = await sb
+        .from("whatsapp_members")
+        .select("user_id")
+        .eq("external_id", ext)
+        .not("user_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (anyMember?.user_id) resolvedUserId = anyMember.user_id;
+    }
+    // Backfill de la fila de este grupo para acelerar futuras resoluciones.
+    if (resolvedUserId) {
+      await sb.from("whatsapp_members")
+        .update({ user_id: resolvedUserId })
+        .eq("group_id", args.groupId)
+        .eq("external_id", ext);
+    }
+  }
+
+  if (!resolvedUserId) {
     return { isOwner: false, senderUserId: null, messageId: args.messageId };
   }
   const { data: profile } = await sb
     .from("profiles")
     .select("is_owner")
-    .eq("id", member.user_id)
+    .eq("id", resolvedUserId)
     .maybeSingle();
   return {
     isOwner: profile?.is_owner === true,
-    senderUserId: member.user_id,
+    senderUserId: resolvedUserId,
     messageId: args.messageId,
   };
 }
@@ -3754,7 +3791,7 @@ async function runAgent(req: AgentRequest): Promise<{
 
   const { data: group } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona, wa_bot_id")
+    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona, wa_bot_id, is_direct")
     .eq("id", groupId)
     .single();
 
@@ -3800,6 +3837,64 @@ async function runAgent(req: AgentRequest): Promise<{
     groupId: group.id,
     messageId: req.message_id ?? null,
   });
+
+  // ── GATE de acceso: el bot SOLO asiste a usuarios reconocidos de Maven ─────
+  // Seguridad (pedido 2026-07-28): si el remitente NO está linkeado a un usuario
+  // Maven (senderUserId null, ya con fallback global por LID) y el bot está siendo
+  // DIRIGIDO (mención; los DMs entran como invoked_by="mention"), NO damos datos:
+  // respondemos el instructivo de verificación — máx 1 vez cada 24h por remitente
+  // (sin spam). En auto-listening / digests quedamos en el flujo normal (silencio).
+  const addressedByUser = req.invoked_by === "mention" ||
+    req.invoked_by === "audio_mention" || req.invoked_by === "image_mention";
+  // Los DMs (is_direct) YA están gateados por la allowlist en whatsapp-ingest, y su
+  // sender es el teléfono (no matchea LID) → NO les aplicamos este gate (rompería
+  // el DM de Álvaro). El gate es para GRUPOS reales, donde cualquiera puede mencionar.
+  if (!senderCtx.senderUserId && addressedByUser && !group.is_direct && req.message_id) {
+    const { data: senderMsg } = await sb
+      .from("whatsapp_messages")
+      .select("sender_external_id, sender_display_name")
+      .eq("id", req.message_id)
+      .maybeSingle();
+    const senderExt = senderMsg?.sender_external_id ?? null;
+    let alreadyWarned = false;
+    if (senderExt) {
+      const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { data: prior } = await sb
+        .from("whatsapp_bot_events")
+        .select("id")
+        .eq("group_id", group.id)
+        .eq("kind", "verify_prompt_sent")
+        .gte("created_at", dayAgo)
+        .contains("payload", { sender_external_id: senderExt })
+        .limit(1);
+      alreadyWarned = !!(prior && prior.length > 0);
+    }
+    if (!alreadyWarned) {
+      const fn = (senderMsg?.sender_display_name ?? "").trim().split(" ")[0] || "";
+      const verifyMsg =
+        `Hola${fn ? " " + fn : ""} 👋 No te tengo verificado como usuario de Maven, así que todavía no puedo asistirte — por seguridad solo respondo a usuarios verificados.\n\n` +
+        `Para habilitarte:\n` +
+        `1️⃣ Entrá a Maven → tu Perfil → *Verificar WhatsApp*\n` +
+        `2️⃣ Copiá el código de 6 caracteres\n` +
+        `3️⃣ Mandámelo por privado a este número\n\n` +
+        `Con eso quedás verificado y te asisto según tu rol. Si tenés dudas, tu admin te ayuda. 🙏`;
+      await executeTool("reply_to_group", { body: verifyMsg } as ToolInput, {
+        groupId: group.id,
+        tenantId: group.tenant_id,
+        isOwner: false,
+        senderUserId: null,
+        messageId: req.message_id,
+        department: botCfg?.department ?? null,
+      });
+      await logEvent(sb, {
+        tenantId: group.tenant_id,
+        groupId: group.id,
+        kind: "verify_prompt_sent",
+        payload: { sender_external_id: senderExt, invoked_by: req.invoked_by },
+      });
+    }
+    return { ok: true, iterations: 0 };
+  }
 
   // Cargar reglas persistentes activas del grupo para inyectarlas en el system
   // prompt — así el modelo las aplica en CADA invocación sin que el caller
