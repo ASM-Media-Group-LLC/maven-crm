@@ -11,7 +11,11 @@ export const managersTools: AgentTool[] = [
       "(BLU, mes a la fecha vs mismo día del mes pasado) y devuelve solo las accionables con su cuadrante — 'critico' (no promociona + " +
       "ingreso cae), 'calidad' (promociona pero igual cae → revisar CÓMO promociona), 'riesgo' (promo baja, " +
       "ingreso aún ok). Incluye manager responsable, días de promo, ingreso del mes/mes pasado, % de tendencia y un " +
-      "diagnóstico. Filtrá por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece.",
+      "diagnóstico. Filtrá por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece. " +
+      "⚠️ Mide SOLO promoción (Promolog) e ingreso (BLU) — NO sabe nada de contacto/mensajes. NUNCA infieras " +
+      "'sin contacto' ni 'días sin que le escriban' a partir de que una creadora promociona poco: son cosas " +
+      "distintas. Para contacto usá get_manager_contact_activity (cuántas contactó hoy) o " +
+      "get_manager_silent_creators (quiénes llevan días sin contacto).",
     input_schema: {
       type: "object",
       properties: {
@@ -343,6 +347,85 @@ export const managersTools: AgentTool[] = [
         nota: "Contacto = creadora DISTINTA con ≥1 mensaje saliente ese día por la línea de Managers (Maven + teléfono/externos; fallidos no cuentan). " +
           "Atribución por cuenta Kash de la creadora (Plus=Carolina, Massive=Fabiana; la línea es compartida, no se sabe quién tipeó). " +
           "La línea se conectó a Maven el 2026-07-16: días anteriores no tienen historial.",
+      };
+    },
+  },
+  {
+    name: "get_manager_silent_creators",
+    description:
+      "LISTA de creadoras que una manager NO ha contactado hace varios días (o sin registro), por la " +
+      "línea de WhatsApp del equipo de Managers. Es LA fuente para '¿a quién no ha contactado " +
+      "Carolina/Fabiana?', '¿quiénes llevan 3+ días sin contacto?', '¿cuántas tiene abandonadas?'. " +
+      "Complementa get_manager_contact_activity (que cuenta cuántas contactó HOY). Devuelve por " +
+      "manager: cuántas creadoras silenciosas + la lista (nombre, IG, días sin contacto, último " +
+      "contacto); dias_sin_contacto='sin registro' = ningún saliente por la línea de Managers en el historial " +
+      "visible (NO prueba abandono: pudo contactarla por otra línea o antes del 16/07). Matching por teléfono robusto " +
+      "(últimos 10 dígitos, sirve para México 521/52); atribución por manager asignada (alineada con " +
+      "la cuenta Kash: Plus=Carolina, Massive=Fabiana). Pasá silent_days para cambiar el umbral " +
+      "(default 3) y manager_name para filtrar. ⚠️ NUNCA respondas esto de memoria ni lo deduzcas de " +
+      "get_manager_growth_feed (promo ≠ contacto): llamá a ESTA tool. CAVEAT: solo cuenta las líneas " +
+      "'manager'; si contactan desde otra línea, no se ve.",
+    input_schema: {
+      type: "object",
+      properties: {
+        manager_name: { type: "string", description: "opcional: filtra por manager (ilike, ej 'Carolina', 'Fabi')" },
+        silent_days: { type: "number", description: "opcional: umbral de días sin contacto (default 3)" },
+      },
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const nRaw = Number(args?.silent_days);
+      const silentDays = Number.isFinite(nRaw) && nRaw > 0 ? Math.floor(nRaw) : 3;
+      const { data, error } = await ctx.sb.rpc("get_manager_silent_creators", {
+        p_tenant: ctx.tenantId,
+        p_days: silentDays,
+      });
+      if (error) throw new Error(`get_manager_silent_creators: ${error.message}`);
+      let rows = (data ?? []) as Array<{
+        name: string | null;
+        instagram_handle: string | null;
+        manager_name: string | null;
+        last_contact_at: string | null;
+        days_since_contact: number | null;
+      }>;
+      const filtro = String(args?.manager_name ?? "").trim().toLowerCase();
+      if (filtro) rows = rows.filter((r) => String(r.manager_name ?? "").toLowerCase().includes(filtro));
+
+      const byMgr = new Map<
+        string,
+        Array<{ creadora: string; instagram: string | null; dias_sin_contacto: number | string; ultimo_contacto: string | null }>
+      >();
+      for (const r of rows) {
+        const grupo = r.manager_name ?? "(sin manager)";
+        if (!byMgr.has(grupo)) byMgr.set(grupo, []);
+        byMgr.get(grupo)!.push({
+          creadora: r.name ?? "(sin nombre)",
+          instagram: r.instagram_handle,
+          dias_sin_contacto: r.days_since_contact ?? "sin registro",
+          ultimo_contacto: r.last_contact_at,
+        });
+      }
+      const rank = (v: number | string) => (typeof v === "number" ? v : Number.MAX_SAFE_INTEGER);
+      const por_manager = [...byMgr.entries()]
+        .map(([manager, creadoras]) => ({
+          manager,
+          silenciosas: creadoras.length,
+          creadoras: creadoras.sort((a, b) => rank(b.dias_sin_contacto) - rank(a.dias_sin_contacto)),
+        }))
+        .sort((a, b) => b.silenciosas - a.silenciosas);
+
+      return {
+        umbral_dias: silentDays,
+        total_silenciosas: rows.length,
+        por_manager,
+        nota:
+          `Silenciosa = creadora ACTIVA sin ningún saliente por la línea de Managers en los últimos ${silentDays} días. ` +
+          "dias_sin_contacto='sin registro' = ningún saliente por la línea de Managers en el historial visible (desde el " +
+          "2026-07-16); NO prueba abandono: pudo ser contactada por OTRA línea (p.ej. un closer) o antes de esa fecha. " +
+          "Solo mira las líneas del departamento 'manager'. Cobertura PARCIAL: no evalúa creadoras sin teléfono normalizable " +
+          "ni sin manager asignada, así que la lista no es exhaustiva.",
       };
     },
   },
