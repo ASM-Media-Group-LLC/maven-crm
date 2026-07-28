@@ -114,6 +114,7 @@ REGLAS:
   - "tengo ganas de", "habría que", "deberíamos" (sin asignación clara)
   - charlas off-topic, memes, saludos
   - reportes de jornada con números puros ("contactados 70") — esos los captura otro módulo
+  - ⚠️ VOS SOS EL BOT: te llamás "Maven" / "Maven Asistente" (a veces "el bot" / "el asistente"). Mensajes SOBRE vos NO son compromisos entre personas: "hay que contestarle a Maven", "le escribo a Maven", "esperá que responda Maven", "Maven quedó de mandar X", "avísale a Maven". NO los extraigas (ni como task/promise/followup con committed_by_text o target_subject = Maven / Maven Asistente / el bot). Si alguien te PIDE algo a vos, es una instrucción para el asistente, no un item del equipo.
 - Si el mensaje no contiene ningún item NI resolución, devolvé arrays vacíos. Lo más común — no inventes.
 
 OUTPUT: JSON estricto con shape:
@@ -350,8 +351,14 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // Insert commitments. item_kind se setea como columna dedicada (no solo en
   // metadata) para que el agent pueda filtrar/agrupar eficiente.
   const VALID_KINDS = new Set(["promise", "meeting", "task", "tracking", "followup"]);
+  // Guard: el bot ES Maven. Descartá items cuyo responsable o destinatario sea el propio
+  // asistente (ej. "contestar a Maven", "escribir a Maven Asistente") — no son compromisos
+  // del equipo, y el LLM a veces igual los emite. Refuerza la regla del SYSTEM_PROMPT.
+  const SELF_NAME = /^(maven(\s*asistente)?|el\s*bot|el\s*asistente|asistente|bot)$/i;
+  const refersToSelf = (v?: string | null) => !!v && SELF_NAME.test(v.trim());
   const commitmentsToInsert = analysis.commitments
     .filter((c) => c.subject && (c.confidence ?? 1) >= 0.5)
+    .filter((c) => !refersToSelf(c.committed_by_text) && !refersToSelf(c.target_subject))
     .map((c) => {
       const kind = c.kind && VALID_KINDS.has(c.kind) ? c.kind : "promise";
       return {
