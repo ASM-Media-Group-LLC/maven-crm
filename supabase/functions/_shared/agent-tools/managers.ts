@@ -253,28 +253,55 @@ export const managersTools: AgentTool[] = [
         .select("id, phone_e164, manual_name, resolved_name, display_name")
         .in("id", [...perContact.keys()]);
 
-      // 4) Match contacto→creadora por últimos 10 dígitos (los tel. de Maven vienen sucios).
-      const d10 = (s: unknown) => {
-        const d = String(s ?? "").replace(/\D/g, "");
-        return d.length >= 10 ? d.slice(-10) : "";
+      // 4) Match contacto→creadora. Clave robusta a variantes de formato: canonicalizamos
+      // el teléfono (arregla el 9º dígito de Brasil y el "1" móvil de México; MISMA lógica
+      // que la función SQL public.canonical_phone) y comparamos por últimos 10 díg. Fallback
+      // por últimos 8 díg SOLO si hay UNA única creadora candidata (anti-colisión), para
+      // números guardados sin código de país (ej. Chile bare).
+      const onlyDigits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
+      const canon = (s: unknown) => {
+        const d = onlyDigits(s);
+        if (d.length === 13 && d.startsWith("521")) return "52" + d.slice(3); // MX móvil legacy 521 → 52
+        if (d.length === 13 && d.startsWith("55") && d[4] === "9") return d.slice(0, 4) + d.slice(5); // BR 9º dígito
+        return d;
       };
+      const k10 = (s: unknown) => { const c = canon(s); return c.length >= 10 ? c.slice(-10) : ""; };
+      const k8 = (s: unknown) => { const d = onlyDigits(s); return d.length >= 8 ? d.slice(-8) : ""; };
       const { data: creators } = await ctx.sb
         .from("creators")
         .select("id, name, artistic_name, instagram_handle, phone_e164, whatsapp_number, phone, assigned_manager_profile_id")
         .eq("status", "active");
       type CreatorRow = { id: string; name: string | null; artistic_name: string | null; instagram_handle: string | null; phone_e164: string | null; whatsapp_number: string | null; phone: string | null; assigned_manager_profile_id: string | null };
-      const creatorByD10 = new Map<string, CreatorRow>();
+      const creatorByK10 = new Map<string, CreatorRow>();
+      const k8ToCreatorIds = new Map<string, Set<string>>();
+      const k8ToCreator = new Map<string, CreatorRow>();
       for (const cr of (creators ?? []) as CreatorRow[]) {
-        const key = d10(cr.phone_e164 || cr.whatsapp_number || cr.phone);
-        if (!key) continue;
-        const prev = creatorByD10.get(key);
-        if (!prev || (!prev.assigned_manager_profile_id && cr.assigned_manager_profile_id)) creatorByD10.set(key, cr);
+        const raw = cr.phone_e164 || cr.whatsapp_number || cr.phone;
+        const key = k10(raw);
+        if (key) {
+          const prev = creatorByK10.get(key);
+          if (!prev || (!prev.assigned_manager_profile_id && cr.assigned_manager_profile_id)) creatorByK10.set(key, cr);
+        }
+        const k8k = k8(raw);
+        if (k8k) {
+          if (!k8ToCreatorIds.has(k8k)) k8ToCreatorIds.set(k8k, new Set());
+          k8ToCreatorIds.get(k8k)!.add(cr.id);
+          k8ToCreator.set(k8k, cr);
+        }
       }
+      // canonical primero; si no matchea, últimos-8 SOLO si esa cola pertenece a UNA sola creadora.
+      const matchCreator = (rawPhone: unknown): CreatorRow | undefined => {
+        const byK10 = creatorByK10.get(k10(rawPhone));
+        if (byK10) return byK10;
+        const k8k = k8(rawPhone);
+        if (k8k && k8ToCreatorIds.get(k8k)?.size === 1) return k8ToCreator.get(k8k);
+        return undefined;
+      };
 
       // 5) Atribución por manager: la línea es COMPARTIDA → se atribuye por la cuenta
       // Kash de la creadora (creator_business.kash_type, viene de BLU): Plus=Carolina,
       // Massive=Fabiana. Fallback: manager asignada en el perfil (profiles.full_name).
-      const creatorIds = [...new Set([...creatorByD10.values()].map((c) => c.id))];
+      const creatorIds = [...new Set(((creators ?? []) as CreatorRow[]).map((c) => c.id))];
       const kashByCreator = new Map<string, string>();
       if (creatorIds.length) {
         const { data: biz } = await ctx.sb
@@ -284,7 +311,7 @@ export const managersTools: AgentTool[] = [
         }
       }
       const KASH_MANAGER: Record<string, string> = { Plus: "Carolina (Kash Plus)", Massive: "Fabiana (Kash Massive)" };
-      const mgrIds = [...new Set([...creatorByD10.values()].map((c) => c.assigned_manager_profile_id).filter((x): x is string => Boolean(x)))];
+      const mgrIds = [...new Set(((creators ?? []) as CreatorRow[]).map((c) => c.assigned_manager_profile_id).filter((x): x is string => Boolean(x)))];
       const mgrName = new Map<string, string>();
       if (mgrIds.length) {
         const { data: profs } = await ctx.sb.from("profiles").select("id, full_name").in("id", mgrIds);
@@ -306,7 +333,7 @@ export const managersTools: AgentTool[] = [
         const agg = perContact.get(ct.id);
         if (!agg) continue;
         totalMsgs += agg.mensajes;
-        const cr = creatorByD10.get(d10(ct.phone_e164));
+        const cr = matchCreator(ct.phone_e164);
         if (cr) {
           const kash = kashByCreator.get(cr.id);
           const grupo = (kash && KASH_MANAGER[kash])
