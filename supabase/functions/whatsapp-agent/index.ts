@@ -1425,7 +1425,7 @@ async function resolveMembersByName(
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; privileged?: boolean; canSeePhones?: boolean },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -1626,6 +1626,11 @@ async function executeTool(
             role_in_group: member.role,
           },
         };
+      }
+
+      // Scoping por ROL (candado 2): un no-privilegiado solo ve SU propia actividad.
+      if (!ctx.privileged && member.user_id !== ctx.senderUserId) {
+        return { error: "no_autorizado", message: "Solo podés consultar tu propia actividad. La de otros la ve un supervisor." };
       }
 
       // 2. Profile + roles del user.
@@ -2613,6 +2618,18 @@ async function executeTool(
         closerName = m.full_name ?? m.display_name ?? displayName;
       }
 
+      // Scoping por ROL (candado 2): un no-privilegiado solo ve SU propio pipeline.
+      if (!ctx.privileged) {
+        if (!ctx.senderUserId) {
+          return { error: "no_autorizado", message: "No puedo identificarte para acotar tus datos; verificá tu WhatsApp en Maven." };
+        }
+        if (closerUserId && closerUserId !== ctx.senderUserId) {
+          return { error: "no_autorizado", message: "Solo podés ver tu propio pipeline. El de otro closer lo consulta un supervisor." };
+        }
+        closerUserId = ctx.senderUserId;
+        if (closerName === "equipo") closerName = "vos";
+      }
+
       // Cadencia de los 6 contactos del closer (días desde passed_date).
       const cadence = [1, 3, 5, 8, 15, 29];
 
@@ -3288,6 +3305,41 @@ async function resolveSenderContext(args: {
 }
 
 // ----------------------------------------------------------------------------
+// getSenderScope — scoping por ROL (candado 2). Reusa los MISMOS predicados que
+// las RLS de Maven (con _user_id explícito, ya que el bot corre con service_role):
+//   - privileged = owner / admin / supervisor_or_above → ve TODO (como hoy).
+//   - canSeePhones = privileged o permiso 'Contactos/Ver Teléfonos' (default-deny).
+// El resto de roles (closer, manager, LLG) quedan acotados a lo SUYO en las tools.
+// ----------------------------------------------------------------------------
+async function getSenderScope(
+  sb: SupabaseClient,
+  senderUserId: string | null,
+  isOwner: boolean,
+): Promise<{ privileged: boolean; canSeePhones: boolean }> {
+  if (!senderUserId) {
+    // Sin identidad resuelta: default-DENY (salvo owner ya resuelto).
+    return { privileged: isOwner === true, canSeePhones: isOwner === true };
+  }
+  const [sup, adm, phone, rolesRes] = await Promise.all([
+    sb.rpc("is_in_role_group", { _user_id: senderUserId, _group: "supervisor_or_above" }),
+    sb.rpc("is_in_role_group", { _user_id: senderUserId, _group: "admin" }),
+    sb.rpc("has_permission", { _user_id: senderUserId, _module: "Contactos", _submodule: "Ver Teléfonos" }),
+    sb.from("user_roles").select("role").eq("user_id", senderUserId),
+  ]);
+  // ⚠️ En Maven el rol 'manager' cae DENTRO de supervisor_or_above, pero el modelo
+  // de scope del bot lo quiere ACOTADO (ve solo SUS creadoras). Por eso un manager
+  // NO es privilegiado salvo que además sea admin/owner. Los roles de supervisión
+  // reales (Closer Supervisor, Team Leader) sí ven todo.
+  const roles = ((rolesRes.data ?? []) as Array<{ role: string | null }>)
+    .map((r) => (r.role ?? "").toLowerCase());
+  const isManager = roles.includes("manager");
+  const admin = isOwner === true || adm.data === true;
+  const privileged = admin || (sup.data === true && !isManager);
+  const canSeePhones = privileged || phone.data === true;
+  return { privileged, canSeePhones };
+}
+
+// ----------------------------------------------------------------------------
 // Build initial user message
 // ----------------------------------------------------------------------------
 async function buildInitialUserMessage(args: {
@@ -3896,6 +3948,19 @@ async function runAgent(req: AgentRequest): Promise<{
     return { ok: true, iterations: 0 };
   }
 
+  // ── Scope por ROL (candado 2) ──────────────────────────────────────────────
+  // El scoping por rol aplica SOLO cuando un usuario DIRIGE al bot en un GRUPO real
+  // (mención). Todo lo demás corre como PRIVILEGIADO (ve todo), preservando el
+  // comportamiento actual: digests/aperturas (night_catchup/auto), reportes, panel
+  // admin, y DMs (is_direct — hoy allowlist solo owner/admin; su sender es teléfono
+  // que no resuelve). Cuando abramos DM a staff (#4) se resuelve el user del DM.
+  const scopedRequest = addressedByUser && group.is_direct !== true;
+  const scope = scopedRequest
+    ? await getSenderScope(sb, senderCtx.senderUserId, senderCtx.isOwner)
+    : { privileged: true, canSeePhones: true };
+  const privileged = scope.privileged;
+  const canSeePhones = scope.canSeePhones;
+
   // Cargar reglas persistentes activas del grupo para inyectarlas en el system
   // prompt — así el modelo las aplica en CADA invocación sin que el caller
   // haga nada extra.
@@ -4057,6 +4122,8 @@ async function runAgent(req: AgentRequest): Promise<{
           senderUserId: senderCtx.senderUserId,
           messageId: senderCtx.messageId,
           department: botCfg?.department ?? null,
+          privileged,
+          canSeePhones,
         },
       );
       if (t.name === "reply_to_group") {
