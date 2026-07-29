@@ -15,7 +15,14 @@ export const managersTools: AgentTool[] = [
       "⚠️ Mide SOLO promoción (Promolog) e ingreso (BLU) — NO sabe nada de contacto/mensajes. NUNCA infieras " +
       "'sin contacto' ni 'días sin que le escriban' a partir de que una creadora promociona poco: son cosas " +
       "distintas. Para contacto usá get_manager_contact_activity (cuántas contactó hoy) o " +
-      "get_manager_silent_creators (quiénes llevan días sin contacto).",
+      "get_manager_silent_creators (quiénes llevan días sin contacto). " +
+      "⚠️ Devuelve SOLO las creadoras EN ALERTA — NO es el roster: para totales y % por manager usá " +
+      "get_manager_roster_stats. " +
+      "⚠️ RED DE PROMO: cada fila trae 'promo_networks' (días de promo por red este mes, ej 'x:15d, telegram:11d') " +
+      "e 'ig_has_data'. Si ig_has_data=false NO hay dato utilizable de Instagram este mes (historias sin leer o sin " +
+      "IG) → está PROHIBIDO decirle que revise 'el formato/oferta de sus historias de IG' o culpar a IG por la " +
+      "caída: nombrá las redes reales de promo_networks y pedí revisar la calidad AHÍ. Caso típico: creadoras cuyo " +
+      "tráfico va por X/Telegram con link directo a OF.",
     input_schema: {
       type: "object",
       properties: {
@@ -453,6 +460,59 @@ export const managersTools: AgentTool[] = [
           "2026-07-16); NO prueba abandono: pudo ser contactada por OTRA línea (p.ej. un closer) o antes de esa fecha. " +
           "Solo mira las líneas del departamento 'manager'. Cobertura PARCIAL: no evalúa creadoras sin teléfono normalizable " +
           "ni sin manager asignada, así que la lista no es exhaustiva.",
+      };
+    },
+  },
+  {
+    name: "get_manager_roster_stats",
+    description:
+      "EL TOTAL de creadoras que tiene cada manager (el DENOMINADOR) + cuántas promocionaron y cuántas " +
+      "contactó ese día, con sus PORCENTAJES ya calculados. Es LA tool para '¿en % cómo va cada manager?', " +
+      "'¿cuántas de sus modelos promocionaron sobre el total?', '¿cuántas creadoras tiene Carolina/Fabiana?'. " +
+      "⚠️ NUNCA pidas al equipo que te confirme cuántas creadoras tiene cada una, ni digas que no tenés el " +
+      "total: SIEMPRE está acá (roster = creadoras ACTIVAS por manager asignada, alineado con la cuenta Kash: " +
+      "Plus=Carolina, Massive=Fabiana). Tampoco lo deduzcas de get_manager_growth_feed: ese SOLO devuelve las " +
+      "creadoras EN ALERTA, no el roster completo. Pasá 'date' (YYYY-MM-DD) para otro día (ej. ayer); default hoy. " +
+      "Campos: total_active (denominador), promoted_count/promoted_pct, contacted_count/contacted_pct y " +
+      "covered_count = a cuántas Promolog logró LEER ese día. Si covered_count < total_active, aclaralo al dar " +
+      "el %: las no leídas no son 'no promocionó' (ver #818). Incluye una fila manager_name=null con las activas " +
+      "SIN manager asignada — mencionala si es >0 en vez de ignorarla.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "opcional: día YYYY-MM-DD (default hoy, zona Bogotá)" },
+        manager_name: { type: "string", description: "opcional: filtra por manager (ilike, ej 'Carolina', 'Fabi')" },
+      },
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const raw = String(args?.date ?? "").trim();
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+      const { data, error } = await ctx.sb.rpc("get_manager_roster_stats", {
+        p_tenant: ctx.tenantId,
+        ...(date ? { p_date: date } : {}),
+      });
+      if (error) throw new Error(`get_manager_roster_stats: ${error.message}`);
+      let rows = (data ?? []) as Array<Record<string, unknown>>;
+      const filtro = String(args?.manager_name ?? "").trim().toLowerCase();
+      if (filtro) rows = rows.filter((r) => String(r.manager_name ?? "").toLowerCase().includes(filtro));
+      return {
+        dia: date ?? "hoy",
+        por_manager: rows,
+        nota:
+          "total_active = creadoras ACTIVAS con esa manager asignada; promoted_pct va sobre total_active. " +
+          "⚠️ is_partial_day=true ⇒ el día está EN CURSO y la mayor parte de la promo se detecta por la tarde: " +
+          "ese % es un PISO, NO sirve para comparar managers. Para comparar usá el día CERRADO (pasá date=ayer) y decilo. " +
+          "covered_count = a cuántas Promolog pudo LEER ese día (las no leídas NO son 'no promocionó', ver #818). " +
+          "scannable_count = cuántas tienen handle escaneable: las que no tienen NUNCA pueden contar como que " +
+          "promocionaron, así que si scannable_count < total_active el techo de esa manager es menor a 100% " +
+          "(hay que cargarles el handle). contacted_pct va sobre reachable_count (con teléfono usable), no sobre el total. " +
+          "⚠️ contacted_* mide a cuántas creadoras DE ESA MANAGER les escribió alguien por la línea de Managers — " +
+          "la línea es COMPARTIDA por las dos managers y los salientes NO traen autor, así que NO es prueba de que " +
+          "la contactó ELLA; y si escribe desde su teléfono personal no se registra. Solo hay historial desde el " +
+          "2026-07-16 (cuando se conectó la línea): para fechas anteriores contacted_count=0 significa SIN DATO.",
       };
     },
   },

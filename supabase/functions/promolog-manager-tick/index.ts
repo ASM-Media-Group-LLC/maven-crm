@@ -49,6 +49,12 @@ interface GrowthRow {
   quadrant: string; // critico | calidad | riesgo
   priority: number;
   diagnosis: string;
+  // Red donde promociona de verdad + si IG es su canal. Sin esto el digest mandaba a
+  // "revisar calidad" (que el equipo lee como "revisá tus historias de IG") a creadoras
+  // cuya promo real es X/Telegram y que no tienen dato de IG.
+  promo_networks?: string | null;
+  ig_promo_days?: number;
+  ig_read_days?: number;
 }
 
 // Señal de "contacto": creadora a la que la manager no le escribe hace >= N días
@@ -100,7 +106,18 @@ function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string
   const bullet = (r: GrowthRow) => {
     const link = igUrl(r.instagram_handle);
     const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
-    return `   • ${label}\n     promo ${r.promo_days}/${r.mtd_day ?? "?"} este mes · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})`;
+    // Denominador = días LEÍDOS (covered_days), el mismo con el que se decidió el
+    // cuadrante. Antes usaba mtd_day (días del mes) y no coincidía con el veredicto.
+    const denom = r.covered_days ?? r.mtd_day ?? "?";
+    // Si IG no es su canal de promo, avisarlo ACÁ: si no, "revisar calidad" se lee como
+    // "revisá tus historias de IG" sobre alguien que promociona en X/Telegram.
+    const igNotChannel = (r.ig_promo_days ?? 0) === 0 ||
+      (r.ig_promo_days ?? 0) * 10 < (r.promo_days ?? 0) * 3;
+    const redes = r.promo_networks ? `\n     promo en ${r.promo_networks}` : "\n     ⚠️ sin promo detectada en ninguna red";
+    const aviso = (r.promo_networks && igNotChannel)
+      ? `\n     ⚠️ IG no es su canal (IG ${r.ig_promo_days ?? 0}d de promo) → revisar la calidad EN ESAS REDES, no en historias de IG`
+      : "";
+    return `   • ${label}\n     promo ${r.promo_days}/${denom} días leídos · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})${redes}${aviso}`;
   };
   const silentBullet = (r: SilentRow) => {
     const link = igUrl(r.instagram_handle);
