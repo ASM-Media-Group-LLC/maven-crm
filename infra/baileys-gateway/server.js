@@ -340,6 +340,16 @@ function clearDefaultAuthFiles() {
   return n;
 }
 
+// --- Anti-ban / anti-flap (circuit breaker + arranque escalonado) ---
+// Cuando una línea acumula CIRCUIT_THRESHOLD fallos de reconexión SEGUIDOS sin
+// llegar a 'open', asumimos rechazo del lado de WhatsApp (405 / bloqueo de IP) y
+// espaciamos los reintentos a CIRCUIT_COOLDOWN_MS en vez de martillar cada 60s.
+const CIRCUIT_THRESHOLD = 6;                 // fallos seguidos antes de abrir el breaker (~1 min de escalada)
+const CIRCUIT_COOLDOWN_MS = 15 * 60_000;     // en breaker: ~1 intento cada 15 min
+// Arranque escalonado: no abrir las 9 líneas a la vez desde el mismo IP (pico de
+// handshakes simultáneos = señal de datacenter). Las separamos en el tiempo.
+const BOOT_STAGGER_MS = 8000;
+
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
   // Teardown LIMPIO del socket anterior ANTES de abrir uno nuevo. Sin esto, un
@@ -459,10 +469,29 @@ async function startSocket(instanceName = INSTANCE_NAME) {
         // de 3s que, ante un hipo de red simultáneo en todas las líneas, cascadeaba
         // reconexiones en paralelo y disparaba los conflicts.
         s.reconnectCount += 1;
-        const floor = isConflict ? 15000 : 2000;
-        const backoff = Math.min(60000, floor * Math.pow(2, Math.min(s.reconnectCount - 1, 5)));
-        const delay = backoff + Math.floor(Math.random() * 2000);
-        logger.info({ instance: instanceName, delay, attempt: s.reconnectCount, isConflict }, 'Reconnecting');
+        // El breaker es SOLO para líneas VINCULADAS que WhatsApp rechaza (caso
+        // bloqueo de IP). Una línea SIN vincular (creds no registradas) que cierra
+        // por "QR refs attempts ended" está esperando que un humano escanee: ahí NO
+        // abrimos el breaker, así sigue refrescando el QR cada ~60s y el botón
+        // "Conectar (QR)" nunca queda en blanco.
+        const hasCreds = !!(authState && authState.creds && authState.creds.registered);
+        let delay;
+        if (hasCreds && s.reconnectCount >= CIRCUIT_THRESHOLD) {
+          // CIRCUIT BREAKER: muchos fallos seguidos SIN abrir ⇒ WhatsApp está
+          // rechazando la conexión (típico 405 / bloqueo del IP del datacenter, no
+          // un hipo puntual). Seguir reintentando cada ≤60s HUNDE MÁS el IP — fue
+          // exactamente lo que convirtió un blip en 4h de caída con las 9 líneas
+          // martillando en paralelo. Bajamos a ~1 intento cada 15 min + jitter
+          // GRANDE (desincroniza las líneas que abrieron el breaker juntas).
+          // reconnectCount se resetea a 0 en cada 'open' sano y en /reset|/reconnect.
+          delay = CIRCUIT_COOLDOWN_MS + Math.floor(Math.random() * 120_000);
+          logger.warn({ instance: instanceName, attempt: s.reconnectCount, delay }, 'Circuit breaker OPEN — WhatsApp rejecting, long cooldown');
+        } else {
+          const floor = isConflict ? 15000 : 2000;
+          const backoff = Math.min(60000, floor * Math.pow(2, Math.min(s.reconnectCount - 1, 5)));
+          delay = backoff + Math.floor(Math.random() * 2000);
+          logger.info({ instance: instanceName, delay, attempt: s.reconnectCount, isConflict }, 'Reconnecting');
+        }
         s.reconnectTimer = setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
       }
     } else if (connection === 'connecting') {
@@ -1438,6 +1467,11 @@ app.delete('/instance/delete/:instance', async (req, res) => {
 app.post('/instance/reconnect/:instance', async (req, res) => {
   const name = (req.params && req.params.instance) || INSTANCE_NAME;
   try {
+    // Acción manual del operador → cerramos el circuit breaker: reseteamos el
+    // contador para que el reintento arranque desde el backoff corto (no quede
+    // atrapado en la ventana de 15 min si veníamos de una racha de fallos).
+    const s = getSession(name);
+    s.reconnectCount = 0;
     startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'manual reconnect failed'));
     return res.json({ message: 'reconnecting', instance: name });
   } catch (e) {
@@ -1531,10 +1565,18 @@ app.listen(PORT, () => {
   // así que no se re-arranca acá. Bridge hasta que la fuente de verdad sea la DB (Fase 3).
   try {
     if (fs.existsSync(AUTH_DIR)) {
+      // ESCALONADO: no abrir todas las líneas a la vez (el default ya arrancó en
+      // t=0 arriba). Cada adicional se separa BOOT_STAGGER_MS para no disparar 9
+      // handshakes simultáneos desde el mismo IP (señal de datacenter / lo que
+      // ayudó a que WhatsApp bloqueara con 405).
+      let staggerIdx = 0;
       for (const entry of fs.readdirSync(AUTH_DIR, { withFileTypes: true })) {
         if (entry.isDirectory() && entry.name !== INSTANCE_NAME) {
-          logger.info({ instance: entry.name }, 'Restoring saved instance');
-          startSocket(entry.name).catch((e) => logger.error({ err: e.message, instance: entry.name }, 'restore failed'));
+          const name = entry.name;
+          const delay = BOOT_STAGGER_MS * (staggerIdx + 1);
+          staggerIdx += 1;
+          logger.info({ instance: name, delay }, 'Restoring saved instance (staggered)');
+          setTimeout(() => startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'restore failed')), delay);
         }
       }
     }
