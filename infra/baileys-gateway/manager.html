@@ -272,6 +272,14 @@
           if (j.qrcode && j.qrcode.base64) {
             $("qr-body").innerHTML = `<img src="${j.qrcode.base64}" alt="QR" class="w-64 h-64 border rounded bg-white" style="image-rendering:pixelated">
               <p class="text-xs text-slate-500 leading-relaxed">En el teléfono de esta línea:<br>WhatsApp → Dispositivos vinculados → <b>Vincular un dispositivo</b> → escaneá</p>`;
+          } else {
+            // Sin QR fresco todavía. Si el socket está 'close' (cayó o entró en el
+            // cooldown de QR ocioso del gateway), lo RE-ARMAMOS: tener este modal
+            // abierto = alguien está vinculando, así que pedimos un QR nuevo (eso
+            // resetea el backoff en el gateway). Al cerrar el modal dejamos de
+            // repostear y el cooldown ocioso vuelve a enganchar solo.
+            $("qr-body").innerHTML = '<p class="text-slate-400 text-sm">generando QR…</p>';
+            if (j.status === "close") { try { await fetch("/instance/create/" + name, { method: "POST", headers: authH() }); } catch (e) {} }
           }
           qrTimer = setTimeout(poll, 3000);
         } catch (e) { $("qr-body").innerHTML = '<p class="text-red-600 text-sm">Error: ' + esc(e.message) + "</p>"; }

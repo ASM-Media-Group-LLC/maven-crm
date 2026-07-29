@@ -349,6 +349,17 @@ const CIRCUIT_COOLDOWN_MS = 15 * 60_000;     // en breaker: ~1 intento cada 15 m
 // Arranque escalonado: no abrir las 9 líneas a la vez desde el mismo IP (pico de
 // handshakes simultáneos = señal de datacenter). Las separamos en el tiempo.
 const BOOT_STAGGER_MS = 8000;
+// Backoff de QR OCIOSO: una línea SIN vincular que cierra por "QR refs attempts
+// ended" pide un QR nuevo cada ~60s. Si NADIE la está escaneando, eso son
+// solicitudes de emparejamiento al IP para siempre (lo que preocupaba). Tras unos
+// pocos ciclos sin escanear pasamos a un cooldown largo (1 ráfaga de QR cada
+// ~30 min). El caso "alguien SÍ está vinculando" lo cubre el modal de "Conectar
+// (QR)": mientras está abierto re-postea /instance/create al ver 'close', lo que
+// resetea reconnectCount y mantiene QRs frescos indefinidamente. Cuando se cierra
+// el modal, para de repostear → el cooldown ocioso vuelve a engancharse. Por eso la
+// ventana de gracia es chica (solo un colchón para casos sin modal: boot, /reset).
+const QR_GRACE_ATTEMPTS = 3;                 // ciclos de QR rápido sin modal antes de frenar (~3 min)
+const QR_IDLE_COOLDOWN_MS = 30 * 60_000;     // sin vincular y sin nadie escaneando: 1 ráfaga de QR cada 30 min
 
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
@@ -438,6 +449,12 @@ async function startSocket(instanceName = INSTANCE_NAME) {
     } else if (connection === 'close') {
       s.connection = 'close';
       s.lastDisconnectAt = Date.now();
+      // El QR viejo muere junto con el socket cerrado. Lo limpiamos SIEMPRE para no
+      // servir un QR congelado/expirado (que WhatsApp rechaza) mientras la línea
+      // espera el próximo intento — sobre todo en el cooldown de QR ocioso, donde el
+      // socket no re-abre por ~30 min. Así /instance/connect devuelve qrcode:null y el
+      // modal muestra "generando QR…" (honesto) en vez de un QR muerto que parece vivo.
+      s.qrRaw = null; s.qrDataUrl = null;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       s.lastError = lastDisconnect?.error?.message || 'unknown';
       logger.warn({ instance: instanceName, statusCode, err: s.lastError }, 'Connection closed');
@@ -460,6 +477,10 @@ async function startSocket(instanceName = INSTANCE_NAME) {
         if (instanceName !== INSTANCE_NAME) {
           clearAuth(instanceName);
           s.qrRaw = null; s.qrDataUrl = null;
+          // Logout = arranque limpio (creds borradas → registered pasa a false). El
+          // contador viejo NO debe arrastrarse, o la línea recién deslogueada caería
+          // directo al cooldown de QR ocioso salteándose la ventana de gracia.
+          s.reconnectCount = 0;
           s.reconnectTimer = setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message, instance: instanceName }, 'post-logout re-init failed')), 1500);
         }
       } else {
@@ -469,11 +490,11 @@ async function startSocket(instanceName = INSTANCE_NAME) {
         // de 3s que, ante un hipo de red simultáneo en todas las líneas, cascadeaba
         // reconexiones en paralelo y disparaba los conflicts.
         s.reconnectCount += 1;
-        // El breaker es SOLO para líneas VINCULADAS que WhatsApp rechaza (caso
-        // bloqueo de IP). Una línea SIN vincular (creds no registradas) que cierra
-        // por "QR refs attempts ended" está esperando que un humano escanee: ahí NO
-        // abrimos el breaker, así sigue refrescando el QR cada ~60s y el botón
-        // "Conectar (QR)" nunca queda en blanco.
+        // El breaker (IP-block) es SOLO para líneas VINCULADAS que WhatsApp rechaza.
+        // Una línea SIN vincular (creds no registradas) que cierra por "QR refs
+        // attempts ended" está esperando que un humano escanee → NO abre el breaker:
+        // refresca QR rápido durante una ventana de gracia (QR_GRACE_ATTEMPTS) y luego
+        // pasa a QR ocioso (más abajo) para no pedir emparejamiento al IP para siempre.
         const hasCreds = !!(authState && authState.creds && authState.creds.registered);
         let delay;
         if (hasCreds && s.reconnectCount >= CIRCUIT_THRESHOLD) {
@@ -486,6 +507,15 @@ async function startSocket(instanceName = INSTANCE_NAME) {
           // reconnectCount se resetea a 0 en cada 'open' sano y en /reset|/reconnect.
           delay = CIRCUIT_COOLDOWN_MS + Math.floor(Math.random() * 120_000);
           logger.warn({ instance: instanceName, attempt: s.reconnectCount, delay }, 'Circuit breaker OPEN — WhatsApp rejecting, long cooldown');
+        } else if (!hasCreds && s.reconnectCount >= QR_GRACE_ATTEMPTS) {
+          // QR OCIOSO: línea SIN vincular que sigue cerrando por "QR refs attempts
+          // ended" y nadie escaneó dentro de la ventana de gracia. Dejamos de pedir
+          // un QR nuevo cada 60s (esas solicitudes de emparejamiento al IP no sirven
+          // si no hay un humano escaneando → era el "forever mandando solicitudes")
+          // y pasamos a 1 QR cada ~30 min. Cualquier acción del operador
+          // (/create=Conectar QR, /reset, /reconnect) resetea reconnectCount → QR al toque.
+          delay = QR_IDLE_COOLDOWN_MS + Math.floor(Math.random() * 60_000);
+          logger.warn({ instance: instanceName, attempt: s.reconnectCount, delay }, 'QR idle cooldown — nobody scanning, backing off pairing requests');
         } else {
           const floor = isConflict ? 15000 : 2000;
           const backoff = Math.min(60000, floor * Math.pow(2, Math.min(s.reconnectCount - 1, 5)));
@@ -964,6 +994,9 @@ app.post('/instance/create/:instance', async (req, res) => {
     return res.status(400).json({ error: 'invalid_instance_name', hint: 'use [a-zA-Z0-9_-], 1-64 chars' });
   }
   const existing = sessions.get(name);
+  // "Conectar (QR)" es intención explícita del operador de vincular → reabrimos la
+  // ventana de gracia de QR (saca la línea del cooldown ocioso si estaba ahí).
+  if (existing) existing.reconnectCount = 0;
   if (existing && (existing.connection === 'open' || existing.connection === 'connecting')) {
     return res.json({ instance: name, status: existing.connection, message: 'already_running' });
   }
