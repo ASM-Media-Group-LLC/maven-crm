@@ -60,13 +60,24 @@ Deno.serve(async (req) => {
     // verify_jwt=true → el gateway YA validó la firma del JWT antes de llegar
     // acá; un token con role=service_role no se puede falsificar. El portador
     // de la service key ya puede todo en el proyecto, no abre nada nuevo.
-    let isServiceCall = false;
-    try {
-      const b64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/") ?? "";
-      const claims = JSON.parse(atob(b64)) as { role?: string };
-      isServiceCall = claims?.role === "service_role";
-    } catch {
-      // No es un JWT decodificable — lo frena el getUser de abajo.
+    // Se aceptan los DOS formatos de credencial de servidor, porque conviven:
+    //   · JWT legacy (eyJ...) → se valida por el claim role=service_role.
+    //   · Key nueva (sb_secret_...) → NO es un JWT, así que sólo se puede
+    //     validar por igualdad contra el env del proyecto.
+    // Chequear sólo uno de los dos falla en silencio: el intento anterior
+    // (#961) validaba nada más el claim, y la llamada real edge→edge —que usa
+    // la key del runtime— seguía muriendo en 401 (caso del 29-jul: el correo
+    // del QA nunca salió aunque el análisis sí terminó).
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    let isServiceCall = serviceKey.length > 0 && token === serviceKey;
+    if (!isServiceCall) {
+      try {
+        const b64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/") ?? "";
+        const claims = JSON.parse(atob(b64)) as { role?: string };
+        isServiceCall = claims?.role === "service_role";
+      } catch {
+        // No es un JWT decodificable — lo frena el getUser de abajo.
+      }
     }
     if (!isServiceCall) {
       const authClient = createClient(
@@ -76,6 +87,12 @@ Deno.serve(async (req) => {
       );
       const { data: { user }, error: userError } = await authClient.auth.getUser(token);
       if (userError || !user?.id) {
+        // Log diagnóstico sin exponer el token: forma de la credencial recibida.
+        // Sirve para distinguir "JWT de usuario expirado" de "credencial de
+        // servidor no reconocida", que fue justo el bug del 29-jul.
+        console.warn(
+          `[send-notification-email] 401 — token no válido (len=${token.length}, jwt_like=${token.startsWith("ey")}, sb_key_like=${token.startsWith("sb_")}, env_service_key_len=${serviceKey.length})`,
+        );
         return json(401, { error: "Unauthorized", reason: "invalid_token" });
       }
     }

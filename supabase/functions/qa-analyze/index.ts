@@ -35,6 +35,11 @@ const CLAUDE_TIMEOUT_MS = 120_000; // 2 min
 interface AnalyzeRequest {
   call_id?: string;
   with_feedback?: boolean;
+  /** Sólo reenviar el correo del reporte usando el claude_analysis YA guardado
+   *  (no vuelve a llamar a Claude → no gasta tokens). Lo usa el cron
+   *  retry_pending_qa_report_emails para los correos que se perdieron cuando el
+   *  navegador cerró la pestaña y el worker se canceló antes del envío. */
+  email_only?: boolean;
 }
 
 interface HumanFeedbackRow {
@@ -160,13 +165,53 @@ serve(async (req) => {
     const { data: call, error: callErr } = await supabase
       .from("qa_calls")
       .select(
-        "id, transcript, audio_metrics, closer_id, model_id, claude_score, call_type, service_sold, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country, ig_url)",
+        "id, transcript, audio_metrics, closer_id, model_id, claude_score, call_type, service_sold, claude_analysis, created_at, call_date, evaluator_name, uploaded_by, report_email_sent_at, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country, ig_url)",
       )
       .eq("id", callId)
       .maybeSingle();
 
     if (callErr) throw callErr;
     if (!call) return jsonError("Call no encontrada.", 404);
+
+    // ── Modo email_only: reenviar el correo del reporte SIN volver a analizar ──
+    // Lo dispara el cron retry_pending_qa_report_emails para los casos en que el
+    // análisis se guardó pero el correo no salió (el closer cerró la pestaña y
+    // Supabase canceló el worker antes del envío). Idempotente por
+    // report_email_sent_at.
+    if (body.email_only === true) {
+      const row = call as Record<string, unknown>;
+      const existing = row.claude_analysis as Record<string, unknown> | null;
+      if (!existing || Object.keys(existing).length === 0) {
+        return jsonError("La call todavía no tiene análisis; no hay reporte que enviar.", 409);
+      }
+      if (row.report_email_sent_at) {
+        return new Response(
+          JSON.stringify({ ok: true, skipped: "email_already_sent" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const savedScore = Number(row.claude_score ?? 0);
+      try {
+        await sendQaReportEmail(
+          supabase,
+          row,
+          existing,
+          savedScore,
+          (call as unknown as CallRow).model,
+          (call as unknown as CallRow).closer,
+        );
+        await supabase
+          .from("qa_calls")
+          .update({ report_email_sent_at: new Date().toISOString(), status: "ready" })
+          .eq("id", callId);
+        return new Response(JSON.stringify({ ok: true, emailed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (mailErr) {
+        console.error("qa-analyze email_only: falló el envío:", (mailErr as Error).message);
+        return jsonError(`No se pudo enviar el correo: ${(mailErr as Error).message}`, 502);
+      }
+    }
 
     const c = call as unknown as CallRow;
     const transcript = (c.transcript ?? "").trim();
@@ -465,6 +510,11 @@ serve(async (req) => {
       .update({
         claude_analysis: analysis,
         claude_score: score,
+        // status server-side: antes lo escribía SÓLO el frontend al final de su
+        // secuencia, así que si el closer cerraba la pestaña la QA quedaba
+        // "processing" para siempre (caso real 29-jul). El análisis terminó acá,
+        // así que el estado real es 'ready'.
+        status: "ready",
       })
       .eq("id", callId)
       .select("*")
@@ -482,6 +532,13 @@ serve(async (req) => {
     if (wasFirstAnalysis) {
       try {
         await sendQaReportEmail(supabase, updated, analysis, score, c.model, c.closer);
+        // Marca idempotente: sin esto el cron retry_pending_qa_report_emails lo
+        // volvería a mandar. Si el worker muere ANTES de esta línea, el correo
+        // queda pendiente y el cron lo reintenta — que es justo lo que se busca.
+        await supabase
+          .from("qa_calls")
+          .update({ report_email_sent_at: new Date().toISOString() })
+          .eq("id", callId);
       } catch (mailErr) {
         console.error("qa-analyze: email del reporte falló:", (mailErr as Error).message);
       }
@@ -602,7 +659,16 @@ async function sendQaReportEmail(
     improvements: a.improvements ?? [],
   };
 
+  // ⚠️ Authorization EXPLÍCITO. `supabase.functions.invoke` NO hereda la
+  // credencial del createClient(url, serviceKey) para las llamadas edge→edge:
+  // llega sin header y send-notification-email (verify_jwt=true) responde
+  // 401 missing_auth_header. Eso es lo que hacía que NINGÚN correo de QA saliera
+  // desde que el envío se movió al server — el 401 caía en un catch silencioso.
+  // Diagnóstico del 29-jul: el detalle real del error sólo apareció al leer el
+  // body de la Response (ver el manejo de mailErr abajo).
+  const serviceKeyForInvoke = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const { error: mailErr } = await supabase.functions.invoke("send-notification-email", {
+    headers: { Authorization: `Bearer ${serviceKeyForInvoke}` },
     body: {
       to: recipients,
       subject: buildQaEmailSubject(payload),
@@ -611,7 +677,23 @@ async function sendQaReportEmail(
       also_include_user_ids: uploaderUserId ? [uploaderUserId] : undefined,
     },
   });
-  if (mailErr) throw new Error((mailErr as Error).message ?? "send-notification-email falló");
+  if (mailErr) {
+    // supabase-js devuelve "Edge Function returned a non-2xx status code" sin el
+    // motivo, que es inútil para diagnosticar (¿401 de credencial? ¿400 de
+    // payload?). FunctionsHttpError trae la Response en .context → leemos el
+    // body real y lo propagamos. Esto es lo que faltaba para encontrar el bug
+    // del correo del 29-jul.
+    let detail = "";
+    try {
+      const ctx = (mailErr as { context?: Response }).context;
+      if (ctx && typeof ctx.text === "function") {
+        detail = ` — status ${ctx.status}: ${(await ctx.text()).slice(0, 300)}`;
+      }
+    } catch { /* si no se puede leer el body, queda el mensaje genérico */ }
+    throw new Error(
+      `${(mailErr as Error).message ?? "send-notification-email falló"}${detail}`,
+    );
+  }
 }
 
 function jsonError(error: string, status: number): Response {
