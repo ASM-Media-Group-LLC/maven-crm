@@ -41,7 +41,11 @@ interface ApiUsageBase {
 // USD por hora). Lista actualizada 2026-05. Si el modelo no está acá,
 // cost = 0 (mejor que crashear).
 const ANTHROPIC_PRICING: Record<string, { in: number; out: number; cache_read: number; cache_create: number }> = {
+  // Claude 5 family (modelos en uso: grupos=sonnet-5, Clari=opus-5). $/M tokens.
+  "claude-opus-5":           { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 6.25 },
+  "claude-sonnet-5":         { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 3.75 },
   // Claude 4.x family
+  "claude-opus-4-8":         { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 6.25 },
   "claude-opus-4-7":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 18.75 },
   "claude-opus-4-6":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 18.75 },
   "claude-sonnet-4-6":       { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 3.75 },
