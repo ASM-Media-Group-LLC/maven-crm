@@ -3673,7 +3673,10 @@ async function buildInitialUserMessage(args: {
       .eq("group_id", args.groupId)
       .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
       .order("sent_at", { ascending: false })
-      .limit(10);
+      // Ventana de contexto = últimos N mensajes del grupo antes del trigger.
+      // 30 (antes 10): en grupos movidos, 10 filas se llenaban en <3min y el bot
+      // "olvidaba" lo que un miembro había dicho hace un rato (ej. "no manejo IG").
+      .limit(30);
 
     // ── Esperar transcripción pendiente de audio ──────────────────────────
     // Bug (28/7): un closer manda un audio y @menciona al bot casi al mismo
@@ -3702,7 +3705,7 @@ async function buildInitialUserMessage(args: {
           .eq("group_id", args.groupId)
           .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
           .order("sent_at", { ascending: false })
-          .limit(10)).data;
+          .limit(30)).data; // debe coincidir con la ventana de arriba
       }
     }
 
