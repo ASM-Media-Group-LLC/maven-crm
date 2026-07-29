@@ -31,12 +31,15 @@ import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/ag
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 // Modelo según contexto:
-//   - mention / audio_mention / image_mention / manual (panel admin) → Sonnet 4.6
-//     Necesita razonamiento profundo cuando alguien CITÓ al bot.
+//   - mention / audio_mention / image_mention / manual (panel admin) → Sonnet 5
+//     Necesita razonamiento profundo cuando alguien CITÓ al bot. Sonnet 5 ≈ calidad
+//     Opus en agéntico/tools, mismo precio que Sonnet 4.6 (intro más barato hasta 31/8).
 //   - auto (modo always-listening) → Haiku 4.5
 //     Solo decide "callar vs llamar tool". Haiku es 5× más barato y alcanza.
 //   - report_kind → Sonnet (síntesis larga + multi-tool)
-const SONNET_MODEL = "claude-sonnet-4-6";
+// NOTA thinking: Sonnet 5 corre con thinking DESACTIVADO en el request (rápido+barato);
+// Clari (Opus 5) corre con thinking adaptativo a effort bajo. Ver el body del fetch.
+const SONNET_MODEL = "claude-sonnet-5";
 const HAIKU_MODEL = "claude-haiku-4-5";
 function pickModel(invokedBy: string | undefined, hasReportKind: boolean): string {
   if (hasReportKind) return SONNET_MODEL;
@@ -4110,10 +4113,21 @@ async function runAgent(req: AgentRequest): Promise<{
       },
       body: JSON.stringify({
         model: modelToUse,
-        max_tokens: 4000,
+        // Opus 5 (Clari) tiene headroom para thinking → 8000; el resto 4000.
+        max_tokens: modelToUse.startsWith("claude-opus-5") ? 8000 : 4000,
         system: systemWithCache,
         tools: toolsWithCache,
         messages,
+        // thinking por modelo (Sonnet 5 / Opus 5 lo prenden por default si se omite):
+        // - Opus 5 (Clari, DM): adaptativo a effort BAJO → preciso pero rápido, y SIN el
+        //   fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
+        // - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
+        // - Haiku (auto) y demás: se omite → sin thinking (default).
+        ...(modelToUse.startsWith("claude-opus-5")
+          ? { output_config: { effort: "low" } }
+          : modelToUse.startsWith("claude-sonnet-5")
+          ? { thinking: { type: "disabled" } }
+          : {}),
       }),
     });
 
