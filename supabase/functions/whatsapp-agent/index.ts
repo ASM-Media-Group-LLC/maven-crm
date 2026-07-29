@@ -1345,6 +1345,32 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "remember_fact",
+    description:
+      "Guardá un HECHO DURABLE sobre una persona del equipo para recordarlo en el futuro (más allá de la ventana de contexto de mensajes). Usalo cuando alguien dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer — ej. 'no manejo IG para contactar', 'yo solo trabajo por Telegram', 'pasame los cierres por privado', 'espero que me habiliten el número de Unlimited'. NO lo uses para cosas efímeras del día (eso es un recordatorio) ni para datos de leads/pipeline. Por defecto el hecho es sobre QUIEN ESCRIBE; pasá `about` solo si es sobre OTRA persona (y solo el owner/supervisor puede guardar hechos de terceros). Redactá `fact` corto, en 3ª persona.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fact: { type: "string", description: "el hecho, corto y accionable, en 3ª persona (ej. 'No maneja IG para contactar; solo WhatsApp/Telegram')" },
+        about: { type: "string", description: "opcional: nombre de la persona de quien es el hecho si NO es quien escribe. Solo owner/supervisor puede usarlo para terceros." },
+      },
+      required: ["fact"],
+    },
+  },
+  {
+    name: "forget_fact",
+    description:
+      "Desactivá un hecho guardado sobre una persona cuando dejó de ser cierto o fue un error. Usalo cuando dicen 'ya no es así', 'ahora sí manejo IG', 'olvidate de eso'. Pasá `contains` con parte del texto del hecho. Por defecto opera sobre los hechos de QUIEN ESCRIBE; `about` para otra persona (solo owner/supervisor).",
+    input_schema: {
+      type: "object",
+      properties: {
+        contains: { type: "string", description: "fragmento del hecho a olvidar (match case-insensitive)" },
+        about: { type: "string", description: "opcional: nombre de la persona (default: quien escribe). Solo owner/supervisor para terceros." },
+      },
+      required: ["contains"],
+    },
+  },
+  {
     name: "reply_to_group",
     description:
       "Manda la respuesta final al grupo de WhatsApp. Llamala UNA SOLA VEZ al final del razonamiento. El cuerpo debe ser corto (idealmente <500 chars), en español argentino, conciso.\n\nMENCIONES REALES (opcional):\n- Si querés que un miembro reciba un PING (notificación al móvil), incluí su LID en el texto como '@<lid_number>' (ej. '@143250161664036') Y pasalo también en el array `mention_lids`.\n- El bot tiene la tabla en el initial_user_message como 'MIEMBROS DEL GRUPO (con LID)' — usá los LIDs que aparecen ahí.\n- WhatsApp renderiza el '@<lid>' como '@NombrePersona' al destinatario.\n- USÁ MENCIONES SOLO cuando es de alto valor: '@Daniel falta tu reporte', '@Miguel decide vos sobre X'. NO en EOD normal, NO cuando solo confirmás algo ('✓ Reporte de Daniel registrado' va sin mención).",
@@ -3169,6 +3195,60 @@ async function executeTool(
       return { ok: true, rule_id: ruleId };
     }
 
+    case "remember_fact": {
+      if (!ctx.senderUserId) {
+        return { error: "no_te_reconozco", hint: "El remitente no está vinculado a un user de Maven; no puedo atribuir el hecho." };
+      }
+      const factText = String(input.fact ?? "").trim();
+      if (!factText) return { error: "missing_fact" };
+      const about = String(input.about ?? "").trim();
+      let subjectId = ctx.senderUserId;
+      if (about) {
+        const matches = await resolveMembersByName(sb, ctx.groupId, about, 3);
+        const withUser = matches.find((m) => m.user_id);
+        if (!withUser?.user_id) return { error: "persona_no_encontrada", about };
+        // Scope: un no-privilegiado solo puede guardar hechos sobre SÍ MISMO.
+        if (withUser.user_id !== ctx.senderUserId && !ctx.privileged) {
+          return { error: "no_autorizado", message: "Solo podés guardar hechos sobre vos. Los de otras personas los guarda un supervisor/owner." };
+        }
+        subjectId = withUser.user_id;
+      }
+      const { data: inserted, error } = await sb.from("whatsapp_person_facts").insert({
+        tenant_id: ctx.tenantId,
+        subject_user_id: subjectId,
+        fact: factText,
+        created_by: ctx.senderUserId,
+      }).select("id").maybeSingle();
+      if (error) return { error: error.message };
+      return { ok: true, fact_id: inserted?.id ?? null, subject_user_id: subjectId };
+    }
+
+    case "forget_fact": {
+      if (!ctx.senderUserId) return { error: "no_te_reconozco" };
+      const contains = String(input.contains ?? "").trim();
+      if (!contains) return { error: "missing_contains" };
+      const about = String(input.about ?? "").trim();
+      let subjectId = ctx.senderUserId;
+      if (about) {
+        const matches = await resolveMembersByName(sb, ctx.groupId, about, 3);
+        const withUser = matches.find((m) => m.user_id);
+        if (!withUser?.user_id) return { error: "persona_no_encontrada", about };
+        if (withUser.user_id !== ctx.senderUserId && !ctx.privileged) {
+          return { error: "no_autorizado", message: "Solo podés olvidar hechos tuyos." };
+        }
+        subjectId = withUser.user_id;
+      }
+      const { data: rows, error } = await sb.from("whatsapp_person_facts")
+        .update({ active: false })
+        .eq("tenant_id", ctx.tenantId)
+        .eq("subject_user_id", subjectId)
+        .eq("active", true)
+        .ilike("fact", `%${contains}%`)
+        .select("id");
+      if (error) return { error: error.message };
+      return { ok: true, forgotten: rows?.length ?? 0 };
+    }
+
     case "reply_to_group": {
       const body = String(input.body ?? "").trim();
       if (!body) return { error: "empty_body" };
@@ -3258,6 +3338,23 @@ async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rul
   return (data ?? [])
     .filter((r) => !r.expires_at || r.expires_at > nowIso)
     .map((r) => ({ id: r.id, rule_text: r.rule_text }));
+}
+
+// Memoria por-persona: hechos durables que el equipo le contó al bot (ej. "María
+// no maneja IG"). Se inyectan en el system prompt en CADA invocación (como las
+// reglas), agrupados por persona. Tenant-scoped, cap 50.
+async function loadPersonFacts(tenantId: string): Promise<Array<{ name: string; fact: string }>> {
+  const sb = adminClient();
+  const { data, error } = await sb
+    .from("whatsapp_person_facts")
+    .select("fact, profiles:subject_user_id(full_name)")
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (error || !data) return [];
+  return (data as Array<{ fact: string; profiles: { full_name: string | null } | null }>)
+    .map((r) => ({ name: r.profiles?.full_name ?? "(alguien del equipo)", fact: r.fact }));
 }
 
 // ----------------------------------------------------------------------------
@@ -4026,6 +4123,7 @@ async function runAgent(req: AgentRequest): Promise<{
   // prompt — así el modelo las aplica en CADA invocación sin que el caller
   // haga nada extra.
   const activeRules = await loadActiveRules(group.id);
+  const personFacts = await loadPersonFacts(group.tenant_id);
 
   // Prompt = MOTOR (código) + MANUAL. Con bot asignado, el MANUAL sale de la DB
   // (botCfg.manualPrompt); si está vacío, cae al MANUAL_VENTAS de código. Sin bot
@@ -4036,11 +4134,20 @@ async function runAgent(req: AgentRequest): Promise<{
   const systemPromptBase = group.bot_persona
     ? `${enginePrompt}\n\nPersonalización del grupo:\n${group.bot_persona}`
     : enginePrompt;
-  const systemPrompt = activeRules.length > 0
+  let systemPrompt = activeRules.length > 0
     ? `${systemPromptBase}\n\nREGLAS PERSISTENTES DEL OWNER (este grupo):\n${
         activeRules.map((r, i) => `${i + 1}. [id=${r.id}] ${r.rule_text}`).join("\n")
       }\n\nAplicálas estrictamente. Si en algún momento entran en conflicto con tus reglas generales, las del owner ganan. Si vas a violarlas, no lo hagas — preguntá al owner.`
     : systemPromptBase;
+  // Memoria por-persona: hechos durables que el equipo le contó al bot. Se inyectan
+  // acá para que los recuerde más allá de la ventana de 30 mensajes (ej. "María no
+  // maneja IG"). Si alguien dice algo estable sobre cómo trabaja, o corrige uno,
+  // el bot usa remember_fact / forget_fact.
+  if (personFacts.length > 0) {
+    systemPrompt += `\n\nLO QUE EL EQUIPO TE CONTÓ (recordalo y RESPETALO; por persona):\n${
+      personFacts.map((f) => `- ${f.name}: ${f.fact}`).join("\n")
+    }\n\nSi alguien te dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer, guardalo con remember_fact. Si te corrigen un hecho de acá, usá forget_fact. NUNCA contradigas estos hechos (ej. si dice que no maneja IG, no lo mandes a IG).`;
+  }
 
   const initialUser = await buildInitialUserMessage({
     req,
@@ -4138,43 +4245,65 @@ async function runAgent(req: AgentRequest): Promise<{
         ]
       : activeTools;
 
-    const reqBody = JSON.stringify({
-      model: modelToUse,
-      // Opus 5 (Clari) tiene headroom para thinking → 8000; el resto 4000.
-      max_tokens: modelToUse.startsWith("claude-opus-5") ? 8000 : 4000,
+    // Body por modelo. thinking/max_tokens dependen del modelo, así que se
+    // recalculan si caemos al modelo de respaldo.
+    //  - Opus 5 (Clari, DM): adaptativo a effort BAJO → preciso pero rápido, y SIN el
+    //    fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
+    //  - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
+    //  - Haiku (auto) y demás: se omite → sin thinking (default).
+    const buildBody = (model: string) => JSON.stringify({
+      model,
+      max_tokens: model.startsWith("claude-opus-5") ? 8000 : 4000,
       system: systemWithCache,
       tools: toolsWithCache,
       messages,
-      // thinking por modelo (Sonnet 5 / Opus 5 lo prenden por default si se omite):
-      // - Opus 5 (Clari, DM): adaptativo a effort BAJO → preciso pero rápido, y SIN el
-      //   fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
-      // - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
-      // - Haiku (auto) y demás: se omite → sin thinking (default).
-      ...(modelToUse.startsWith("claude-opus-5")
+      ...(model.startsWith("claude-opus-5")
         ? { output_config: { effort: "low" } }
-        : modelToUse.startsWith("claude-sonnet-5")
+        : model.startsWith("claude-sonnet-5")
         ? { thinking: { type: "disabled" } }
         : {}),
     });
-
-    // Reintento ante sobrecarga transitoria de Anthropic (429 / 5xx / 529). Sin esto
-    // un 529 "overloaded" dejaba al bot SIN responder (error, iterations:0) → "no me
-    // contestó". Backoff corto, máx 3 intentos; el MAX_WALL_MS del loop lo acota igual.
-    let resp: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const callAnthropic = (model: string) =>
+      fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
         },
-        body: reqBody,
+        body: buildBody(model),
       });
+
+    // Sobrecarga de Anthropic (429/5xx/529): sin esto el bot quedaba MUDO — se vio en
+    // vivo 2026-07-29, Sonnet 5 sobrecargado dejó "en visto" a María (Marketing/Ventas)
+    // y a Daniel (AI WARMING) en la misma ventana de 5 min. Dos niveles:
+    //   1) reintentos con backoff corto sobre el modelo primario;
+    //   2) si sigue sobrecargado, UN intento con un modelo de respaldo — otro pool de
+    //      capacidad, que rara vez está saturado a la vez. Mejor responder con otro
+    //      modelo que no responder.
+    let resp: Response | null = null;
+    let lastRetryable = false;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      resp = await callAnthropic(modelToUse);
       if (resp.ok) break;
-      const retryable = resp.status === 429 || resp.status === 529 || (resp.status >= 500 && resp.status < 600);
-      if (!retryable || attempt === 2) break;
+      lastRetryable = resp.status === 429 || resp.status === 529 || (resp.status >= 500 && resp.status < 600);
+      if (!lastRetryable || attempt === 2) break;
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1))); // 0.8s, 1.6s
+    }
+
+    if (resp && !resp.ok && lastRetryable) {
+      const fallbackModel = modelToUse.startsWith("claude-sonnet-5")
+        ? "claude-opus-5"
+        : modelToUse.startsWith("claude-opus-5")
+        ? "claude-sonnet-5"
+        : SONNET_MODEL;
+      if (fallbackModel !== modelToUse) {
+        const fb = await callAnthropic(fallbackModel);
+        if (fb.ok) {
+          console.log(`anthropic overload en ${modelToUse} → respondido con ${fallbackModel}`);
+          resp = fb;
+        }
+      }
     }
 
     if (!resp || !resp.ok) {
