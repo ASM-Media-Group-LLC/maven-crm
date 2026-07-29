@@ -69,17 +69,6 @@ function timeToMinutes(hhmm: string): number {
 // ─────────────────────────────────────────────────────────────────────────
 // Métricas — consultas a Maven
 // ─────────────────────────────────────────────────────────────────────────
-async function getLlgContactsToday(sb: SupabaseClient, userId: string, today: string): Promise<number> {
-  // Meta del LLG: filas en closers_contacts creadas hoy por este user.
-  const { count } = await sb
-    .from("closers_contacts")
-    .select("id", { count: "exact", head: true })
-    .eq("created_by", userId)
-    .gte("created_at", `${today}T00:00:00-05:00`)
-    .lte("created_at", `${today}T23:59:59-05:00`);
-  return count ?? 0;
-}
-
 async function getCloserStatsToday(
   sb: SupabaseClient,
   userId: string,
@@ -183,61 +172,12 @@ async function tryClaimGroup(sb: SupabaseClient, groupId: string, kind: string, 
   return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// LLG checker
-// ─────────────────────────────────────────────────────────────────────────
-async function checkLlg(
-  sb: SupabaseClient,
-  user: UserSchedule,
-  group: GroupInfo,
-  now: { hhmm: string; date: string },
-): Promise<void> {
-  if (user.daily_goal === null) return;
-  const startM = timeToMinutes(user.start_time.slice(0, 5));
-  const endM = timeToMinutes(user.end_time.slice(0, 5));
-  const nowM = timeToMinutes(now.hhmm);
-  if (nowM < startM || nowM > endM) return;
-
-  const turnoTotal = endM - startM;
-  const progresoMin = nowM - startM;
-  const pctTurno = progresoMin / turnoTotal;
-
-  const contacts = await getLlgContactsToday(sb, user.user_id, now.date);
-  const goal = user.daily_goal;
-  const mention = user.whatsapp_push_name ?? user.full_name?.split(" ")[0] ?? "equipo";
-
-  // Si ya llegó a la meta, no se molesta.
-  if (contacts >= goal) return;
-
-  // 3 puntos de check según % de turno. Cada uno tiene su check_kind para
-  // dedup independiente.
-  // 1/3 turno: si va 0/goal
-  if (pctTurno >= 0.33 && pctTurno < 0.65) {
-    if (contacts === 0) {
-      const ok = await tryClaim(sb, user.user_id, "llg_progress_1_3", now.date, { contacts, goal });
-      if (ok) await sendToGroup(sb, group.id, `@${mention} vas 0/${goal}.`);
-    }
-    return;
-  }
-
-  // 2/3 turno: si va <2/3 del goal
-  if (pctTurno >= 0.65 && pctTurno < 0.9) {
-    const umbral = Math.ceil(goal * 0.66);
-    if (contacts < umbral) {
-      const ok = await tryClaim(sb, user.user_id, "llg_progress_2_3", now.date, { contacts, goal });
-      if (ok) await sendToGroup(sb, group.id, `@${mention} ${contacts}/${goal}. Última recta.`);
-    }
-    return;
-  }
-
-  // Últimos 30 min: si va <goal
-  if (endM - nowM <= 30 && endM - nowM > 0) {
-    if (contacts < goal) {
-      const ok = await tryClaim(sb, user.user_id, "llg_last_30min", now.date, { contacts, goal });
-      if (ok) await sendToGroup(sb, group.id, `@${mention} ${contacts}/${goal}. Última media hora.`);
-    }
-  }
-}
+// NOTA (2026-07-29): acá vivía `checkLlg` — los pings de meta de LLG ("@X vas
+// 0/3", "Última recta", "Última media hora"). Se eliminó porque los LLGs pasaron
+// al grupo AI WARMING y este tick solo corre en grupos de ventas, así que los
+// pings caían en Marketing/Ventas (hoy solo closers). El seguimiento de LLGs lo
+// hace el bot de AI WARMING. Si algún día se quiere volver a tener nudges de LLG
+// automáticos, hay que hacerlos apuntando al grupo de warming, no acá.
 
 // ─────────────────────────────────────────────────────────────────────────
 // Closer checker — preguntas abiertas (sin meta numérica fija)
@@ -909,9 +849,11 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
       };
       checked += 1;
       try {
-        if (user.role_kind === "llg") {
-          await checkLlg(sb, user, g, now);
-        } else if (user.role_kind === "closer") {
+        // Los LLGs se movieron al grupo AI WARMING (2026-07-29) y su seguimiento
+        // lo hace el bot de ese grupo. Este tick corre SOLO en grupos de ventas,
+        // así que sus pings de meta ("@X vas 0/3") caían en Marketing/Ventas, que
+        // ya es solo de closers. Se elimina el checker de LLG por pedido del owner.
+        if (user.role_kind === "closer") {
           await checkCloser(sb, user, g, now);
         }
       } catch (e) {
