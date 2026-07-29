@@ -19,6 +19,13 @@ export interface AgentCtx {
   userId?: string | null;
   groupId?: string | null;
   department?: string | null;
+  // Candado 2 (scoping por rol). Los propaga el whatsapp-agent al ejecutar tools
+  // del catálogo para que puedan acotar por rol del remitente. privileged=false
+  // ⇒ el remitente es un usuario NO privilegiado que mencionó al bot en un grupo
+  // (closer/LLG/manager). undefined/true ⇒ contexto privilegiado (owner/admin/
+  // supervisor, o corridas de sistema: digests/auto/DMs).
+  privileged?: boolean;
+  canSeePhones?: boolean;
 }
 
 export interface AgentTool {

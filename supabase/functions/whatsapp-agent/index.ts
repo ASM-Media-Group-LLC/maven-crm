@@ -3199,6 +3199,24 @@ async function executeTool(
       // se ejecuta acá. Aditivo: hoy las 25 tools inline nunca caen al default, así que
       // es cero cambio de comportamiento para el bot de closers actual.
       if (hasTool(name)) {
+        // ── CANDADO 2 para el CATÁLOGO ──────────────────────────────────────
+        // Las tools INLINE gatean por rol una por una (ctx.privileged, ver
+        // get_closer_pipeline_status / get_member_maven_activity). Las del CATÁLOGO
+        // son management/analítica (Hubstaff productividad, actividad de equipo,
+        // earnings, comparativas de promo, conversaciones de otros) y NINGUNA se
+        // auto-scopea al remitente. Sin este gate, un no-privilegiado que menciona
+        // al bot en un grupo las alcanzaba (bypass de candado 2). Denegamos TODO el
+        // catálogo cuando el request está scopeado (privileged===false). Los digests/
+        // auto/aperturas/DMs/owner/admin/supervisor corren con privileged=true|undefined
+        // → sin cambios. Si en el futuro alguna tool de catálogo debe estar disponible
+        // para no-privilegiados, hay que darle scoping propio y whitelistearla acá.
+        if (ctx.privileged === false) {
+          return {
+            error: "no_autorizado",
+            message:
+              "Esa información es de supervisión (actividad/productividad/earnings del equipo). La ve un supervisor, manager o el owner — por tu rol no está disponible acá.",
+          };
+        }
         try {
           const result = await runTool(name, (input ?? {}) as Record<string, unknown>, {
             sb,
@@ -3206,6 +3224,8 @@ async function executeTool(
             userId: ctx.senderUserId,
             groupId: ctx.groupId,
             department: ctx.department ?? null,
+            privileged: ctx.privileged,
+            canSeePhones: ctx.canSeePhones,
           });
           return { result };
         } catch (e) {
