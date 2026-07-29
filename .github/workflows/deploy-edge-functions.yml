@@ -56,7 +56,19 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Versión PINNEADA a propósito. Con `version: latest` el action resuelve la
+          # release contra la API de GitHub SIN autenticar y, cuando pega el rate limit,
+          # el run muere acá ("Failed to resolve latest Supabase CLI release: rate limit
+          # exceeded") ANTES de deployar nada → el merge queda verde a medias y las
+          # funciones se quedan con el código viejo (pasó el 2026-07-29 con el PR #978).
+          # Pinnear también hace los deploys reproducibles: la misma versión de CLI
+          # siempre. Para actualizar: mirá la última en
+          # https://github.com/supabase/cli/releases y subí este número.
+          version: 2.110.0
+        env:
+          # El action igual consulta la API de GitHub para bajar el asset; con token va
+          # autenticado (5000 req/h en vez de 60) y deja de ser una lotería.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determinar qué deployar
         id: changes
