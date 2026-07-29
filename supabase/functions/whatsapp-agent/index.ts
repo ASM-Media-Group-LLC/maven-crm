@@ -3859,6 +3859,26 @@ async function buildInitialUserMessage(args: {
 }
 
 // ----------------------------------------------------------------------------
+// SINGLE-FLIGHT: lock por grupo. Serializa corridas del agente para el mismo
+// grupo (evita respuestas concurrentes duplicadas/contradictorias). Vía RPC
+// atómica (INSERT ON CONFLICT WHERE expires_at<now), robusto con connection pooling.
+// ----------------------------------------------------------------------------
+async function tryAcquireAgentLock(sb: SupabaseClient, groupId: string, holder: string, ttlSec = 60): Promise<boolean> {
+  const { data, error } = await sb.rpc("wa_agent_lock_acquire", {
+    p_group_id: groupId, p_holder: holder, p_ttl_seconds: ttlSec,
+  });
+  // Failsafe: si el lock falla (RPC caída), NO bloqueamos al bot — mejor responder
+  // (con riesgo de dup) que quedar mudo.
+  if (error) return true;
+  return data === true;
+}
+async function releaseAgentLock(sb: SupabaseClient, groupId: string, holder: string): Promise<void> {
+  try {
+    await sb.rpc("wa_agent_lock_release", { p_group_id: groupId, p_holder: holder });
+  } catch { /* el TTL lo limpia */ }
+}
+
+// ----------------------------------------------------------------------------
 // Run the agent loop
 // ----------------------------------------------------------------------------
 async function runAgent(req: AgentRequest): Promise<{
@@ -4072,6 +4092,20 @@ async function runAgent(req: AgentRequest): Promise<{
     return t;
   })();
 
+  // ── SINGLE-FLIGHT: tomar el lock del grupo antes de arrancar ────────────────
+  // Si otra corrida está atendiendo este grupo, esperamos hasta ~8s a que libere;
+  // al proceder ya vemos su respuesta en la ventana de contexto (30 msgs) → el
+  // modelo no la repite. Si sigue tomado tras 8s, seguimos igual (nunca mudo).
+  const lockHolder = crypto.randomUUID();
+  {
+    let got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
+    for (let w = 0; w < 8 && !got; w += 1) {
+      await new Promise((r) => setTimeout(r, 1000));
+      got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
+    }
+  }
+
+  try {
   for (; iter < MAX_ITERATIONS; iter += 1) {
     if (Date.now() - startedAt > MAX_WALL_MS) break;
 
@@ -4104,36 +4138,48 @@ async function runAgent(req: AgentRequest): Promise<{
         ]
       : activeTools;
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: modelToUse,
-        // Opus 5 (Clari) tiene headroom para thinking → 8000; el resto 4000.
-        max_tokens: modelToUse.startsWith("claude-opus-5") ? 8000 : 4000,
-        system: systemWithCache,
-        tools: toolsWithCache,
-        messages,
-        // thinking por modelo (Sonnet 5 / Opus 5 lo prenden por default si se omite):
-        // - Opus 5 (Clari, DM): adaptativo a effort BAJO → preciso pero rápido, y SIN el
-        //   fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
-        // - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
-        // - Haiku (auto) y demás: se omite → sin thinking (default).
-        ...(modelToUse.startsWith("claude-opus-5")
-          ? { output_config: { effort: "low" } }
-          : modelToUse.startsWith("claude-sonnet-5")
-          ? { thinking: { type: "disabled" } }
-          : {}),
-      }),
+    const reqBody = JSON.stringify({
+      model: modelToUse,
+      // Opus 5 (Clari) tiene headroom para thinking → 8000; el resto 4000.
+      max_tokens: modelToUse.startsWith("claude-opus-5") ? 8000 : 4000,
+      system: systemWithCache,
+      tools: toolsWithCache,
+      messages,
+      // thinking por modelo (Sonnet 5 / Opus 5 lo prenden por default si se omite):
+      // - Opus 5 (Clari, DM): adaptativo a effort BAJO → preciso pero rápido, y SIN el
+      //   fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
+      // - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
+      // - Haiku (auto) y demás: se omite → sin thinking (default).
+      ...(modelToUse.startsWith("claude-opus-5")
+        ? { output_config: { effort: "low" } }
+        : modelToUse.startsWith("claude-sonnet-5")
+        ? { thinking: { type: "disabled" } }
+        : {}),
     });
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      return { ok: false, error: `anthropic ${resp.status}: ${txt.slice(0, 200)}`, iterations: iter };
+    // Reintento ante sobrecarga transitoria de Anthropic (429 / 5xx / 529). Sin esto
+    // un 529 "overloaded" dejaba al bot SIN responder (error, iterations:0) → "no me
+    // contestó". Backoff corto, máx 3 intentos; el MAX_WALL_MS del loop lo acota igual.
+    let resp: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: reqBody,
+      });
+      if (resp.ok) break;
+      const retryable = resp.status === 429 || resp.status === 529 || (resp.status >= 500 && resp.status < 600);
+      if (!retryable || attempt === 2) break;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1))); // 0.8s, 1.6s
+    }
+
+    if (!resp || !resp.ok) {
+      const txt = resp ? await resp.text() : "no response";
+      return { ok: false, error: `anthropic ${resp?.status ?? "?"}: ${txt.slice(0, 200)}`, iterations: iter };
     }
 
     const data = await resp.json() as {
@@ -4164,6 +4210,18 @@ async function runAgent(req: AgentRequest): Promise<{
 
     const toolResults: Array<Record<string, unknown>> = [];
     for (const t of toolUses) {
+      // SINGLE-FLIGHT (una sola respuesta por corrida): si el modelo emitió VARIOS
+      // reply_to_group en la misma respuesta (tool-use en paralelo), ejecutamos SOLO
+      // el primero. Los demás se ignoran → evita 2-4 mensajes seguidos que se
+      // contradicen en el mismo turno.
+      if (t.name === "reply_to_group" && finalReply) {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: t.id,
+          content: JSON.stringify({ skipped: "ya respondiste una vez en este turno — no mandes más de un mensaje al grupo" }),
+        });
+        continue;
+      }
       const result = await executeTool(
         String(t.name),
         (t.input as ToolInput) ?? {},
@@ -4192,6 +4250,9 @@ async function runAgent(req: AgentRequest): Promise<{
 
     // Si el modelo llamó reply_to_group exitosamente, salimos.
     if (finalReply) break;
+  }
+  } finally {
+    await releaseAgentLock(sb, group.id, lockHolder);
   }
 
   await logAnthropicUsage({
