@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  CATALOG_REFERENCE_ONLY_NOTE,
   EXTERNAL_SALE_ADDENDUM,
   PRODUCT_CATALOG,
   SERVICE_SALE_ADDENDUM,
@@ -52,7 +53,11 @@ interface HumanFeedbackRow {
 interface SectionFeedbackRow {
   section_type: string;
   section_index: number | null;
-  thumbs: "up" | "down";
+  section_label: string | null;
+  // qa_section_feedback.thumbs es INTEGER (1 = pulgar arriba, -1 = abajo). Estaba
+  // tipada como "up" | "down" y comparada con === "up", así que TODO el feedback
+  // del supervisor llegaba al prompt como "MAL", incluido lo que había aprobado.
+  thumbs: number;
   note: string | null;
   suggested_score: number | null;
 }
@@ -245,7 +250,9 @@ serve(async (req) => {
         `Tipo de llamada: VENTA EXTERNA a una modelo que NO es de la agencia — plataforma ofrecida: ${serviceName}`,
       );
     } else {
-      headerLines.push("Tipo de llamada: RECLUTAMIENTO (cerrar a la modelo para la agencia)");
+      headerLines.push(
+        "Tipo de llamada: RECLUTAMIENTO (cerrar a la modelo para la agencia). Este dato viene del formulario y describe el OBJETIVO INICIAL de la llamada, no necesariamente cómo terminó.",
+      );
     }
     if (c.closer?.name) headerLines.push(`Closer: ${c.closer.name}`);
     if (c.model?.name) {
@@ -349,7 +356,7 @@ serve(async (req) => {
       // Section-level feedback (thumbs up/down per dimension/red_flag/etc.)
       const { data: sfRaw } = await supabase
         .from("qa_section_feedback")
-        .select("section_type, section_index, thumbs, note, suggested_score")
+        .select("section_type, section_index, section_label, thumbs, note, suggested_score")
         .eq("call_id", callId)
         .limit(24);
 
@@ -358,10 +365,11 @@ serve(async (req) => {
         feedbackBlock += "\n[FEEDBACK GRANULAR POR SECCIÓN]\n";
         for (const sf of sectionFeedback) {
           const idx = sf.section_index !== null ? ` #${sf.section_index}` : "";
-          const thumb = sf.thumbs === "up" ? "OK" : "MAL";
+          const label = sf.section_label ? ` "${sf.section_label}"` : "";
+          const thumb = Number(sf.thumbs) > 0 ? "OK" : "MAL";
           const note = sf.note ? ` — ${sf.note}` : "";
           const score = sf.suggested_score !== null ? ` (sugerido: ${sf.suggested_score})` : "";
-          feedbackBlock += `  ${sf.section_type}${idx}: ${thumb}${note}${score}\n`;
+          feedbackBlock += `  ${sf.section_type}${idx}${label}: ${thumb}${note}${score}\n`;
         }
       }
 
@@ -375,34 +383,11 @@ serve(async (req) => {
       feedbackBlock +
       `[TRANSCRIPT]\n${transcript}`;
 
-    // Inyectar dinámicamente el portfolio de productos en el system
-    // prompt. Si la query falla, usamos un placeholder que evita
-    // alucinaciones en lugar de exponer el {{}} crudo.
-    // active=true: la tabla tiene filas viejas desactivadas (p.ej. el slug
-    // legacy "contentprotector" además del vigente "content_protector") y sin
-    // filtrar la IA recibía "Content Protector" DOS veces. El frontend ya filtra
-    // igual (useScouterCompanies). El dedupe por nombre cubre además cualquier
-    // par activo con el mismo label.
-    const { data: portfolioRows } = await supabase
-      .from("scouter_companies")
-      .select("name")
-      .eq("active", true)
-      .order("name");
-    const portfolioNames = [
-      ...new Set(
-        ((portfolioRows ?? []) as Array<{ name: string }>)
-          .map((r) => (r.name ?? "").trim())
-          .filter((n) => n.length > 0),
-      ),
-    ];
-    const portfolioList =
-      portfolioNames.length > 0
-        ? portfolioNames.map((n) => `  • ${n}`).join("\n")
-        : "  • (no hay productos registrados; el closer debe seguir sólo con la agencia de OF)";
-    let systemPromptWithPortfolio = SYSTEM_PROMPT.replace(
-      "{{PRODUCT_PORTFOLIO}}",
-      portfolioList,
-    );
+    // El portfolio ya NO se interpola desde scouter_companies: esa tabla es de
+    // SCOUTING (a quién reclutar) y arrastraba entidades que un closer no puede
+    // ofrecerle a una modelo (Price Shoes, Pagomundo, Exchange...). La lista
+    // taxativa vive ahora en el bloque PORTFOLIO del SYSTEM_PROMPT.
+    let systemPromptWithPortfolio = SYSTEM_PROMPT;
     // Venta de servicio a creadora existente → el addendum ANULA el framing de
     // reclutamiento (outcome = cierre del servicio, sin red flag cross-portfolio).
     if (isServiceSale) {
@@ -418,11 +403,15 @@ serve(async (req) => {
         serviceName,
       );
     }
-    // Catálogo de producto: sólo en modos de venta (es donde hay que juzgar si
-    // explicó bien QUÉ vende). Reclutamiento sigue viendo únicamente la lista de
-    // nombres del portfolio, igual que siempre.
-    if (isServiceSale || isExternalSale) {
-      systemPromptWithPortfolio += PRODUCT_CATALOG;
+    // El catálogo va SIEMPRE: reclutamiento también pitchea plataformas (pivote
+    // tras el "no" a la agencia) y sin él la IA alucina features, pricing y
+    // nombres — en prod escribió "Ledshot/Onimred" y "el servicio Unlimited de
+    // filtración" en calls de reclutamiento.
+    systemPromptWithPortfolio += PRODUCT_CATALOG;
+    if (!isServiceSale && !isExternalSale) {
+      // En reclutamiento es SOLO referencia: sin la regla de penalización de la
+      // dim 7 (claude_score = promedio de 13 dims y las 53 QA son reclutamiento).
+      systemPromptWithPortfolio += CATALOG_REFERENCE_ONLY_NOTE;
     }
     // Doblemente guardado: sólo en ventas y sólo si el servicio no vino
     // identificado → reclutamiento nunca ve esta nota.
@@ -501,8 +490,15 @@ serve(async (req) => {
         `qa-analyze: dimensiones inesperadas (${dimScores.length} en vez de 13) en call ${callId} — el promedio del score cambia de escala.`,
       );
     }
-    const score = dimScores.length
-      ? Math.round(dimScores.reduce((a, b) => a + b, 0) / dimScores.length)
+    // Escala: el rubric pide 0-100. Si TODAS las dims vienen <= 10 es una
+    // respuesta en escala 1-10 → guardarla daría una nota ~7/100 sin error visible.
+    if (dimScores.length >= 2 && dimScores.every((n) => n <= 10)) {
+      console.error(`qa-analyze: dims en escala 1-10 en call ${callId}`, dimScores);
+      return jsonError("El análisis vino en escala 1-10 en vez de 0-100. Reintentá.", 502);
+    }
+    const clamped = dimScores.map((n) => Math.min(100, Math.max(0, n)));
+    const score = clamped.length
+      ? Math.round(clamped.reduce((a, b) => a + b, 0) / clamped.length)
       : (analysis as { overall_score: number }).overall_score;
 
     const { data: updated, error: updateErr } = await supabase

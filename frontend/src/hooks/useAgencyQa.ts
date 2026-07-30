@@ -76,7 +76,7 @@ export interface CallAnalysis {
   call_facts?: AnalysisCallFacts;
   call_outcome?: CallOutcome;
   call_outcome_reason?: string;
-  closer_speaker_label?: "Hablante 1" | "Hablante 2" | null;
+  closer_speaker_label?: string | null;
   model_signals?: AnalysisModelSignals;
   dimensions?: AnalysisDimension[];
   red_flags?: AnalysisRedFlag[];

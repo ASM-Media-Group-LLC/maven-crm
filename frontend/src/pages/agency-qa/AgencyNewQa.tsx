@@ -109,6 +109,9 @@ const QA_SERVICES = [
   "Content Protector",
   "ORA",
   "Let's Shoot",
+  // Make Me: producto de generación con IA del ecosistema. Sin esta opción las
+  // ventas de Make Me entraban como "Otro" y el evaluador no sabía qué se vendió.
+  "Make Me",
   "Otro",
 ] as const;
 

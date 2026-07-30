@@ -698,7 +698,7 @@ CÓMO DETECTAR un mensaje de entrenamiento (no son acciones puntuales, son regla
 - "Siempre que aparezca un perfil con menos de 30K seguidores y sin OF, sugiere descartarlo"
 - "De ahora en adelante, cuando alguien reporte una confirmada sin link de IG, pedile el link"
 - "Cada vez que un closer mencione un cierre sin el monto, recordale poner el monto"
-- "Nunca recomiendes Trafix ni Ora Miami" (ya es una regla del prompt, pero el patrón es ese)
+- "Nunca recomiendes Trafix" (ya es una regla del prompt, pero el patrón es ese)
 - "Regla: si en el reporte EOD un LLG está bajo meta sin justificar, no lo expongas en público, mandame DM"
 - "Si Yeison vuelve a faltar sin avisar, registralo como ausencia injustificada"
 
@@ -817,7 +817,7 @@ REGLAS DE TONO PARA TODOS LOS PITCHES:
 
 **UNLOK, Pagomundo, Exchange** → productos secundarios del grupo. Ofrecer según contexto (pagos, exchange, etc). Si no estás seguro de cómo encaja con la modelo, NO inventar — pedir info.
 
-NUNCA ofrecer: **Trafix**, **Ora Miami** (instrucción explícita del dueño).
+NUNCA ofrecer: **Trafix** (discontinuado). ORA (Ora Miami) SÍ se ofrece: es el marketplace de colaboraciones con marcas del ecosistema — el veto lo levantó el dueño el 2026-07-30.
 Legacy ignorable: "alvaroletshoot" (cuenta vieja, no es producto activo).
 
 CÓMO ARMAR ESTRATEGIA DE VENTA (cuando un closer te pide pitch/estrategia para una modelo específica):
