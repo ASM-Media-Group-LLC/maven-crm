@@ -371,3 +371,50 @@ export function hasBotMention(...textos: Array<string | null | undefined>): bool
     lower.includes("@maven_bot")
   );
 }
+
+// ----------------------------------------------------------------------------
+// Redacción de teléfonos en mensajes SALIENTES a grupos
+// ----------------------------------------------------------------------------
+// Maven oculta los teléfonos por permiso (can_see_contact_phone, default-deny) y la UI usa
+// WaChatButton justamente para no mostrar dígitos. Pero el bot corre con service_role y
+// escribe texto libre: el 30/07, al reconocerle a un LLG su primer número del día, publicó
+// el teléfono de la lead en el grupo entero — dos veces. Cualquiera en el grupo, incluida
+// gente sin permiso de ver teléfonos, se lo lleva.
+//
+// Por eso la guarda va en el BORDE de salida y no en el prompt: una instrucción se puede
+// ignorar, esto no. Solo aplica a GRUPOS, no a DMs. Ver pii_leak_audit_2026_06: enmascarar
+// en la UI no es seguridad, el control tiene que estar donde los datos salen del sistema.
+const URL_RE = /https?:\/\/\S+/gi;
+// ⚠️ Las MENCIONES son LIDs de ~15 dígitos ("@143250161664036", a veces "@…@lid"). Sin
+// protegerlas, el detector las toma por teléfono y las redacta → se rompen todos los pings
+// del bot. Se protegen igual que las URLs, antes de buscar teléfonos.
+const MENCION_RE = /@\d+(?:@lid)?/g;
+// Candidato: dígitos con separadores típicos (espacio, guion, punto, paréntesis) y "+"
+// opcional. El filtrado fino se hace después, match por match, en pareceTelefono().
+const TEL_CAND_RE = /\+?\(?\d[\d\s().-]{5,}\d\)?/g;
+
+function pareceTelefono(s: string): boolean {
+  if (s.includes(",")) return false; // "$3,443" · "1,234 followers"
+  const digitos = s.replace(/\D/g, "");
+  if (digitos.length < 7 || digitos.length > 15) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return false; // fecha ISO
+  // Series cortas separadas ("cadencia 1-3-5-8-15-29"): sin ningún bloque de 3+ dígitos.
+  const bloqueMasLargo = Math.max(...(s.match(/\d+/g) ?? [""]).map((b) => b.length));
+  return bloqueMasLargo >= 3;
+}
+
+/** Reemplaza telefonos por un marcador. Preserva URLs y menciones: llevan digitos y no son telefonos. */
+export function redactPhones(texto: string, marcador = "[numero en Maven]"): string {
+  if (!texto) return texto;
+  const guardados: string[] = [];
+  const guardar = (s: string): string => {
+    guardados.push(s);
+    // Token sin digitos pegados, para que TEL_CAND_RE no lo confunda con un telefono.
+    return `⟦${guardados.length - 1}⟧`;
+  };
+  const conPlaceholders = texto
+    .replace(URL_RE, guardar)
+    .replace(MENCION_RE, guardar);
+  const limpio = conPlaceholders.replace(TEL_CAND_RE, (m) => (pareceTelefono(m) ? marcador : m));
+  return limpio.replace(/⟦(\d+)⟧/g, (_x, i) => guardados[Number(i)]);
+}

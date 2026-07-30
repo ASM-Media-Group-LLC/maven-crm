@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
 
 // whatsapp-send — manda mensajes a un grupo via el provider configurado.
 //
@@ -102,7 +102,7 @@ async function sendOne(args: {
 
   const { data: group, error: gErr } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, external_id, provider, bot_enabled, active")
+    .select("id, tenant_id, external_id, provider, bot_enabled, active, is_direct")
     .eq("id", args.groupId)
     .single();
 
@@ -112,9 +112,19 @@ async function sendOne(args: {
   if (!group.active) return { ok: false, error: "group_inactive" };
   if (!group.bot_enabled) return { ok: false, error: "bot_disabled" };
 
+  // ── GUARDA DE PII: nunca publicar teléfonos en un GRUPO ─────────────────────
+  // Maven oculta los teléfonos por permiso (can_see_contact_phone, default-deny), pero el
+  // bot corre con service_role y escribe texto libre. El 30/07, al reconocerle a Daniel su
+  // primer número del día, publicó el teléfono de la lead en AI WARMING — dos veces, a la
+  // vista de todo el grupo. Va acá, en el ÚNICO punto por el que salen TODOS los mensajes
+  // (respuestas del agente, recordatorios, digests, reportes), en vez de confiar en una
+  // regla del prompt que el modelo puede ignorar.
+  // Los DMs quedan afuera: son 1-a-1 con el dueño de la data.
+  const bodyFinal = group.is_direct === true ? args.body : redactPhones(args.body);
+
   let result: ProviderSendResult;
   if (group.provider === "evolution") {
-    result = await sendViaEvolution(group.external_id, args.body, args.mentions);
+    result = await sendViaEvolution(group.external_id, bodyFinal, args.mentions);
   } else if (group.provider === "manual") {
     // Modo manual: no mandamos al provider, solo grabamos la salida en
     // whatsapp_messages para testing y para ver lo que el bot habría
@@ -134,7 +144,7 @@ async function sendOne(args: {
         external_id: result.externalId,
         sender_external_id: "bot@maven",
         sender_display_name: "Maven Asistente",
-        body: args.body,
+        body: bodyFinal,
         msg_type: "text",
         is_from_bot: true,
         sent_at: new Date().toISOString(),
@@ -149,7 +159,7 @@ async function sendOne(args: {
       groupId: group.id,
       kind: "message_out",
       payload: {
-        body_preview: args.body.slice(0, 120),
+        body_preview: bodyFinal.slice(0, 120),
         reminder_id: args.reminderId,
         provider_msg_id: result.externalId,
         message_id: inserted?.id,
