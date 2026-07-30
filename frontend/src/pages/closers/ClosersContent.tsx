@@ -35,6 +35,10 @@ const ALL_TABS = [
   { value: "confirmadas", label: "Confirmadas" },
   { value: "completadas", label: "Completadas" },
   { value: "no_interesadas", label: "No Interesadas" },
+  // Bases de leads propias (closer_creators.lead_source). Son vistas por ORIGEN
+  // y cruzan todos los stages, como "Todas" pero de esa base.
+  { value: "ex_creadores", label: "Ex-creadores" },
+  { value: "agencias", label: "Agencias" },
 ];
 
 const ClosersContent = () => {
@@ -347,6 +351,8 @@ const ClosersContent = () => {
                   tab.value === "asignadas" ? "Asignada" :
                   tab.value === "confirmadas" ? "Confirmada" :
                   tab.value === "completadas" ? "Completada" :
+                  tab.value === "ex_creadores" ? "ex_creadores" :
+                  tab.value === "agencias" ? "agencias" :
                   "No interesada";
                 const count = statusCounts[stageKey];
                 // Dot rojo (vencidos) + naranja (decisión) sólo en el

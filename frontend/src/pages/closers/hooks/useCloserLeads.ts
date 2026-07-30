@@ -37,6 +37,9 @@ export interface CloserCreatorRow {
   // Tipo de deal: 'reclutamiento' (comisión % sobre OF) | 'venta_plataforma'
   // (creadora existente que paga una suscripción mensual fija).
   deal_type: string;
+  // De qué base viene el lead: 'maven' (LeadGen/Contactos, default) |
+  // 'ex_creadora' (base EX MODELOS KASH) | 'agencia' (base B2B de agencias).
+  lead_source: string | null;
   subscription_amount: number | null;
   created_at: string;
   updated_at: string;
@@ -78,7 +81,24 @@ export const TAB_STAGE_MAP: Record<string, string[]> = {
   confirmadas: ["Confirmada"],
   completadas: ["Completada"],
   no_interesadas: ["No interesada"],
+  // Bases propias: cruzan todos los stages, filtran por lead_source.
+  ex_creadores: [],
+  agencias: [],
 };
+
+// Tabs que son una BASE de leads (vista por origen) en vez de un stage.
+export const SOURCE_TABS: Record<string, string> = {
+  ex_creadores: "ex_creadora",
+  agencias: "agencia",
+};
+
+// Las agencias son otra LÍNEA DE NEGOCIO (B2B: se les vende producto, no se
+// recluta a una modelo). Se excluyen de los tabs del embudo de modelos para no
+// ensuciar sus conteos ni el pool; viven sólo en su propio tab.
+// Las ex-creadoras SÍ quedan en los tabs de modelos: son reclutamiento para Kash
+// (mismo embudo), y su tab es un agrupador extra — así el closer las sigue viendo
+// en "Asignaciones" donde trabaja todos los días.
+const B2B_SOURCE = "agencia";
 
 export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot", "Otra"] as const;
 export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot"] as const;
@@ -266,7 +286,9 @@ export const useCloserLeads = () => {
           .from("closer_creators")
           .select("*", { count: "exact" })
           .eq("stage", "Nuevo")
-          .is("assigned_to", null);
+          .is("assigned_to", null)
+          // El pool de modelos no muestra agencias (tienen su propio tab).
+          .neq("lead_source", B2B_SOURCE);
 
         // Antigüedad: Nuevo = recientes (≤30d), Antiguos = viejos (>30d)
         query = tab === "nuevo"
@@ -311,7 +333,17 @@ export const useCloserLeads = () => {
         query = query.in("stage", stageFilter);
       }
 
+      // Tabs de BASE (Ex-creadores / Agencias): filtran por origen, cross-stage.
+      if (SOURCE_TABS[tab]) {
+        query = query.eq("lead_source", SOURCE_TABS[tab]);
+      } else {
+        // Los tabs del embudo de modelos excluyen las agencias (línea B2B).
+        query = query.neq("lead_source", B2B_SOURCE);
+      }
+
       // Tab "Ventas": deals de venta de plataforma a creadoras (cross-stage).
+      // Acotado a lo que NO es agencia (arriba) para no mezclar las 465 B2B con
+      // las ventas a creadoras propias.
       if (tab === "ventas") {
         query = query.eq("deal_type", "venta_plataforma");
       }
@@ -528,7 +560,7 @@ export const useCloserLeads = () => {
       // techo (>2500), así que sin paginar los conteos por stage (No interesada,
       // etc.) quedaban truncados a ~1000. fetchAllRows trae TODAS con .range().
       const rows = await fetchAllRows((from, to) => {
-        let q = supabase.from("closer_creators").select("stage, deal_type");
+        let q = supabase.from("closer_creators").select("stage, deal_type, lead_source");
         if (!canSeeAll && effectiveUserId) {
           q = q.eq("assigned_to", effectiveUserId);
         }
@@ -540,7 +572,14 @@ export const useCloserLeads = () => {
         return q.order("id", { ascending: true }).range(from, to);
       });
       const counts: Record<string, number> = {};
-      for (const row of rows as Array<{ stage: string | null; deal_type: string | null }>) {
+      for (const row of rows as Array<{ stage: string | null; deal_type: string | null; lead_source: string | null }>) {
+        const src = row.lead_source || "maven";
+        // Contadores de las bases propias (cruzan stages).
+        if (src === "ex_creadora") counts["ex_creadores"] = (counts["ex_creadores"] || 0) + 1;
+        if (src === "agencia") counts["agencias"] = (counts["agencias"] || 0) + 1;
+        // Los conteos por stage y el de Ventas son del embudo de MODELOS: las
+        // agencias (B2B) no suman ahí, igual que no aparecen en esos tabs.
+        if (src === B2B_SOURCE) continue;
         const s = row.stage || "Sin stage";
         counts[s] = (counts[s] || 0) + 1;
         if (row.deal_type === "venta_plataforma") counts["ventas"] = (counts["ventas"] || 0) + 1;
@@ -551,11 +590,13 @@ export const useCloserLeads = () => {
       // de passed_date (los 'Nuevo' no tienen passed_date). head:true =
       // solo cuenta, no transfiere filas. Sobrescribe Nuevo/Antiguos de (A).
       const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      // .neq(lead_source, agencia): el pool de modelos no incluye B2B (mismo
+      // criterio que la query del listado, si no el contador no cuadra con la lista).
       const [recentRes, oldRes] = await Promise.all([
         supabase.from("closer_creators").select("id", { count: "exact", head: true })
-          .eq("stage", "Nuevo").is("assigned_to", null).gte("created_at", cutoff),
+          .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).gte("created_at", cutoff),
         supabase.from("closer_creators").select("id", { count: "exact", head: true })
-          .eq("stage", "Nuevo").is("assigned_to", null).lt("created_at", cutoff),
+          .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).lt("created_at", cutoff),
       ]);
       counts["Nuevo"] = recentRes.count || 0;
       counts["Antiguos"] = oldRes.count || 0;

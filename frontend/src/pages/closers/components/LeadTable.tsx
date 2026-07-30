@@ -929,6 +929,18 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             Venta{c.main_platform ? `: ${c.main_platform}` : ""}
           </Badge>
         )}
+        {/* Origen del lead: de qué base viene. Sólo se marca lo que NO es Maven,
+            así las ~2.5k filas de siempre se ven igual que antes. */}
+        {c.lead_source === "ex_creadora" && (
+          <Badge variant="warning-soft" className="text-[9px] h-4 whitespace-nowrap" title="Viene de la base EX MODELOS KASH (ya fue creadora de la agencia)">
+            Ex-creadora
+          </Badge>
+        )}
+        {c.lead_source === "agencia" && (
+          <Badge variant="secondary-soft" className="text-[9px] h-4 whitespace-nowrap" title="Lead B2B: agencia de la base de agencias">
+            Agencia
+          </Badge>
+        )}
       </>
     );
 
