@@ -294,6 +294,60 @@ export const useCloserLeads = () => {
   // prefetchear las otras tabs cuando se monta el componente — así al
   // cambiar de tab los datos ya están en caché y no se ve el skeleton.
   const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
+      // ── Ex-creadores / Agencias: son BASES DEL DIRECTORIO, no del pipeline ──
+      // Muestran los CONTACTOS disponibles para trabajar (closers_contacts), y
+      // cuando un closer toma uno pasa a "Asignaciones" (ahí sí es un lead).
+      // Se excluyen los ya convertidos: al asignarse, assign_closer_to_contact
+      // pone status='converted' → la fila sale sola de la base.
+      if (SOURCE_TABS[tab]) {
+        let cq = supabase
+          .from("v_closers_contacts")
+          .select("id, name, handle, phone, city, physical_appearance, notes, created_at, created_by, contact_kind, status", { count: "exact" })
+          .eq("contact_kind", SOURCE_TABS[tab])
+          .neq("status", "converted")
+          .order("physical_appearance", { ascending: true })   // Alta → Media → Baja
+          .order("created_at", { ascending: false });
+
+        if (normalizedSearch) {
+          cq = cq.or(`handle.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%`);
+        }
+        const cFrom = pageNum * PAGE_SIZE;
+        cq = cq.range(cFrom, cFrom + PAGE_SIZE - 1);
+
+        const { data, error, count } = await cq;
+        if (error) throw error;
+
+        // Se mapean a la forma que espera LeadTable (stage 'Nuevo' = disponible
+        // para tomar). `__isContact` marca que el id es de closers_contacts, así
+        // "Tomar" llama al RPC de asignación en vez de tocar closer_creators.
+        const rows = (data || []).map((c: any) => ({
+          id: c.id,
+          __isContact: true,
+          instagram_handle: c.handle || c.name || "sin_handle",
+          phone: c.phone ?? null,
+          category: c.physical_appearance ?? null,
+          city: c.city ?? null,
+          notes: c.notes ?? null,
+          stage: "Nuevo",
+          assigned_to: null,
+          passed_date: null,
+          last_contact_date: null,
+          contact_count: 0,
+          estimated_monetization: 0,
+          agency_commission: 0,
+          subscription_amount: null,
+          deal_type: tab === "agencias" ? "venta_plataforma" : "reclutamiento",
+          lead_source: SOURCE_TABS[tab],
+          main_platform: null,
+          extras: null,
+          created_at: c.created_at,
+          created_by: c.created_by,
+          source_contact_id: c.id,
+          agent_name: null,
+        }));
+        return { rows, total: count || 0 };
+      }
+
       // ── Nuevo / Antiguos: pool de leads SIN asignar (stage 'Nuevo') ──
       // Partido por antigüedad: "Nuevo" = creados en los últimos 30 días;
       // "Antiguos" = hace más de 30 días sin que nadie los asigne. Ambos
@@ -353,10 +407,7 @@ export const useCloserLeads = () => {
         query = query.in("stage", stageFilter);
       }
 
-      // Tabs de BASE (Ex-creadores / Agencias): filtran por origen, cross-stage.
-      if (SOURCE_TABS[tab]) {
-        query = query.eq("lead_source", SOURCE_TABS[tab]);
-      } else {
+      {
         // Los tabs del embudo de modelos excluyen las agencias (línea B2B).
         query = query.neq("lead_source", B2B_SOURCE);
       }
@@ -602,9 +653,8 @@ export const useCloserLeads = () => {
         counts[`${line}:${s}`] = (counts[`${line}:${s}`] || 0) + 1;
         counts[`line:${line}`] = (counts[`line:${line}`] || 0) + 1;
 
-        // Contadores de las bases propias (cruzan stages) — para los tabs.
-        if (src === "ex_creadora") counts["ex_creadores"] = (counts["ex_creadores"] || 0) + 1;
-        if (src === "agencia") counts["agencias"] = (counts["agencias"] || 0) + 1;
+        // Los contadores de Ex-creadores/Agencias NO salen de acá: esos tabs
+        // cuentan CONTACTOS del directorio (ver el bloque (C) más abajo).
         // Los conteos por stage y el de Ventas son del embudo de MODELOS: las
         // agencias (B2B) no suman ahí, igual que no aparecen en esos tabs.
         if (src === B2B_SOURCE) continue;
@@ -625,6 +675,18 @@ export const useCloserLeads = () => {
         supabase.from("closer_creators").select("id", { count: "exact", head: true })
           .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).lt("created_at", cutoff),
       ]);
+      // (C) Bases del DIRECTORIO: Ex-creadores y Agencias cuentan contactos
+      // disponibles (no convertidos), igual que su listado — si contaran leads,
+      // el número del tab no cuadraría con las filas que se ven.
+      const [exRes, agRes] = await Promise.all([
+        supabase.from("v_closers_contacts").select("id", { count: "exact", head: true })
+          .eq("contact_kind", "ex_creadora").neq("status", "converted"),
+        supabase.from("v_closers_contacts").select("id", { count: "exact", head: true })
+          .eq("contact_kind", "agencia").neq("status", "converted"),
+      ]);
+      counts["ex_creadores"] = exRes.count || 0;
+      counts["agencias"] = agRes.count || 0;
+
       counts["Nuevo"] = recentRes.count || 0;
       counts["Antiguos"] = oldRes.count || 0;
       return counts;
@@ -897,6 +959,22 @@ export const useCloserLeads = () => {
   const claimLead = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       if (!user?.id) throw new Error("No hay usuario autenticado");
+
+      // En los tabs Ex-creadores/Agencias las filas son CONTACTOS del directorio,
+      // no leads: tomar uno es asignárselo vía RPC (que crea el lead heredando el
+      // tipo → ex_creadora/agencia, y marca el contacto como convertido para que
+      // salga de la base). Si se hiciera el update directo a closer_creators, el
+      // id no existiría ahí y el "Tomar" fallaría en silencio.
+      const row = (creators as any[]).find((r) => r.id === id);
+      if (row?.__isContact) {
+        const { error } = await (supabase as any).rpc("assign_closer_to_contact", {
+          p_contact_id: id,
+          p_closer_id: user.id,
+        });
+        if (error) throw error;
+        return;
+      }
+
       const { data, error } = await supabase
         .from("closer_creators")
         .update({
@@ -915,7 +993,8 @@ export const useCloserLeads = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
-      toast({ title: "Lead tomada", description: "Quedó asignada a vos, en Asignaciones." });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      toast({ title: "Tomada", description: "Quedó asignada a vos, en Asignaciones." });
     },
     onError: (e: Error) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
