@@ -40,13 +40,24 @@ Deno.serve(async (req) => {
   // → definitiva Sí/No (2). Así una corrida parcial de la extensión ataca la cola sin
   // escanear en vez de re-leer siempre el principio. Si el RPC falla, se cae al orden de
   // la vista (todas rank 0 = orden por c.id) → cero pérdida de cobertura.
+  // Estado del scan de HOY por (creator_id, handle) — NO por creador. Antes era por
+  // creador y eso hacía que la 2ª/3ª cuenta de IG heredara el rank de la principal y
+  // quedara al fondo de la cola para siempre (caso yessca2of, ver migración
+  // 20260730120000). La clave es `${creator_id}:${handle normalizado}`.
   const definitive = new Set<string>();
   const scannedAny = new Set<string>();
   try {
     const { data: st } = await (sb as any).rpc("promolog_ig_scan_state_today");
-    for (const r of (st ?? [])) { scannedAny.add(r.creator_id); if (r.has_definitive === true) definitive.add(r.creator_id); }
+    for (const r of (st ?? [])) {
+      const k = `${r.creator_id}:${norm(r.source_handle)}`;
+      scannedAny.add(k);
+      if (r.has_definitive === true) definitive.add(k);
+    }
   } catch (_) { /* fallback: orden de la vista (c.id) */ }
-  const rank = (cid: string) => !scannedAny.has(cid) ? 0 : (definitive.has(cid) ? 2 : 1);
+  const rank = (cid: string, handle: string) => {
+    const k = `${cid}:${handle}`;
+    return !scannedAny.has(k) ? 0 : (definitive.has(k) ? 2 : 1);
+  };
 
   // Cuentas de IG ADICIONALES (creator_social_accounts) — igual que x-scan/fb-scan/
   // telegram-scan, que SÍ escanean las cuentas extra. La vista solo trae el
@@ -86,7 +97,7 @@ Deno.serve(async (req) => {
     for (const h of (extraByCreator.get(c.id) ?? [])) if (h !== primary) push(c.id, h, idByAccount.get(`${c.id}:${h}`) ?? null, name);
   }
   // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
-  const targets = rows.sort((a, b) => rank(a.creator_id) - rank(b.creator_id));
+  const targets = rows.sort((a, b) => rank(a.creator_id, a.handle) - rank(b.creator_id, b.handle));
 
   return json({ ok: true, count: targets.length, targets });
 });
