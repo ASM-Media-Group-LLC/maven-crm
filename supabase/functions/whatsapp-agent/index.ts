@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
 
@@ -176,7 +176,7 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - CIFRAS DE PLATA (facturación/monetización de una creadora — "$X/mes", "factura $Y", "monetiza $Z") salen SOLO de una fuente real: un campo de Maven (estimated_monetization / monthly_monetization) o el monto que alguien escribió o mostró en el mensaje/imagen. Si NO tenés la fuente, NO inventes ni estimes el número — omitilo o pedilo. Nunca tires un monto "de memoria" ni lo deduzcas de followers.
 - Si el closer reportó hoy múltiples veces (medio día + cierre), usá el ÚLTIMO reporte como source of truth, no el primero.
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí decílo.
-- NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisá en LeadGen", ni escales al owner por un número faltante, SIN haberlo confirmado primero con get_member_maven_activity (cuenta closers_contacts con teléfono — NUNCA leadgen_entries.phone_e164). Si la tool lo muestra cargado, está OK: no alarmes ni escales. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
+- NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisá en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usá lookup_lead_history(@handle) y mirá el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confirmáselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí decí que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asumí que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
 
 RANKING / PERFORMANCE — USAR MÉTRICAS DE NEGOCIO (no del chat):
 
@@ -1563,19 +1563,47 @@ async function executeTool(
     case "search_maven_leads": {
       const q = String(input.query ?? "").trim();
       if (!q) return { error: "empty_query" };
+      // ⚠️ NO exponemos phone_e164: es una columna MUERTA de leadgen_entries (4 filas de
+      // ~21k). El modelo la leía como "el teléfono del lead" y le decía a los LLGs "sin
+      // número cargado, recargalo" aunque el número estuviera bien puesto — el teléfono
+      // real vive en closers_contacts.phone. Abajo adjuntamos el estado REAL por handle.
       const { data, error } = await sb
         .from("leadgen_entries")
         .select(
-          "id, model_handle, platform, phone_e164, status, quality, ticket_number, company, city, state, notes, created_at",
+          "id, model_handle, platform, status, quality, ticket_number, company, city, state, notes, created_at",
         )
         .eq("tenant_id", ctx.tenantId)
         .or(
-          `model_handle.ilike.%${q}%,phone_e164.ilike.%${q}%,ticket_number.ilike.%${q}%,company.ilike.%${q}%`,
+          `model_handle.ilike.%${q}%,ticket_number.ilike.%${q}%,company.ilike.%${q}%`,
         )
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) return { error: error.message };
-      return { leads: data ?? [] };
+      const leads = data ?? [];
+
+      // Estado del NÚMERO por handle: una sola query a closers_contacts para todos los
+      // handles devueltos. Se reporta cargado + enmascarado (nunca el número crudo).
+      const handles = [...new Set(leads.map((l) => (l.model_handle ?? "").toLowerCase()).filter(Boolean))];
+      const telPorHandle = new Map<string, string>();
+      if (handles.length > 0) {
+        const { data: cts } = await sb
+          .from("closers_contacts")
+          .select("handle, phone")
+          .in("handle", handles)
+          .not("phone", "is", null);
+        for (const c of (cts ?? []) as Array<{ handle: string | null; phone: string | null }>) {
+          const h = (c.handle ?? "").toLowerCase();
+          if (h && c.phone && String(c.phone).replace(/\D/g, "").length >= 7 && !telPorHandle.has(h)) {
+            telPorHandle.set(h, redactPhones(String(c.phone)));
+          }
+        }
+      }
+      const leadsConNumero = leads.map((l) => {
+        const h = (l.model_handle ?? "").toLowerCase();
+        const masked = telPorHandle.get(h) ?? null;
+        return { ...l, numero: { cargado: !!masked, telefono_enmascarado: masked } };
+      });
+      return { leads: leadsConNumero };
     }
 
     case "get_lead_details": {
@@ -1589,7 +1617,25 @@ async function executeTool(
         .maybeSingle();
       if (error) return { error: error.message };
       if (!data) return { error: "not_found" };
-      return { lead: data };
+      // El phone_e164 de leadgen_entries está muerto. El teléfono real vive en
+      // closers_contacts (ligado por leadgen_entry_id, o por handle si no hay link).
+      // Se busca y se reporta ENMASCARADO — nunca el crudo (no meterlo en el contexto).
+      let numeroCargado = false;
+      let telefonoEnmascarado: string | null = null;
+      {
+        let cq = sb.from("closers_contacts").select("phone").not("phone", "is", null);
+        if ((data as { leadgen_entry_id?: string }).leadgen_entry_id) {
+          cq = cq.eq("leadgen_entry_id", (data as { leadgen_entry_id: string }).leadgen_entry_id);
+        } else if ((data as { model_handle?: string }).model_handle) {
+          cq = cq.ilike("handle", String((data as { model_handle: string }).model_handle));
+        }
+        const { data: cts } = await cq.limit(1).maybeSingle();
+        if (cts?.phone && String(cts.phone).replace(/\D/g, "").length >= 7) {
+          numeroCargado = true;
+          telefonoEnmascarado = redactPhones(String(cts.phone));
+        }
+      }
+      return { lead: data, numero: { cargado: numeroCargado, telefono_enmascarado: telefonoEnmascarado } };
     }
 
     case "list_commitments": {
@@ -2215,6 +2261,7 @@ async function executeTool(
         closerCreatorsRes,
         creatorsRes,
         scouterRes,
+        contactsRes,
       ] = await Promise.all([
         sb.from("leadgen_entries")
           .select("id, model_handle, platform, status, quality, company, notes, created_at, lg_user_id")
@@ -2238,6 +2285,15 @@ async function executeTool(
           .ilike("instagram_handle", ilike)
           .order("date_added", { ascending: false, nullsFirst: false })
           .limit(3),
+        // ⚠️ El TELÉFONO ("número obtenido" del LLG) vive ACÁ, en closers_contacts.phone,
+        // NO en leadgen_entries.phone_e164 (columna muerta). Sin esta fuente, el bot no
+        // tenía forma de ver un número cargado y le decía al LLG "sigue sin teléfono,
+        // recargalo" aunque estuviera bien cargado (incidente Daniel 30/07).
+        sb.from("closers_contacts")
+          .select("id, handle, phone, phone_first_set_at, created_at, created_by, contact_kind")
+          .ilike("handle", ilike)
+          .order("created_at", { ascending: false })
+          .limit(5),
       ]);
 
       // Para closer_creators que matchean, traemos también el historial reciente de touches.
@@ -2266,6 +2322,22 @@ async function executeTool(
       const creators = creatorsRes.data ?? [];
       const leadgen = leadgenRes.data ?? [];
       const scouter = scouterRes.data ?? [];
+      const contacts = contactsRes.data ?? [];
+
+      // Estado del NÚMERO OBTENIDO: la verdad está en closers_contacts.phone. Devolvemos
+      // solo un booleano + el número ENMASCARADO (últimos 4) — nunca el crudo, para no
+      // meterlo en el contexto del modelo (de ahí podría repetirlo aunque el borde de
+      // salida lo enmascare igual). "cargado" = hay al menos un contacto con teléfono.
+      const contactoConTel = contacts.find((c) => c.phone && String(c.phone).replace(/\D/g, "").length >= 7);
+      const telResumen = {
+        cargado: !!contactoConTel,
+        // "*****6868" o null
+        telefono_enmascarado: contactoConTel
+          ? redactPhones(String(contactoConTel.phone))
+          : null,
+        cargado_at: contactoConTel?.phone_first_set_at ?? contactoConTel?.created_at ?? null,
+        contactos_totales: contacts.length,
+      };
 
       if (creators.some((c) => c.status === "active")) overall = "active_creator";
       else if (cc.some((c) => c.no_interesada_date)) overall = "no_interesada";
@@ -2277,6 +2349,7 @@ async function executeTool(
       return {
         handle,
         overall_status: overall,
+        numero: telResumen,
         leadgen_entries: leadgen,
         closer_creators: cc,
         creators,
