@@ -208,6 +208,10 @@ export function useClosersKpiPopup(
           .from("closer_creators")
           .select("id, instagram_handle, estimated_monetization, stage, passed_date")
           .in("stage", ["Completada", "Confirmada"])
+          // Mismos filtros que la CARD de Rev. OnlyFans (línea Kash). Sin esto el
+          // detalle listaba filas que no suman en el número de arriba.
+          .eq("deal_type", "reclutamiento")
+          .neq("lead_source", "agencia")
           .gt("estimated_monetization", 0)
           .order("estimated_monetization", { ascending: false });
         if (viewAsCloserId) {
@@ -225,6 +229,39 @@ export function useClosersKpiPopup(
           primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
           secondary: r.stage,
           amount: fmtMoney(Number(r.estimated_monetization)),
+        }));
+        return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
+      }
+
+      // Suscripciones (creadoras propias) y Agencias (B2B). Faltaban las dos:
+      // "Rev. Suscripciones" existe desde que hay venta de plataformas y al
+      // clickearla el popup no listaba NADA porque ninguna rama la matcheaba;
+      // "Rev. Agencias" es nueva. Ambas se miden por subscription_amount, no por
+      // estimated_monetization (que en estos deals es 0).
+      if (platform === "Rev. Suscripciones" || platform === "Rev. Agencias") {
+        const esAgencia = platform === "Rev. Agencias";
+        let q = supabase
+          .from("closer_creators")
+          .select("id, instagram_handle, subscription_amount, main_platform, stage, passed_date")
+          .eq("deal_type", "venta_plataforma")
+          .in("stage", ["Completada", "Confirmada"])
+          .order("subscription_amount", { ascending: false });
+        q = esAgencia ? q.eq("lead_source", "agencia") : q.neq("lead_source", "agencia");
+        if (viewAsCloserId) {
+          q = q.eq("assigned_to", viewAsCloserId);
+        }
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        const rows: ClosersKpiPopupRow[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
+          secondary: [r.main_platform, r.stage].filter(Boolean).join(" · "),
+          amount: fmtMoney(Number(r.subscription_amount || 0)),
         }));
         return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
       }
