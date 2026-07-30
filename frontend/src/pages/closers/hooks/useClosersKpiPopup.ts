@@ -110,9 +110,16 @@ export function useClosersKpiPopup(
     }
     return q;
   };
+  // Mismo token de alcance que useCloserLeads: sin él, si el popup abre antes de
+  // que scopeAgentIds resuelva, muestra el detalle SIN alcance y no se refetchea
+  // al resolver (su key no cambia). Ver la nota extensa en useCloserLeads.
+  const scopeKey =
+    role === "Closer Supervisor" && !viewAsCloserId
+      ? (scopeAgentIds ? `sc:${scopeAgentIds.join(",")}` : "sc:pending")
+      : "sc:none";
 
   return useQuery<ClosersKpiPopupResult>({
-    queryKey: ["closers-kpi-popup", state, userId, role, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
+    queryKey: ["closers-kpi-popup", state, userId, role, scopeKey, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
     enabled: !!state && !!userId && !!role,
     staleTime: 30_000,
     queryFn: async (): Promise<ClosersKpiPopupResult> => {

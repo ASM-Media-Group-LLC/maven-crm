@@ -320,6 +320,20 @@ export const useCloserLeads = () => {
     return q;
   };
 
+  // Token de alcance para las queryKeys de TODAS las queries que pasan por
+  // scopeByAgent. `scopeAgentIds` se resuelve async en una query aparte: si una
+  // lista corre ANTES de que resuelva, se ejecuta SIN alcance (el supervisor ve
+  // todo el pipeline) y —como su key no incluía el alcance— nunca se refetcheaba
+  // al resolver. Resultado: el count era del set completo (varias páginas) pero
+  // el fetch de la página 2 ya venía scoped → página 1 con datos de más y
+  // página 2 vacía (bug reportado por Miguel en Asignaciones). Incluir el token
+  // fuerza el refetch en la transición pending→resuelto. Para no-supervisores el
+  // token es constante (la query de alcance está deshabilitada) → sin refetch de más.
+  const scopeKey =
+    role === "Closer Supervisor" && !viewAsCloserId
+      ? (scopeAgentIds ? `sc:${scopeAgentIds.join(",")}` : "sc:pending")
+      : "sc:none";
+
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
   const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
   const handleSetAgentFilter = (v: string | null) => { setAgentFilter(v); setPage(0); };
@@ -509,7 +523,7 @@ export const useCloserLeads = () => {
   };
 
   const buildCreatorsListKey = (tab: string, pageNum: number) =>
-    ["closer-creators-list", tab, pageNum, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId] as const;
+    ["closer-creators-list", tab, pageNum, user?.id, role, scopeKey, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId] as const;
 
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: buildCreatorsListKey(activeTab, page),
@@ -622,7 +636,7 @@ export const useCloserLeads = () => {
   // (6 contactos hechos, stage='Asignada'). Filtrado por closer si el
   // user no es admin/manager. Se usa para el dot rojo en el tab.
   const { data: alertCounts = { overdue: 0, decision: 0 } } = useQuery({
-    queryKey: ["closer-alert-counts", user?.id, role, viewAsCloserId],
+    queryKey: ["closer-alert-counts", user?.id, role, scopeKey, viewAsCloserId],
     queryFn: async () => {
       const targetUserId = effectiveUserId;
       let creatorsQ = supabase
@@ -675,7 +689,7 @@ export const useCloserLeads = () => {
   // La RPC get_closer_stage_counts no acepta fechas, así que contamos
   // acá, PAGINADO (closer_creators ya pasa las 1000 filas del cap PostgREST).
   const { data: statusCounts = {} } = useQuery({
-    queryKey: ["closer-creators-counts", "v2", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryKey: ["closer-creators-counts", "v2", user?.id, role, scopeKey, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       // (A) Conteos por stage "real" — respeta el rol (closer = solo sus
       // asignadas) y el rango de fecha sobre passed_date, igual que el
@@ -779,7 +793,7 @@ export const useCloserLeads = () => {
 
   // OF monetization total (estimated_monetization from completed/confirmed)
   const { data: ofMonetizationTotal = 0 } = useQuery({
-    queryKey: ["closer-of-monetization", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryKey: ["closer-of-monetization", user?.id, role, scopeKey, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       let q = supabase
         .from("closer_creators")
@@ -808,7 +822,7 @@ export const useCloserLeads = () => {
   // existentes (deal_type='venta_plataforma'): monto MENSUAL fijo, sin
   // comisión %. Bucket separado del revenue de reclutamiento (OF × %).
   const { data: subscriptionRevenue = EMPTY_SUBSCRIPTION_REVENUE } = useQuery({
-    queryKey: ["closer-subscription-revenue", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryKey: ["closer-subscription-revenue", user?.id, role, scopeKey, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       let q = supabase
         .from("closer_creators")
@@ -863,7 +877,7 @@ export const useCloserLeads = () => {
   // agencias. Va aparte de las suscripciones de creadoras porque son dos
   // negocios distintos y el owner los quiere medidos por separado.
   const { data: agencyRevenueTotal = 0 } = useQuery({
-    queryKey: ["closer-agency-revenue", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryKey: ["closer-agency-revenue", user?.id, role, scopeKey, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       let q = supabase
         .from("closer_creators")
