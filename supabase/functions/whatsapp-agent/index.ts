@@ -3301,21 +3301,25 @@ async function executeTool(
       // es cero cambio de comportamiento para el bot de closers actual.
       if (hasTool(name)) {
         // ── CANDADO 2 para el CATÁLOGO ──────────────────────────────────────
-        // Las tools INLINE gatean por rol una por una (ctx.privileged, ver
-        // get_closer_pipeline_status / get_member_maven_activity). Las del CATÁLOGO
-        // son management/analítica (Hubstaff productividad, actividad de equipo,
-        // earnings, comparativas de promo, conversaciones de otros) y NINGUNA se
-        // auto-scopea al remitente. Sin este gate, un no-privilegiado que menciona
-        // al bot en un grupo las alcanzaba (bypass de candado 2). Denegamos TODO el
-        // catálogo cuando el request está scopeado (privileged===false). Los digests/
-        // auto/aperturas/DMs/owner/admin/supervisor corren con privileged=true|undefined
-        // → sin cambios. Si en el futuro alguna tool de catálogo debe estar disponible
-        // para no-privilegiados, hay que darle scoping propio y whitelistearla acá.
-        if (ctx.privileged === false) {
+        // Las tools INLINE gatean por rol una por una (ctx.privileged). Las del
+        // CATÁLOGO no se auto-scopean, así que hay que gatearlas acá.
+        // ⚠️ HISTORIA: primero denegué el catálogo ENTERO a los no privilegiados y eso
+        // ROMPIÓ el bot de Managers — `privileged` excluye a propósito el rol 'manager'
+        // (ver getSenderScope), así que Carolina/Fabiana/Lorena se quedaron sin
+        // get_manager_growth_feed y el bot le respondió a Fabiana "me está bloqueando el
+        // acceso a esa data (error de permisos)". La separación por dominio ya la hace
+        // el llavero por bot (wa_bots.tool_allowlist/denylist); lo que candado 2 tiene
+        // que cubrir es lo que expone a OTRAS PERSONAS del equipo, no el dominio propio.
+        const CATALOGO_SOLO_PRIVILEGIADOS = new Set([
+          "get_hubstaff_activity",    // horas y % de actividad de cualquier empleado
+          "get_chatter_productivity", // ROI/costo por persona, flag "online improductivo"
+          "get_qa_activity",          // desempeño de QA por persona
+        ]);
+        if (ctx.privileged === false && CATALOGO_SOLO_PRIVILEGIADOS.has(name)) {
           return {
             error: "no_autorizado",
             message:
-              "Esa información es de supervisión (actividad/productividad/earnings del equipo). La ve un supervisor, manager o el owner — por tu rol no está disponible acá.",
+              "Esa información es de supervisión (horas/productividad del equipo). La ve un supervisor o el owner — por tu rol no está disponible acá.",
           };
         }
         try {
@@ -3365,10 +3369,11 @@ async function loadPersonFacts(tenantId: string, groupId: string): Promise<Array
   const sb = adminClient();
   const { data, error } = await sb
     .from("whatsapp_person_facts")
+    .select("fact, profiles:subject_user_id(full_name)")
     // SCOPE POR GRUPO: sin esto, un hecho contado en Managers aparecía en el prompt de
     // Ventas, AI WARMING y el DM de Álvaro. Lo que se cuenta en un grupo queda ahí.
+    // (Los filtros van DESPUÉS de .select() — supabase-js no expone .eq() sobre from().)
     .eq("group_id", groupId)
-    .select("fact, profiles:subject_user_id(full_name)")
     .eq("tenant_id", tenantId)
     .eq("active", true)
     .order("created_at", { ascending: true })
