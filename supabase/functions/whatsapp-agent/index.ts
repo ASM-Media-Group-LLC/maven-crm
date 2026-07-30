@@ -1137,21 +1137,25 @@ const TOOLS: Array<{
   {
     name: "register_daily_report",
     description:
-      "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. Llamala cuando detectes patrones tipo 'Reporte Daniel: contactados 70, respuestas 1, números 0' (LLG) o 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0' (Closer Supervisor). Idempotente: si ya hay un reporte para ese user y fecha, lo actualiza (típicamente el último wins). Después de registrar, confirmá breve en el grupo con un ✓ y un mini-summary.",
+      "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. TRES tipos:\n- role_kind='llg': outreach de captación — 'contactados 70, respuestas 1, números 0'.\n- role_kind='closer': calls/cierres — 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0'.\n- role_kind='content': CONTENIDO del equipo de warming — 'hice 5 videos, 3 fotos', 'creé 2 cuentas', 'subí 4 posts a @cuenta'. Usá videos_creados/fotos_creadas/cuentas_creadas/posts_subidos.\nOJO: cualquiera puede ADEMÁS meter números — si un creador de contenido reporta que consiguió un número, seteá también numeros_obtenidos (igual el número real se cuenta por el contacto cargado en Maven). Idempotente por (user, fecha): el último reporte actualiza. Después de registrar, confirmá breve con ✓ y mini-summary REAL (los datos que guardaste), NUNCA un 'anotado' vacío sin haber llamado esta tool.",
     input_schema: {
       type: "object",
       properties: {
         display_name: { type: "string", description: "nombre del miembro (de quien es el reporte)" },
         report_date: { type: "string", description: "fecha YYYY-MM-DD (zona Bogotá) — generalmente HOY si lo manda al final del día" },
-        role_kind: { type: "string", enum: ["llg", "closer"], description: "LLG si es reporte de contactos (números), closer si es reporte de calls/closings" },
+        role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "llg=captación (números), closer=calls/cierres, content=creación de contenido (videos/fotos/cuentas) del equipo de warming" },
         contactados: { type: "number", description: "cantidad de contactados (LLG: nuevos perfiles texteados; closer: contactos+seguimientos)" },
         respuestas: { type: "number", description: "respuestas recibidas" },
-        numeros_obtenidos: { type: "number", description: "solo LLG: cuántos números nuevos obtuvo" },
+        numeros_obtenidos: { type: "number", description: "cuántos números nuevos obtuvo — típico de LLG, pero cualquiera puede meter uno (seteálo aunque role_kind sea content)" },
         confirmadas: { type: "number", description: "solo closer: reuniones confirmadas" },
         rechazadas: { type: "number", description: "solo closer: rechazadas/descartadas" },
         canceladas: { type: "number", description: "solo closer: canceladas" },
         cerradas: { type: "number", description: "solo closer: cierres formales" },
         seguimientos: { type: "number", description: "solo closer: seguimientos hechos" },
+        videos_creados: { type: "number", description: "solo content: videos hechos ese día" },
+        fotos_creadas: { type: "number", description: "solo content: fotos creadas ese día" },
+        cuentas_creadas: { type: "number", description: "solo content: cuentas de IG nuevas creadas ese día" },
+        posts_subidos: { type: "number", description: "solo content: posts/historias subidos a las cuentas ese día" },
         links: { type: "array", items: { type: "string" }, description: "URLs de IG u otros que aparezcan en el reporte" },
         raw_text: { type: "string", description: "texto crudo del reporte para auditoría" },
       },
@@ -2487,7 +2491,7 @@ async function executeTool(
       const roleKind = String(input.role_kind ?? "");
       if (!displayName) return { error: "missing_display_name" };
       if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return { error: "invalid_report_date" };
-      if (!["llg", "closer"].includes(roleKind)) return { error: "invalid_role_kind" };
+      if (!["llg", "closer", "content"].includes(roleKind)) return { error: "invalid_role_kind" };
 
       // Resolver display_name → user_id (helper busca en wpp + full_name).
       const members = await resolveMembersByName(sb, ctx.groupId, displayName);
@@ -2508,6 +2512,10 @@ async function executeTool(
         canceladas: input.canceladas ?? null,
         cerradas: input.cerradas ?? null,
         seguimientos: input.seguimientos ?? null,
+        videos_creados: input.videos_creados ?? null,
+        fotos_creadas: input.fotos_creadas ?? null,
+        cuentas_creadas: input.cuentas_creadas ?? null,
+        posts_subidos: input.posts_subidos ?? null,
         links: input.links ?? [],
         raw_text: input.raw_text ? String(input.raw_text).slice(0, 5000) : null,
         group_id: ctx.groupId,
@@ -2516,7 +2524,7 @@ async function executeTool(
       const { data, error } = await sb
         .from("whatsapp_daily_reports")
         .upsert(payload, { onConflict: "user_id,report_date" })
-        .select("id, user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas")
+        .select("id, user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos")
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
