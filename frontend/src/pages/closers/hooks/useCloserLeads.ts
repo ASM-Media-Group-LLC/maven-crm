@@ -100,6 +100,26 @@ export const SOURCE_TABS: Record<string, string> = {
 // en "Asignaciones" donde trabaja todos los días.
 const B2B_SOURCE = "agencia";
 
+// Las TRES líneas de negocio del pipeline. Cada una tiene su propio embudo y su
+// propia forma de facturar, así que se cuentan y se miden por separado:
+//   kash        → reclutar modelos para la agencia (comisión % sobre su OF).
+//                 Incluye las ex-creadoras: es el mismo embudo.
+//   plataformas → venderle un producto del portfolio a una creadora propia
+//                 (suscripción mensual).
+//   agencias    → B2B: venderle producto a una agencia externa (suscripción).
+export type BusinessLine = "kash" | "plataformas" | "agencias";
+export const BUSINESS_LINES: { value: BusinessLine | "todo"; label: string }[] = [
+  { value: "todo", label: "Todo" },
+  { value: "kash", label: "Kash" },
+  { value: "plataformas", label: "Plataformas" },
+  { value: "agencias", label: "Agencias" },
+];
+
+export const businessLineOf = (leadSource: string | null, dealType: string | null): BusinessLine => {
+  if ((leadSource || "maven") === B2B_SOURCE) return "agencias";
+  return dealType === "venta_plataforma" ? "plataformas" : "kash";
+};
+
 export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot", "Otra"] as const;
 export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot"] as const;
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
@@ -574,13 +594,20 @@ export const useCloserLeads = () => {
       const counts: Record<string, number> = {};
       for (const row of rows as Array<{ stage: string | null; deal_type: string | null; lead_source: string | null }>) {
         const src = row.lead_source || "maven";
-        // Contadores de las bases propias (cruzan stages).
+        const s = row.stage || "Sin stage";
+        // Línea de negocio del lead. Son tres embudos distintos y el owner los
+        // quiere contados aparte (si se mezclan, la conversión no significa nada:
+        // reclutar una modelo y venderle Trafix a una agencia no son lo mismo).
+        const line = businessLineOf(src, row.deal_type);
+        counts[`${line}:${s}`] = (counts[`${line}:${s}`] || 0) + 1;
+        counts[`line:${line}`] = (counts[`line:${line}`] || 0) + 1;
+
+        // Contadores de las bases propias (cruzan stages) — para los tabs.
         if (src === "ex_creadora") counts["ex_creadores"] = (counts["ex_creadores"] || 0) + 1;
         if (src === "agencia") counts["agencias"] = (counts["agencias"] || 0) + 1;
         // Los conteos por stage y el de Ventas son del embudo de MODELOS: las
         // agencias (B2B) no suman ahí, igual que no aparecen en esos tabs.
         if (src === B2B_SOURCE) continue;
-        const s = row.stage || "Sin stage";
         counts[s] = (counts[s] || 0) + 1;
         if (row.deal_type === "venta_plataforma") counts["ventas"] = (counts["ventas"] || 0) + 1;
       }
@@ -640,6 +667,11 @@ export const useCloserLeads = () => {
       let q = supabase
         .from("closer_creators")
         .select("estimated_monetization, passed_date")
+        // Revenue de la línea KASH: sólo reclutamiento de modelos. Antes no
+        // filtraba, así que cualquier fila con estimated_monetization sumaba acá
+        // (las agencias, por ejemplo, si les cargan monetización).
+        .eq("deal_type", "reclutamiento")
+        .neq("lead_source", B2B_SOURCE)
         .in("stage", ["Completada", "Confirmada"]);
       if (!canSeeAll && effectiveUserId) {
         q = q.eq("assigned_to", effectiveUserId);
@@ -667,6 +699,38 @@ export const useCloserLeads = () => {
         .from("closer_creators")
         .select("subscription_amount, passed_date")
         .eq("deal_type", "venta_plataforma")
+        // Sólo ventas a creadoras propias. Las agencias también son
+        // venta_plataforma con suscripción: sin este filtro, al importar las 465
+        // sus suscripciones se sumarían al "Rev. Suscripciones" de creadoras y el
+        // número dejaría de significar lo que dice.
+        .neq("lead_source", B2B_SOURCE)
+        .in("stage", ["Completada", "Confirmada"]);
+      if (!canSeeAll && effectiveUserId) {
+        q = q.eq("assigned_to", effectiveUserId);
+      }
+      if (applyCreatorDate) {
+        const fromStr = dateFrom!.toISOString().split("T")[0];
+        const toStr = dateTo!.toISOString().split("T")[0];
+        q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).reduce((s, r) => s + Number((r as any).subscription_amount || 0), 0);
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+  });
+
+  // Revenue de la línea AGENCIAS (B2B): suscripciones de los deals cerrados con
+  // agencias. Va aparte de las suscripciones de creadoras porque son dos
+  // negocios distintos y el owner los quiere medidos por separado.
+  const { data: agencyRevenueTotal = 0 } = useQuery({
+    queryKey: ["closer-agency-revenue", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryFn: async () => {
+      let q = supabase
+        .from("closer_creators")
+        .select("subscription_amount, passed_date")
+        .eq("lead_source", B2B_SOURCE)
         .in("stage", ["Completada", "Confirmada"]);
       if (!canSeeAll && effectiveUserId) {
         q = q.eq("assigned_to", effectiveUserId);
@@ -869,6 +933,7 @@ export const useCloserLeads = () => {
     platformSalesByCreator,
     ofMonetizationTotal,
     subscriptionRevenueTotal,
+    agencyRevenueTotal,
     totalCount,
     totalPages,
     page, setPage,

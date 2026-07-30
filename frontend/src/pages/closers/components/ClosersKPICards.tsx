@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 import { useBestCloser } from "@/hooks/useOperationsDashboard";
+import { BUSINESS_LINES, type BusinessLine } from "../hooks/useCloserLeads";
 
 interface Props {
   statusCounts: Record<string, number>;
   platformRevenue: Record<string, number>;
   ofMonetizationTotal: number;
   subscriptionRevenueTotal: number;
+  agencyRevenueTotal: number;
   dateFrom?: Date;
   dateTo?: Date;
   onPipelineClick?: (key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas") => void;
@@ -43,17 +45,32 @@ const ClosersKPICards = ({
   platformRevenue,
   ofMonetizationTotal,
   subscriptionRevenueTotal,
+  agencyRevenueTotal,
   dateFrom,
   dateTo,
   onPipelineClick,
   onRevenueClick,
 }: Props) => {
-  const asignadas = statusCounts["Asignada"] || 0;
-  const confirmadas = statusCounts["Confirmada"] || 0;
-  const completadas = statusCounts["Completada"] || 0;
-  const noInteresadas = statusCounts["No interesada"] || 0;
+  // Línea de negocio a mostrar. Son tres embudos distintos (reclutar una modelo
+  // ≠ venderle Trafix a una agencia): mezclarlos hacía que la conversión y los
+  // conteos no significaran nada. "Todo" suma las tres.
+  const [line, setLine] = useState<BusinessLine | "todo">("todo");
+  const at = (stage: string) =>
+    line === "todo"
+      ? (statusCounts[`kash:${stage}`] || 0) + (statusCounts[`plataformas:${stage}`] || 0) + (statusCounts[`agencias:${stage}`] || 0)
+      : (statusCounts[`${line}:${stage}`] || 0);
+
+  const asignadas = at("Asignada");
+  const confirmadas = at("Confirmada");
+  const completadas = at("Completada");
+  const noInteresadas = at("No interesada");
+  const nuevos = at("Nuevo");
   const cerradas = confirmadas + completadas;
-  const total = asignadas + confirmadas + completadas + noInteresadas;
+  const total = asignadas + confirmadas + completadas + noInteresadas + nuevos;
+  // Conversión real de la línea: cerradas sobre lo que se trabajó (excluye los
+  // que todavía nadie tocó, si no el número castiga por tener pool).
+  const trabajadas = asignadas + confirmadas + completadas + noInteresadas;
+  const conversion = trabajadas > 0 ? (cerradas / trabajadas) * 100 : 0;
 
   // Mismo hook que usa Panel de Control — 70% cierres normalizados +
   // 30% calif QA promedio del rango. Si el filter de la página NO tiene
@@ -70,7 +87,28 @@ const ClosersKPICards = ({
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
-  const revTotal = ofMonetizationTotal + revPlataformas + subscriptionRevenueTotal;
+  const revTotal = ofMonetizationTotal + revPlataformas + subscriptionRevenueTotal + agencyRevenueTotal;
+
+  // Cada línea factura distinto: Kash cobra comisión % sobre el OF de la modelo;
+  // Plataformas y Agencias cobran suscripción. Mostrar sólo lo que aplica evita
+  // cards en $0 que parecen un error.
+  const revenueCards =
+    line === "kash"
+      ? [{ label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" }]
+      : line === "plataformas"
+        ? [
+            { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
+            { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
+          ]
+        : line === "agencias"
+          ? [{ label: "Rev. Agencias", amount: agencyRevenueTotal, icon: Repeat, color: "bg-amber-500" }]
+          : [
+              { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
+              { label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" },
+              { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
+              { label: "Rev. Agencias", amount: agencyRevenueTotal, icon: Repeat, color: "bg-amber-500" },
+              { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
+            ];
 
   const pipelineCards = [
     { key: "total" as const, label: "Total", count: total, icon: Users, color: "bg-slate-500" },
@@ -81,13 +119,8 @@ const ClosersKPICards = ({
     { key: "no_interesadas" as const, label: "No interesadas", count: noInteresadas, icon: XCircle, color: "bg-rose-500" },
   ];
 
-  // Hero del revenue — 3 cards grandes y prominentes (lo que importa).
-  const heroRevenue = [
-    { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
-    { label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" },
-    { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
-    { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
-  ];
+  // Hero del revenue — armado según la línea seleccionada (ver revenueCards).
+  const heroRevenue = revenueCards;
 
   // Datos para el stacked bar de plataformas. Si todo es $0, mostramos
   // un placeholder en vez de barra vacía.
@@ -147,9 +180,40 @@ const ClosersKPICards = ({
 
       {/* Pipeline — primera sección */}
       <div className="space-y-3">
-        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
-          Pipeline
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+            Pipeline
+          </h3>
+          {/* Selector de LÍNEA DE NEGOCIO. Sin esto los conteos mezclaban
+              reclutamiento de modelos con ventas de plataforma (y, al importar,
+              con las agencias) → la conversión no era comparable con nada. */}
+          <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+              {BUSINESS_LINES.map((l) => (
+                <button
+                  key={l.value}
+                  type="button"
+                  onClick={() => setLine(l.value)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    line === l.value
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            {trabajadas > 0 && (
+              <span
+                className="whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-muted-foreground"
+                title="Cerradas (confirmadas + completadas) sobre los leads que se trabajaron — no cuenta el pool sin tocar."
+              >
+                Conversión <strong className="text-foreground">{conversion.toFixed(1)}%</strong>
+              </span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {pipelineCards.map((card) => (
             <KpiCard
