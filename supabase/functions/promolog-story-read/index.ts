@@ -201,9 +201,10 @@ Deno.serve(async (req: Request) => {
           const id = idByU.get(normalizeHandle(c.instagram_handle));
           if (id) {
             idByCreator.set(c.id, id);
+            // PK compuesta desde 20260730013000 (una fila por creadora+cuenta).
             await (sb as any).from("promolog_ig_identity").upsert(
               { creator_id: c.id, handle: normalizeHandle(c.instagram_handle), ig_user_id: id, resolved_at: new Date().toISOString() },
-              { onConflict: "creator_id" });
+              { onConflict: "creator_id,handle" });
           }
         }
       }

@@ -25,12 +25,15 @@ Deno.serve(async (req) => {
     .from("v_promolog_eligible_creators").select("id, instagram_handle, name, artistic_name");
   if (error) return json({ error: error.message }, 500);
 
-  // ids cacheados (para que la extensión no tenga que resolverlos).
+  // ids cacheados (para que la extensión no tenga que resolverlos). El caché es por
+  // (creadora, cuenta) — cubre la principal Y las extra de creator_social_accounts.
+  // Sin el id, la extensión resuelve vía web_profile_info, el endpoint que IG limita
+  // silenciosamente → las cuentas sin caché salían "throttled" en cada corrida.
   const ids = (creators ?? []).map((c: any) => c.id);
-  const idByCreator = new Map<string, string>();
+  const idByAccount = new Map<string, string>(); // `${creator_id}:${handle}` → ig_user_id
   if (ids.length) {
-    const { data: cached } = await (sb as any).from("promolog_ig_identity").select("creator_id, ig_user_id").in("creator_id", ids);
-    for (const r of (cached ?? [])) idByCreator.set(r.creator_id, r.ig_user_id);
+    const { data: cached } = await (sb as any).from("promolog_ig_identity").select("creator_id, handle, ig_user_id").in("creator_id", ids);
+    for (const r of (cached ?? [])) idByAccount.set(`${r.creator_id}:${norm(r.handle)}`, r.ig_user_id);
   }
 
   // Estado del scan de HOY para ordenar: nunca-escaneada (0) → pendiente/reintentable (1)
@@ -62,11 +65,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Handle principal (con ig_user_id cacheado) + cada cuenta EXTRA. La extra va con
-  // ig_user_id=null a propósito: el cache de promolog_ig_identity es de la cuenta
-  // PRINCIPAL, así que la extensión debe resolver el id de la 2ª cuenta desde su handle.
-  // Dedupe por (creator_id, handle) → la principal, que también aparece en
-  // creator_social_accounts, no se duplica.
+  // Handle principal + cada cuenta EXTRA, ambos con su ig_user_id cacheado si existe
+  // (por (creator_id, handle)). La primera pasada de una cuenta nueva va con id=null →
+  // la extensión lo resuelve UNA vez, el ingest lo persiste, y de ahí en más viaja
+  // cacheado (sin pasar por web_profile_info). Dedupe por (creator_id, handle) → la
+  // principal, que también aparece en creator_social_accounts, no se duplica.
   const rows: Array<{ creator_id: string; handle: string; ig_user_id: string | null; name: string }> = [];
   const seen = new Set<string>();
   const push = (creator_id: string, handle: string, ig_user_id: string | null, name: string) => {
@@ -79,8 +82,8 @@ Deno.serve(async (req) => {
   for (const c of (creators ?? [])) {
     const primary = norm(c.instagram_handle);
     const name = c.artistic_name || c.name;
-    push(c.id, primary, idByCreator.get(c.id) ?? null, name);
-    for (const h of (extraByCreator.get(c.id) ?? [])) if (h !== primary) push(c.id, h, null, name);
+    push(c.id, primary, idByAccount.get(`${c.id}:${primary}`) ?? null, name);
+    for (const h of (extraByCreator.get(c.id) ?? [])) if (h !== primary) push(c.id, h, idByAccount.get(`${c.id}:${h}`) ?? null, name);
   }
   // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
   const targets = rows.sort((a, b) => rank(a.creator_id) - rank(b.creator_id));

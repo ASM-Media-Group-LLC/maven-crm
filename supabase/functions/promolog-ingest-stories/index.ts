@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
   let si = 0, no = 0, pending = 0, entries = 0;
   const results: any[] = [];
   const tgDiscovered = new Map<string, string>(); // creator_id → @handle de Telegram visto en su IG
+  const idUpserts: any[] = []; // user-ids que la extensión resolvió en ESTA corrida → cachear
   for (const c of incoming) {
     const cid = c.creator_id;
     if (!cid || !metaById.has(cid)) { results.push({ handle: c.handle, outcome: "skip_no_creator" }); continue; }
@@ -84,6 +85,13 @@ Deno.serve(async (req) => {
     // (creator_social_accounts) la fila quedaba atribuida al handle principal → imposible
     // saber de qué cuenta salió la promo o el error. Ahora manda el handle que se leyó.
     const handle = String(c.handle ?? meta.instagram_handle ?? "").toLowerCase();
+
+    // Cachear el user-id que la extensión resolvió (los targets se lo mandaron en null).
+    // El id es PERMANENTE (sobrevive renombres) → la próxima corrida viaja cacheado y no
+    // pasa por web_profile_info, el endpoint que IG limita silenciosamente (throttled).
+    if (typeof c.ig_user_id === "string" && /^\d{1,32}$/.test(c.ig_user_id) && handle) {
+      idUpserts.push({ creator_id: cid, handle, ig_user_id: c.ig_user_id, resolved_at: new Date().toISOString() });
+    }
 
     if (c.error) {
       // Etiqueta REAL de la extensión (throttled | http_0 | no_ig_id | http_XXX) → queda
@@ -172,6 +180,14 @@ Deno.serve(async (req) => {
       }).catch((e) => console.warn("ig→tg verify:", e?.message));
     }
     results.push({ ig_to_tg: [...tgDiscovered.entries()].map(([id, h]) => ({ creator_id: id, tg: h })) });
+  }
+
+  // Persistir los user-ids resueltos (una fila por creadora+cuenta; PK compuesta).
+  // Best-effort: si falla, la próxima corrida re-resuelve — no bloquea el scan.
+  if (idUpserts.length) {
+    const { error: idErr } = await (sb as any).from("promolog_ig_identity")
+      .upsert(idUpserts, { onConflict: "creator_id,handle" });
+    if (idErr) console.error("promolog_ig_identity upsert:", idErr.message);
   }
 
   await (sb as any).from("promolog_dispatch_runs").update({

@@ -156,18 +156,27 @@ function trimItem(it) {
 // runScan por racha (no acá, porque una sola lectura vacía es indistinguible).
 async function scanOne(t) {
   let id = t.ig_user_id;
+  // v1.3.0: si los targets no traían id cacheado, se resuelve acá (web_profile_info =
+  // el endpoint que IG limita silencioso) y el id resuelto VIAJA en el payload → Maven
+  // lo cachea (promolog_ig_identity, por creadora+cuenta) y la próxima corrida ya no
+  // pasa por acá. Antes se tiraba: las cuentas extra se re-resolvían en CADA corrida
+  // y salían "throttled" casi siempre (el grueso de los ⏳).
+  let resolvedNow = null;
   if (!id) {
     const res = await resolveId(t.handle);
     id = res.id;
     if (!id) return { creator_id: t.creator_id, handle: t.handle, error: res.net ? "http_0" : (res.blocked ? "throttled" : "no_ig_id") };
+    resolvedNow = String(id);
   }
+  const withId = (o) => (resolvedNow ? { ...o, ig_user_id: resolvedNow } : o);
 
   const st = await igGet(`feed/user/${id}/story/`);
   if (!st.ok) {
     // soft-fail (200 pero status!="ok") o 401/403/429 = sesión limitada → throttled
     // (re-intentable); otros HTTP → etiqueta cruda para diagnóstico. Ambos → pending.
+    // El id resuelto se manda IGUAL: la resolución sirvió aunque la lectura fallara.
     const blocked = st.softFail || [401, 403, 429].includes(st.status);
-    return { creator_id: t.creator_id, handle: t.handle, error: blocked ? "throttled" : `http_${st.status}` };
+    return withId({ creator_id: t.creator_id, handle: t.handle, error: blocked ? "throttled" : `http_${st.status}` });
   }
   const items = st.json?.reel?.items ?? [];
 
@@ -177,11 +186,11 @@ async function scanOne(t) {
     is_private = fr.json?.is_private ?? null;
     following = fr.json?.following ?? null;
   }
-  return {
+  return withId({
     creator_id: t.creator_id, handle: t.handle,
     reel_items: items.slice(0, 15).map(trimItem),
     is_private, following,
-  };
+  });
 }
 
 // Mutex simple: dos scans a la vez (doble click / alarm + manual) duplican el ritmo de
@@ -205,14 +214,41 @@ async function runScan(trigger = "manual") {
   // mitad del loop (scans de varios minutos quedaban congelados en "Escaneando… N/56").
   // Un chrome.* barato cada 20s resetea el timer de idle. clearInterval SIEMPRE (finally).
   keepAlive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {} }, 20000);
-  await setStatus(`Escaneando… (${trigger})`);
+  // Aviso anti-throttle: pasadas manuales muy seguidas gastan la cuota de lectura de la
+  // sesión de IG y suben los ⏳ throttled. El followup automático (50 min) ya reintenta
+  // las fallidas solo — no hace falta re-escanear a mano.
+  let warn = "";
+  if (trigger === "manual") {
+    const { lastScanDoneAt } = await chrome.storage.local.get("lastScanDoneAt");
+    if (lastScanDoneAt && Date.now() - lastScanDoneAt < 90 * 60 * 1000) {
+      warn = ` · ⚠ la pasada anterior terminó hace ${Math.max(1, Math.round((Date.now() - lastScanDoneAt) / 60000))} min — escanear tan seguido sube los ⏳ (throttle de IG)`;
+    }
+  }
+  await setStatus(`Escaneando… (${trigger})${warn}`);
 
     const post = (creators) => fetchMaven(`${mavenUrl}/functions/v1/promolog-ingest-stories`, {
       method: "POST", headers: { "x-ext-token": extToken, "Content-Type": "application/json" },
       body: JSON.stringify({ creators }),
     });
+    // Etiquetas humanas para el desglose de ⏳ (por qué no se pudo leer cada cuenta).
+    const whyLabel = (reason) => {
+      const s = String(reason || "");
+      if (s.startsWith("throttled")) return "throttled";
+      if (s.startsWith("no_ig_id")) return "handle roto";
+      if (s.startsWith("follow_pending")) return "privada sin follow";
+      if (s.startsWith("http_0")) return "red";
+      if (s.startsWith("unconfirmed_empty")) return "sin confirmar";
+      return "otros";
+    };
     const tally = async (res, acc) => {
-      if (res && res.ok) { const j = await res.json().catch(() => ({})); acc.si += j.si || 0; acc.no += j.no || 0; acc.pending += j.pending || 0; }
+      if (res && res.ok) {
+        const j = await res.json().catch(() => ({}));
+        acc.si += j.si || 0; acc.no += j.no || 0; acc.pending += j.pending || 0;
+        // Desglose de los ⏳ desde results[] del ingest → el badge dice POR QUÉ, no solo cuántas.
+        for (const r of (Array.isArray(j.results) ? j.results : [])) {
+          if (r && r.outcome === "pending") { const k = whyLabel(r.reason); acc.why[k] = (acc.why[k] || 0) + 1; }
+        }
+      }
     };
 
     if (trigger === "followup") {
@@ -229,7 +265,7 @@ async function runScan(trigger = "manual") {
     }
     if (!targets.length) { await setStatus("Sin creadoras que escanear."); return; }
 
-    const acc = { si: 0, no: 0, pending: 0 };
+    const acc = { si: 0, no: 0, pending: 0, why: {} };
     let done = 0;
     // Breakers de sesión limitada, DOS caras (ver constantes arriba):
     //  - emptyStreak + held: soft-block SILENCIOSO. Los vacíos no explicados de la
@@ -345,7 +381,10 @@ async function runScan(trigger = "manual") {
       held = [];
     }
     await flush();
-    await setStatus(`✔ Listo ${new Date().toLocaleString()} · ${done} creadoras · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}${tailNote}`);
+    // El conteo es de ESTA pasada: lo ya registrado hoy no se re-cuenta como ✅ (dedup
+    // por historia), así que un ✅ bajo a la tarde NO significa que el día vino mal.
+    const why = Object.entries(acc.why).map(([k, v]) => `${v} ${k}`).join(" · ");
+    await setStatus(`✔ Listo ${new Date().toLocaleString()} · ${done} cuentas · ✅${acc.si} ❌${acc.no} ⏳${acc.pending}${acc.pending && why ? ` (${why})` : ""} — solo esta pasada; el estado del DÍA completo está en Maven → Promolog${tailNote}`);
   } catch (e) {
     await setStatus(`⚠ Error: ${String(e).slice(0, 120)}`);
   } finally {
@@ -363,6 +402,8 @@ async function runScan(trigger = "manual") {
         }
       }
     } catch (_) { /* best-effort */ }
+    // Marca de "última pasada terminada" → alimenta el aviso anti-throttle de arriba.
+    try { if (targets.length) await chrome.storage.local.set({ lastScanDoneAt: Date.now() }); } catch (_) { /* best-effort */ }
     if (keepAlive) clearInterval(keepAlive);
     scanRunning = false;
   }

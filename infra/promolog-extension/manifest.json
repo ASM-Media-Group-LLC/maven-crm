@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Maven Promolog — Scanner IG",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "description": "Lee las historias de Instagram de las creadoras DESDE TU NAVEGADOR (tu IP + tu sesión) y las envía a Maven para analizar. Evita el bloqueo por IP de datacenter.",
   "permissions": ["alarms", "storage"],
   "host_permissions": [
