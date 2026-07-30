@@ -31,7 +31,18 @@ const corsHeaders = {
 const MAX_TRANSCRIPT_CHARS = 200_000;
 // Claude Opus context: 200k tokens → ~600k chars; Sonnet: 200k tokens.
 // 200k chars de transcript cabe holgado con el system prompt + contexto.
-const CLAUDE_TIMEOUT_MS = 120_000; // 2 min
+// Presupuesto de pared: Supabase mata la edge function a los ~150s. El resto de
+// la invocación (leer la call, parsear, escribir el análisis) son 2-5s, así que
+// 135s para Claude deja margen para devolver un 502 LEGIBLE en vez de que el
+// runtime la mate y el closer vea un error genérico.
+// Estaba en 120s y con el prompt recalibrado (SYSTEM_PROMPT pasó de 18k a 50k
+// chars y pide más output: prefijos "No aplica", atribución por hablante, el
+// aviso de tipo de llamada) las llamadas largas empezaron a pasarse — aca2a7af
+// falló 2 de 3 veces con "Claude tardó más de 120s".
+// Red de seguridad: si igual se pasa, la fila queda con claude_analysis='{}' y
+// el cron retry_stuck_qa_analyses (job 18, cada 10 min) la reintenta — eso recién
+// funciona desde que se creó el secret project_url en Vault el 2026-07-30.
+const CLAUDE_TIMEOUT_MS = 135_000;
 
 interface AnalyzeRequest {
   call_id?: string;
