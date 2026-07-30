@@ -98,10 +98,12 @@ const isSaleType = (t: CallType) => t === "venta_servicio" || t === "venta_exter
 // Servicios/plataformas que un closer puede vender (a creadora propia o a una
 // modelo externa). Los que pidió Miguel (Kash/Unlimited) + las plataformas del
 // pipeline de closers (SALE_PLATFORMS de useCloserLeads).
+// Trafix salió del catálogo (discontinuada) → ya no se ofrece. Las QA viejas
+// que la tengan guardada siguen mostrándose bien: el valor se lee de la fila,
+// no de esta lista.
 const QA_SERVICES = [
   "Kash",
   "Unlimited",
-  "Trafix",
   "Blu",
   "Piclink",
   "Content Protector",

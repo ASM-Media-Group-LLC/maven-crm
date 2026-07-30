@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { SALE_PLATFORMS } from "./useCloserLeads";
 
 // Datos para los popups de los KPI cards en closers/dashboard.
 //
@@ -53,7 +54,10 @@ const STAGE_BY_KEY: Record<string, string[] | null> = {
 
 const STAGE_ORDER: string[] = ["Asignada", "Confirmada", "Completada", "No interesada"];
 
-const PLATFORM_KEYS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
+// Del catálogo vigente + Trafix, que ya no se vende pero tiene ventas viejas
+// clickeables en el desglose. Se deriva de SALE_PLATFORMS para que no vuelva a
+// quedar desincronizado con el selector de ventas.
+const PLATFORM_KEYS: string[] = [...SALE_PLATFORMS, "Trafix"];
 
 const fmtMoney = (n: number) => `$${Number(n || 0).toLocaleString("es")}`;
 
@@ -203,6 +207,39 @@ export function useClosersKpiPopup(
       // ── REVENUE ── (flat por ahora)
       const platform = state.platform;
 
+      // Ventas de plataforma registradas por el CARRITO (pipeline). Mismos
+      // filtros que la card "Rev. Plataformas" de ClosersKPICards: si acá
+      // divergen, el popup muestra un total distinto al de la card.
+      // `onlyPlatform` usa ilike (igualdad case-insensitive) porque el mismo
+      // producto está escrito de dos formas según la fila ("Piclink"/"PicLink").
+      const fetchPipelinePlatformRows = async (onlyPlatform?: string): Promise<ClosersKpiPopupRow[]> => {
+        let q = supabase
+          .from("closer_creators")
+          .select("id, instagram_handle, subscription_amount, main_platform, stage, passed_date")
+          .eq("deal_type", "venta_plataforma")
+          .neq("lead_source", "agencia")
+          .in("stage", ["Completada", "Confirmada"]);
+        if (onlyPlatform) q = q.ilike("main_platform", onlyPlatform);
+        if (viewAsCloserId) q = q.eq("assigned_to", viewAsCloserId);
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        return (data ?? [])
+          .map((r: any) => ({
+            id: r.id,
+            primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
+            secondary: [r.main_platform, r.stage].filter(Boolean).join(" · "),
+            amount: fmtMoney(Number(r.subscription_amount || 0)),
+            _sort: Number(r.subscription_amount || 0),
+          }))
+          .sort((a, b) => b._sort - a._sort)
+          .map(({ _sort, ...row }) => row);
+      };
+
       if (platform === "Rev. OnlyFans") {
         let q = supabase
           .from("closer_creators")
@@ -305,7 +342,12 @@ export function useClosersKpiPopup(
             secondary: v.platforms.join(", "),
             amount: fmtMoney(v.total),
           }));
-        return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
+        // Las ventas registradas por el CARRITO viven en el pipeline, no en
+        // closer_platform_sales. La card las suma, así que el detalle también
+        // tiene que listarlas o el popup no cuadra con el monto de arriba.
+        const pipelineRows = await fetchPipelinePlatformRows();
+        const allRows = [...rows, ...pipelineRows];
+        return { mode: "flat", totalCount: allRows.length, groups: [{ cat: "", count: allRows.length, rows: allRows }] };
       }
 
       if (platform === "Rev. Total") {
@@ -315,9 +357,13 @@ export function useClosersKpiPopup(
               .select("creator_id, price, created_at, closer_creators!inner(assigned_to)")
               .eq("closer_creators.assigned_to", viewAsCloserId)
           : supabase.from("closer_platform_sales").select("creator_id, price, created_at");
+        // Rev. Total = OF (reclutamiento) + plataformas + agencias. Antes sólo
+        // leía estimated_monetization, que en los deals de venta es 0 → las
+        // ventas de plataforma y las agencias no aparecían en el detalle aunque
+        // sí estaban en el monto de la card.
         let ofQ = supabase
           .from("closer_creators")
-          .select("id, instagram_handle, estimated_monetization, stage, passed_date")
+          .select("id, instagram_handle, estimated_monetization, subscription_amount, deal_type, lead_source, stage, passed_date")
           .in("stage", ["Completada", "Confirmada"]);
         if (viewAsCloserId) {
           ofQ = ofQ.eq("assigned_to", viewAsCloserId);
@@ -338,8 +384,24 @@ export function useClosersKpiPopup(
           byCreator[r.creator_id] = (byCreator[r.creator_id] || 0) + Number(r.price || 0);
         }
         const handleMap: Record<string, string> = {};
-        for (const c of (ofRes.data ?? []) as Array<{ id: string; instagram_handle: string | null; estimated_monetization: number | string }>) {
-          byCreator[c.id] = (byCreator[c.id] || 0) + Number(c.estimated_monetization || 0);
+        for (const c of (ofRes.data ?? []) as unknown as Array<{
+          id: string;
+          instagram_handle: string | null;
+          estimated_monetization: number | string;
+          subscription_amount: number | string | null;
+          deal_type: string | null;
+          lead_source: string | null;
+        }>) {
+          // Cada línea factura por un campo distinto: reclutamiento por
+          // estimated_monetization, venta de plataforma y agencias por
+          // subscription_amount.
+          const amount =
+            c.deal_type === "venta_plataforma"
+              ? Number(c.subscription_amount || 0)
+              : c.lead_source === "agencia"
+                ? 0
+                : Number(c.estimated_monetization || 0);
+          byCreator[c.id] = (byCreator[c.id] || 0) + amount;
           handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle";
         }
         const missingIds = Object.keys(byCreator).filter((id) => !(id in handleMap));
@@ -363,17 +425,21 @@ export function useClosersKpiPopup(
         return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
       }
 
-      if (PLATFORM_KEYS.includes(platform)) {
+      // Clic en una barra del desglose "por plataforma". El desglose se arma con
+      // los datos, así que acá puede llegar cualquier nombre de plataforma —
+      // incluida una que no esté en PLATFORM_KEYS. Se descarta sólo lo que ya
+      // matcheó una rama de label ("Rev. …"), que retornó más arriba.
+      if (PLATFORM_KEYS.includes(platform) || !platform.startsWith("Rev. ")) {
         let q = viewAsCloserId
           ? supabase
               .from("closer_platform_sales")
               .select("creator_id, price, created_at, closer_creators!inner(assigned_to)")
-              .eq("platform", platform)
+              .ilike("platform", platform)
               .eq("closer_creators.assigned_to", viewAsCloserId)
           : supabase
               .from("closer_platform_sales")
               .select("creator_id, price, created_at")
-              .eq("platform", platform);
+              .ilike("platform", platform);
         if (applySalesDate) {
           q = q.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
         }
@@ -398,7 +464,10 @@ export function useClosersKpiPopup(
             primary: handleMap[r.creator_id] ?? "Sin handle",
             amount: fmtMoney(Number(r.price || 0)),
           }));
-        return { mode: "flat", totalCount: sortedRows.length, groups: [{ cat: "", count: sortedRows.length, rows: sortedRows }] };
+        // + las ventas de esa misma plataforma hechas por el carrito.
+        const pipelineRows = await fetchPipelinePlatformRows(platform);
+        const allRows = [...sortedRows, ...pipelineRows];
+        return { mode: "flat", totalCount: allRows.length, groups: [{ cat: "", count: allRows.length, rows: allRows }] };
       }
 
       return { mode: "flat", groups: [], totalCount: 0 };

@@ -120,8 +120,33 @@ export const businessLineOf = (leadSource: string | null, dealType: string | nul
   return dealType === "venta_plataforma" ? "plataformas" : "kash";
 };
 
+// PLATFORMS = plataforma principal del lead (filtro). Mantiene Trafix porque
+// hay leads históricos con ese valor y sin la opción no se pueden filtrar.
 export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot", "Otra"] as const;
-export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot"] as const;
+// SALE_PLATFORMS = lo que se VENDE hoy (catálogo Unlimited). Trafix salió del
+// catálogo → ya no se ofrece al registrar una venta nueva, pero las ventas
+// históricas siguen contando en el desglose (que se arma desde los datos).
+export const SALE_PLATFORMS = ["Blu", "Piclink", "Content Protector", "ORA", "Let's Shoot"] as const;
+
+// El mismo producto está escrito distinto según de dónde venga la fila:
+// "Piclink" en el pipeline vs "PicLink" en el catálogo, "Blu" vs "BLU". Sin
+// normalizar, el desglose por plataforma parte una misma plataforma en dos
+// barras y ninguna matchea el color asignado.
+const PLATFORM_CANON = new Map<string, string>(
+  [...SALE_PLATFORMS, "Trafix", "Unlok", "Kash", "OnlyFans"].map((p) => [p.toLowerCase(), p]),
+);
+// Default a nivel de módulo (no inline): si fuera un objeto nuevo por render,
+// el useMemo que arma platformRevenue se recalcularía siempre.
+const EMPTY_SUBSCRIPTION_REVENUE: { total: number; byPlatform: Record<string, number> } = {
+  total: 0,
+  byPlatform: {},
+};
+
+export const canonicalPlatform = (raw?: string | null): string => {
+  const name = (raw || "").trim();
+  if (!name) return "Sin plataforma";
+  return PLATFORM_CANON.get(name.toLowerCase()) ?? name;
+};
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
 
@@ -696,7 +721,10 @@ export const useCloserLeads = () => {
   });
 
   // Revenue by platform
-  const { data: platformRevenue = {} } = useQuery({
+  // Camino VIEJO de registrar una venta de plataforma: el panel dentro del lead
+  // (tabla closer_platform_sales). Sigue en uso, así que no se puede ignorar —
+  // pero tampoco es la única fuente (ver platformRevenue más abajo).
+  const { data: legacyPlatformRevenue = {} } = useQuery({
     queryKey: ["closer-platform-revenue", user?.id, role, applySalesDate ? dateFromStr : null, applySalesDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       // Si estamos viendo "como" un closer, embebemos la FK a
@@ -714,7 +742,8 @@ export const useCloserLeads = () => {
       if (error) throw error;
       const rev: Record<string, number> = {};
       for (const row of data || []) {
-        rev[row.platform] = (rev[row.platform] || 0) + Number(row.price || 0);
+        const key = canonicalPlatform(row.platform);
+        rev[key] = (rev[key] || 0) + Number(row.price || 0);
       }
       return rev;
     },
@@ -754,12 +783,12 @@ export const useCloserLeads = () => {
   // Ingreso por SUSCRIPCIÓN — deals de venta de plataforma a creadoras
   // existentes (deal_type='venta_plataforma'): monto MENSUAL fijo, sin
   // comisión %. Bucket separado del revenue de reclutamiento (OF × %).
-  const { data: subscriptionRevenueTotal = 0 } = useQuery({
+  const { data: subscriptionRevenue = EMPTY_SUBSCRIPTION_REVENUE } = useQuery({
     queryKey: ["closer-subscription-revenue", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       let q = supabase
         .from("closer_creators")
-        .select("subscription_amount, passed_date")
+        .select("main_platform, subscription_amount, passed_date")
         .eq("deal_type", "venta_plataforma")
         // Sólo ventas a creadoras propias. Las agencias también son
         // venta_plataforma con suscripción: sin este filtro, al importar las 465
@@ -777,11 +806,36 @@ export const useCloserLeads = () => {
       }
       const { data, error } = await q;
       if (error) throw error;
-      return (data || []).reduce((s, r) => s + Number((r as any).subscription_amount || 0), 0);
+      // Desglosado por plataforma además del total: es la fuente REAL del
+      // "por plataforma" del dashboard (el carrito de Creadoras escribe acá).
+      const byPlatform: Record<string, number> = {};
+      let total = 0;
+      for (const r of (data || []) as unknown as Array<{ main_platform: string | null; subscription_amount: number | string | null }>) {
+        const amount = Number(r.subscription_amount || 0);
+        total += amount;
+        const key = canonicalPlatform(r.main_platform);
+        byPlatform[key] = (byPlatform[key] || 0) + amount;
+      }
+      return { total, byPlatform };
     },
     enabled: !!user?.id && !!role,
     staleTime: 30_000,
   });
+  const subscriptionRevenueTotal = subscriptionRevenue.total;
+
+  // "Rev. Plataformas" y el desglose por plataforma tienen que reflejar TODO lo
+  // vendido, venga del panel viejo del lead (closer_platform_sales) o del
+  // carrito de Creadoras (deal_type='venta_plataforma' en el pipeline, el camino
+  // de hoy). Antes sólo miraba el panel viejo: mostraba $190 de marzo/mayo y
+  // dejaba fuera las ventas del pipeline, que sumaban aparte en "Rev.
+  // Suscripciones" — así que el desglose por plataforma estaba congelado en 2026-05.
+  const platformRevenue = useMemo(() => {
+    const merged: Record<string, number> = { ...legacyPlatformRevenue };
+    for (const [k, v] of Object.entries(subscriptionRevenue.byPlatform)) {
+      merged[k] = (merged[k] || 0) + v;
+    }
+    return merged;
+  }, [legacyPlatformRevenue, subscriptionRevenue]);
 
   // Revenue de la línea AGENCIAS (B2B): suscripciones de los deals cerrados con
   // agencias. Va aparte de las suscripciones de creadoras porque son dos

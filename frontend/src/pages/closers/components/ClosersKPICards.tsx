@@ -38,7 +38,22 @@ const PLATFORM_COLORS: Record<string, { bar: string; dot: string }> = {
   Piclink:    { bar: "bg-pink-500",    dot: "bg-pink-500" },
   "Content Protector": { bar: "bg-amber-500", dot: "bg-amber-500" },
   ORA:        { bar: "bg-emerald-500", dot: "bg-emerald-500" },
+  "Let's Shoot": { bar: "bg-cyan-500", dot: "bg-cyan-500" },
 };
+
+// El desglose se arma con los datos, así que puede aparecer una plataforma que
+// no esté en el mapa. Color estable derivado del nombre (no random) para que no
+// cambie entre renders ni queden dos barras del mismo gris.
+const FALLBACK_PALETTE = [
+  { bar: "bg-sky-500", dot: "bg-sky-500" },
+  { bar: "bg-rose-500", dot: "bg-rose-500" },
+  { bar: "bg-teal-500", dot: "bg-teal-500" },
+  { bar: "bg-fuchsia-500", dot: "bg-fuchsia-500" },
+  { bar: "bg-lime-500", dot: "bg-lime-500" },
+];
+const platformColor = (name: string) =>
+  PLATFORM_COLORS[name] ??
+  FALLBACK_PALETTE[[...name].reduce((h, c) => h + c.charCodeAt(0), 0) % FALLBACK_PALETTE.length];
 
 const ClosersKPICards = ({
   statusCounts,
@@ -85,9 +100,15 @@ const ClosersKPICards = ({
   const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(bestCloserRange);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
 
-  const salePlatforms = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
-  const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
-  const revTotal = ofMonetizationTotal + revPlataformas + subscriptionRevenueTotal + agencyRevenueTotal;
+  // platformRevenue ya viene con las DOS fuentes de venta de plataforma (panel
+  // viejo del lead + pipeline) sumadas por plataforma, así que el total es la
+  // suma de todo lo que traiga. Antes se recortaba con una lista fija que tenía
+  // Trafix (discontinuada) y le faltaba Let's Shoot: una venta real de $250
+  // quedaba invisible en el dashboard.
+  const revPlataformas = Object.values(platformRevenue).reduce((s, v) => s + v, 0);
+  // subscriptionRevenueTotal es un SUBCONJUNTO de revPlataformas (la parte
+  // recurrente del pipeline) → sumarlo acá lo contaba dos veces.
+  const revTotal = ofMonetizationTotal + revPlataformas + agencyRevenueTotal;
 
   // Cada línea factura distinto: Kash cobra comisión % sobre el OF de la modelo;
   // Plataformas y Agencias cobran suscripción. Mostrar sólo lo que aplica evita
@@ -98,6 +119,8 @@ const ClosersKPICards = ({
       : line === "plataformas"
         ? [
             { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
+            // Sub-detalle de la card anterior (cuánto de ese total es
+            // suscripción recurrente del pipeline), no un bucket aparte.
             { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
           ]
         : line === "agencias"
@@ -105,7 +128,9 @@ const ClosersKPICards = ({
           : [
               { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
               { label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" },
-              { label: "Rev. Suscripciones", amount: subscriptionRevenueTotal, icon: Repeat, color: "bg-cyan-500" },
+              // "Rev. Suscripciones" no va en la vista Todo: está DENTRO de
+              // Rev. Plataformas y al lado de Rev. Total parecía sumarse aparte.
+              // El detalle recurrente se ve eligiendo la línea Plataformas.
               { label: "Rev. Agencias", amount: agencyRevenueTotal, icon: Repeat, color: "bg-amber-500" },
               { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
             ];
@@ -124,10 +149,13 @@ const ClosersKPICards = ({
 
   // Datos para el stacked bar de plataformas. Si todo es $0, mostramos
   // un placeholder en vez de barra vacía.
-  const platformBreakdown = salePlatforms.map((p) => ({
-    key: p,
-    amount: platformRevenue[p] || 0,
-  }));
+  // Se arma con los DATOS, no con una lista fija: cualquier plataforma nueva
+  // aparece sola y una discontinuada deja de ocupar lugar cuando no factura,
+  // sin tener que acordarse de editar el array.
+  const platformBreakdown = Object.entries(platformRevenue)
+    .filter(([, amount]) => amount > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, amount]) => ({ key, amount }));
   const platformsTotal = revPlataformas;
 
   return (
@@ -263,7 +291,7 @@ const ClosersKPICards = ({
                 .filter((p) => p.amount > 0)
                 .map((p) => {
                   const pct = (p.amount / platformsTotal) * 100;
-                  const color = PLATFORM_COLORS[p.key]?.bar ?? "bg-slate-500";
+                  const color = platformColor(p.key).bar;
                   return (
                     <button
                       key={p.key}
@@ -281,7 +309,7 @@ const ClosersKPICards = ({
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-5">
             {platformBreakdown.map((p) => {
               const pct = platformsTotal > 0 ? (p.amount / platformsTotal) * 100 : 0;
-              const dot = PLATFORM_COLORS[p.key]?.dot ?? "bg-slate-500";
+              const dot = platformColor(p.key).dot;
               return (
                 <button
                   key={p.key}
