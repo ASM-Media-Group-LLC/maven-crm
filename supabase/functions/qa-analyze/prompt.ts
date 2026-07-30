@@ -207,6 +207,13 @@ Esto NO afloja ninguna exigencia del rubric — sólo prohíbe usar el resultado
 - Los techos y pisos duros siguen vigentes y NO se relajan para levantar el promedio: dim 12 máximo 30 sin ningún intento cross-portfolio, dim 13 máximo 30 con evidencia de que la modelo entró sin cam y no se la pidió, dim 8 nunca por debajo de 70 por mera ausencia de evidencia.
 Chequeo antes de devolver: si no cerró y el procedimiento igual fue bueno, la combinación correcta es dimensiones ALTAS con "overall_score" BAJO — eso es lo esperado, no un error tuyo, y no lo "arregles" bajando dims. Si cerró y el procedimiento fue flojo, las dims van bajas igual y sólo sube "overall_score".
 
+CHEQUEO FINAL DE "call_outcome" — la separación de arriba NO cambia la CLASIFICACIÓN
+El bloque anterior sólo prohíbe que el resultado mueva las dimensiones. Clasificar "call_outcome" se sigue haciendo con el bloque CALL_OUTCOME — reglas finas, aplicado LITERALMENTE. Antes de devolver el JSON recorré estos tres pasos en orden y quedate con el primero que se cumpla:
+1. ¿Hay una acción VINCULANTE ejecutada o autorizada sin condiciones, en la llamada o inmediatamente después (firmó, pagó, dejó el pago hecho, autorizó el alta o el cargo, contrato enviado + confirmación explícita)? → "cerro". Acordar pagar, prometer pagar "hoy" o "esta semana", pactar una fecha de inicio, o comprometerse a mandar plata NO son acciones ejecutadas: eso NO es "cerro".
+2. ¿La modelo RECHAZÓ explícitamente? → "no_cerro". La ausencia de cierre no es rechazo: si no dijo que no, NO es "no_cerro".
+3. Todo lo demás → "en_espera". Es el DEFAULT y es la respuesta correcta para la MAYORÍA de las llamadas: "lo pienso", "te aviso", "lo consulto", próximos pasos acordados sin pago, y compromisos informales como aceptar un programa de referidos o prometer traer otras creadoras.
+Este chequeo no admite excepciones por lo bien o mal que se haya manejado la llamada: el manejo ya está medido en las 13 dimensiones.
+
 LEAD NO CALIFICADO — excepción de resultado (gate estricto)
 Se aplica SÓLO si el transcript cumple las TRES condiciones, todas con texto literal citable:
 (a) queda ENUNCIADO EN LA LLAMADA un requisito de entrada objetivo de la agencia (facturación mínima, tipo de contenido, plataforma, país, edad, exclusividad), dicho por el closer o por la modelo — nunca inferido por vos;
