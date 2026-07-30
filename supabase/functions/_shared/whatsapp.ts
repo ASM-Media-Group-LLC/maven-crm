@@ -330,3 +330,44 @@ export function authorizeCronOrJwt(req: Request): boolean {
   const auth = req.headers.get("Authorization") ?? "";
   return auth.toLowerCase().startsWith("bearer ") && auth.length > 20;
 }
+
+// ----------------------------------------------------------------------------
+// Detección de mención al bot — FUENTE ÚNICA
+// ----------------------------------------------------------------------------
+// Vivía duplicada: whatsapp-ingest tenía esta versión (LID + "~" + variantes) y
+// whatsapp-analyze-image una propia, mucho más pobre, que solo miraba el OCR y
+// buscaba los literales "@maven"/"@bot". Por esa divergencia, en un grupo en modo
+// `mention` NINGUNA imagen con mención llegaba al agente: WhatsApp serializa la
+// mención como el LID numérico ("@140716701401153") y la pone en el CAPTION, no
+// adentro de los píxeles. Caso real 30/07: Daniel posteó su primer número obtenido
+// del día como screenshot y el bot nunca se enteró — ni siquiera se lo invocó.
+// Cualquier consumidor nuevo tiene que usar ESTA función, nunca su propia copia.
+
+// LID(s) interno(s) del bot en WhatsApp. Cuando alguien lo menciona con el picker
+// "@", WhatsApp inserta el LID numérico en el body en lugar del display name.
+// Configurable via env BOT_LIDS (CSV) por si cambia de número o hay más instancias.
+export const BOT_LIDS: string[] = (Deno.env.get("BOT_LIDS") ?? "140716701401153")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// IMPORTANTE: WhatsApp prefija el display name con `~` cuando el contacto que se
+// menciona NO está agendado por quien escribe. Por eso el body puede llegar como
+// "@~Maven" en vez de "@maven" — hay que matchear ambos, con espacios y mayúsculas
+// mixtas. Pasale TODO el texto disponible (caption + OCR + transcripción), no una
+// sola fuente.
+export function hasBotMention(...textos: Array<string | null | undefined>): boolean {
+  const body = textos.filter(Boolean).join("\n");
+  if (!body) return false;
+  if (/@\s*~?\s*maven\b/i.test(body)) return true;
+  if (/@\s*~?\s*bot\b/i.test(body)) return true;
+  for (const lid of BOT_LIDS) {
+    if (body.includes(`@${lid}`)) return true;
+  }
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("maven bot") ||
+    lower.includes("maven asistente") ||
+    lower.includes("@maven_bot")
+  );
+}

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, hasBotMention, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
 // whatsapp-analyze-image — analiza imágenes del grupo con un LLM con
@@ -426,12 +426,13 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     .eq("id", msg.group_id)
     .maybeSingle();
   if (group?.bot_enabled && group?.bot_mode !== "off") {
-    const ocrLower = (result.analysis.ocr_text ?? "").toLowerCase();
-    const hasMention =
-      ocrLower.includes("@maven") ||
-      ocrLower.includes("@bot") ||
-      ocrLower.includes("maven bot");
-    if (hasMention) {
+    // ⚠️ La mención va en el CAPTION del mensaje (msg.body), no adentro de la imagen,
+    // y WhatsApp la serializa como el LID numérico ("@140716701401153"), no como
+    // "@maven". Antes acá solo se miraba el OCR y solo esos literales → en un grupo
+    // en modo `mention` NINGUNA imagen disparaba al agente. Costó real: el 30/07
+    // Daniel posteó su primer número obtenido del día como screenshot y el bot nunca
+    // fue invocado. Ahora se usa el detector compartido sobre caption + OCR.
+    if (hasBotMention(msg.body, result.analysis.ocr_text)) {
       fireAgent(msg.id, msg.group_id, "image_mention");
     } else if (group.bot_mode === "always" && extractedText.trim().length >= 4) {
       const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });

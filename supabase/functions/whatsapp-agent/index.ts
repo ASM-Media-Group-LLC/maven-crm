@@ -4205,8 +4205,9 @@ async function runAgent(req: AgentRequest): Promise<{
     { role: "user", content: initialUser },
   ];
 
-  const startedAt = Date.now();
   let finalReply: string | null = null;
+  // Por qué la corrida terminó sin publicar nada (se reporta en el evento agent_silent).
+  let silentReason: string = "loop_agotado";
   let iter = 0;
   const totalUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
@@ -4242,9 +4243,9 @@ async function runAgent(req: AgentRequest): Promise<{
   })();
 
   // ── SINGLE-FLIGHT: tomar el lock del grupo antes de arrancar ────────────────
-  // Si otra corrida está atendiendo este grupo, esperamos hasta ~8s a que libere;
-  // al proceder ya vemos su respuesta en la ventana de contexto (30 msgs) → el
-  // modelo no la repite. Si sigue tomado tras 8s, seguimos igual (nunca mudo).
+  // Si otra corrida está atendiendo este grupo, esperamos a que libere; al proceder
+  // ya vemos su respuesta en la ventana de contexto (30 msgs) → el modelo no la
+  // repite. Si sigue tomado al vencer la espera, seguimos igual (nunca mudo).
   const lockHolder = crypto.randomUUID();
   {
     // La espera tiene que cubrir lo que dura una corrida REAL (MAX_WALL_MS = 30s). Con
@@ -4259,9 +4260,17 @@ async function runAgent(req: AgentRequest): Promise<{
     }
   }
 
+  // ⚠️ startedAt va DESPUÉS de la espera del lock, no antes. El presupuesto de pared
+  // (MAX_WALL_MS = 30s) mide cuánto puede trabajar la corrida, NO cuánto estuvo
+  // haciendo cola. Con el reloj arrancando antes de la espera (que llega a 33s), una
+  // corrida que esperaba el lock entraba al loop ya vencida, rompía en iter=0 y
+  // devolvía ok:true SIN responder y SIN loguear nada: el bot quedaba mudo justo en el
+  // caso que el single-flight venía a resolver. No se disparó en prod, pero estaba armado.
+  const startedAt = Date.now();
+
   try {
   for (; iter < MAX_ITERATIONS; iter += 1) {
-    if (Date.now() - startedAt > MAX_WALL_MS) break;
+    if (Date.now() - startedAt > MAX_WALL_MS) { silentReason = "presupuesto_de_pared"; break; }
 
     // PROMPT CACHING (Anthropic): el system prompt (~5K tokens con
     // catálogo + reglas) y el array TOOLS (~3K tokens) son estables
@@ -4378,6 +4387,7 @@ async function runAgent(req: AgentRequest): Promise<{
       // texto en mention — pero terminaba publicando el META-RAZONAMIENTO del
       // bot (ej. "esto no requiere respuesta, silencio total"). Si el modelo no
       // llamó reply_to_group, respetamos su silencio.
+      silentReason = "el_modelo_no_llamo_ninguna_tool";
       messages.push({ role: "assistant", content: data.content });
       break;
     }
@@ -4438,6 +4448,33 @@ async function runAgent(req: AgentRequest): Promise<{
     tenantId: group.tenant_id,
     context: { group_id: group.id, iterations: iter + 1, invoked_by: req.invoked_by },
   });
+
+  // ── OBSERVABILIDAD: dejar rastro cuando la corrida termina SIN hablar ────────
+  // Esta función nunca logueaba un evento de fallo: una corrida que salía muda era
+  // indistinguible de una que reventaba, y las dos se veían igual desde la DB
+  // (agent_invoked y nada más). Diagnosticar el silencio de AI WARMING del 30/07
+  // costó horas por esto. Ahora todo silencio deja su motivo.
+  //
+  // OJO con el ruido: en `auto` el silencio es lo NORMAL y esperado (escucha pasiva),
+  // así que ese caso se loguea igual pero queda marcado como esperado. Cuando alguien
+  // CITA al bot y no obtiene respuesta, eso casi siempre es un defecto → `esperado:false`.
+  if (!finalReply) {
+    const dirigido = req.invoked_by === "mention" || req.invoked_by === "audio_mention" ||
+      req.invoked_by === "image_mention" || group.is_direct === true;
+    await logEvent(sb, {
+      tenantId: group.tenant_id,
+      groupId: group.id,
+      kind: "agent_silent",
+      payload: {
+        motivo: silentReason,
+        esperado: !dirigido,
+        invoked_by: req.invoked_by,
+        message_id: req.message_id ?? null,
+        iterations: iter + 1,
+        output_tokens: totalUsage.output_tokens,
+      },
+    });
+  }
 
   return {
     ok: true,
