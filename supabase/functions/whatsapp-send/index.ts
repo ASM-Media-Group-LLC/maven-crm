@@ -203,11 +203,38 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
       continue;
     }
 
+    // Los recordatorios se guardan como TEXTO PLANO, y el agente suele escribir el
+    // destinatario como "@<lid>" (copiado de la tabla de miembros). Como el drain
+    // mandaba el body tal cual, SIN el array `mentions`, WhatsApp no podía resolver
+    // el LID y el equipo veía "@249125350154247, recordatorio: ..." — números crudos.
+    // (Caso real 29/07 con María.) Acá resolvemos cada @<dígitos> a su NOMBRE y de paso
+    // pasamos los LIDs en `mentions` para que además le llegue el ping.
+    let outBody = r.body;
+    let mentions: string[] | undefined;
+    const lids = [...String(r.body).matchAll(/@(\d{6,})/g)].map((m) => m[1]);
+    if (lids.length > 0) {
+      const { data: mem } = await sb
+        .from("whatsapp_members")
+        .select("external_id, display_name, profiles:user_id(full_name)")
+        .eq("group_id", r.group_id)
+        .in("external_id", lids.map((d) => `${d}@lid`));
+      const found: string[] = [];
+      for (const d of lids) {
+        const row = (mem ?? []).find((x: any) => x.external_id === `${d}@lid`) as any;
+        if (!row) continue;
+        const nombre = String(row.profiles?.full_name ?? row.display_name ?? "").split(" ")[0];
+        if (nombre) outBody = outBody.split(`@${d}`).join(nombre);
+        found.push(`${d}@lid`);
+      }
+      if (found.length > 0) mentions = found;
+    }
+
     const result = await sendOne({
       groupId: r.group_id,
-      body: r.body,
+      body: outBody,
       tenantId: r.tenant_id,
       reminderId: r.id,
+      mentions,
     });
 
     if (result.ok) {
