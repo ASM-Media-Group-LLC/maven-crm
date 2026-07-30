@@ -117,7 +117,15 @@ async function resolveId(handle) {
     const softFail = typeof j?.status === "string" && j.status !== "ok";
     if (softFail || r.status === 401 || r.status === 403 || r.status === 429) return { id: null, blocked: true };
     if (!r.ok) return { id: null, blocked: false }; // 404 u otro → handle roto, no bloqueo
-    return { id: j?.data?.user?.id ?? null, blocked: false };
+    const id = j?.data?.user?.id ?? null;
+    // 200 + status "ok" pero SIN usuario = límite SILENCIOSO de IG en web_profile_info,
+    // NO un handle roto. Antes caía en no_ig_id, que el drain trata como TERMINAL del día
+    // → la cuenta no se reintentaba nunca más. Caso real: solamente_moramay (2ª cuenta de
+    // Moramay, existe y es pública) fallaba con no_ig_id TODOS los días desde el 12/06.
+    // Ojo: solo las cuentas EXTRA pasan por acá — la principal trae ig_user_id cacheado,
+    // por eso el síntoma parecía exclusivo de las secundarias.
+    if (!id) return { id: null, blocked: true };
+    return { id, blocked: false };
   } catch { return { id: null, blocked: false, net: true }; } // red caída ≠ bloqueo de IG
 }
 

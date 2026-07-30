@@ -79,14 +79,18 @@ Deno.serve(async (req) => {
     const cid = c.creator_id;
     if (!cid || !metaById.has(cid)) { results.push({ handle: c.handle, outcome: "skip_no_creator" }); continue; }
     const meta = metaById.get(cid);
-    const handle = String(meta.instagram_handle ?? c.handle ?? "").toLowerCase();
+    // La cuenta REALMENTE escaneada. Antes esto priorizaba meta.instagram_handle (la
+    // PRINCIPAL) sobre c.handle, así que cuando la extensión escaneaba una 2ª cuenta de IG
+    // (creator_social_accounts) la fila quedaba atribuida al handle principal → imposible
+    // saber de qué cuenta salió la promo o el error. Ahora manda el handle que se leyó.
+    const handle = String(c.handle ?? meta.instagram_handle ?? "").toLowerCase();
 
     if (c.error) {
       // Etiqueta REAL de la extensión (throttled | http_0 | no_ig_id | http_XXX) → queda
       // en error_reason/notas. Antes todo se aplanaba a "read_failed" y era IMPOSIBLE
       // distinguir throttle de IG vs red vs handle roto al diagnosticar los ⏳.
       const errLabel = String(c.error).toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24) || "read_failed";
-      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: errLabel });
+      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: errLabel, source_handle: handle });
       pending++; results.push({ handle, outcome: "pending", reason: String(c.error).slice(0, 60) }); continue;
     }
     const rawItems: any[] = Array.isArray(c.reel_items) ? c.reel_items : [];
@@ -107,20 +111,20 @@ Deno.serve(async (req) => {
       // se muestra como "No · no verificado").
       const isReadable = c.is_private === false || (c.is_private === true && c.following === true);
       if (c.is_private === true && c.following !== true) {
-        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "follow_pending" });
+        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "follow_pending", source_handle: handle });
         pending++; results.push({ handle, outcome: "pending", reason: "follow_pending" });
       } else if (isReadable) {
-        await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate });
+        await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, source_handle: handle });
         no++; results.push({ handle, outcome: "no", story_items: 0 });
       } else {
-        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "read_failed" });
+        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "read_failed", source_handle: handle });
         pending++; results.push({ handle, outcome: "pending", reason: "unconfirmed_empty" });
       }
       continue;
     }
     const items = rawItems.map(mapReelItem).filter((s) => s.mediaUrl);
     if (items.length === 0) {
-      await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate });
+      await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, source_handle: handle });
       no++; results.push({ handle, outcome: "no", note: "items sin media" }); continue;
     }
     const nick = ofNickFromUrl(meta.onlyfans_url ?? "");

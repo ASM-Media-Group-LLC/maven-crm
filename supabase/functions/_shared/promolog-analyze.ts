@@ -452,7 +452,7 @@ async function insertUnreadableEntry(
 // historia (o ninguna era promo). promoted='false' = No legítimo.
 export async function insertEmptyEntry(
   sb: any,
-  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string },
+  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string; source_handle?: string | null },
 ): Promise<void> {
   // Idempotencia: si ya hay una entry de IG hoy (p.ej. un run anterior leyó historias),
   // no agregamos un "sin historias" que la contradiga ni duplique.
@@ -465,6 +465,10 @@ export async function insertEmptyEntry(
     analyzed_by_ai: true, ai_model: LLM_MODEL, ai_confidence: 1.0,
     ai_reasoning: "Lectura directa a IG con sesión: sin historias activas → no promocionó.",
     story_count: 0,
+    // DE QUÉ CUENTA vino la lectura. Antes el path de la extensión no lo guardaba, así
+    // que una creadora con 2ª cuenta de IG mostraba filas indistinguibles y no se podía
+    // saber cuál se leyó ni cuál falló (caso Moramay).
+    source_handle: args.source_handle ?? null,
   });
 }
 
@@ -472,7 +476,7 @@ export async function insertEmptyEntry(
 // cuenta privada). NO afirma "no promocionó" → promoted='pending' + error_reason.
 export async function insertNoDataEntry(
   sb: any,
-  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string; reason?: string },
+  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string | null; scan_date: string; reason?: string; source_handle?: string | null },
 ): Promise<void> {
   const reason = args.reason ?? "read_failed";
   // Idempotencia: no agregues un "sin datos" si ya hay una entry de IG hoy para la
@@ -497,6 +501,10 @@ export async function insertNoDataEntry(
     // error_reason real (no_ig_id | follow_pending | read_failed) → el drain trata
     // no_ig_id/follow_pending como TERMINALES del día (no re-intenta en vano).
     story_count: 0, needs_review: false, error_reason: reason,
+    // DE QUÉ CUENTA vino el intento fallido — sin esto no se podía distinguir si el que
+    // falló era el handle principal o una 2ª cuenta (caso Moramay: la secundaria fallaba
+    // todos los días y aparecía como un "sin datos" genérico de la creadora).
+    source_handle: args.source_handle ?? null,
   });
 }
 
