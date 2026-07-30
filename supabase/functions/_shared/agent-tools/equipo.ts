@@ -6,24 +6,49 @@ export const equipoTools: AgentTool[] = [
     name: "get_pipeline_overview",
     description:
       "Resumen del pipeline de closers: cuántas creadoras hay en cada etapa (Nuevo, Asignada, " +
-      "Confirmada, Completada, etc.) y la facturación mensual (USD) sumada de las confirmadas + completadas.",
+      "Confirmada, Completada, etc.) y la facturación mensual (USD) sumada de las confirmadas + completadas. " +
+      "Devuelve además el desglose por LÍNEA DE NEGOCIO, que son embudos distintos y NO hay que sumarlos como " +
+      "si fueran lo mismo: 'kash' = reclutar modelos para la agencia (comisión % sobre su OF; incluye las " +
+      "ex-creadoras que vuelven), 'plataformas' = venderle un producto del portfolio a una creadora propia " +
+      "(suscripción mensual), 'agencias' = B2B, venderle producto a una agencia externa. Si te preguntan por " +
+      "'el pipeline' sin aclarar, la línea principal es kash. Trae también de qué BASE viene cada lead " +
+      "(by_base): maven = entró por LeadGen/Contactos, ex_creadora = base EX MODELOS KASH, agencia = base de agencias.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
     domain: "equipo",
     scope: "read",
     handler: async (_args, ctx) => {
       const { data, error } = await ctx.sb
         .from("closer_creators")
-        .select("stage, monthly_monetization");
+        .select("stage, monthly_monetization, deal_type, lead_source");
       if (error) throw new Error(`get_pipeline_overview: ${error.message}`);
-      const rows = (data ?? []) as Array<{ stage: string | null; monthly_monetization: number | null }>;
+      const rows = (data ?? []) as Array<{
+        stage: string | null; monthly_monetization: number | null;
+        deal_type: string | null; lead_source: string | null;
+      }>;
       const byStage: Record<string, number> = {};
+      const byLine: Record<string, Record<string, number>> = {};
+      const byBase: Record<string, number> = {};
       let mrr = 0;
       for (const r of rows) {
         const s = r.stage || "Sin etapa";
+        const base = r.lead_source || "maven";
+        const line = base === "agencia"
+          ? "agencias"
+          : (r.deal_type === "venta_plataforma" ? "plataformas" : "kash");
         byStage[s] = (byStage[s] ?? 0) + 1;
+        byBase[base] = (byBase[base] ?? 0) + 1;
+        byLine[line] = byLine[line] ?? {};
+        byLine[line][s] = (byLine[line][s] ?? 0) + 1;
         if (s === "Confirmada" || s === "Completada") mrr += Number(r.monthly_monetization ?? 0);
       }
-      return { total: rows.length, by_stage: byStage, monthly_usd_confirmadas_completadas: Math.round(mrr) };
+      return {
+        total: rows.length,
+        by_stage: byStage,
+        by_line: byLine,
+        by_base: byBase,
+        monthly_usd_confirmadas_completadas: Math.round(mrr),
+        nota: "by_stage es el total mezclado; usá by_line para no sumar embudos distintos.",
+      };
     },
   },
   {

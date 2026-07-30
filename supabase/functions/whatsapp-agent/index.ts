@@ -726,7 +726,13 @@ LINK DE INSTAGRAM (auto-lookup proactivo):
   4. Si está en "ya_contactada" o "no_interesada" → AVISO claro al grupo ANTES de que el closer la trabaje al pedo.
   5. Si está en "nueva" → silencio (solo recordá llamarla cuando alguien pregunte por ella). NO spamees.
 
-Contexto: el equipo trabaja con cuentas de IG, captan modelos (llamadas "creators") y luego las venden a fans en OF. Los "leads" son contactos de IG que se filtran como potenciales modelos. Los "spammer accounts" son cuentas que mandan DMs masivos para captar. Las "QAs" (*Agency QA → Closers QA*) son las llamadas de venta que los closers SUBEN para que la IA las evalúe (valoración de cómo estuvo la llamada). Esas llamadas subidas son las qa_calls. Los LLGs cargan leads (meta diaria 3 lun-vie, 2 sáb); los closers suben sus llamadas a Closers QA para que la IA las valore (sin meta numérica fija); los Closer Supervisors revisan esas QA.
+Contexto: el equipo trabaja con cuentas de IG, captan modelos (llamadas "creators") y luego las venden a fans en OF. Los "leads" son contactos de IG que se filtran como potenciales modelos. Los "spammer accounts" son cuentas que mandan DMs masivos para captar. Las "QAs" (*Agency QA → Closers QA*) son las llamadas de venta que los closers SUBEN para que la IA las evalúe (valoración de cómo estuvo la llamada). Esas llamadas subidas son las qa_calls. Los LLGs cargan leads (meta diaria 3 lun-vie, 2 sáb); los closers suben sus llamadas a Closers QA para que la IA las valore (sin meta numérica fija); los Closer Supervisors revisan esas QA. 
+
+TRES BASES DE LEADS (de dónde viene cada uno) — las tools te lo devuelven en "base_del_lead" / "by_base" / "tipo_de_contacto":
+· **maven**: entró por LeadGen o Contactos. Es el flujo normal de captación de modelos.
+· **ex_creadora**: YA fue creadora de la agencia y se la quiere recuperar. Hay historia previa: no la trates como una modelo nueva, y el cierre se hace REACTIVANDO su ficha (no "Convertir a Creadora").
+· **agencia**: lead B2B — es una AGENCIA de OF externa, no una modelo. No se la recluta: se le VENDE un producto del portfolio (suscripción). Nunca hables de "cerrarla para la agencia" ni la cuentes como modelo captada.
+Son tres embudos DISTINTOS: no sumes sus números como si fueran lo mismo. Si te preguntan por "el pipeline" sin aclarar, la línea principal es la de reclutamiento (kash).
 
 PIPELINE END-TO-END DEL EQUIPO (esto es central, mantenelo siempre presente):
 
@@ -1706,13 +1712,20 @@ async function executeTool(
         // LLG). NO vive en leadgen_entries.phone_e164 (columna muerta: 4 de
         // ~21k). Antes contábamos esa columna → siempre 0 (el bot decía "no hay
         // números cargados" aunque sí los hubiera).
+        // ⚠️ neq(contact_kind,'agencia'): estas métricas miden CAPTACIÓN DE
+        // MODELOS. El directorio ahora también tiene 464 agencias (B2B), y sin
+        // este filtro los "números cargados" de quien las importó se inflaban con
+        // contactos que no son modelos captadas.
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
           .eq("created_by", member.user_id).gte("created_at", since)
+          .neq("contact_kind", "agencia")
           .not("phone", "is", null).then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
-          .eq("created_by", member.user_id).gte("created_at", since).then(head),
+          .eq("created_by", member.user_id).gte("created_at", since)
+          .neq("contact_kind", "agencia").then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
-          .eq("assigned_to", member.user_id).gte("created_at", since).then(head),
+          .eq("assigned_to", member.user_id).gte("created_at", since)
+          .neq("contact_kind", "agencia").then(head),
         sb.from("closer_creators").select("id", { count: "exact", head: true })
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("closer_creators").select("id", { count: "exact", head: true })

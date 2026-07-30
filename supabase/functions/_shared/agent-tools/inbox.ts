@@ -86,20 +86,32 @@ export const inboxTools: AgentTool[] = [
       const ccIds = new Set<string>();
       let displayName: string | null = null;
 
+      // lead_source/deal_type: de qué BASE viene el lead (maven / ex_creadora /
+      // agencia). El bot lo necesita para no tratar a una agencia B2B como si
+      // fuera una modelo a reclutar.
+      let leadBase: string | null = null;
+      let leadDealType: string | null = null;
+      let contactKind: string | null = null;
+
       const { data: ccByHandle } = await ctx.sb
         .from("closer_creators")
-        .select("id, instagram_handle")
+        .select("id, instagram_handle, lead_source, deal_type")
         .ilike("instagram_handle", `%${q}%`)
         .limit(10);
+      if (ccByHandle?.length) {
+        leadBase = (ccByHandle[0] as { lead_source?: string }).lead_source ?? "maven";
+        leadDealType = (ccByHandle[0] as { deal_type?: string }).deal_type ?? null;
+      }
       (ccByHandle ?? []).forEach((c: { id: string }) => ccIds.add(c.id));
 
       const { data: contacts } = await ctx.sb
         .from("closers_contacts")
-        .select("id, name, handle")
+        .select("id, name, handle, contact_kind")
         .or(`name.ilike.%${q}%,handle.ilike.%${q}%`)
         .limit(10);
       if (contacts?.length) {
         displayName = (contacts[0] as { name?: string }).name ?? null;
+        contactKind = (contacts[0] as { contact_kind?: string }).contact_kind ?? "modelo";
         const { data: ccBySrc } = await ctx.sb
           .from("closer_creators")
           .select("id, source_contact_id")
@@ -108,7 +120,15 @@ export const inboxTools: AgentTool[] = [
         (ccBySrc ?? []).forEach((c: { id: string }) => ccIds.add(c.id));
       }
 
-      if (ccIds.size === 0) return { found: false, reason: "modelo_no_encontrada_en_pipeline", query: q };
+      if (ccIds.size === 0) {
+        return {
+          found: false,
+          reason: "modelo_no_encontrada_en_pipeline",
+          query: q,
+          // Puede existir como CONTACTO sin estar todavía en el pipeline.
+          tipo_de_contacto: contactKind,
+        };
+      }
 
       // 2) wa_contacts por el link directo (closer_creator_id).
       const { data: waContacts } = await ctx.sb
@@ -121,6 +141,8 @@ export const inboxTools: AgentTool[] = [
           found: false,
           reason: "sin_conversacion_de_whatsapp_registrada",
           modelo: displayName ?? q,
+          base_del_lead: leadBase,
+          tipo_de_contacto: contactKind,
         };
       }
       if (!displayName) displayName = (waContacts[0] as { display_name?: string }).display_name ?? null;
@@ -150,6 +172,12 @@ export const inboxTools: AgentTool[] = [
       return {
         found: true,
         modelo: displayName ?? q,
+        // De qué BASE viene: maven (LeadGen/Contactos) · ex_creadora (ya trabajó
+        // con la agencia: el cierre se hace con Reactivar) · agencia (B2B: se le
+        // vende producto, NO se la recluta como modelo).
+        base_del_lead: leadBase,
+        tipo_de_deal: leadDealType,
+        tipo_de_contacto: contactKind,
         canal_marca: canalMarca,
         departamento: canalDept,
         ultimo_mensaje: conv.last_message_at,
