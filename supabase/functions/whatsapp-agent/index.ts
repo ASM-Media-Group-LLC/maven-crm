@@ -1163,6 +1163,18 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_creator_scan_config",
+    description:
+      "Muestra QUÉ redes/handles tiene cargada una creadora en el escaneo de promo y si están SANOS. Usalo cuando pregunten '¿estás revisando su X/Telegram/IG secundaria?', '¿por qué no aparece promo de X?', '¿el handle que actualicé quedó bien?', '¿está privada?'. Devuelve por red: el handle cargado, últimos días leídos, promos en 14d, y el último error del scan (read_failed/privada/etc). También avisa si el Telegram apunta a un canal o a un usuario (mal). NO inventes que una red 'no se cuenta' — chequeá acá primero.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "nombre artístico o @handle de IG de la creadora" },
+      },
+      required: ["creator"],
+    },
+  },
+  {
     name: "add_note_to_lead",
     description:
       "Agrega una nota a un lead de Maven. ATENCIÓN: solo usar si el usuario lo pidió explícito.",
@@ -2528,6 +2540,18 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "get_creator_scan_config": {
+      const query = String(input.creator ?? "").trim();
+      if (!query) return { error: "missing_creator" };
+      const { data, error } = await sb.rpc("get_creator_scan_config", {
+        p_tenant: ctx.tenantId,
+        p_query: query,
+      });
+      if (error) return { error: error.message };
+      if (!data) return { not_found: true, creator: query };
+      return data as Record<string, unknown>;
     }
 
     case "add_note_to_lead": {
