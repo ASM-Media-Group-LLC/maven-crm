@@ -2978,9 +2978,14 @@ async function executeTool(
       const errors: Array<{ table: string; error: string }> = [];
 
       // 1) leadgen_entries
+      // ⚠️ El bot corre con service_role (RLS bypasseada) y acá matcheamos por
+      // HANDLE, que no es único entre tenants: sin este filtro una agencia podía
+      // pisar el lead homónimo de otra. closer_creators (abajo) todavía NO tiene
+      // columna tenant_id — queda pendiente del cutover (ver maven_cutover_setup).
       const { data: lg } = await sb
         .from("leadgen_entries")
         .select("id, model_handle, status, notes")
+        .eq("tenant_id", ctx.tenantId)
         .ilike("model_handle", handle)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -4133,12 +4138,23 @@ async function runAgent(req: AgentRequest): Promise<{
   }
 
   // ── Scope por ROL (candado 2) ──────────────────────────────────────────────
-  // El scoping por rol aplica SOLO cuando un usuario DIRIGE al bot en un GRUPO real
-  // (mención). Todo lo demás corre como PRIVILEGIADO (ve todo), preservando el
-  // comportamiento actual: digests/aperturas (night_catchup/auto), reportes, panel
-  // admin, y DMs (is_direct — hoy allowlist solo owner/admin; su sender es teléfono
-  // que no resuelve). Cuando abramos DM a staff (#4) se resuelve el user del DM.
-  const scopedRequest = addressedByUser && group.is_direct !== true;
+  // El scoping por rol aplica cuando la corrida la DISPARA UN HUMANO en un GRUPO
+  // real: sea porque citó al bot (mention/audio/image) o porque el grupo está en
+  // `bot_mode='always'` y el bot lo escuchó pasivamente (invoked_by="auto").
+  //
+  // ⚠️ `auto` estaba FUERA del scoping y eso era un bypass completo del candado 2:
+  // Marketing/Ventas y Managers corren en modo always, así que bastaba con NO
+  // mencionar al bot para que la corrida saliera privilegiada. Un mensaje de auto
+  // lo dispara UNA persona concreta y cualquier respuesta le contesta a ESA persona
+  // → tiene que ir scopeada por su rol, igual que una mención.
+  //
+  // Sigue corriendo PRIVILEGIADO todo lo que NO dispara un humano puntual: digests
+  // y aperturas (night_catchup), reportes de cierre (supervisor_tick_eod,
+  // quick_command_eod), panel admin y DMs (is_direct — allowlist owner/admin, su
+  // sender es teléfono que no resuelve). Ahí la audiencia es el grupo entero, que
+  // es una decisión de diseño aparte (ver whatsapp_bot_access_control).
+  const humanTriggered = addressedByUser || req.invoked_by === "auto";
+  const scopedRequest = humanTriggered && group.is_direct !== true;
   const scope = scopedRequest
     ? await getSenderScope(sb, senderCtx.senderUserId, senderCtx.isOwner)
     : { privileged: true, canSeePhones: true };

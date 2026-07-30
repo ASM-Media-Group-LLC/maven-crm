@@ -120,13 +120,41 @@ async function resolveMavenUser(
       if (data) return data as string;
     } catch (_e) { /* fallthrough */ }
   }
-  if (pushName) {
-    try {
-      const { data } = await sb.rpc("whatsapp_resolve_user_by_push_name", { p_push_name: pushName });
-      if (data) return data as string;
-    } catch (_e) { /* fallthrough */ }
-  }
+  // ⚠️ NO resolvemos por PUSH NAME. El push name es texto que el propio remitente
+  // elige desde su WhatsApp: usarlo para LINKEAR a un usuario Maven convertía el
+  // display name en una credencial. Cualquiera en un grupo podía renombrarse con el
+  // push name de un verificado (visible para todos en el grupo) y quedar linkeado a
+  // ESE usuario, heredando su rol frente al bot — incluido el del owner.
+  // El LID y el teléfono vienen de la sesión de WhatsApp y no se pueden elegir; el
+  // push name no. Para linkear a alguien nuevo: que verifique por DM (deja LID), o
+  // linkearlo a mano. Los candidatos por push name se registran abajo para revisión.
   return null;
+}
+
+// Deja constancia de un candidato de link que ANTES se auto-aplicaba por push name,
+// para que un admin lo confirme a mano en vez de que el sistema lo asuma.
+async function logPushNameCandidate(
+  sb: SupabaseClient,
+  group: { id: string; tenant_id: string },
+  externalId: string,
+  pushName: string | null | undefined,
+): Promise<void> {
+  if (!pushName) return;
+  try {
+    const { data } = await sb.rpc("whatsapp_resolve_user_by_push_name", { p_push_name: pushName });
+    if (!data) return;
+    await sb.from("whatsapp_bot_events").insert({
+      tenant_id: group.tenant_id,
+      group_id: group.id,
+      kind: "member_link_suggested",
+      payload: {
+        external_id: externalId,
+        push_name: pushName,
+        candidate_user_id: data,
+        note: "Coincide por push name (no se auto-linkea: es spoofeable). Confirmar a mano.",
+      },
+    });
+  } catch (_e) { /* best-effort: nunca bloquear el ingest */ }
 }
 
 async function upsertMember(
@@ -151,12 +179,16 @@ async function upsertMember(
     if (!existing.user_id) {
       const resolved = await resolveMavenUser(sb, msg.senderExternalId, msg.senderDisplayName);
       if (resolved) patch.user_id = resolved;
+      else await logPushNameCandidate(sb, group, msg.senderExternalId, msg.senderDisplayName);
     }
     await sb.from("whatsapp_members").update(patch).eq("id", existing.id);
     return existing.id;
   }
 
   const resolvedUserId = await resolveMavenUser(sb, msg.senderExternalId, msg.senderDisplayName);
+  if (!resolvedUserId) {
+    await logPushNameCandidate(sb, group, msg.senderExternalId, msg.senderDisplayName);
+  }
 
   const { data: inserted, error } = await sb
     .from("whatsapp_members")
