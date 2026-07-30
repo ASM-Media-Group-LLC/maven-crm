@@ -3228,6 +3228,9 @@ async function executeTool(
       }
       const { data: inserted, error } = await sb.from("whatsapp_person_facts").insert({
         tenant_id: ctx.tenantId,
+        // El hecho queda atado al grupo donde se contó (loadPersonFacts filtra por acá):
+        // lo que se dice en Managers no debe aparecer en el prompt de Ventas ni del DM.
+        group_id: ctx.groupId,
         subject_user_id: subjectId,
         fact: factText,
         created_by: ctx.senderUserId,
@@ -3254,6 +3257,8 @@ async function executeTool(
       const { data: rows, error } = await sb.from("whatsapp_person_facts")
         .update({ active: false })
         .eq("tenant_id", ctx.tenantId)
+        // Solo se olvidan hechos de ESTE grupo (mismo scope con el que se guardan y leen).
+        .eq("group_id", ctx.groupId)
         .eq("subject_user_id", subjectId)
         .eq("active", true)
         .ilike("fact", `%${contains}%`)
@@ -3356,10 +3361,13 @@ async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rul
 // Memoria por-persona: hechos durables que el equipo le contó al bot (ej. "María
 // no maneja IG"). Se inyectan en el system prompt en CADA invocación (como las
 // reglas), agrupados por persona. Tenant-scoped, cap 50.
-async function loadPersonFacts(tenantId: string): Promise<Array<{ name: string; fact: string }>> {
+async function loadPersonFacts(tenantId: string, groupId: string): Promise<Array<{ name: string; fact: string }>> {
   const sb = adminClient();
   const { data, error } = await sb
     .from("whatsapp_person_facts")
+    // SCOPE POR GRUPO: sin esto, un hecho contado en Managers aparecía en el prompt de
+    // Ventas, AI WARMING y el DM de Álvaro. Lo que se cuenta en un grupo queda ahí.
+    .eq("group_id", groupId)
     .select("fact, profiles:subject_user_id(full_name)")
     .eq("tenant_id", tenantId)
     .eq("active", true)
@@ -4136,7 +4144,7 @@ async function runAgent(req: AgentRequest): Promise<{
   // prompt — así el modelo las aplica en CADA invocación sin que el caller
   // haga nada extra.
   const activeRules = await loadActiveRules(group.id);
-  const personFacts = await loadPersonFacts(group.tenant_id);
+  const personFacts = await loadPersonFacts(group.tenant_id, group.id);
 
   // Prompt = MOTOR (código) + MANUAL. Con bot asignado, el MANUAL sale de la DB
   // (botCfg.manualPrompt); si está vacío, cae al MANUAL_VENTAS de código. Sin bot
@@ -4218,8 +4226,13 @@ async function runAgent(req: AgentRequest): Promise<{
   // modelo no la repite. Si sigue tomado tras 8s, seguimos igual (nunca mudo).
   const lockHolder = crypto.randomUUID();
   {
+    // La espera tiene que cubrir lo que dura una corrida REAL (MAX_WALL_MS = 30s). Con
+    // los 8s de antes, la 2ª corrida se rendía y arrancaba mientras la 1ª seguía
+    // trabajando → las dos respondían igual, que es el duplicado que queríamos matar.
+    const maxEsperaMs = MAX_WALL_MS + 3_000;
+    const esperaInicio = Date.now();
     let got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
-    for (let w = 0; w < 8 && !got; w += 1) {
+    while (!got && Date.now() - esperaInicio < maxEsperaMs) {
       await new Promise((r) => setTimeout(r, 1000));
       got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
     }
