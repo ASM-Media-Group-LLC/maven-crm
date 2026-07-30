@@ -27,6 +27,15 @@ import { classifyLinkDestination } from "../_shared/link-classifier.ts";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (igual que promolog-dispatch)
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
 
+// Ritmo contra el gateway MTProto. Diagnóstico 30/07: el edge disparaba los ~37 canales
+// sin pausa → el gateway (sesión única en el VPS) se saturaba a mitad y devolvía 502/504 en
+// una banda corrida de ~13 canales, hasta recuperarse solo. THROTTLE (con jitter) espacia
+// las llamadas para NO provocar ese atragantamiento; el reintento pesca los 502 que igual
+// se cuelen. El 504 NO se reintenta (puede tapar un floodwait, ver el loop).
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const THROTTLE_MS = 400;        // pausa base entre canales (+ jitter 0-400ms)
+const GW_RETRY_PAUSE_MS = 2500; // espera antes del único reintento en 502
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
@@ -188,28 +197,89 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // ROTACIÓN JUSTA (igual x-scan #934 / fb-scan #940): las creadoras que hace más que no
+  // se escanean por Telegram van PRIMERO. Antes el orden era el de la vista (siempre las
+  // mismas primero) → si el gateway se satura a mitad de corrida, la cola de atrás nunca se
+  // alcanzaba (Yoisnia caía siempre en la banda de 502). Con rotación, la banda —si queda
+  // alguna tras el reintento— cae en creadoras DISTINTAS cada corrida → cobertura completa
+  // en pocas pasadas. Nunca-escaneada = prioridad máxima (last=0). Se salta si only_ids.
+  if (!onlyIds && (creators?.length ?? 0) > 1 && creatorIds.length) {
+    const lastScan = new Map<string, number>();
+    // Ventana de 21 días (NO limit(1000) crudo): con 1 fila por post, una creadora chatty se
+    // come el tope de 1000 filas de PostgREST y las demás caen a last=0 → el sort estable
+    // deja el orden original y vuelve la starvation que esto quería matar. Acotar por fecha
+    // (patrón de x-scan/fb-scan) mantiene ≤1 punto por creadora relevante.
+    const since = new Date(Date.now() - 21 * 864e5).toISOString();
+    const { data: recent } = await sb.from("promolog_entries")
+      .select("creator_id, created_at")
+      .eq("network", "telegram")
+      .in("creator_id", creatorIds)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    for (const r of (recent ?? []) as Array<{ creator_id: string; created_at: string }>) {
+      if (!lastScan.has(r.creator_id)) lastScan.set(r.creator_id, new Date(r.created_at).getTime());
+    }
+    (creators as any[]).sort((a, b) => (lastScan.get(a.id) ?? 0) - (lastScan.get(b.id) ?? 0));
+  }
+
   // Targets de escaneo: canal principal (telegram_handle) + cada canal TG extra. Cada
   // target se une/escanea por separado y la fila lleva source_handle = ese canal.
-  const targets: Array<{ c: any; handle: string }> = [];
+  const allTargets: Array<{ c: any; handle: string }> = [];
   for (const c of creators || []) {
-    targets.push({ c, handle: c.telegram_handle });
-    for (const u of tgExtraByCreator.get(c.id) ?? []) targets.push({ c, handle: u });
+    allTargets.push({ c, handle: c.telegram_handle });
+    for (const u of tgExtraByCreator.get(c.id) ?? []) allTargets.push({ c, handle: u });
   }
+  // CAP POR CORRIDA (como x-scan #934 / fb-scan #940): el gateway serial + throttle + inserts
+  // no entra en el wall-clock de ~150s del edge con las ~37 (se comió un 504 IDLE_TIMEOUT).
+  // Cortamos a MAX y dejamos que la ROTACIÓN reparta el resto entre las corridas del día
+  // (cron 20:30/08:30/14:00 + sweeps) — los primeros del array ya son los más atrasados.
+  // Una corrida manual con only_creator_ids no se capa (batch chico dirigido).
+  const MAX_TARGETS_PER_RUN = 22;
+  const targets = onlyIds ? allTargets : allTargets.slice(0, MAX_TARGETS_PER_RUN);
+  const skipped_por_cap = allTargets.length - targets.length;
 
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
   let llmUsed = 0; // cap de costo/tiempo por corrida (solo repesca de "sin-señales")
 
   const results: unknown[] = [];
+  const runStarted = Date.now();
+  const RUN_BUDGET_MS = 100_000; // corte prolijo con margen antes del wall-clock del edge (~150s)
   for (const t of targets) {
+    // GUARDA DE TIEMPO: cortamos a 120s con lo hecho (los inserts ya commitearon uno a uno)
+    // en vez de que la plataforma mate la función seca sin devolver `results`. La rotación
+    // hace que la próxima corrida retome por donde quedó.
+    if (Date.now() - runStarted > RUN_BUDGET_MS) {
+      results.push({ ok: false, aborted: "time_budget", note: "corrida cortada a 120s; el resto lo retoma la próxima por rotación" });
+      break;
+    }
     const c = t.c;
     const handle = t.handle;
     try {
-      const r = await fetch(`${GW_URL}/channel/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
-        body: JSON.stringify({ link: handle, hours }),
-      });
-      const j = await r.json().catch(() => ({}));
+      const doJoin = async () => {
+        const rr = await fetch(`${GW_URL}/channel/join`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
+          body: JSON.stringify({ link: handle, hours }),
+        });
+        const jj = await rr.json().catch(() => ({}));
+        return { r: rr, j: jj };
+      };
+      let { r, j } = await doJoin();
+      // Reintento SUAVE y ACOTADO: SOLO en 502 (Bad Gateway = el gateway se saturó y rechazó
+      // la conexión; se recupera solo). NO reintentamos 504: un timeout del upstream puede
+      // ENMASCARAR un FLOOD_WAIT en curso (el cliente MTProto duerme la espera) y reintentar
+      // ahí golpea una cuenta que Telegram ya está limitando → ban (ver promolog_direct_read_ig_ban).
+      if (r.status === 502) {
+        await sleep(GW_RETRY_PAUSE_MS);
+        ({ r, j } = await doJoin());
+      }
+      // CIRCUIT-BREAKER: si el gateway reporta floodwait/peer_flood explícito, Telegram YA está
+      // limitando la cuenta → cortamos la corrida ENTERA, no seguimos golpeando canal por canal.
+      if (/flood|peer_flood/i.test(String(j?.error ?? ""))) {
+        results.push({ creator: c.name, ok: false, error: j.error, aborted: "floodwait" });
+        break;
+      }
       if (!r.ok || !j.ok) { results.push({ creator: c.name, ok: false, error: j.error || `gw ${r.status}` }); continue; }
       if (j.pending) { results.push({ creator: c.name, ok: true, pending: true, note: "esperando aprobación del admin del canal" }); continue; }
 
@@ -222,7 +292,10 @@ Deno.serve(async (req: Request) => {
         let aiModel = "heuristic-of-v1";
         // Repesca IA: solo cuando la heurística NO vio nada ("sin-señales" — un guard
         // como brand_ad/money_making es un No FIRME y no se repesca) y hay texto real.
-        if (!promoted && reason === "sin-señales" && OPENROUTER_API_KEY && llmUsed < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
+        // Se apaga si queda poco presupuesto de tiempo (cada llamada aborta a 12s → puede
+        // desbordar el wall-clock; mejor un No heurístico que un 504 que mata la corrida).
+        const hayPresupuestoLLM = (Date.now() - runStarted) < (RUN_BUDGET_MS - 15_000);
+        if (!promoted && reason === "sin-señales" && hayPresupuestoLLM && OPENROUTER_API_KEY && llmUsed < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
           llmUsed++;
           const v = await llmSecondOpinion(p.text, nicks, OPENROUTER_API_KEY);
           if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
@@ -282,8 +355,13 @@ Deno.serve(async (req: Request) => {
       });
     } catch (e) {
       results.push({ creator: c.name, ok: false, error: String((e as Error)?.message || e) });
+    } finally {
+      // Throttle CON JITTER entre canales: no saturar el gateway (evita la banda de 502) y
+      // no marcar un ritmo robótico perfecto (los antispam premian variación humana).
+      await sleep(THROTTLE_MS + Math.floor(Math.random() * 400));
     }
   }
 
-  return jsonResponse({ ok: true, scan_date: scanDate, hours, creators: creators?.length || 0, results });
+  return jsonResponse({ ok: true, scan_date: scanDate, hours, creators: creators?.length || 0,
+    targets_run: targets.length, skipped_por_cap, results });
 });
