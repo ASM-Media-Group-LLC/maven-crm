@@ -28,6 +28,11 @@ import {
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
+  // Bases de leads propias (closer_creators.lead_source): vistas por ORIGEN que
+  // cruzan todos los stages, como "Todas" pero de esa base. Van juntas al lado
+  // de "Todas" porque son del mismo tipo (vista global), no un stage del embudo.
+  { value: "ex_creadores", label: "Ex-creadores" },
+  { value: "agencias", label: "Agencias" },
   { value: "ventas", label: "Ventas" },
   { value: "antiguos", label: "Antiguos" },
   { value: "nuevo", label: "Nuevo" },
@@ -35,10 +40,6 @@ const ALL_TABS = [
   { value: "confirmadas", label: "Confirmadas" },
   { value: "completadas", label: "Completadas" },
   { value: "no_interesadas", label: "No Interesadas" },
-  // Bases de leads propias (closer_creators.lead_source). Son vistas por ORIGEN
-  // y cruzan todos los stages, como "Todas" pero de esa base.
-  { value: "ex_creadores", label: "Ex-creadores" },
-  { value: "agencias", label: "Agencias" },
 ];
 
 const ClosersContent = () => {
@@ -341,7 +342,11 @@ const ClosersContent = () => {
           {viewTab === "operaciones" && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="shrink-0 px-6 pt-2 pb-2 space-y-4 bg-background/30 backdrop-blur-xl border-b border-white/10">
-            <TabsList className="flex-wrap">
+            {/* h-auto: TabsList trae h-10 fija de shadcn y con flex-wrap la 2ª
+                fila se salía del contenedor y se montaba sobre los filtros
+                (reporte con screenshot, 10 tabs). Con h-auto + gap el wrap
+                respeta el alto real y las dos filas quedan prolijas. */}
+            <TabsList className="flex-wrap h-auto gap-1 py-1">
               {TABS.map((tab) => {
                 const stageKey =
                   tab.value === "todas" ? "" :
