@@ -54,6 +54,9 @@ export interface Contacto {
   pais: string;
   city: string;
   categoria: string;
+  /** 'modelo' (default) | 'agencia' — un lead B2B. Al asignarlo a un closer entra
+   *  al pipeline como venta de plataforma y aparece en el tab Agencias. */
+  contactKind: string;
   whatsapp: string;
   interacciones: number;
   creadoPor: string;
@@ -85,6 +88,7 @@ const emptyFilters: ContactoFilters = {
   dateTo: "",
   creadoPor: "",
   salesChannels: [],
+  contactKind: "",
 };
 
 const PAGE_SIZE = 50;
@@ -247,6 +251,9 @@ const ContactosContent = () => {
       // El filtro ofrece ISO ("CO") pero la columna guarda el dial code ("+57") → mapear.
       if (filters.pais) q = q.eq("country_code", dialForIso(filters.pais) ?? filters.pais);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
+      // Tipo de contacto (modelo/agencia): server-side para que la paginación y
+      // el total sean correctos, igual que los demás filtros.
+      if (filters.contactKind) q = q.eq("contact_kind", filters.contactKind);
       // Agente y Ciudad: server-side (antes client-side sobre la página → solo filtraban lo visible).
       if (creadoPorUserId) q = q.eq("created_by", creadoPorUserId);
       // Ciudad: filtrar por los ids que devolvió el RPC (creadora-por-handle en esa ciudad).
@@ -420,6 +427,8 @@ const ContactosContent = () => {
         pais: c.country_code || "",
         city: resolvedCity,
         categoria: c.physical_appearance || "",
+        // 'modelo' (default) | 'agencia' (B2B). Lo expone v_closers_contacts.
+        contactKind: (c as any).contact_kind || "modelo",
         whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
         interacciones: interactionCounts[c.id] || 0,
         creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
@@ -457,7 +466,7 @@ const ContactosContent = () => {
   // Opciones de ciudad del DATASET completo (RPC contact_filter_cities), no solo la página.
   const citiesList = cityOptions;
 
-  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor || (filters.salesChannels && filters.salesChannels.length > 0));
+  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor || filters.contactKind || (filters.salesChannels && filters.salesChannels.length > 0));
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">

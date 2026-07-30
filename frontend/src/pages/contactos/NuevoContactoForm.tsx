@@ -54,6 +54,24 @@ interface FormData {
   notas: string;
 }
 
+// Tipo de contacto. 'modelo' es el default histórico; 'agencia' marca un lead
+// B2B, y al asignarlo a un closer el RPC assign_closer_to_contact lo traduce a
+// un lead con lead_source='agencia' + deal_type='venta_plataforma' (cae en el tab
+// Agencias, no en el embudo de modelos).
+const CONTACT_KINDS = [
+  { value: "modelo", label: "Modelo / creadora" },
+  { value: "agencia", label: "Agencia (B2B)" },
+] as const;
+
+// Para una agencia, el campo de categoría se usa como PRIORIDAD comercial (mismo
+// criterio que el import de la base: Alta/Media/Baja). Va en la misma columna
+// (physical_appearance) que la categoría de una modelo, así reusa filtros y orden.
+const AGENCY_PRIORITIES = [
+  { value: "Alta", label: "Alta" },
+  { value: "Media", label: "Media" },
+  { value: "Baja", label: "Baja" },
+] as const;
+
 const defaultForm: FormData = {
   nombre: "",
   categoria: "",
@@ -74,6 +92,8 @@ const NuevoContactoForm = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
+  const [contactKind, setContactKind] = useState<"modelo" | "agencia">("modelo");
+  const esAgencia = contactKind === "agencia";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const [existingContactData, setExistingContactData] = useState<{
@@ -238,6 +258,7 @@ const NuevoContactoForm = () => {
         created_by: user?.id || "",
         status: "new",
         record_type: recordType,
+        contact_kind: contactKind,
       } as any);
 
       if (error) throw error;
@@ -314,6 +335,7 @@ const NuevoContactoForm = () => {
         created_by: user?.id || "",
         status: "new",
         record_type: "reactivado",
+        contact_kind: contactKind,
       } as any);
       if (error) throw error;
       if (handle) void enqueueAvatarFetch(handle);
@@ -348,14 +370,48 @@ const NuevoContactoForm = () => {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="space-y-6 rounded-lg border border-border p-6">
+          {/* Tipo de contacto — va primero porque cambia el sentido del resto del
+              form. Una agencia es un lead B2B: al asignarla a un closer entra al
+              pipeline como venta de plataforma (tab Agencias), no como
+              reclutamiento de una modelo. */}
+          <Field label="Tipo de contacto *">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
+              {CONTACT_KINDS.map((k) => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setContactKind(k.value)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    contactKind === k.value
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {k.label}
+                </button>
+              ))}
+            </div>
+            {esAgencia && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Al asignarla a un closer entra al pipeline como <strong>venta de plataforma</strong> y
+                aparece en el tab <strong>Agencias</strong>. Usá la categoría como prioridad y el
+                website/Telegram en las notas.
+              </p>
+            )}
+          </Field>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Nombre del Contacto *" error={errors.nombre}>
-              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre completo" className={errors.nombre ? "border-destructive" : ""} />
+            <Field label={esAgencia ? "Nombre de la agencia *" : "Nombre del Contacto *"} error={errors.nombre}>
+              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={esAgencia ? "Ej. OnlyModelos" : "Nombre completo"} className={errors.nombre ? "border-destructive" : ""} />
             </Field>
-            <Field label="Categoría Física *" error={errors.categoria}>
+            <Field label={esAgencia ? "Prioridad *" : "Categoría Física *"} error={errors.categoria}>
               <Select value={form.categoria} onValueChange={(v) => set("categoria", v)}>
-                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}><SelectValue placeholder={esAgencia ? "Alta / Media / Baja" : "Seleccionar categoría"} /></SelectTrigger>
+                <SelectContent>
+                  {(esAgencia ? AGENCY_PRIORITIES : CATEGORIES).map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
           </div>

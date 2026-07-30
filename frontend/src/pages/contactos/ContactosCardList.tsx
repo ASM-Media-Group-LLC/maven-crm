@@ -93,6 +93,17 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
                       Reactivado
                     </Badge>
                   )}
+                  {/* Lead B2B: distingue las agencias entre los contactos de
+                      modelos (hay 464 agencias en un directorio de ~3.100). */}
+                  {c.contactKind === "agencia" && (
+                    <Badge
+                      variant="primary-soft"
+                      className="font-normal text-[10px] px-1.5 py-0 shrink-0"
+                      title="Agencia (B2B) — al asignarla a un closer entra al pipeline como venta de plataforma"
+                    >
+                      Agencia
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                   {cleanHandle && (

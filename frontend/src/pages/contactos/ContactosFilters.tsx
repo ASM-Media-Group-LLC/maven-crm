@@ -26,6 +26,9 @@ export interface ContactoFilters {
   // Canales de venta seleccionados. Valores = wa_channels.id, más las opciones
   // especiales "__none__" (sin contactar por WhatsApp) y "__multi__" (2+ canales).
   salesChannels?: string[];
+  /** Tipo de contacto: "" (todos) | "modelo" | "agencia". Sin esto las 464
+   *  agencias quedan perdidas entre ~3.100 contactos de modelos. */
+  contactKind?: string;
 }
 
 // Opciones especiales del filtro "Canal de venta".
@@ -99,10 +102,18 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         )}
         onChange={(v) => onChange({ pais: v })}
       />
+      {/* Tipo: separa las agencias (B2B) de los contactos de modelos. */}
+      <FilterSelect
+        placeholder="Tipo"
+        value={filters.contactKind ?? ""}
+        options={["modelo", "agencia"]}
+        labels={{ modelo: "Modelos", agencia: "Agencias" }}
+        onChange={(v) => onChange({ contactKind: v })}
+      />
       <FilterSelect
         placeholder="Categoría"
         value={filters.categoria}
-        options={["A+", "A", "B+", "B", "C"]}
+        options={["A+", "A", "B+", "B", "C", "Alta", "Media", "Baja"]}
         onChange={(v) => onChange({ categoria: v })}
       />
       <FilterSelect
