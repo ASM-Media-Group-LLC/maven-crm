@@ -100,6 +100,9 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
   // (no privilegiado) → no lo mostramos como si fuera el real.
   const phoneText = (c.whatsapp || c.phone || "").trim();
   const showPhone = canSeePhone && !!phoneText && !phoneText.includes("•");
+  // ¿Hay número cargado? Se puede saber SIN verlo: la vista enmascara con "•"
+  // pero deja el campo no vacío, así que vacío = no hay teléfono (no es falta de permiso).
+  const hasPhone = !!phoneText;
   const phoneDigits = phoneText.replace(/[^0-9+]/g, "");
   const stats: { label: string; value: React.ReactNode; full?: boolean }[] = [
     { label: "Creación", value: c.creacion || "—" },
@@ -137,7 +140,14 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
       value: (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <WaChatButton contactId={c.id} name={c.nombre} />
+            {/* Sin teléfono cargado el botón sólo puede fallar (el edge no tiene a
+                dónde escribir): 336 agencias y varias ex-creadoras entraron sin
+                número. Se avisa en vez de ofrecer un botón que revienta. */}
+            {hasPhone ? (
+              <WaChatButton contactId={c.id} name={c.nombre} />
+            ) : (
+              <span className="text-xs text-muted-foreground">Sin teléfono cargado</span>
+            )}
             <TgChatButton contactId={c.id} name={c.nombre} />
           </div>
           {showPhone && (

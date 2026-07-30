@@ -293,6 +293,33 @@ export const useCloserLeads = () => {
   // Cuando impersona (viewAsCloserId) queda false → ve exactamente lo del closer.
   const canSeeAll = effectiveIsAdmin || effectiveIsManager || effectiveIsSupervisor;
 
+  // Un CLOSER SUPERVISOR ve todo el pipeline por `canSeeAll`, pero no debe ver las
+  // asignadas de sus PARES: sólo lo suyo y lo de los closers rasos (regla del owner).
+  // La lista de agentes visibles la resuelve la BD (closer_scope_agent_ids) para no
+  // enumerar roles en el front; null = sin restricción.
+  const { data: scopeAgentIds = null } = useQuery({
+    queryKey: ["closer-scope-agents", user?.id, role],
+    enabled: !!user?.id && role === "Closer Supervisor" && !viewAsCloserId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("closer_scope_agent_ids");
+      if (error) throw error;
+      return (data as string[] | null) ?? null;
+    },
+  });
+
+  /** Aplica el alcance por agente a una query sobre closer_creators.
+   *  - closer raso → sólo sus filas (comportamiento previo).
+   *  - closer supervisor → él + closers rasos + el POOL sin asignar (cualquiera puede tomarlo).
+   *  - resto → sin restricción. */
+  const scopeByAgent = (q: any) => {
+    if (!canSeeAll && effectiveUserId) return q.eq("assigned_to", effectiveUserId);
+    if (scopeAgentIds && scopeAgentIds.length > 0) {
+      return q.or(`assigned_to.in.(${scopeAgentIds.join(",")}),assigned_to.is.null`);
+    }
+    return q;
+  };
+
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
   const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
   const handleSetAgentFilter = (v: string | null) => { setAgentFilter(v); setPage(0); };
@@ -461,9 +488,7 @@ export const useCloserLeads = () => {
 
       // Role-based filter: closers only see assigned. Si el admin está
       // viendo "como" un closer (viewAsCloserId), también restringimos.
-      if (!canSeeAll && effectiveUserId) {
-        query = query.eq("assigned_to", effectiveUserId);
-      }
+      query = scopeByAgent(query);
 
       // Date filter server-side for passed_date
       if (dateFrom && dateTo && dateField === "passed_date") {
@@ -607,6 +632,9 @@ export const useCloserLeads = () => {
         .not("passed_date", "is", null);
       if (!canSeeAll && targetUserId) {
         creatorsQ = creatorsQ.eq("assigned_to", targetUserId);
+      } else if (scopeAgentIds && scopeAgentIds.length > 0) {
+        // Closer supervisor: las alertas de contacto son de SU gente, no de sus pares.
+        creatorsQ = creatorsQ.in("assigned_to", scopeAgentIds);
       } else if (viewAsCloserId) {
         // Admin viendo como un closer específico
         creatorsQ = creatorsQ.eq("assigned_to", viewAsCloserId);
@@ -657,9 +685,7 @@ export const useCloserLeads = () => {
       // etc.) quedaban truncados a ~1000. fetchAllRows trae TODAS con .range().
       const rows = await fetchAllRows((from, to) => {
         let q = supabase.from("closer_creators").select("stage, deal_type, lead_source");
-        if (!canSeeAll && effectiveUserId) {
-          q = q.eq("assigned_to", effectiveUserId);
-        }
+        q = scopeByAgent(q);
         if (applyCreatorDate) {
           const fromStr = dateFrom!.toISOString().split("T")[0];
           const toStr = dateTo!.toISOString().split("T")[0];
@@ -764,9 +790,7 @@ export const useCloserLeads = () => {
         .eq("deal_type", "reclutamiento")
         .neq("lead_source", B2B_SOURCE)
         .in("stage", ["Completada", "Confirmada"]);
-      if (!canSeeAll && effectiveUserId) {
-        q = q.eq("assigned_to", effectiveUserId);
-      }
+      q = scopeByAgent(q);
       if (applyCreatorDate) {
         const fromStr = dateFrom!.toISOString().split("T")[0];
         const toStr = dateTo!.toISOString().split("T")[0];
@@ -796,9 +820,7 @@ export const useCloserLeads = () => {
         // número dejaría de significar lo que dice.
         .neq("lead_source", B2B_SOURCE)
         .in("stage", ["Completada", "Confirmada"]);
-      if (!canSeeAll && effectiveUserId) {
-        q = q.eq("assigned_to", effectiveUserId);
-      }
+      q = scopeByAgent(q);
       if (applyCreatorDate) {
         const fromStr = dateFrom!.toISOString().split("T")[0];
         const toStr = dateTo!.toISOString().split("T")[0];
@@ -848,9 +870,7 @@ export const useCloserLeads = () => {
         .select("subscription_amount, passed_date")
         .eq("lead_source", B2B_SOURCE)
         .in("stage", ["Completada", "Confirmada"]);
-      if (!canSeeAll && effectiveUserId) {
-        q = q.eq("assigned_to", effectiveUserId);
-      }
+      q = scopeByAgent(q);
       if (applyCreatorDate) {
         const fromStr = dateFrom!.toISOString().split("T")[0];
         const toStr = dateTo!.toISOString().split("T")[0];

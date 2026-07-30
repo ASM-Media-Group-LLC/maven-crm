@@ -185,7 +185,9 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
                 <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
-                    <WaChatButton contactId={c.id} />
+                    {/* Sin número cargado el botón sólo puede fallar → no se ofrece.
+                        Vacío ≠ enmascarado: la vista enmascara con "•". */}
+                    {(c.whatsapp || c.phone || "").trim() ? <WaChatButton contactId={c.id} /> : null}
                     <TgChatButton contactId={c.id} />
                   </div>
                 </TableCell>

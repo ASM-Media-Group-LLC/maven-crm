@@ -90,6 +90,27 @@ export function useClosersKpiPopup(
   // Ve todo el pipeline: admin/manager/supervisor (incluye Team Leader).
   const canSeeAll = effectiveIsAdmin || effectiveIsManager || effectiveIsSupervisor;
 
+  // Mismo alcance que el listado de Operaciones: un Closer Supervisor no ve las
+  // filas de sus PARES. Sin esto, el popup de un KPI listaba leads que el listado
+  // de abajo ya no muestra (y el conteo del card no cuadraba con el detalle).
+  const { data: scopeAgentIds = null } = useQuery({
+    queryKey: ["closer-scope-agents", userId, role],
+    enabled: !!userId && role === "Closer Supervisor" && !viewAsCloserId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("closer_scope_agent_ids");
+      if (error) throw error;
+      return (data as string[] | null) ?? null;
+    },
+  });
+  const scopeByAgent = (q: any) => {
+    if (!canSeeAll && effectiveUserId) return q.eq("assigned_to", effectiveUserId);
+    if (scopeAgentIds && scopeAgentIds.length > 0) {
+      return q.or(`assigned_to.in.(${scopeAgentIds.join(",")}),assigned_to.is.null`);
+    }
+    return q;
+  };
+
   return useQuery<ClosersKpiPopupResult>({
     queryKey: ["closers-kpi-popup", state, userId, role, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
     enabled: !!state && !!userId && !!role,
@@ -111,9 +132,7 @@ export function useClosersKpiPopup(
           if (stages && stages.length > 0) {
             q = stages.length === 1 ? q.eq("stage", stages[0]) : q.in("stage", stages);
           }
-          if (!canSeeAll && effectiveUserId) {
-            q = q.eq("assigned_to", effectiveUserId);
-          }
+          q = scopeByAgent(q);
           if (applyCreatorDate) {
             const fromStr = dateFrom!.toISOString().split("T")[0];
             const toStr = dateTo!.toISOString().split("T")[0];
@@ -220,7 +239,7 @@ export function useClosersKpiPopup(
           .neq("lead_source", "agencia")
           .in("stage", ["Completada", "Confirmada"]);
         if (onlyPlatform) q = q.ilike("main_platform", onlyPlatform);
-        if (viewAsCloserId) q = q.eq("assigned_to", viewAsCloserId);
+        q = viewAsCloserId ? q.eq("assigned_to", viewAsCloserId) : scopeByAgent(q);
         if (applyCreatorDate) {
           const fromStr = dateFrom!.toISOString().split("T")[0];
           const toStr = dateTo!.toISOString().split("T")[0];
@@ -251,9 +270,7 @@ export function useClosersKpiPopup(
           .neq("lead_source", "agencia")
           .gt("estimated_monetization", 0)
           .order("estimated_monetization", { ascending: false });
-        if (viewAsCloserId) {
-          q = q.eq("assigned_to", viewAsCloserId);
-        }
+        q = viewAsCloserId ? q.eq("assigned_to", viewAsCloserId) : scopeByAgent(q);
         if (applyCreatorDate) {
           const fromStr = dateFrom!.toISOString().split("T")[0];
           const toStr = dateTo!.toISOString().split("T")[0];
@@ -284,9 +301,7 @@ export function useClosersKpiPopup(
           .in("stage", ["Completada", "Confirmada"])
           .order("subscription_amount", { ascending: false });
         q = esAgencia ? q.eq("lead_source", "agencia") : q.neq("lead_source", "agencia");
-        if (viewAsCloserId) {
-          q = q.eq("assigned_to", viewAsCloserId);
-        }
+        q = viewAsCloserId ? q.eq("assigned_to", viewAsCloserId) : scopeByAgent(q);
         if (applyCreatorDate) {
           const fromStr = dateFrom!.toISOString().split("T")[0];
           const toStr = dateTo!.toISOString().split("T")[0];

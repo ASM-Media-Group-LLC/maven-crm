@@ -242,7 +242,10 @@ Deno.serve(async (req) => {
     displayName = displayName || payload.name || null;
   }
   const jid = e164 ? toJid(e164) : null;
-  if (!jid) return json({ ok: false, error: "target_no_phone" }, 422);
+  // 200 + ok:false (no 422): con 4xx supabase-js devuelve "Edge Function returned a
+  // non-2xx status code" SIN el cuerpo, así que el front mostraba ese texto crudo en
+  // un toast rojo en vez del motivo. Mismo patrón que los rechazos de gating de arriba.
+  if (!jid) return json({ ok: false, error: "Este contacto no tiene teléfono cargado, así que no se puede abrir un chat de WhatsApp. Agregale el número desde Editar." });
 
   // ── find-or-create wa_contact (por tenant + jid) ───────────────────────────
   let contactId: string;

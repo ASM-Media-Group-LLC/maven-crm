@@ -661,6 +661,7 @@ const ContactosContent = () => {
           contactId={sellContacto.id}
           contactName={sellContacto.nombre}
           instagramHandle={sellContacto.instagram}
+          contactKind={sellContacto.contactKind}
         />
       )}
 
