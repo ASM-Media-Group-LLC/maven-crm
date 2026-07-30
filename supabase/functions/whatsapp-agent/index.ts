@@ -4287,6 +4287,8 @@ async function runAgent(req: AgentRequest): Promise<{
   let finalReply: string | null = null;
   // Por qué la corrida terminó sin publicar nada (se reporta en el evento agent_silent).
   let silentReason: string = "loop_agotado";
+  // Un solo empujón para que reenvíe por reply_to_group si redactó la respuesta como texto.
+  let nudgedToReply = false;
   let iter = 0;
   const totalUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
@@ -4460,12 +4462,29 @@ async function runAgent(req: AgentRequest): Promise<{
     const toolUses = data.content.filter((b) => b.type === "tool_use");
 
     if (toolUses.length === 0) {
-      // El modelo no llamó ninguna tool. Su texto/razonamiento suelto NUNCA se
-      // publica (ni en mention ni en auto): para hablarle al grupo TIENE que
-      // llamar reply_to_group explícitamente. Antes un "fallback" publicaba ese
-      // texto en mention — pero terminaba publicando el META-RAZONAMIENTO del
-      // bot (ej. "esto no requiere respuesta, silencio total"). Si el modelo no
-      // llamó reply_to_group, respetamos su silencio.
+      // El modelo no llamó ninguna tool. Su texto suelto NO se publica: para hablarle al
+      // grupo TIENE que llamar reply_to_group. Antes un "fallback" publicaba ese texto y
+      // terminaba filtrando el META-RAZONAMIENTO ("esto no requiere respuesta, silencio").
+      //
+      // PERO cuando LO MENCIONARON y el modelo redactó una respuesta REAL como texto plano
+      // (falla conocida: a veces emite el tool-call como texto), tragársela deja a la persona
+      // hablándole a la pared — caso Fabiana 30/07: 578 tokens de respuesta descartados, dos
+      // veces seguidas. En vez de publicar el texto crudo (que puede traer meta-razonamiento),
+      // le damos UN empujón para que lo reenvíe por la tool. Solo una vez, para no loopear.
+      const addressed = req.invoked_by === "mention" || req.invoked_by === "audio_mention" ||
+        req.invoked_by === "image_mention" || group.is_direct === true;
+      const textoModelo = (data.content ?? [])
+        .filter((b) => b.type === "text").map((b) => (b as { text?: string }).text ?? "").join("\n").trim();
+      if (addressed && !nudgedToReply && textoModelo.length > 0) {
+        nudgedToReply = true;
+        messages.push({ role: "assistant", content: data.content });
+        messages.push({ role: "user", content: [{ type: "text", text:
+          "⚠️ No publicaste NADA en el grupo, pero la persona te MENCIONÓ y espera respuesta. " +
+          "Si el texto que acabás de escribir ERA tu respuesta, reenvialo AHORA llamando la tool " +
+          "reply_to_group (solo el mensaje para la persona, sin el meta-razonamiento). Si de verdad " +
+          "NO corresponde responder, terminá sin llamar ninguna tool." }] });
+        continue;
+      }
       silentReason = "el_modelo_no_llamo_ninguna_tool";
       messages.push({ role: "assistant", content: data.content });
       break;
