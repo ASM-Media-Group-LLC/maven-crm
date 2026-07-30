@@ -403,8 +403,18 @@ function pareceTelefono(s: string): boolean {
   return bloqueMasLargo >= 3;
 }
 
-/** Reemplaza telefonos por un marcador. Preserva URLs y menciones: llevan digitos y no son telefonos. */
-export function redactPhones(texto: string, marcador = "[numero en Maven]"): string {
+// Deja los ultimos 4 digitos y tapa el resto con asteriscos, uno por digito oculto.
+function enmascarar(s: string): string {
+  const d = s.replace(/\D/g, "");
+  return "*".repeat(Math.max(0, d.length - 4)) + d.slice(-4);
+}
+
+/**
+ * Enmascara telefonos dejando visibles solo los ULTIMOS 4 digitos (ej "******6868"), asi el
+ * equipo puede identificar de cual numero se habla sin que el numero quede publicado.
+ * Preserva URLs y menciones: llevan digitos y no son telefonos.
+ */
+export function redactPhones(texto: string): string {
   if (!texto) return texto;
   const guardados: string[] = [];
   const guardar = (s: string): string => {
@@ -415,6 +425,6 @@ export function redactPhones(texto: string, marcador = "[numero en Maven]"): str
   const conPlaceholders = texto
     .replace(URL_RE, guardar)
     .replace(MENCION_RE, guardar);
-  const limpio = conPlaceholders.replace(TEL_CAND_RE, (m) => (pareceTelefono(m) ? marcador : m));
+  const limpio = conPlaceholders.replace(TEL_CAND_RE, (m) => (pareceTelefono(m) ? enmascarar(m) : m));
   return limpio.replace(/⟦(\d+)⟧/g, (_x, i) => guardados[Number(i)]);
 }
