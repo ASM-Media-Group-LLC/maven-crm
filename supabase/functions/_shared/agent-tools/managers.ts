@@ -11,7 +11,7 @@ export const managersTools: AgentTool[] = [
       "(BLU, mes a la fecha vs mismo día del mes pasado) y devuelve solo las accionables con su cuadrante — 'critico' (no promociona + " +
       "ingreso cae), 'calidad' (promociona pero igual cae → revisar CÓMO promociona), 'riesgo' (promo baja, " +
       "ingreso aún ok). Incluye manager responsable, días de promo, ingreso del mes/mes pasado, % de tendencia y un " +
-      "diagnóstico. Filtrá por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece. " +
+      "diagnóstico. Filtra por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece. " +
       "⚠️ Mide SOLO promoción (Promolog) e ingreso (BLU) — NO sabe nada de contacto/mensajes. NUNCA infieras " +
       "'sin contacto' ni 'días sin que le escriban' a partir de que una creadora promociona poco: son cosas " +
       "distintas. Para contacto usá get_manager_contact_activity (cuántas contactó hoy) o " +
@@ -21,7 +21,7 @@ export const managersTools: AgentTool[] = [
       "⚠️ RED DE PROMO: cada fila trae 'promo_networks' (días de promo por red este mes, ej 'x:15d, telegram:11d') " +
       "e 'ig_has_data'. Si ig_has_data=false NO hay dato utilizable de Instagram este mes (historias sin leer o sin " +
       "IG) → está PROHIBIDO decirle que revise 'el formato/oferta de sus historias de IG' o culpar a IG por la " +
-      "caída: nombrá las redes reales de promo_networks y pedí revisar la calidad AHÍ. Caso típico: creadoras cuyo " +
+      "caída: nombra las redes reales de promo_networks y pide revisar la calidad AHÍ. Caso típico: creadoras cuyo " +
       "tráfico va por X/Telegram con link directo a OF.",
     input_schema: {
       type: "object",
@@ -60,7 +60,7 @@ export const managersTools: AgentTool[] = [
     scope: "read",
     handler: async (args, ctx) => {
       const raw = String(args?.query ?? "").trim().replace(/^@+/, "");
-      if (!raw) throw new Error("get_creator_earnings: pasá { query }");
+      if (!raw) throw new Error("get_creator_earnings: pasa { query }");
       const like = `%${raw}%`;
       const { data: cands, error: cErr } = await ctx.sb
         .from("creators")
@@ -107,7 +107,7 @@ export const managersTools: AgentTool[] = [
       "Compara los DÍAS DE PROMO del tramo del mes ACTUAL (día 1 → hoy) contra el MISMO TRAMO de un mes anterior " +
       "(por defecto el mes pasado), por creadora ACTIVA con manager. Úsala para 'promo de julio vs junio', " +
       "'¿quién bajó la promoción respecto al mes pasado?', comparaciones mes-contra-mes. El histórico SÍ existe " +
-      "en el sistema. Filtrá por manager con manager_name. months_back: 1 = mes pasado (default), 2 = el anterior, etc. " +
+      "en el sistema. Filtra por manager con manager_name. months_back: 1 = mes pasado (default), 2 = el anterior, etc. " +
       "Devuelve, por creadora, días de promo del mes actual vs el previo + delta (negativo = bajó) + las fechas exactas " +
       "de cada tramo. Ordenado por mayor caída primero.",
     input_schema: {
@@ -136,12 +136,12 @@ export const managersTools: AgentTool[] = [
       "Cuántas CREADORAS promocionaron en un DÍA (por defecto HOY, Bogotá), separado por manager. " +
       "⚠️ 'cuántas promociones' = cuántas CREADORAS promocionaron, NO cantidad de stories. Cuenta creadoras con " +
       "promo OF detectada ese día (promoted='true'); ignora las que solo tuvieron stories sin promo y las pendientes " +
-      "de scan. Úsala para '¿cuántas promocionaron hoy?', 'separá las de Carolina y Fabiana', '¿quiénes promocionaron " +
-      "el 14?'. Pasá date (YYYY-MM-DD) para otro día y manager_name para filtrar. Devuelve por manager: cuántas " +
+      "de scan. Úsala para '¿cuántas promocionaron hoy?', 'separa las de Carolina y Fabiana', '¿quiénes promocionaron " +
+      "el 14?'. Pasa date (YYYY-MM-DD) para otro día y manager_name para filtrar. Devuelve por manager: cuántas " +
       "creadoras promocionaron + quiénes (con nº de stories de promo y redes). " +
-      "⚠️ MIRÁ SIEMPRE el bloque `cobertura` antes de responder: si scan_corrio=false / creadoras_leidas=0, el scan " +
-      "de ese día TODAVÍA NO CORRIÓ — decí eso, NO listes promos ni afirmes que nadie promocionó. Si la cobertura es " +
-      "parcial, decí explícitamente que faltan creadoras por escanear en vez de dar el número por cerrado, y nunca " +
+      "⚠️ MIRA SIEMPRE el bloque `cobertura` antes de responder: si scan_corrio=false / creadoras_leidas=0, el scan " +
+      "de ese día TODAVÍA NO CORRIÓ — di eso, NO listes promos ni afirmes que nadie promocionó. Si la cobertura es " +
+      "parcial, di explícitamente que faltan creadoras por escanear en vez de dar el número por cerrado, y nunca " +
       "digas 'sigue escaneando' si ultimo_scan es viejo.",
     input_schema: {
       type: "object",
@@ -218,7 +218,7 @@ export const managersTools: AgentTool[] = [
         nota: leidas === 0
           ? "⚠️ EL SCAN DE ESE DÍA TODAVÍA NO LEYÓ A NADIE (creadoras_leidas=0). NO digas que nadie promocionó ni listes promos de 'hoy': lo correcto es decir que el scan aún no corrió y que todavía no hay datos del día."
           : "Cuenta CREADORAS con promo OF detectada (promoted=true), no cantidad de stories. Cobertura: se leyeron " +
-            `${leidas} creadoras hasta el último scan (${ultimoScan}). Si la cobertura es baja, aclará que el reporte es PARCIAL en vez de darlo por cerrado.`,
+            `${leidas} creadoras hasta el último scan (${ultimoScan}). Si la cobertura es baja, aclara que el reporte es PARCIAL en vez de darlo por cerrado.`,
       };
     },
   },
@@ -231,7 +231,7 @@ export const managersTools: AgentTool[] = [
       "Carolina, Kash MASSIVE = Fabiana (creator_business.kash_type, viene de BLU; fallback: manager asignada en el " +
       "perfil). Cuenta solo mensajes SALIENTES (desde Maven o desde el teléfono/WA Web capturados como externos); los " +
       "fallidos no cuentan. Devuelve por manager: cuántas creadoras contactó + quiénes (con mensajes por creadora); y " +
-      "aparte los contactos de la línea NO vinculados a una creadora (sin_atribuir). Pasá date (YYYY-MM-DD) para otro " +
+      "aparte los contactos de la línea NO vinculados a una creadora (sin_atribuir). Pasa date (YYYY-MM-DD) para otro " +
       "día y manager_name para filtrar. Usala para '¿cuántos contactos hizo hoy Carolina y Fabiana?'.",
     input_schema: {
       type: "object",
@@ -439,9 +439,9 @@ export const managersTools: AgentTool[] = [
       "contacto); dias_sin_contacto='sin registro' = ningún saliente por la línea de Managers en el historial " +
       "visible (NO prueba abandono: pudo contactarla por otra línea o antes del 16/07). Matching por teléfono robusto " +
       "(últimos 10 dígitos, sirve para México 521/52); atribución por manager asignada (alineada con " +
-      "la cuenta Kash: Plus=Carolina, Massive=Fabiana). Pasá silent_days para cambiar el umbral " +
+      "la cuenta Kash: Plus=Carolina, Massive=Fabiana). Pasa silent_days para cambiar el umbral " +
       "(default 3) y manager_name para filtrar. ⚠️ NUNCA respondas esto de memoria ni lo deduzcas de " +
-      "get_manager_growth_feed (promo ≠ contacto): llamá a ESTA tool. CAVEAT: solo cuenta las líneas " +
+      "get_manager_growth_feed (promo ≠ contacto): llama a ESTA tool. CAVEAT: solo cuenta las líneas " +
       "'manager'; si contactan desde otra línea, no se ve.",
     input_schema: {
       type: "object",
@@ -513,10 +513,10 @@ export const managersTools: AgentTool[] = [
       "EL TOTAL de creadoras que tiene cada manager (el DENOMINADOR) + cuántas promocionaron y cuántas " +
       "contactó ese día, con sus PORCENTAJES ya calculados. Es LA tool para '¿en % cómo va cada manager?', " +
       "'¿cuántas de sus modelos promocionaron sobre el total?', '¿cuántas creadoras tiene Carolina/Fabiana?'. " +
-      "⚠️ NUNCA pidas al equipo que te confirme cuántas creadoras tiene cada una, ni digas que no tenés el " +
+      "⚠️ NUNCA pidas al equipo que te confirme cuántas creadoras tiene cada una, ni digas que no tienes el " +
       "total: SIEMPRE está acá (roster = creadoras ACTIVAS por manager asignada, alineado con la cuenta Kash: " +
       "Plus=Carolina, Massive=Fabiana). Tampoco lo deduzcas de get_manager_growth_feed: ese SOLO devuelve las " +
-      "creadoras EN ALERTA, no el roster completo. Pasá 'date' (YYYY-MM-DD) para otro día (ej. ayer); default hoy. " +
+      "creadoras EN ALERTA, no el roster completo. Pasa 'date' (YYYY-MM-DD) para otro día (ej. ayer); default hoy. " +
       "Campos: total_active (denominador), promoted_count/promoted_pct, contacted_count/contacted_pct y " +
       "covered_count = a cuántas Promolog logró LEER ese día. Si covered_count < total_active, aclaralo al dar " +
       "el %: las no leídas no son 'no promocionó' (ver #818). Incluye una fila manager_name=null con las activas " +
@@ -548,7 +548,7 @@ export const managersTools: AgentTool[] = [
         nota:
           "total_active = creadoras ACTIVAS con esa manager asignada; promoted_pct va sobre total_active. " +
           "⚠️ is_partial_day=true ⇒ el día está EN CURSO y la mayor parte de la promo se detecta por la tarde: " +
-          "ese % es un PISO, NO sirve para comparar managers. Para comparar usá el día CERRADO (pasá date=ayer) y decilo. " +
+          "ese % es un PISO, NO sirve para comparar managers. Para comparar usá el día CERRADO (pasa date=ayer) y decilo. " +
           "covered_count = a cuántas Promolog pudo LEER ese día (las no leídas NO son 'no promocionó', ver #818). " +
           "scannable_count = cuántas tienen handle escaneable: las que no tienen NUNCA pueden contar como que " +
           "promocionaron, así que si scannable_count < total_active el techo de esa manager es menor a 100% " +

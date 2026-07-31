@@ -36,7 +36,7 @@ export const qaTools: AgentTool[] = [
       "del mes en curso. Devuelve por chatter: ventas, $/hora, ingreso de la agencia (venta × 80% neto OF × % " +
       "efectivo firmado), costo (salario base), margen y ROI (×). Detecta 'online pero improductivo' (mucha " +
       "actividad, poca venta) y 'no rentable' (la agencia recibe menos de lo que cuesta el chatter, ROI<1). " +
-      "Pasá only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
+      "Pasa only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
       "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo.",
     input_schema: {
       type: "object",

@@ -201,7 +201,7 @@ export const inboxTools: AgentTool[] = [
       "(que sólo encuentra modelos linkeadas del pipeline), esta ve TODAS las conversaciones de la línea, " +
       "incluidas las que no están vinculadas a una creadora. Sin `contact` → lista las conversaciones " +
       "recientes de la línea (nombre, marca, último mensaje, no leídos). Con `contact` → trae los últimos " +
-      "mensajes de ESA conversación. Por defecto usa TU departamento (el del bot); pasá `department` para otro.",
+      "mensajes de ESA conversación. Por defecto usa TU departamento (el del bot); pasa `department` para otro.",
     input_schema: {
       type: "object",
       properties: {
@@ -217,7 +217,7 @@ export const inboxTools: AgentTool[] = [
       const dept = String(args.department ?? ctx.department ?? "").trim();
       if (!dept) {
         return { found: false, reason: "sin_departamento",
-          nota: "Especificá `department` (este bot no tiene department asignado)." };
+          nota: "Especifica `department` (este bot no tiene department asignado)." };
       }
 
       // Canales (líneas) de ese departamento.
@@ -280,7 +280,7 @@ export const inboxTools: AgentTool[] = [
           no_leidos: c.unread_count ?? 0,
           estado: c.status,
         })),
-        nota: "Para leer los mensajes de una conversación puntual, llamá de nuevo con `contact`=<nombre>.",
+        nota: "Para leer los mensajes de una conversación puntual, llama de nuevo con `contact`=<nombre>.",
       };
     },
   },

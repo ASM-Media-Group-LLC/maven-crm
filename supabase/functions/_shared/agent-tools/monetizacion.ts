@@ -17,7 +17,7 @@ export const monetizacionTools: AgentTool[] = [
     description:
       "Oportunidades de venta de productos (Piclink, Content Protector, Blu, Exchange, etc.) de Maven, priorizadas " +
       "por etapa y urgencia de seguimiento. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para " +
-      "VENTAS CERRADAS pasá stage='won' (ej. '¿cuántas se cerraron?' → mirá last_touch_at); 'all' trae todas. " +
+      "VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas se cerraron?' → mira last_touch_at); 'all' trae todas. " +
       "Nota: Maven solo tiene lo que registró el bot o lo cargado acá — si un closer dice que las puso en un Google " +
       "Sheet u otro lado, no van a aparecer.",
     input_schema: {
@@ -51,9 +51,9 @@ export const monetizacionTools: AgentTool[] = [
       "Ventas de PLATAFORMAS a creadoras hechas desde el pipeline de closers (el carrito 🛒 de la pantalla " +
       "Creadoras → deal_type venta_plataforma): Trafix, Blu, Piclink, Content Protector, ORA, Let's Shoot, con " +
       "suscripción mensual fija (sin comisión %). Es la SEGUNDA fuente de 'unlimited' — la otra es " +
-      "get_monetization_opportunities. Para '¿cuántas ventas de unlimited/plataformas?' mirá AMBAS. Devuelve por " +
+      "get_monetization_opportunities. Para '¿cuántas ventas de unlimited/plataformas?' mira AMBAS. Devuelve por " +
       "deal: creadora, plataforma, suscripción USD/mes, etapa (Asignada=en curso · Confirmada/Completada=cerrada), " +
-      "closer y fechas; + un resumen (total, cerradas, MRR). Filtrá por stage, closer (nombre) o since (fecha ISO).",
+      "closer y fechas; + un resumen (total, cerradas, MRR). Filtra por stage, closer (nombre) o since (fecha ISO).",
     input_schema: {
       type: "object",
       properties: {

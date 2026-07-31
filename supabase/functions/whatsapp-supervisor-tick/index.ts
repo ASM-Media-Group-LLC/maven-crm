@@ -245,13 +245,13 @@ async function checkCloser(
       const ok = await tryClaim(sb, user.user_id, "closer_no_leads_2h", now.date, stats);
       if (ok) {
         // Estratega, no notetaker: en vez de solo preguntar "¿algo pendiente?",
-        // recomendá leads de alta calidad sin asignar para que los agarre y les
+        // recomienda leads de alta calidad sin asignar para que los agarre y les
         // dé seguimiento hoy.
         const top = await topUnassignedLeads(sb, 4);
         const msg = top.length > 0
           ? `@${mention} venís sin leads asignados hoy. Sin tomar, de mayor calidad: ${
             top.map((l) => `${igLink(l.handle)} (${l.quality})`).join(", ")
-          } — agarrá 2-3 y arrancales el seguimiento hoy. ¿Cuáles te asignás?`
+          } — agarra 2-3 y arrancales el seguimiento hoy. ¿Cuáles te asignás?`
           : `@${mention} venís sin leads asignados hoy y el pool de Nuevas está vacío. ¿Reactivamos algún seguimiento pendiente o conseguimos más leads?`;
         await sendToGroup(sb, group.id, msg);
       }
@@ -454,7 +454,7 @@ async function checkUnannouncedAbsence(
   const msg = `🚨 Ausencia no anunciada · *${group.tenant_id ? "Marketing/Ventas" : "grupo"}*\n\n` +
     `Estos miembros del equipo no se han reportado activos hoy (>30 min del inicio):\n` +
     missing.map((m) => `  · ${m}`).join("\n") +
-    `\n\n¿Sabés si están OK?`;
+    `\n\n¿Sabes si están OK?`;
   // Send via gateway directo (DM al owner, no al grupo).
   try {
     const gwUrl = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
@@ -678,7 +678,7 @@ async function checkCommitmentFollowups(
     const top = leads.slice(0, 6);
     const lista = top.map((l) => `· ${igLink(l.handle)} — ${l.detail}`).join("\n");
     const extra = leads.length > top.length ? `\n…y ${leads.length - top.length} más` : "";
-    const msg = `@${closerName}, tenés ${leads.length} lead${leads.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy? Si ya los tocaste, registrá el contacto (canal + resultado).`;
+    const msg = `@${closerName}, tienes ${leads.length} lead${leads.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy? Si ya los tocaste, registra el contacto (canal + resultado).`;
     await sendFollowup(sb, group, `closer_contact_digest:${closerId}`, msg);
   }
 
@@ -831,7 +831,7 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
   const activos = (groupsRaw ?? []).filter((g: any) => g.bot_mode !== "off");
   const groups = activos.filter((g: any) => !(g.wa_bot_id && excludeBotIds.has(g.wa_bot_id)));
   // El CIERRE DE JORNADA no es específico de ventas: es "se terminó el turno de este
-  // equipo, resumí el día". Excluirlo junto con los checks de closers dejó a AI WARMING
+  // equipo, resume el día". Excluirlo junto con los checks de closers dejó a AI WARMING
   // sin cierre PROGRAMADO desde el 08/07 — el 30/07, el día de mayor producción del
   // equipo (14 videos, 14 fotos, 6 posts), no hubo ningún resumen. Corre para todos los
   // grupos con bot activo; los checks de closers siguen scopeados a department='sales'.

@@ -63,7 +63,7 @@ export const equipoTools: AgentTool[] = [
       type: "object",
       properties: {
         person: { type: "string", description: "nombre (o parte) de la persona; omitir para todo el equipo" },
-        days: { type: "number", description: "últimos N días (default 7, máx 92). Ignorado si pasás from/to." },
+        days: { type: "number", description: "últimos N días (default 7, máx 92). Ignorado si pasas from/to." },
         from: { type: "string", description: "fecha desde YYYY-MM-DD (opcional)" },
         to: { type: "string", description: "fecha hasta YYYY-MM-DD (opcional)" },
       },
