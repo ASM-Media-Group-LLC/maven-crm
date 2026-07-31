@@ -75,6 +75,89 @@ export const equipoTools: AgentTool[] = [
     },
   },
   {
+    name: "get_group_members",
+    description:
+      "La FUENTE DE VERDAD de quiénes están en un grupo de WhatsApp del equipo (whatsapp_members de ESE grupo). " +
+      "Sin `group_name` devuelve el grupo actual; con `group_name` busca por nombre (Managers, Marketing/Ventas, " +
+      "AI WARMING…). Devuelve los linkeados a Maven (nombre completo + rol) y aparte los sin vincular (display name " +
+      "crudo de WhatsApp, puede ser basura tipo '#21'). USALA SIEMPRE que armes una lista de miembros, de monitoreo " +
+      "o respondas 'quiénes están en X' — NUNCA armes esas listas de memoria ni desde Hubstaff: Hubstaff tiene OTRA " +
+      "gente (chatters que no están en los grupos; el 31/07 el bot le inventó al owner dos personas sacadas de ahí, " +
+      "y al corregirse inventó una tercera). Si mezclás fuentes, decí de cuál sale cada nombre. No devuelve teléfonos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        group_name: { type: "string", description: "nombre (o parte) del grupo; omitir = el grupo actual" },
+      },
+      additionalProperties: false,
+    },
+    domain: "equipo",
+    scope: "read",
+    handler: async (args, ctx) => {
+      const gname = typeof args.group_name === "string" && args.group_name.trim() ? args.group_name.trim() : null;
+      let groupId = ctx.groupId ?? null;
+      let groupLabel: string | null = null;
+      if (gname) {
+        const { data: gs, error: gErr } = await ctx.sb
+          .from("whatsapp_groups")
+          .select("id, name")
+          .eq("tenant_id", ctx.tenantId)
+          .eq("active", true)
+          .eq("is_direct", false)
+          .ilike("name", `%${gname}%`)
+          .limit(5);
+        if (gErr) throw new Error(`get_group_members: ${gErr.message}`);
+        if (!gs || gs.length === 0) return { error: "grupo_no_encontrado", buscado: gname };
+        if (gs.length > 1) return { error: "varios_grupos_matchean", buscado: gname, opciones: gs.map((g) => g.name) };
+        groupId = gs[0].id;
+        groupLabel = gs[0].name;
+      } else if (groupId) {
+        const { data: g } = await ctx.sb.from("whatsapp_groups").select("name").eq("id", groupId).maybeSingle();
+        groupLabel = g?.name ?? null;
+      }
+      if (!groupId) return { error: "sin_grupo", nota: "pasá group_name (ej. 'Managers')" };
+
+      const { data: members, error } = await ctx.sb
+        .from("whatsapp_members")
+        .select("display_name, user_id")
+        .eq("group_id", groupId)
+        .eq("active", true);
+      if (error) throw new Error(`get_group_members: ${error.message}`);
+      const rows = (members ?? []) as Array<{ display_name: string | null; user_id: string | null }>;
+
+      const uids = [...new Set(rows.map((m) => m.user_id).filter((u): u is string => Boolean(u)))];
+      const nameById = new Map<string, string>();
+      const roleById = new Map<string, string>();
+      if (uids.length) {
+        const { data: profs } = await ctx.sb.from("profiles").select("id, full_name").in("id", uids);
+        for (const p of profs ?? []) if (p.full_name) nameById.set(p.id, p.full_name);
+        const { data: userRoles } = await ctx.sb.from("user_roles").select("user_id, role").in("user_id", uids);
+        for (const r of userRoles ?? []) if (r.role) roleById.set(r.user_id, r.role);
+      }
+
+      const linkeados: Array<{ nombre: string; rol: string | null }> = [];
+      const sinVincular: string[] = [];
+      for (const m of rows) {
+        const fn = m.user_id ? nameById.get(m.user_id) : null;
+        if (fn) linkeados.push({ nombre: fn, rol: (m.user_id && roleById.get(m.user_id)) || null });
+        else sinVincular.push(m.display_name ?? "(sin nombre)");
+      }
+      linkeados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      sinVincular.sort();
+
+      return {
+        grupo: groupLabel,
+        miembros_maven: linkeados,
+        total_linkeados: linkeados.length,
+        sin_vincular: sinVincular,
+        nota:
+          "Esta lista (whatsapp_members del grupo) es LA fuente para 'quiénes están en el grupo'. Hubstaff tiene " +
+          "OTRA gente (chatters) que NO está acá — si mezclás fuentes, aclará de dónde sale cada nombre. Los " +
+          "sin_vincular son participantes reales sin cuenta Maven linkeada (display name crudo, puede ser basura).",
+      };
+    },
+  },
+  {
     name: "get_hubstaff_activity",
     description:
       "Datos de Hubstaff (tiempo trabajado + % de actividad) de CUALQUIER persona del equipo registrada en Maven, " +
