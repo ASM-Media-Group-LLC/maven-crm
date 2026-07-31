@@ -1163,6 +1163,20 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "post_to_group",
+    description:
+      "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\n⚠️ FLUJO OBLIGATORIO EN DOS PASOS — nunca se manda de una:\n1) Primero llamala SIN pending_id, con group_name y body. NO se envía: te devuelve un pending_id y el texto. Mostrale a la persona el texto EXACTO que se publicaría y preguntale si lo mandás así.\n2) Solo cuando te diga que sí, llamala de nuevo con ese pending_id y confirm=true. Ahí se publica.\nSi te pide cambios, volvé al paso 1 con el texto corregido (se genera un pending_id nuevo).",
+    input_schema: {
+      type: "object",
+      properties: {
+        group_name: { type: "string", description: "nombre del grupo destino (ej. 'Managers', 'Marketing/Ventas', 'AI WARMING')" },
+        body: { type: "string", description: "texto EXACTO a publicar. Paso 1 solamente." },
+        pending_id: { type: "string", description: "id devuelto en el paso 1. Solo en el paso 2." },
+        confirm: { type: "boolean", description: "true SOLO cuando la persona ya confirmó explícitamente. Requiere pending_id." },
+      },
+    },
+  },
+  {
     name: "get_blu_sales",
     description:
       "INGRESOS BLU de las modelos (lo que facturan en OnlyFans), NO las ventas de los closers. ⚠️ Son DOS cuentas agencia con accesos distintos: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). Si te preguntan por 'ventas' sin aclarar, PREGUNTÁ primero si hablan de los closers o de BLU; si eligen BLU y no dicen cuál cuenta, preguntá Plus o Massive (o 'both' si te dicen todo). Devuelve total, split por cuenta, cuántas creadoras facturaron, top 5 y cuándo fue la última importación. Con refresh=true dispara una sincronización on-demand contra BLU para traer data fresca (tarda ~40s: avisá que la pediste y volvé a consultar en un minuto).",
@@ -2567,6 +2581,88 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "post_to_group": {
+      // SOLO el dueño, y SOLO desde su DM. Publicar en un grupo del equipo desde otro lado
+      // sería que cualquiera con acceso a un grupo hable en nombre del bot en otro.
+      if (!ctx.isOwner) return { error: "no_autorizado", message: "Publicar en otros grupos es solo para el dueño." };
+
+      // ── PASO 2: confirmar y publicar ──────────────────────────────────────
+      if (input.pending_id) {
+        if (input.confirm !== true) {
+          return { error: "falta_confirmacion", message: "Pasá confirm=true solo cuando la persona haya dicho explícitamente que sí." };
+        }
+        const { data: pend } = await sb
+          .from("whatsapp_pending_posts")
+          .select("id, target_group_id, body, status, created_at")
+          .eq("id", String(input.pending_id))
+          .eq("tenant_id", ctx.tenantId)
+          .maybeSingle();
+        if (!pend) return { error: "pending_no_encontrado", message: "Ese pending_id no existe. Volvé al paso 1." };
+        if (pend.status !== "pending") return { error: "ya_procesado", status: pend.status };
+        // Expira a los 30 min: confirmar algo compuesto hace rato es riesgoso (el contexto cambió).
+        if (Date.now() - new Date(pend.created_at as string).getTime() > 30 * 60 * 1000) {
+          await sb.from("whatsapp_pending_posts").update({ status: "expired" }).eq("id", pend.id);
+          return { error: "expirado", message: "Pasaron más de 30 min. Rehacé el paso 1 para reconfirmar el texto." };
+        }
+        const enviado = await executeTool("reply_to_group", { body: pend.body } as ToolInput, {
+          groupId: pend.target_group_id as string,
+          tenantId: ctx.tenantId,
+          isOwner: ctx.isOwner,
+          senderUserId: ctx.senderUserId,
+          messageId: null,
+          department: ctx.department ?? null,
+        });
+        await sb.from("whatsapp_pending_posts")
+          .update({ status: "sent", sent_at: new Date().toISOString() })
+          .eq("id", pend.id);
+        return { ok: true, publicado_en: pend.target_group_id, resultado: enviado };
+      }
+
+      // ── PASO 1: componer y devolver para confirmación (NO envía) ──────────
+      const groupName = String(input.group_name ?? "").trim();
+      const body = String(input.body ?? "").trim();
+      if (!groupName || !body) return { error: "faltan_group_name_o_body" };
+
+      const { data: candidatos } = await sb
+        .from("whatsapp_groups")
+        .select("id, name")
+        .eq("tenant_id", ctx.tenantId)
+        .eq("active", true)
+        .eq("is_direct", false)
+        .neq("provider", "manual")
+        .ilike("name", `%${groupName}%`);
+      const opciones = (candidatos ?? []) as Array<{ id: string; name: string }>;
+      if (opciones.length === 0) {
+        const { data: todos } = await sb.from("whatsapp_groups")
+          .select("name").eq("tenant_id", ctx.tenantId).eq("active", true).eq("is_direct", false).neq("provider", "manual");
+        return { error: "grupo_no_encontrado", disponibles: (todos ?? []).map((g) => (g as { name: string }).name) };
+      }
+      if (opciones.length > 1) {
+        return { error: "grupo_ambiguo", coincidencias: opciones.map((g) => g.name), message: "Preguntá a cuál de estos se refiere." };
+      }
+
+      const { data: nuevo, error: insErr } = await sb
+        .from("whatsapp_pending_posts")
+        .insert({
+          tenant_id: ctx.tenantId,
+          target_group_id: opciones[0].id,
+          requested_from_group_id: ctx.groupId,
+          requested_by_user_id: ctx.senderUserId,
+          body,
+        })
+        .select("id")
+        .single();
+      if (insErr) return { error: insErr.message };
+      return {
+        paso: "confirmacion_pendiente",
+        enviado: false,
+        pending_id: nuevo?.id,
+        grupo_destino: opciones[0].name,
+        texto_a_publicar: body,
+        instruccion: "NO se envió todavía. Mostrale a la persona el grupo destino y el texto EXACTO, y preguntale si lo publicás así. Si dice que sí, llamá post_to_group con este pending_id y confirm=true.",
+      };
     }
 
     case "get_blu_sales": {
