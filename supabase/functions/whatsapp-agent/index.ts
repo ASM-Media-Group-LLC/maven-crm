@@ -1163,6 +1163,33 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_blu_sales",
+    description:
+      "INGRESOS BLU de las modelos (lo que facturan en OnlyFans), NO las ventas de los closers. ⚠️ Son DOS cuentas agencia con accesos distintos: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). Si te preguntan por 'ventas' sin aclarar, PREGUNTÁ primero si hablan de los closers o de BLU; si eligen BLU y no dicen cuál cuenta, preguntá Plus o Massive (o 'both' si te dicen todo). Devuelve total, split por cuenta, cuántas creadoras facturaron, top 5 y cuándo fue la última importación. Con refresh=true dispara una sincronización on-demand contra BLU para traer data fresca (tarda ~40s: avisá que la pediste y volvé a consultar en un minuto).",
+    input_schema: {
+      type: "object",
+      properties: {
+        kash: { type: "string", enum: ["plus", "massive", "both"], description: "qué cuenta agencia: plus (Carolina), massive (Fabiana) o both" },
+        from: { type: "string", description: "fecha desde YYYY-MM-DD (Bogotá). Default: primer día del mes" },
+        to: { type: "string", description: "fecha hasta YYYY-MM-DD (Bogotá). Default: hoy" },
+        refresh: { type: "boolean", description: "true = pedir sync fresco a BLU antes de responder (solo si piden data 'de ahora'/'actualizada'). Tarda ~40s." },
+      },
+      required: ["kash"],
+    },
+  },
+  {
+    name: "get_daily_reports",
+    description:
+      "Los reportes de jornada que el equipo YA registró hoy (o en la fecha que pidas): números/contactados de captación (llg), cierres de closers, y CONTENIDO del equipo de warming (videos, fotos, cuentas, posts). Usalo cuando pregunten '¿qué hizo hoy el equipo?', '¿fulano ya reportó?', '¿cuánto produjo warming?' — o cuando te digan 'chequeá, acaba de mandar el reporte'. Devuelve una fila por persona con lo que quedó registrado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default hoy" },
+        role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "filtrar por tipo. Omitir = todos" },
+      },
+    },
+  },
+  {
     name: "get_creator_scan_config",
     description:
       "Muestra QUÉ redes/handles tiene cargada una creadora en el escaneo de promo y si están SANOS. Usalo cuando pregunten '¿estás revisando su X/Telegram/IG secundaria?', '¿por qué no aparece promo de X?', '¿el handle que actualicé quedó bien?', '¿está privada?'. Devuelve por red: el handle cargado, últimos días leídos, promos en 14d, y el último error del scan (read_failed/privada/etc). También avisa si el Telegram apunta a un canal o a un usuario (mal). NO inventes que una red 'no se cuenta' — chequeá acá primero.",
@@ -2540,6 +2567,62 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "get_blu_sales": {
+      const kash = String(input.kash ?? "both").toLowerCase();
+      const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const from = String(input.from ?? `${hoyBog.slice(0, 7)}-01`);
+      const to = String(input.to ?? hoyBog);
+
+      // Refresh on-demand: el blu-bridge NO expone HTTP — solo habla con Supabase y
+      // pollea `blu_sync_requests` cada 20s. Encolamos y avisamos: el sync tarda ~40s,
+      // más de lo que dura la corrida del agente (MAX_WALL_MS 30s), así que NO esperamos
+      // acá (bloquearía y dejaría al usuario sin respuesta). Devolvemos la data actual +
+      // el aviso de que el refresh está en curso.
+      let refreshInfo: Record<string, unknown> | undefined;
+      if (input.refresh === true) {
+        const { data: req, error: reqErr } = await sb
+          .from("blu_sync_requests")
+          .insert({ requested_by: "whatsapp-agent" })
+          .select("id")
+          .single();
+        refreshInfo = reqErr
+          ? { pedido: false, error: reqErr.message }
+          : { pedido: true, request_id: req?.id,
+              nota: "Sync a BLU encolado (~40s). Los datos de abajo son los ANTERIORES al refresh: avisale a la persona que en un minuto le podés dar los frescos." };
+      }
+
+      const { data, error } = await sb.rpc("get_blu_sales_summary", {
+        p_tenant: ctx.tenantId, p_kash: kash, p_from: from, p_to: to,
+      });
+      if (error) return { error: error.message };
+      return { ...(data as Record<string, unknown>), refresh: refreshInfo };
+    }
+
+    case "get_daily_reports": {
+      const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const fecha = String(input.date ?? hoyBog);
+      let q = sb
+        .from("whatsapp_daily_reports")
+        .select("user_id, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos, raw_text, profiles:user_id(full_name)")
+        .eq("report_date", fecha);
+      if (input.role_kind) q = q.eq("role_kind", String(input.role_kind));
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      if (rows.length === 0) return { fecha, reportes: [], nota: "Nadie registró reporte todavía en esa fecha." };
+      return {
+        fecha,
+        reportes: rows.map((r) => ({
+          persona: (r.profiles as { full_name?: string } | null)?.full_name ?? null,
+          tipo: r.role_kind,
+          numeros: r.numeros_obtenidos, contactados: r.contactados, respuestas: r.respuestas,
+          confirmadas: r.confirmadas, cerradas: r.cerradas,
+          videos: r.videos_creados, fotos: r.fotos_creadas, cuentas: r.cuentas_creadas, posts: r.posts_subidos,
+          detalle: typeof r.raw_text === "string" ? r.raw_text.slice(0, 300) : null,
+        })),
+      };
     }
 
     case "get_creator_scan_config": {
