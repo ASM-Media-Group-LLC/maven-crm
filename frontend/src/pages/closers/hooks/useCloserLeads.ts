@@ -360,33 +360,16 @@ export const useCloserLeads = () => {
   // prefetchear las otras tabs cuando se monta el componente — así al
   // cambiar de tab los datos ya están en caché y no se ve el skeleton.
   const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
-      // ── Ex-creadores / Agencias: son BASES DEL DIRECTORIO, no del pipeline ──
-      // Muestran los CONTACTOS disponibles para trabajar (closers_contacts), y
-      // cuando un closer toma uno pasa a "Asignaciones" (ahí sí es un lead).
-      // Se excluyen los ya convertidos: al asignarse, assign_closer_to_contact
-      // pone status='converted' → la fila sale sola de la base.
+      // ── Ex-creadores / Agencias: BASES DEL DIRECTORIO ──
+      // Muestran los CONTACTOS disponibles para trabajar (closers_contacts).
+      // Se excluyen los convertidos: al tomar uno, assign_closer_to_contact pone
+      // status='converted' → sale de la base. `__isContact` marca que el id es de
+      // closers_contacts, así "Tomar" y "registrar seguimiento" llaman al RPC de
+      // asignación (que promueve el contacto a lead) en vez de tocar closer_creators
+      // con un id que no existe ahí.
       if (SOURCE_TABS[tab]) {
-        let cq = supabase
-          .from("v_closers_contacts")
-          .select("id, name, handle, phone, city, physical_appearance, notes, created_at, created_by, contact_kind, status", { count: "exact" })
-          .eq("contact_kind", SOURCE_TABS[tab])
-          .neq("status", "converted")
-          .order("physical_appearance", { ascending: true })   // Alta → Media → Baja
-          .order("created_at", { ascending: false });
-
-        if (normalizedSearch) {
-          cq = cq.or(`handle.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%`);
-        }
-        const cFrom = pageNum * PAGE_SIZE;
-        cq = cq.range(cFrom, cFrom + PAGE_SIZE - 1);
-
-        const { data, error, count } = await cq;
-        if (error) throw error;
-
-        // Se mapean a la forma que espera LeadTable (stage 'Nuevo' = disponible
-        // para tomar). `__isContact` marca que el id es de closers_contacts, así
-        // "Tomar" llama al RPC de asignación en vez de tocar closer_creators.
-        const rows = (data || []).map((c: any) => ({
+        // Query del directorio (contactos disponibles), parametrizada por página.
+        const mapContactRow = (c: any) => ({
           id: c.id,
           __isContact: true,
           instagram_handle: c.handle || c.name || "sin_handle",
@@ -410,8 +393,68 @@ export const useCloserLeads = () => {
           created_by: c.created_by,
           source_contact_id: c.id,
           agent_name: null,
-        }));
-        return { rows, total: count || 0 };
+        });
+        const dirBase = () => {
+          let q = supabase
+            .from("v_closers_contacts")
+            .select("id, name, handle, phone, city, physical_appearance, notes, created_at, created_by, contact_kind, status", { count: "exact" })
+            .eq("contact_kind", SOURCE_TABS[tab])
+            .neq("status", "converted")
+            .order("physical_appearance", { ascending: true })   // Alta → Media → Baja
+            .order("created_at", { ascending: false });
+          if (normalizedSearch) q = q.or(`handle.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%`);
+          return q;
+        };
+
+        // EX-CREADORES: directorio puro. Al tomarse pasan a reclutamiento y
+        // reaparecen en "Asignaciones" (no están excluidas del embudo), así que
+        // no necesitan mostrarse acá una vez trabajadas.
+        if (tab !== "agencias") {
+          const cFrom = pageNum * PAGE_SIZE;
+          const { data, error, count } = await dirBase().range(cFrom, cFrom + PAGE_SIZE - 1);
+          if (error) throw error;
+          return { rows: (data || []).map(mapContactRow), total: count || 0 };
+        }
+
+        // AGENCIAS: unimos las que YA están en trabajo (leads B2B en el pipeline)
+        // con las intactas del directorio. Sin esto, al registrar el primer
+        // seguimiento la agencia se convierte en lead y —como las agencias están
+        // EXCLUIDAS del embudo de modelos (Asignaciones, etc.)— desaparecería de
+        // toda vista. Las en trabajo van primero (tienen actividad). Conjuntos
+        // disjuntos: al convertirse el contacto sale del directorio.
+        const leadBase = () => {
+          let q = supabase.from("closer_creators").select("*", { count: "exact" }).eq("lead_source", B2B_SOURCE);
+          if (normalizedSearch) q = q.ilike("instagram_handle", `%${normalizedSearch}%`);
+          q = scopeByAgent(q); // el Closer Supervisor no ve las de sus pares
+          return q.order("passed_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+        };
+        const [leadCountRes, dirCountRes] = await Promise.all([
+          leadBase().range(0, 0),   // solo para el count exact
+          dirBase().range(0, 0),
+        ]);
+        if (leadCountRes.error) throw leadCountRes.error;
+        if (dirCountRes.error) throw dirCountRes.error;
+        const L = leadCountRes.count || 0;
+        const D = dirCountRes.count || 0;
+
+        const from = pageNum * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        let rows: any[] = [];
+        // Porción de leads en trabajo (índices [0, L) del listado combinado).
+        if (from < L) {
+          const { data, error } = await leadBase().range(from, Math.min(to, L - 1));
+          if (error) throw error;
+          rows = data || [];
+        }
+        // Porción de directorio (rellena el resto de la página).
+        if (rows.length < PAGE_SIZE && to >= L) {
+          const dFrom = Math.max(0, from - L);
+          const need = PAGE_SIZE - rows.length;
+          const { data, error } = await dirBase().range(dFrom, dFrom + need - 1);
+          if (error) throw error;
+          rows = rows.concat((data || []).map(mapContactRow));
+        }
+        return { rows, total: L + D };
       }
 
       // ── Nuevo / Antiguos: pool de leads SIN asignar (stage 'Nuevo') ──

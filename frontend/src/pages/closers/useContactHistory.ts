@@ -35,10 +35,28 @@ export const useContactHistory = (creatorId: string | null) => {
   });
 
   const addContact = useMutation({
-    mutationFn: async (record: { creator_id: string; channel: string; result?: string; notes?: string; contact_date?: string }) => {
+    mutationFn: async (record: { creator_id: string; channel: string; result?: string; notes?: string; contact_date?: string; promoteContactId?: string }) => {
       if (!user) throw new Error("No autenticado");
+      const { promoteContactId, ...rest } = record;
+      let targetId = record.creator_id;
+      // Filas de los tabs Agencias/Ex-creadores: son CONTACTOS del directorio, no
+      // leads. closer_contact_history.creator_id tiene FK a closer_creators, así
+      // que registrar un seguimiento sobre un closers_contacts.id explota
+      // (violación de FK — el error que reportó Miguel). Antes de anotar, promovemos
+      // el contacto a lead con el MISMO RPC que "Tomar": crea/asigna el lead
+      // (heredando tipo agencia/ex_creadora), lo deja tuyo, y devuelve su id.
+      if (promoteContactId) {
+        const { data: newLeadId, error: promoErr } = await (supabase as any).rpc("assign_closer_to_contact", {
+          p_contact_id: promoteContactId,
+          p_closer_id: user.id,
+        });
+        if (promoErr) throw promoErr;
+        if (!newLeadId) throw new Error("No se pudo tomar la agencia para registrar el seguimiento.");
+        targetId = newLeadId as string;
+      }
       const { error } = await supabase.from("closer_contact_history").insert({
-        ...record,
+        ...rest,
+        creator_id: targetId,
         created_by: user.id,
         contact_date: record.contact_date || new Date().toISOString(),
       });
@@ -58,6 +76,9 @@ export const useContactHistory = (creatorId: string | null) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-alert-counts"] });
+      // Si el seguimiento promovió un contacto del directorio a lead, hay que
+      // refrescar también la vista de contactos para que salga de la base.
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       toast({ title: "Contacto registrado" });
     },
     onError: (e: Error) => {

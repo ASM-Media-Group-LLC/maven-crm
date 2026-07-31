@@ -342,7 +342,7 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
 InlineStageSelect.displayName = "InlineStageSelect";
 
 // ─── ContactCountCell (popover with history + quick form) ───
-const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: number }) => {
+const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; count: number; isContact?: boolean }) => {
   const [open, setOpen] = useState(false);
   const { history, isLoading, addContact, maxReached } = useContactHistory(open ? creatorId : null);
   const [channel, setChannel] = useState("");
@@ -352,7 +352,15 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   const handleSubmit = () => {
     if (!channel) return;
     addContact.mutate(
-      { creator_id: creatorId, channel, result: result || undefined, notes: notes || undefined },
+      {
+        creator_id: creatorId,
+        channel,
+        result: result || undefined,
+        notes: notes || undefined,
+        // Fila del directorio (Agencias/Ex-creadores): promover a lead antes de
+        // anotar (ver useContactHistory). Para un lead real no se manda y anota directo.
+        ...(isContact ? { promoteContactId: creatorId } : {}),
+      },
       {
         onSuccess: () => {
           setChannel("");
@@ -557,7 +565,7 @@ const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
   const next = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <ContactCountCell creatorId={c.id} count={c.contact_count} />
+      <ContactCountCell creatorId={c.id} count={c.contact_count} isContact={(c as unknown as { __isContact?: boolean }).__isContact} />
       <span className="text-[11px] text-muted-foreground whitespace-nowrap">
         {c.last_contact_date ? `últ ${format(new Date(c.last_contact_date), "dd/MM")}` : "sin contacto"}
         {next ? ` · próx ${format(next, "dd/MM")}` : ""}
