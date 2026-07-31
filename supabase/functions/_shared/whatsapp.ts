@@ -428,3 +428,36 @@ export function redactPhones(texto: string): string {
   const limpio = conPlaceholders.replace(TEL_CAND_RE, (m) => (pareceTelefono(m) ? enmascarar(m) : m));
   return limpio.replace(/⟦(\d+)⟧/g, (_x, i) => guardados[Number(i)]);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTF-16: cortar sin partir emojis, y limpiar sustitutos sueltos
+// ─────────────────────────────────────────────────────────────────────────────
+// INCIDENTE 31/07: el bot le prometió a Miguel una estrategia scrapeada ("dame ~1
+// min, ya vuelvo 🔍") y nunca volvió. El scrape había funcionado; lo que murió fue
+// la llamada a Anthropic con un 400:
+//   "The request body is not valid JSON: no low surrogate in string"
+// Causa: `String(caption).slice(0, 180)` sobre un caption de Instagram. `.slice()`
+// cuenta unidades UTF-16 y un emoji ocupa DOS, así que el corte cayó en la mitad de
+// un par sustituto y dejó medio carácter. Uno de los 19 captions de la creadora medía
+// 179 code points pero 183 unidades UTF-16 (4 emojis) — bastó ese.
+// El fallo era invisible: el request explota ANTES de que el loop pueda loguear nada.
+
+/** Trunca a `max` CARACTERES REALES (code points), nunca parte un emoji por la mitad. */
+export function cortarSeguro(s: string, max: number): string {
+  if (typeof s !== "string" || max <= 0) return "";
+  const cps = [...s]; // itera por code point, no por unidad UTF-16
+  return cps.length <= max ? s : cps.slice(0, max).join("");
+}
+
+/**
+ * Elimina sustitutos SUELTOS (mitades de emoji sin su par). Guarda de último recurso
+ * para el borde de salida hacia cualquier API JSON: un solo punto protege todos los
+ * `.slice()` del código, presentes y futuros — mismo patrón que redactPhones en
+ * whatsapp-send. No toca los pares bien formados.
+ */
+export function limpiarSustitutosSueltos(s: string): string {
+  return s.replace(
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    "",
+  );
+}

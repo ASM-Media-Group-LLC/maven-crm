@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { adminClient, authorizeCronOrJwt, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
+import {
+  adminClient,
+  authorizeCronOrJwt,
+  cortarSeguro,
+  limpiarSustitutosSueltos,
+  logEvent,
+  redactPhones,
+  whatsappCors,
+} from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
 
@@ -4275,7 +4283,10 @@ async function buildInitialUserMessage(args: {
     for (const s of validStories) {
       const idx = s.story_index ?? "?";
       const promo = s.promoted ? (s.promotion_type === "direct" ? "PROMO directa" : "PROMO indirecta") : "sin promo";
-      const cap = s.caption ? `caption: "${String(s.caption).slice(0, 180).replace(/\n/g, " / ")}"` : "caption: [sin texto]";
+      // cortarSeguro (no .slice) — los captions de IG vienen llenos de emojis y un
+      // corte por unidad UTF-16 parte el par sustituto al medio. Ver el incidente
+      // documentado en _shared/whatsapp.ts.
+      const cap = s.caption ? `caption: "${cortarSeguro(String(s.caption), 180).replace(/\n/g, " / ")}"` : "caption: [sin texto]";
       const reasoning = s.reasoning ? ` · ${s.reasoning}` : "";
       const audience = s.signals?.audience_vibe ? ` · vibe: ${s.signals.audience_vibe}` : "";
       const paywall = s.signals?.paywall_strength && s.signals.paywall_strength !== "unknown" ? ` · paywall: ${s.signals.paywall_strength}` : "";
@@ -5015,6 +5026,22 @@ async function runAgent(req: AgentRequest): Promise<{
     //    fallo de Opus 5 con thinking desactivado (tool-calls como texto plano que no corren).
     //  - Sonnet 5 (grupos): thinking DESACTIVADO → rápido y barato (Sonnet 5 no tiene ese fallo).
     //  - Haiku (auto) y demás: se omite → sin thinking (default).
+    // ⚠️ GUARDA UTF-16 EN EL BORDE DE SALIDA. Un sustituto suelto (medio emoji, que
+    // aparece cuando algún `.slice(0,N)` corta un par por la mitad) hace que Anthropic
+    // rechace el body ENTERO con 400 "no low surrogate in string" → iterations:0 → el
+    // bot queda mudo. Pasó el 31/07 con un caption de Instagram y dejó a Miguel
+    // esperando una estrategia que ya estaba lista en la base.
+    // Va acá y no en cada call site porque hay ~37 truncados en este archivo y el
+    // próximo que alguien escriba volvería a abrir el agujero. Mismo criterio que
+    // redactPhones en whatsapp-send: una guarda en el único punto por el que sale todo.
+    // El replacer corre sobre CADA string del objeto ANTES de serializar. Es a
+    // propósito y no un `limpiarSustitutosSueltos(JSON.stringify(...))`: stringify
+    // ESCAPA el sustituto suelto como el texto "\ud83d", así que saneando después el
+    // regex no encuentra nada y la guarda pasa sin hacer nada (lo comprobé: el test
+    // daba verde por la razón equivocada). El body sale bien formado, y del otro lado
+    // el parser de Anthropic ya no tiene un huérfano que rechazar.
+    const sanearStrings = (_k: string, v: unknown) =>
+      typeof v === "string" ? limpiarSustitutosSueltos(v) : v;
     const buildBody = (model: string) => JSON.stringify({
       model,
       max_tokens: model.startsWith("claude-opus-5") ? 8000 : 4000,
@@ -5026,7 +5053,7 @@ async function runAgent(req: AgentRequest): Promise<{
         : model.startsWith("claude-sonnet-5")
         ? { thinking: { type: "disabled" } }
         : {}),
-    });
+    }, sanearStrings);
     const callAnthropic = (model: string) =>
       fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -5072,6 +5099,22 @@ async function runAgent(req: AgentRequest): Promise<{
 
     if (!resp || !resp.ok) {
       const txt = resp ? await resp.text() : "no response";
+      // ⚠️ DEJAR RASTRO. Sin este evento el fallo era INVISIBLE: la corrida moría acá,
+      // antes del logueo de agent_silent, así que un "dame ~1 min y vuelvo" que nunca
+      // volvía no aparecía en ningún lado. Pasó el 31/07 (Anthropic 400 por sustituto
+      // suelto) y solo se detectó porque un humano notó que el bot no contestó.
+      await logEvent(sb, {
+        tenantId: group.tenant_id,
+        groupId: group.id,
+        kind: "agent_llm_error",
+        payload: {
+          status: resp?.status ?? null,
+          invoked_by: req.invoked_by,
+          iterations: iter,
+          request_id: resp?.headers.get("request-id") ?? null,
+          error: txt.slice(0, 400),
+        },
+      }).catch(() => {});
       return { ok: false, error: `anthropic ${resp?.status ?? "?"}: ${txt.slice(0, 200)}`, iterations: iter };
     }
 
