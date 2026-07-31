@@ -14,9 +14,9 @@ export const managersTools: AgentTool[] = [
       "diagnóstico. Filtra por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece. " +
       "⚠️ Mide SOLO promoción (Promolog) e ingreso (BLU) — NO sabe nada de contacto/mensajes. NUNCA infieras " +
       "'sin contacto' ni 'días sin que le escriban' a partir de que una creadora promociona poco: son cosas " +
-      "distintas. Para contacto usá get_manager_contact_activity (cuántas contactó hoy) o " +
+      "distintas. Para contacto usa get_manager_contact_activity (cuántas contactó hoy) o " +
       "get_manager_silent_creators (quiénes llevan días sin contacto). " +
-      "⚠️ Devuelve SOLO las creadoras EN ALERTA — NO es el roster: para totales y % por manager usá " +
+      "⚠️ Devuelve SOLO las creadoras EN ALERTA — NO es el roster: para totales y % por manager usa " +
       "get_manager_roster_stats. " +
       "⚠️ RED DE PROMO: cada fila trae 'promo_networks' (días de promo por red este mes, ej 'x:15d, telegram:11d') " +
       "e 'ig_has_data'. Si ig_has_data=false NO hay dato utilizable de Instagram este mes (historias sin leer o sin " +
@@ -232,7 +232,7 @@ export const managersTools: AgentTool[] = [
       "perfil). Cuenta solo mensajes SALIENTES (desde Maven o desde el teléfono/WA Web capturados como externos); los " +
       "fallidos no cuentan. Devuelve por manager: cuántas creadoras contactó + quiénes (con mensajes por creadora); y " +
       "aparte los contactos de la línea NO vinculados a una creadora (sin_atribuir). Pasa date (YYYY-MM-DD) para otro " +
-      "día y manager_name para filtrar. Usala para '¿cuántos contactos hizo hoy Carolina y Fabiana?'.",
+      "día y manager_name para filtrar. Úsala para '¿cuántos contactos hizo hoy Carolina y Fabiana?'.",
     input_schema: {
       type: "object",
       properties: {
@@ -548,7 +548,7 @@ export const managersTools: AgentTool[] = [
         nota:
           "total_active = creadoras ACTIVAS con esa manager asignada; promoted_pct va sobre total_active. " +
           "⚠️ is_partial_day=true ⇒ el día está EN CURSO y la mayor parte de la promo se detecta por la tarde: " +
-          "ese % es un PISO, NO sirve para comparar managers. Para comparar usá el día CERRADO (pasa date=ayer) y decilo. " +
+          "ese % es un PISO, NO sirve para comparar managers. Para comparar usa el día CERRADO (pasa date=ayer) y decilo. " +
           "covered_count = a cuántas Promolog pudo LEER ese día (las no leídas NO son 'no promocionó', ver #818). " +
           "scannable_count = cuántas tienen handle escaneable: las que no tienen NUNCA pueden contar como que " +
           "promocionaron, así que si scannable_count < total_active el techo de esa manager es menor a 100% " +

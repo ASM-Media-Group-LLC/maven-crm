@@ -70,7 +70,7 @@ export const equipoTools: AgentTool[] = [
         by_line: byLine,
         by_base: byBase,
         monthly_usd_confirmadas_completadas: Math.round(mrr),
-        nota: "by_stage es el total mezclado; usá by_line para no sumar embudos distintos.",
+        nota: "by_stage es el total mezclado; usa by_line para no sumar embudos distintos.",
       };
     },
   },
@@ -83,7 +83,7 @@ export const equipoTools: AgentTool[] = [
       "crudo de WhatsApp, puede ser basura tipo '#21'). USALA SIEMPRE que armes una lista de miembros, de monitoreo " +
       "o respondas 'quiénes están en X' — NUNCA armes esas listas de memoria ni desde Hubstaff: Hubstaff tiene OTRA " +
       "gente (chatters que no están en los grupos; el 31/07 el bot le inventó al owner dos personas sacadas de ahí, " +
-      "y al corregirse inventó una tercera). Si mezclás fuentes, decí de cuál sale cada nombre. No devuelve teléfonos.",
+      "y al corregirse inventó una tercera). Si mezclas fuentes, di de cuál sale cada nombre. No devuelve teléfonos.",
     input_schema: {
       type: "object",
       properties: {
@@ -115,7 +115,7 @@ export const equipoTools: AgentTool[] = [
         const { data: g } = await ctx.sb.from("whatsapp_groups").select("name").eq("id", groupId).maybeSingle();
         groupLabel = g?.name ?? null;
       }
-      if (!groupId) return { error: "sin_grupo", nota: "pasá group_name (ej. 'Managers')" };
+      if (!groupId) return { error: "sin_grupo", nota: "pasa group_name (ej. 'Managers')" };
 
       const { data: members, error } = await ctx.sb
         .from("whatsapp_members")
@@ -152,7 +152,7 @@ export const equipoTools: AgentTool[] = [
         sin_vincular: sinVincular,
         nota:
           "Esta lista (whatsapp_members del grupo) es LA fuente para 'quiénes están en el grupo'. Hubstaff tiene " +
-          "OTRA gente (chatters) que NO está acá — si mezclás fuentes, aclará de dónde sale cada nombre. Los " +
+          "OTRA gente (chatters) que NO está acá — si mezclas fuentes, aclara de dónde sale cada nombre. Los " +
           "sin_vincular son participantes reales sin cuenta Maven linkeada (display name crudo, puede ser basura).",
       };
     },
@@ -165,12 +165,12 @@ export const equipoTools: AgentTool[] = [
       "del rango, ordenado por horas; CON `person` devuelve esa persona + su desglose por día. Default: últimos 7 días. " +
       "Útil para '¿cuántas horas hizo X esta semana?', '¿quién trabajó menos?', 'horas del equipo este mes', " +
       "'¿quién está con baja actividad?'. Nota: no incluye screenshots (no se sincronizan). " +
-      "⚠️ PARA HOY: usá EXCLUSIVAMENTE el bloque `hoy_en_vivo` de la respuesta (feed de a 10 min, refrescado cada " +
+      "⚠️ PARA HOY: usa EXCLUSIVAMENTE el bloque `hoy_en_vivo` de la respuesta (feed de a 10 min, refrescado cada " +
       "2-5 min); el agregado diario de HOY puede venir hasta 6h atrasado y hacía reportar '0h' de gente trabajando. " +
       "Cada persona de hoy trae `estado`: 'ficho_hoy' (horas reales al último ping), 'sin_fichar_hoy' (el feed está " +
       "vivo y NO tiene ni un minuto — solo esto es 'no arrancó'), o 'sin_dato_feed_stale' (el tracker no reporta: " +
-      "PROHIBIDO decir 0h, decí desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (tres 'Brayan'): " +
-      "identificá siempre por nombre COMPLETO + rol de la respuesta, nunca adivines quién es quién. " +
+      "PROHIBIDO decir 0h, di desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (tres 'Brayan'): " +
+      "identifica siempre por nombre COMPLETO + rol de la respuesta, nunca adivines quién es quién. " +
       "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
     input_schema: {
       type: "object",
@@ -233,7 +233,7 @@ export const equipoTools: AgentTool[] = [
           horas: Math.round((Number(d.tracked_seconds) / 3600) * 100) / 100,
           actividad_pct: d.overall_activity,
           proyecto: d.project_name,
-          ...(d.date === hoyBog ? { parcial: "agregado de HOY, puede venir hasta 6h atrasado — usá hoy_en_vivo" } : {}),
+          ...(d.date === hoyBog ? { parcial: "agregado de HOY, puede venir hasta 6h atrasado — usa hoy_en_vivo" } : {}),
         }));
       }
 
@@ -313,11 +313,11 @@ export const equipoTools: AgentTool[] = [
             nota: feedStale
               ? `⚠️ EL FEED EN VIVO ESTÁ VIEJO: último ping ${horaBogota(feedLast || null) ?? "desconocido"} (hace ${feedAgeMin ?? "?"} min; umbral ${HUBSTAFF_FEED_STALE_MIN}). ` +
                 "El puente de Hubstaff está caído o atrasado. PROHIBIDO afirmar '0h' o 'no arrancó' de NADIE: " +
-                "decí explícito que el tracker no reporta desde esa hora y que esto es lo último que se sabe."
+                "di explícito que el tracker no reporta desde esa hora y que esto es lo último que se sabe."
               : "Estados: ficho_hoy = horas REALES al último ping · sin_fichar_hoy = el feed está vivo y esta persona " +
-                "no registra NI UN slot hoy (esto sí es 'no fichó') · el agregado diario de hoy atrasa hasta 6h, usá este bloque. " +
+                "no registra NI UN slot hoy (esto sí es 'no fichó') · el agregado diario de hoy atrasa hasta 6h, usa este bloque. " +
                 "Citá horas con horas_hoy_fmt (4.13 horas NO son '4h13'). " +
-                "Nombres repetidos (hay tres 'Brayan'): identificá por nombre completo + nombre_en_maven, no adivines.",
+                "Nombres repetidos (hay tres 'Brayan'): identifica por nombre completo + nombre_en_maven, no adivines.",
           };
         }
       }
