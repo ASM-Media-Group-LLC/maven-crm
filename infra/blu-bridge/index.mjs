@@ -23,6 +23,9 @@ const {
   RESYNC_DAYS = "90",    // resync PESADO: re-jala los últimos N días → auto-corrige reembolsos/chargebacks
   RUN_EVERY_HOURS = "3", // cadencia LIVIANA: corre seguido y solo refresca el mes en curso (barato)
   RESYNC_EVERY_HOURS = "12", // cadencia del resync PESADO (90 días). Las corridas intermedias son livianas.
+  // Desde cuándo pedirle a BLU el top-fans HISTÓRICO. El primer día con ingresos en Maven es
+  // el 02/12/2025; se arranca antes por las dudas. Solo afecta al período 'alltime'.
+  BLU_HISTORY_START = "2025-01-01",
   RUN_ONCE,
 } = process.env;
 
@@ -451,13 +454,43 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
     }
     fanRows = rows.length;
     console.log(`[blu-bridge] fans: ${fanModels.length} modelos → ${fanRows} filas (active_fans/new_fans).`);
-    // Ballenas (top fans) — misma respuesta. Un solo call (el RPC reemplaza por modelo: delete+insert).
-    const topRows = transformTopFans(fanModels);
-    if (topRows.length) {
-      const { error: tfErr } = await sb().rpc("import_blu_top_fans", { p_rows: topRows, p_from: fanStart, p_to: fanEnd });
-      if (tfErr) throw new Error("import_blu_top_fans: " + tfErr.message);
+
+    // ── Ballenas (top fans) — DOS períodos que conviven: MES EN CURSO e HISTÓRICO ──────
+    // Antes se importaba UNA sola ventana: la del rango de esa corrida, y el RPC borraba lo
+    // anterior. Como el sync on-demand ("quick") usa hoy+ayer, cualquier pedido de data
+    // fresca dejaba a las creadoras con top-fans de 2 DÍAS (wanderslover: $19k facturados en
+    // el mes, "top fan" $60). Ahora cada período se guarda con su period_kind y el borrado
+    // va scopeado, así el mensual y el histórico no se pisan.
+    //
+    // En QUICK (on-demand) NO se tocan: un rango de 2 días no representa ni el mes ni el
+    // histórico, y re-pedirlos a BLU en cada sync manual es caro al pedo.
+    if (quickDays == null) {
+      const hoy = allDays[allDays.length - 1];
+      const inicioMes = `${hoy.slice(0, 7)}-01`;
+      const periodos = [
+        { kind: "month",   from: inicioMes,   to: hoy },
+        { kind: "alltime", from: BLU_HISTORY_START, to: hoy },
+      ];
+      for (const p of periodos) {
+        try {
+          const { results: pm, freshToken: ft } = await fetchFanReportsWS(token, p.from, p.to);
+          if (ft && ft !== token) { await saveToken(acct.id, ft); token = ft; }
+          const rows2 = transformTopFans(pm);
+          if (rows2.length) {
+            const { error: e2 } = await sb().rpc("import_blu_top_fans",
+              { p_rows: rows2, p_from: p.from, p_to: p.to, p_period_kind: p.kind });
+            if (e2) throw new Error(e2.message);
+          }
+          console.log(`[blu-bridge] ballenas ${p.kind} (${p.from}..${p.to}): ${rows2.length} filas.`);
+        } catch (e) {
+          if (e.expired) throw e;
+          // Un período que falla no debe tumbar al otro ni a la retención.
+          console.error(`[blu-bridge] ballenas ${p.kind} falló: ${e.message}`);
+        }
+      }
+    } else {
+      console.log("[blu-bridge] ballenas: omitidas en sync QUICK (no representan mes ni histórico).");
     }
-    console.log(`[blu-bridge] ballenas: ${topRows.length} top-fans ingestados.`);
     // Retención por cohorte — misma respuesta. Ingesta POR MODELO (muchas cohortes; respeta delete-por-modelo).
     const retRows = transformRetention(fanModels);
     const byModel = {};

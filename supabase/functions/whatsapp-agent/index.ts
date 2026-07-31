@@ -1179,11 +1179,12 @@ const TOOLS: Array<{
   {
     name: "get_creator_top_fans",
     description:
-      "Los MEJORES FANS/compradores de una creadora: quién gastó más, en qué (PPV, tips, suscripción), cuántas transacciones, si sigue activo y hace cuánto está suscripto. Además la concentración (qué % del ingreso viene del top 3). ⚠️ Es un SNAPSHOT de BLU de una ventana concreta, NO el histórico: la tool te devuelve 'ventana' y 'dias_de_la_ventana' — si la ventana es corta (ej. 2 días), ACLARÁ que los montos son de esos días y no de todo el mes, si no das una impresión falsa.",
+      "Los MEJORES FANS/compradores de una creadora: quién gastó más, en qué (PPV, tips, suscripción), transacciones, si sigue activo y hace cuánto está suscripto, más la concentración (qué % viene del top 3). Elegí el período: 'month' = mes en curso, 'alltime' = histórico completo, 'auto' = el mejor disponible. La tool devuelve SIEMPRE 'periodo', 'ventana' y 'periodos_disponibles' — decí de qué período estás hablando, y si la ventana es corta aclarálo (si no, das una impresión falsa: una creadora que facturó $19k en el mes puede mostrar un top fan de $60 si la ventana es de 2 días).",
     input_schema: {
       type: "object",
       properties: {
         creator: { type: "string", description: "nombre artístico o @handle de IG" },
+        period: { type: "string", enum: ["month", "alltime", "auto"], description: "month = mes en curso · alltime = histórico completo · auto (default)" },
         limit: { type: "number", description: "cuántos fans traer (default 10, máx 25)" },
       },
       required: ["creator"],
@@ -2661,6 +2662,7 @@ async function executeTool(
       if (!creator) return { error: "missing_creator" };
       const { data, error } = await sb.rpc("get_creator_top_fans", {
         p_tenant: ctx.tenantId, p_query: creator, p_limit: Number(input.limit ?? 10),
+        p_period: String(input.period ?? "auto").toLowerCase(),
       });
       if (error) return { error: error.message };
       if (!data) return { not_found: true, creator };
