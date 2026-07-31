@@ -1482,7 +1482,7 @@ const TOOLS: Array<{
   {
     name: "add_persistent_rule",
     description:
-      "SOLO PARA EL OWNER. Registra una regla permanente que el bot debe aplicar de aquí en adelante en este grupo. Las reglas activas se inyectan en el system prompt en CADA invocación. Usala cuando el owner dice algo tipo 'siempre que aparezca X, haz Y', 'de ahora en adelante haz Z', 'nunca W', 'regla: ...', 'cada vez que pase X'. NO la uses para mensajes regulares del owner — solo cuando claramente está enseñando una regla. El rule_text debe quedar redactado como instrucción accionable en español (ej. 'Cuando aparezca un perfil con <30K seguidores y sin OF visible, sugiere descartar').",
+      "SOLO PARA EL OWNER. Registra una regla permanente que el bot debe aplicar de aquí en adelante en este grupo. Las reglas activas se inyectan en el system prompt en CADA invocación. Usala cuando el owner dice algo tipo 'siempre que aparezca X, haz Y', 'de ahora en adelante haz Z', 'nunca W', 'regla: ...', 'cada vez que pase X' — Y TAMBIÉN cuando expresa una PREFERENCIA de formato/estilo/comunicación, aunque venga como gusto o queja y no como orden: 'no me gusta que digas 13:15, me gusta 1:15 pm', 'los updates cortos, no párrafos', 'cita a la gente por @handle'. Eso ES una regla a persistir (el 31/07 el bot respondió 'Anotado' a la preferencia de hora sin llamar esta tool y no quedó guardada: aplicarla solo en la conversación NO alcanza, se pierde en la próxima corrida). NO la uses para mensajes regulares del owner — solo cuando claramente está enseñando cómo comportarse de aquí en adelante. El rule_text debe quedar redactado como instrucción accionable en español (ej. 'Cuando aparezca un perfil con <30K seguidores y sin OF visible, sugiere descartar', 'Di las horas en formato 1:15 pm, nunca 13:15').",
     input_schema: {
       type: "object",
       properties: {
@@ -4972,6 +4972,15 @@ async function runAgent(req: AgentRequest): Promise<{
     /\b(?:lo|la|los|las)\s+(?:registr|anot|agend)(?:é|e|amos|ó)\b/i,
     /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend)/i,
     /\bte\s+lo\s+(?:registr|anot|agend|dej)/i,
+    // Participio suelto al inicio de mensaje O DE LÍNEA (flag m): "Anotado: ...",
+    // "Registrado.", "Listo, anotado", "Anotadas las 3 cuentas", "Dale.\nAnotado: ...".
+    // El 31/07 13:19 un "Anotado:" pelado pasó los 5 patrones de arriba y Álvaro
+    // creyó guardada una preferencia de formato que nunca se escribió. El imperativo
+    // ("anotá esto") NO matchea (exige la d del participio) y "listo" solo dispara
+    // si le sigue el participio ("Listo, no lo mando yo" pasa).
+    /^\s*(?:listo[,!.]?\s+)?(?:anotad|registrad|agendad|apuntad)[oa]s?\b/im,
+    // "Tomo/tomé nota" = la misma promesa de registro con otras palabras.
+    /\btom[oé]\s+nota\b/i,
   ];
   const escriturasOk = new Set<string>();
   let ackBloqueados = 0;
