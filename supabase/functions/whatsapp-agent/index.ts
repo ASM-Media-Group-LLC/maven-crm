@@ -1119,7 +1119,7 @@ const TOOLS: Array<{
   {
     name: "get_llg_account_status",
     description:
-      "Devuelve el inventario de cuentas IG (spammer accounts) que un LLG está usando para hacer outreach a creadoras. Para cada cuenta: handle, followers, AI score (1-100, qué tan creíble se ve la cuenta), si está restringida por IG, niche, días desde creación, status del scan. Usalo cuando el LLG (o el owner) pide planificación operativa, recomendaciones de outreach, o explicación de por qué bajó el rendimiento. También cuando alguien reporte una cuenta baneada, para chequear cuántas le quedan funcionando.",
+      "Devuelve el inventario de cuentas IG (spammer accounts) CARGADO EN MAVEN que un LLG está usando para hacer outreach a creadoras. Para cada cuenta: handle, followers, AI score (1-100, qué tan creíble se ve la cuenta), si está restringida por IG, niche, días desde creación, status del scan. Usalo cuando el LLG (o el owner) pide planificación operativa, recomendaciones de outreach, o explicación de por qué bajó el rendimiento. También cuando alguien reporte una cuenta baneada, para chequear cuántas le quedan funcionando. ⚠️ El inventario cargado puede estar INCOMPLETO o VIEJO (el equipo crea cuentas más rápido de lo que se cargan: el 30/07 Daniel reportó 9 cuentas por chat y había 3 cargadas, escaneadas semanas atrás). La respuesta trae `inventario` (cuántas cargadas + último scan) y, si el dato está flojo, `advertencia`: con advertencia presente está PROHIBIDO concluir sobre la capacidad del LLG ('solo tiene N cuentas', 'ninguna fuerte', 'con eso es difícil sacar números') — decí cuántas hay CARGADAS, de cuándo es el último scan, y qué falta verificar (ej. las cuentas que el equipo reportó por chat y no están cargadas).",
     input_schema: {
       type: "object",
       properties: {
@@ -2400,11 +2400,44 @@ async function executeTool(
         strong: summarized.filter((a) => a.status === "ok_strong").length,
       };
 
+      // ── Salud del inventario, calculada en código (31/07: el bot le dijo al
+      // owner "Daniel: solo 3 cuentas, ninguna fuerte, difícil sacar números"
+      // sobre 3 filas escaneadas el 01/07 y 14/07, cuando Daniel había
+      // reportado NUEVE cuentas por chat el día anterior). La advertencia viaja
+      // EN el resultado — el borde que el modelo lee en cada corrida — no solo
+      // en el prompt. Umbrales: scans de más de una semana ya no describen el
+      // estado real de una cuenta de IG (bans/restricciones cambian en días), y
+      // con menos de 5 cuentas cargadas lo más probable es que falte cargar
+      // (los LLG operan con varias por marca, ING/ESP).
+      const INVENTARIO_SCAN_VIEJO_DIAS = 7;
+      const INVENTARIO_MINIMO_CUENTAS = 5;
+      const scanTimes = (accounts ?? [])
+        .map((a) => (a.last_scanned_at ? Date.parse(a.last_scanned_at) : NaN))
+        .filter((t) => Number.isFinite(t));
+      const ultimoScan = scanTimes.length ? new Date(Math.max(...scanTimes)) : null;
+      const diasDesdeScan = ultimoScan ? Math.floor((now - ultimoScan.getTime()) / (24 * 3600 * 1000)) : null;
+      const inventario = {
+        cuentas_cargadas: summarized.length,
+        ultimo_scan: ultimoScan ? ultimoScan.toISOString().slice(0, 10) : null,
+        dias_desde_ultimo_scan: diasDesdeScan,
+      };
+      const flojo = summarized.length < INVENTARIO_MINIMO_CUENTAS ||
+        diasDesdeScan === null || diasDesdeScan > INVENTARIO_SCAN_VIEJO_DIAS;
+      const advertencia = flojo
+        ? `⚠️ INVENTARIO POSIBLEMENTE INCOMPLETO/DESACTUALIZADO: ${summarized.length} cuenta(s) cargada(s), ` +
+          (diasDesdeScan === null ? "sin scan registrado" : `último scan hace ${diasDesdeScan} días`) +
+          ". PROHIBIDO concluir sobre la capacidad del LLG con esto ('solo tiene N', 'ninguna fuerte', " +
+          "'difícil sacar números'). Decí cuántas hay CARGADAS y de cuándo es el scan, y aclará que pueden " +
+          "faltar cuentas (el equipo reporta por chat cuentas que nadie cargó — Brayan quedó en pasar la lista completa)."
+        : undefined;
+
       return {
         ok: true,
         llg: member.full_name ?? member.display_name,
         accounts: summarized,
         totals,
+        inventario,
+        ...(advertencia ? { advertencia } : {}),
       };
     }
 
