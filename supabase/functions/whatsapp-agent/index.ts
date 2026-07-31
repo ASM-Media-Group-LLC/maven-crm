@@ -1163,6 +1163,60 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_creator_earnings_range",
+    description:
+      "Ingreso BLU de UNA creadora entre las FECHAS que te pidan (a diferencia de get_creator_earnings, que solo hace ventanas fijas 7d/30d). Devuelve total del rango, desglose (suscripciones/tips/PPV/posts/streams), fans activos y nuevos, y su mejor día. Para comparar períodos, llamala dos veces con rangos distintos. Ojo: BLU liquida con ~2 días de lag, los últimos 2 días del rango pueden venir parciales.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "nombre artístico o @handle de IG" },
+        from: { type: "string", description: "desde YYYY-MM-DD" },
+        to: { type: "string", description: "hasta YYYY-MM-DD" },
+      },
+      required: ["creator", "from", "to"],
+    },
+  },
+  {
+    name: "get_creator_top_fans",
+    description:
+      "Los MEJORES FANS/compradores de una creadora: quién gastó más, en qué (PPV, tips, suscripción), cuántas transacciones, si sigue activo y hace cuánto está suscripto. Además la concentración (qué % del ingreso viene del top 3). ⚠️ Es un SNAPSHOT de BLU de una ventana concreta, NO el histórico: la tool te devuelve 'ventana' y 'dias_de_la_ventana' — si la ventana es corta (ej. 2 días), ACLARÁ que los montos son de esos días y no de todo el mes, si no das una impresión falsa.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "nombre artístico o @handle de IG" },
+        limit: { type: "number", description: "cuántos fans traer (default 10, máx 25)" },
+      },
+      required: ["creator"],
+    },
+  },
+  {
+    name: "get_group_activity",
+    description:
+      "Qué está pasando en OTRO grupo del equipo (Managers, Marketing/Ventas, AI WARMING): los mensajes recientes con su contenido, los pendientes/compromisos abiertos, y los reportes de jornada que se registraron. Usalo cuando pregunten '¿qué pasó hoy en el grupo X?', '¿qué le pidieron a fulano?', '¿qué quedó pendiente en ventas?'. SOLO para el dueño desde su chat privado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        group_name: { type: "string", description: "nombre del grupo (ej. 'Managers', 'Ventas', 'WARMING')" },
+        date: { type: "string", description: "día YYYY-MM-DD (Bogotá). Default hoy" },
+        limit: { type: "number", description: "cuántos mensajes traer (default 40, máx 100)" },
+      },
+      required: ["group_name"],
+    },
+  },
+  {
+    name: "get_contact_messages",
+    description:
+      "El CONTENIDO REAL de lo que el equipo le escribió a las creadoras por la línea de WhatsApp (no solo cuántas contactaron). Usalo para saber PARA QUÉ se hicieron los contactos: si les pidieron promo, si hicieron seguimiento, si les vendieron algo. ⚠️ get_manager_contact_activity solo CUENTA contactos sin leer el texto — si te preguntan 'a cuántas les pidieron promo', necesitás ESTA tool para leer los mensajes y clasificarlos vos; nunca respondas con el conteo de contactos como si fuera 'pidieron promo'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        department: { type: "string", description: "línea a leer: 'manager' (managers↔creadoras) o 'closer'. Default manager" },
+        date: { type: "string", description: "día YYYY-MM-DD (Bogotá). Default hoy" },
+        limit: { type: "number", description: "cuántos mensajes (default 60, máx 150)" },
+      },
+    },
+  },
+  {
     name: "post_to_group",
     description:
       "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\n⚠️ FLUJO OBLIGATORIO EN DOS PASOS — nunca se manda de una:\n1) Primero llamala SIN pending_id, con group_name y body. NO se envía: te devuelve un pending_id y el texto. Mostrale a la persona el texto EXACTO que se publicaría y preguntale si lo mandás así.\n2) Solo cuando te diga que sí, llamala de nuevo con ese pending_id y confirm=true. Ahí se publica.\nSi te pide cambios, volvé al paso 1 con el texto corregido (se genera un pending_id nuevo).",
@@ -2581,6 +2635,138 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "get_creator_earnings_range": {
+      const creator = String(input.creator ?? "").trim();
+      const from = String(input.from ?? "").trim();
+      const to = String(input.to ?? "").trim();
+      if (!creator || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return { error: "faltan_creator_o_fechas", formato: "from/to en YYYY-MM-DD" };
+      }
+      const { data, error } = await sb.rpc("get_creator_earnings_range", {
+        p_tenant: ctx.tenantId, p_query: creator, p_from: from, p_to: to,
+      });
+      if (error) return { error: error.message };
+      if (!data) return { not_found: true, creator };
+      return data as Record<string, unknown>;
+    }
+
+    case "get_creator_top_fans": {
+      // Nombres de fans = PII de terceros → solo privilegiados (owner/admin/supervisor).
+      if (ctx.privileged === false) {
+        return { error: "no_autorizado", message: "El detalle de fans/compradores es de supervisión." };
+      }
+      const creator = String(input.creator ?? "").trim();
+      if (!creator) return { error: "missing_creator" };
+      const { data, error } = await sb.rpc("get_creator_top_fans", {
+        p_tenant: ctx.tenantId, p_query: creator, p_limit: Number(input.limit ?? 10),
+      });
+      if (error) return { error: error.message };
+      if (!data) return { not_found: true, creator };
+      return data as Record<string, unknown>;
+    }
+
+    case "get_group_activity": {
+      // Cruza el aislamiento por-grupo a propósito: es el DM del DUEÑO, que ve todo.
+      // Gateado duro a isOwner para que ningún bot de grupo pueda espiar a otro grupo
+      // (los bots de Ventas/AI Warming tienen allowlist null → heredarían la tool sola).
+      if (!ctx.isOwner) return { error: "no_autorizado", message: "Ver otros grupos es solo para el dueño." };
+      const gname = String(input.group_name ?? "").trim();
+      if (!gname) return { error: "missing_group_name" };
+      const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const dia = String(input.date ?? hoyBog);
+      const lim = Math.min(Math.max(Number(input.limit ?? 40), 5), 100);
+
+      const { data: gs } = await sb.from("whatsapp_groups")
+        .select("id, name").eq("tenant_id", ctx.tenantId).eq("active", true)
+        .eq("is_direct", false).neq("provider", "manual").ilike("name", `%${gname}%`);
+      const grupos = (gs ?? []) as Array<{ id: string; name: string }>;
+      if (grupos.length === 0) return { error: "grupo_no_encontrado", buscado: gname };
+      if (grupos.length > 1) return { error: "grupo_ambiguo", coincidencias: grupos.map((g) => g.name) };
+      const g = grupos[0];
+
+      const desde = `${dia}T00:00:00-05:00`, hasta = `${dia}T23:59:59-05:00`;
+      const [msgs, comps, reps] = await Promise.all([
+        sb.from("whatsapp_messages")
+          .select("sent_at, sender_display_name, is_from_bot, msg_type, body, transcribed_text")
+          .eq("group_id", g.id).gte("sent_at", desde).lte("sent_at", hasta)
+          .order("sent_at", { ascending: true }).limit(lim),
+        sb.from("whatsapp_commitments")
+          .select("subject, target_subject, committed_by_text, status, due_at, followup_count")
+          .eq("group_id", g.id).in("status", ["pending", "overdue", "stale"])
+          .order("created_at", { ascending: false }).limit(30),
+        sb.from("whatsapp_daily_reports")
+          .select("role_kind, contactados, numeros_obtenidos, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos, profiles:user_id(full_name)")
+          .eq("group_id", g.id).eq("report_date", dia),
+      ]);
+
+      return {
+        grupo: g.name,
+        fecha: dia,
+        mensajes: ((msgs.data ?? []) as Array<Record<string, unknown>>).map((m) => ({
+          hora: String(m.sent_at).slice(11, 16),
+          quien: m.is_from_bot ? "BOT" : m.sender_display_name,
+          texto: String(m.transcribed_text ?? m.body ?? "").slice(0, 400),
+        })),
+        pendientes_abiertos: ((comps.data ?? []) as Array<Record<string, unknown>>).map((c) => ({
+          que: c.subject, de_quien: c.committed_by_text, sobre: c.target_subject,
+          estado: c.status, seguimientos: c.followup_count,
+        })),
+        reportes_registrados: ((reps.data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+          persona: (r.profiles as { full_name?: string } | null)?.full_name ?? null,
+          tipo: r.role_kind, contactados: r.contactados, numeros: r.numeros_obtenidos,
+          videos: r.videos_creados, fotos: r.fotos_creadas, cuentas: r.cuentas_creadas, posts: r.posts_subidos,
+        })),
+      };
+    }
+
+    case "get_contact_messages": {
+      if (ctx.privileged === false) {
+        return { error: "no_autorizado", message: "Leer las conversaciones del equipo con las creadoras es de supervisión." };
+      }
+      const dept = String(input.department ?? "manager").toLowerCase();
+      const hoyBog2 = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const dia = String(input.date ?? hoyBog2);
+      const lim = Math.min(Math.max(Number(input.limit ?? 60), 10), 150);
+
+      const { data: chans } = await sb.from("wa_channels")
+        .select("id, label").eq("tenant_id", ctx.tenantId).eq("department", dept).eq("active", true);
+      const chanIds = ((chans ?? []) as Array<{ id: string }>).map((c) => c.id);
+      if (chanIds.length === 0) return { error: "sin_linea", department: dept };
+
+      const { data: convos } = await sb.from("wa_conversations")
+        .select("id, contact_id, wa_contacts(display_name, phone_e164)")
+        .in("channel_id", chanIds).limit(1000);
+      const convById = new Map<string, string>();
+      for (const c of ((convos ?? []) as Array<Record<string, unknown>>)) {
+        const wc = c.wa_contacts as { display_name?: string; phone_e164?: string } | null;
+        convById.set(String(c.id), wc?.display_name || "(sin nombre)");
+      }
+      if (convById.size === 0) return { department: dept, fecha: dia, mensajes: [] };
+
+      const { data: msgs, error: mErr } = await sb.from("wa_conversation_messages")
+        .select("conversation_id, direction, body, sent_at, status")
+        .in("conversation_id", [...convById.keys()])
+        .gte("sent_at", `${dia}T00:00:00-05:00`).lte("sent_at", `${dia}T23:59:59-05:00`)
+        .order("sent_at", { ascending: true }).limit(lim);
+      if (mErr) return { error: mErr.message };
+
+      const filas = ((msgs ?? []) as Array<Record<string, unknown>>)
+        .filter((m) => String(m.body ?? "").trim().length > 0)
+        .map((m) => ({
+          hora: String(m.sent_at).slice(11, 16),
+          con: convById.get(String(m.conversation_id)) ?? "?",
+          direccion: m.direction === "out" ? "equipo→creadora" : "creadora→equipo",
+          texto: String(m.body ?? "").slice(0, 400),
+        }));
+      return {
+        department: dept, fecha: dia,
+        linea: ((chans ?? []) as Array<{ label: string }>).map((c) => c.label).join(", "),
+        creadoras_distintas: new Set(filas.map((f) => f.con)).size,
+        mensajes: filas,
+        nota: "Este es el CONTENIDO real. Para 'a cuántas les pidieron promo', clasificá vos leyendo los textos salientes — no uses el conteo de get_manager_contact_activity, que solo cuenta contactos sin leer.",
+      };
     }
 
     case "post_to_group": {
