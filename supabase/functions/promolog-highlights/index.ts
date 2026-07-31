@@ -207,10 +207,29 @@ async function buildDailyQuality(sb: any): Promise<string> {
   const today = bogToday();
   const names = await activeNames(sb);
   const rows = await fetchEntries(sb, today);
-  const ranked = scoreByCreator(rows, names).filter((r) => r.score > 0).slice(0, 3);
-  if (!ranked.length) return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\nTodavía no hay promos con calidad registrada hoy.`;
-  const lines = ranked.map((r, i) => `${medals[i]} *${r.name}* — ${pct(r.score)}  (${r.nets.join(" · ") || "—"})`);
-  return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n_% = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`;
+  const conPuntaje = scoreByCreator(rows, names).filter((r) => r.score > 0);
+  if (!conPuntaje.length) return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\nTodavía no hay promos con calidad registrada hoy.`;
+
+  // Podio por PUNTAJES DISTINTOS, no por posición. La barra de calidad satura (una
+  // sola story de IG ya vale 60), así que repartir 🥇🥈🥉 entre puntajes idénticos
+  // inventa un orden que no existe: el 30/07 salieron Danikmichelltv, Moramay y
+  // Jacqueenriquez5 con 60% EXACTO las tres, presentadas como 1º, 2º y 3º.
+  const nets = (r: { nets: string[] }) => r.nets.join(" · ") || "—";
+  const puntajes = [...new Set(conPuntaje.map((r) => r.score))].slice(0, 3);
+  const lines = puntajes.map((sc, i) => {
+    const grupo = conPuntaje.filter((r) => r.score === sc);
+    return grupo.length === 1
+      ? `${medals[i]} *${grupo[0].name}* — ${pct(sc)}  (${nets(grupo[0])})`
+      : `${medals[i]} *Empate — ${pct(sc)}*: ${grupo.map((r) => `${r.name} (${nets(r)})`).join(" · ")}`;
+  });
+
+  // Denominador: sin esto un podio de 3 sobre 5 lecturas válidas se lee como si
+  // fuera el top de todo el roster.
+  const leidas = new Set(rows.map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean)).size;
+  const pie = leidas > 0
+    ? `_${conPuntaje.length} con promo sobre ${leidas} creadoras con lectura válida hoy · % = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`
+    : `_% = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`;
+  return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n${pie}`;
 }
 
 // "Hasta ahora": sync fresco de BLU + total del día al momento del reporte, SIN
@@ -226,9 +245,13 @@ async function buildDailyIncome(sb: any): Promise<string> {
   const head = `💰 *Top ingresos de hoy ${fmtDia(today)} — hasta las ${hhmm}*`;
   if (!top5.length) return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte) || "s/d"}).`;
   const lines = top5.map(([cid, v], i) => `${medals[i]} *${names.get(cid)}* — ${money(v)}`);
+  // "Recién sincronizada" se leía como "cifra cerrada del día", y no lo es: BLU liquida
+  // con lag, así que el total de hoy siempre viene PARCIAL (el 30/07 cerró en $15,8k
+  // contra $27,6k del 29 y $29,4k del 28 — no fue un mal día, faltaba ingesta). El sync
+  // nuestro sí corrió; lo que falta es upstream. Que el mensaje lo diga.
   const nota = fresh === "fresh"
-    ? `_Data BLU recién sincronizada (${fmtCorte(hoy.corte)})_`
-    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo_`;
+    ? `_Sync BLU al día (corte ${fmtCorte(hoy.corte)}). ⚠️ Parcial: BLU liquida con ~2 días de lag, el total de hoy va a SUBIR._`
+    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo. ⚠️ Parcial: el total de hoy va a subir._`;
   return `${head}\n\n${lines.join("\n")}\n\n${nota}`;
 }
 

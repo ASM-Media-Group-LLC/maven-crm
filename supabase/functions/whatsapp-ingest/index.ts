@@ -934,12 +934,62 @@ function isBotAddressed(body: string | null, mentions: string[] | undefined, nam
 // vía RPC `whatsapp_group_in_business_hours`. Fuera de horario, el modo
 // always degrada efectivamente a mention-only — ahorra tokens en bursts
 // nocturnos / fines de semana sin miembros activos.
+// ¿Este mensaje CONTINÚA una conversación que el bot ya venía teniendo con esta
+// persona? En modo 'mention' el bot solo se entera si lo @mencionan, y nadie repite
+// la mención en cada turno de un ida y vuelta: el 31/07 Brayan preguntó "Puedes
+// revisar LINKS?" 19 segundos después de que el bot le contestara, sin mención, y el
+// agente NUNCA fue invocado — no hubo silencio ni error, el mensaje no le llegó.
+//
+// Se exige el patrón estricto de back-and-forth para no meter al bot en charlas entre
+// humanos: el mensaje inmediatamente anterior del grupo tiene que ser DEL BOT, y el
+// anterior a ese, de ESTA MISMA persona. Si alguien más habló en el medio, no aplica.
+async function esContinuacionDeCharla(
+  sb: SupabaseClient,
+  groupId: string,
+  senderExternalId: string | null,
+  sentAt: string,
+): Promise<boolean> {
+  if (!senderExternalId) return false;
+  // Se miran los últimos 10 y no los últimos 2: el bot puede haber mandado VARIOS
+  // mensajes seguidos (su respuesta + una apertura/digest de cron en el medio), y
+  // exigir exactamente [humano, bot] rechazaba seguimientos legítimos.
+  const { data } = await sb
+    .from("whatsapp_messages")
+    .select("sender_external_id, is_from_bot, sent_at")
+    .eq("group_id", groupId)
+    .lt("sent_at", sentAt)
+    .order("sent_at", { ascending: false })
+    .limit(10);
+  const prev = (data ?? []) as Array<{ sender_external_id: string | null; is_from_bot: boolean; sent_at: string }>;
+  if (!prev.length || !prev[0].is_from_bot) return false; // el bot no fue el último en hablar
+
+  const ultimoBot = prev.find((p) => p.is_from_bot)!;
+  const ultimoHumano = prev.find((p) => !p.is_from_bot);
+  if (!ultimoHumano) return false;                                        // el bot habló solo, no hay diálogo
+  if (ultimoHumano.sender_external_id !== senderExternalId) return false; // el último que habló fue OTRO
+  const minutos = (Date.parse(sentAt) - Date.parse(ultimoBot.sent_at)) / 60_000;
+  return minutos >= 0 && minutos <= 5;
+}
+
+// Acuses puros: no ameritan invocar al agente aunque continúen la charla. Sin esto,
+// cada "ok", "gracias", "listo" o 👍 después de una respuesta del bot gastaría una
+// corrida y probablemente generaría ruido de vuelta.
+// ⚠️ "si"/"no"/"ya" NO van acá: sueltos son la RESPUESTA a una pregunta del bot
+// ("¿es typo de @blu.ai.app?" → "si"), no un acuse. Filtrarlos volvería a producir
+// justo el silencio que este cambio arregla. Solo se filtra lo que no aporta nada.
+// Acepta CADENAS de acuses ("listo, gracias 👍"), no solo uno suelto: con la versión
+// de una sola palabra, un "listo, gracias 👍" seguía gastando una corrida completa.
+const ACUSE_TOKEN = "ok(?:ay)?|dale|listo|gracias+|perfecto|bueno|genial|entendido|copiado|(?:[jh][aei]){2,}|👍|✅|🙏|😂|👌|💪|🚀|🔥";
+const ES_ACUSE = new RegExp(`^(?:(?:${ACUSE_TOKEN})[\\s,.!¡]*)+$`, "iu");
+
 async function resolveAgentTrigger(
   sb: SupabaseClient,
   group: { id: string; bot_enabled: boolean; bot_mode: string; department?: string | null },
   body: string | null,
   isFromBot: boolean,
   mentions?: string[],
+  senderExternalId?: string | null,
+  sentAt?: string | null,
 ): Promise<"mention" | "auto" | null> {
   if (!group.bot_enabled) return null;
   if (isFromBot) return null; // nunca respondemos a nuestros propios mensajes
@@ -978,6 +1028,16 @@ async function resolveAgentTrigger(
     }
     if (!inHours) return null; // fuera de horario → bot calla
     return "auto";
+  }
+
+  // Modo 'mention': además de la mención explícita, contestar el SEGUIMIENTO inmediato
+  // de alguien a quien el bot le acaba de responder. Los acuses ("ok", "gracias", 👍)
+  // se filtran acá para no gastar una corrida ni devolver ruido.
+  const texto = (body ?? "").trim();
+  if (texto.length >= 3 && !ES_ACUSE.test(texto) && sentAt) {
+    if (await esContinuacionDeCharla(sb, group.id, senderExternalId ?? null, sentAt)) {
+      return "mention";
+    }
   }
 
   return null;
@@ -1370,7 +1430,10 @@ serve(async (req) => {
       }
 
       // Trigger del agent: mention | auto | null según bot_mode del grupo.
-      const trigger = await resolveAgentTrigger(sb, group, msg.body, msg.isFromBot ?? false, msg.mentions);
+      const trigger = await resolveAgentTrigger(
+        sb, group, msg.body, msg.isFromBot ?? false, msg.mentions,
+        msg.senderExternalId, msg.sentAt,
+      );
       if (trigger) {
         // ¿Es la PRIMERA invocación del día tras una pausa larga?
         // (ej. arranca el horario laboral después de la noche, weekend, etc).

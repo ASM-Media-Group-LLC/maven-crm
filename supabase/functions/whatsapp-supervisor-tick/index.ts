@@ -769,11 +769,22 @@ async function maybeEndOfDayReport(
   group: GroupInfo,
   now: { hhmm: string; weekday: number; date: string },
 ): Promise<void> {
-  // Hora del último turno del día: tomar el end_time max de schedules de ese weekday.
+  // Hora del último turno del día: el end_time máximo de LOS MIEMBROS DE ESTE GRUPO.
+  // ⚠️ Antes esta query no filtraba por grupo y tomaba el máximo GLOBAL del sistema:
+  // todos los grupos cerraban a la misma hora, la del turno más largo de cualquier
+  // equipo, sin relación con la jornada real de sus miembros.
+  const { data: miembros } = await sb
+    .from("whatsapp_members")
+    .select("user_id")
+    .eq("group_id", group.id)
+    .not("user_id", "is", null);
+  const userIds = [...new Set((miembros ?? []).map((m: any) => m.user_id as string))];
+  if (userIds.length === 0) return;
   const { data: schedules } = await sb
     .from("whatsapp_user_schedules")
     .select("end_time")
     .eq("weekday", now.weekday)
+    .in("user_id", userIds)
     .order("end_time", { ascending: false })
     .limit(1);
   if (!schedules || schedules.length === 0) return;
@@ -817,10 +828,15 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
   //     closers se cuelen en otros departamentos.
   const { data: nonSalesBots } = await sb.from("wa_bots").select("id").neq("department", "sales");
   const excludeBotIds = new Set((nonSalesBots ?? []).map((b: any) => b.id));
-  const groups = (groupsRaw ?? []).filter(
-    (g: any) => g.bot_mode !== "off" && !(g.wa_bot_id && excludeBotIds.has(g.wa_bot_id)),
-  );
-  if (!groups || groups.length === 0) return { checked: 0, sent: 0 };
+  const activos = (groupsRaw ?? []).filter((g: any) => g.bot_mode !== "off");
+  const groups = activos.filter((g: any) => !(g.wa_bot_id && excludeBotIds.has(g.wa_bot_id)));
+  // El CIERRE DE JORNADA no es específico de ventas: es "se terminó el turno de este
+  // equipo, resumí el día". Excluirlo junto con los checks de closers dejó a AI WARMING
+  // sin cierre PROGRAMADO desde el 08/07 — el 30/07, el día de mayor producción del
+  // equipo (14 videos, 14 fotos, 6 posts), no hubo ningún resumen. Corre para todos los
+  // grupos con bot activo; los checks de closers siguen scopeados a department='sales'.
+  const gruposParaCierre = activos;
+  if (activos.length === 0) return { checked: 0, sent: 0 };
 
   // Por tenant, sacar users en schedule hoy con sus profile data.
   let checked = 0;
@@ -861,13 +877,6 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
       }
     }
 
-    // Reporte cierre del día (una sola vez por grupo por día).
-    try {
-      await maybeEndOfDayReport(sb, g, now);
-    } catch (e) {
-      console.warn("end of day report failed:", (e as Error).message);
-    }
-
     // Follow-ups deterministicos de commitments + closer pipeline.
     try {
       await checkCommitmentFollowups(sb, g);
@@ -880,6 +889,16 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
       await checkUnannouncedAbsence(sb, g, now);
     } catch (e) {
       console.warn("unannounced absence check failed:", (e as Error).message);
+    }
+  }
+
+  // Cierre del día: TODOS los grupos con bot activo, no solo los de ventas (una vez
+  // por grupo por día, garantizado por tryClaimGroup dentro de maybeEndOfDayReport).
+  for (const g of gruposParaCierre as GroupInfo[]) {
+    try {
+      await maybeEndOfDayReport(sb, g, now);
+    } catch (e) {
+      console.warn("end of day report failed:", g.id, (e as Error).message);
     }
   }
 

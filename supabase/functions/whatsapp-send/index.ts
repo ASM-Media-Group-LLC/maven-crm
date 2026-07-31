@@ -112,6 +112,24 @@ async function sendOne(args: {
   if (!group.active) return { ok: false, error: "group_inactive" };
   if (!group.bot_enabled) return { ok: false, error: "bot_disabled" };
 
+  // ── MARKDOWN → FORMATO WHATSAPP ─────────────────────────────────────────────
+  // WhatsApp usa *un* asterisco para negrita y _uno_ para itálica. El modelo escribe
+  // markdown estándar (**negrita**, ## títulos, - bullets) y esos asteriscos dobles
+  // salen CRUDOS a la vista: el 30/07 pasó en 5 mensajes seguidos de la tanda de
+  // asesoría a Miguel, justo cuando Álvaro venía pidiendo mensajes más prolijos.
+  // Va acá y no en reply_to_group porque este es el único punto por el que salen
+  // TODOS los mensajes (agente, recordatorios, digests, supervisor-tick).
+  const mdAWhatsApp = (s: string) =>
+    s
+      // **negrita** → *negrita* (no toca un ***triple*** ni un * suelto de lista)
+      .replace(/(?<!\*)\*\*(?!\s)([^*\n]+?)(?<!\s)\*\*(?!\*)/g, "*$1*")
+      // __itálica__ → _itálica_
+      .replace(/(?<!_)__(?!\s)([^_\n]+?)(?<!\s)__(?!_)/g, "_$1_")
+      // Encabezados markdown (### Título) → negrita de WhatsApp
+      .replace(/^\s{0,3}#{1,6}\s+(.+?)\s*$/gm, "*$1*")
+      // Bullets "- " / "* " al inicio de línea → viñeta legible
+      .replace(/^(\s*)[-*]\s+(?=\S)/gm, "$1• ");
+
   // ── GUARDA DE PII: nunca publicar teléfonos en un GRUPO ─────────────────────
   // Maven oculta los teléfonos por permiso (can_see_contact_phone, default-deny), pero el
   // bot corre con service_role y escribe texto libre. El 30/07, al reconocerle a Daniel su
@@ -120,7 +138,7 @@ async function sendOne(args: {
   // (respuestas del agente, recordatorios, digests, reportes), en vez de confiar en una
   // regla del prompt que el modelo puede ignorar.
   // Los DMs quedan afuera: son 1-a-1 con el dueño de la data.
-  const bodyFinal = group.is_direct === true ? args.body : redactPhones(args.body);
+  const bodyFinal = mdAWhatsApp(group.is_direct === true ? args.body : redactPhones(args.body));
 
   let result: ProviderSendResult;
   if (group.provider === "evolution") {

@@ -333,17 +333,33 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   );
 
   if (!analysis) {
-    // Mark analyzed=now igual para no reintentar para siempre. Loggeamos
-    // el error.
+    // Reintentable: un parse_failed marcaba analyzed_at al toque y el mensaje se
+    // descartaba PARA SIEMPRE sin un solo reintento. El 30/07 se comió el mensaje de
+    // Lorena que traía las dos correcciones operativas del día. Ahora dejamos
+    // analyzed_at en NULL las 2 primeras veces (el tick lo vuelve a tomar) y recién a
+    // la 3ª lo damos por perdido, para no crear un poison que reintente eternamente.
+    const intentos = Number(
+      (msg as { analysis?: { attempts?: number } | null }).analysis?.attempts ?? 0,
+    ) + 1;
+    const rendirse = intentos >= 3;
     await sb
       .from("whatsapp_messages")
-      .update({ analyzed_at: new Date().toISOString(), analysis: { error: "parse_failed" } })
+      .update({
+        analyzed_at: rendirse ? new Date().toISOString() : null,
+        analysis: { error: "parse_failed", attempts: intentos },
+      })
       .eq("id", msg.id);
     await logEvent(sb, {
       tenantId: msg.tenant_id,
       groupId: msg.group_id,
       kind: "error",
-      payload: { stage: "extract_commitments", message_id: msg.id, reason: "parse_failed" },
+      payload: {
+        stage: "extract_commitments",
+        message_id: msg.id,
+        reason: "parse_failed",
+        attempts: intentos,
+        abandonado: rendirse,
+      },
     });
     return { ok: false, reason: "claude_parse_failed" };
   }
@@ -356,6 +372,32 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // del equipo, y el LLM a veces igual los emite. Refuerza la regla del SYSTEM_PROMPT.
   const SELF_NAME = /^(maven(\s*asistente)?|el\s*bot|el\s*asistente|asistente|bot)$/i;
   const refersToSelf = (v?: string | null) => !!v && SELF_NAME.test(v.trim());
+
+  // ── Persona legible en vez de LID crudo ─────────────────────────────────────
+  // El 30/07 quedaron 5 compromisos con "@140716701401153" como responsable: el LID
+  // de WhatsApp entra tal cual cuando el mensaje @menciona a alguien o cuando el
+  // display_name viene vacío. Así no sirven para ningún reporte por persona.
+  const { data: miembros } = await sb
+    .from("whatsapp_members")
+    .select("display_name, external_id")
+    .eq("group_id", msg.group_id);
+  const nombrePorDigitos = new Map<string, string>();
+  for (const m of (miembros ?? []) as Array<{ display_name: string | null; external_id: string | null }>) {
+    const dig = (m.external_id ?? "").split("@")[0].replace(/\D/g, "");
+    if (dig && m.display_name) nombrePorDigitos.set(dig, m.display_name);
+  }
+  const esIdCrudo = (v: string) => /^@?\d{8,}$/.test(v.trim());
+  const resolverPersona = (v: string | null | undefined): string | null => {
+    const t = (v ?? "").trim();
+    if (!t) return null;
+    if (!esIdCrudo(t)) return t;
+    const dig = t.replace(/\D/g, "");
+    // Match por los últimos 10 dígitos: los LID y los teléfonos no siempre vienen igual.
+    const hit = nombrePorDigitos.get(dig) ??
+      [...nombrePorDigitos.entries()].find(([d]) => d.endsWith(dig.slice(-10)))?.[1];
+    return hit ?? null; // sin nombre real preferimos NULL a guardar el LID
+  };
+
   const commitmentsToInsert = analysis.commitments
     .filter((c) => c.subject && (c.confidence ?? 1) >= 0.5)
     .filter((c) => !refersToSelf(c.committed_by_text) && !refersToSelf(c.target_subject))
@@ -365,9 +407,9 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         tenant_id: msg.tenant_id,
         group_id: msg.group_id,
         source_message_id: msg.id,
-        committed_by_text: c.committed_by_text ?? senderName,
+        committed_by_text: resolverPersona(c.committed_by_text) ?? resolverPersona(senderName) ?? senderName,
         subject: c.subject,
-        target_subject: c.target_subject ?? null,
+        target_subject: resolverPersona(c.target_subject),
         due_at: c.due_at_iso ?? null,
         confidence: c.confidence ?? 0.7,
         item_kind: kind,
@@ -375,13 +417,42 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
       };
     });
 
+  // ── Idempotencia por reenvío ────────────────────────────────────────────────
+  // Lizeth mandó su reporte a las 19:13 y lo reenvió con mención a las 19:23 →
+  // 7 + 7 = 14 filas para UN solo reporte. Antes de insertar, descartamos lo que ya
+  // existe abierto en el grupo con la misma persona + mismo asunto en las últimas 12h.
+  let aInsertar = commitmentsToInsert;
+  if (aInsertar.length > 0) {
+    const desde = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
+    const { data: recientes } = await sb
+      .from("whatsapp_commitments")
+      .select("committed_by_text, subject")
+      .eq("group_id", msg.group_id)
+      .gte("created_at", desde)
+      .neq("status", "done");
+    const norm = (s: string | null | undefined) =>
+      (s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+    const yaHay = new Set(
+      (recientes ?? []).map((r: { committed_by_text: string | null; subject: string | null }) =>
+        `${norm(r.committed_by_text)}|${norm(r.subject)}`
+      ),
+    );
+    const vistosEnEsteLote = new Set<string>();
+    aInsertar = aInsertar.filter((c) => {
+      const k = `${norm(c.committed_by_text)}|${norm(c.subject)}`;
+      if (yaHay.has(k) || vistosEnEsteLote.has(k)) return false;
+      vistosEnEsteLote.add(k);
+      return true;
+    });
+  }
+
   let insertedCommitments = 0;
-  if (commitmentsToInsert.length > 0) {
-    const { error: cErr } = await sb.from("whatsapp_commitments").insert(commitmentsToInsert);
+  if (aInsertar.length > 0) {
+    const { error: cErr } = await sb.from("whatsapp_commitments").insert(aInsertar);
     if (cErr) {
       console.warn("insert commitments error:", cErr.message);
     } else {
-      insertedCommitments = commitmentsToInsert.length;
+      insertedCommitments = aInsertar.length;
     }
   }
 

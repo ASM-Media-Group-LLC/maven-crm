@@ -907,6 +907,27 @@ INTELIGENCIA SOBRE LEADS (F2 — usar cuando aparezca un handle de IG en el grup
   · Si overall_status="scouter_known" → la encontró el scouter pero NO está en pipeline del closer todavía. Ver ai_status del scouter para guía, sugerí cargarla.
   · Si overall_status="nueva" (todas las listas vacías) → la modelo NO está en Maven todavía. Decílo CLARO + explicá cómo cargarla (ver abajo).
 
+NO PROMETAS LO QUE NO PODÉS EJECUTAR (revisión 31/07 — el bot falló en las cuatro):
+- ACCIONES EN PRIMERA PERSONA: prohibido "lo corrijo", "lo cargo", "lo actualizo", "lo dejo listo",
+  "lo agrego al escaneo" sobre cualquier cosa para la que NO tengas tool. Solo podés ESCRIBIR lo que
+  tus tools escriben (reportes, recordatorios, stage/valor de un lead, hechos de personas, reglas del
+  owner). Todo lo demás —config de escaneo de creadoras, redes secundarias, cuentas de IG del equipo,
+  permisos, horarios— lo tocan humanos en Maven. La forma correcta es: decir QUÉ hay que cambiar,
+  @mencionar a quién le toca, y dejar un create_reminder para que no se pierda.
+- CADENCIA / AVISOS FUTUROS: prohibido prometer "cada 2h te pregunto", "te aviso al cierre", "te hago
+  seguimiento" sin crear el/los create_reminder en el MISMO turno (uno por checkpoint: la tool es
+  one-shot, no recurrente). Si no podés agendarlo, decí "no puedo auto-recordármelo, pinchame vos".
+  El 30/07 le prometiste a María check-ins cada 2 horas y no le escribiste en 8 horas — justo lo que
+  ella venía de reclamarte. Una promesa incumplida cuesta más que un "no puedo".
+- EXCEPCIONES QUE TE CORRIGEN UNA MÉTRICA: si el equipo te explica por qué un dato tuyo está mal de
+  forma ESTABLE (ej. "a Yoisnia la contactamos por un grupo aparte, por eso te figura sin contacto"),
+  guardalo con remember_fact en ese momento. Si no, lo repetís a las horas como si nada — el 30/07
+  volviste a decir "10 días sin contacto" cuatro horas después de que Lorena te lo aclarara.
+- SI ALGUIEN AFIRMA QUE YA CARGÓ ALGO Y VOS NO LO VES: la hipótesis por defecto es que TU lectura está
+  mal, no la de esa persona. Decí qué miraste ("no lo veo en el registro de contactos") y pedí que
+  verifiquen. PROHIBIDO inventar una causa técnica ("el form no guarda si no tocás bien el campo") y
+  mandar a la persona a rehacer trabajo: el 30/07 Daniel rehízo dos veces una carga que estaba bien.
+
 PROHIBIDO ALUCINAR DATOS DE MAVEN:
 - Si la tool lookup_lead_history devuelve overall_status="nueva" o arrays vacíos, NUNCA inventes cosas como "está en pipeline", "quality B", "cargada ayer", "stage Nuevo", etc. Esos datos NO existen.
 - En ese caso decí EXPLÍCITAMENTE: "No la veo en Maven todavía".
@@ -1137,7 +1158,7 @@ const TOOLS: Array<{
   {
     name: "register_daily_report",
     description:
-      "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. TRES tipos:\n- role_kind='llg': outreach de captación — 'contactados 70, respuestas 1, números 0'.\n- role_kind='closer': calls/cierres — 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0'.\n- role_kind='content': CONTENIDO del equipo de warming — 'hice 5 videos, 3 fotos', 'creé 2 cuentas', 'subí 4 posts a @cuenta'. Usá videos_creados/fotos_creadas/cuentas_creadas/posts_subidos.\nOJO: cualquiera puede ADEMÁS meter números — si un creador de contenido reporta que consiguió un número, seteá también numeros_obtenidos (igual el número real se cuenta por el contacto cargado en Maven). Idempotente por (user, fecha): el último reporte actualiza. Después de registrar, confirmá breve con ✓ y mini-summary REAL (los datos que guardaste), NUNCA un 'anotado' vacío sin haber llamado esta tool.",
+      "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. TRES tipos:\n- role_kind='llg': outreach de captación — 'contactados 70, respuestas 1, números 0'.\n- role_kind='closer': calls/cierres — 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0'.\n- role_kind='content': CONTENIDO del equipo de warming — 'hice 5 videos, 3 fotos', 'creé 2 cuentas', 'subí 4 posts a @cuenta'. Usá videos_creados/fotos_creadas/cuentas_creadas/posts_subidos.\nOJO: cualquiera puede ADEMÁS meter números — si un creador de contenido reporta que consiguió un número, seteá también numeros_obtenidos (igual el número real se cuenta por el contacto cargado en Maven). Idempotente por (user, fecha): el último reporte actualiza. Después de registrar, confirmá breve con ✓ y mini-summary REAL (los datos que guardaste), NUNCA un 'anotado' vacío sin haber llamado esta tool.\nCUÁNDO LLAMARLA: ante CUALQUIER mensaje con cifras de producción del día (videos/fotos/posts/cuentas/contactos/números/respuestas), sea un reporte formal de cierre o un avance suelto a media tarde ('van 4 videos aprobados'). No esperes al formato de reporte: si hay números de lo que la persona hizo hoy, registralos.\nFECHA: si el autor encabeza con una fecha ('Reporte 29/07'), usá ESA, no hoy — y decilo en la confirmación ('registrado con fecha 29/07').\nGRUPO EQUIVOCADO: la fila NO depende del grupo. Si alguien manda su reporte donde no corresponde, registralo IGUAL y aclará dónde va la próxima vez; nunca digas 'igual te lo tomo' sin llamar esta tool.\nAL CONFIRMAR, MOSTRÁ EL DESGLOSE que sumaste, no solo el total ('1 carrete + 3 historias + 2 historias + 1 post fijo = 7'), así el equipo detecta si contaste mal. El 30/07 el bot publicó '6 posts' sobre un reporte que listaba 8.",
     input_schema: {
       type: "object",
       properties: {
@@ -1471,7 +1492,7 @@ const TOOLS: Array<{
   {
     name: "remember_fact",
     description:
-      "Guardá un HECHO DURABLE sobre una persona del equipo para recordarlo en el futuro (más allá de la ventana de contexto de mensajes). Usalo cuando alguien dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer — ej. 'no manejo IG para contactar', 'yo solo trabajo por Telegram', 'pasame los cierres por privado', 'espero que me habiliten el número de Unlimited'. NO lo uses para cosas efímeras del día (eso es un recordatorio) ni para datos de leads/pipeline. Por defecto el hecho es sobre QUIEN ESCRIBE; pasá `about` solo si es sobre OTRA persona (y solo el owner/supervisor puede guardar hechos de terceros). Redactá `fact` corto, en 3ª persona.",
+      "Guardá un HECHO DURABLE sobre una persona del equipo para recordarlo en el futuro (más allá de la ventana de contexto de mensajes). Usalo cuando alguien dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer — ej. 'no manejo IG para contactar', 'yo solo trabajo por Telegram', 'pasame los cierres por privado', 'espero que me habiliten el número de Unlimited'. NO lo uses para cosas efímeras del día (eso es un recordatorio) ni para datos de leads/pipeline. Por defecto el hecho es sobre QUIEN ESCRIBE; pasá `about` solo si es sobre OTRA persona (y solo el owner/supervisor puede guardar hechos de terceros). Redactá `fact` corto, en 3ª persona.\nTAMBIÉN para EXCEPCIONES OPERATIVAS ESTABLES que corrigen una métrica tuya: cuando el equipo te explica por qué un dato que reportaste está mal y la causa se va a repetir — ej. 'a Yoisnia se la contacta por un grupo de WhatsApp aparte, por eso figura sin contacto en la línea de Managers', 'esta creadora promociona por Telegram, no por IG'. Guardala con `about` = la persona responsable de esa creadora/área. Sin esto volvés a publicar el mismo dato equivocado a las horas, después de que ya te corrigieron.",
     input_schema: {
       type: "object",
       properties: {
@@ -3168,18 +3189,23 @@ async function executeTool(
       // Cadencia de los 6 contactos del closer (días desde passed_date).
       const cadence = [1, 3, 5, 8, 15, 29];
 
-      // Counts + HANDLES por stage. Trae los handles para que el bot
-      // pueda responder "cuáles son las confirmadas de Julieth?" sin
-      // tener que preguntarle al user — la data ya está en Maven.
-      let detailQ = sb.from("closer_creators")
-        .select("id, instagram_handle, stage, confirmed_date, completed_date, no_interesada_date, last_contact_date, passed_date, estimated_monetization, monthly_monetization")
-        .order("updated_at", { ascending: false })
-        .limit(200);
-      if (closerUserId) detailQ = detailQ.eq("assigned_to", closerUserId);
-      const { data: stageRows } = await detailQ;
+      // ⚠️ CONTEO EXACTO por stage vía RPC de agregación — NO contando filas traídas.
+      // ANTES esto iteraba un `.limit(200)` ordenado por updated_at y contaba ahí los
+      // stages, o sea publicaba la composición de una MUESTRA como si fuera el pipeline:
+      // el cierre del 30/07 dijo "77 Asignadas · 112 Nuevas sin tomar" cuando eran 129 y
+      // 2.306 (los dos números salían clavados de las 200 filas más recientes). Encima
+      // las 4 Confirmadas y 13 Completadas caían FUERA del top-200 → el "🔥 FOCO del día"
+      // salía vacío. Invisible por closer (una cartera entra entera en 200 filas), solo
+      // mentía en el agregado del equipo, que es el que se publica a diario. [rev 31/07]
+      const { data: stageCounts } = await sb.rpc("get_closer_stage_counts", {
+        p_assigned_to: closerUserId,
+      });
       const byStage: Record<string, number> = {};
-      const handlesByStage: Record<string, Array<{ handle: string; date: string | null; monthly_usd: number | null }>> = {};
-      for (const r of (stageRows ?? []) as Array<{
+      for (const r of (stageCounts ?? []) as Array<{ stage_name: string | null; total: number | string }>) {
+        byStage[r.stage_name ?? "Sin stage"] = Number(r.total) || 0;
+      }
+
+      type StageRow = {
         id: string;
         instagram_handle: string | null;
         stage: string | null;
@@ -3190,9 +3216,26 @@ async function executeTool(
         passed_date: string | null;
         estimated_monetization: number | string | null;
         monthly_monetization: number | string | null;
-      }>) {
+      };
+      const SEL_STAGE =
+        "id, instagram_handle, stage, confirmed_date, completed_date, no_interesada_date, last_contact_date, passed_date, estimated_monetization, monthly_monetization";
+
+      // HANDLES por stage, en dos queries con propósitos distintos:
+      //  (a) Confirmada/Completada → TODAS, sin muestreo. Son pocas (≈17) y alimentan el
+      //      FOCO del día; con el limit(200) por updated_at se perdían enteras.
+      //  (b) el resto → MUESTRA de las 200 más recientes, solo para listar ejemplos.
+      let cerradasQ = sb.from("closer_creators").select(SEL_STAGE)
+        .in("stage", ["Confirmada", "Completada"]);
+      if (closerUserId) cerradasQ = cerradasQ.eq("assigned_to", closerUserId);
+      let muestraQ = sb.from("closer_creators").select(SEL_STAGE)
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (closerUserId) muestraQ = muestraQ.eq("assigned_to", closerUserId);
+      const [cerradasRes, muestraRes] = await Promise.all([cerradasQ, muestraQ]);
+
+      const handlesByStage: Record<string, Array<{ handle: string; date: string | null; monthly_usd: number | null }>> = {};
+      const pushRow = (r: StageRow) => {
         const s = r.stage ?? "Sin stage";
-        byStage[s] = (byStage[s] ?? 0) + 1;
         if (!handlesByStage[s]) handlesByStage[s] = [];
         // Fecha relevante según el stage
         const dateForStage = s === "Confirmada" ? r.confirmed_date
@@ -3207,6 +3250,12 @@ async function executeTool(
           date: dateForStage,
           monthly_usd: Number.isFinite(valNum) && valNum > 0 ? valNum : null,
         });
+      };
+      for (const r of (cerradasRes.data ?? []) as StageRow[]) pushRow(r);
+      for (const r of (muestraRes.data ?? []) as StageRow[]) {
+        const s = r.stage ?? "Sin stage";
+        if (s === "Confirmada" || s === "Completada") continue; // ya vinieron completas arriba
+        pushRow(r);
       }
 
       // Leads Asignadas → overdue por cadencia RE-ANCLADA al último contacto (mismo
@@ -3217,11 +3266,27 @@ async function executeTool(
       //   sin contactos → passed_date + 1 día ; con ≥1 → último_contacto + gap de cadencia.
       let asignadasQ = sb
         .from("closer_creators")
-        .select("id, instagram_handle, passed_date")
+        .select("id, instagram_handle, passed_date, assigned_to")
         .eq("stage", "Asignada");
       if (closerUserId) asignadasQ = asignadasQ.eq("assigned_to", closerUserId);
       const { data: asignadas } = await asignadasQ;
-      const asignadasList = (asignadas ?? []) as Array<{ id: string; instagram_handle: string | null; passed_date: string | null }>;
+      const asignadasList = (asignadas ?? []) as Array<{ id: string; instagram_handle: string | null; passed_date: string | null; assigned_to: string | null }>;
+
+      // DUEÑO de cada lead vencido. Sin esto el bot le adjudicaba a quien estaba
+      // hablando los vencidos de OTRO closer: el 30/07 le dijo a María "te quedan 3
+      // contactos vencidos" y dos eran de Miguel. Solo hace falta en la vista de
+      // equipo (con closerUserId ya sabemos de quién son todos).
+      const ownerNameByLead: Record<string, string> = {};
+      if (!closerUserId) {
+        const ownerIds = [...new Set(asignadasList.map((a) => a.assigned_to).filter(Boolean))] as string[];
+        if (ownerIds.length) {
+          const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", ownerIds);
+          const nameById = new Map((profs ?? []).map((p) => [p.id as string, (p.full_name as string | null) ?? null]));
+          for (const a of asignadasList) {
+            if (a.assigned_to) ownerNameByLead[a.id] = nameById.get(a.assigned_to) ?? "(sin nombre)";
+          }
+        }
+      }
 
       // Historial de contactos de TODAS esas leads en UNA query (antes: N queries de
       // count, uno por lead). Agregamos count + último contacto por lead.
@@ -3247,7 +3312,14 @@ async function executeTool(
         new Date(new Date(dateStr + "T00:00:00Z").getTime() + n * 86_400_000).toISOString().slice(0, 10);
       const todayBog = bogotaDate(Date.now());
 
-      const overdue: Array<{ handle: string; days_since: number; next_contact_day: number; contacts_done: number }> = [];
+      const overdue: Array<{
+        handle: string;
+        days_since: number;
+        days_since_assigned: number;
+        next_contact_day: number;
+        contacts_done: number;
+        closer?: string;
+      }> = [];
       const staleAsignadas: Array<{ handle: string; days_since: number }> = [];
 
       for (const a of asignadasList) {
@@ -3255,23 +3327,44 @@ async function executeTool(
         const pd = a.passed_date.slice(0, 10);
         const days = Math.floor((Date.parse(todayBog) - Date.parse(pd)) / 86_400_000);
         const count = contactCountByLead[a.id] ?? 0;
+        // "Días sin contacto" = desde el ÚLTIMO CONTACTO, no desde que entró el lead.
+        // Antes se reportaba `days` (contra passed_date) y salía inflado al doble:
+        // el 30/07 bella_ioanna figuró con "45 días" cuando hacía 21 del último
+        // contacto, y lounasmodels "27" cuando eran 9. Sin contactos aún, el único
+        // ancla posible sigue siendo la asignación.
+        const lastC = lastContactByLead[a.id] ? bogotaDate(Date.parse(lastContactByLead[a.id])) : null;
+        const daysSinceContact = lastC
+          ? Math.floor((Date.parse(todayBog) - Date.parse(lastC)) / 86_400_000)
+          : days;
         if (count < 6) {
           let deadline: string;
           if (count === 0) {
             deadline = addDays(pd, cadence[0]); // 1 día tras la asignación
           } else {
             const gap = (cadence[count] ?? 29) - (cadence[count - 1] ?? 0);
-            const base = lastContactByLead[a.id] ? bogotaDate(Date.parse(lastContactByLead[a.id])) : pd;
+            const base = lastC ?? pd;
             deadline = addDays(base, gap);
           }
           if (todayBog > deadline) {
-            overdue.push({ handle: a.instagram_handle ?? "(sin handle)", days_since: days, next_contact_day: cadence[count] ?? 29, contacts_done: count });
+            overdue.push({
+              handle: a.instagram_handle ?? "(sin handle)",
+              days_since: daysSinceContact,
+              days_since_assigned: days,
+              next_contact_day: cadence[count] ?? 29,
+              contacts_done: count,
+              ...(ownerNameByLead[a.id] ? { closer: ownerNameByLead[a.id] } : {}),
+            });
           }
         }
         if (days > 30 && count === 0) {
           staleAsignadas.push({ handle: a.instagram_handle ?? "(sin handle)", days_since: days });
         }
       }
+
+      // Más urgente primero. Además de ser el orden útil, hace que la muestra de 15 sea
+      // REPRESENTATIVA: en orden de tabla salían los 15 del mismo closer y el modelo
+      // concluía "34 vencidos, todos de María" aunque el desglose dijera 25/9.
+      overdue.sort((a, b) => b.days_since - a.days_since);
 
       // Para Confirmadas/Completadas mostramos TODOS los handles
       // (lo más útil para el bot). Para Asignadas/Nuevo solo los
@@ -3293,8 +3386,25 @@ async function executeTool(
         handles_by_stage: trimmedHandles,
         overdue_contacts: overdue.slice(0, 15),
         overdue_count: overdue.length,
+        // Desglose por closer SOBRE EL TOTAL. Sin esto el modelo lee los 15 de la
+        // muestra —que salen agrupados por dueño— y generaliza: en la prueba del 31/07
+        // dijo "34 overdue, todos de María" cuando 8 eran de Miguel. Mismo vicio que el
+        // by_stage: nunca dejar que una muestra truncada parezca el universo.
+        overdue_by_closer: (() => {
+          const acc: Record<string, number> = {};
+          for (const o of overdue) acc[o.closer ?? closerName] = (acc[o.closer ?? closerName] ?? 0) + 1;
+          return acc;
+        })(),
         stale_asignadas: staleAsignadas.slice(0, 10),
         cadence_days: cadence,
+        nota: "by_stage son conteos EXACTOS de TODO el pipeline (usá esos para cualquier total). " +
+          "handles_by_stage trae TODAS las Confirmada/Completada, pero para los demás stages es " +
+          "solo una MUESTRA de las 20 más recientes: NUNCA presentes la cantidad de handles listados " +
+          "como si fuera el total del stage — el total está en by_stage. " +
+          "En overdue_contacts, days_since = días desde el ÚLTIMO CONTACTO (days_since_assigned = " +
+          "desde que se asignó). Si viene 'closer', el lead es de ESA persona: no se lo adjudiques a " +
+          "quien te está hablando. overdue_contacts está CAPADA a 15 ítems: para decir de quién son " +
+          "los vencidos usá overdue_by_closer (cubre el total), NUNCA generalices desde la lista.",
       };
     }
 
@@ -3492,7 +3602,12 @@ async function executeTool(
       if (cc) {
         const newNotes = (cc.notes ? cc.notes + noteSuffix : (noteSuffix.trim() || null));
         const update: Record<string, unknown> = { stage: newStatus, notes: newNotes };
-        if (/rechaz|no_interes/i.test(newStatus)) {
+        // ⚠️ `no[_ ]?interes` y no `no_interes`: el stage canónico de closer_creators es
+        // "No interesada" CON ESPACIO, así que el guard viejo nunca matcheaba desde el bot
+        // y la baja quedaba sin no_interesada_date ni rejection_reason (el 30/07,
+        // @abigmaretto quedó con stage cambiado pero ambos campos en NULL → invisible para
+        // los reportes y para la re-elegibilidad a los 3 meses). leadgen usa "no_interesada".
+        if (/rechaz|no[_ ]?interes/i.test(newStatus)) {
           update.rejection_reason = reason || null;
           update.no_interesada_date = new Date().toISOString();
         }
@@ -4276,16 +4391,29 @@ async function buildInitialUserMessage(args: {
     // inyectamos el marcador [OWNER_MESSAGE] en el prompt.
     const isOwner = args.isOwner;
 
-    let { data: ctx } = await sb
-      .from("whatsapp_messages")
-      .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
-      .eq("group_id", args.groupId)
-      .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
-      .order("sent_at", { ascending: false })
-      // Ventana de contexto = últimos N mensajes del grupo antes del trigger.
-      // 30 (antes 10): en grupos movidos, 10 filas se llenaban en <3min y el bot
-      // "olvidaba" lo que un miembro había dicho hace un rato (ej. "no manejo IG").
-      .limit(30);
+    // Ventana de contexto = últimos N mensajes del grupo. 30 (antes 10): en grupos
+    // movidos, 10 filas se llenaban en <3min y el bot "olvidaba" lo que un miembro
+    // había dicho hace un rato (ej. "no manejo IG").
+    //
+    // ⚠️ SIN filtro `.lt(sent_at, trigger)` a propósito. Ese corte dejaba al bot ciego a
+    // lo que se publicó DESPUÉS del disparador —incluidas SUS PROPIAS respuestas— y era
+    // la causa raíz de tres bugs distintos del 30/07: dos respuestas contradictorias con
+    // 10s de diferencia sobre el mismo teléfono, el mismo dato repetido a 3s, y cuatro
+    // mensajes casi idénticos en 41s. El single-flight ya serializa las corridas y su
+    // comentario promete "al proceder ya vemos su respuesta en la ventana de contexto":
+    // solo era cierto si la ventana se lee DESPUÉS del lock y sin este corte. El
+    // disparador se excluye por id porque se muestra aparte, al final del prompt.
+    const CTX_SEL = "id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at";
+    const leerContexto = async () => {
+      const { data } = await sb
+        .from("whatsapp_messages")
+        .select(CTX_SEL)
+        .eq("group_id", args.groupId)
+        .order("sent_at", { ascending: false })
+        .limit(31);
+      return (data ?? []).filter((c) => c.id !== args.req.message_id).slice(0, 30);
+    };
+    let ctx = await leerContexto();
 
     // ── Esperar transcripción pendiente de audio ──────────────────────────
     // Bug (28/7): un closer manda un audio y @menciona al bot casi al mismo
@@ -4308,13 +4436,7 @@ async function buildInitialUserMessage(args: {
           .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
           .eq("id", args.req.message_id)
           .single()).data;
-        ctx = (await sb
-          .from("whatsapp_messages")
-          .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
-          .eq("group_id", args.groupId)
-          .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
-          .order("sent_at", { ascending: false })
-          .limit(30)).data; // debe coincidir con la ventana de arriba
+        ctx = await leerContexto();
       }
     }
 
@@ -4379,12 +4501,24 @@ async function buildInitialUserMessage(args: {
       return m.body;
     };
 
-    lines.push("Contexto reciente (orden cronológico):");
+    // Hora de cada mensaje YA en zona del grupo. Antes se imprimía `m.sent_at` crudo
+    // (ISO en UTC) y el modelo lo leía como hora local: el 30/07 a las 16:41 de Bogotá
+    // le dijo al equipo "ya son las 21:41" —el UTC del propio mensaje— y encima sacó
+    // una conclusión operativa de eso ("probablemente cierres bajo"). El bloque
+    // "Hora actual" de más arriba ya venía en local; la fuga estaba acá.
+    const horaLocal = (iso: string | null | undefined) => {
+      if (!iso) return "??:??";
+      const d = new Date(Date.parse(iso) - 5 * 3600 * 1000); // Bogotá = UTC-5 fijo, sin DST
+      return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")} ${
+        String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+    };
+
+    lines.push("Contexto reciente (orden cronológico, hora de Colombia):");
     for (const m of (ctx ?? []).reverse()) {
       const text = effectiveText(m);
       if (text) {
         const sender = renderSender(m.sender_display_name, m.sender_external_id);
-        lines.push(`[${m.sent_at}] ${sender}: ${text}`);
+        lines.push(`[${horaLocal(m.sent_at)}] ${sender}: ${text}`);
       }
     }
     lines.push("");
@@ -4397,7 +4531,7 @@ async function buildInitialUserMessage(args: {
     lines.push("Mensaje al cual debés responder:");
     if (msg) {
       const sender = renderSender(msg.sender_display_name, msg.sender_external_id);
-      lines.push(`[${msg.sent_at}] ${sender}: ${effectiveText(msg)}`);
+      lines.push(`[${horaLocal(msg.sent_at)}] ${sender}: ${effectiveText(msg)}`);
     }
     lines.push("");
     lines.push("Nota sobre nombres: los senders mostrados acá ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Usalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");
@@ -4669,19 +4803,29 @@ async function runAgent(req: AgentRequest): Promise<{
     }\n\nSi alguien te dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer, guardalo con remember_fact. Si te corrigen un hecho de acá, usá forget_fact. NUNCA contradigas estos hechos (ej. si dice que no maneja IG, no lo mandes a IG).`;
   }
 
-  const initialUser = await buildInitialUserMessage({
-    req,
-    groupId: group.id,
-    groupName: group.name,
-    timezone: group.timezone,
-    isOwner: senderCtx.isOwner,
-    department: botCfg?.department ?? null,
-  });
-
-  // Loop messages array per Anthropic spec.
-  const messages: Array<Record<string, unknown>> = [
-    { role: "user", content: initialUser },
+  // ── GUARDA CONTRA EL "ANOTADO" FANTASMA ─────────────────────────────────────
+  // El bot afirma haber registrado algo sin haber llamado ninguna tool de escritura.
+  // El 30/07 pasó cuatro veces: "✓ Miguel registrado: 13 contactos" (cero filas),
+  // "igual te lo tomo" con el reporte de Daniel (cero filas), "quedan anotados los SFS
+  // de ayer" y "con eso lo corrijo y entran al escaneo" (no existe tool para eso).
+  // La regla en prosa YA existía en el system prompt y el modelo la violó igual — dos
+  // horas después de desplegarla. Por eso esto es una guarda DETERMINÍSTICA en el borde
+  // de salida, el mismo patrón que usamos para enmascarar teléfonos: no depende de que
+  // el modelo obedezca. Si afirma persistencia y en la corrida no hubo escritura ok,
+  // se le devuelve el control con una instrucción concreta en vez de publicar la mentira.
+  const TOOLS_DE_ESCRITURA = new Set([
+    "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
+    "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
+  ]);
+  const PATRONES_ACK_FALSO: RegExp[] = [
+    /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad)/i,
+    /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad)/i,
+    /\b(?:lo|la|los|las)\s+(?:registr|anot|agend)(?:é|e|amos|ó)\b/i,
+    /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend)/i,
+    /\bte\s+lo\s+(?:registr|anot|agend|dej)/i,
   ];
+  const escriturasOk = new Set<string>();
+  let ackBloqueados = 0;
 
   let finalReply: string | null = null;
   // Por qué la corrida terminó sin publicar nada (se reporta en el evento agent_silent).
@@ -4747,6 +4891,26 @@ async function runAgent(req: AgentRequest): Promise<{
   // devolvía ok:true SIN responder y SIN loguear nada: el bot quedaba mudo justo en el
   // caso que el single-flight venía a resolver. No se disparó en prod, pero estaba armado.
   const startedAt = Date.now();
+
+  // ⚠️ El prompt se arma DESPUÉS del lock, no antes. Si se arma antes, la ventana de
+  // contexto queda congelada en el instante en que la corrida entró a la cola: la 2ª
+  // corrida esperaba correctamente su turno pero después razonaba sobre una foto vieja
+  // del grupo, sin ver la respuesta que la 1ª acababa de publicar. Ese desfase es el que
+  // producía los duplicados del 30/07 (dos respuestas contradictorias a 10s, la misma
+  // cifra repetida a 3s, cuatro mensajes casi iguales en 41s) pese al single-flight.
+  const initialUser = await buildInitialUserMessage({
+    req,
+    groupId: group.id,
+    groupName: group.name,
+    timezone: group.timezone,
+    isOwner: senderCtx.isOwner,
+    department: botCfg?.department ?? null,
+  });
+
+  // Loop messages array per Anthropic spec.
+  const messages: Array<Record<string, unknown>> = [
+    { role: "user", content: initialUser },
+  ];
 
   try {
   for (; iter < MAX_ITERATIONS; iter += 1) {
@@ -4905,6 +5069,30 @@ async function runAgent(req: AgentRequest): Promise<{
         });
         continue;
       }
+      // Guarda del "anotado" fantasma: afirma haber registrado y no escribió nada.
+      // Se devuelve el control hasta 2 veces; a la 3ª se publica igual (nunca mudo)
+      // pero queda el evento agent_false_ack para poder auditarlo.
+      if (t.name === "reply_to_group" && escriturasOk.size === 0 && ackBloqueados < 2) {
+        const cuerpo = String((t.input as ToolInput).body ?? "");
+        if (PATRONES_ACK_FALSO.some((re) => re.test(cuerpo))) {
+          ackBloqueados += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "ack_sin_persistencia",
+              message:
+                "NO se envió: tu mensaje afirma que registraste/anotaste/agendaste algo, pero en esta corrida no " +
+                "llamaste ninguna tool de escritura, así que no quedó guardado en ningún lado. Elegí UNA: " +
+                "(a) llamá la tool que corresponde (register_daily_report para reportes de jornada, create_reminder " +
+                "para un aviso futuro, mark_lead_stage/set_lead_value para leads) y DESPUÉS respondé; o " +
+                "(b) si no existe tool para eso, reescribí sin prometer registro: decí quién lo tiene que hacer y " +
+                "@mencionalo. Prohibido 'lo corrijo/lo cargo/lo dejo agendado' sobre algo que no podés tocar.",
+            }),
+          });
+          continue;
+        }
+      }
       const result = await executeTool(
         String(t.name),
         (t.input as ToolInput) ?? {},
@@ -4919,8 +5107,28 @@ async function runAgent(req: AgentRequest): Promise<{
           canSeePhones,
         },
       );
+      // Escrituras exitosas de la corrida: habilitan que el bot pueda decir "registrado".
+      if (
+        TOOLS_DE_ESCRITURA.has(String(t.name)) &&
+        result && typeof result === "object" && !(result as Record<string, unknown>).error
+      ) {
+        escriturasOk.add(String(t.name));
+      }
       if (t.name === "reply_to_group") {
         finalReply = String((t.input as ToolInput).body ?? "");
+        if (ackBloqueados > 0 && escriturasOk.size === 0) {
+          // Se publicó igual tras 2 bloqueos: dejamos rastro para auditar.
+          await sb.from("whatsapp_bot_events").insert({
+            group_id: group.id,
+            tenant_id: group.tenant_id,
+            kind: "agent_false_ack",
+            payload: {
+              motivo: "afirmo_persistencia_sin_tool_de_escritura",
+              intentos_bloqueados: ackBloqueados,
+              body_preview: finalReply.slice(0, 300),
+            },
+          });
+        }
       }
       toolResults.push({
         type: "tool_result",

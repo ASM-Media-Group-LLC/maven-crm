@@ -138,8 +138,11 @@ export const managersTools: AgentTool[] = [
       "promo OF detectada ese día (promoted='true'); ignora las que solo tuvieron stories sin promo y las pendientes " +
       "de scan. Úsala para '¿cuántas promocionaron hoy?', 'separá las de Carolina y Fabiana', '¿quiénes promocionaron " +
       "el 14?'. Pasá date (YYYY-MM-DD) para otro día y manager_name para filtrar. Devuelve por manager: cuántas " +
-      "creadoras promocionaron + quiénes (con nº de stories de promo y redes). Nota: refleja lo scaneado hasta el " +
-      "momento — el promolog scanea a lo largo del día, así que a media jornada puede faltar gente por scanear.",
+      "creadoras promocionaron + quiénes (con nº de stories de promo y redes). " +
+      "⚠️ MIRÁ SIEMPRE el bloque `cobertura` antes de responder: si scan_corrio=false / creadoras_leidas=0, el scan " +
+      "de ese día TODAVÍA NO CORRIÓ — decí eso, NO listes promos ni afirmes que nadie promocionó. Si la cobertura es " +
+      "parcial, decí explícitamente que faltan creadoras por escanear en vez de dar el número por cerrado, y nunca " +
+      "digas 'sigue escaneando' si ultimo_scan es viejo.",
     input_schema: {
       type: "object",
       properties: {
@@ -157,7 +160,10 @@ export const managersTools: AgentTool[] = [
         p_tenant: ctx.tenantId, p_date: date, p_manager_name: mgr,
       });
       if (error) throw new Error(`get_promo_day_breakdown: ${error.message}`);
-      const rows = (data ?? []) as Array<{ manager_name: string | null; handle: string | null; promo_stories: number; networks: string | null }>;
+      const rows = (data ?? []) as Array<{
+        manager_name: string | null; creadora: string | null; handle: string | null;
+        cuentas: string | null; promo_stories: number; networks: string | null;
+      }>;
       const byMgr = new Map<string, typeof rows>();
       for (const r of rows) {
         const k = r.manager_name ?? "(sin manager)";
@@ -168,13 +174,51 @@ export const managersTools: AgentTool[] = [
         .map(([manager, rs]) => ({
           manager,
           creadoras_promocionaron: rs.length,
-          creadoras: rs.map((r) => ({ handle: r.handle, stories_promo: r.promo_stories, redes: r.networks })),
+          // `creadora` = nombre con el que la manager la conoce; `cuenta_donde_promocionó`
+          // puede ser una secundaria (Moramay promociona desde @solamente_moramay aunque
+          // su handle principal sea otro) — nombrar solo el principal confunde.
+          creadoras: rs.map((r) => ({
+            creadora: r.creadora,
+            handle_principal: r.handle,
+            cuenta_donde_promociono: r.cuentas,
+            stories_promo: r.promo_stories,
+            redes: r.networks,
+          })),
         }))
         .sort((a, b) => b.creadoras_promocionaron - a.creadoras_promocionaron);
+
+      // COBERTURA DEL SCAN DE ESE DÍA. Sin esto el bot no puede distinguir "nadie
+      // promocionó" de "todavía no se escaneó a nadie", y presenta lo que haya como si
+      // fuera el estado de hoy. El 31/07 a las 10:38 le listó a Fabiana 5 creadoras que
+      // "ya promocionaron hoy" — eran del scan de anoche, y el de hoy arrancó 11:15.
+      const diaBog = date ?? new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+      const { data: cov } = await ctx.sb
+        .from("promolog_entries")
+        .select("creator_id, promoted, created_at")
+        .eq("tenant_id", ctx.tenantId)
+        .eq("dia", diaBog);
+      const covRows = (cov ?? []) as Array<{ creator_id: string | null; promoted: string | null; created_at: string }>;
+      const leidas = new Set(
+        covRows.filter((r) => r.promoted !== "pending" && r.creator_id).map((r) => r.creator_id),
+      ).size;
+      const ultimoScan = covRows.length
+        ? new Date(Math.max(...covRows.map((r) => Date.parse(r.created_at))) - 5 * 3600_000)
+          .toISOString().slice(5, 16).replace("T", " ")
+        : null;
+
       return {
         total_creadoras_promocionaron: rows.length,
         por_manager,
-        nota: "Cuenta CREADORAS con promo OF detectada (promoted=true), no cantidad de stories. Refleja lo scaneado hasta ahora (el promolog corre a lo largo del día).",
+        cobertura: {
+          dia: diaBog,
+          creadoras_leidas: leidas,
+          ultimo_scan: ultimoScan,
+          scan_corrio: leidas > 0,
+        },
+        nota: leidas === 0
+          ? "⚠️ EL SCAN DE ESE DÍA TODAVÍA NO LEYÓ A NADIE (creadoras_leidas=0). NO digas que nadie promocionó ni listes promos de 'hoy': lo correcto es decir que el scan aún no corrió y que todavía no hay datos del día."
+          : "Cuenta CREADORAS con promo OF detectada (promoted=true), no cantidad de stories. Cobertura: se leyeron " +
+            `${leidas} creadoras hasta el último scan (${ultimoScan}). Si la cobertura es baja, aclará que el reporte es PARCIAL en vez de darlo por cerrado.`,
       };
     },
   },
