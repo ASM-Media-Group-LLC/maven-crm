@@ -1,0 +1,15 @@
+{
+  "name": "promolog-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lector de historias de IG para Promolog — corre LOCAL en la Mac de Jhon (IP residencial) con Playwright + un navegador real logueado. Reemplaza la extensión de Chrome. Reparte la carga entre 2 cuentas scanner (slots A/B) para no quemar ninguna.",
+  "scripts": {
+    "login": "node login.mjs",
+    "scan": "node index.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

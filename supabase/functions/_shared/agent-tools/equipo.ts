@@ -233,6 +233,46 @@ export const equipoTools: AgentTool[] = [
     },
   },
   {
+    name: "read_webpage",
+    description:
+      "Lee una página web renderizada (con JavaScript) y devuelve su TEXTO limpio + título. Usala cuando alguien pega un link o pide revisar el contenido de una URL, o cuando necesitás datos de una página que no tenés como tool (dashboards, SPAs, radares con JS que el server no puede leer directo). Solo lectura, no envía nada ni interactúa. Si el lector no responde o el host no está permitido, lo DICE — nunca inventes el contenido de la página. Para el estado de cuentas del equipo usá get_radar_accounts (más estructurado); esta es para páginas web genéricas.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL completa (https://…) a leer" },
+        selector: { type: "string", description: "opcional: CSS a esperar antes de leer (si la página tarda en pintar la parte que importa)" },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+    domain: "equipo",
+    scope: "read",
+    handler: async (args, _ctx) => {
+      const url = String(args?.url ?? "").trim();
+      if (!/^https?:\/\//i.test(url)) return { error: "url_invalida", nota: "Pasá una URL completa https://…" };
+      const READER_URL = (Deno.env.get("WEB_READER_URL") ?? "").replace(/\/+$/, "");
+      const READER_TOKEN = Deno.env.get("WEB_READER_TOKEN") ?? "";
+      if (!READER_URL || !READER_TOKEN) return { error: "lector_no_configurado", nota: "El micro web-reader todavía no está desplegado/cableado (WEB_READER_URL/WEB_READER_TOKEN). Decí que aún no podés leer páginas web, no inventes." };
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 28_000);
+      try {
+        const resp = await fetch(`${READER_URL}/read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-reader-token": READER_TOKEN },
+          body: JSON.stringify({ url, selector: args?.selector, max_chars: 12000 }),
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data?.ok === false) return { error: `lector_${resp.status}`, detalle: data?.error ?? null, nota: "No se pudo leer la página — decilo tal cual, no inventes el contenido." };
+        return { ok: true, url: data.final_url ?? url, titulo: data.title ?? null, texto: data.text ?? "", truncado: data.text_truncated ?? false };
+      } catch (e) {
+        clearTimeout(t);
+        return { error: `lector_no_responde: ${(e as Error).message}`, nota: "El lector web no respondió — decilo tal cual, no inventes." };
+      }
+    },
+  },
+  {
     name: "get_hubstaff_activity",
     description:
       "Datos de Hubstaff (tiempo trabajado + % de actividad) de CUALQUIER persona del equipo registrada en Maven, " +

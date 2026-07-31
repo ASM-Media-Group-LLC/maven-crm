@@ -82,6 +82,9 @@ verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (N
 [functions.promolog-ingest-stories]
 verify_jwt = false  # la extensión de Chrome la llama con header x-ext-token (NO manda JWT) — NO cambiar o la ingesta queda 401
 
+[functions.promolog-ig-apify-dispatch]
+verify_jwt = false  # utilitario resolve_ids (siembra ig_user_id vía Apify) + spike de medición; auth por x-cron-token
+
 # ---------------------------------------------------------------------------
 # COMPLETADO 2026-07-22: verify_jwt EXPLÍCITO para TODAS las funciones.
 # Motivo: el CI de auto-deploy (.github/workflows/deploy-edge-functions.yml)

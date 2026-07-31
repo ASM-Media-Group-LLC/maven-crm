@@ -1,0 +1,9 @@
+{
+  "name": "web-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Micro Playwright headless (Dokploy) que renderiza páginas web con JS y devuelve texto/HTML limpio. Para que los bots de Maven lean páginas que el edge de Supabase no puede (dashboards con JS, SPAs). NO se usa para Instagram (eso va por IP residencial, no datacenter).",
+  "scripts": { "start": "node index.mjs" },
+  "dependencies": { "playwright": "^1.47.0" }
+}

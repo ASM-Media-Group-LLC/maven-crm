@@ -20,6 +20,27 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
+  // ── REPARTO DE CARGA ENTRE CUENTAS SCANNER (slot A/B) ─────────────────────
+  // El burn de IG es por VOLUMEN por sesión: una cuenta haciendo 75 lecturas se
+  // sensibiliza y cae; dos cuentas haciendo ~37 c/u no. Cada cliente lector se
+  // identifica con ?slot=a|b&slots=2 y recibe SOLO su partición. La partición es
+  // por creator_id (hash estable) → todas las cuentas de IG de una creadora caen
+  // en el MISMO slot (la misma cuenta scanner las lee → no se pisan entre cuentas).
+  // Sin slot → devuelve TODO (compatible con la extensión actual y con 1 sola cuenta).
+  const url = new URL(req.url);
+  const slotParam = (url.searchParams.get("slot") ?? "").trim().toLowerCase();
+  const slotsCount = Math.max(1, Math.min(Number(url.searchParams.get("slots") ?? "0") || 0, 8));
+  // slot como índice: "a"→0, "b"→1, … o numérico "0","1".
+  const slotIdx = /^\d+$/.test(slotParam) ? Number(slotParam)
+    : (slotParam.length === 1 && slotParam >= "a" && slotParam <= "h" ? slotParam.charCodeAt(0) - 97 : -1);
+  const partitionOn = slotsCount >= 2 && slotIdx >= 0 && slotIdx < slotsCount;
+  // Hash determinístico y balanceado del uuid (FNV-1a sobre los hex del creator_id).
+  const creatorSlot = (creatorId: string): number => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < creatorId.length; i++) { h ^= creatorId.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0) % slotsCount;
+  };
+
   // Activas elegibles (misma vista que el resto de Promolog).
   const { data: creators, error } = await (sb as any)
     .from("v_promolog_eligible_creators").select("id, instagram_handle, name, artistic_name");
@@ -96,8 +117,10 @@ Deno.serve(async (req) => {
     push(c.id, primary, idByAccount.get(`${c.id}:${primary}`) ?? null, name);
     for (const h of (extraByCreator.get(c.id) ?? [])) if (h !== primary) push(c.id, h, idByAccount.get(`${c.id}:${h}`) ?? null, name);
   }
+  // Partición por slot (si se pidió): cada cuenta scanner lee solo su mitad.
+  const partitioned = partitionOn ? rows.filter((r) => creatorSlot(r.creator_id) === slotIdx) : rows;
   // Array.sort es estable → dentro de cada rango se conserva el orden de la vista (c.id).
-  const targets = rows.sort((a, b) => rank(a.creator_id, a.handle) - rank(b.creator_id, b.handle));
+  const targets = partitioned.sort((a, b) => rank(a.creator_id, a.handle) - rank(b.creator_id, b.handle));
 
-  return json({ ok: true, count: targets.length, targets });
+  return json({ ok: true, count: targets.length, slot: partitionOn ? slotParam : null, slots: partitionOn ? slotsCount : null, total_sin_particion: rows.length, targets });
 });
