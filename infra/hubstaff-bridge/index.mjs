@@ -394,6 +394,50 @@ function warnIfExpired(e) {
   if (e.expired) console.error("[hubstaff-bridge] ⚠ El refresh token venció/revocó. Generá un PAT nuevo en Hubstaff y actualizá HUBSTAFF_PAT_REFRESH_TOKEN en Dokploy (re-seed).");
 }
 
+// ── Sync ON-DEMAND (cola hubstaff_sync_requests) ─────────────────────────────
+// Réplica del patrón blu_sync_requests del blu-bridge: la tool
+// get_hubstaff_activity del bot inserta una fila 'pending' y espera ≤12s, acá
+// la vemos y corremos un syncLiveActivities() extra, marcando done al terminar.
+// El poll es cada 5s (no 20 como BLU) porque la ventana de espera del bot es de
+// solo 12s — con 20s de poll casi nunca llegaría a tiempo. Es un SELECT sobre
+// una tabla mínima con índice parcial: costo despreciable. Pedidos >10 min se
+// expiran (el caller ya no espera). Sin puertos HTTP: solo Supabase.
+let onDemandBusy = false;
+async function pollHubstaffSyncRequests() {
+  if (onDemandBusy) return;
+  let req = null;
+  try {
+    const tenMinAgo = new Date(Date.now() - 10 * 60000).toISOString();
+    await sb().from("hubstaff_sync_requests").update({ status: "expired", finished_at: new Date().toISOString() })
+      .eq("status", "pending").lt("requested_at", tenMinAgo);
+    const { data } = await sb().from("hubstaff_sync_requests")
+      .select("id").eq("status", "pending").gte("requested_at", tenMinAgo)
+      .order("id", { ascending: true }).limit(1);
+    req = data && data[0];
+  } catch (e) { console.error("[hubstaff-bridge] poll sync requests:", e.message); return; }
+  if (!req) return;
+  onDemandBusy = true;
+  console.log(`[hubstaff-bridge] sync on-demand #${req.id} → live activities…`);
+  try {
+    const startedAt = new Date().toISOString();
+    await sb().from("hubstaff_sync_requests").update({ status: "running", started_at: startedAt }).eq("id", req.id);
+    await syncLiveActivities();
+    // El live sync que acaba de correr satisface también los pending que se
+    // encolaron ANTES de arrancar — cerrarlos evita correr una pasada por pedido.
+    await sb().from("hubstaff_sync_requests")
+      .update({ status: "done", finished_at: new Date().toISOString() })
+      .in("status", ["running", "pending"]).lte("requested_at", startedAt);
+    console.log(`[hubstaff-bridge] sync on-demand #${req.id} done.`);
+  } catch (e) {
+    console.error(`[hubstaff-bridge] sync on-demand #${req.id} falló: ${e.message}`);
+    await sb().from("hubstaff_sync_requests")
+      .update({ status: "error", finished_at: new Date().toISOString(), note: String(e.message || e).slice(0, 200) })
+      .eq("id", req.id).then(() => {}, () => {});
+  } finally {
+    onDemandBusy = false;
+  }
+}
+
 async function main() {
   if (HUBSTAFF_PROBE) { try { await probe(); process.exit(0); } catch (e) { warnIfExpired(e); process.exit(1); } return; }
   if (RUN_ONCE) { try { await runOnce(); process.exit(0); } catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); } return; }
@@ -408,6 +452,10 @@ async function main() {
   console.log(`[hubstaff-bridge] poll en vivo cada ${liveMin} min.`);
   runLive();
   setInterval(runLive, liveMin * 60000);
+
+  // Cola de refresh on-demand del bot (ver pollHubstaffSyncRequests).
+  console.log("[hubstaff-bridge] poll de sync on-demand cada 5s.");
+  setInterval(() => pollHubstaffSyncRequests().catch((e) => console.error(`[hubstaff-bridge] on-demand falló: ${e.message}`)), 5000);
 }
 
 main();
