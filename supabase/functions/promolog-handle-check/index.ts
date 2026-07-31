@@ -12,9 +12,21 @@ import { adminClient, authorizeCronOrJwt, whatsappCors } from "../_shared/whatsa
 //
 // Body: { stale_days?=7, handles?:[...] (test, no persiste), mode?:'all', debug?:bool }.
 // Deploy --no-verify-jwt. Lo dispara un cron diario (tras el scan de stories).
+//
+// MODO ASYNC (tool check_ig_handles del bot de WhatsApp):
+//   Body { handles:[...], reply_group_id, requested_by? } → crea fila en
+//   promolog_handle_check_jobs, lanza el run de Apify con webhook y devuelve
+//   'queued' al instante (whatsapp-agent tiene 30s de pared; el scrape tarda ~1min).
+//   El webhook vuelve a esta misma función con ?cb=1&job_id=... y ahí se clasifica
+//   POR HANDLE, se enriquece con scouter_spammer_accounts (solo lectura) y se postea
+//   el resultado al grupo vía whatsapp-send. profile-analyses-poll re-dispara el
+//   callback si el webhook se pierde y aplica un deadline duro de 10 min.
+//   NO escribe en scouter_leads ni en scouter_spammer_accounts ni en
+//   promolog_handle_status: solo en su tabla de jobs.
 
 const APIFY_ACTOR = "apify~instagram-profile-scraper";
 const BATCH = 30;
+const MAX_ASYNC_HANDLES = 8;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
@@ -24,9 +36,30 @@ const norm = (s: string | null | undefined): string =>
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+
+  // ── CALLBACK del webhook de Apify (rama async) ──────────────────────────
+  // Va ANTES de authorizeCronOrJwt: el webhook de Apify no manda cron token.
+  // Auth propia: el runId del payload tiene que coincidir con el apify_run_id
+  // GUARDADO en la fila del job; si viene con placeholders {{...}} (bug conocido
+  // del actor) se ignora el body y se consulta la API de Apify con el run id
+  // guardado — nunca se procesa con datos del request que no coincidan.
+  const reqUrl = new URL(req.url);
+  if (reqUrl.searchParams.get("cb") === "1") {
+    return await asyncCheckCallback(req, reqUrl);
+  }
+
   if (!authorizeCronOrJwt(req)) return json({ ok: false, error: "unauthorized" }, 401);
 
-  const body = await req.json().catch(() => ({})) as { handles?: string[]; stale_days?: number; mode?: string; debug?: boolean; whoami?: boolean };
+  const body = await req.json().catch(() => ({})) as {
+    handles?: string[]; stale_days?: number; mode?: string; debug?: boolean; whoami?: boolean;
+    follow_status?: boolean; story_check?: boolean; proxy_test?: boolean;
+    reply_group_id?: string; requested_by?: string; tenant_id?: string;
+  };
+
+  // ── DISPATCH async (tool check_ig_handles del bot) ──────────────────────
+  if (body.reply_group_id && Array.isArray(body.handles)) {
+    return await asyncCheckDispatch(body as { handles: string[]; reply_group_id: string; requested_by?: string; tenant_id?: string });
+  }
 
   // whoami: ¿de qué cuenta de IG es la sesión (IG_SESSION_COOKIE)? Devuelve SOLO el
   // user-id + @usuario resuelto — NUNCA el sessionid. Para confirmar que seguís a las
@@ -155,7 +188,7 @@ serve(async (req) => {
   let rows: Row[];
   let persist = true;
   if (Array.isArray(body.handles) && body.handles.length) {
-    rows = body.handles.map((h) => ({ creator_id: null, name: null, handle: norm(h), days_empty: null })).filter((r) => r.handle);
+    rows = body.handles.map((h) => ({ creator_id: null, name: null, handle: norm(h), days_empty: null })).filter((r: Row) => r.handle);
     persist = false; // set manual de test → no persiste
   } else if (body.mode === "all") {
     const { data, error } = await sb.from("v_promolog_eligible_creators").select("id, name, instagram_handle");
@@ -165,7 +198,7 @@ serve(async (req) => {
     // DEFAULT: solo las persistentemente vacías (sospechosas de handle roto).
     const { data, error } = await sb.rpc("get_promolog_stale_creators", { p_days: staleDays });
     if (error) return json({ ok: false, error: error.message }, 500);
-    rows = (data ?? []).map((c: any) => ({ creator_id: c.creator_id, name: c.name, handle: c.handle, days_empty: c.days_empty })).filter((r) => r.handle);
+    rows = (data ?? []).map((c: any) => ({ creator_id: c.creator_id, name: c.name, handle: c.handle, days_empty: c.days_empty })).filter((r: Row) => r.handle);
   }
 
   const byHandle = new Map<string, Row>();
@@ -225,3 +258,308 @@ serve(async (req) => {
     broken_count: broken.length, broken, inconclusive, persisted: persist,
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODO ASYNC — chequeo pedido por el bot de WhatsApp (tool check_ig_handles)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Lanza el run de Apify con webhook y devuelve 'queued' al toque. La espera
+// larga la banca Apify, no un isolate nuestro (EdgeRuntime.waitUntil ya demostró
+// perder trabajo en este runtime — ver admin-user-actions).
+async function asyncCheckDispatch(
+  body: { handles: string[]; reply_group_id: string; requested_by?: string; tenant_id?: string },
+): Promise<Response> {
+  const token = Deno.env.get("APIFY_TOKEN");
+  if (!token) return json({ ok: false, error: "APIFY_TOKEN no configurado" }, 500);
+  const sb = adminClient();
+
+  const handles = [...new Set(body.handles.map(norm).filter(Boolean))];
+  if (!handles.length) return json({ ok: false, error: "sin_handles_validos" }, 400);
+  if (handles.length > MAX_ASYNC_HANDLES) {
+    return json({ ok: false, error: `max_${MAX_ASYNC_HANDLES}_handles`, recibidos: handles.length }, 400);
+  }
+
+  const { data: job, error: jobErr } = await sb
+    .from("promolog_handle_check_jobs")
+    .insert({
+      tenant_id: body.tenant_id ?? null,
+      group_id: body.reply_group_id,
+      requested_by: body.requested_by ?? null,
+      handles,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (jobErr || !job) return json({ ok: false, error: `job_insert: ${jobErr?.message}` }, 500);
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+  const webhooks = [{
+    eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED", "ACTOR.RUN.TIMED_OUT", "ACTOR.RUN.ABORTED"],
+    requestUrl: `${SUPABASE_URL}/functions/v1/promolog-handle-check?cb=1&job_id=${job.id}`,
+    headersTemplate: JSON.stringify({ Authorization: `Bearer ${ANON_KEY}`, "Content-Type": "application/json" }),
+    payloadTemplate: JSON.stringify({
+      runId: "{{resource.id}}",
+      status: "{{resource.status}}",
+      defaultDatasetId: "{{resource.defaultDatasetId}}",
+      job_id: job.id,
+    }),
+  }];
+  // base64url, NO base64 estándar — Apify rechaza el estándar en silencio.
+  const webhooksB64 = btoa(JSON.stringify(webhooks)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  let runId: string | null = null;
+  let launchErr: string | null = null;
+  try {
+    const resp = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${token}&webhooks=${webhooksB64}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usernames: handles, resultsType: "details", resultsLimit: 1,
+        proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) launchErr = `apify_${resp.status}: ${JSON.stringify(data).slice(0, 180)}`;
+    else {
+      runId = data?.data?.id ?? null;
+      if (!runId) launchErr = "apify_run_sin_id";
+    }
+  } catch (e) { launchErr = (e as Error).message; }
+
+  if (launchErr) {
+    // El fallo de lanzamiento vuelve SINCRÓNICO a la tool: el bot avisa al
+    // toque y nadie queda esperando un resultado que nunca va a llegar.
+    await sb.from("promolog_handle_check_jobs")
+      .update({ status: "failed", error: launchErr, completed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    return json({ ok: false, error: launchErr, job_id: job.id }, 502);
+  }
+
+  await sb.from("promolog_handle_check_jobs")
+    .update({ status: "running", apify_run_id: runId })
+    .eq("id", job.id);
+  return json({ ok: true, status: "queued", job_id: job.id, handles, eta_seconds: 60 });
+}
+
+// Callback: clasifica por handle, enriquece con el inventario y postea al grupo.
+// Idempotente por claim atómico running→processing (un UPDATE condicional gana,
+// el resto ve 0 filas y no publica). Lo puede disparar el webhook de Apify, el
+// re-fire de profile-analyses-poll, o un webhook duplicado — solo uno postea.
+async function asyncCheckCallback(req: Request, url: URL): Promise<Response> {
+  const jobId = url.searchParams.get("job_id");
+  if (!jobId) return json({ ok: false, error: "missing_job_id" }, 400);
+  const payload = await req.json().catch(() => ({})) as { runId?: string; status?: string; defaultDatasetId?: string };
+  const sb = adminClient();
+
+  const { data: job } = await sb
+    .from("promolog_handle_check_jobs")
+    .select("id, status, apify_run_id, group_id, requested_by, handles")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job) return json({ ok: false, error: "job_not_found" }, 404);
+  if (job.status === "complete" || job.status === "failed") {
+    return json({ ok: true, idempotent: true, status: job.status });
+  }
+  if (!job.apify_run_id) return json({ ok: false, error: "job_sin_apify_run_id" }, 400);
+
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) return json({ ok: false, error: "APIFY_TOKEN no configurado" }, 500);
+
+  // Confiamos en el body SOLO si el runId coincide con el guardado y no hay
+  // placeholders; ante cualquier duda, la fuente de verdad es la API de Apify
+  // consultada con el run id GUARDADO (fallback de placeholders, mismo esquema
+  // que scrape-profile-deep-callback).
+  const bodyRunId = String(payload.runId ?? "");
+  const bodyStatus = String(payload.status ?? "").toUpperCase();
+  const bodyDatasetId = String(payload.defaultDatasetId ?? "");
+  const hasPlaceholders = bodyRunId.includes("{{") || bodyStatus.includes("{{") || bodyDatasetId.includes("{{");
+  let status: string;
+  let datasetId: string | null;
+  if (!hasPlaceholders && bodyStatus && bodyRunId === job.apify_run_id) {
+    status = bodyStatus;
+    datasetId = bodyDatasetId || null;
+  } else {
+    const run = await fetchApifyRunHC(job.apify_run_id, apifyToken);
+    if ("error" in run) return json({ ok: false, error: `apify_lookup: ${run.error}` }, 502);
+    status = String(run.status).toUpperCase();
+    datasetId = run.defaultDatasetId;
+    const FINAL = ["SUCCEEDED", "FAILED", "TIMED-OUT", "TIMED_OUT", "ABORTED"];
+    if (!FINAL.includes(status)) return json({ ok: true, status: "still_running", apify_status: status });
+  }
+
+  // ── CLAIM atómico: solo el que transiciona running→processing publica ────
+  const { data: claimed } = await sb
+    .from("promolog_handle_check_jobs")
+    .update({ status: "processing" })
+    .eq("id", jobId)
+    .eq("status", "running")
+    .select("id");
+  if (!claimed || claimed.length === 0) {
+    return json({ ok: true, idempotent: true, note: "otro callback ya reclamó este job" });
+  }
+
+  const handles: string[] = Array.isArray(job.handles) ? job.handles : [];
+  const finishJob = async (st: "complete" | "failed", extra: { result?: unknown; error?: string }) => {
+    await sb.from("promolog_handle_check_jobs")
+      .update({ status: st, result: extra.result ?? null, error: extra.error ?? null, completed_at: new Date().toISOString() })
+      .eq("id", jobId);
+  };
+
+  // Run que no terminó bien → el grupo se entera del fallo (nunca silencio).
+  if (status !== "SUCCEEDED" || !datasetId) {
+    const reason = status !== "SUCCEEDED" ? `el scraper terminó con status ${status}` : "el scraper no devolvió datos";
+    const sent = await postCheckToGroup(job.group_id, buildCheckFailureMessage(handles, job.requested_by, reason));
+    await finishJob("failed", { error: `apify_${status}${sent.ok ? "" : ` · aviso_no_enviado: ${sent.error}`}` });
+    return json({ ok: true, status: "failed_notified", send_ok: sent.ok });
+  }
+
+  const items = await fetchDatasetHC(datasetId, apifyToken);
+  if ("error" in items) {
+    const sent = await postCheckToGroup(job.group_id, buildCheckFailureMessage(handles, job.requested_by, "no pude leer el resultado del scraper"));
+    await finishJob("failed", { error: `dataset: ${items.error}${sent.ok ? "" : ` · aviso_no_enviado: ${sent.error}`}` });
+    return json({ ok: true, status: "failed_notified", send_ok: sent.ok });
+  }
+
+  // ── Clasificación POR HANDLE (misma taxonomía que el modo cron) ─────────
+  const byU = new Map<string, any>();
+  for (const it of items.data) {
+    const u = norm(it?.username ?? it?.inputUrl ?? it?.url ?? "");
+    if (u && !byU.has(u)) byU.set(u, it);
+  }
+  const results = handles.map((h) => {
+    const it = byU.get(h);
+    if (!it) return { handle: h, status: "inconclusive" as const };
+    if (it.error === "not_found" || it.ig_status === "not_found") return { handle: h, status: "broken" as const };
+    if (it.error) return { handle: h, status: "restricted" as const, error: String(it.error) };
+    return {
+      handle: h, status: "alive" as const,
+      followers: typeof it.followersCount === "number" ? it.followersCount : null,
+      is_private: it.private ?? it.isPrivate ?? null,
+      is_verified: it.verified ?? null,
+    };
+  });
+
+  // ── Inventario Maven (SOLO LECTURA de scouter_spammer_accounts) ─────────
+  type InvRow = { handle: string; owner: string | null; followers: number | null; is_restricted: boolean | null; active: boolean | null };
+  let inventory: InvRow[] = [];
+  try {
+    const { data: inv } = await sb
+      .from("scouter_spammer_accounts")
+      .select("instagram_handle, user_id, followers_count, is_restricted, active")
+      .in("instagram_handle", handles);
+    if (inv?.length) {
+      const uids = [...new Set(inv.map((r: any) => r.user_id).filter(Boolean))];
+      const ownerById = new Map<string, string>();
+      if (uids.length) {
+        const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", uids);
+        for (const p of profs ?? []) if (p.full_name) ownerById.set(p.id, p.full_name);
+      }
+      inventory = inv.map((r: any) => ({
+        handle: norm(r.instagram_handle),
+        owner: r.user_id ? (ownerById.get(r.user_id) ?? null) : null,
+        followers: r.followers_count ?? null,
+        is_restricted: r.is_restricted ?? null,
+        active: r.active ?? null,
+      }));
+    }
+  } catch { /* enriquecimiento best-effort: el chequeo vale sin inventario */ }
+
+  const msg = buildCheckResultMessage(results, inventory, job.requested_by);
+  const sent = await postCheckToGroup(job.group_id, msg);
+  if (!sent.ok) {
+    await finishJob("failed", { result: { results, inventory }, error: `post_failed: ${sent.error}` });
+    return json({ ok: false, error: `post_failed: ${sent.error}` }, 502);
+  }
+  await finishJob("complete", { result: { results, inventory } });
+  return json({ ok: true, status: "complete", checked: results.length });
+}
+
+function fmtFollowersHC(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
+  return String(n);
+}
+
+function buildCheckResultMessage(
+  results: Array<{ handle: string; status: string; followers?: number | null; is_private?: boolean | null; error?: string }>,
+  inventory: Array<{ handle: string; owner: string | null; followers: number | null; is_restricted: boolean | null }>,
+  requestedBy: string | null,
+): string {
+  const lines: string[] = [];
+  lines.push(`🔎 *Chequeo de cuentas IG*${requestedBy ? ` (pedido por ${requestedBy})` : ""}`);
+  lines.push("");
+  for (const r of results) {
+    if (r.status === "alive") {
+      const extra = [
+        r.followers != null ? `${fmtFollowersHC(r.followers)} followers` : null,
+        r.is_private ? "privada" : null,
+      ].filter(Boolean).join(" · ");
+      lines.push(`✅ @${r.handle} — activa${extra ? ` · ${extra}` : ""}`);
+    } else if (r.status === "broken") {
+      lines.push(`🚫 @${r.handle} — no resuelve`);
+    } else if (r.status === "restricted") {
+      lines.push(`⚠️ @${r.handle} — existe pero no se puede leer (restringida o privada)`);
+    } else {
+      lines.push(`❓ @${r.handle} — sin dato (blip del scraper; pedí reintentar esta)`);
+    }
+  }
+  if (results.some((r) => r.status === "broken")) {
+    lines.push("");
+    lines.push('_Ojo: "no resuelve" no distingue si la cuenta no existe, fue renombrada o está suspendida — solo que ese handle ya no carga._');
+  }
+  if (inventory.length) {
+    lines.push("");
+    lines.push("📋 Registradas en el inventario Maven:");
+    for (const i of inventory) {
+      const bits = [
+        i.owner ? `dueño: ${i.owner}` : "sin dueño asignado",
+        i.followers != null ? `${fmtFollowersHC(i.followers)} followers registrados` : null,
+        i.is_restricted ? "marcada restringida" : null,
+      ].filter(Boolean).join(" · ");
+      lines.push(`• @${i.handle} — ${bits}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function buildCheckFailureMessage(handles: string[], requestedBy: string | null, reason: string): string {
+  const quien = requestedBy ? ` ${requestedBy},` : "";
+  const lista = handles.map((h) => `@${h}`).join(", ");
+  return `⚠️${quien} no pude completar el chequeo de ${lista} — ${reason}. Reintentá pidiéndomelo de nuevo en unos minutos.`;
+}
+
+async function postCheckToGroup(groupId: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const cronToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cron-Token": cronToken },
+      body: JSON.stringify({ group_id: groupId, body }),
+    });
+    const data = await resp.json().catch(() => ({})) as { ok?: boolean; error?: string };
+    if (!resp.ok || data?.ok === false) return { ok: false, error: String(data?.error ?? resp.status) };
+    return { ok: true };
+  } catch (e) { return { ok: false, error: (e as Error).message }; }
+}
+
+async function fetchApifyRunHC(
+  runId: string, token: string,
+): Promise<{ status: string; defaultDatasetId: string | null } | { error: string }> {
+  try {
+    const resp = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`);
+    if (!resp.ok) return { error: `apify_${resp.status}` };
+    const data = await resp.json();
+    return { status: data?.data?.status ?? "UNKNOWN", defaultDatasetId: data?.data?.defaultDatasetId ?? null };
+  } catch (e) { return { error: (e as Error).message }; }
+}
+
+async function fetchDatasetHC(datasetId: string, token: string): Promise<{ data: any[] } | { error: string }> {
+  try {
+    const resp = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&format=json&token=${token}`);
+    if (!resp.ok) return { error: `apify_${resp.status}` };
+    const data = await resp.json();
+    return { data: Array.isArray(data) ? data : [] };
+  } catch (e) { return { error: (e as Error).message }; }
+}

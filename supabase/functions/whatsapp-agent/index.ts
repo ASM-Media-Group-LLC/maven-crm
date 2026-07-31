@@ -1117,6 +1117,23 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "check_ig_handles",
+    description:
+      "Chequea EN VIVO si cuentas de Instagram existen y cargan. Para cada handle devuelve: activa (con followers), restringida/privada (existe pero no legible), o 'no resuelve' (inexistente/renombrada/suspendida — el chequeo no distingue cuál). Usala cuando alguien pega @handles o links de IG y pide revisarlos/verificarlos — típico: cuentas de marca, spam o warming DEL EQUIPO. NO escribe nada en ninguna base. NO confundir con: get_llg_account_status (lista el inventario YA guardado de un LLG, no chequea IG en vivo), analyze_instagram_lead / analyze_profile_deep (son para LEADS a captar y ensucian scouter_leads si les pasás cuentas propias del equipo). ASÍNCRONA: devuelve 'queued' al instante y el resultado se postea SOLO al grupo en ~1-2 min como segundo mensaje automático — respondé corto 'chequeando, en ~1 min te paso el detalle' y nada más. COSTO: cada handle gasta una corrida de Apify. Máximo 8 por llamada. Usala solo cuando lo piden explícitamente — no verifiques cuentas que nadie pidió chequear.",
+    input_schema: {
+      type: "object",
+      properties: {
+        handles: {
+          type: "array",
+          items: { type: "string" },
+          description: "hasta 8 cuentas: handle con o sin @, o URL completa de instagram.com",
+        },
+        requested_by_display_name: { type: "string", description: "quién lo pidió (para citarlo cuando llegue el resultado)" },
+      },
+      required: ["handles"],
+    },
+  },
+  {
     name: "lookup_lead_history",
     description:
       "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Usalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?. Devuelve un summary estructurado.",
@@ -2377,6 +2394,53 @@ async function executeTool(
         accounts: summarized,
         totals,
       };
+    }
+
+    case "check_ig_handles": {
+      // Chequeo async de salud de handles IG (cuentas del equipo). Despacha a
+      // promolog-handle-check, que lanza Apify con webhook y postea el resultado
+      // al grupo vía whatsapp-send cuando termina (~1 min). Acá solo se valida
+      // y se dispara: whatsapp-agent tiene 30s de pared y el scrape tarda más.
+      const raw = Array.isArray(input.handles) ? input.handles : [];
+      const parsed: string[] = [];
+      const invalid: string[] = [];
+      for (const h of raw) {
+        const p = parseInstagramHandle(String(h ?? ""));
+        if (p) parsed.push(p);
+        else if (String(h ?? "").trim()) invalid.push(String(h).trim());
+      }
+      const handles = [...new Set(parsed)];
+      if (!handles.length) return { error: "sin_handles_validos", invalid };
+      if (handles.length > 8) {
+        return { error: "max_8_handles_por_llamada", recibidos: handles.length, note: "Partí el pedido: mandá de a 8 como máximo." };
+      }
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/promolog-handle-check`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Cron-Token": CRON_TOKEN },
+          body: JSON.stringify({
+            handles,
+            reply_group_id: ctx.groupId,
+            requested_by: String(input.requested_by_display_name ?? "").trim() || null,
+            tenant_id: ctx.tenantId ?? null,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data?.ok) return { error: `dispatch_failed: ${data?.error ?? resp.status}` };
+        return {
+          status: "queued",
+          job_id: data.job_id,
+          handles,
+          invalid_ignored: invalid.length ? invalid : undefined,
+          eta_seconds: data.eta_seconds ?? 60,
+          note: "Chequeo lanzado. Respondé corto que en ~1-2 min posteás el detalle por cuenta (llega automático en un segundo mensaje). Si hubo handles inválidos, mencionalos.",
+        };
+      } catch (e) {
+        return { error: `dispatch_call_failed: ${(e as Error).message}` };
+      }
     }
 
     case "lookup_lead_history": {
