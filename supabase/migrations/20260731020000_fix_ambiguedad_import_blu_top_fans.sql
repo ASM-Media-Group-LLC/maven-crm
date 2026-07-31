@@ -1,0 +1,19 @@
+-- ⚠️ EL WRAPPER DE COMPATIBILIDAD QUE AGREGUÉ EN #1026 ROMPIÓ LA INGESTA DE FANS.
+--
+-- Creé import_blu_top_fans(jsonb,date,date) "por compatibilidad" con el bridge viejo, sin ver
+-- que la nueva import_blu_top_fans(jsonb,date,date,text DEFAULT 'window') YA es invocable con
+-- 3 argumentos → las dos quedaban como candidatas → Postgres tira:
+--   ERROR 42725: function public.import_blu_top_fans(jsonb, date, date) is not unique
+--
+-- Efecto en prod: el bridge (código viejo, 3 args) explotaba en la llamada de top-fans; como
+-- esa llamada NO está dentro de un try propio en el código viejo, se llevaba puesta también la
+-- ingesta de RETENCIÓN, que va después en el mismo bloque. Las DOS cuentas (plus y massive)
+-- terminaron su corrida sin top fans ni retención.
+--
+-- Diagnóstico útil para el futuro: el código NUEVO llama con 4 args explícitos (no ambiguo),
+-- así que el hecho de que fallara probó que el contenedor seguía corriendo la imagen vieja.
+--
+-- El wrapper era innecesario desde el principio: con el DEFAULT, una llamada de 3 args resuelve
+-- sola a la versión de 4. REGLA: al agregar un parámetro con DEFAULT a una función existente,
+-- NO dejar además el overload viejo — se vuelven ambiguos.
+DROP FUNCTION IF EXISTS public.import_blu_top_fans(jsonb, date, date);
