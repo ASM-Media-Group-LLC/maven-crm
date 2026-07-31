@@ -158,6 +158,81 @@ export const equipoTools: AgentTool[] = [
     },
   },
   {
+    name: "get_radar_accounts",
+    description:
+      "Estado EN VIVO de las cuentas de marca/outreach del equipo desde el RADAR de Brayan " +
+      "(radar.marketingkash.com — el dashboard donde el equipo de warming lleva el registro real, " +
+      "43 cuentas de todas las marcas: Letshoot, UNLOK, ORA, KASH, Exchange…). Por cuenta: handle, " +
+      "marca/categoría, idioma, plataforma, followers y status (activa / baneada / porcrear). " +
+      "Úsala cuando pregunten cómo van las cuentas del equipo, cuántas hay activas/baneadas, o al " +
+      "planificar outreach/apelaciones. Es la fuente MÁS completa para el estado de cuentas del " +
+      "equipo: scouter_spammer_accounts (get_llg_account_status) solo tiene las cargadas en Maven " +
+      "con score de IA — complementarias, no iguales; si citas ambas, di de cuál sale cada dato. " +
+      "El radar no expone timestamp de actualización: preséntalo como 'según el radar del equipo'. " +
+      "Si el radar no responde, dilo tal cual — nunca inventes el estado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["activa", "baneada", "porcrear"], description: "opcional: filtra por estado" },
+        category: { type: "string", description: "opcional: filtra por marca/categoría (ilike: Letshoot, UNLOK, ORA…)" },
+      },
+      additionalProperties: false,
+    },
+    domain: "equipo",
+    scope: "read",
+    handler: async (args, _ctx) => {
+      // GET público sin auth (lo pasó Brayan 31/07). Timeout corto: el agente
+      // tiene 30s de pared y esto es un JSON chico servido por su dashboard.
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 8_000);
+      let data: {
+        updated?: string | null;
+        counts?: { total?: number; activas?: number; baneadas?: number; porCrear?: number };
+        accounts?: Array<{
+          name?: string; handle?: string; category?: string; lang?: string;
+          backup?: boolean; platform?: string; link?: string;
+          followers?: string | number | null; status?: string;
+        }>;
+      };
+      try {
+        const resp = await fetch("https://radar.marketingkash.com/redes.json", { signal: ac.signal });
+        clearTimeout(t);
+        if (!resp.ok) return { error: `radar_http_${resp.status}`, nota: "El radar del equipo no respondió bien — dilo tal cual, no inventes el estado de las cuentas." };
+        data = await resp.json();
+      } catch (e) {
+        clearTimeout(t);
+        return { error: `radar_no_responde: ${(e as Error).message}`, nota: "No se pudo leer el radar del equipo — dilo tal cual, no inventes el estado de las cuentas." };
+      }
+
+      const statusFiltro = typeof args.status === "string" && args.status.trim() ? args.status.trim().toLowerCase() : null;
+      const catFiltro = typeof args.category === "string" && args.category.trim() ? args.category.trim().toLowerCase() : null;
+      let cuentas = (Array.isArray(data.accounts) ? data.accounts : []).map((a) => ({
+        handle: a.handle ?? null,
+        nombre: a.name ?? null,
+        marca: a.category ?? null,
+        idioma: a.lang ?? null,
+        plataforma: a.platform ?? null,
+        es_backup: a.backup === true,
+        followers: a.followers ?? null,
+        status: String(a.status ?? "").toLowerCase() || null,
+      }));
+      if (statusFiltro) cuentas = cuentas.filter((c) => c.status === statusFiltro);
+      if (catFiltro) cuentas = cuentas.filter((c) => (c.marca ?? "").toLowerCase().includes(catFiltro));
+
+      return {
+        fuente: "radar.marketingkash.com (dashboard del equipo, en vivo; sin timestamp propio)",
+        totales: {
+          total: data.counts?.total ?? null,
+          activas: data.counts?.activas ?? null,
+          baneadas: data.counts?.baneadas ?? null,
+          por_crear: data.counts?.porCrear ?? null,
+        },
+        cuentas: cuentas.slice(0, 100),
+        ...(statusFiltro || catFiltro ? { filtro_aplicado: { status: statusFiltro, marca: catFiltro }, coincidencias: cuentas.length } : {}),
+      };
+    },
+  },
+  {
     name: "get_hubstaff_activity",
     description:
       "Datos de Hubstaff (tiempo trabajado + % de actividad) de CUALQUIER persona del equipo registrada en Maven, " +
