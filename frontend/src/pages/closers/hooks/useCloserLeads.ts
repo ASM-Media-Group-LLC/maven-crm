@@ -1061,6 +1061,25 @@ export const useCloserLeads = () => {
         .eq("id", id)
         .maybeSingle();
 
+      // ── El id puede NO ser de un lead ────────────────────────────────────
+      // En los tabs Ex-creadoras y Agencias las filas son CONTACTOS del
+      // directorio: su id es de closers_contacts y no existe en closer_creators.
+      // Antes se hacía el UPDATE igual → matcheaba 0 filas, y como un UPDATE sin
+      // coincidencias NO es un error en Postgres, la mutación salía "ok" y la UI
+      // cantaba "Creator asignada" sin haber guardado nada. Ese era el bug que
+      // reportó Miguel el 01/08: asignaba agencias, veía el cartel verde, y
+      // después no aparecían en ningún lado porque nunca se escribieron.
+      // El RPC es el mismo que usa "Tomar": crea el lead heredando la base del
+      // contacto y lo marca como convertido.
+      if (!current) {
+        const { error } = await (supabase as any).rpc("assign_closer_to_contact", {
+          p_contact_id: id,
+          p_closer_id: assigned_to,
+        });
+        if (error) throw error;
+        return;
+      }
+
       const updates: Record<string, unknown> = { assigned_to };
       if (current?.stage === "Nuevo") {
         updates.stage = "Asignada";
@@ -1070,8 +1089,15 @@ export const useCloserLeads = () => {
         updates.passed_date = new Date().toISOString().slice(0, 10);
       }
 
-      const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
+      // .select("id") NO es decorativo: es la única forma de saber si el UPDATE
+      // tocó algo. Sin esto la UI puede volver a decir "asignada" sobre cero filas
+      // (RLS que filtra, id inexistente, fila borrada entre medio).
+      const { data: updated, error } = await supabase
+        .from("closer_creators").update(updates).eq("id", id).select("id");
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error("No se pudo asignar: la lead ya no existe o no tienes permiso sobre ella.");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
@@ -1125,7 +1151,15 @@ export const useCloserLeads = () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
-      toast({ title: "Tomada", description: "Quedó asignada a vos, en Asignaciones." });
+      // Las agencias son B2B y están EXCLUIDAS de los tabs del embudo de modelos
+      // (ver el filtro neq lead_source=agencia): mandarlas a buscar a "Asignaciones"
+      // era mandarlas donde por diseño nunca van a estar.
+      toast({
+        title: "Tomada",
+        description: activeTab === "agencias"
+          ? "Quedó asignada a ti, en el tab Agencias."
+          : "Quedó asignada a ti, en Asignaciones.",
+      });
     },
     onError: (e: Error) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });

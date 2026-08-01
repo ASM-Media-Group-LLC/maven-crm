@@ -646,6 +646,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
+  // Ex-creadoras y Agencias caen en el layout genérico (`default`), cuyo menú de
+  // fila solo trae "Mover a…" y "Asignar" — y "Asignar" además exige permiso de
+  // supervisor. Resultado: un closer no tenía forma de tomarse una para sí y
+  // terminaba usando "Asignar" para elegirse a sí mismo de la lista, que era
+  // justo el camino roto (01/08, reporte de Miguel). Estas dos bases son
+  // autoservicio igual que Antiguos, así que llevan el mismo "Tomar".
+  const isBaseTab = activeTab === "ex_creadores" || activeTab === "agencias";
+
   // Motivo estructurado al cerrar: al mover un lead a "No interesada" pedimos el
   // motivo (enum) + detalle opcional antes de confirmar. El code va a
   // close_reason_code y alimenta el embudo (drop-off por motivo); el detalle a
@@ -1293,6 +1301,17 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {/* Autoservicio en las bases (Ex-creadoras / Agencias), igual
+                        que en Antiguos: cualquier closer puede tomársela sin
+                        depender del permiso de asignar. */}
+                    {isBaseTab && (
+                      <>
+                        <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
+                          <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     {CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
                       <DropdownMenuItem key={s} onClick={() => requestStageChange(c.id, s, c._source)}>
                         Mover a {s}
