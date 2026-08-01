@@ -25,6 +25,11 @@ import { postKey, MARKER_KEY } from "../_shared/promolog-dedup.ts";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apidojo~tweet-scraper";
 const HANDLES_PER_RUN = 20; // lote por corrida de Apify (acota tiempo/costo)
+// Ventana de lectura de X. El actor de Apify devuelve el timeline reciente del
+// perfil sin importar la antigüedad; sin este corte, un handle recién cargado mete
+// su historial entero como promos retroactivas (ver el filtro en el loop). 36h y no
+// 24 para tolerar el desfase entre corridas sin perder la promo de anoche.
+const X_WINDOW_HOURS = Number(Deno.env.get("X_WINDOW_HOURS") ?? "36");
 // Presupuesto por corrida — evita el 504 de plataforma (~150s). Antes x-scan procesaba
 // TODAS las creadoras (Apify por lote hasta 120s + visión) → hacía timeout y la cobertura
 // quedaba a medias (el comentario de la rotación decía "~13/corrida" pero NUNCA se codeó).
@@ -539,11 +544,28 @@ Deno.serve(async (req: Request) => {
     // Corte por wall-clock: si nos acercamos al kill de plataforma (~150s), dejamos de
     // arrancar creadoras nuevas y diferimos las que quedan (las cubre el auto-encadenado).
     if (Date.now() - handlerStart > RUN_BUDGET_MS) { timedOut.push(...list.slice(__ci)); break; }
-    const tweets = (tweetsByCreator.get(c.id) || []).sort((a, b) => {
+    // ⚠️ FILTRO DE VENTANA. Este path ORDENABA por fecha pero no descartaba nada:
+    // el actor de Apify devuelve el timeline reciente del perfil, así que al cargar
+    // un handle NUEVO entraba su historial entero como promos en días que nunca
+    // escaneamos. Pasó el 01/08 con Mackiie89 (Carolina la cargó el 31/07): 15 filas
+    // con fechas del 22/06 al 23/07, todas insertadas de una. Eso infla hacia atrás
+    // los conteos de días ya cerrados. El agente local ya filtraba a 24h; este no.
+    // Sin fecha legible → FUERA: no inventamos el día de un tweet.
+    const desdeMs = Date.now() - X_WINDOW_HOURS * 3600_000;
+    const tweetsCrudos = (tweetsByCreator.get(c.id) || []);
+    const fueraDeVentana = tweetsCrudos.filter((t) => {
+      const ts = parseTweetDate(t?.createdAt || t?.created_at)?.getTime();
+      return !ts || ts < desdeMs;
+    }).length;
+    const tweets = tweetsCrudos.filter((t) => {
+      const ts = parseTweetDate(t?.createdAt || t?.created_at)?.getTime();
+      return !!ts && ts >= desdeMs;
+    }).sort((a, b) => {
       const da = parseTweetDate(a?.createdAt || a?.created_at)?.getTime() || 0;
       const db = parseTweetDate(b?.createdAt || b?.created_at)?.getTime() || 0;
       return da - db;
     });
+    if (fueraDeVentana > 0) results.push({ creator: c.name, fuera_de_ventana: fueraDeVentana, nota: `descartados por ser anteriores a ${X_WINDOW_HOURS}h` });
     if (!tweets.length) {
       // Dos casos MUY distintos con 0 tweets:
       //  · lote de Apify caído → NO pudimos leer → pending/"sin datos" (re-intentable),
