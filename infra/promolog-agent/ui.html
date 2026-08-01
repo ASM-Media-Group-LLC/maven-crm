@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Promolog Scanner</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1115; --card:#1a1d24; --fg:#e8eaed; --mut:#9aa0aa; --line:#2a2e37; --ok:#2ecc71; --warn:#f1c40f; --bad:#e74c3c; --accent:#6c8cff; }
+  @media (prefers-color-scheme: light){ :root{ --bg:#f4f5f7; --card:#fff; --fg:#1a1d24; --mut:#667; --line:#e3e5e9; } }
+  * { box-sizing:border-box; } body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:18px; margin:0; } header .sub { color:var(--mut); font-size:13px; }
+  main { max-width:920px; margin:0 auto; padding:20px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:640px){ .cards{ grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h2 { margin:0 0 8px; font-size:15px; display:flex; align-items:center; gap:8px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--mut); display:inline-block; }
+  .dot.ok{ background:var(--ok); } .dot.bad{ background:var(--bad); } .dot.warn{ background:var(--warn); }
+  .muted { color:var(--mut); font-size:13px; }
+  button { font:inherit; border:0; border-radius:9px; padding:9px 14px; cursor:pointer; background:var(--accent); color:#fff; }
+  button.secondary { background:transparent; color:var(--fg); border:1px solid var(--line); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .controls { margin:18px 0; display:flex; gap:10px; flex-wrap:wrap; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+  @media (max-width:640px){ .split{ grid-template-columns:1fr; } }
+  #log { background:#0b0d11; color:#cbd2dc; border:1px solid var(--line); border-radius:12px; padding:12px; height:340px; overflow:auto; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; }
+  @media (prefers-color-scheme: light){ #log{ background:#0f1115; color:#cbd2dc; } }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; }
+  .pill { padding:2px 8px; border-radius:20px; font-size:12px; }
+  .pill.historias{ background:rgba(46,204,113,.16); color:var(--ok); }
+  .pill.sin_promo{ background:rgba(154,160,170,.16); color:var(--mut); }
+  .pill.pendiente,.pill.throttled,.pill.no_ig_id{ background:rgba(241,196,15,.16); color:var(--warn); }
+  .results-wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; max-height:340px; overflow:auto; }
+  .badge { font-size:12px; padding:2px 8px; border-radius:20px; background:rgba(108,140,255,.16); color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:22px">📸</span>
+  <div><h1>Promolog Scanner</h1><div class="sub">Lee historias de IG por tu red · 2 cuentas repartidas · anti-ban</div></div>
+</header>
+<main>
+  <div id="tokenWarn" class="card" style="display:none;border-color:var(--bad)">
+    ⚠️ Falta el token (PROMOLOG_EXT_TOKEN en el .env). El scan no va a funcionar hasta ponerlo.
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="controls">
+    <button id="scanAll">▶︎ Escanear todo</button>
+    <button id="scanA" class="secondary">Solo cuenta A</button>
+    <button id="scanB" class="secondary">Solo cuenta B</button>
+    <button id="stop" class="secondary" disabled>■ Detener</button>
+    <span id="runstate" class="muted"></span>
+  </div>
+
+  <div class="split">
+    <div>
+      <div class="muted" style="margin-bottom:6px">Progreso en vivo</div>
+      <div id="log"></div>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:6px">Resultados <span id="counts" class="badge">0</span></div>
+      <div class="results-wrap"><table><thead><tr><th>Creadora</th><th>Resultado</th><th>Historias</th></tr></thead><tbody id="results"></tbody></table></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const logEl = $("#log"), resultsEl = $("#results"), cardsEl = $("#cards");
+let LOGIN = {}; // slot → "open" mientras esperás confirmar
+
+function fmtCooldown(ts){ if(!ts) return ""; const m = Math.max(0, Math.round((ts - Date.now())/60000)); return `en cooldown (${m} min)`; }
+
+function renderCards(st){
+  $("#tokenWarn").style.display = st.token_ok ? "none" : "block";
+  cardsEl.innerHTML = st.accounts.map(a => {
+    const cls = a.cooldown_until ? "warn" : (a.logged_in ? "ok" : "bad");
+    const estado = a.cooldown_until ? fmtCooldown(a.cooldown_until) : (a.logged_in ? "sesión lista" : "sin login");
+    const loginBtn = LOGIN[a.slot]==="open"
+      ? `<button data-save="${a.slot}">✓ Ya me logueé</button>`
+      : `<button class="secondary" data-login="${a.slot}">${a.logged_in?"Re-loguear":"Loguear"}</button>`;
+    const hint = LOGIN[a.slot]==="open" ? `<div class="muted" style="margin-top:8px">Logueate en la ventana que se abrió y apretá “Ya me logueé”.</div>` : "";
+    return `<div class="card"><h2><span class="dot ${cls}"></span> Cuenta ${a.slot.toUpperCase()}</h2>
+      <div class="muted">${estado}</div>
+      <div class="row" style="margin-top:10px">${loginBtn}</div>${hint}</div>`;
+  }).join("");
+  const anyCd = st.accounts.some(a=>a.cooldown_until);
+  $("#runstate").textContent = st.running ? "escaneando…" : (anyCd ? "hay cuenta(s) en cooldown" : "");
+  const busy = st.running;
+  for (const id of ["scanAll","scanA","scanB"]) $("#"+id).disabled = busy;
+  $("#stop").disabled = !busy;
+}
+function addResult(r){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${r.outcome.replace("_"," ")}</span></td><td>${r.stories??""}</td>`;
+  resultsEl.prepend(tr);
+  $("#counts").textContent = resultsEl.children.length;
+}
+function addLog(m){ logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+
+const es = new EventSource("/api/stream");
+es.addEventListener("status", e => renderCards(JSON.parse(e.data)));
+es.addEventListener("log", e => addLog(JSON.parse(e.data).msg));
+es.addEventListener("result", e => addResult(JSON.parse(e.data)));
+es.addEventListener("done", () => addLog("✔︎ listo"));
+
+async function post(url, body){ const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: body?JSON.stringify(body):undefined}); return r.json().catch(()=>({})); }
+
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button"); if(!t) return;
+  if (t.dataset.login){ const s=t.dataset.login; LOGIN[s]="open"; await post(`/api/login/${s}/open`); const st=await (await fetch("/api/status")).json(); renderCards(st); }
+  else if (t.dataset.save){ const s=t.dataset.save; await post(`/api/login/${s}/save`); LOGIN[s]=null; }
+  else if (t.id==="scanAll"){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post("/api/scan",{}); }
+  else if (t.id==="scanA"){ resultsEl.innerHTML=""; await post("/api/scan",{slots:["a"]}); }
+  else if (t.id==="scanB"){ resultsEl.innerHTML=""; await post("/api/scan",{slots:["b"]}); }
+  else if (t.id==="stop"){ await post("/api/stop"); }
+});
+</script>
+</body>
+</html>

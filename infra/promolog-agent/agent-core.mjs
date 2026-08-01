@@ -1,0 +1,159 @@
+// agent-core.mjs — la lógica reusable del scanner (la comparten el CLI index.mjs
+// y la GUI ui.mjs). Todo lo que antes vivía inline en index.mjs, más los helpers
+// de login por UI. Emite eventos por callbacks (log/onResult) en vez de console.log
+// para que la GUI pueda streamear el progreso en vivo.
+
+import { chromium } from "playwright";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { SESSIONS_DIR, MAVEN_URL, EXT_TOKEN, SLOTS_COUNT, PACING, SOFTBLOCK, HEADFUL } from "./config.mjs";
+
+const COOLDOWN_FILE = join(SESSIONS_DIR, "cooldown.json");
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const jitter = () => PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs);
+export const norm = (s) => String(s ?? "").toLowerCase().replace(/[@/\s]/g, "").trim();
+
+export function readCooldowns() { try { return JSON.parse(readFileSync(COOLDOWN_FILE, "utf8")); } catch { return {}; } }
+export function writeCooldown(slot, until) {
+  mkdirSync(SESSIONS_DIR, { recursive: true });
+  const c = readCooldowns(); if (until) c[slot] = until; else delete c[slot];
+  writeFileSync(COOLDOWN_FILE, JSON.stringify(c, null, 2));
+}
+export function sessionInfo(sessionFile) {
+  try {
+    const d = JSON.parse(readFileSync(sessionFile, "utf8"));
+    const hasSid = (d.cookies || []).some((c) => c.name === "sessionid" && c.value);
+    return { exists: true, loggedIn: hasSid };
+  } catch { return { exists: false, loggedIn: false }; }
+}
+
+export async function fetchTargets(slot) {
+  const u = `${MAVEN_URL}/functions/v1/promolog-scan-targets?slot=${encodeURIComponent(slot)}&slots=${SLOTS_COUNT}`;
+  const r = await fetch(u, { headers: { "x-ext-token": EXT_TOKEN } });
+  if (!r.ok) throw new Error(`scan-targets ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const j = await r.json();
+  return Array.isArray(j.targets) ? j.targets : [];
+}
+
+// Lee historias de una creadora desde el contexto de la página (IP residencial,
+// sesión real). Devuelve { outcome, reelItems?, igUserId? }.
+export async function readStories(page, handle, igUserId) {
+  let uid = igUserId && /^\d{1,32}$/.test(String(igUserId)) ? String(igUserId) : null;
+  if (!uid) {
+    try {
+      const res = await page.evaluate(async (h) => {
+        const r = await fetch(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(h)}`,
+          { headers: { "x-ig-app-id": "936619743392459" }, credentials: "include" });
+        if (!r.ok) return { status: r.status };
+        const j = await r.json().catch(() => ({}));
+        return { status: r.status, id: j?.data?.user?.id ?? null };
+      }, handle);
+      if (res?.id) uid = String(res.id);
+      else if (res?.status === 401 || res?.status === 429) return { outcome: "throttled" };
+    } catch { /* */ }
+    if (!uid) return { outcome: "no_ig_id" };
+  }
+  try { await page.goto(`https://www.instagram.com/stories/${handle}/`, { waitUntil: "domcontentloaded", timeout: PACING.navTimeoutMs }); } catch { /* */ }
+  if (/\/accounts\/login|\/challenge/i.test(page.url())) return { outcome: "throttled" };
+  await sleep(600 + Math.random() * 900);
+  try {
+    const res = await page.evaluate(async (id) => {
+      const r = await fetch(`https://www.instagram.com/api/v1/feed/reels_media/?reel_ids=${id}`,
+        { headers: { "x-ig-app-id": "936619743392459" }, credentials: "include" });
+      let body = null; try { body = await r.json(); } catch { /* */ }
+      return { status: r.status, body };
+    }, uid);
+    if ([401, 403, 429].includes(res.status)) return { outcome: "throttled" };
+    if (res.status !== 200 || !res.body) return { outcome: "throttled" };
+    const rm = res.body.reels_media?.[0] ?? res.body.reels?.[uid] ?? null;
+    const items = Array.isArray(rm?.items) ? rm.items : [];
+    if (items.length === 0) return { outcome: "empty", igUserId: uid };
+    return { outcome: "items", reelItems: items, igUserId: uid };
+  } catch { return { outcome: "throttled" }; }
+}
+
+export async function postToIngest(creators) {
+  if (!creators.length) return { ok: true, note: "nada que postear" };
+  const r = await fetch(`${MAVEN_URL}/functions/v1/promolog-ingest-stories`, {
+    method: "POST", headers: { "Content-Type": "application/json", "x-ext-token": EXT_TOKEN },
+    body: JSON.stringify({ creators }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`ingest ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
+  return j;
+}
+
+// Corre UNA cuenta. Callbacks: log(msg), onResult({handle,outcome,stories}), shouldStop().
+export async function runAccount(acct, { log = () => {}, onResult = () => {}, shouldStop = () => false } = {}) {
+  const cds = readCooldowns();
+  if (cds[acct.slot] && Date.now() < cds[acct.slot]) {
+    const mins = Math.round((cds[acct.slot] - Date.now()) / 60000);
+    log(`⏸️ slot ${acct.slot}: en cooldown ${mins} min más. Se saltea.`);
+    return { slot: acct.slot, skipped: "cooldown", cooldownUntil: cds[acct.slot] };
+  }
+  if (!existsSync(acct.sessionFile)) { log(`⚠️ slot ${acct.slot}: sin sesión. Logueá la cuenta primero.`); return { slot: acct.slot, skipped: "no_session" }; }
+
+  const targets = await fetchTargets(acct.slot);
+  log(`▶️ slot ${acct.slot}: ${targets.length} creadoras (su mitad).`);
+  const browser = await chromium.launch({ headless: !HEADFUL });
+  const context = await browser.newContext({
+    storageState: acct.sessionFile, viewport: { width: 1280, height: 900 },
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  });
+  const page = await context.newPage();
+  const out = [];
+  let sawStories = false, emptyStreak = 0, softBlocked = false, done = 0, sis = 0, nos = 0, pend = 0;
+
+  for (const t of targets) {
+    if (shouldStop()) { log(`⏹️ slot ${acct.slot}: detenido a pedido.`); break; }
+    if (done >= PACING.maxPerRun) { log(`(tope ${PACING.maxPerRun} por corrida)`); break; }
+    const handle = norm(t.handle);
+    const base = { creator_id: t.creator_id, handle };
+    const r = await readStories(page, handle, t.ig_user_id);
+
+    if (r.outcome === "items") {
+      out.push({ ...base, reel_items: r.reelItems, is_private: false, following: true, ig_user_id: r.igUserId });
+      sawStories = true; emptyStreak = 0; sis++;
+      log(`✅ ${handle}: ${r.reelItems.length} historias`); onResult({ handle, outcome: "historias", stories: r.reelItems.length });
+    } else if (r.outcome === "empty") {
+      if (sawStories) { out.push({ ...base, reel_items: [], is_private: false, following: true, ...(r.igUserId ? { ig_user_id: r.igUserId } : {}) }); nos++; log(`· ${handle}: sin historias hoy`); onResult({ handle, outcome: "sin_promo" }); }
+      else { out.push({ ...base, error: "unconfirmed_empty" }); pend++; log(`? ${handle}: vacío sin lectura previa → pendiente`); onResult({ handle, outcome: "pendiente" }); }
+      emptyStreak++;
+    } else {
+      out.push({ ...base, error: r.outcome }); if (sawStories) emptyStreak++; pend++;
+      log(`⚠️ ${handle}: ${r.outcome} → pendiente`); onResult({ handle, outcome: r.outcome });
+    }
+    done++;
+    if (sawStories && emptyStreak >= SOFTBLOCK.streakAbort) {
+      softBlocked = true;
+      log(`⛔ slot ${acct.slot}: racha de ${emptyStreak} vacíos → IG limitó la sesión. Corto y dejo en cooldown ${SOFTBLOCK.cooldownHours}h.`);
+      break;
+    }
+    await sleep(jitter());
+    if (done % PACING.batchPauseEvery === 0) { log(`… pausa de lote (${Math.round(PACING.batchPauseMs / 1000)}s)`); await sleep(PACING.batchPauseMs); }
+  }
+  await browser.close();
+  if (softBlocked) writeCooldown(acct.slot, Date.now() + SOFTBLOCK.cooldownHours * 3600_000);
+  const ingest = await postToIngest(out).catch((e) => ({ ok: false, error: e.message }));
+  log(`◀️ slot ${acct.slot}: leídas ${done} (✅${sis} ·${nos} ⚠️${pend}). Ingest ok=${ingest.ok !== false}.`);
+  return { slot: acct.slot, leidas: done, si: sis, no: nos, pending: pend, softBlocked };
+}
+
+// ── Login por UI: abrir navegador headed, guardar sesión cuando el usuario avisa ──
+const openLogins = new Map(); // slot → { browser, context }
+export async function openLogin(slot) {
+  if (openLogins.has(slot)) { try { await openLogins.get(slot).browser.close(); } catch { /* */ } openLogins.delete(slot); }
+  mkdirSync(SESSIONS_DIR, { recursive: true });
+  const browser = await chromium.launch({ headless: false });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "domcontentloaded" });
+  openLogins.set(slot, { browser, context });
+}
+export async function saveLogin(slot, sessionFile) {
+  const l = openLogins.get(slot);
+  if (!l) throw new Error("no hay login abierto para ese slot");
+  await l.context.storageState({ path: sessionFile });
+  await l.browser.close();
+  openLogins.delete(slot);
+}

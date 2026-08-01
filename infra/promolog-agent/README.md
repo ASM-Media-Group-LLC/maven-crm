@@ -15,9 +15,25 @@ sigue viviendo en el server (`promolog-ingest-stories`), igual que con la extens
 ## Requisitos
 - Node 18+ y la Mac prendida cuando corre (igual que hoy necesitás el navegador abierto).
 - Las 2 cuentas scanner (las que YA siguen a las creadoras).
-- El `PROMOLOG_EXT_TOKEN` (el mismo de la extensión).
+- El `PROMOLOG_EXT_TOKEN` (el mismo de la extensión) en el `.env`.
 
-## Setup (una vez)
+## Interfaz gráfica (recomendado — sin terminal) 🖥️
+La forma fácil: un panel web local con botones para loguear las cuentas, correr el
+scan y ver el progreso creadora por creadora en vivo.
+
+**Doble clic en `abrir-panel.command`** (instala deps la 1ª vez, levanta el server
+y abre el navegador en `http://localhost:4599`). O por terminal: `npm run ui`.
+
+En el panel:
+- **Cuenta A / Cuenta B**: si dice "sin login", tocá **Loguear** → se abre una ventana
+  de IG, logueate (resolvé challenge/2FA si aparece) y tocá **"Ya me logueé"**.
+  El estado pasa a verde ("sesión lista").
+- **▶︎ Escanear todo** corre las 2 cuentas (cada una su mitad). También podés correr
+  **solo A** o **solo B**. El progreso y los resultados aparecen en vivo.
+- Si una cuenta cae en **cooldown** (IG la limitó), el panel lo muestra y la saltea
+  sola hasta que se recupere.
+
+## Setup por terminal (alternativa a la GUI)
 ```bash
 cd infra/promolog-agent
 npm install                 # instala Playwright + Chromium
@@ -26,7 +42,7 @@ node login.mjs a            # abre navegador → logueá la cuenta scanner A →
 node login.mjs b            # idem cuenta B
 ```
 El login guarda la sesión en `sessions/<slot>.json` (no se commitean; ver `.gitignore`).
-Si IG caduca una sesión, re-corrés `node login.mjs <slot>`.
+Si IG caduca una sesión, re-logueá esa cuenta (desde el panel o `node login.mjs <slot>`).
 
 ## Correr un scan
 ```bash

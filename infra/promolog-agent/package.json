@@ -7,7 +7,8 @@
   "scripts": {
     "login": "node login.mjs",
     "scan": "node index.mjs",
-    "postinstall": "playwright install chromium"
+    "postinstall": "playwright install chromium",
+    "ui": "node --env-file=.env ui.mjs"
   },
   "dependencies": {
     "playwright": "^1.47.0"
