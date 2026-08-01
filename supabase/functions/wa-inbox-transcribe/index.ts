@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
-import { buildGlossary, type Glossary } from "../_shared/whisper-glossary.ts";
+import { corregirTerminos } from "../_shared/whisper-postfix.ts";
 
 // wa-inbox-transcribe — transcribe los AUDIOS de la BANDEJA (wa_conversation_messages)
 // con el Whisper self-hosted de Dokploy, y escribe el texto en `body`.
@@ -23,14 +23,11 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Una vez por cold start: jerga + equipo + creadoras activas (acá se habla CON
 // creadoras, sus nombres aparecen todo el tiempo). Sin grupo del bot → sin
 // miembros dinámicos. Si la query falla, cae al glosario fijo (nunca bloquea).
-// Vocabulario mínimo y fijo (ver _shared/whisper-glossary.ts): sin query a la DB.
-const GLOSSARY = buildGlossary();
-
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
 }
 
-async function transcribe(blob: Blob, glossary: Glossary): Promise<{ text: string } | { error: string }> {
+async function transcribe(blob: Blob): Promise<{ text: string } | { error: string }> {
   if (!WHISPER_URL) return { error: "WHISPER_API_URL_not_set" };
   const ext = (blob.type || "").includes("mp4") || (blob.type || "").includes("m4a") ? "m4a" : "ogg";
   const form = new FormData();
@@ -39,11 +36,8 @@ async function transcribe(blob: Blob, glossary: Glossary): Promise<{ text: strin
   form.append("language", "es");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
-  // Glosario (jerga + equipo + creadoras). SOLO hotwords, nunca junto al prompt:
-  // faster-whisper mete los dos en los 448 tokens del decoder (223 c/u) y con
-  // ambos revienta con "positions >= 448". Esta función solo habla con el
-  // self-host, así que hotwords es la opción correcta (persiste en todo el audio).
-  if (glossary.hotwords) form.append("hotwords", glossary.hotwords);
+  // Sin vocabulario en el request: sesga la decodificación de todo el audio.
+  // Los términos conocidos se corrigen después (_shared/whisper-postfix.ts).
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
   try {
@@ -73,14 +67,14 @@ async function processOne(sb: any, row: { id: string; media_url: string }): Prom
     const buf = new Uint8Array(await resp.arrayBuffer());
     if (!buf.length || buf.length > MAX_BYTES) { await mark("[audio no transcribible: tamaño]"); return false; }
     const mime = resolveMimeType(resp.headers.get("content-type"), buf, "audio/ogg");
-    const res = await transcribe(new Blob([buf], { type: mime }), GLOSSARY);
+    const res = await transcribe(new Blob([buf], { type: mime }));
     if ("error" in res) {
       console.warn("transcribe failed", row.id, res.error);
       // Solo marcamos permanente si NO es transitorio (timeout/red) — esos reintentan.
       if (!/timeout|fetch|network|whisper 5\d\d/i.test(res.error)) await mark("[audio no transcribible]");
       return false;
     }
-    await sb.from("wa_conversation_messages").update({ body: res.text }).eq("id", row.id);
+    await sb.from("wa_conversation_messages").update({ body: corregirTerminos(res.text).texto }).eq("id", row.id);
     return true;
   } catch (e) {
     console.warn("processOne error", row.id, (e as Error).message);
