@@ -402,7 +402,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: blob.error };
   }
 
-  const glossary = await buildGlossary(sb, msg.group_id);
+  const glossary = buildGlossary();
   const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) {
     await logEvent(sb, {
@@ -513,7 +513,7 @@ async function testTranscribe(messageId: string, sinGlosario = false): Promise<R
   if ("error" in blob && msg.media_url) blob = await downloadAudio(msg.media_url);
   if ("error" in blob) return { ok: false, error: `download: ${blob.error}` };
 
-  const glossary = sinGlosario ? { prompt: "", hotwords: "" } : await buildGlossary(sb, msg.group_id);
+  const glossary = sinGlosario ? { prompt: "", hotwords: "" } : buildGlossary();
   const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) return { ok: false, error: result.error };
   return {

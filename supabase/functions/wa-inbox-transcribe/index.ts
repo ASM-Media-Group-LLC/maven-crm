@@ -23,7 +23,8 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Una vez por cold start: jerga + equipo + creadoras activas (acá se habla CON
 // creadoras, sus nombres aparecen todo el tiempo). Sin grupo del bot → sin
 // miembros dinámicos. Si la query falla, cae al glosario fijo (nunca bloquea).
-const GLOSSARY = await buildGlossary(adminClient(), null);
+// Vocabulario mínimo y fijo (ver _shared/whisper-glossary.ts): sin query a la DB.
+const GLOSSARY = buildGlossary();
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
