@@ -4141,7 +4141,7 @@ async function loadPersonFacts(tenantId: string, groupId: string): Promise<Array
   const sb = adminClient();
   const { data, error } = await sb
     .from("whatsapp_person_facts")
-    .select("fact, profiles:subject_user_id(full_name)")
+    .select("fact, subject_user_id, profiles:subject_user_id(full_name)")
     // SCOPE POR GRUPO: sin esto, un hecho contado en Managers aparecía en el prompt de
     // Ventas, AI WARMING y el DM de Álvaro. Lo que se cuenta en un grupo queda ahí.
     // (Los filtros van DESPUÉS de .select() — supabase-js no expone .eq() sobre from().)
@@ -4151,8 +4151,31 @@ async function loadPersonFacts(tenantId: string, groupId: string): Promise<Array
     .order("created_at", { ascending: true })
     .limit(50);
   if (error || !data) return [];
-  return (data as Array<{ fact: string; profiles: { full_name: string | null } | null }>)
-    .map((r) => ({ name: r.profiles?.full_name ?? "(alguien del equipo)", fact: r.fact }));
+  const filas = data as Array<{ fact: string; subject_user_id: string | null; profiles: { full_name: string | null } | null }>;
+
+  // ⚠️ EL NOMBRE DE WHATSAPP TAMBIÉN, si no el hecho no se aplica. Los facts se
+  // guardan contra el nombre de Maven ("María de los Ángeles Suárez") pero en el
+  // chat la persona aparece con su display name de WhatsApp ("Msv", "F"), así que
+  // el modelo no ata una cosa con la otra: María repitió TRES veces que no maneja
+  // IG, el hecho estaba guardado (dos veces) y el bot seguía sin aplicarlo.
+  const uids = [...new Set(filas.map((r) => r.subject_user_id).filter((u): u is string => !!u))];
+  const waPorUid = new Map<string, string>();
+  if (uids.length) {
+    const { data: miembros } = await sb
+      .from("whatsapp_members")
+      .select("user_id, display_name")
+      .eq("group_id", groupId)
+      .in("user_id", uids);
+    for (const m of (miembros ?? []) as Array<{ user_id: string; display_name: string | null }>) {
+      const dn = (m.display_name ?? "").trim();
+      if (dn) waPorUid.set(m.user_id, dn);
+    }
+  }
+  return filas.map((r) => {
+    const maven = r.profiles?.full_name ?? "(alguien del equipo)";
+    const wa = r.subject_user_id ? waPorUid.get(r.subject_user_id) : null;
+    return { name: wa && wa !== maven ? `${maven} (en WhatsApp aparece como "${wa}")` : maven, fact: r.fact };
+  });
 }
 
 // ----------------------------------------------------------------------------

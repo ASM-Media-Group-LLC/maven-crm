@@ -982,6 +982,27 @@ async function esContinuacionDeCharla(
 const ACUSE_TOKEN = "ok(?:ay)?|dale|listo|gracias+|perfecto|bueno|genial|entendido|copiado|(?:[jh][aei]){2,}|👍|✅|🙏|😂|👌|💪|🚀|🔥";
 const ES_ACUSE = new RegExp(`^(?:(?:${ACUSE_TOKEN})[\\s,.!¡]*)+$`, "iu");
 
+// ¿Este mensaje corto es una respuesta a lo que el bot acaba de decir? Dos señales:
+//   · el bot habló último y hace poco (ventana de conversación abierta), y
+//   · el texto es una afirmación/negación real, no un acuse suelto ("ok", "👍").
+// Con eso un "Si" a una oferta del bot lo invoca, y un "ok" de cortesía no.
+const CORTO_SUSTANTIVO = /^(s[ií]+|no|dale|listo|hazlo|hacelo|hágalo|obvio|correcto|exacto|va|ya|claro|sipi|nop)\b[.!]?$/i;
+
+async function esRespuestaAlBot(sb: SupabaseClient, groupId: string, texto: string): Promise<boolean> {
+  if (!CORTO_SUSTANTIVO.test(texto)) return false;
+  const { data: ultimo } = await sb
+    .from("whatsapp_messages")
+    .select("is_from_bot, sent_at")
+    .eq("group_id", groupId)
+    .order("sent_at", { ascending: false })
+    .limit(2);
+  // limit(2): el primero puede ser este mismo mensaje (ya insertado por el ingest).
+  const previo = (ultimo ?? []).find((m) => m.is_from_bot === true);
+  if (!previo?.sent_at) return false;
+  const minutos = (Date.now() - new Date(previo.sent_at).getTime()) / 60_000;
+  return minutos <= 15;
+}
+
 async function resolveAgentTrigger(
   sb: SupabaseClient,
   group: { id: string; bot_enabled: boolean; bot_mode: string; department?: string | null },
@@ -1012,7 +1033,12 @@ async function resolveAgentTrigger(
   //   2) fuera de horario laboral, no se invoca (solo mention)
   if (group.bot_mode === "always") {
     const trimmed = (body ?? "").trim();
-    if (trimmed.length < 4) return null;
+    // El filtro de mensajes cortos es para no quemar tokens con "ok"/"👍" sueltos.
+    // PERO cuando el corto es la RESPUESTA a algo que el bot acaba de ofrecer, es
+    // justo el mensaje que NO se puede perder: el 01/08 el bot le ofreció a Fabiana
+    // armar una historia de ejemplo, ella contestó "Si" (2 chars) y el mensaje ni
+    // llegó a invocarlo — quedó como que ofreció algo y no lo hizo.
+    if (trimmed.length < 4 && !(await esRespuestaAlBot(sb, group.id, trimmed))) return null;
 
     // Bots de SUPERVISIÓN (managers) se invocan 24/7: NO dependen del horario
     // laboral (los managers no tienen turnos cargados en whatsapp_user_schedules,
@@ -1435,6 +1461,7 @@ serve(async (req) => {
         msg.senderExternalId, msg.sentAt,
       );
       if (trigger) {
+        let disparado = false;   // ¿ya lo tomó el night_catchup? (ver abajo)
         // ¿Es la PRIMERA invocación del día tras una pausa larga?
         // (ej. arranca el horario laboral después de la noche, weekend, etc).
         // Si el bot estuvo dormido >6h, primero le mandamos un "night_catchup"
@@ -1467,15 +1494,23 @@ serve(async (req) => {
               .from("whatsapp_catchup_claims")
               .insert({ group_id: group.id, catchup_date: today });
             if (!claimErr) {
-              // Ganamos el claim → fire-and-forget; el agent lee todo lo nocturno
-              // antes de responder al mensaje actual.
+              // Ganamos el claim → el catchup ES la invocación de este mensaje:
+              // lo tiene en su ventana, abre el día y manda UN solo mensaje.
+              // ⚠️ NO se dispara además el trigger normal. Antes se hacían las
+              // DOS fire-and-forget con el MISMO message_id y las dos contestaban:
+              // el 01/08 a las 11:21:11 Fabiana preguntó una vez y recibió dos
+              // respuestas (11:21:25 "¡Buenos días! Fabiana, tu reporte…" del
+              // catchup y 11:21:34 "Fabi, con lo que tengo confirmado…" del
+              // trigger) con NÚMEROS DISTINTOS. El comentario decía "después fire
+              // el trigger normal", pero no había secuencia: eran paralelas.
               fireAgent(messageId, group.id, "night_catchup" as "auto");
+              disparado = true;
             }
           }
         } catch (e) {
           console.warn("night_catchup check failed:", (e as Error).message);
         }
-        fireAgent(messageId, group.id, trigger);
+        if (!disparado) fireAgent(messageId, group.id, trigger);
       }
     }
   }
