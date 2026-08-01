@@ -43,13 +43,14 @@ services:
     container_name: maven-whisper
     restart: unless-stopped
     environment:
-      # Modelo precargado al iniciar. Si no se setea, se carga on-demand
-      # en el primer request (cold start ~30s). Precargar es preferible
-      # para producción.
-      WHISPER__MODEL: deepdml/faster-whisper-large-v3-turbo-ct2
-      # Workers: cuántos requests simultáneos podemos procesar. Cada
-      # worker carga el modelo en RAM (~1.5GB para large-v3-turbo).
-      # Para audios de WhatsApp con bajo throughput, 1-2 alcanza.
+      # En speaches el modelo NO se fija por env (va por request: la edge function
+      # manda `model=` en cada llamada) — WHISPER__MODEL no existe como campo y un
+      # env desconocido puede tirar el boot. La precarga se pide así (JSON):
+      PRELOAD_MODELS: '["deepdml/faster-whisper-large-v3-turbo-ct2"]'
+      # AUTH NATIVA de speaches: exige `Authorization: Bearer <API_KEY>` en toda
+      # la API (deja libres /health y docs). Reemplaza al sidecar `whisper-auth`
+      # del compose viejo pegado en Dokploy — mismo token, un servicio menos.
+      API_KEY: ${WHISPER_INTERNAL_TOKEN}
       WHISPER__INFERENCE_DEVICE: cpu
       # int8_float32 = pesos cuantizados (mismo RAM que int8) pero activaciones en
       # float32 → un poco más lento y un poco más preciso. Se cambió de int8 tras
