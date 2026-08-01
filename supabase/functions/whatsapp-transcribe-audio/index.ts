@@ -60,6 +60,11 @@ interface TranscribeRequest {
   // disparar extractor/agente. Para A/B de calidad (p.ej. glosario) contra audios
   // reales ya guardados — un re-proceso normal haría que el bot conteste de nuevo.
   test_message_id?: string;
+  // A/B del GLOSARIO en el MISMO server: sin esto, comparar contra lo guardado
+  // mezcla tres cambios a la vez (server, cuantización y glosario) y no se sabe
+  // cuál mejora o empeora. Con sin_glosario:true se transcribe igual pero sin
+  // prompt ni hotwords → la diferencia es SOLO el glosario.
+  sin_glosario?: boolean;
 }
 
 // Response shape de Whisper con response_format='verbose_json'. Tanto
@@ -494,7 +499,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
 
 // Re-transcribe SIN efectos: ni update, ni extractor, ni agente. Devuelve el
 // texto nuevo junto al guardado, para comparar al lado del otro.
-async function testTranscribe(messageId: string): Promise<Record<string, unknown>> {
+async function testTranscribe(messageId: string, sinGlosario = false): Promise<Record<string, unknown>> {
   const sb = adminClient();
   const { data: msg } = await sb
     .from("whatsapp_messages")
@@ -508,11 +513,12 @@ async function testTranscribe(messageId: string): Promise<Record<string, unknown
   if ("error" in blob && msg.media_url) blob = await downloadAudio(msg.media_url);
   if ("error" in blob) return { ok: false, error: `download: ${blob.error}` };
 
-  const glossary = await buildGlossary(sb, msg.group_id);
+  const glossary = sinGlosario ? { prompt: "", hotwords: "" } : await buildGlossary(sb, msg.group_id);
   const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) return { ok: false, error: result.error };
   return {
     ok: true,
+    glosario: !sinGlosario,
     provider: result.provider,
     guardado: msg.transcribed_text,
     nuevo: result.text,
@@ -572,7 +578,7 @@ serve(async (req) => {
 
   try {
     if (body.test_message_id) {
-      const r = await testTranscribe(body.test_message_id);
+      const r = await testTranscribe(body.test_message_id, body.sin_glosario === true);
       return new Response(JSON.stringify(r), {
         status: 200,
         headers: { ...whatsappCors, "Content-Type": "application/json" },
