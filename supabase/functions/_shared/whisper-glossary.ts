@@ -111,12 +111,16 @@ export async function buildGlossary(sb: any, groupId: string | null): Promise<Gl
     terms = terms.slice(1);
     prompt = `${prefix}${terms.join(", ")}.`;
   }
-  return {
-    prompt,
-    // hotwords no pasa por Groq (solo speaches), pero comparte la ventana de
-    // contexto de Whisper — mismo recorte para no desbordarla en silencio.
-    hotwords: terms.join(", "),
-  };
+  // hotwords tiene un presupuesto MUCHO más chico que el prompt de Groq, y por
+  // una razón distinta: vive dentro de los 448 tokens del decoder de Whisper,
+  // COMPARTIDOS con el texto que se va generando y con el arrastre del segmento
+  // anterior (condition_on_previous_text). Con la lista completa aparecía
+  // "ValueError: The maximum decoding length must be > 0" — el contexto lleno,
+  // sin lugar para decodificar. ~340 chars ≈ 100 tokens deja el resto libre.
+  const HOTWORDS_MAX = 340;
+  let hw = terms;
+  while (hw.join(", ").length > HOTWORDS_MAX && hw.length > 1) hw = hw.slice(1);
+  return { prompt, hotwords: hw.join(", ") };
 }
 
 /** Compat: la firma vieja (solo el prompt). */
