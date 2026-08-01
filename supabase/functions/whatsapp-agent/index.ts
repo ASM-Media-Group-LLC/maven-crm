@@ -1159,7 +1159,7 @@ const TOOLS: Array<{
   {
     name: "lookup_lead_history",
     description:
-      "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Usalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?. Devuelve un summary estructurado.",
+      "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Usalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?, (5) DE QUÉ BASE viene y quién la cargó. Devuelve un summary estructurado. ⚠️ El bloque `procedencia` responde '¿de dónde salió esta lead?': `base_del_lead` (maven = entró por LeadGen/Contactos · ex_creadora = ya fue creadora de la agencia, hay historia previa y el cierre es una REACTIVACIÓN · agencia = lead B2B, se le VENDE producto, NO se la recluta ni cuenta como modelo captada), `origen_del_contacto` (leadgen / contacto_directo / el import del que salió), `cargado_por` + `cargado_el` (quién metió el contacto y cuándo) y `llg_de_leadgen` (el LLG que la trajo, que puede ser otra persona). Si te preguntan de qué base es una lead o quién la consiguió, la respuesta sale de acá — no la deduzcas.",
     input_schema: {
       type: "object",
       properties: {
@@ -2523,7 +2523,10 @@ async function executeTool(
           .order("created_at", { ascending: false })
           .limit(5),
         sb.from("closer_creators")
-          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, last_contact_date, created_at, notes")
+          // lead_source/deal_type/source_contact_id: de qué BASE viene el lead y con
+          // qué contacto está atado. Sin esto el bot no podía decir de dónde salió
+          // (respondía como si todo fuera de la base maven).
+          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, last_contact_date, created_at, notes, lead_source, deal_type, source_contact_id")
           .ilike("instagram_handle", ilike)
           .order("created_at", { ascending: false })
           .limit(5),
@@ -2543,7 +2546,9 @@ async function executeTool(
         // tenía forma de ver un número cargado y le decía al LLG "sigue sin teléfono,
         // recargalo" aunque estuviera bien cargado (incidente Daniel 30/07).
         sb.from("closers_contacts")
-          .select("id, handle, phone, phone_first_set_at, created_at, created_by, contact_kind")
+          // `source` = de dónde salió el contacto (leadgen / import_agencias_2026 /
+          // import_ex_modelos_kash / contacto_directo…) y `created_by` = quién lo cargó.
+          .select("id, handle, phone, phone_first_set_at, created_at, created_by, contact_kind, source, leadgen_entry_id")
           .ilike("handle", ilike)
           .order("created_at", { ascending: false })
           .limit(5),
@@ -2599,9 +2604,51 @@ async function executeTool(
       else if (leadgen.length > 0) overall = "kash_lead_known";
       else if (scouter.length > 0) overall = "scouter_known";
 
+      // ── PROCEDENCIA ────────────────────────────────────────────────────────
+      // De qué BASE salió el lead y quién lo metió. Antes el bot no tenía nada de
+      // esto: el manual le decía que las tools devolvían la base, pero ninguna de
+      // las tools de lead la traía, así que hablaba de todo como si fuera "maven".
+      // La base se toma del lead si existe; si todavía no hay fila en el pipeline
+      // se infiere del tipo de contacto, que es la misma regla que aplica el RPC.
+      const contactoBase = contacts[0] as Record<string, unknown> | undefined;
+      const KIND_A_BASE: Record<string, string> = { agencia: "agencia", ex_creadora: "ex_creadora" };
+      const baseDelLead =
+        (cc[0]?.lead_source as string | undefined) ??
+        (contactoBase ? KIND_A_BASE[String(contactoBase.contact_kind ?? "")] ?? "maven" : null);
+
+      // Nombres de quien cargó el contacto y del LLG del entry de LeadGen.
+      const idsPersonas = [
+        contactoBase?.created_by,
+        leadgen[0]?.lg_user_id,
+      ].filter(Boolean) as string[];
+      const nombres: Record<string, string> = {};
+      if (idsPersonas.length > 0) {
+        const { data: profs } = await sb.from("profiles")
+          .select("id, full_name").in("id", [...new Set(idsPersonas)]);
+        for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+          nombres[p.id] = p.full_name ?? "sin nombre";
+        }
+      }
+
+      const procedencia = {
+        // maven = entró por LeadGen/Contactos · ex_creadora = base EX MODELOS KASH
+        // (ya fue creadora, hay historia previa) · agencia = lead B2B, se le VENDE
+        // producto, no se la recluta.
+        base_del_lead: baseDelLead,
+        // De dónde salió el contacto: 'leadgen', 'contacto_directo', o el import.
+        origen_del_contacto: (contactoBase?.source as string | undefined) ?? null,
+        cargado_por: contactoBase?.created_by ? (nombres[String(contactoBase.created_by)] ?? null) : null,
+        cargado_el: (contactoBase?.created_at as string | undefined) ?? null,
+        // Si nació en LeadGen, el LLG que lo cargó allá (puede no ser el mismo que
+        // creó el contacto: uno lo trae y otro consigue el número).
+        llg_de_leadgen: leadgen[0]?.lg_user_id ? (nombres[String(leadgen[0].lg_user_id)] ?? null) : null,
+        entrada_leadgen_el: (leadgen[0]?.created_at as string | undefined) ?? null,
+      };
+
       return {
         handle,
         overall_status: overall,
+        procedencia,
         numero: telResumen,
         leadgen_entries: leadgen,
         closer_creators: cc,
