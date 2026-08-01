@@ -35,14 +35,15 @@ async function fetchTargets() {
 // `unreadable` viaja al server para que quede en el INFORME de la corrida: lo que
 // no se pudo leer tiene que ser visible (si no, un canal ilegible es invisible —
 // no genera fila a propósito, para no escribir un "No" falso).
-async function postIngest(items, unreadable = []) {
-  if (!items.length && !unreadable.length) return { ok: true };
+async function postIngest(items, unreadable = [], { acumulado = null, final = true } = {}) {
+  if (!items.length && !unreadable.length && final !== true) return { ok: true };
   const r = await fetch(`${MAVEN_URL}/functions/v1/telegram-scan`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-cron-token": CRON_TOKEN },
-    body: JSON.stringify({ mode: "ingest", items, unreadable }),
+    body: JSON.stringify({ mode: "ingest", items, unreadable, acumulado, final }),
   });
   return r.json().catch(() => ({ ok: false }));
 }
+const FLUSH_EVERY = 6;  // ver x-scraper: veredicto por tandas, no al final
 
 // ── PÚBLICO: t.me/s/<user> = vista previa pública del canal ───────────────────
 // Devuelve:
@@ -134,6 +135,16 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
   const batch = [];
   const handleByCreator = new Map();
   const noLegibles = [];   // {handle, reason} → van al informe de la corrida
+  const acc = { leidos: 0, con_promo: 0, sin_promo: 0, leidos_sin_posts: 0, detalle_con_promo: [] };
+  const aplicar = (res) => {
+    for (const r of (res?.results ?? [])) {
+      const h = handleByCreator.get(r.creator_id) ?? r.source_handle ?? "?";
+      acc.leidos++;
+      if (r.promoted > 0) { acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: r.promoted }); onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "telegram" }); log(`   ✅ @${h} PROMOCIONÓ (${r.promoted})`); }
+      else if (r.posts > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.posts, red: "telegram" }); }
+      else { acc.leidos_sin_posts++; }
+    }
+  };
   for (const t of pub) {
     if (shouldStop()) break;
     const user = publicUser(t.handle);
@@ -150,6 +161,7 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
       log(`${posts.length ? "✅" : "·"} @${user}: ${posts.length} posts en las últimas 24h`);
       onResult({ handle: user, outcome: posts.length ? "leido" : "sin_posts", stories: posts.length, red: "telegram" });
     }
+    if (batch.length >= FLUSH_EVERY) aplicar(await postIngest(batch.splice(0, batch.length), [], { acumulado: acc, final: false }));
     await sleep(1200 + Math.random() * 1500);
   }
 
@@ -173,14 +185,8 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
     }
   }
 
-  const res = await postIngest(batch, noLegibles);
-  // La clasificación (promo sí/no) la hace el SERVER en el ingest — acá reflejamos
-  // su veredicto por canal, que es lo que interesa ver en el panel.
-  for (const r of (res?.results ?? [])) {
-    const h = handleByCreator.get(r.creator_id) ?? r.source_handle ?? "?";
-    if (r.promoted > 0) onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "telegram" });
-    else if (r.posts > 0) onResult({ handle: h, outcome: "sin_promo", stories: r.posts, red: "telegram" });
-  }
+  const res = await postIngest(batch, noLegibles, { acumulado: acc, final: true });
+  aplicar(res);
   const R = res?.resumen;
   if (R) {
     log(`━━━ INFORME TELEGRAM ━━━`);

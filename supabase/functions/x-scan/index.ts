@@ -368,19 +368,24 @@ Deno.serve(async (req: Request) => {
 
     // Informe de la corrida (accesible para el bot; ver telegram-scan).
     const noLegibles = Array.isArray(body.unreadable) ? body.unreadable as Array<any> : [];
+    // El scraper local postea en TANDAS para que el veredicto (promo sí/no) aparezca
+    // mientras corre, en vez de esperar ~9 min al final. `acumulado` trae los totales
+    // de las tandas previas y `final` marca la última: el informe se escribe UNA vez.
+    const acumulado = (body.acumulado ?? null) as any;
+    const esFinal = body.final !== false;
     const conPromo = out.filter((r: any) => r.promoted > 0);
     const sinPromo = out.filter((r: any) => r.promoted === 0 && r.tweets > 0);
     const resumen = {
       red: "x", origen: "agente local",
-      perfiles_leidos: out.length,
-      con_promo: conPromo.length,
-      sin_promo: sinPromo.length,
-      leidos_sin_posts: out.filter((r: any) => r.tweets === 0).length,
+      perfiles_leidos: out.length + (acumulado?.leidos ?? 0),
+      con_promo: conPromo.length + (acumulado?.con_promo ?? 0),
+      sin_promo: sinPromo.length + (acumulado?.sin_promo ?? 0),
+      leidos_sin_posts: out.filter((r: any) => r.tweets === 0).length + (acumulado?.leidos_sin_posts ?? 0),
       no_legibles: noLegibles.length,
-      detalle_con_promo: conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted })),
+      detalle_con_promo: [...(acumulado?.detalle_con_promo ?? []), ...conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted }))],
       detalle_no_legibles: noLegibles.map((u: any) => ({ handle: u.handle ?? u.source_handle, motivo: u.reason ?? "desconocido" })),
     };
-    if (!dryRun) {
+    if (!dryRun && esFinal) {
       await sb.from("promolog_dispatch_runs").insert({
         tenant_id: TENANT_ID, apify_actor_id: "local-agent", status: "succeeded",
         creators_count: items.length + noLegibles.length, creators_succeeded: out.length,

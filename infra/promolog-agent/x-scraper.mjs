@@ -22,19 +22,30 @@ async function fetchTargets() {
   const j = await r.json();
   return Array.isArray(j.targets) ? j.targets : [];
 }
-async function postIngest(items, unreadable = []) {
-  if (!items.length && !unreadable.length) return { ok: true };
+async function postIngest(items, unreadable = [], { acumulado = null, final = true } = {}) {
+  if (!items.length && !unreadable.length && final !== true) return { ok: true };
   const r = await fetch(`${MAVEN_URL}/functions/v1/x-scan`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-cron-token": CRON_TOKEN },
-    body: JSON.stringify({ mode: "ingest", items, unreadable }),
+    body: JSON.stringify({ mode: "ingest", items, unreadable, acumulado, final }),
   });
   return r.json().catch(() => ({ ok: false }));
 }
 
+// Cada cuántos perfiles se postea. Sin esto el veredicto (promo sí/no) recién
+// aparecía al terminar los ~37 perfiles (~9 min mirando una lista sin saber
+// quién promocionó). Además, si algo corta a mitad, lo leído ya quedó guardado.
+const FLUSH_EVERY = 6;
+
 // ⚠️ Extracción del DOM de x.com — el punto a tunear. Lee los <article> de tweets
 // del perfil: texto, permalink (link al status), fecha (time[datetime]) e imagen.
-async function extractTweets(page, handle) {
-  return page.evaluate((h) => {
+// ⚠️ FILTRO DE FECHA (obligatorio): el timeline trae los últimos ~20 tweets SIN
+// filtrar por fecha, e incluye los FIJADOS (pueden ser de hace años). Sin este
+// filtro se insertaban promos con fecha 2024-12-11, 2025-08-31, 2026-01-12…, o
+// sea días de promo RETROACTIVOS en meses ya cerrados (verificado en la corrida
+// del 31/07). El path server-side (Apify) ya filtra por `start`; este también.
+async function extractTweets(page, handle, hours = 24) {
+  const desde = Date.now() - hours * 3600e3;
+  const all = await page.evaluate((h) => {
     const out = [];
     for (const art of document.querySelectorAll("article")) {
       const textEl = art.querySelector('[data-testid="tweetText"]');
@@ -52,6 +63,21 @@ async function extractTweets(page, handle) {
     }
     return out.slice(0, 20);
   }, handle);
+  return all.filter((t) => {
+    const ts = Date.parse(t.date || "");
+    return Number.isFinite(ts) && ts >= desde;   // sin fecha legible → fuera (no inventamos)
+  });
+}
+
+// Refleja el veredicto del server por perfil y acumula los totales de la tanda.
+function aplicarVeredictos(res, acc, onResult, log) {
+  for (const r of (res?.results ?? [])) {
+    const h = r.source_handle ?? "?";
+    acc.leidos++;
+    if (r.promoted > 0) { acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: r.promoted }); onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "x" }); log(`   ✅ @${h} PROMOCIONÓ (${r.promoted})`); }
+    else if (r.tweets > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.tweets, red: "x" }); }
+    else { acc.leidos_sin_posts++; }
+  }
 }
 
 export async function runX({ account = { sessionFile: X_SESSION, index: 0, count: 1 }, log = () => {}, onResult = () => {}, shouldStop = () => false } = {}) {
@@ -67,6 +93,7 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
 
   const batch = [];
   const noLegibles = [];   // {handle, reason} → informe de la corrida
+  const acc = { leidos: 0, con_promo: 0, sin_promo: 0, leidos_sin_posts: 0, detalle_con_promo: [] };
   let done = 0;
   for (const t of targets) {
     if (shouldStop()) { log("⏹️ X: detenido."); break; }
@@ -100,16 +127,16 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
       log(`🔒 @${handle}: no se pudo leer — ${String(e.message).slice(0, 40)}`); onResult({ handle, outcome: "no_legible", red: "x" });
     }
     done++;
+    // Flush por tandas: manda lo acumulado y muestra el veredicto del server ya.
+    if (batch.length >= FLUSH_EVERY) {
+      const parcial = await postIngest(batch.splice(0, batch.length), [], { acumulado: acc, final: false });
+      aplicarVeredictos(parcial, acc, onResult, log);
+    }
     await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
   }
   await browser.close();
-  const res = await postIngest(batch, noLegibles);
-  // Veredicto del server (promo sí/no) reflejado por perfil en el panel.
-  for (const r of (res?.results ?? [])) {
-    const h = r.source_handle ?? "?";
-    if (r.promoted > 0) onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "x" });
-    else if (r.tweets > 0) onResult({ handle: h, outcome: "sin_promo", stories: r.tweets, red: "x" });
-  }
+  const res = await postIngest(batch, noLegibles, { acumulado: acc, final: true });
+  aplicarVeredictos(res, acc, onResult, log);
   const R = res?.resumen;
   if (R) {
     log(`━━━ INFORME X ━━━`);
