@@ -133,4 +133,14 @@ const server = createServer(async (req, res) => {
   json(res, 404, { ok: false, error: "not_found" });
 });
 
+// Sin esto, un panel ya abierto hace que el nuevo muera con un stack trace de Node
+// en la ventana de Terminal — que para quien hizo doble clic es "se abrió en negro".
+server.on("error", (e) => {
+  if (e.code === "EADDRINUSE") {
+    console.error(`\n⚠️  Ya hay un panel abierto en el puerto ${PORT}.\n   Cerrá esa ventana de Terminal (o su pestaña) y volvé a hacer doble clic.\n   Si querés abrir OTRO en paralelo:  UI_PORT=4600 node --env-file=.env ui.mjs\n`);
+    process.exit(1);
+  }
+  console.error(`\n⚠️  No se pudo levantar el panel: ${e.message}\n`);
+  process.exit(1);
+});
 server.listen(PORT, () => console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}\n`));

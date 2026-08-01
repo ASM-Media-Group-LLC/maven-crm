@@ -101,6 +101,10 @@ export async function runJoin(opts = {}, { log = console.log, shouldStop = () =>
     if (shouldStop()) { log("■ detenido"); break; }
     // Los que ya sabemos adentro no se vuelven a tocar: cada apertura de invite es
     // una llamada más contra la cuenta, y no hay nada que ganar.
+    // Con la solicitud ya enviada, el web app no vuelve a mostrar el popup: el canal
+    // se lee como "no pude determinarlo" y, al reveer, pisaba el "pendiente" que sí
+    // sabíamos. La espera de aprobación es un hecho nuestro, no algo que se releva.
+    if (prev[t.key]?.state === "pendiente") { resumen.pendiente++; log(`⏳ ${t.name} — solicitud ya enviada, esperando al admin`); continue; }
     if (!OPTS.join && prev[t.key]?.state === "ok") { resumen.ok++; log(`✅ ${t.name} — ya adentro (relevado antes)`); continue; }
     if (OPTS.join && unidosEstaCorrida >= OPTS.max) { log(`\n⏸️  Tope de ${OPTS.max} alcanzado — el resto queda para la próxima tanda.`); break; }
     if (OPTS.join && prev[t.key]?.state === "ok") { resumen.ok++; continue; }
