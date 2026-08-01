@@ -80,7 +80,12 @@ services:
       # la migración re-descarga el modelo una vez y después queda cacheado.
       - whisper-models:/home/ubuntu/.cache/huggingface
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # En esta build de speaches /health TAMBIÉN exige la API key (la doc lo
+      # da por exento — esta versión no). Sin el header el check daba 403,
+      # Docker marcaba el contenedor unhealthy y Traefik no publicaba la ruta:
+      # el server estaba perfecto adentro y el dominio afuera daba 404.
+      # ($$ = escape de compose para que el $ le llegue al shell del contenedor)
+      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $$WHISPER_INTERNAL_TOKEN\" http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
