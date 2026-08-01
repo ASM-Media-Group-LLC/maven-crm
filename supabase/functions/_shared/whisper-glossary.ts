@@ -98,10 +98,23 @@ export async function buildGlossary(sb: any, groupId: string | null): Promise<Gl
     seen.add(k);
     return true;
   });
-  const terms = all.slice(0, 85);
+  // ⚠️ TOPE DURO DE GROQ: prompt ≤ 896 CARACTERES (no tokens). Con 50 creadoras
+  // el prompt daba 1015 y Groq devolvía 400 — o sea el fallback moría JUSTO
+  // cuando más se lo necesita (self-host caído/lento) y el audio quedaba
+  // "[transcripción falló]". Se recorta desde el PRINCIPIO (por diseño ahí van
+  // las creadoras): lo crítico —equipo y herramientas— vive al final y no se toca.
+  const PROMPT_MAX = 880;
+  const prefix = `Nota de voz del equipo de la agencia Kash, sobre gestión de modelos. Suelen nombrar a `;
+  let terms = all.slice(0, 85);
+  let prompt = `${prefix}${terms.join(", ")}.`;
+  while (prompt.length > PROMPT_MAX && terms.length > 1) {
+    terms = terms.slice(1);
+    prompt = `${prefix}${terms.join(", ")}.`;
+  }
   return {
-    prompt: `Nota de voz del equipo de la agencia Kash, sobre gestión de modelos. ` +
-      `Suelen nombrar a ${terms.join(", ")}.`,
+    prompt,
+    // hotwords no pasa por Groq (solo speaches), pero comparte la ventana de
+    // contexto de Whisper — mismo recorte para no desbordarla en silencio.
     hotwords: terms.join(", "),
   };
 }
