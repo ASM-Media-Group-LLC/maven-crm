@@ -18,6 +18,46 @@
 import type { AgentCtx, AgentTool } from "./types.ts";
 
 const MAX_MESSAGES = 30;
+
+// ── CANDADO DE LÍNEA DE BANDEJA ──────────────────────────────────────────────
+// Antes cada tool de bandeja resolvía la línea con `args.department ?? algo`, o
+// sea que el MODELO elegía qué bandeja leer: el bot de Managers podía leer la de
+// closers con solo pedirlo, y get_contact_messages defaulteaba a 'manager' para
+// TODOS los bots. Ahora la lista permitida la fija el bot en DB
+// (wa_bots.inbox_departments) y lo que pida el modelo se valida contra ella.
+//
+// No se deriva del `department` del bot: no existe ninguna wa_channels 'sales' y
+// el bot de Ventas (department='sales') tiene que leer la línea de 'closer'
+// porque M/V es el grupo de closers. Por eso el permiso va explícito en DB.
+//
+// Vive acá y lo usan TANTO el catálogo como las tools inline de whatsapp-agent,
+// a propósito: son dos archivos distintos y una copia pegada se desincroniza.
+export type LineaResuelta =
+  | { ok: true; dept: string; permitidos: string[] }
+  | { ok: false; motivo: Record<string, unknown> };
+
+export function resolverLineaBandeja(
+  pedido: unknown,
+  ctx: Pick<AgentCtx, "department" | "inboxDepartments">,
+): LineaResuelta {
+  // undefined ⇒ no declarado ⇒ conservador: solo su propio department.
+  // [] ⇒ declarado explícitamente como "este bot no lee bandeja".
+  const permitidos = (ctx.inboxDepartments ?? (ctx.department ? [ctx.department] : []))
+    .map((d) => String(d).trim()).filter(Boolean);
+  if (permitidos.length === 0) {
+    return { ok: false, motivo: { found: false, reason: "bandeja_no_habilitada",
+      nota: "Este bot no tiene línea de bandeja asignada. No inventes el contenido: di que no tienes acceso a esa bandeja." } };
+  }
+  const q = String(pedido ?? "").trim().toLowerCase();
+  if (q && !permitidos.includes(q)) {
+    // Se devuelve el motivo en vez de leer otra línea en silencio: si el modelo
+    // cree que leyó 'closer' y en realidad leyó 'manager', reporta los datos de
+    // la línea equivocada como si fueran los que le pidieron.
+    return { ok: false, motivo: { found: false, reason: "linea_no_permitida", pedido: q, permitidos,
+      nota: `Este bot solo puede leer la bandeja de: ${permitidos.join(", ")}. No tiene acceso a '${q}' — dilo así, sin inventar datos.` } };
+  }
+  return { ok: true, dept: q || permitidos[0], permitidos };
+}
 const MAX_CHARS_PER_MSG = 600;
 
 function sanitize(q: string): string {
@@ -201,11 +241,13 @@ export const inboxTools: AgentTool[] = [
       "(que sólo encuentra modelos linkeadas del pipeline), esta ve TODAS las conversaciones de la línea, " +
       "incluidas las que no están vinculadas a una creadora. Sin `contact` → lista las conversaciones " +
       "recientes de la línea (nombre, marca, último mensaje, no leídos). Con `contact` → trae los últimos " +
-      "mensajes de ESA conversación. Por defecto usa TU departamento (el del bot); pasa `department` para otro.",
+      "mensajes de ESA conversación. La línea que puedes leer está FIJADA para tu bot: normalmente no " +
+      "hace falta pasar `department`. Si pides una que no te corresponde, la tool la rechaza — en ese " +
+      "caso di que no tienes acceso a esa bandeja, nunca inventes su contenido.",
     input_schema: {
       type: "object",
       properties: {
-        department: { type: "string", description: "manager | closer | sales… Por defecto el departamento del bot." },
+        department: { type: "string", description: "opcional y normalmente innecesario: la línea permitida ya viene fijada por tu bot. Solo úsalo si tu bot tiene más de una." },
         contact: { type: "string", description: "opcional: nombre/@handle (o parte) para abrir UNA conversación y leer sus mensajes" },
         limit: { type: "number", description: "máximo de conversaciones a listar (default 20, tope 50)" },
       },
@@ -214,11 +256,9 @@ export const inboxTools: AgentTool[] = [
     domain: "leads",
     scope: "read",
     handler: async (args, ctx) => {
-      const dept = String(args.department ?? ctx.department ?? "").trim();
-      if (!dept) {
-        return { found: false, reason: "sin_departamento",
-          nota: "Especifica `department` (este bot no tiene department asignado)." };
-      }
+      const linea = resolverLineaBandeja(args.department, ctx);
+      if (!linea.ok) return linea.motivo;
+      const dept = linea.dept;
 
       // Canales (líneas) de ese departamento.
       const { data: chans } = await ctx.sb

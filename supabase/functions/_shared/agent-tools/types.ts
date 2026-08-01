@@ -26,6 +26,12 @@ export interface AgentCtx {
   // supervisor, o corridas de sistema: digests/auto/DMs).
   privileged?: boolean;
   canSeePhones?: boolean;
+  // Líneas de bandeja (wa_channels.department) que este bot puede leer. Va
+  // explícito y NO derivado del `department` de arriba: el bot de Ventas es
+  // 'sales' pero la línea que le toca es la de 'closer' (M/V es el grupo de
+  // closers) y no existe ninguna línea 'sales'. undefined ⇒ solo su propio
+  // department; [] ⇒ no lee bandeja. El modelo no puede salirse de la lista.
+  inboxDepartments?: string[] | null;
 }
 
 export interface AgentTool {

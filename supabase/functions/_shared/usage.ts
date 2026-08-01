@@ -4,13 +4,13 @@
 // worker escribe directo desde servicios/scouter-worker/src/storage.ts).
 //
 // Precios (USD por millón de tokens / hora de audio):
-//   anthropic claude-sonnet-4-6:
+//   anthropic claude-sonnet-5 / claude-sonnet-4-6:
 //     input        $3.00
 //     output       $15.00
-//     cache_read   $0.30
-//     cache_create $3.75
+//     cache_read   $0.30   (0,1× la entrada)
+//     cache_create $6.00   (2× la entrada — TTL de 1h; ver nota en la tabla)
 //   anthropic claude-haiku-4-5:
-//     input  $0.80, output $4.00 (similar ratios)
+//     input  $0.80, output $4.00 (mismos múltiplos de caché)
 //   elevenlabs scribe_v1: $0.40 / hora de audio
 //
 // Si el modelo es desconocido, costo = 0 (NO falla la edge function por
@@ -40,18 +40,25 @@ interface ApiUsageBase {
 // Pricing por modelo (USD por millón de tokens, salvo elevenlabs que es
 // USD por hora). Lista actualizada 2026-05. Si el modelo no está acá,
 // cost = 0 (mejor que crashear).
+// ⚠️ cache_create va a 2× el precio de entrada, NO a 1,25×. Anthropic cobra la
+// escritura de caché según el TTL: 1,25× para el de 5 minutos y 2× para el de 1
+// hora. El agente de WhatsApp manda `cache_control: {ttl: "1h"}`, así que siempre
+// paga la tarifa de 2×. Con el 1,25× de antes, api_usage_log SUBESTIMABA la
+// factura real ~23% en el camino mention/sonnet-5 (el más caro y el más usado),
+// y las decisiones de costo se tomaban sobre un número que no era el que cobraba
+// Anthropic. Si algún día se baja el TTL a 5 minutos, hay que volver a 1,25×.
 const ANTHROPIC_PRICING: Record<string, { in: number; out: number; cache_read: number; cache_create: number }> = {
   // Claude 5 family (modelos en uso: grupos=sonnet-5, Clari=opus-5). $/M tokens.
-  "claude-opus-5":           { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 6.25 },
-  "claude-sonnet-5":         { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 3.75 },
+  "claude-opus-5":           { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 10.0 },
+  "claude-sonnet-5":         { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 6.0  },
   // Claude 4.x family
-  "claude-opus-4-8":         { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 6.25 },
-  "claude-opus-4-7":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 18.75 },
-  "claude-opus-4-6":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 18.75 },
-  "claude-sonnet-4-6":       { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 3.75 },
-  "claude-sonnet-4-5":       { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 3.75 },
-  "claude-haiku-4-5":        { in: 0.80, out: 4,    cache_read: 0.08, cache_create: 1.0  },
-  "claude-haiku-4-5-20251001": { in: 0.80, out: 4,  cache_read: 0.08, cache_create: 1.0  },
+  "claude-opus-4-8":         { in: 5,    out: 25,   cache_read: 0.5,  cache_create: 10.0 },
+  "claude-opus-4-7":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 30.0 },
+  "claude-opus-4-6":         { in: 15,   out: 75,   cache_read: 1.5,  cache_create: 30.0 },
+  "claude-sonnet-4-6":       { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 6.0  },
+  "claude-sonnet-4-5":       { in: 3,    out: 15,   cache_read: 0.3,  cache_create: 6.0  },
+  "claude-haiku-4-5":        { in: 0.80, out: 4,    cache_read: 0.08, cache_create: 1.6  },
+  "claude-haiku-4-5-20251001": { in: 0.80, out: 4,  cache_read: 0.08, cache_create: 1.6  },
 };
 
 // $/hora de audio. Default scribe_v1.

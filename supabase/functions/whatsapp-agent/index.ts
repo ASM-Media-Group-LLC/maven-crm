@@ -11,6 +11,9 @@ import {
 } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
+// El candado de línea de bandeja vive en el catálogo y se usa también acá, en las
+// tools inline, para que las dos rutas no se desincronicen.
+import { resolverLineaBandeja } from "../_shared/agent-tools/inbox.ts";
 
 // whatsapp-agent — el agente IA que responde preguntas en el grupo,
 // hace tracking de casos, genera reportes y puede tomar acciones en
@@ -1269,7 +1272,7 @@ const TOOLS: Array<{
     input_schema: {
       type: "object",
       properties: {
-        department: { type: "string", description: "línea a leer: 'manager' (managers↔creadoras) o 'closer'. Default manager" },
+        department: { type: "string", description: "opcional: la línea que puedes leer ya viene fijada por tu bot. Si pides una que no te corresponde, la tool la rechaza." },
         date: { type: "string", description: "día YYYY-MM-DD (Bogotá). Default hoy" },
         limit: { type: "number", description: "cuántos mensajes (default 60, máx 150)" },
       },
@@ -1651,7 +1654,7 @@ async function resolveMembersByName(
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; privileged?: boolean; canSeePhones?: boolean },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; inboxDepartments?: string[] | null; privileged?: boolean; canSeePhones?: boolean },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -2865,7 +2868,15 @@ async function executeTool(
       if (ctx.privileged === false) {
         return { error: "no_autorizado", message: "Leer las conversaciones del equipo con las creadoras es de supervisión." };
       }
-      const dept = String(input.department ?? "manager").toLowerCase();
+      // Mismo candado que la bandeja del catálogo (ver resolverLineaBandeja):
+      // antes esto defaulteaba a "manager" para CUALQUIER bot y aceptaba lo que
+      // el modelo pidiera, así que el bot de Ventas leía la línea de managers.
+      const lineaCM = resolverLineaBandeja(input.department, {
+        department: ctx.department ?? null,
+        inboxDepartments: ctx.inboxDepartments ?? null,
+      });
+      if (!lineaCM.ok) return lineaCM.motivo;
+      const dept = lineaCM.dept;
       const hoyBog2 = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
       const dia = String(input.date ?? hoyBog2);
       const lim = Math.min(Math.max(Number(input.limit ?? 60), 10), 150);
@@ -2939,6 +2950,7 @@ async function executeTool(
           senderUserId: ctx.senderUserId,
           messageId: null,
           department: ctx.department ?? null,
+          inboxDepartments: ctx.inboxDepartments ?? null,
         });
         await sb.from("whatsapp_pending_posts")
           .update({ status: "sent", sent_at: new Date().toISOString() })
@@ -4101,6 +4113,7 @@ async function executeTool(
             userId: ctx.senderUserId,
             groupId: ctx.groupId,
             department: ctx.department ?? null,
+            inboxDepartments: ctx.inboxDepartments ?? null,
             privileged: ctx.privileged,
             canSeePhones: ctx.canSeePhones,
           });
@@ -4873,12 +4886,12 @@ async function runAgent(req: AgentRequest): Promise<{
   // botCfg = null y todo cae al comportamiento legacy (SYSTEM_PROMPT completo +
   // bot_persona, todas las tools, pickModel).
   let botCfg:
-    | { manualPrompt: string | null; model: string | null; allow: string[] | null; deny: string[] | null; department: string | null }
+    | { manualPrompt: string | null; model: string | null; allow: string[] | null; deny: string[] | null; department: string | null; inboxDepartments: string[] | null }
     | null = null;
   if (group.wa_bot_id) {
     const { data: bot } = await sb
       .from("wa_bots")
-      .select("manual_prompt, model, tool_allowlist, tool_denylist, active, department")
+      .select("manual_prompt, model, tool_allowlist, tool_denylist, active, department, inbox_departments")
       .eq("id", group.wa_bot_id)
       .single();
     if (bot && bot.active) {
@@ -4888,6 +4901,9 @@ async function runAgent(req: AgentRequest): Promise<{
         allow: Array.isArray(bot.tool_allowlist) ? bot.tool_allowlist as string[] : null,
         deny: Array.isArray(bot.tool_denylist) ? bot.tool_denylist as string[] : null,
         department: (bot.department as string | null) ?? null,
+        // null (columna sin declarar) ≠ [] (declarado "sin bandeja"): el handler
+        // distingue los dos, así que NO colapsar el null en array vacío acá.
+        inboxDepartments: Array.isArray(bot.inbox_departments) ? bot.inbox_departments as string[] : null,
       };
     }
   }
@@ -4954,6 +4970,7 @@ async function runAgent(req: AgentRequest): Promise<{
         senderUserId: null,
         messageId: req.message_id,
         department: botCfg?.department ?? null,
+        inboxDepartments: botCfg?.inboxDepartments ?? null,
       });
       await logEvent(sb, {
         tenantId: group.tenant_id,
@@ -5079,6 +5096,15 @@ async function runAgent(req: AgentRequest): Promise<{
     "al privado y vuelve a enviarlo.";
   const escriturasOk = new Set<string>();
   let ackBloqueados = 0;
+
+  // Qué tools PIDIÓ el modelo en esta corrida (nombre → veces). Se guarda en el
+  // context de api_usage_log para poder recortar la lista por datos y no a ojo.
+  // Motivo: el bot de Ventas recibe ~58 tools y el de Managers 13, y esa lista es
+  // la mitad del prefijo que se re-lee en CADA respuesta. Sin este registro, podar
+  // es adivinar: quitar una que sí se usaba deja al bot diciendo "no puedo ver eso".
+  // Se cuenta lo PEDIDO, no lo ejecutado — una tool que el modelo pide y que una
+  // guarda bloquea igual tiene que seguir en la lista.
+  const toolsPedidas = new Map<string, number>();
 
   let finalReply: string | null = null;
   // Por qué la corrida terminó sin publicar nada (se reporta en el evento agent_silent).
@@ -5357,6 +5383,7 @@ async function runAgent(req: AgentRequest): Promise<{
 
     const toolResults: Array<Record<string, unknown>> = [];
     for (const t of toolUses) {
+      toolsPedidas.set(String(t.name), (toolsPedidas.get(String(t.name)) ?? 0) + 1);
       // SINGLE-FLIGHT (una sola respuesta por corrida): si el modelo emitió VARIOS
       // reply_to_group en la misma respuesta (tool-use en paralelo), ejecutamos SOLO
       // el primero. Los demás se ignoran → evita 2-4 mensajes seguidos que se
@@ -5426,6 +5453,7 @@ async function runAgent(req: AgentRequest): Promise<{
           senderUserId: senderCtx.senderUserId,
           messageId: senderCtx.messageId,
           department: botCfg?.department ?? null,
+          inboxDepartments: botCfg?.inboxDepartments ?? null,
           privileged,
           canSeePhones,
         },
@@ -5474,7 +5502,16 @@ async function runAgent(req: AgentRequest): Promise<{
     model: modelToUse,
     usage: totalUsage,
     tenantId: group.tenant_id,
-    context: { group_id: group.id, iterations: iter + 1, invoked_by: req.invoked_by },
+    context: {
+      group_id: group.id,
+      iterations: iter + 1,
+      invoked_by: req.invoked_by,
+      // Para derivar la allowlist con datos (ver toolsPedidas). `tools_ofrecidas`
+      // es el denominador: sin él no se sabe si una tool no se usó porque sobra o
+      // porque ese bot ni la tenía.
+      tools_usadas: Object.fromEntries(toolsPedidas),
+      tools_ofrecidas: activeTools.length,
+    },
   });
 
   // ── OBSERVABILIDAD: dejar rastro cuando la corrida termina SIN hablar ────────
