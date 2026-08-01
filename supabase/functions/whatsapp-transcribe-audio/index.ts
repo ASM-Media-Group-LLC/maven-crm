@@ -191,13 +191,22 @@ function buildWhisperForm(blob: Blob, modelName: string, glossary: Glossary, hot
   // compromisos sin que Whisper "invente" palabras.
   form.append("temperature", "0");
   // Glosario (ver _shared/whisper-glossary.ts): sin él, Whisper escribía "shit"
-  // por sheet, "hop stop" por Hubstaff y "calorina" por Carolina — y sobre esas
-  // palabras el bot decide. `prompt` lo honran ambos providers.
-  if (glossary.prompt) form.append("prompt", glossary.prompt);
-  // `hotwords` es de speaches (self-host): a diferencia del prompt, sigue activo
-  // en TODAS las ventanas de un audio largo. Groq no lo acepta → nunca se manda ahí.
-  // (El server viejo lo ignora sin quejarse hasta que se migre el contenedor.)
-  if (hotwords && glossary.hotwords) form.append("hotwords", glossary.hotwords);
+  // por sheet, "hop stop" por Hubstaff y "calorina" por Carolina.
+  //
+  // ⚠️ UNO SOLO, NUNCA LOS DOS. El decoder de Whisper tiene 448 tokens de
+  // contexto y faster-whisper mete `prompt` Y `hotwords` ahí, cada uno hasta
+  // max_length//2 - 1 = 223 tokens. Mandando ambos con el mismo glosario da
+  // ~446 tokens de contexto y, sumado al texto generado, revienta con
+  // "RuntimeError: No position encodings are defined for positions >= 448"
+  // (500 en cada audio del self-host, verificado en prod 01/08).
+  //   · self-host → hotwords: sigue activo en TODAS las ventanas del audio
+  //     (el prompt solo condiciona los primeros 30s).
+  //   · Groq      → prompt: no soporta hotwords.
+  if (hotwords) {
+    if (glossary.hotwords) form.append("hotwords", glossary.hotwords);
+  } else if (glossary.prompt) {
+    form.append("prompt", glossary.prompt);
+  }
   return form;
 }
 

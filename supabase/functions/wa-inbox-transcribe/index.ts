@@ -38,10 +38,10 @@ async function transcribe(blob: Blob, glossary: Glossary): Promise<{ text: strin
   form.append("language", "es");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
-  // Glosario (jerga + equipo + creadoras): acá no hay grupo del bot, así que va
-  // sin miembros dinámicos. hotwords es de speaches — esta función SOLO habla con
-  // el self-host, así que se manda siempre (el server viejo lo ignora).
-  if (glossary.prompt) form.append("prompt", glossary.prompt);
+  // Glosario (jerga + equipo + creadoras). SOLO hotwords, nunca junto al prompt:
+  // faster-whisper mete los dos en los 448 tokens del decoder (223 c/u) y con
+  // ambos revienta con "positions >= 448". Esta función solo habla con el
+  // self-host, así que hotwords es la opción correcta (persiste en todo el audio).
   if (glossary.hotwords) form.append("hotwords", glossary.hotwords);
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
