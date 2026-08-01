@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { EXT_TOKEN, CRON_TOKEN } from "./config.mjs";
 import { runAccount, sleep, readCooldowns, sessionInfo, openLoginTo, saveLoginTo } from "./agent-core.mjs";
 import { runTelegram } from "./tg-scraper.mjs";
+import { runJoin } from "./tg-join.mjs";
 import { runX } from "./x-scraper.mjs";
 import { NETWORKS, accountsOf, addAccount, removeAccount, sessionPath } from "./accounts.mjs";
 
@@ -112,6 +113,19 @@ const server = createServer(async (req, res) => {
     if (running) return json(res, 409, { ok: false, error: "ya_corriendo" });
     const b = await readBody(req);
     runScan(network, Array.isArray(b.ids) && b.ids.length ? b.ids : null);
+    return json(res, 200, { ok: true });
+  }
+  // canales de Telegram:  POST /api/tg-join  {join?, max?, aprobacion?}
+  // Sin `join` solo releva (no se une a nada). Comparte el candado `running` con el
+  // scan: una sola cuenta de Telegram, un solo navegador a la vez.
+  if (req.method === "POST" && u.pathname === "/api/tg-join") {
+    if (running) return json(res, 409, { ok: false, error: "ya_corriendo" });
+    const b = await readBody(req);
+    running = true; stopFlag = false; broadcast("status", statusPayload());
+    runJoin({ join: !!b.join, max: Number(b.max) || 4, aprobacion: !!b.aprobacion, headless: true },
+            { log, shouldStop: () => stopFlag })
+      .catch((e) => log(`Telegram/canales falló: ${e.message}`))
+      .finally(() => { running = false; broadcast("done", { at: Date.now() }); broadcast("status", statusPayload()); });
     return json(res, 200, { ok: true });
   }
   if (req.method === "POST" && u.pathname === "/api/stop") { stopFlag = true; return json(res, 200, { ok: true }); }

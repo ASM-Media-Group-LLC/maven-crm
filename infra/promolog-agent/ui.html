@@ -97,6 +97,9 @@ function render(st){
       <div class="netactions">
         <button data-scan="${net.network}" ${busy?"disabled":""}>▶︎ Escanear ${net.label}</button>
         <button class="secondary" data-add="${net.network}">＋ Agregar cuenta</button>
+        ${net.network==="telegram" ? `<span style="width:1px;height:22px;background:var(--line)"></span>
+        <button class="secondary" data-tgcheck="1" ${busy?"disabled":""} title="Mira en cuáles canales está la cuenta. No se une a nada.">🔎 Revisar canales</button>
+        <button class="secondary" data-tgjoin="1" ${busy?"disabled":""} title="Se une a los canales que falten, de a 4 por vez.">🚪 Unirme a los que faltan</button>` : ""}
       </div></div>`;
   }).join("");
   $("#stop").disabled = !busy;
@@ -132,6 +135,10 @@ document.addEventListener("click", async (e) => {
   else if (d.login){ LOGIN[d.login]="open"; const [n,id]=d.login.split(":"); await post(`/api/login/${n}/${id}/open`); await refresh(); }
   else if (d.save){ const [n,id]=d.save.split(":"); await post(`/api/login/${n}/${id}/save`); LOGIN[d.save]=null; await refresh(); }
   else if (d.scan){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post(`/api/scan/${d.scan}`); }
+  else if (d.tgcheck){ await post("/api/tg-join", { join:false }); }
+  // De a 4 por tanda: unirse a muchos canales seguidos es lo que dispara el límite
+  // de Telegram, y esta cuenta es la única que ve los canales privados.
+  else if (d.tgjoin){ await post("/api/tg-join", { join:true, max:4 }); }
   else if (t.id==="stop"){ await post("/api/stop"); }
 });
 </script>

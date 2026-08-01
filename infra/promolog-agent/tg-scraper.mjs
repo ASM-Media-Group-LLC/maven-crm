@@ -2,8 +2,13 @@
 //   • PÚBLICOS (t.me/<user> o @user): se leen por `t.me/s/<user>` — vista pública,
 //     SIN login ni cuenta, con fetch pelado. Robusto.
 //   • PRIVADOS (t.me/+invite): necesitan que la cuenta dedicada sea MIEMBRO. Se leen
-//     con Playwright + web.telegram.org logueado. ⚠️ Es la parte a tunear en el
-//     primer run (leer el DOM de Telegram Web + matchear el canal por título).
+//     con Playwright + web.telegram.org logueado.
+//
+// ESTE ARCHIVO SOLO LEE. Unirse a un canal es de tg-join.mjs — una acción deliberada,
+// con tope y pausas, no algo que pase de rebote en medio de un scan (antes intentaba
+// un click de "Join" acá que además nunca funcionó: la landing t.me/+hash no tiene
+// sesión ni UI de unirse). Cuando el canal pide membresía, el scan lo dice en el
+// informe y sigue: prefiero un "no revisado" honesto que un "no promocionó" falso.
 //
 // Los posts scrapeados se mandan a telegram-scan?mode=ingest → reusa la MISMA
 // clasificación y persist que el gateway. Targets en vivo desde telegram-scan?mode=targets.
@@ -13,15 +18,8 @@ import { existsSync } from "node:fs";
 import { MAVEN_URL, CRON_TOKEN, TG_SESSION, HEADFUL } from "./config.mjs";
 import { sleep } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
-
-const norm = (s) => String(s ?? "").trim();
-const isInvite = (h) => /t\.me\/\+|t\.me\/joinchat/i.test(h);
-const publicUser = (h) => {
-  const m = String(h).match(/t\.me\/(?:s\/)?([A-Za-z0-9_]+)/);
-  if (m) return m[1];
-  const at = String(h).replace(/^@/, "");
-  return /^[A-Za-z0-9_]+$/.test(at) ? at : null;
-};
+import { parseHandle } from "./tg-links.mjs";
+import { abrir, snapshot, estado, inviteVivo } from "./tg-web.mjs";
 
 async function fetchTargets() {
   const r = await fetch(`${MAVEN_URL}/functions/v1/telegram-scan`, {
@@ -97,32 +95,35 @@ async function scrapePublic(user, hours = 24) {
 // Este era el hueco: para los canales con username el scraper solo probaba
 // t.me/s (vista pública SIN cuenta) y si estaba desactivada se rendía… teniendo
 // la sesión al lado. Verificado: la cuenta local es miembro de 15+ canales y
-// abriendo web.telegram.org/k/#@usuario se leen sus mensajes sin problema.
+// abriendo el deep link del web app se leen sus mensajes sin problema.
 //
 // Cada mensaje trae data-timestamp (unix s) y data-mid → fecha real + permalink
 // estable para el dedup (nada de meter posts viejos como de hoy).
-async function scrapeTelegramWeb(page, ref, hours = 24) {
-  const esInvite = isInvite(ref);
-  const user = esInvite ? null : publicUser(ref);
-  const url = esInvite
-    ? (ref.startsWith("http") ? ref : `https://${ref}`)      // invite: abre el join/preview
-    : `https://web.telegram.org/k/#@${user}`;                 // username: abre el chat directo
-  try {
-    // ⚠️ RECARGA OBLIGATORIA: con `#@usuario` solo cambia el HASH y la SPA NO cambia
-    // de chat → se leían los mensajes del chat anterior y se le atribuía la promo de
-    // una creadora a TODAS las siguientes (pasó: 12 canales con el mismo texto).
-    // Un load completo hace que el web app lea el hash al arrancar y abra el correcto.
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
-  } catch { return null; }
-  await sleep(8000);                                          // el web app tarda en pintar
-  // Si el invite pide unirse, intentarlo (algunos requieren aprobación del admin).
-  if (esInvite) {
-    for (const sel of ['button:has-text("Join")', 'button:has-text("Unirse")', '.popup-button:has-text("Join")']) {
-      const b = await page.$(sel).catch(() => null);
-      if (b) { await b.click().catch(() => {}); await sleep(4000); break; }
-    }
+//
+// Devuelve  { titulo, msgs }            → leído
+//           { noMiembro, needsApproval } → hay que unirse primero (tg-join.mjs)
+//           { invalido, detail }         → el link no lleva a ningún canal
+//           null                         → no cargó / no se pudo determinar
+async function scrapeTelegramWeb(page, p, hours = 24) {
+  // ⚠️ CARGA COMPLETA OBLIGATORIA (la hace `abrir`): con `#…` solo cambia el HASH y
+  // la SPA NO cambia de chat → se leían los mensajes del chat anterior y se le
+  // atribuía la promo de una creadora a TODAS las siguientes (pasó: 12 canales con
+  // el mismo texto).
+  try { await abrir(page, p.openUrl, 8000); } catch { return null; }
+
+  const snap = await snapshot(page);
+  let st = estado(snap);
+  // Un invite revocado no da error: el web app simplemente no abre nada. Sin esta
+  // segunda opinión (la landing pública de t.me, sin cuenta) el informe decía
+  // "reintentar" para siempre sobre un link que nunca va a funcionar.
+  if (st.state === "desconocido" && p.kind === "invite" && (await inviteVivo(p.hash)) === false) {
+    st = { state: "invalido" };
   }
+  if (st.state === "falta") return { noMiembro: true, needsApproval: !!st.needsApproval, titulo: snap.title };
+  if (st.state === "invalido") return { invalido: true, detail: st.detail };
+  if (st.state !== "ok") return null;
+
+  const user = p.kind === "public" ? p.username : null;
   const cutoff = Math.floor((Date.now() - hours * 3600e3) / 1000);
   try {
     const msgs = await page.evaluate(({ cut, uname }) => {
@@ -145,9 +146,7 @@ async function scrapeTelegramWeb(page, ref, hours = 24) {
     // GUARDA DE IDENTIDAD: además de abrir, hay que confirmar QUÉ chat se abrió.
     // Devolvemos el título del canal; el caller verifica que no se repita entre
     // creadoras distintas (así un fallo de navegación no vuelve a atribuir mal).
-    const titulo = await page.evaluate(() => document.querySelector(".chat-info .peer-title")?.textContent?.trim() || null);
-    if (!titulo) return null;
-    return { titulo, msgs };
+    return { titulo: snap.title, msgs };
   } catch { return null; }
 }
 
@@ -158,13 +157,20 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
   // Reparto: si hay N cuentas de Telegram, esta lee su parte (por hash del creator_id).
   if (count > 1) targets = targets.filter((t) => creatorSlot(t.creator_id, count) === index);
   log(`▶️ Telegram cuenta ${index + 1}/${count}: ${targets.length} canales (en vivo desde Maven).`);
-  const pub = targets.filter((t) => !isInvite(t.handle) && publicUser(t.handle));
-  const priv = targets.filter((t) => isInvite(t.handle));
+  // Un solo parseo para todos (tg-links.mjs). Lo que no es ni público ni invite NO se
+  // descarta en silencio: antes un handle raro (hash pelado sin t.me, un link t.me/m/…)
+  // no entraba en ninguna de las dos listas y desaparecía del scan — ni leído ni
+  // reportado. Un canal invisible es peor que uno que falla.
+  const conP = targets.map((t) => ({ ...t, p: parseHandle(t.handle) }));
+  const pub = conP.filter((t) => t.p.kind === "public");
+  const priv = conP.filter((t) => t.p.kind === "invite");
+  const raros = conP.filter((t) => t.p.kind === "unknown");
 
   // 1) PÚBLICOS (sin cuenta)
   const batch = [];
   const handleByCreator = new Map();
   const noLegibles = [];   // {handle, reason} → van al informe de la corrida
+  for (const t of raros) noLegibles.push({ handle: t.name, reason: `el handle de Telegram guardado en Maven no es un canal: "${t.handle}" — hay que corregirlo en la ficha de la creadora` });
   const acc = { leidos: 0, con_promo: 0, sin_promo: 0, leidos_sin_posts: 0, detalle_con_promo: [] };
   const porWeb = [];   // públicos sin preview → se intentan con la sesión
   let ultimoTitulo = null;   // guarda anti-atribución cruzada (ver scrapeTelegramWeb)
@@ -179,7 +185,7 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
   };
   for (const t of pub) {
     if (shouldStop()) break;
-    const user = publicUser(t.handle);
+    const user = t.p.username;
     handleByCreator.set(t.creator_id, user);
     let posts = await scrapePublic(user);
     if (posts == null) porWeb.push(t);                        // sin preview → lo intenta la sesión
@@ -204,9 +210,24 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
       const page = await context.newPage();
       for (const t of porSesion) {
         if (shouldStop()) break;
-        const etiqueta = publicUser(t.handle) || t.name;
+        const etiqueta = t.p.kind === "public" ? t.p.username : (t.name || t.p.label);
         handleByCreator.set(t.creator_id, etiqueta);
-        const leido = await scrapeTelegramWeb(page, t.handle);
+        const leido = await scrapeTelegramWeb(page, t.p);
+        // Falta membresía / link muerto: son diagnósticos DISTINTOS de "no cargó", y
+        // cada uno pide una acción distinta. Decirlos con nombre es lo que hace que el
+        // informe sirva para algo en vez de mandar a Jhon a adivinar.
+        if (leido?.noMiembro) {
+          noLegibles.push({ handle: etiqueta, reason: leido.needsApproval
+            ? `la cuenta no es miembro y el canal pide aprobación del admin — correr: node --env-file=.env tg-join.mjs --join --pedir-aprobacion --only ${etiqueta}`
+            : "la cuenta no es miembro del canal — correr: node --env-file=.env tg-join.mjs --join" });
+          log(`🔒 ${etiqueta}: falta unirse al canal`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
+          await sleep(3000); continue;
+        }
+        if (leido?.invalido) {
+          noLegibles.push({ handle: etiqueta, reason: "el link de invitación ya no lleva a ningún canal (revocado o vencido) — hay que pedirle uno nuevo a la creadora y actualizarlo en Maven" });
+          log(`❌ ${etiqueta}: link de invitación muerto`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
+          await sleep(3000); continue;
+        }
         // Anti-atribución cruzada: si el chat abierto es el MISMO que el del target
         // anterior, la navegación falló → no se atribuye nada.
         if (leido && leido.titulo && leido.titulo === ultimoTitulo) {
@@ -218,7 +239,7 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
         const posts = leido ? leido.msgs : null;
         // Si no se pudo leer, NO se manda posts:[] (sería un "No" falso).
         if (posts == null) {
-          noLegibles.push({ handle: etiqueta, reason: isInvite(t.handle) ? "canal privado: la cuenta no es miembro (o el invite pide aprobación del admin)" : "no se pudo abrir el canal en Telegram Web con esta cuenta" });
+          noLegibles.push({ handle: etiqueta, reason: "no se pudo abrir el canal en Telegram Web (no cargó o quedó a medias) — reintentar" });
           log(`🔒 ${etiqueta}: no se pudo leer — no se marca nada`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
         } else if (posts.length === 0) {
           // CONSERVADOR: por esta vía, 0 mensajes NO se afirma como "no promocionó"

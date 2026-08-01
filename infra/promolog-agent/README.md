@@ -71,9 +71,8 @@ Además de IG, el panel tiene una sección **"Otras redes (Plan B local)"**. Est
 corren donde conviene, pero se disparan desde el mismo panel:
 - **Telegram**: los canales **públicos** se leen por `t.me/s/` (sin cuenta). Los
   **privados** (invite) necesitan **loguear la cuenta dedicada** (botón Loguear →
-  QR con el teléfono de esa cuenta). El scraper se une a los invites y lee por
-  web.telegram.org. ⚠️ La lectura de privados por DOM es la parte a **tunear en el
-  primer run** (`scrapePrivate()` en `tg-scraper.mjs`).
+  QR con el teléfono de esa cuenta) **y que esa cuenta sea miembro del canal**
+  (ver abajo). El scan solo LEE: unirse es una acción aparte y deliberada.
 - **X**: **loguear una cuenta de X** (botón Loguear). Navega los perfiles y lee los
   tweets. ⚠️ Los selectores del DOM de x.com cambian seguido — si no extrae tweets,
   se ajusta `extractTweets()` en `x-scraper.mjs`.
@@ -83,6 +82,33 @@ MISMA clasificación que las corridas server-side (cron). Los targets salen **en
 de Maven (`mode:targets`): creadora inactiva deja de escanearse, nueva activa entra sola.
 
 Requiere `CRON_INTERNAL_TOKEN` en el `.env` (solo Telegram/X lo usan; IG no).
+
+### Unirse a los canales de Telegram
+Un canal privado que la cuenta no tiene **no se puede leer** — el scan lo reporta
+como "no revisado" (nunca como "no promocionó"). Para meter la cuenta:
+
+En el panel, en la tarjeta de Telegram:
+- **🔎 Revisar canales** — dice en cuáles está y cuáles faltan. **No se une a nada.**
+- **🚪 Unirme a los que faltan** — se une **de a 4 por tanda**. Apretalo de nuevo
+  para la siguiente. De a poco a propósito: unirse a muchos canales seguidos es lo
+  que dispara el `FLOOD_WAIT` de Telegram, y esta cuenta es la única que ve los
+  privados. Si Telegram empieza a limitar, corta la corrida sola.
+
+Por terminal, lo mismo con más control:
+```bash
+node --env-file=.env tg-join.mjs                       # releva, no se une
+node --env-file=.env tg-join.mjs --join --max 4        # tanda de 4
+node --env-file=.env tg-join.mjs --only moramay        # uno solo
+node --env-file=.env tg-join.mjs --all                 # incluye los públicos
+```
+El estado queda en `sessions/tg-membership.json` (se retoma donde quedó).
+
+Dos casos que **no** se resuelven solos y salen en el informe:
+- **Pide aprobación del admin** — mandar la solicitud le aparece a la creadora con
+  el nombre y la foto de esta cuenta, así que no pasa de rebote: hay que pedirlo
+  con `--pedir-aprobacion`.
+- **Link vencido/revocado** — hay que pedirle uno nuevo a la creadora y
+  actualizarlo en su ficha de Maven.
 
 ## Cómo se reparte la carga
 `promolog-scan-targets?slot=a&slots=2` devuelve una partición estable por creadora
