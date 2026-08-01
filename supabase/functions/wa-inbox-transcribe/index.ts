@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
+import { buildGlossaryPrompt } from "../_shared/whisper-glossary.ts";
 
 // wa-inbox-transcribe — transcribe los AUDIOS de la BANDEJA (wa_conversation_messages)
 // con el Whisper self-hosted de Dokploy, y escribe el texto en `body`.
@@ -19,11 +20,13 @@ const WHISPER_MODEL = Deno.env.get("WHISPER_API_MODEL") ?? "deepdml/faster-whisp
 const TIMEOUT_MS = 90_000;
 const MAX_BYTES = 25 * 1024 * 1024;
 
+const GLOSSARY = await buildGlossaryPrompt(null, null);
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
 }
 
-async function transcribe(blob: Blob): Promise<{ text: string } | { error: string }> {
+async function transcribe(blob: Blob, glossary = ""): Promise<{ text: string } | { error: string }> {
   if (!WHISPER_URL) return { error: "WHISPER_API_URL_not_set" };
   const ext = (blob.type || "").includes("mp4") || (blob.type || "").includes("m4a") ? "m4a" : "ogg";
   const form = new FormData();
@@ -32,6 +35,9 @@ async function transcribe(blob: Blob): Promise<{ text: string } | { error: strin
   form.append("language", "es");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
+  // Glosario fijo (jerga + nombres del equipo): acá no hay grupo del bot, así que
+  // va sin miembros dinámicos. Whisper igual deja de escribir "shit" por sheet.
+  if (glossary) form.append("prompt", glossary);
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
   try {
@@ -61,7 +67,7 @@ async function processOne(sb: any, row: { id: string; media_url: string }): Prom
     const buf = new Uint8Array(await resp.arrayBuffer());
     if (!buf.length || buf.length > MAX_BYTES) { await mark("[audio no transcribible: tamaño]"); return false; }
     const mime = resolveMimeType(resp.headers.get("content-type"), buf, "audio/ogg");
-    const res = await transcribe(new Blob([buf], { type: mime }));
+    const res = await transcribe(new Blob([buf], { type: mime }), GLOSSARY);
     if ("error" in res) {
       console.warn("transcribe failed", row.id, res.error);
       // Solo marcamos permanente si NO es transitorio (timeout/red) — esos reintentan.

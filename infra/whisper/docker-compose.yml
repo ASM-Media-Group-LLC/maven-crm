@@ -48,7 +48,12 @@ services:
       # worker carga el modelo en RAM (~1.5GB para large-v3-turbo).
       # Para audios de WhatsApp con bajo throughput, 1-2 alcanza.
       WHISPER__INFERENCE_DEVICE: cpu
-      WHISPER__COMPUTE_TYPE: int8
+      # int8_float32 = pesos cuantizados (mismo RAM que int8) pero activaciones en
+      # float32 → un poco más lento y un poco más preciso. Se cambió de int8 tras
+      # los errores del 31/07 ("shit" por sheet, "hop stop" por Hubstaff): en CPU es
+      # el único salto de precisión disponible sin cambiar de modelo — large-v3
+      # completo acá tarda 4-8x y revienta el timeout de 90s de la edge function.
+      WHISPER__COMPUTE_TYPE: int8_float32
       # Auth simple via API key. El servidor compara este valor contra
       # el header Authorization: Bearer <key>. Lo seteamos al mismo
       # valor que la edge function va a mandar.

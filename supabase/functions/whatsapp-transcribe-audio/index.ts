@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGroqAudioUsage } from "../_shared/usage.ts";
+import { buildGlossaryPrompt } from "../_shared/whisper-glossary.ts";
 
 // whatsapp-transcribe-audio — transcribe audios del grupo con Whisper.
 //
@@ -55,6 +56,10 @@ interface TranscribeRequest {
   // Modo batch: procesa audios pending (catch-up).
   batch?: boolean;
   batch_size?: number;
+  // Modo PRUEBA: re-transcribe el audio y DEVUELVE el texto, sin tocar la DB ni
+  // disparar extractor/agente. Para A/B de calidad (p.ej. glosario) contra audios
+  // reales ya guardados — un re-proceso normal haría que el bot conteste de nuevo.
+  test_message_id?: string;
 }
 
 // Response shape de Whisper con response_format='verbose_json'. Tanto
@@ -135,7 +140,7 @@ async function downloadAudio(url: string): Promise<Blob | { error: string }> {
 //   - Groq:       "whisper-large-v3-turbo" (alias propio de Groq)
 //   - self-hosted: path HuggingFace, ej. "deepdml/faster-whisper-large-v3-turbo-ct2"
 //     (faster-whisper-server requiere el path completo para descargar/cargar)
-function buildWhisperForm(blob: Blob, modelName: string): FormData {
+function buildWhisperForm(blob: Blob, modelName: string, glossary: string): FormData {
   // WhatsApp audios suelen ser .ogg opus en Android y .m4a/.aac en iOS.
   // Pasamos un nombre con extensión coherente con el MIME.
   const mime = blob.type || "audio/ogg";
@@ -156,6 +161,10 @@ function buildWhisperForm(blob: Blob, modelName: string): FormData {
   // temperature=0 = output determinístico, mejor para detectar
   // compromisos sin que Whisper "invente" palabras.
   form.append("temperature", "0");
+  // Glosario (ver _shared/whisper-glossary.ts): sin él, Whisper escribía "shit"
+  // por sheet, "hop stop" por Hubstaff y "calorina" por Carolina — y sobre esas
+  // palabras el bot decide. Lo honran ambos providers (API OpenAI-compatible).
+  if (glossary) form.append("prompt", glossary);
   return form;
 }
 
@@ -164,8 +173,9 @@ async function callWhisperEndpoint(
   authHeader: string | null,
   blob: Blob,
   modelName: string,
+  glossary: string,
 ): Promise<{ text: string; duration_s: number } | { error: string }> {
-  const form = buildWhisperForm(blob, modelName);
+  const form = buildWhisperForm(blob, modelName, glossary);
   const ac = new AbortController();
   const timeoutId = setTimeout(() => ac.abort(), WHISPER_TIMEOUT_MS);
   try {
@@ -199,11 +209,11 @@ async function callWhisperEndpoint(
 
 // Transcribe usando self-hosted primero, fallback a Groq si falla.
 // Devuelve qué provider terminó atendiendo, para el logging y telemetría.
-async function transcribeWithFallback(blob: Blob): Promise<TranscribeResult> {
+async function transcribeWithFallback(blob: Blob, glossary: string): Promise<TranscribeResult> {
   // 1. Self-hosted (preferido si está configurado).
   if (SELF_HOSTED_URL) {
     const authHeader = SELF_HOSTED_KEY ? `Bearer ${SELF_HOSTED_KEY}` : null;
-    const r = await callWhisperEndpoint(SELF_HOSTED_URL, authHeader, blob, SELF_HOSTED_MODEL);
+    const r = await callWhisperEndpoint(SELF_HOSTED_URL, authHeader, blob, SELF_HOSTED_MODEL, glossary);
     if (!("error" in r)) {
       return { ok: true, text: r.text, duration_s: r.duration_s, provider: "self_hosted" };
     }
@@ -223,7 +233,7 @@ async function transcribeWithFallback(blob: Blob): Promise<TranscribeResult> {
         : "no_whisper_provider_configured",
     };
   }
-  const r = await callWhisperEndpoint(GROQ_URL, `Bearer ${GROQ_API_KEY}`, blob, GROQ_MODEL);
+  const r = await callWhisperEndpoint(GROQ_URL, `Bearer ${GROQ_API_KEY}`, blob, GROQ_MODEL, glossary);
   if ("error" in r) {
     return { ok: false, error: `groq: ${r.error}` };
   }
@@ -343,7 +353,8 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: blob.error };
   }
 
-  const result = await transcribeWithFallback(blob);
+  const glossary = await buildGlossaryPrompt(sb, msg.group_id);
+  const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,
@@ -431,6 +442,34 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   return { ok: true };
 }
 
+// Re-transcribe SIN efectos: ni update, ni extractor, ni agente. Devuelve el
+// texto nuevo junto al guardado, para comparar al lado del otro.
+async function testTranscribe(messageId: string): Promise<Record<string, unknown>> {
+  const sb = adminClient();
+  const { data: msg } = await sb
+    .from("whatsapp_messages")
+    .select("id, group_id, msg_type, media_url, transcribed_text, raw")
+    .eq("id", messageId)
+    .single();
+  if (!msg) return { ok: false, error: "message_not_found" };
+  if (msg.msg_type !== "audio") return { ok: false, error: "not_audio" };
+
+  let blob: Blob | { error: string } = await downloadAudioViaGateway(msg.raw);
+  if ("error" in blob && msg.media_url) blob = await downloadAudio(msg.media_url);
+  if ("error" in blob) return { ok: false, error: `download: ${blob.error}` };
+
+  const glossary = await buildGlossaryPrompt(sb, msg.group_id);
+  const result = await transcribeWithFallback(blob, glossary);
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    provider: result.provider,
+    guardado: msg.transcribed_text,
+    nuevo: result.text,
+    glossary_usado: glossary.slice(0, 300),
+  };
+}
+
 async function processBatch(batchSize: number): Promise<number> {
   const sb = adminClient();
   const { data: pending } = await sb
@@ -480,6 +519,13 @@ serve(async (req) => {
   }
 
   try {
+    if (body.test_message_id) {
+      const r = await testTranscribe(body.test_message_id);
+      return new Response(JSON.stringify(r), {
+        status: 200,
+        headers: { ...whatsappCors, "Content-Type": "application/json" },
+      });
+    }
     if (body.message_id) {
       const r = await processMessage(body.message_id);
       return new Response(JSON.stringify({ ok: r.ok, reason: r.reason }), {

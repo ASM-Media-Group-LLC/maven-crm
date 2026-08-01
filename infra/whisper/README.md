@@ -148,6 +148,15 @@ WHISPER_FALLBACK_ENABLED=false
 - Verificá que `DEFAULT_LANGUAGE: es` está seteado
 - Si los audios tienen mucho ruido, considerar pre-procesado (no implementado acá)
 
+**Nombres propios / jerga mal transcritos ("shit" por sheet, "hop stop" por Hubstaff)**
+- El fix NO está acá: es el **glosario** que las edge functions mandan como `prompt`
+  (ver `supabase/functions/_shared/whisper-glossary.ts`). Whisper sesga la
+  decodificación hacia esos términos. Nombre nuevo que Whisper masacre → agregarlo
+  a ese glosario (constantes `EQUIPO` / `HERRAMIENTAS`).
+- Además el compose usa `WHISPER__COMPUTE_TYPE: int8_float32` (más preciso que
+  int8 puro, mismo RAM). Cambios al compose requieren **Redeploy manual** de la
+  app `whisper` en Dokploy — no se auto-deploya con el push.
+
 **Logs**
 - En Dokploy → la app → **Logs** ves stdout/stderr del container
 - En el panel admin de Maven Bot, los errores también aparecen en la tab "Eventos" del grupo correspondiente
