@@ -25,15 +25,21 @@
 #      fallback automático a Groq.
 #
 # VARIANTE GPU (opcional, si tu server tiene GPU NVIDIA):
-#   Cambiar la imagen a: fedirz/faster-whisper-server:latest-cuda
+#   Cambiar la imagen a: ghcr.io/speaches-ai/speaches:latest-cuda
 #   Agregar la sección deploy con runtime: nvidia
-#   Esto es ~25x más rápido pero requiere drivers NVIDIA + nvidia-docker.
+#   ~25x más rápido → permitiría large-v3 COMPLETO (más preciso que el turbo).
 
 version: "3.8"
 
 services:
   whisper:
-    image: fedirz/faster-whisper-server:latest-cpu
+    # speaches = el SUCESOR oficial de faster-whisper-server (mismo autor; el
+    # repo viejo quedó archivado y sin parches). Misma API OpenAI-compatible —
+    # las edge functions no cambian — pero con faster-whisper/CTranslate2 al
+    # día y `hotwords` en el endpoint (sesgo de nombres propios que, a
+    # diferencia del prompt, sigue activo en todas las ventanas de un audio
+    # largo; whatsapp-transcribe-audio ya lo manda).
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
     container_name: maven-whisper
     restart: unless-stopped
     environment:
@@ -41,9 +47,6 @@ services:
       # en el primer request (cold start ~30s). Precargar es preferible
       # para producción.
       WHISPER__MODEL: deepdml/faster-whisper-large-v3-turbo-ct2
-      # Idioma default. WA del equipo es 99% español, le forzamos para
-      # mejor precisión y para que Whisper no pierda tiempo detectando.
-      DEFAULT_LANGUAGE: es
       # Workers: cuántos requests simultáneos podemos procesar. Cada
       # worker carga el modelo en RAM (~1.5GB para large-v3-turbo).
       # Para audios de WhatsApp con bajo throughput, 1-2 alcanza.
@@ -54,6 +57,11 @@ services:
       # el único salto de precisión disponible sin cambiar de modelo — large-v3
       # completo acá tarda 4-8x y revienta el timeout de 90s de la edge function.
       WHISPER__COMPUTE_TYPE: int8_float32
+      # 0 = auto (todos los cores). Si el VPS va justo de CPU compartida, fijar
+      # un número explícito acá. El beam search ya corre en 5 (default de
+      # faster-whisper) — no hay que configurarlo.
+      WHISPER__CPU_THREADS: "0"
+
       # Auth simple via API key. El servidor compara este valor contra
       # el header Authorization: Bearer <key>. Lo seteamos al mismo
       # valor que la edge function va a mandar.
@@ -65,9 +73,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Cache de modelos. Sin esto Whisper baja el modelo (~1.5GB) en
-      # cada deploy. Es ~3-5 min de cold start y consume bandwidth.
-      - whisper-models:/root/.cache/huggingface
+      # Cache de modelos. Sin esto Whisper baja el modelo (~1.5GB) en cada
+      # deploy (~3-5 min de cold start). ⚠️ speaches corre como usuario
+      # `ubuntu`, no root → el path del cache CAMBIÓ; el primer arranque tras
+      # la migración re-descarga el modelo una vez y después queda cacheado.
+      - whisper-models:/home/ubuntu/.cache/huggingface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

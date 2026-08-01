@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGroqAudioUsage } from "../_shared/usage.ts";
-import { buildGlossaryPrompt } from "../_shared/whisper-glossary.ts";
+import { buildGlossary, type Glossary } from "../_shared/whisper-glossary.ts";
 
 // whatsapp-transcribe-audio — transcribe audios del grupo con Whisper.
 //
@@ -69,12 +69,41 @@ interface WhisperResponse {
   text: string;
   language?: string;
   duration?: number;
-  segments?: Array<{ start: number; end: number; text: string }>;
+  // verbose_json trae POR SEGMENTO las señales de confianza (formato OpenAI,
+  // lo emiten igual speaches y Groq). Antes las descartábamos.
+  segments?: Array<{
+    start: number;
+    end: number;
+    text: string;
+    avg_logprob?: number;
+    no_speech_prob?: number;
+    compression_ratio?: number;
+  }>;
 }
 
 type TranscribeResult =
-  | { ok: true; text: string; duration_s: number; provider: "self_hosted" | "groq" }
+  | { ok: true; text: string; duration_s: number; provider: "self_hosted" | "groq"; dudosa: boolean; confianza: string }
   | { ok: false; error: string };
+
+// ¿La transcripción es confiable? Whisper lo venía diciendo y no lo mirábamos.
+// Umbrales conservadores (habla clara en es ≈ logprob -0.2..-0.5):
+//   · avg_logprob ponderado por duración < -0.85  → decodificó adivinando
+//   · compression_ratio > 2.4                     → se metió en un loop de repetición
+//   · no_speech_prob alto en todos los segmentos  → probablemente no era voz
+function evaluarConfianza(data: WhisperResponse): { dudosa: boolean; detalle: string } {
+  const segs = (data.segments ?? []).filter((s) => Number.isFinite(s?.avg_logprob));
+  if (!segs.length) return { dudosa: false, detalle: "sin señales" };
+  let dur = 0, acc = 0, maxCr = 0, minNs = 1;
+  for (const s of segs) {
+    const d = Math.max(0.1, (s.end ?? 0) - (s.start ?? 0));
+    dur += d; acc += (s.avg_logprob ?? 0) * d;
+    maxCr = Math.max(maxCr, s.compression_ratio ?? 0);
+    minNs = Math.min(minNs, s.no_speech_prob ?? 0);
+  }
+  const logprob = acc / (dur || 1);
+  const dudosa = logprob < -0.85 || maxCr > 2.4 || minNs > 0.6;
+  return { dudosa, detalle: `logprob=${logprob.toFixed(2)} cr=${maxCr.toFixed(1)} ns=${minNs.toFixed(2)}` };
+}
 
 const GATEWAY_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
 const GATEWAY_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
@@ -140,7 +169,7 @@ async function downloadAudio(url: string): Promise<Blob | { error: string }> {
 //   - Groq:       "whisper-large-v3-turbo" (alias propio de Groq)
 //   - self-hosted: path HuggingFace, ej. "deepdml/faster-whisper-large-v3-turbo-ct2"
 //     (faster-whisper-server requiere el path completo para descargar/cargar)
-function buildWhisperForm(blob: Blob, modelName: string, glossary: string): FormData {
+function buildWhisperForm(blob: Blob, modelName: string, glossary: Glossary, hotwords: boolean): FormData {
   // WhatsApp audios suelen ser .ogg opus en Android y .m4a/.aac en iOS.
   // Pasamos un nombre con extensión coherente con el MIME.
   const mime = blob.type || "audio/ogg";
@@ -163,8 +192,12 @@ function buildWhisperForm(blob: Blob, modelName: string, glossary: string): Form
   form.append("temperature", "0");
   // Glosario (ver _shared/whisper-glossary.ts): sin él, Whisper escribía "shit"
   // por sheet, "hop stop" por Hubstaff y "calorina" por Carolina — y sobre esas
-  // palabras el bot decide. Lo honran ambos providers (API OpenAI-compatible).
-  if (glossary) form.append("prompt", glossary);
+  // palabras el bot decide. `prompt` lo honran ambos providers.
+  if (glossary.prompt) form.append("prompt", glossary.prompt);
+  // `hotwords` es de speaches (self-host): a diferencia del prompt, sigue activo
+  // en TODAS las ventanas de un audio largo. Groq no lo acepta → nunca se manda ahí.
+  // (El server viejo lo ignora sin quejarse hasta que se migre el contenedor.)
+  if (hotwords && glossary.hotwords) form.append("hotwords", glossary.hotwords);
   return form;
 }
 
@@ -173,9 +206,10 @@ async function callWhisperEndpoint(
   authHeader: string | null,
   blob: Blob,
   modelName: string,
-  glossary: string,
-): Promise<{ text: string; duration_s: number } | { error: string }> {
-  const form = buildWhisperForm(blob, modelName, glossary);
+  glossary: Glossary,
+  hotwords: boolean,
+): Promise<{ text: string; duration_s: number; dudosa: boolean; confianza: string } | { error: string }> {
+  const form = buildWhisperForm(blob, modelName, glossary, hotwords);
   const ac = new AbortController();
   const timeoutId = setTimeout(() => ac.abort(), WHISPER_TIMEOUT_MS);
   try {
@@ -195,7 +229,8 @@ async function callWhisperEndpoint(
     const data = (await resp.json()) as WhisperResponse;
     const text = (data.text ?? "").trim();
     if (!text) return { error: "empty_transcript" };
-    return { text, duration_s: data.duration ?? 0 };
+    const conf = evaluarConfianza(data);
+    return { text, duration_s: data.duration ?? 0, dudosa: conf.dudosa, confianza: conf.detalle };
   } catch (e) {
     clearTimeout(timeoutId);
     const aborted = (e as Error).name === "AbortError";
@@ -209,13 +244,13 @@ async function callWhisperEndpoint(
 
 // Transcribe usando self-hosted primero, fallback a Groq si falla.
 // Devuelve qué provider terminó atendiendo, para el logging y telemetría.
-async function transcribeWithFallback(blob: Blob, glossary: string): Promise<TranscribeResult> {
+async function transcribeWithFallback(blob: Blob, glossary: Glossary): Promise<TranscribeResult> {
   // 1. Self-hosted (preferido si está configurado).
   if (SELF_HOSTED_URL) {
     const authHeader = SELF_HOSTED_KEY ? `Bearer ${SELF_HOSTED_KEY}` : null;
-    const r = await callWhisperEndpoint(SELF_HOSTED_URL, authHeader, blob, SELF_HOSTED_MODEL, glossary);
+    const r = await callWhisperEndpoint(SELF_HOSTED_URL, authHeader, blob, SELF_HOSTED_MODEL, glossary, true);
     if (!("error" in r)) {
-      return { ok: true, text: r.text, duration_s: r.duration_s, provider: "self_hosted" };
+      return { ok: true, text: r.text, duration_s: r.duration_s, provider: "self_hosted", dudosa: r.dudosa, confianza: r.confianza };
     }
     console.warn("self-hosted whisper failed:", r.error);
     if (!FALLBACK_ENABLED) {
@@ -233,11 +268,11 @@ async function transcribeWithFallback(blob: Blob, glossary: string): Promise<Tra
         : "no_whisper_provider_configured",
     };
   }
-  const r = await callWhisperEndpoint(GROQ_URL, `Bearer ${GROQ_API_KEY}`, blob, GROQ_MODEL, glossary);
+  const r = await callWhisperEndpoint(GROQ_URL, `Bearer ${GROQ_API_KEY}`, blob, GROQ_MODEL, glossary, false);
   if ("error" in r) {
     return { ok: false, error: `groq: ${r.error}` };
   }
-  return { ok: true, text: r.text, duration_s: r.duration_s, provider: "groq" };
+  return { ok: true, text: r.text, duration_s: r.duration_s, provider: "groq", dudosa: r.dudosa, confianza: r.confianza };
 }
 
 function fireExtractCommitments(messageId: string): void {
@@ -353,7 +388,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: blob.error };
   }
 
-  const glossary = await buildGlossaryPrompt(sb, msg.group_id);
+  const glossary = await buildGlossary(sb, msg.group_id);
   const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) {
     await logEvent(sb, {
@@ -372,10 +407,14 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: result.error };
   }
 
-  // Guardar transcripción y bumpear el extractor.
+  // Guardar transcripción y bumpear el extractor. Si Whisper mismo dice que
+  // decodificó adivinando, el texto queda MARCADO: Clari (y quien lea el chat)
+  // ve "[transcripción dudosa]" y puede repreguntar en vez de actuar en firme
+  // sobre basura — de ahí salieron los malentendidos con Álvaro del 31/07.
+  const textoFinal = (result.dudosa ? "[transcripción dudosa] " : "") + result.text;
   await sb
     .from("whatsapp_messages")
-    .update({ transcribed_text: result.text })
+    .update({ transcribed_text: textoFinal })
     .eq("id", msg.id);
 
   // Loggeamos costo solo si fue via Groq. Self-hosted no tiene costo
@@ -400,6 +439,8 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
       duration_s: result.duration_s,
       char_count: result.text.length,
       provider: result.provider,
+      dudosa: result.dudosa,
+      confianza: result.confianza,
     },
   });
 
@@ -458,7 +499,7 @@ async function testTranscribe(messageId: string): Promise<Record<string, unknown
   if ("error" in blob && msg.media_url) blob = await downloadAudio(msg.media_url);
   if ("error" in blob) return { ok: false, error: `download: ${blob.error}` };
 
-  const glossary = await buildGlossaryPrompt(sb, msg.group_id);
+  const glossary = await buildGlossary(sb, msg.group_id);
   const result = await transcribeWithFallback(blob, glossary);
   if (!result.ok) return { ok: false, error: result.error };
   return {
@@ -466,7 +507,9 @@ async function testTranscribe(messageId: string): Promise<Record<string, unknown
     provider: result.provider,
     guardado: msg.transcribed_text,
     nuevo: result.text,
-    glossary_usado: glossary.slice(0, 300),
+    dudosa: result.dudosa,
+    confianza: result.confianza,
+    glossary_usado: glossary.prompt.slice(0, 300),
   };
 }
 

@@ -1,6 +1,6 @@
 # Whisper self-hosted para Maven Bot WhatsApp
 
-Servicio Docker que corre [faster-whisper-server](https://github.com/fedirz/faster-whisper-server) y expone una API **OpenAI-compatible** para transcribir audios de WhatsApp **sin depender de Groq ni ElevenLabs**.
+Servicio Docker que corre [speaches](https://github.com/speaches-ai/speaches) (el sucesor oficial de faster-whisper-server — el repo viejo quedó archivado) y expone una API **OpenAI-compatible** para transcribir audios de WhatsApp **sin depender de Groq ni ElevenLabs**.
 
 ## Por qué self-host
 

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
-import { buildGlossaryPrompt } from "../_shared/whisper-glossary.ts";
+import { buildGlossary, type Glossary } from "../_shared/whisper-glossary.ts";
 
 // wa-inbox-transcribe — transcribe los AUDIOS de la BANDEJA (wa_conversation_messages)
 // con el Whisper self-hosted de Dokploy, y escribe el texto en `body`.
@@ -23,13 +23,13 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Una vez por cold start: jerga + equipo + creadoras activas (acá se habla CON
 // creadoras, sus nombres aparecen todo el tiempo). Sin grupo del bot → sin
 // miembros dinámicos. Si la query falla, cae al glosario fijo (nunca bloquea).
-const GLOSSARY = await buildGlossaryPrompt(adminClient(), null);
+const GLOSSARY = await buildGlossary(adminClient(), null);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
 }
 
-async function transcribe(blob: Blob, glossary = ""): Promise<{ text: string } | { error: string }> {
+async function transcribe(blob: Blob, glossary: Glossary): Promise<{ text: string } | { error: string }> {
   if (!WHISPER_URL) return { error: "WHISPER_API_URL_not_set" };
   const ext = (blob.type || "").includes("mp4") || (blob.type || "").includes("m4a") ? "m4a" : "ogg";
   const form = new FormData();
@@ -38,9 +38,11 @@ async function transcribe(blob: Blob, glossary = ""): Promise<{ text: string } |
   form.append("language", "es");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
-  // Glosario fijo (jerga + nombres del equipo): acá no hay grupo del bot, así que
-  // va sin miembros dinámicos. Whisper igual deja de escribir "shit" por sheet.
-  if (glossary) form.append("prompt", glossary);
+  // Glosario (jerga + equipo + creadoras): acá no hay grupo del bot, así que va
+  // sin miembros dinámicos. hotwords es de speaches — esta función SOLO habla con
+  // el self-host, así que se manda siempre (el server viejo lo ignora).
+  if (glossary.prompt) form.append("prompt", glossary.prompt);
+  if (glossary.hotwords) form.append("hotwords", glossary.hotwords);
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
   try {

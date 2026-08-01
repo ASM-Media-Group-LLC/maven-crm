@@ -74,12 +74,21 @@ async function creatorNames(sb: any): Promise<string[]> {
   }
 }
 
-/** Arma el prompt de vocabulario para un audio de este grupo.
+export interface Glossary {
+  /** Oración de contexto para el `prompt` estándar (lo honran self-host y Groq). */
+  prompt: string;
+  /** Lista pelada para `hotwords` de speaches (SOLO self-host — Groq no lo acepta).
+   *  A diferencia del prompt, que solo condiciona la primera ventana de 30s,
+   *  hotwords sigue activo en todas las ventanas de un audio largo. */
+  hotwords: string;
+}
+
+/** Arma el vocabulario para un audio de este grupo.
  *  ORDEN A PROPÓSITO: creadoras primero, herramientas al FINAL. Si el prompt
  *  excede el tope, Whisper se queda con los ÚLTIMOS ~224 tokens y descarta el
  *  principio — lo que se recorta primero son creadoras (degradación aceptable),
  *  nunca "Hubstaff"/"sheet"/el equipo, que son los errores ya vistos en prod. */
-export async function buildGlossaryPrompt(sb: any, groupId: string | null): Promise<string> {
+export async function buildGlossary(sb: any, groupId: string | null): Promise<Glossary> {
   const [creadoras, extra] = await Promise.all([creatorNames(sb), memberNames(sb, groupId)]);
   // dedup case-insensitive conservando la primera forma
   const seen = new Set<string>();
@@ -89,6 +98,15 @@ export async function buildGlossaryPrompt(sb: any, groupId: string | null): Prom
     seen.add(k);
     return true;
   });
-  return `Nota de voz del equipo de la agencia Kash, sobre gestión de modelos. ` +
-    `Suelen nombrar a ${all.slice(0, 85).join(", ")}.`;
+  const terms = all.slice(0, 85);
+  return {
+    prompt: `Nota de voz del equipo de la agencia Kash, sobre gestión de modelos. ` +
+      `Suelen nombrar a ${terms.join(", ")}.`,
+    hotwords: terms.join(", "),
+  };
+}
+
+/** Compat: la firma vieja (solo el prompt). */
+export async function buildGlossaryPrompt(sb: any, groupId: string | null): Promise<string> {
+  return (await buildGlossary(sb, groupId)).prompt;
 }
