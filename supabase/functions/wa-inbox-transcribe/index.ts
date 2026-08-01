@@ -20,7 +20,10 @@ const WHISPER_MODEL = Deno.env.get("WHISPER_API_MODEL") ?? "deepdml/faster-whisp
 const TIMEOUT_MS = 90_000;
 const MAX_BYTES = 25 * 1024 * 1024;
 
-const GLOSSARY = await buildGlossaryPrompt(null, null);
+// Una vez por cold start: jerga + equipo + creadoras activas (acá se habla CON
+// creadoras, sus nombres aparecen todo el tiempo). Sin grupo del bot → sin
+// miembros dinámicos. Si la query falla, cae al glosario fijo (nunca bloquea).
+const GLOSSARY = await buildGlossaryPrompt(adminClient(), null);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });

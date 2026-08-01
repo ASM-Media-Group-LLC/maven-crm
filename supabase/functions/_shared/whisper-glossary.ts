@@ -36,7 +36,7 @@ const EQUIPO = [
  *  quién nombran suele estar ahí). Falla en silencio: el glosario es una ayuda,
  *  nunca un motivo para no transcribir. */
 async function memberNames(sb: any, groupId: string | null): Promise<string[]> {
-  if (!groupId) return [];
+  if (!sb || !groupId) return [];
   try {
     const { data } = await sb
       .from("whatsapp_members")
@@ -53,17 +53,42 @@ async function memberNames(sb: any, groupId: string | null): Promise<string[]> {
   }
 }
 
-/** Arma el prompt de vocabulario para un audio de este grupo. */
+/** Las CREADORAS activas — de quiénes más se habla en los audios ("Moramay",
+ *  "Suunnhoney", "Yoisnia" son irreconocibles para el LM español de Whisper).
+ *  Nombre artístico primero (es lo que se DICE en voz alta); tope corto porque
+ *  el prompt entero no puede pasar de ~224 tokens. */
+async function creatorNames(sb: any): Promise<string[]> {
+  if (!sb) return [];
+  try {
+    const { data } = await sb
+      .from("creators")
+      .select("artistic_name, name")
+      .eq("status", "active")
+      .limit(80);
+    return (data ?? [])
+      .map((c: any) => String(c.artistic_name ?? c.name ?? "").trim())
+      .filter((n: string) => n.length >= 3)
+      .slice(0, 50);
+  } catch {
+    return [];
+  }
+}
+
+/** Arma el prompt de vocabulario para un audio de este grupo.
+ *  ORDEN A PROPÓSITO: creadoras primero, herramientas al FINAL. Si el prompt
+ *  excede el tope, Whisper se queda con los ÚLTIMOS ~224 tokens y descarta el
+ *  principio — lo que se recorta primero son creadoras (degradación aceptable),
+ *  nunca "Hubstaff"/"sheet"/el equipo, que son los errores ya vistos en prod. */
 export async function buildGlossaryPrompt(sb: any, groupId: string | null): Promise<string> {
-  const extra = await memberNames(sb, groupId);
+  const [creadoras, extra] = await Promise.all([creatorNames(sb), memberNames(sb, groupId)]);
   // dedup case-insensitive conservando la primera forma
   const seen = new Set<string>();
-  const all = [...EQUIPO, ...extra, ...HERRAMIENTAS].filter((t) => {
+  const all = [...creadoras, ...extra, ...EQUIPO, ...HERRAMIENTAS].filter((t) => {
     const k = t.toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
   return `Nota de voz del equipo de la agencia Kash, sobre gestión de modelos. ` +
-    `Suelen nombrar a ${all.slice(0, 40).join(", ")}.`;
+    `Suelen nombrar a ${all.slice(0, 85).join(", ")}.`;
 }
