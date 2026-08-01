@@ -372,6 +372,33 @@ export const equipoTools: AgentTool[] = [
       // acá se corta eso de raíz: sin match → candidatos y a PREGUNTAR; multi-match
       // → candidatos y a PREGUNTAR. Nunca datos de la persona equivocada.
       if (person && rows.length === 0) {
+        // PRIMERO Maven: hay staff que NO ficha Hubstaff (directivos — caso real:
+        // Juan Pachas, admin, gestiona creadoras a nivel líder). El 31/07 el bot
+        // dijo "no existe ni en Maven" por extrapolar de esta tool, que solo
+        // miraba Hubstaff. "Existe pero no trackea" ≠ "no existe".
+        const { data: profs } = await ctx.sb
+          .from("profiles").select("id, full_name")
+          .ilike("full_name", `%${person}%`).limit(5);
+        if (profs && profs.length) {
+          const ids = (profs as Array<{ id: string }>).map((p) => p.id);
+          const { data: rls } = await ctx.sb.from("user_roles").select("user_id, role").in("user_id", ids);
+          const rolesById = new Map<string, string[]>();
+          for (const r of (rls ?? []) as Array<{ user_id: string; role: string }>) {
+            rolesById.set(r.user_id, [...(rolesById.get(r.user_id) ?? []), r.role]);
+          }
+          return {
+            en_hubstaff: false,
+            en_maven: (profs as Array<{ id: string; full_name: string }>).map((p) => ({
+              nombre: p.full_name, roles: rolesById.get(p.id) ?? [],
+            })),
+            buscado: personRaw,
+            ...(aliased?.alias ? { alias_aplicado: person } : {}),
+            nota:
+              "La persona SÍ existe en Maven pero NO trackea Hubstaff (los directivos/admins no fichan). " +
+              "No hay horas que reportar y eso NO es 'no trabajó' ni 'no existe' — decilo así. " +
+              "Para su actividad usá otras fuentes (grupos de WhatsApp, pipeline, etc.).",
+          };
+        }
         const { data: all } = await ctx.sb.rpc("hubstaff_activity_summary", { p_from: from, p_to: to, p_person: null });
         const roster = ((all ?? []) as Array<Record<string, unknown>>).map((r) => ({
           nombre: String(r.name), rol: (r.hubstaff_role as string) ?? null, en_maven: Boolean(r.mapped_to_maven),
@@ -382,9 +409,9 @@ export const equipoTools: AgentTool[] = [
           ...(aliased?.alias ? { alias_aplicado: person } : {}),
           parecidos: parecidos(person, roster),
           nota:
-            "NO respondas con datos de otra persona. Decí que ese nombre no está en Hubstaff, mostrá los parecidos " +
-            "y PREGUNTÁ a quién se refiere. Si es alguien de un grupo de WhatsApp (apodo), verificá con " +
-            "get_group_members. Cuando el owner aclare quién es, podés guardarlo con remember_fact " +
+            "NO respondas con datos de otra persona. Decí que ese nombre no está ni en Hubstaff ni en Maven, " +
+            "mostrá los parecidos y PREGUNTÁ a quién se refiere. Si es alguien de un grupo de WhatsApp (apodo), " +
+            "verificá con get_group_members. Cuando el owner aclare quién es, podés guardarlo con remember_fact " +
             "(ej. 'a Juan X le dicen Pachas') para la próxima.",
         };
       }
