@@ -222,7 +222,35 @@ Deno.serve(async (req: Request) => {
       promotedTotal += promo;
       out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins });
     }
-    return jsonResponse({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, ...(dryRun ? { dry_run: true } : {}), results: out });
+
+    // ── INFORME DE LA CORRIDA (queda accesible para el bot) ───────────────────
+    // Guarda qué se leyó, qué promocionó y —clave— QUÉ NO SE PUDO LEER Y POR QUÉ.
+    // Sin esto, un canal ilegible es invisible: no genera fila (a propósito, para
+    // no escribir un "No" falso) y nadie se entera de que quedó sin revisar.
+    const noLegibles = Array.isArray(body.unreadable) ? body.unreadable as Array<any> : [];
+    const conPromo = out.filter((r: any) => r.promoted > 0);
+    const sinPromo = out.filter((r: any) => r.promoted === 0 && r.posts > 0);
+    const sinPosts = out.filter((r: any) => r.posts === 0);
+    const resumen = {
+      red: "telegram", origen: "agente local",
+      canales_leidos: out.length,
+      con_promo: conPromo.length,
+      sin_promo: sinPromo.length,
+      leidos_sin_posts: sinPosts.length,
+      no_legibles: noLegibles.length,
+      detalle_con_promo: conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted })),
+      detalle_no_legibles: noLegibles.map((u: any) => ({ handle: u.handle ?? u.source_handle, motivo: u.reason ?? "desconocido" })),
+    };
+    if (!dryRun) {
+      await sb.from("promolog_dispatch_runs").insert({
+        tenant_id: TENANT_ID, apify_actor_id: "local-agent", status: "succeeded",
+        creators_count: items.length + noLegibles.length, creators_succeeded: out.length,
+        creators_failed: noLegibles.length, entries_created: inserted,
+        payload: { source: "local", network: "telegram", resumen },
+        finished_at: new Date().toISOString(),
+      });
+    }
+    return jsonResponse({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
   }
 
   // ── MODO TARGETS ────────────────────────────────────────────────────────────

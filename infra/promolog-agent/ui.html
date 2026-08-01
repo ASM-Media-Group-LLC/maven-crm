@@ -35,9 +35,11 @@
   th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:600; }
   .pill { padding:2px 8px; border-radius:20px; font-size:12px; }
-  .pill.historias{ background:rgba(46,204,113,.16); color:var(--ok); }
-  .pill.sin_promo{ background:rgba(154,160,170,.16); color:var(--mut); }
+  .pill.historias,.pill.leido{ background:rgba(108,140,255,.16); color:var(--accent); }
+  .pill.con_promo{ background:rgba(46,204,113,.2); color:var(--ok); font-weight:600; }
+  .pill.sin_promo,.pill.sin_posts{ background:rgba(154,160,170,.16); color:var(--mut); }
   .pill.pendiente,.pill.throttled,.pill.no_ig_id{ background:rgba(241,196,15,.16); color:var(--warn); }
+  .pill.no_legible{ background:rgba(231,76,60,.18); color:var(--bad); }
   .results-wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; max-height:320px; overflow:auto; }
   .badge { font-size:12px; padding:2px 8px; border-radius:20px; background:rgba(108,140,255,.16); color:var(--accent); }
 </style>
@@ -100,7 +102,18 @@ function render(st){
   $("#stop").disabled = !busy;
   $("#runstate").textContent = busy ? "escaneando…" : "";
 }
-function addResult(r){ const tr=document.createElement("tr"); tr.innerHTML=`<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${r.outcome.replace("_"," ")}</span></td><td>${r.stories??""}</td>`; resultsEl.prepend(tr); $("#counts").textContent=resultsEl.children.length; }
+const LABEL = { con_promo:"✅ SÍ promocionó", sin_promo:"no promocionó", leido:"leído", historias:"leído", sin_posts:"sin posts nuevos", no_legible:"🔒 no se pudo leer", pendiente:"pendiente", throttled:"limitado por la red", no_ig_id:"handle no resuelve" };
+function addResult(r){
+  const tr=document.createElement("tr");
+  const txt = LABEL[r.outcome] ?? r.outcome.replace("_"," ");
+  tr.innerHTML=`<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${txt}</span></td><td>${r.stories??""}</td>`;
+  // el veredicto final (con_promo/sin_promo) reemplaza la fila previa del mismo handle
+  if (r.outcome==="con_promo" || r.outcome==="sin_promo") {
+    const prev=[...resultsEl.children].find(x=>x.firstChild.textContent==="@"+r.handle);
+    if (prev) { prev.replaceWith(tr); $("#counts").textContent=resultsEl.children.length; return; }
+  }
+  resultsEl.prepend(tr); $("#counts").textContent=resultsEl.children.length;
+}
 function addLog(m){ logEl.textContent+=m+"\n"; logEl.scrollTop=logEl.scrollHeight; }
 
 const es = new EventSource("/api/stream");

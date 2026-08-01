@@ -365,7 +365,31 @@ Deno.serve(async (req: Request) => {
       promotedTotal += promo;
       out.push({ creator_id: cid, source_handle: it.source_handle, tweets: tweets.length, promoted: promo, inserted: ins });
     }
-    return json({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, ...(dryRun ? { dry_run: true } : {}), results: out });
+
+    // Informe de la corrida (accesible para el bot; ver telegram-scan).
+    const noLegibles = Array.isArray(body.unreadable) ? body.unreadable as Array<any> : [];
+    const conPromo = out.filter((r: any) => r.promoted > 0);
+    const sinPromo = out.filter((r: any) => r.promoted === 0 && r.tweets > 0);
+    const resumen = {
+      red: "x", origen: "agente local",
+      perfiles_leidos: out.length,
+      con_promo: conPromo.length,
+      sin_promo: sinPromo.length,
+      leidos_sin_posts: out.filter((r: any) => r.tweets === 0).length,
+      no_legibles: noLegibles.length,
+      detalle_con_promo: conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted })),
+      detalle_no_legibles: noLegibles.map((u: any) => ({ handle: u.handle ?? u.source_handle, motivo: u.reason ?? "desconocido" })),
+    };
+    if (!dryRun) {
+      await sb.from("promolog_dispatch_runs").insert({
+        tenant_id: TENANT_ID, apify_actor_id: "local-agent", status: "succeeded",
+        creators_count: items.length + noLegibles.length, creators_succeeded: out.length,
+        creators_failed: noLegibles.length, entries_created: inserted,
+        payload: { source: "local", network: "x", resumen },
+        finished_at: new Date().toISOString(),
+      });
+    }
+    return json({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
   }
 
   // ── MODO TARGETS ────────────────────────────────────────────────────────────
