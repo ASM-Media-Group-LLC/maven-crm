@@ -27,8 +27,10 @@ export function sessionInfo(sessionFile) {
   } catch { return { exists: false, loggedIn: false }; }
 }
 
-export async function fetchTargets(slot) {
-  const u = `${MAVEN_URL}/functions/v1/promolog-scan-targets?slot=${encodeURIComponent(slot)}&slots=${SLOTS_COUNT}`;
+// index = posición de esta cuenta (0..count-1); count = total de cuentas IG.
+// scan-targets reparte por hash(creator_id)%count → esta cuenta recibe su parte.
+export async function fetchTargets(index, count) {
+  const u = `${MAVEN_URL}/functions/v1/promolog-scan-targets?slot=${index}&slots=${count}`;
   const r = await fetch(u, { headers: { "x-ext-token": EXT_TOKEN } });
   if (!r.ok) throw new Error(`scan-targets ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const j = await r.json();
@@ -86,15 +88,15 @@ export async function postToIngest(creators) {
 // Corre UNA cuenta. Callbacks: log(msg), onResult({handle,outcome,stories}), shouldStop().
 export async function runAccount(acct, { log = () => {}, onResult = () => {}, shouldStop = () => false } = {}) {
   const cds = readCooldowns();
-  if (cds[acct.slot] && Date.now() < cds[acct.slot]) {
-    const mins = Math.round((cds[acct.slot] - Date.now()) / 60000);
-    log(`⏸️ slot ${acct.slot}: en cooldown ${mins} min más. Se saltea.`);
-    return { slot: acct.slot, skipped: "cooldown", cooldownUntil: cds[acct.slot] };
+  if (cds[acct.id] && Date.now() < cds[acct.id]) {
+    const mins = Math.round((cds[acct.id] - Date.now()) / 60000);
+    log(`⏸️ slot ${acct.id}: en cooldown ${mins} min más. Se saltea.`);
+    return { slot: acct.id, skipped: "cooldown", cooldownUntil: cds[acct.id] };
   }
-  if (!existsSync(acct.sessionFile)) { log(`⚠️ slot ${acct.slot}: sin sesión. Logueá la cuenta primero.`); return { slot: acct.slot, skipped: "no_session" }; }
+  if (!existsSync(acct.sessionFile)) { log(`⚠️ slot ${acct.id}: sin sesión. Logueá la cuenta primero.`); return { slot: acct.id, skipped: "no_session" }; }
 
-  const targets = await fetchTargets(acct.slot);
-  log(`▶️ slot ${acct.slot}: ${targets.length} creadoras (su mitad).`);
+  const targets = await fetchTargets(acct.index, acct.count);
+  log(`▶️ cuenta ${acct.id} (${acct.index + 1}/${acct.count}): ${targets.length} creadoras.`);
   const browser = await chromium.launch({ headless: !HEADFUL });
   const context = await browser.newContext({
     storageState: acct.sessionFile, viewport: { width: 1280, height: 900 },
@@ -105,7 +107,7 @@ export async function runAccount(acct, { log = () => {}, onResult = () => {}, sh
   let sawStories = false, emptyStreak = 0, softBlocked = false, done = 0, sis = 0, nos = 0, pend = 0;
 
   for (const t of targets) {
-    if (shouldStop()) { log(`⏹️ slot ${acct.slot}: detenido a pedido.`); break; }
+    if (shouldStop()) { log(`⏹️ slot ${acct.id}: detenido a pedido.`); break; }
     if (done >= PACING.maxPerRun) { log(`(tope ${PACING.maxPerRun} por corrida)`); break; }
     const handle = norm(t.handle);
     const base = { creator_id: t.creator_id, handle };
@@ -126,34 +128,38 @@ export async function runAccount(acct, { log = () => {}, onResult = () => {}, sh
     done++;
     if (sawStories && emptyStreak >= SOFTBLOCK.streakAbort) {
       softBlocked = true;
-      log(`⛔ slot ${acct.slot}: racha de ${emptyStreak} vacíos → IG limitó la sesión. Corto y dejo en cooldown ${SOFTBLOCK.cooldownHours}h.`);
+      log(`⛔ slot ${acct.id}: racha de ${emptyStreak} vacíos → IG limitó la sesión. Corto y dejo en cooldown ${SOFTBLOCK.cooldownHours}h.`);
       break;
     }
     await sleep(jitter());
     if (done % PACING.batchPauseEvery === 0) { log(`… pausa de lote (${Math.round(PACING.batchPauseMs / 1000)}s)`); await sleep(PACING.batchPauseMs); }
   }
   await browser.close();
-  if (softBlocked) writeCooldown(acct.slot, Date.now() + SOFTBLOCK.cooldownHours * 3600_000);
+  if (softBlocked) writeCooldown(acct.id, Date.now() + SOFTBLOCK.cooldownHours * 3600_000);
   const ingest = await postToIngest(out).catch((e) => ({ ok: false, error: e.message }));
-  log(`◀️ slot ${acct.slot}: leídas ${done} (✅${sis} ·${nos} ⚠️${pend}). Ingest ok=${ingest.ok !== false}.`);
-  return { slot: acct.slot, leidas: done, si: sis, no: nos, pending: pend, softBlocked };
+  log(`◀️ slot ${acct.id}: leídas ${done} (✅${sis} ·${nos} ⚠️${pend}). Ingest ok=${ingest.ok !== false}.`);
+  return { slot: acct.id, leidas: done, si: sis, no: nos, pending: pend, softBlocked };
 }
 
 // ── Login por UI: abrir navegador headed, guardar sesión cuando el usuario avisa ──
-const openLogins = new Map(); // slot → { browser, context }
-export async function openLogin(slot) {
-  if (openLogins.has(slot)) { try { await openLogins.get(slot).browser.close(); } catch { /* */ } openLogins.delete(slot); }
+const openLogins = new Map(); // key → { browser, context }
+// Genérico: abre un navegador visible en `url` (login de IG / Telegram Web / X).
+export async function openLoginTo(key, url) {
+  if (openLogins.has(key)) { try { await openLogins.get(key).browser.close(); } catch { /* */ } openLogins.delete(key); }
   mkdirSync(SESSIONS_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
-  await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "domcontentloaded" });
-  openLogins.set(slot, { browser, context });
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  openLogins.set(key, { browser, context });
 }
-export async function saveLogin(slot, sessionFile) {
-  const l = openLogins.get(slot);
-  if (!l) throw new Error("no hay login abierto para ese slot");
+export async function saveLoginTo(key, sessionFile) {
+  const l = openLogins.get(key);
+  if (!l) throw new Error("no hay login abierto para " + key);
   await l.context.storageState({ path: sessionFile });
   await l.browser.close();
-  openLogins.delete(slot);
+  openLogins.delete(key);
 }
+// IG (compat con ui.mjs existente): slot → login de Instagram.
+export const openLogin = (slot) => openLoginTo(slot, "https://www.instagram.com/accounts/login/");
+export const saveLogin = (slot, sessionFile) => saveLoginTo(slot, sessionFile);

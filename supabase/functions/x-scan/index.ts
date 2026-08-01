@@ -301,6 +301,82 @@ Deno.serve(async (req: Request) => {
   const chainDepth = Number((body as { _chain_depth?: number })._chain_depth) || 0; // auto-encadenado
   const start = new Date(Date.now() - hours * 3600 * 1000).toISOString().slice(0, 10);
 
+  // ── MODO INGEST (Plan B local) ──────────────────────────────────────────────
+  // El scraper LOCAL (Playwright + sesión de X) navega los perfiles y manda acá los
+  // tweets YA scrapeados. Reusamos la MISMA clasificación (classifyX + visión) y el
+  // MISMO persist que el path de Apify — cero lógica duplicada. NO usa Apify.
+  //   body: { mode:"ingest", items:[ { creator_id, source_handle?, tweets:[{text, permalink?, date?, imageUrl?}] } ] }
+  if (body.mode === "ingest") {
+    const items = Array.isArray(body.items) ? body.items as Array<any> : [];
+    if (!items.length) return json({ ok: true, note: "sin items" });
+    const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
+    const nicksByCreator = new Map<string, string[]>();
+    if (ids.length) {
+      const { data: crs } = await sb.from("creators").select("id, onlyfans_url").in("id", ids);
+      for (const c of (crs ?? []) as any[]) { const p = ofHandleFromUrl(c.onlyfans_url); nicksByCreator.set(c.id, p ? [p] : []); }
+      const { data: extra } = await sb.from("creator_social_accounts").select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", ids);
+      for (const a of (extra ?? []) as any[]) { const nick = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!nick) continue; const arr = nicksByCreator.get(a.creator_id) ?? []; if (!arr.includes(nick)) arr.push(nick); nicksByCreator.set(a.creator_id, arr); }
+    }
+    let vis = 0, inserted = 0, promotedTotal = 0;
+    const out: unknown[] = [];
+    for (const it of items) {
+      const cid = it.creator_id; if (!cid) { out.push({ skip: "sin_creator_id" }); continue; }
+      const nicks = nicksByCreator.get(cid) ?? [];
+      const tweets: Array<{ text?: string; permalink?: string; date?: string; imageUrl?: string }> = Array.isArray(it.tweets) ? it.tweets : [];
+      let ins = 0, promo = 0;
+      for (let i = 0; i < tweets.length; i++) {
+        const tw = tweets[i];
+        // Objeto mínimo que classifyX entiende (lee text/url/createdAt).
+        const fake = { text: tw.text || "", url: tw.permalink || "", createdAt: tw.date || "" };
+        const clsX = classifyX(fake, nicks);
+        let { promoted, reason } = clsX;
+        if (!promoted && !clsX.brandAd && OPENROUTER_API_KEY && tw.imageUrl && vis < MAX_VISION_PER_RUN) {
+          vis++;
+          const v = await visionIsOfPromo(tw.imageUrl, OPENROUTER_API_KEY, tw.text || "");
+          if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
+        }
+        if (promoted) promo++;
+        const dedupKey = tw.permalink || tw.imageUrl || null;
+        if (dryRun) continue;
+        if (!dedupKey) continue;
+        const { data: dupe } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "x").eq("story_link_url", dedupKey).limit(1);
+        if (dupe && dupe.length) continue;
+        let evidenceUrl: string = tw.imageUrl || tw.permalink || "";
+        if (promoted && tw.imageUrl) { const durable = await persistTweetImage(sb, tw.imageUrl, `${cid}/${i}`); if (durable) evidenceUrl = durable; }
+        const when = parseTweetDate(tw.date || "");
+        const { error: insErr } = await sb.from("promolog_entries").insert({
+          tenant_id: TENANT_ID, creator_id: cid, date: (when || new Date()).toISOString(),
+          promoted: promoted ? "true" : "false", network: "x",
+          platform: promoted ? "OnlyFans" : "Ninguna",
+          notes: (tw.text || "").slice(0, 2000) || null, evidence_url: evidenceUrl,
+          story_media_url: tw.imageUrl || null, story_link_url: dedupKey,
+          analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: reason,
+          source_handle: (it.source_handle || "").replace(/^@+/, "").toLowerCase() || null,
+          story_index: i, story_count: tweets.length, scraped_at: new Date().toISOString(),
+        });
+        if (!insErr) { ins++; inserted++; }
+      }
+      // marker "sin actividad" si el perfil no trajo tweets (1/día).
+      if (tweets.length === 0 && !dryRun) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: ex } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "x").gte("date", today).limit(1);
+        if (!ex || !ex.length) await sb.from("promolog_entries").insert({ tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "x", platform: "Ninguna", analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
+      }
+      promotedTotal += promo;
+      out.push({ creator_id: cid, source_handle: it.source_handle, tweets: tweets.length, promoted: promo, inserted: ins });
+    }
+    return json({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, ...(dryRun ? { dry_run: true } : {}), results: out });
+  }
+
+  // ── MODO TARGETS ────────────────────────────────────────────────────────────
+  // Le da al scraper LOCAL la lista de perfiles de X a leer, con el creator_id.
+  //   body: { mode:"targets" }
+  if (body.mode === "targets") {
+    const { data: crs } = await sb.from("creators").select("id, name, artistic_name, twitter_handle").eq("status", "active").not("twitter_handle", "is", null).neq("twitter_handle", "");
+    const targets = (crs ?? []).map((c: any) => ({ creator_id: c.id, name: c.artistic_name || c.name, handle: String(c.twitter_handle || "").replace(/^@+/, "") }));
+    return json({ ok: true, mode: "targets", count: targets.length, targets });
+  }
+
   let q = sb.from("creators")
     .select("id, name, twitter_handle, onlyfans_url")
     .eq("status", "active") // solo creadoras activas (no escanear bajas/terminated)

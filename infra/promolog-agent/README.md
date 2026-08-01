@@ -66,6 +66,24 @@ logueadas). En la primera corrida, mirá el log:
 - Si arranca bien y a mitad corta con `⛔ … IG limitó la sesión` → es la guarda
   anti-ban haciendo su trabajo: dejá descansar esa cuenta (queda en cooldown sola).
 
+## Otras redes en el panel (Plan B local) — Telegram y X
+Además de IG, el panel tiene una sección **"Otras redes (Plan B local)"**. Estas
+corren donde conviene, pero se disparan desde el mismo panel:
+- **Telegram**: los canales **públicos** se leen por `t.me/s/` (sin cuenta). Los
+  **privados** (invite) necesitan **loguear la cuenta dedicada** (botón Loguear →
+  QR con el teléfono de esa cuenta). El scraper se une a los invites y lee por
+  web.telegram.org. ⚠️ La lectura de privados por DOM es la parte a **tunear en el
+  primer run** (`scrapePrivate()` en `tg-scraper.mjs`).
+- **X**: **loguear una cuenta de X** (botón Loguear). Navega los perfiles y lee los
+  tweets. ⚠️ Los selectores del DOM de x.com cambian seguido — si no extrae tweets,
+  se ajusta `extractTweets()` en `x-scraper.mjs`.
+
+Ambas mandan lo scrapeado a `telegram-scan`/`x-scan` en **modo ingest** → reusan la
+MISMA clasificación que las corridas server-side (cron). Los targets salen **en vivo**
+de Maven (`mode:targets`): creadora inactiva deja de escanearse, nueva activa entra sola.
+
+Requiere `CRON_INTERNAL_TOKEN` en el `.env` (solo Telegram/X lo usan; IG no).
+
 ## Cómo se reparte la carga
 `promolog-scan-targets?slot=a&slots=2` devuelve una partición estable por creadora
 (hash del `creator_id`), así todas las cuentas de IG de una misma creadora caen en

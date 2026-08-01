@@ -152,14 +152,99 @@ Deno.serve(async (req: Request) => {
     if (!ok) return jsonResponse({ error: "forbidden (admin/manager)" }, 403);
   }
 
-  if (!GW_API_KEY) return jsonResponse({ error: "falta TELEGRAM_GW_API_KEY (secreto de la edge function)" }, 500);
-
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
   // scan_date → columna `date` (el dashboard corta por fecha). Naive, igual que IG.
   const scanDate = (body.scan_date as string) || new Date().toISOString().slice(0, 10);
   const hours = Number(body.hours) || 24;
   const onlyIds = Array.isArray(body.only_creator_ids) ? body.only_creator_ids as string[] : null;
   const dryRun = body.dry_run === true; // clasifica y devuelve, sin insertar (para probar)
+
+  // ── MODO INGEST (Plan B local) ──────────────────────────────────────────────
+  // El scraper LOCAL (Playwright + web.telegram.org, cuenta dedicada) lee los
+  // canales y manda acá los posts YA scrapeados. Reusamos la MISMA clasificación
+  // (classifyPromo + repesca LLM) y el MISMO persist que el path del gateway — cero
+  // lógica duplicada. NO toca el gateway (no necesita GW_API_KEY). Auth: x-cron-token.
+  //   body: { mode:"ingest", items:[ { creator_id, source_handle?, posts:[{text, permalink?, date?}] } ] }
+  if (body.mode === "ingest") {
+    const items = Array.isArray(body.items) ? body.items as Array<any> : [];
+    if (!items.length) return jsonResponse({ ok: true, note: "sin items" });
+    const OPENROUTER = Deno.env.get("OPENROUTER_API_KEY") || "";
+    const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
+    // OF nicks por creadora (para la clasificación), igual que el path normal.
+    const nicksByCreator = new Map<string, string[]>();
+    if (ids.length) {
+      const { data: crs } = await sb.from("creators").select("id, onlyfans_url").in("id", ids);
+      for (const c of (crs ?? []) as any[]) { const p = ofHandleFromUrl(c.onlyfans_url); nicksByCreator.set(c.id, p ? [p] : []); }
+      const { data: extra } = await sb.from("creator_social_accounts").select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", ids);
+      for (const a of (extra ?? []) as any[]) { const nick = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!nick) continue; const arr = nicksByCreator.get(a.creator_id) ?? []; if (!arr.includes(nick)) arr.push(nick); nicksByCreator.set(a.creator_id, arr); }
+    }
+    let inserted = 0, promotedTotal = 0, llmUsed2 = 0;
+    const out: unknown[] = [];
+    for (const it of items) {
+      const cid = it.creator_id;
+      if (!cid) { out.push({ skip: "sin_creator_id" }); continue; }
+      const nicks = nicksByCreator.get(cid) ?? [];
+      const posts: Array<{ text?: string; permalink?: string; date?: number }> = Array.isArray(it.posts) ? it.posts : [];
+      let ins = 0, promo = 0;
+      for (let i = 0; i < posts.length; i++) {
+        const p = posts[i];
+        let { promoted, reason } = classifyPromo(p.text || "", nicks);
+        let aiModel = "heuristic-of-v1";
+        if (!promoted && reason === "sin-señales" && OPENROUTER && llmUsed2 < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
+          llmUsed2++;
+          const v = await llmSecondOpinion(p.text || "", nicks, OPENROUTER);
+          if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
+        }
+        if (promoted) promo++;
+        if (dryRun) continue;
+        if (p.permalink) {
+          const { data: dupe } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "telegram").eq("evidence_url", p.permalink).limit(1);
+          if (dupe && dupe.length) continue;
+        }
+        const { error: insErr } = await sb.from("promolog_entries").insert({
+          tenant_id: TENANT_ID, creator_id: cid,
+          date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
+          promoted: promoted ? "true" : "false", network: "telegram",
+          platform: promoted ? "OnlyFans" : "Ninguna",
+          notes: (p.text || "").slice(0, 2000) || null, evidence_url: p.permalink || null,
+          analyzed_by_ai: true, ai_model: aiModel, ai_reasoning: reason,
+          source_handle: (it.source_handle || "").trim() || null,
+          story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
+        });
+        if (!insErr) { ins++; inserted++; }
+      }
+      // marker "sin actividad" si el canal no trajo posts (1/día), igual que el path normal.
+      if (posts.length === 0 && !dryRun) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: ex } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "telegram").gte("date", today).limit(1);
+        if (!ex || !ex.length) await sb.from("promolog_entries").insert({ tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "telegram", platform: "Ninguna", analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
+      }
+      promotedTotal += promo;
+      out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins });
+    }
+    return jsonResponse({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, ...(dryRun ? { dry_run: true } : {}), results: out });
+  }
+
+  // ── MODO TARGETS ────────────────────────────────────────────────────────────
+  // Le da al scraper LOCAL la lista de canales a leer (principal + extra), con el
+  // creator_id, sin tocar el gateway.  body: { mode:"targets" }
+  if (body.mode === "targets") {
+    const { data: crs } = await sb.from("creators").select("id, name, artistic_name, telegram_handle").eq("status", "active").not("telegram_handle", "is", null).neq("telegram_handle", "");
+    const cids = (crs ?? []).map((c: any) => c.id);
+    const extraByCreator = new Map<string, string[]>();
+    if (cids.length) {
+      const { data: ex } = await sb.from("creator_social_accounts").select("creator_id, username").eq("network", "telegram").eq("active", true).in("creator_id", cids);
+      for (const a of (ex ?? []) as any[]) { const u = String(a.username || "").trim(); if (!u) continue; const arr = extraByCreator.get(a.creator_id) ?? []; if (!arr.includes(u)) arr.push(u); extraByCreator.set(a.creator_id, arr); }
+    }
+    const targets: any[] = [];
+    for (const c of (crs ?? []) as any[]) {
+      targets.push({ creator_id: c.id, name: c.artistic_name || c.name, handle: c.telegram_handle });
+      for (const u of extraByCreator.get(c.id) ?? []) targets.push({ creator_id: c.id, name: c.artistic_name || c.name, handle: u });
+    }
+    return jsonResponse({ ok: true, mode: "targets", count: targets.length, targets });
+  }
+
+  if (!GW_API_KEY) return jsonResponse({ error: "falta TELEGRAM_GW_API_KEY (secreto de la edge function)" }, 500);
 
   // Creadoras con Telegram (la principal vive en creators.telegram_handle).
   let q = sb.from("creators")

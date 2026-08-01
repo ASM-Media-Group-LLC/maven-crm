@@ -9,6 +9,15 @@ export const SESSIONS_DIR = join(ROOT, "sessions");
 
 export const MAVEN_URL = (process.env.MAVEN_URL || "https://lsagslbkliprespbyhts.supabase.co").replace(/\/+$/, "");
 export const EXT_TOKEN = process.env.PROMOLOG_EXT_TOKEN || "";
+// Token cron: SOLO lo usan los scrapers de Telegram y X (llaman a telegram-scan /
+// x-scan en modo targets/ingest, que van con x-cron-token). IG no lo necesita.
+export const CRON_TOKEN = process.env.CRON_INTERNAL_TOKEN || "";
+
+// Sesiones de las OTRAS redes (Plan B local). Una cuenta cada una (no slots):
+//   sessions/telegram.json  — cuenta dedicada, miembro de los canales (privados incl.)
+//   sessions/x.json         — cuenta de X logueada
+export const TG_SESSION = join(SESSIONS_DIR, "telegram.json");
+export const X_SESSION = join(SESSIONS_DIR, "x.json");
 
 // Las 2 cuentas scanner. Cada una = un slot (a, b, …) y su archivo de sesión.
 // El slot define qué MITAD de las creadoras lee (scan-targets?slot=a&slots=2),

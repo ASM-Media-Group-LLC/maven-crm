@@ -10,115 +10,115 @@
   * { box-sizing:border-box; } body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
   header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; } header .sub { color:var(--mut); font-size:13px; }
-  main { max-width:920px; margin:0 auto; padding:20px; }
-  .cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media (max-width:640px){ .cards{ grid-template-columns:1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  .card h2 { margin:0 0 8px; font-size:15px; display:flex; align-items:center; gap:8px; }
-  .dot { width:10px; height:10px; border-radius:50%; background:var(--mut); display:inline-block; }
+  main { max-width:960px; margin:0 auto; padding:20px; }
+  .net { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; }
+  .net > h2 { margin:0 0 4px; font-size:16px; display:flex; align-items:center; gap:8px; }
+  .net .netsub { color:var(--mut); font-size:12.5px; margin-bottom:12px; }
+  .accts { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; margin-bottom:12px; }
+  .acct { border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .acct .top { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+  .acct .name { font-weight:600; font-size:14px; display:flex; align-items:center; gap:7px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--mut); display:inline-block; }
   .dot.ok{ background:var(--ok); } .dot.bad{ background:var(--bad); } .dot.warn{ background:var(--warn); }
-  .muted { color:var(--mut); font-size:13px; }
-  button { font:inherit; border:0; border-radius:9px; padding:9px 14px; cursor:pointer; background:var(--accent); color:#fff; }
+  .muted { color:var(--mut); font-size:12.5px; }
+  button { font:inherit; border:0; border-radius:9px; padding:8px 13px; cursor:pointer; background:var(--accent); color:#fff; font-size:13.5px; }
   button.secondary { background:transparent; color:var(--fg); border:1px solid var(--line); }
+  button.tiny { padding:4px 9px; font-size:12px; }
+  button.ghost { background:transparent; color:var(--mut); border:0; padding:2px 6px; }
   button:disabled { opacity:.45; cursor:not-allowed; }
-  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .controls { margin:18px 0; display:flex; gap:10px; flex-wrap:wrap; }
-  .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
-  @media (max-width:640px){ .split{ grid-template-columns:1fr; } }
-  #log { background:#0b0d11; color:#cbd2dc; border:1px solid var(--line); border-radius:12px; padding:12px; height:340px; overflow:auto; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; }
-  @media (prefers-color-scheme: light){ #log{ background:#0f1115; color:#cbd2dc; } }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .netactions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+  @media (max-width:680px){ .split{ grid-template-columns:1fr; } .accts{ grid-template-columns:1fr; } }
+  #log { background:#0b0d11; color:#cbd2dc; border:1px solid var(--line); border-radius:12px; padding:12px; height:320px; overflow:auto; font:12.5px/1.5 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:600; }
   .pill { padding:2px 8px; border-radius:20px; font-size:12px; }
   .pill.historias{ background:rgba(46,204,113,.16); color:var(--ok); }
   .pill.sin_promo{ background:rgba(154,160,170,.16); color:var(--mut); }
   .pill.pendiente,.pill.throttled,.pill.no_ig_id{ background:rgba(241,196,15,.16); color:var(--warn); }
-  .results-wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; max-height:340px; overflow:auto; }
+  .results-wrap { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; max-height:320px; overflow:auto; }
   .badge { font-size:12px; padding:2px 8px; border-radius:20px; background:rgba(108,140,255,.16); color:var(--accent); }
 </style>
 </head>
 <body>
 <header>
   <span style="font-size:22px">📸</span>
-  <div><h1>Promolog Scanner</h1><div class="sub">Lee historias de IG por tu red · 2 cuentas repartidas · anti-ban</div></div>
+  <div><h1>Promolog Scanner</h1><div class="sub">Tu red · cuentas por red · el scan se reparte entre las cuentas que agregues</div></div>
 </header>
 <main>
-  <div id="tokenWarn" class="card" style="display:none;border-color:var(--bad)">
-    ⚠️ Falta el token (PROMOLOG_EXT_TOKEN en el .env). El scan no va a funcionar hasta ponerlo.
-  </div>
-
-  <div class="cards" id="cards"></div>
-
-  <div class="controls">
-    <button id="scanAll">▶︎ Escanear todo</button>
-    <button id="scanA" class="secondary">Solo cuenta A</button>
-    <button id="scanB" class="secondary">Solo cuenta B</button>
-    <button id="stop" class="secondary" disabled>■ Detener</button>
-    <span id="runstate" class="muted"></span>
-  </div>
+  <div id="warn" class="net" style="display:none;border-color:var(--bad)"></div>
+  <div id="nets"></div>
+  <div class="row" style="margin:6px 0 2px"><button id="stop" class="secondary" disabled>■ Detener</button><span id="runstate" class="muted"></span></div>
 
   <div class="split">
-    <div>
-      <div class="muted" style="margin-bottom:6px">Progreso en vivo</div>
-      <div id="log"></div>
-    </div>
-    <div>
-      <div class="muted" style="margin-bottom:6px">Resultados <span id="counts" class="badge">0</span></div>
-      <div class="results-wrap"><table><thead><tr><th>Creadora</th><th>Resultado</th><th>Historias</th></tr></thead><tbody id="results"></tbody></table></div>
-    </div>
+    <div><div class="muted" style="margin-bottom:6px">Progreso en vivo</div><div id="log"></div></div>
+    <div><div class="muted" style="margin-bottom:6px">Resultados <span id="counts" class="badge">0</span></div>
+      <div class="results-wrap"><table><thead><tr><th>Cuenta</th><th>Resultado</th><th>Items</th></tr></thead><tbody id="results"></tbody></table></div></div>
   </div>
 </main>
 
 <script>
 const $ = (s) => document.querySelector(s);
-const logEl = $("#log"), resultsEl = $("#results"), cardsEl = $("#cards");
-let LOGIN = {}; // slot → "open" mientras esperás confirmar
+const netsEl = $("#nets"), logEl = $("#log"), resultsEl = $("#results");
+const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏" };
+const NOTE = {
+  instagram:"cada cuenta lee su parte (residencial). Más cuentas = menos volumen c/u = menos ban.",
+  telegram:"públicos por t.me/s (sin cuenta); privados necesitan una cuenta miembro logueada.",
+  x:"cada cuenta logueada navega su parte de los perfiles.",
+};
+let LOGIN = {}; // "network:id" → "open"
 
-function fmtCooldown(ts){ if(!ts) return ""; const m = Math.max(0, Math.round((ts - Date.now())/60000)); return `en cooldown (${m} min)`; }
+function fmtCd(ts){ if(!ts) return ""; const m=Math.max(0,Math.round((ts-Date.now())/60000)); return `cooldown ${m}min`; }
 
-function renderCards(st){
-  $("#tokenWarn").style.display = st.token_ok ? "none" : "block";
-  cardsEl.innerHTML = st.accounts.map(a => {
-    const cls = a.cooldown_until ? "warn" : (a.logged_in ? "ok" : "bad");
-    const estado = a.cooldown_until ? fmtCooldown(a.cooldown_until) : (a.logged_in ? "sesión lista" : "sin login");
-    const loginBtn = LOGIN[a.slot]==="open"
-      ? `<button data-save="${a.slot}">✓ Ya me logueé</button>`
-      : `<button class="secondary" data-login="${a.slot}">${a.logged_in?"Re-loguear":"Loguear"}</button>`;
-    const hint = LOGIN[a.slot]==="open" ? `<div class="muted" style="margin-top:8px">Logueate en la ventana que se abrió y apretá “Ya me logueé”.</div>` : "";
-    return `<div class="card"><h2><span class="dot ${cls}"></span> Cuenta ${a.slot.toUpperCase()}</h2>
-      <div class="muted">${estado}</div>
-      <div class="row" style="margin-top:10px">${loginBtn}</div>${hint}</div>`;
-  }).join("");
-  const anyCd = st.accounts.some(a=>a.cooldown_until);
-  $("#runstate").textContent = st.running ? "escaneando…" : (anyCd ? "hay cuenta(s) en cooldown" : "");
+function render(st){
+  $("#warn").style.display = (st.token_ok && st.cron_ok) ? "none" : "block";
+  $("#warn").textContent = !st.token_ok ? "⚠️ Falta PROMOLOG_EXT_TOKEN en el .env." : (!st.cron_ok ? "⚠️ Falta CRON_INTERNAL_TOKEN (lo usan Telegram y X)." : "");
   const busy = st.running;
-  for (const id of ["scanAll","scanA","scanB"]) $("#"+id).disabled = busy;
+  netsEl.innerHTML = st.networks.map(net => {
+    const accts = net.accounts.map(a => {
+      const cls = a.cooldown_until ? "warn" : (a.logged_in ? "ok" : "bad");
+      const estado = a.cooldown_until ? fmtCd(a.cooldown_until) : (a.logged_in ? "sesión lista" : "sin login");
+      const key = net.network+":"+a.id;
+      const loginBtn = LOGIN[key]==="open"
+        ? `<button class="tiny" data-save="${key}">✓ Ya me logueé</button>`
+        : `<button class="tiny secondary" data-login="${key}">${a.logged_in?"Re-loguear":"Loguear"}</button>`;
+      const rm = net.accounts.length>1 ? `<button class="ghost" title="quitar" data-remove="${key}">✕</button>` : "";
+      const hint = LOGIN[key]==="open" ? `<div class="muted" style="margin-top:6px">Logueate en la ventana${net.network==="telegram"?" (escaneá el QR)":""} y apretá “Ya me logueé”.</div>` : "";
+      return `<div class="acct"><div class="top"><span class="name"><span class="dot ${cls}"></span>${a.id}</span>${rm}</div>
+        <div class="muted" style="margin:4px 0 8px">${estado}</div><div class="row">${loginBtn}</div>${hint}</div>`;
+    }).join("");
+    return `<div class="net"><h2>${EMO[net.network]} ${net.label} <span class="muted" style="font-weight:400">· ${net.accounts.length} cuenta(s)</span></h2>
+      <div class="netsub">${NOTE[net.network]}</div>
+      <div class="accts">${accts}</div>
+      <div class="netactions">
+        <button data-scan="${net.network}" ${busy?"disabled":""}>▶︎ Escanear ${net.label}</button>
+        <button class="secondary" data-add="${net.network}">＋ Agregar cuenta</button>
+      </div></div>`;
+  }).join("");
   $("#stop").disabled = !busy;
+  $("#runstate").textContent = busy ? "escaneando…" : "";
 }
-function addResult(r){
-  const tr = document.createElement("tr");
-  tr.innerHTML = `<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${r.outcome.replace("_"," ")}</span></td><td>${r.stories??""}</td>`;
-  resultsEl.prepend(tr);
-  $("#counts").textContent = resultsEl.children.length;
-}
-function addLog(m){ logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+function addResult(r){ const tr=document.createElement("tr"); tr.innerHTML=`<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${r.outcome.replace("_"," ")}</span></td><td>${r.stories??""}</td>`; resultsEl.prepend(tr); $("#counts").textContent=resultsEl.children.length; }
+function addLog(m){ logEl.textContent+=m+"\n"; logEl.scrollTop=logEl.scrollHeight; }
 
 const es = new EventSource("/api/stream");
-es.addEventListener("status", e => renderCards(JSON.parse(e.data)));
+es.addEventListener("status", e => render(JSON.parse(e.data)));
 es.addEventListener("log", e => addLog(JSON.parse(e.data).msg));
 es.addEventListener("result", e => addResult(JSON.parse(e.data)));
-es.addEventListener("done", () => addLog("✔︎ listo"));
 
-async function post(url, body){ const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: body?JSON.stringify(body):undefined}); return r.json().catch(()=>({})); }
+async function post(url, body){ const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined}); return r.json().catch(()=>({})); }
+async function refresh(){ render(await (await fetch("/api/status")).json()); }
 
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button"); if(!t) return;
-  if (t.dataset.login){ const s=t.dataset.login; LOGIN[s]="open"; await post(`/api/login/${s}/open`); const st=await (await fetch("/api/status")).json(); renderCards(st); }
-  else if (t.dataset.save){ const s=t.dataset.save; await post(`/api/login/${s}/save`); LOGIN[s]=null; }
-  else if (t.id==="scanAll"){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post("/api/scan",{}); }
-  else if (t.id==="scanA"){ resultsEl.innerHTML=""; await post("/api/scan",{slots:["a"]}); }
-  else if (t.id==="scanB"){ resultsEl.innerHTML=""; await post("/api/scan",{slots:["b"]}); }
+  const d = t.dataset;
+  if (d.add){ await post(`/api/account/${d.add}/add`); await refresh(); }
+  else if (d.remove){ const [n,id]=d.remove.split(":"); await post(`/api/account/${n}/remove`,{id}); await refresh(); }
+  else if (d.login){ LOGIN[d.login]="open"; const [n,id]=d.login.split(":"); await post(`/api/login/${n}/${id}/open`); await refresh(); }
+  else if (d.save){ const [n,id]=d.save.split(":"); await post(`/api/login/${n}/${id}/save`); LOGIN[d.save]=null; await refresh(); }
+  else if (d.scan){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post(`/api/scan/${d.scan}`); }
   else if (t.id==="stop"){ await post("/api/stop"); }
 });
 </script>
