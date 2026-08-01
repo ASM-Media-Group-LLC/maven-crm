@@ -102,5 +102,13 @@ services:
           memory: 2G
 
 volumes:
+  # ⚠️ VOLUMEN NUEVO (v2) A PROPÓSITO. El anterior (maven-whisper-models) lo
+  # escribió el server viejo corriendo como ROOT; speaches corre como `ubuntu`
+  # y no puede ni leer bien ni borrar esos archivos → el modelo figuraba como
+  # "already exists" pero al transcribir tiraba 500 ("model repository does not
+  # contain a valid model card", breaking change de speaches v0.8) y DELETE
+  # /v1/models fallaba con 500 por los mismos permisos. Empezar de cero es más
+  # limpio que pelear con el chown. El volumen viejo queda huérfano: se puede
+  # borrar a mano (docker volume rm maven-whisper-models) para recuperar 1.6GB.
   whisper-models:
-    name: maven-whisper-models
+    name: maven-whisper-models-v2
