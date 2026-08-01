@@ -75,20 +75,29 @@ export async function runJoin(opts = {}, { log = console.log, shouldStop = () =>
   const prev = readState();
   const cand = [];
   const raros = [];
+  let nPub = 0, nInv = 0;
   for (const t of targets) {
     const p = parseHandle(t.handle);
     if (p.kind === "unknown") { raros.push({ name: t.name, handle: t.handle, reason: p.reason }); continue; }
+    if (p.kind === "public") nPub++; else nInv++;
     if (p.kind === "public" && !OPTS.all) continue;
     if (OPTS.only && !`${t.name} ${t.handle}`.toLowerCase().includes(OPTS.only)) continue;
     cand.push({ ...t, p, key: p.kind === "invite" ? `+${p.hash}` : `@${p.username}` });
   }
 
-  log(`\n📋 ${targets.length} canales en Maven · ${cand.length} a revisar${OPTS.all ? " (invites + públicos)" : " (solo invites)"}`);
+  // Decir QUÉ mira y POR QUÉ. "37 canales · 17 a revisar" no le dice nada a nadie:
+  // parece que hay 17 pendientes de algo, cuando en realidad los 19 públicos
+  // simplemente no necesitan que la cuenta esté adentro para leerse.
+  const creadoras = new Set(targets.map((t) => t.creator_id)).size;
+  log(`\n📋 Canales de Telegram en Maven: ${targets.length} (${creadoras} creadoras)`);
+  log(`   · ${nPub} públicos (@usuario) — Telegram los deja ver SIN estar adentro, no hay nada que unir`);
+  log(`   · ${nInv} privados (link de invitación) — solo se leen si la cuenta es MIEMBRO${OPTS.all ? "" : "  ← son los que miro"}`);
   if (raros.length) {
-    log(`⚠️  ${raros.length} handle(s) que NO son un canal — hay que corregirlos en Maven:`);
-    for (const r of raros) log(`     · ${r.name}: ${r.handle}  (${r.reason})`);
+    log(`   · ${raros.length} con el handle mal cargado — no son un canal, hay que corregirlos en Maven:`);
+    for (const r of raros) log(`       ${r.name}: ${r.handle}`);
   }
-  log(OPTS.join ? `🚪 Modo UNIRSE — tope de ${OPTS.max} esta corrida.\n` : `👀 Modo RELEVAMIENTO — no se une a nada.\n`);
+  log(OPTS.only ? `\n🔍 Filtrado por "${OPTS.only}": ${cand.length} canal(es).` : "");
+  log(OPTS.join ? `🚪 Uniéndome a los que falten — tope de ${OPTS.max} esta tanda.\n` : `👀 Solo miro en cuáles ya estoy — no me uno a nada.\n`);
 
   const browser = await chromium.launch({ headless: OPTS.headless });
   const context = await browser.newContext({ storageState: TG_SESSION, viewport: { width: 1280, height: 900 } });
@@ -160,8 +169,13 @@ export async function runJoin(opts = {}, { log = console.log, shouldStop = () =>
 
   await browser.close();
 
+  const ROTULO = {
+    ok: "ya estaba adentro", unido: "me uní recién", pendiente: "esperando que el admin acepte",
+    falta: "falta unirse", invalido: "el link de invitación está muerto — pedirle uno nuevo a la creadora",
+    desconocido: "no pude determinarlo", flood: "Telegram limitó la cuenta",
+  };
   log(`\n━━━ RESUMEN ━━━`);
-  for (const [k, v] of Object.entries(resumen)) if (v) log(`  ${k}: ${v}`);
+  for (const [k, v] of Object.entries(resumen)) if (v) log(`  ${v} ${ROTULO[k] ?? k}`);
   if (cortado) log(`\n🛑 CORRIDA CORTADA — ${cortado}\n   Dejá descansar la cuenta unas horas antes de la próxima tanda.`);
   const faltan = Object.values(prev).filter((v) => v.state === "falta").length;
   if (faltan) log(`\n🔒 Faltan ${faltan} canal(es) — volvé a apretar para la siguiente tanda.`);

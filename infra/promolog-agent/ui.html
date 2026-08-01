@@ -67,7 +67,7 @@ const netsEl = $("#nets"), logEl = $("#log"), resultsEl = $("#results");
 const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏" };
 const NOTE = {
   instagram:"cada cuenta lee su parte (residencial). Más cuentas = menos volumen c/u = menos ban.",
-  telegram:"públicos por t.me/s (sin cuenta); privados necesitan una cuenta miembro logueada.",
+  telegram:"los canales públicos (@usuario) se leen sin cuenta; los privados (link de invitación) solo si la cuenta logueada es miembro.",
   x:"cada cuenta logueada navega su parte de los perfiles.",
 };
 let LOGIN = {}; // "network:id" → "open"
@@ -98,8 +98,8 @@ function render(st){
         <button data-scan="${net.network}" ${busy?"disabled":""}>▶︎ Escanear ${net.label}</button>
         <button class="secondary" data-add="${net.network}">＋ Agregar cuenta</button>
         ${net.network==="telegram" ? `<span style="width:1px;height:22px;background:var(--line)"></span>
-        <button class="secondary" data-tgcheck="1" ${busy?"disabled":""} title="Mira en cuáles canales está la cuenta. No se une a nada.">🔎 Revisar canales</button>
-        <button class="secondary" data-tgjoin="1" ${busy?"disabled":""} title="Se une a los canales que falten, de a 4 por vez.">🚪 Unirme a los que faltan</button>` : ""}
+        <button class="secondary" data-tgcheck="1" ${busy?"disabled":""} title="Mira en cuáles de los canales privados ya está metida la cuenta. No se une a nada.">🔎 ¿En qué canales estoy?</button>
+        <button class="secondary" data-tgjoin="1" ${busy?"disabled":""} title="Se une a los canales privados que falten, de a 4 por vez.">🚪 Unirme a los que faltan</button>` : ""}
       </div></div>`;
   }).join("");
   $("#stop").disabled = !busy;
