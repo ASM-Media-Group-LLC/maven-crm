@@ -23,6 +23,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyLinkDestination } from "../_shared/link-classifier.ts";
+import { postKey, MARKER_KEY, esDuplicado } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (igual que promolog-dispatch)
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
@@ -197,11 +198,10 @@ Deno.serve(async (req: Request) => {
         }
         if (promoted) promo++;
         if (dryRun) continue;
-        if (p.permalink) {
-          const { data: dupe } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "telegram").eq("evidence_url", p.permalink).limit(1);
-          if (dupe && dupe.length) continue;
-        }
+        // Ya no hay "buscá antes de insertar": la clave viaja en la fila y el índice
+        // único la rechaza si ya está. Reprocesar es inofensivo y no hay carrera.
         const { error: insErr } = await sb.from("promolog_entries").insert({
+          dedup_key: postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i }),
           tenant_id: TENANT_ID, creator_id: cid,
           date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
           promoted: promoted ? "true" : "false", network: "telegram",
@@ -212,12 +212,14 @@ Deno.serve(async (req: Request) => {
           story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
         });
         if (!insErr) { ins++; inserted++; }
+        else if (!esDuplicado(insErr)) out.push({ creator_id: cid, insertError: insErr.message });
       }
-      // marker "sin actividad" si el canal no trajo posts (1/día), igual que el path normal.
+      // Marker "sin actividad" si el canal no trajo posts (1/día). El chequeo previo
+      // usaba `date >= hoy-en-UTC`, que después de las 19:00 Bogotá apunta al día
+      // SIGUIENTE → no encontraba nada y reinsertaba el marcador en cada corrida.
+      // Ahora la unicidad la da el índice sobre `dia` (que ya es día de Bogotá).
       if (posts.length === 0 && !dryRun) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: ex } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "telegram").gte("date", today).limit(1);
-        if (!ex || !ex.length) await sb.from("promolog_entries").insert({ tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "telegram", platform: "Ninguna", analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
+        await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "telegram", platform: "Ninguna", analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;
       out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins });
@@ -401,7 +403,9 @@ Deno.serve(async (req: Request) => {
       if (!r.ok || !j.ok) { results.push({ creator: c.name, ok: false, error: j.error || `gw ${r.status}` }); continue; }
       if (j.pending) { results.push({ creator: c.name, ok: true, pending: true, note: "esperando aprobación del admin del canal" }); continue; }
 
-      const posts: Array<{ id: number; text: string; permalink: string; hasMedia: boolean; mediaDownloadable: boolean }> = j.posts || [];
+      // `date` (unix s) lo devuelve el gateway y ya se usaba abajo para que la fila
+      // caiga en SU día; faltaba en el tipo nomás.
+      const posts: Array<{ id: number; date?: number; text: string; permalink: string; hasMedia: boolean; mediaDownloadable: boolean }> = j.posts || [];
       let inserted = 0, promotedCount = 0, skipped = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
@@ -421,14 +425,11 @@ Deno.serve(async (req: Request) => {
         if (promoted) promotedCount++;
         if (dryRun) continue;
 
-        // Idempotente: no re-insertar el mismo permalink (re-corridas no duplican).
-        if (p.permalink) {
-          const { data: dupe } = await sb.from("promolog_entries")
-            .select("id").eq("creator_id", c.id).eq("network", "telegram").eq("evidence_url", p.permalink).limit(1);
-          if (dupe && dupe.length) { skipped++; continue; }
-        }
-
+        // Idempotencia por índice único, no por "buscar antes de insertar": aquel
+        // chequeo se salteaba entero cuando no había permalink (canales privados) y
+        // además dos corridas simultáneas lo pasaban las dos.
         const { error: insErr } = await sb.from("promolog_entries").insert({
+          dedup_key: postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i }),
           tenant_id: TENANT_ID,
           creator_id: c.id,
           // Telegram tiene fecha real por post → la usamos (a diferencia de IG
@@ -447,17 +448,18 @@ Deno.serve(async (req: Request) => {
           story_count: posts.length,
           scraped_at: new Date().toISOString(),
         });
-        if (insErr) { results.push({ creator: c.name, insertError: insErr.message }); }
+        if (insErr) { if (esDuplicado(insErr)) skipped++; else results.push({ creator: c.name, insertError: insErr.message }); }
         else inserted++;
       }
       // Marker "revisada · sin actividad" si el canal no tuvo posts → la columna
-      // Red Social muestra Telegram en gris (dejamos constancia del scan). 1/día.
+      // Red Social muestra Telegram en gris (dejamos constancia del scan). 1/día,
+      // garantizado por el índice sobre `dia` (día de Bogotá). El chequeo anterior
+      // comparaba contra el día en UTC: pasadas las 19:00 de Bogotá miraba el día
+      // siguiente, no encontraba nada y reinsertaba el marcador en cada corrida.
       if (posts.length === 0 && !dryRun) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: ex } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "telegram").gte("date", today).limit(1);
-        if (!ex || !ex.length) {
+        {
           await sb.from("promolog_entries").insert({
+            dedup_key: MARKER_KEY,
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
             promoted: "false", network: "telegram", platform: "Ninguna",
             notes: null, evidence_url: null,

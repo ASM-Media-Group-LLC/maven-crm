@@ -100,10 +100,15 @@ async function scrapePublic(user, hours = 24) {
 // Cada mensaje trae data-timestamp (unix s) y data-mid → fecha real + permalink
 // estable para el dedup (nada de meter posts viejos como de hoy).
 //
-// Devuelve  { titulo, msgs }            → leído
-//           { noMiembro, needsApproval } → hay que unirse primero (tg-join.mjs)
-//           { invalido, detail }         → el link no lleva a ningún canal
-//           null                         → no cargó / no se pudo determinar
+// Devuelve  { titulo, msgs, conFecha, enVentana } → leído (ver contadores abajo)
+//           { noMiembro, needsApproval }          → hay que unirse primero (tg-join.mjs)
+//           { invalido, detail }                  → el link no lleva a ningún canal
+//           null                                  → no cargó / no se pudo determinar
+//
+// Los contadores son los que permiten NO tirar todo a la misma bolsa:
+//   conFecha  = burbujas con timestamp que renderizó el chat (0 = no cargó nada)
+//   enVentana = de esas, cuántas caen dentro de las `hours` (0 = no posteó hoy)
+//   msgs      = las de la ventana que además tienen TEXTO (lo único clasificable)
 async function scrapeTelegramWeb(page, p, hours = 24) {
   // ⚠️ CARGA COMPLETA OBLIGATORIA (la hace `abrir`): con `#…` solo cambia el HASH y
   // la SPA NO cambia de chat → se leían los mensajes del chat anterior y se le
@@ -126,27 +131,55 @@ async function scrapeTelegramWeb(page, p, hours = 24) {
   const user = p.kind === "public" ? p.username : null;
   const cutoff = Math.floor((Date.now() - hours * 3600e3) / 1000);
   try {
-    const msgs = await page.evaluate(({ cut, uname }) => {
+    // ⚠️ AL FONDO ANTES DE LEER. Telegram Web puede abrir el chat parado en el
+    // separador de "no leídos", y entonces los mensajes MÁS NUEVOS no están en el
+    // DOM. Sin esto, "no hay nada en las últimas 24h" podría ser en realidad "todavía
+    // no los renderizó" — y sobre esa lectura vamos a afirmar "no promocionó".
+    await page.evaluate(() => {
+      const c = document.querySelector(".bubbles .scrollable-y") || document.querySelector(".bubbles") || document.querySelector(".chat .scrollable-y");
+      if (c) c.scrollTop = c.scrollHeight;
+    });
+    await sleep(2500);
+
+    const lectura = await page.evaluate(({ cut, uname }) => {
+      // ⚠️ EL PERMALINK ES LA CLAVE CONTRA LA QUE SE DEDUPLICA, así que tiene que
+      // salir IDÉNTICO al que arma el gateway — si no, el mismo post entra dos veces.
+      // Telegram Web guarda el id del mensaje en los 32 bits BAJOS de data-mid
+      // (data-mid 4294969850 = 2³² + 2554 → el mensaje 2554). El código anterior se
+      // quedaba con "los últimos 6 dígitos" (969850): un id inventado, que además
+      // dejaba un link roto como evidencia. Verificado contra filas del gateway:
+      //   público  → https://t.me/<usuario>/<mid>
+      //   privado  → https://t.me/c/<idCanal>/<mid>     (idCanal = |data-peer-id|)
+      const midReal = (raw) => {
+        const n = Number(raw);
+        return Number.isFinite(n) ? (n % 4294967296) : null;   // 2³²
+      };
       const out = [];
+      let conFecha = 0, enVentana = 0;
       for (const el of document.querySelectorAll(".bubble")) {
         const tsRaw = el.getAttribute("data-timestamp") || el.querySelector("[data-timestamp]")?.getAttribute("data-timestamp");
         const ts = Number(tsRaw);
-        if (!Number.isFinite(ts) || ts < cut) continue;        // sin fecha o viejo → fuera
+        if (!Number.isFinite(ts) || ts <= 0) continue;         // divisor de fecha, servicio, o publicidad (ts=0)
+        conFecha++;
+        if (ts < cut) continue;                                // viejo → fuera
+        enVentana++;
         const txt = (el.querySelector(".message")?.innerText || "").trim();
-        const mid = el.getAttribute("data-mid");
-        if (!txt) continue;
-        out.push({
-          text: txt.slice(0, 1500),
-          date: ts,
-          permalink: uname && mid ? `https://t.me/${uname}/${String(mid).slice(-6)}` : null,
-        });
+        if (!txt) continue;                                    // solo imagen/video sin epígrafe
+        const mid = midReal(el.getAttribute("data-mid"));
+        const peer = Number(el.getAttribute("data-peer-id"));
+        let permalink = null;
+        if (mid && mid > 0) {
+          if (uname) permalink = `https://t.me/${uname}/${mid}`;
+          else if (Number.isFinite(peer) && peer !== 0) permalink = `https://t.me/c/${Math.abs(peer)}/${mid}`;
+        }
+        out.push({ text: txt.slice(0, 1500), date: ts, permalink });
       }
-      return out.slice(-30);
+      return { msgs: out.slice(-30), conFecha, enVentana };
     }, { cut: cutoff, uname: user });
     // GUARDA DE IDENTIDAD: además de abrir, hay que confirmar QUÉ chat se abrió.
     // Devolvemos el título del canal; el caller verifica que no se repita entre
     // creadoras distintas (así un fallo de navegación no vuelve a atribuir mal).
-    return { titulo: snap.title, msgs };
+    return { titulo: snap.title, ...lectura };
   } catch { return null; }
 }
 
@@ -242,11 +275,27 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
           noLegibles.push({ handle: etiqueta, reason: "no se pudo abrir el canal en Telegram Web (no cargó o quedó a medias) — reintentar" });
           log(`🔒 ${etiqueta}: no se pudo leer — no se marca nada`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
         } else if (posts.length === 0) {
-          // CONSERVADOR: por esta vía, 0 mensajes NO se afirma como "no promocionó"
-          // (podrían no haber cargado, o ser posts solo-media sin texto). Queda como
-          // no revisado y lo cubre el gateway, que lee por API y sí distingue.
-          noLegibles.push({ handle: etiqueta, reason: "abrió el canal pero no se leyeron mensajes de las últimas 24h (posible carga parcial o posts sin texto) — no se afirma nada" });
-          log(`· ${etiqueta}: sin mensajes legibles → no se marca nada`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
+          // "Vacío" son TRES cosas distintas y antes las tres salían como "no se pudo
+          // leer" — un muro de candados rojos que hacía parecer roto lo que andaba.
+          if (leido.conFecha === 0) {
+            // El chat no renderizó NI UN mensaje: eso sí es no haber podido leer.
+            noLegibles.push({ handle: etiqueta, reason: "el canal abrió pero no renderizó ningún mensaje — reintentar" });
+            log(`🔒 ${etiqueta}: no renderizó mensajes → no se marca nada`); onResult({ handle: etiqueta, outcome: "no_legible", red: "telegram" });
+          } else if (leido.enVentana === 0) {
+            // El chat cargó bien y el mensaje más nuevo es ANTERIOR a la ventana:
+            // no posteó. Eso no es una falla, es la respuesta — y es la misma que
+            // daría el gateway por API. Mandarlo vacío acá SÍ es honesto (ver el bug
+            // #1 del historial: lo prohibido es mandar vacío cuando NO se pudo leer).
+            batch.push({ creator_id: t.creator_id, source_handle: t.handle, posts: [] });
+            log(`· ${etiqueta}: sin posts en las últimas 24h (último, más viejo)`);
+            onResult({ handle: etiqueta, outcome: "sin_posts", stories: 0, red: "telegram" });
+            if (batch.length >= FLUSH_EVERY) aplicar(await postIngest(batch.splice(0, batch.length), [], { acumulado: acc, final: false }));
+          } else {
+            // Posteó, pero todo sin texto (imagen/video sin epígrafe). El clasificador
+            // trabaja sobre texto → acá no se puede afirmar nada, ni sí ni no.
+            noLegibles.push({ handle: etiqueta, reason: `posteó ${leido.enVentana} vez/veces en 24h pero sin texto (solo imagen o video) — no hay nada que clasificar` });
+            log(`🖼️ ${etiqueta}: ${leido.enVentana} post(s) sin texto → no se afirma nada`); onResult({ handle: etiqueta, outcome: "sin_texto", stories: leido.enVentana, red: "telegram" });
+          }
         } else {
           batch.push({ creator_id: t.creator_id, source_handle: t.handle, posts });
           log(`✅ ${etiqueta}: ${posts.length} posts (por sesión)`);

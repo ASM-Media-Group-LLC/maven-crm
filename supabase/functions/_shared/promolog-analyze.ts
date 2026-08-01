@@ -8,6 +8,7 @@
 // historia" / "sin datos" cuando corresponde) y devuelve el conteo.
 
 import { classifyLinkDestination, isShortener } from "./link-classifier.ts";
+import { postKey, MARKER_KEY } from "./promolog-dedup.ts";
 
 export const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 export const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";
@@ -407,6 +408,8 @@ async function insertAnalyzedEntry(
   const inferredTag = platformInferred ? ` · plataforma inferida (${platform})` : "";
   const notes = `${notesPrefix}${args.analysis.reasoning} (confidence: ${args.analysis.confidence.toFixed(2)}${levelTag}${videoTag}${inferredTag})`;
   const { error } = await sb.from("promolog_entries").insert({
+    // La identidad de una historia es su story_pk; si IG no lo dio, la evidencia.
+    dedup_key: postKey({ permalink: args.story_pk ?? args.evidence_url, index: args.story_index }),
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,
     promoted: args.analysis.promoted ? "true" : "false", network: "Instagram", platform,
     has_buy_link: args.analysis.has_buy_link, buy_link_type: args.analysis.buy_link_type,
@@ -436,6 +439,7 @@ async function insertUnreadableEntry(
   const notes = `[REVISAR MANUAL] La IA no devolvió un veredicto legible (${reason}). ` +
     `Evidencia guardada — revisar a mano. · unreadable${videoTag}`;
   const { error } = await sb.from("promolog_entries").insert({
+    dedup_key: postKey({ permalink: args.story_pk ?? args.evidence_url, index: args.story_index }),
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,
     promoted: "pending", network: "Instagram", platform: "Ninguna", has_buy_link: false,
     notes, evidence_url: args.evidence_url, dispatch_run_id: args.dispatch_run_id,
@@ -458,6 +462,7 @@ export async function insertEmptyEntry(
   // no agregamos un "sin historias" que la contradiga ni duplique.
   if (await creatorHasInstagramEntry(sb, args.creator_id)) return;
   await sb.from("promolog_entries").insert({
+    dedup_key: MARKER_KEY,
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,
     promoted: "false", network: "Instagram", platform: "Ninguna", has_buy_link: false,
     notes: "[AUTO] Lectura directa: la creadora no tenía historias activas en el momento del escaneo.",
@@ -492,6 +497,7 @@ export async function insertNoDataEntry(
     ? "[SIN DATOS] Falla de red al leer — se reintenta en el próximo scan. NO confirma que no haya publicado."
     : "[SIN DATOS] No se pudo leer la historia (sesión/red). NO confirma que la creadora no haya publicado.";
   await sb.from("promolog_entries").insert({
+    dedup_key: "ig_read_failed",
     tenant_id: TENANT_ID, creator_id: args.creator_id, date: args.scan_date,
     promoted: "pending", network: "Instagram", platform: "Ninguna", has_buy_link: false,
     notes,

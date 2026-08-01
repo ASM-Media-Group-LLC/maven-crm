@@ -20,6 +20,7 @@
 // SECRETOS: APIFY_TOKEN (ya seteado para IG), CRON_INTERNAL_TOKEN.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { postKey, MARKER_KEY } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apidojo~tweet-scraper";
@@ -338,13 +339,16 @@ Deno.serve(async (req: Request) => {
         if (promoted) promo++;
         const dedupKey = tw.permalink || tw.imageUrl || null;
         if (dryRun) continue;
-        if (!dedupKey) continue;
-        const { data: dupe } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "x").eq("story_link_url", dedupKey).limit(1);
-        if (dupe && dupe.length) continue;
+        // Antes: `if (!dedupKey) continue` → el tweet sin link NI SE GUARDABA, y el
+        // chequeo de duplicado comparaba `.eq(col, null)`, que en SQL no matchea
+        // nunca. Ahora la clave siempre existe (cae al texto o a la fecha) y de la
+        // unicidad se ocupa el índice.
+        const clave = postKey({ permalink: tw.permalink, text: tw.text, date: tw.date, index: i });
         let evidenceUrl: string = tw.imageUrl || tw.permalink || "";
         if (promoted && tw.imageUrl) { const durable = await persistTweetImage(sb, tw.imageUrl, `${cid}/${i}`); if (durable) evidenceUrl = durable; }
         const when = parseTweetDate(tw.date || "");
         const { error: insErr } = await sb.from("promolog_entries").insert({
+          dedup_key: clave,
           tenant_id: TENANT_ID, creator_id: cid, date: (when || new Date()).toISOString(),
           promoted: promoted ? "true" : "false", network: "x",
           platform: promoted ? "OnlyFans" : "Ninguna",
@@ -356,11 +360,12 @@ Deno.serve(async (req: Request) => {
         });
         if (!insErr) { ins++; inserted++; }
       }
-      // marker "sin actividad" si el perfil no trajo tweets (1/día).
+      // Marker "sin actividad" (1/día). El chequeo miraba `date >= hoy-en-UTC`:
+      // pasadas las 19:00 de Bogotá eso ya es MAÑANA, no encontraba el marcador del
+      // día y lo reinsertaba en cada corrida — de ahí los duplicados de X. Ahora la
+      // unicidad la da el índice sobre `dia`, que ya está en hora de Bogotá.
       if (tweets.length === 0 && !dryRun) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: ex } = await sb.from("promolog_entries").select("id").eq("creator_id", cid).eq("network", "x").gte("date", today).limit(1);
-        if (!ex || !ex.length) await sb.from("promolog_entries").insert({ tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "x", platform: "Ninguna", analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
+        await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "x", platform: "Ninguna", analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;
       out.push({ creator_id: cid, source_handle: it.source_handle, tweets: tweets.length, promoted: promo, inserted: ins });
@@ -549,11 +554,12 @@ Deno.serve(async (req: Request) => {
       // scan posterior lee bien, sus tweets entran como filas propias y el día recalcula).
       const failed = failedCreatorIds.has(c.id);
       if (!dryRun) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: ex } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "x").gte("date", today).limit(1);
-        if (!ex || !ex.length) {
+        {
+          // Un marcador por creadora/red/día, garantizado por el índice. El "pending"
+          // (lectura fallida) lleva SU propia clave para no pisarse con el "sin
+          // actividad": son afirmaciones distintas y no deben colapsar en una.
           await sb.from("promolog_entries").insert(failed ? {
+            dedup_key: "x_read_failed",
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
             promoted: "pending", network: "x", platform: "Ninguna",
             notes: "[SIN DATOS] No se pudo leer X (Apify falló). NO confirma que no haya tuiteado.",
@@ -561,6 +567,7 @@ Deno.serve(async (req: Request) => {
             ai_reasoning: "Lectura de X fallida (apify): no ausencia confirmada.",
             error_reason: "x_read_failed", needs_review: false, scraped_at: new Date().toISOString(),
           } : {
+            dedup_key: MARKER_KEY,
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
             promoted: "false", network: "x", platform: "Ninguna",
             notes: null, evidence_url: null,
@@ -601,11 +608,10 @@ Deno.serve(async (req: Request) => {
       // pbs.twimg.com cambia entre scans → no sirve de clave (duplicaba el mismo tweet).
       const dedupKey = permalink || firstImage || null;
       if (dryRun) continue;
-      if (!dedupKey) { skipped++; continue; }
-
-      const { data: dupe } = await sb.from("promolog_entries")
-        .select("id").eq("creator_id", c.id).eq("network", "x").eq("story_link_url", dedupKey).limit(1);
-      if (dupe && dupe.length) { skipped++; continue; }
+      // La clave ya no puede faltar (cae al texto o a la fecha del tweet), así que
+      // un tweet sin link deja de perderse; y la unicidad la impone el índice, no
+      // un SELECT previo que además comparaba contra NULL cuando la clave faltaba.
+      const clave = postKey({ permalink, text: (it?.text || it?.fullText || "") as string, date: it?.createdAt || it?.created_at, index: i });
 
       // Evidencia DURABLE: guardamos la imagen en nuestro bucket SOLO para los tweets que
       // SÍ son promo (la evidencia que de verdad importa). Bajar+subir la foto de CADA
@@ -622,6 +628,7 @@ Deno.serve(async (req: Request) => {
 
       const when = parseTweetDate(it?.createdAt || it?.created_at);
       const { error: insErr } = await sb.from("promolog_entries").insert({
+        dedup_key: clave,
         tenant_id: TENANT_ID,
         creator_id: c.id,
         date: (when || new Date()).toISOString(),

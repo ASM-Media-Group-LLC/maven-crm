@@ -22,6 +22,7 @@
 // SECRETOS: APIFY_TOKEN, CRON_INTERNAL_TOKEN.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { postKey, MARKER_KEY } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apify~facebook-posts-scraper";
@@ -358,10 +359,11 @@ Deno.serve(async (req: Request) => {
 
     if (!items.length) {
       if (!dryRun) {
-        const { data: ex } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "facebook").gte("date", today).limit(1);
-        if (!ex || !ex.length) {
+        {
+          // 1/día por índice único. El chequeo previo miraba el día en UTC, que
+          // pasadas las 19:00 de Bogotá ya es el siguiente → reinsertaba el marcador.
           await sb.from("promolog_entries").insert({
+            dedup_key: MARKER_KEY,
             tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
             promoted: "false", network: "facebook", platform: "Ninguna",
             notes: null, evidence_url: null,
@@ -423,6 +425,7 @@ Deno.serve(async (req: Request) => {
         const d = postDate(it);
         const when = d ? new Date(d) : null;
         const { error: insErr } = await sb.from("promolog_entries").insert({
+          dedup_key: postKey({ permalink: dedupKey, text: postText(it), date: postDate(it), index: i }),
           tenant_id: TENANT_ID, creator_id: c.id,
           date: (when && !isNaN(when.getTime()) ? when : new Date()).toISOString(),
           promoted: promoted ? "true" : "false", network: "facebook",
