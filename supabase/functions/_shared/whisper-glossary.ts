@@ -111,15 +111,30 @@ export async function buildGlossary(sb: any, groupId: string | null): Promise<Gl
     terms = terms.slice(1);
     prompt = `${prefix}${terms.join(", ")}.`;
   }
-  // hotwords tiene un presupuesto MUCHO más chico que el prompt de Groq, y por
-  // una razón distinta: vive dentro de los 448 tokens del decoder de Whisper,
-  // COMPARTIDOS con el texto que se va generando y con el arrastre del segmento
-  // anterior (condition_on_previous_text). Con la lista completa aparecía
-  // "ValueError: The maximum decoding length must be > 0" — el contexto lleno,
-  // sin lugar para decodificar. ~340 chars ≈ 100 tokens deja el resto libre.
+  // ⚠️ HOTWORDS SE ARMA AL REVÉS QUE EL PROMPT, y esto se midió contra audios
+  // reales (01/08): con la MISMA lista, el prompt corregía "Hubstaff" y "sheet"
+  // pero los hotwords devolvían "hopstab" y "shit".
+  // El motivo es que cada uno se trunca por una punta distinta:
+  //   · prompt   → Whisper conserva los ÚLTIMOS tokens  → lo crítico va al FINAL
+  //   · hotwords → faster-whisper hace hotwords_tokens[:max_length//2 - 1],
+  //                o sea conserva los PRIMEROS             → lo crítico va al INICIO
+  // Poner el mismo orden en los dos hacía que en hotwords se descartara
+  // justamente el vocabulario que originó todo esto.
+  //
+  // Presupuesto propio y chico (~340 chars ≈ 100 tokens): los hotwords viven
+  // dentro de los 448 tokens del decoder, COMPARTIDOS con el texto que se va
+  // generando y con el arrastre del segmento anterior. Con la lista completa
+  // aparecía "ValueError: The maximum decoding length must be > 0".
   const HOTWORDS_MAX = 340;
-  let hw = terms;
-  while (hw.join(", ").length > HOTWORDS_MAX && hw.length > 1) hw = hw.slice(1);
+  const hwSeen = new Set<string>();
+  const hwAll = [...HERRAMIENTAS, ...EQUIPO, ...extra, ...creadoras].filter((t) => {
+    const k = t.toLowerCase();
+    if (hwSeen.has(k)) return false;
+    hwSeen.add(k);
+    return true;
+  });
+  let hw = hwAll;
+  while (hw.join(", ").length > HOTWORDS_MAX && hw.length > 1) hw = hw.slice(0, -1);
   return { prompt, hotwords: hw.join(", ") };
 }
 
