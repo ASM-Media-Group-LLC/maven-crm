@@ -423,7 +423,16 @@ export const useCloserLeads = () => {
         // toda vista. Las en trabajo van primero (tienen actividad). Conjuntos
         // disjuntos: al convertirse el contacto sale del directorio.
         const leadBase = () => {
-          let q = supabase.from("closer_creators").select("*", { count: "exact" }).eq("lead_source", B2B_SOURCE);
+          // Solo las que YA están EN TRABAJO (con dueño). Una agencia en el
+          // pipeline pero sin asignar sigue estando "disponible", y su contacto
+          // sin convertir ya la muestra en la porción de directorio de abajo:
+          // sin este filtro aparecería DOS veces para quien ve todo el pipeline
+          // (admin/supervisor), que es lo que pasó al reetiquetar las 72 que el
+          // trigger había metido al embudo de modelos. Los closers rasos no lo
+          // notaban porque scopeByAgent ya les acota a sus propias filas.
+          let q = supabase.from("closer_creators").select("*", { count: "exact" })
+            .eq("lead_source", B2B_SOURCE)
+            .not("assigned_to", "is", null);
           if (normalizedSearch) q = q.ilike("instagram_handle", `%${normalizedSearch}%`);
           q = scopeByAgent(q); // el Closer Supervisor no ve las de sus pares
           return q.order("passed_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
