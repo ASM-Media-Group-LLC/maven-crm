@@ -21,6 +21,47 @@ const HUBSTAFF_REFRESH_WAIT_MS = 12_000;
 const horaBogota = (ts: string | null): string | null =>
   ts ? new Date(Date.parse(ts) - 5 * 3600_000).toISOString().slice(11, 16) : null;
 
+// minúsculas + sin acentos: "María" ≈ "maria". Para comparar nombres dichos
+// (o transcritos por Whisper) contra los registrados.
+const normName = (s: string): string =>
+  s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").trim();
+
+// Apodos/variantes → nombre canónico (team_name_aliases, editable por SQL).
+// "brian" → "Brayan", "lisette" → "Lizeth". Falla en silencio: sin alias se
+// busca lo que vino.
+// deno-lint-ignore no-explicit-any
+async function aplicarAlias(sb: any, tenantId: string, person: string): Promise<{ buscado: string; alias: boolean }> {
+  try {
+    const { data } = await sb
+      .from("team_name_aliases")
+      .select("canonical")
+      .eq("tenant_id", tenantId)
+      .eq("alias", normName(person))
+      .maybeSingle();
+    if (data?.canonical) return { buscado: String(data.canonical), alias: true };
+  } catch { /* sin alias */ }
+  return { buscado: person, alias: false };
+}
+
+// Parecidos por tokens: "Juan Pachas" → los tres Juan del roster. Para que un
+// nombre que NO existe devuelva candidatos en vez de nada (y el bot pregunte).
+function parecidos(
+  buscado: string,
+  roster: Array<{ nombre: string; rol: string | null; en_maven: boolean }>,
+): Array<{ nombre: string; rol: string | null; en_maven: boolean }> {
+  const tokens = normName(buscado).split(/\s+/).filter((t) => t.length >= 3);
+  if (!tokens.length) return [];
+  const scored = roster
+    .map((p) => {
+      const n = normName(p.nombre);
+      const score = tokens.filter((t) => n.includes(t)).length;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, 6).map((x) => x.p);
+}
+
 // "4.13" horas decimales se leen como "4h13m" y son 4h08m — dar el formato hecho.
 const horasHM = (secs: number): string => `${Math.floor(secs / 3600)}h${String(Math.round((secs % 3600) / 60)).padStart(2, "0")}m`;
 
@@ -284,8 +325,11 @@ export const equipoTools: AgentTool[] = [
       "2-5 min); el agregado diario de HOY puede venir hasta 6h atrasado y hacía reportar '0h' de gente trabajando. " +
       "Cada persona de hoy trae `estado`: 'ficho_hoy' (horas reales al último ping), 'sin_fichar_hoy' (el feed está " +
       "vivo y NO tiene ni un minuto — solo esto es 'no arrancó'), o 'sin_dato_feed_stale' (el tracker no reporta: " +
-      "PROHIBIDO decir 0h, di desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (tres 'Brayan'): " +
-      "identifica siempre por nombre COMPLETO + rol de la respuesta, nunca adivines quién es quién. " +
+      "PROHIBIDO decir 0h, di desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (dos 'Brayan', tres " +
+      "'Lizeth'): identifica siempre por nombre COMPLETO + rol de la respuesta. La tool resuelve apodos conocidos " +
+      "(Brian→Brayan) y si el nombre NO existe o matchea a VARIOS te devuelve `persona_no_encontrada`/`ambiguo` con " +
+      "candidatos: en ese caso PREGUNTÁ a cuál se refieren — nunca respondas con datos de otra persona ni elijas vos " +
+      "(el 31/07 'Juan Pachas' no existía y el bot contestó con gente que nadie preguntó). " +
       "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
     input_schema: {
       type: "object",
@@ -314,11 +358,49 @@ export const equipoTools: AgentTool[] = [
         d.setUTCDate(d.getUTCDate() - (n - 1));
         from = d.toISOString().slice(0, 10);
       }
-      const person = typeof args.person === "string" && args.person.trim() ? args.person.trim() : null;
+      const personRaw = typeof args.person === "string" && args.person.trim() ? args.person.trim() : null;
+      // Apodos/variantes de Whisper ("Brian", "Lisette") → canónico, ANTES de la RPC.
+      const aliased = personRaw ? await aplicarAlias(ctx.sb, ctx.tenantId, personRaw) : null;
+      const person = aliased?.buscado ?? null;
 
       const { data, error } = await ctx.sb.rpc("hubstaff_activity_summary", { p_from: from, p_to: to, p_person: person });
       if (error) throw new Error(`get_hubstaff_activity: ${error.message}`);
       const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+      // ── NOMBRE QUE NO MATCHEA O MATCHEA VARIOS: eso es un DATO, no un detalle.
+      // El 31/07 "Juan Pachas" no existía y el bot respondió con OTRAS personas;
+      // acá se corta eso de raíz: sin match → candidatos y a PREGUNTAR; multi-match
+      // → candidatos y a PREGUNTAR. Nunca datos de la persona equivocada.
+      if (person && rows.length === 0) {
+        const { data: all } = await ctx.sb.rpc("hubstaff_activity_summary", { p_from: from, p_to: to, p_person: null });
+        const roster = ((all ?? []) as Array<Record<string, unknown>>).map((r) => ({
+          nombre: String(r.name), rol: (r.hubstaff_role as string) ?? null, en_maven: Boolean(r.mapped_to_maven),
+        }));
+        return {
+          error: "persona_no_encontrada",
+          buscado: personRaw,
+          ...(aliased?.alias ? { alias_aplicado: person } : {}),
+          parecidos: parecidos(person, roster),
+          nota:
+            "NO respondas con datos de otra persona. Decí que ese nombre no está en Hubstaff, mostrá los parecidos " +
+            "y PREGUNTÁ a quién se refiere. Si es alguien de un grupo de WhatsApp (apodo), verificá con " +
+            "get_group_members. Cuando el owner aclare quién es, podés guardarlo con remember_fact " +
+            "(ej. 'a Juan X le dicen Pachas') para la próxima.",
+        };
+      }
+      if (person && rows.length > 1) {
+        return {
+          ambiguo: true,
+          buscado: personRaw,
+          ...(aliased?.alias ? { alias_aplicado: person } : {}),
+          candidatos: rows.slice(0, 8).map((r) => ({
+            nombre: r.name, rol: r.hubstaff_role, en_maven: r.mapped_to_maven,
+          })),
+          nota:
+            `"${personRaw}" matchea a ${rows.length} personas. PREGUNTÁ cuál es (nombre completo) antes de dar ` +
+            "cualquier número — no elijas por tu cuenta. Hay nombres repetidos en el equipo (dos Brayan, tres Lizeth).",
+        };
+      }
 
       const result: Record<string, unknown> = {
         rango: { desde: from, hasta: to },
@@ -386,7 +468,10 @@ export const equipoTools: AgentTool[] = [
           }
         } catch { /* best-effort: sin refresh también hay respuesta */ }
 
-        const { data: live, error: liveErr } = await ctx.sb.rpc("hubstaff_live_today", { p_person: person });
+        // Con match único, al feed en vivo va el nombre EXACTO del match (no lo
+        // que se dijo): la RPC live también hace ilike y podría re-ambiguar.
+        const personLive = person && rows.length === 1 ? String(rows[0].name) : person;
+        const { data: live, error: liveErr } = await ctx.sb.rpc("hubstaff_live_today", { p_person: personLive });
         if (liveErr) {
           result.hoy_en_vivo = { error: `hubstaff_live_today: ${liveErr.message}` };
         } else {
