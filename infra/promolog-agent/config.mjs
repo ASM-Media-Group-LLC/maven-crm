@@ -3,6 +3,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { hostname } from "node:os";
 
 export const ROOT = dirname(fileURLToPath(import.meta.url));
 export const SESSIONS_DIR = join(ROOT, "sessions");
@@ -46,6 +47,22 @@ export const SOFTBLOCK = {
 };
 
 export const HEADFUL = process.env.HEADFUL === "1"; // true = ventana visible (útil para depurar/challenges)
+
+// ── Identidad de esta máquina ────────────────────────────────────────────────
+// Con varias Mac Minis corriendo el agente hace falta saber CUÁL late y cuál se
+// cayó. Default: el nombre del equipo.
+export const AGENT_ID = (process.env.AGENT_ID || hostname() || "agente-local").trim().slice(0, 60);
+
+// ── A qué interfaz se ata el panel ───────────────────────────────────────────
+// ⚠️ EL PANEL NO TIENE CONTRASEÑA: quien lo abre puede lanzar escaneos y abrir
+// ventanas de login con las sesiones de las cuentas. Hasta ahora `listen(PORT)`
+// sin host ataba a TODAS las interfaces, o sea que quedaba expuesto a la red
+// local. Ahora el default es solo la propia máquina.
+// Para llegar desde otra computadora, lo correcto es Tailscale: poner acá la IP
+// de Tailscale de la Mac Mini (100.x.y.z) → solo la alcanzan los equipos de tu
+// red privada, no la oficina entera. `0.0.0.0` existe pero deja el panel abierto
+// a cualquiera del LAN.
+export const UI_HOST = process.env.UI_HOST || "127.0.0.1";
 
 export function assertConfig() {
   const errs = [];

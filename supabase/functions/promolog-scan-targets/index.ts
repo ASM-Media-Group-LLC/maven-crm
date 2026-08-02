@@ -20,6 +20,23 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
+  // ── ?mode=latido — "sigo vivo" del agente local ───────────────────────────
+  // El agente corre en una máquina de la oficina, detrás del NAT: Maven no puede
+  // preguntarle nada. Si se reinicia o se cae el panel, deja de escanear EN
+  // SILENCIO. Que el latido se corte ES la alerta.
+  if ((new URL(req.url)).searchParams.get("mode") === "latido") {
+    const b = await req.json().catch(() => ({})) as { agent_id?: string; hostname?: string; detalle?: unknown };
+    const id = String(b.agent_id ?? "").trim().slice(0, 60);
+    if (!id) return json({ error: "falta agent_id" }, 400);
+    const { error } = await sb.from("promolog_agents").upsert({
+      id, hostname: String(b.hostname ?? "").slice(0, 120) || null,
+      last_seen_at: new Date().toISOString(),
+      detalle: (b.detalle && typeof b.detalle === "object") ? b.detalle : {},
+    }, { onConflict: "id" });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
+
   // ── ?mode=estado — ÚLTIMA CORRIDA POR RED ─────────────────────────────────
   // El panel local no tenía forma de saber cuándo fue el último scan de cada red
   // ni cómo salió: había que abrir Maven o preguntarle al bot. Se sirve desde acá

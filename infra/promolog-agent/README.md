@@ -115,3 +115,89 @@ Dos casos que **no** se resuelven solos y salen en el informe:
 (hash del `creator_id`), así todas las cuentas de IG de una misma creadora caen en
 el mismo slot y no se pisan entre cuentas. Verificado: slot A ~34 creadoras, slot B
 ~23, cero solapamiento, 57 cubiertas.
+
+---
+
+## Mudarlo a una Mac Mini (siempre encendida)
+
+El agente pensado para correr en una laptop tiene un problema: cuando la cerrás,
+deja de escanear. En una Mac Mini queda como servicio y corre solo.
+
+### 1. Traer el código y los tokens
+
+```bash
+git clone https://github.com/jhonjlopez-sudo/maven-crm.git
+cd maven-crm/infra/promolog-agent
+npm install
+npx playwright install chromium
+```
+
+Copiá el `.env` desde la máquina donde ya funciona (tiene `PROMOLOG_EXT_TOKEN` y
+`CRON_INTERNAL_TOKEN`). **No está en el repo a propósito.**
+
+Si vas a correr el agente en **varias** Mac Minis, agregale a cada `.env` un
+nombre propio para poder distinguirlas en el latido:
+
+```
+AGENT_ID=macmini-1
+```
+
+### 2. Las sesiones se hacen EN la Mac Mini, no se copian
+
+`sessions/*.json` son los logins de Instagram, X, Telegram y Facebook.
+
+Se pueden copiar, pero **conviene loguear de nuevo desde la Mac Mini**: las
+sesiones traen huellas de IP y navegador, y una sesión de Instagram que aparece
+de golpe desde otra IP es exactamente lo que dispara el bloqueo (ya se quemó una
+cuenta así). Logueá desde el panel, una red por vez.
+
+### 3. Instalarlo como servicio
+
+Doble clic en **`instalar-servicio.command`**.
+
+Deja el agente como LaunchAgent de macOS: arranca al iniciar sesión y se
+**relevanta solo si se cae**. Detecta Tailscale y ata el panel a esa IP.
+
+> ⚠️ **Activá el inicio de sesión automático** en la Mac Mini
+> (Ajustes → Usuarios y grupos → Inicio de sesión automático).
+> Un LaunchAgent necesita una sesión de usuario iniciada: sin esto, después de un
+> corte de luz la máquina arranca, nadie inicia sesión y el agente **no corre**.
+
+Para detenerlo: `launchctl bootout gui/$(id -u)/com.maven.promolog-agent`
+
+### 4. Entrar al panel desde tu laptop (Tailscale)
+
+El panel **no tiene contraseña**: quien lo abre puede lanzar escaneos y abrir
+ventanas de login con las cuentas. Por eso escucha en `127.0.0.1` por defecto.
+
+El instalador, si encuentra Tailscale, lo ata a la IP de Tailscale (`100.x.y.z`)
+en vez de a `0.0.0.0`. La diferencia importa: por Tailscale llegan solo tus
+equipos; con `0.0.0.0` lo alcanza **cualquiera en la red de la oficina**.
+
+Desde tu laptop, con Tailscale conectado: `http://100.x.y.z:4599`
+
+### 5. Programar las corridas
+
+En el panel, por red: switch de **Automático**, intervalo y ventana horaria.
+Queda guardado en `sessions/schedules.json` y sobrevive reinicios.
+
+### 6. Confirmar que Maven lo está viendo
+
+El agente le avisa a Maven que sigue vivo cada 5 minutos. Para verificarlo:
+
+```sql
+select id, hostname, last_seen_at, detalle from promolog_agents
+order by last_seen_at desc;
+```
+
+**Si `last_seen_at` se quedó viejo, esa máquina dejó de escanear** — que es
+justamente lo que antes pasaba sin que nadie se enterara.
+
+### Cuando algo no anda
+
+| Síntoma | Dónde mirar |
+|---|---|
+| El panel no abre | `logs/agente.error.log` |
+| Arrancó pero no escanea | En el panel, la franja de última corrida por red |
+| Maven no lo ve | La tabla `promolog_agents` (paso 6) |
+| Una red da 0 siempre | Su sesión: re-logueá esa cuenta desde el panel |

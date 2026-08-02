@@ -3,10 +3,11 @@
 // y sirve ui.html. Se lanza con `npm run ui` o doble clic en abrir-panel.command.
 
 import { createServer } from "node:http";
+import { hostname as osHostname } from "node:os";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EXT_TOKEN, CRON_TOKEN, MAVEN_URL } from "./config.mjs";
+import { EXT_TOKEN, CRON_TOKEN, MAVEN_URL, AGENT_ID, UI_HOST } from "./config.mjs";
 import { runAccount, sleep, readCooldowns, sessionInfo, openLoginTo, saveLoginTo } from "./agent-core.mjs";
 import { runTelegram } from "./tg-scraper.mjs";
 import { runJoin } from "./tg-join.mjs";
@@ -17,6 +18,7 @@ import { getSchedules, setSchedule, marcarCorrida, vencidas, proximaCorrida, INT
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PORT = Number(process.env.UI_PORT || 4599);
+const HOST = UI_HOST;
 const LOGIN_URL = {
   instagram: "https://www.instagram.com/accounts/login/",
   telegram: "https://web.telegram.org/k/",
@@ -70,6 +72,38 @@ function statusPayload() {
     })),
     last_results: lastResults,
   };
+}
+
+
+// Momento de arranque: sirve para ver desde Maven si una máquina se reinició.
+const ARRANCADO_AT = new Date().toISOString();
+
+// ── LATIDO ──────────────────────────────────────────────────────────────────
+// El agente corre en una máquina de la oficina, detrás del NAT: Maven no puede
+// preguntarle nada. Si el equipo se reinicia, se corta internet o muere el panel,
+// deja de escanear EN SILENCIO — pasó el 01/08 y costó media hora entender que el
+// agente no estaba produciendo. Que el latido se corte ES la alerta.
+// Best-effort: un latido fallido nunca frena un escaneo.
+async function latir() {
+  if (!EXT_TOKEN) return;
+  try {
+    const sch = getSchedules();
+    await fetch(`${MAVEN_URL}/functions/v1/promolog-scan-targets?mode=latido`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-ext-token": EXT_TOKEN },
+      body: JSON.stringify({
+        agent_id: AGENT_ID, hostname: osHostname(),
+        detalle: {
+          escaneando: running,
+          puerto: PORT,
+          // Qué redes tiene programadas: así desde Maven se ve si una máquina
+          // quedó sin nada activo (que es una caída silenciosa distinta).
+          programadas: NETWORKS.filter((n) => sch[n]?.activo),
+          arrancado_at: ARRANCADO_AT,
+        },
+      }),
+    });
+  } catch { /* sin internet: el propio silencio es la señal */ }
 }
 
 async function runScan(network, onlyIds) {
@@ -207,4 +241,13 @@ setInterval(() => {
   runScan(red, null).catch((e) => log(`⏰ ${red} falló: ${e.message}`));
 }, 60_000);
 
-server.listen(PORT, () => console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}\n`));
+// Latido: al arrancar y cada 5 min. Si esto deja de llegar, la máquina se cayó.
+latir();
+setInterval(latir, 5 * 60_000);
+
+server.listen(PORT, HOST, () => {
+  console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}`);
+  console.log(`   agente: ${AGENT_ID}  ·  escuchando en ${HOST}:${PORT}`);
+  if (HOST === "127.0.0.1") console.log(`   (solo esta máquina. Para entrar por Tailscale: UI_HOST=<tu IP 100.x.y.z>)`);
+  console.log("");
+});
