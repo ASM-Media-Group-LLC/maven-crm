@@ -11,6 +11,7 @@ import { runAccount, sleep, readCooldowns, sessionInfo, openLoginTo, saveLoginTo
 import { runTelegram } from "./tg-scraper.mjs";
 import { runJoin } from "./tg-join.mjs";
 import { runX } from "./x-scraper.mjs";
+import { runFacebook } from "./fb-scraper.mjs";
 import { NETWORKS, accountsOf, addAccount, removeAccount, sessionPath } from "./accounts.mjs";
 import { getSchedules, setSchedule, marcarCorrida, vencidas, proximaCorrida, INTERVALOS } from "./schedules.mjs";
 
@@ -20,8 +21,9 @@ const LOGIN_URL = {
   instagram: "https://www.instagram.com/accounts/login/",
   telegram: "https://web.telegram.org/k/",
   x: "https://x.com/login",
+  facebook: "https://www.facebook.com/login",
 };
-const NET_LABEL = { instagram: "Instagram", telegram: "Telegram", x: "X" };
+const NET_LABEL = { instagram: "Instagram", telegram: "Telegram", x: "X", facebook: "Facebook" };
 
 // ── SSE ───────────────────────────────────────────────────────────────────
 const clients = new Set();
@@ -88,6 +90,7 @@ async function runScan(network, onlyIds) {
       if (network === "instagram") await runAccount(account, cbs);
       else if (network === "telegram") await runTelegram({ account, ...cbs });
       else if (network === "x") await runX({ account, ...cbs });
+      else if (network === "facebook") await runFacebook({ account, ...cbs });
     } catch (e) { log(`${network}/${a.id} falló: ${e.message}`); }
     if (stopFlag) break;
     await sleep(4000 + Math.random() * 4000);

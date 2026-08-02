@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { SESSIONS_DIR } from "./config.mjs";
 
 const FILE = join(SESSIONS_DIR, "accounts.json");
-export const NETWORKS = ["instagram", "telegram", "x"];
+export const NETWORKS = ["instagram", "telegram", "x", "facebook"];
 
 // Hash determinístico (FNV-1a) del creator_id → índice de cuenta. MISMO que
 // promolog-scan-targets, así IG (server) y TG/X (client) reparten igual.
@@ -27,6 +27,7 @@ function seed() {
     instagram: igSlots.map((id) => ({ id, session: `${id}.json` })),
     telegram: [{ id: "tg1", session: "telegram.json" }],
     x: [{ id: "x1", session: "x.json" }],
+    facebook: [{ id: "fb1", session: "facebook.json" }],
   };
   return reg;
 }

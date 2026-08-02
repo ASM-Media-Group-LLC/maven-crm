@@ -22,7 +22,7 @@
 // SECRETOS: APIFY_TOKEN, CRON_INTERNAL_TOKEN.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { postKey, MARKER_KEY } from "../_shared/promolog-dedup.ts";
+import { postKey, MARKER_KEY, esDuplicado, clavesYaGuardadas } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apify~facebook-posts-scraper";
@@ -264,9 +264,124 @@ Deno.serve(async (req: Request) => {
     const ok = (roles || []).some((r: { role: string }) => r.role === "admin" || r.role === "manager");
     if (!ok) return json({ error: "forbidden (admin/manager)" }, 403);
   }
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+
+  // ── PLAN B LOCAL ───────────────────────────────────────────────────────────
+  // Mismo patrón que x-scan y telegram-scan: el agente local lee Facebook con
+  // Playwright (IP residencial, sin costo de Apify) y postea los posts acá para
+  // que los clasifique y guarde LA MISMA lógica. La clasificación NO se duplica:
+  // se reusa classifyFb/postMedia/visionIsOfPromo, así el veredicto es idéntico
+  // venga de Apify o del agente. Solo cambia de dónde salen los posts.
+  //
+  //   ?mode=targets → qué páginas escanear (creadoras activas con facebook_handle)
+  //   ?mode=ingest  → { items:[ { creator_id, source_handle?, posts:[...] } ] }
+  //
+  // Los posts van en la forma que los normalizadores de arriba ya entienden
+  // ({text, permalink, date, imageUrl, link}) — por eso no hace falta adaptar nada.
+  const modo = String(body.mode ?? new URL(req.url).searchParams.get("mode") ?? "");
+
+  if (modo === "targets") {
+    const { data: crs, error } = await sb.from("creators")
+      .select("id, name, facebook_handle")
+      .eq("status", "active").not("facebook_handle", "is", null).neq("facebook_handle", "");
+    if (error) return json({ error: error.message }, 500);
+    const { data: extra } = await sb.from("creator_social_accounts")
+      .select("creator_id, username").eq("network", "facebook").eq("active", true);
+    const out: Array<{ creator_id: string; name: string; handle: string; url: string }> = [];
+    for (const c of (crs ?? []) as Array<any>) {
+      out.push({ creator_id: c.id, name: c.name, handle: c.facebook_handle, url: fbUrl(c.facebook_handle) });
+    }
+    for (const a of (extra ?? []) as Array<any>) {
+      const c = (crs ?? []).find((x: any) => x.id === a.creator_id);
+      if (c && a.username) out.push({ creator_id: c.id, name: c.name, handle: a.username, url: fbUrl(a.username) });
+    }
+    return json({ ok: true, targets: out });
+  }
+
+  if (modo === "ingest") {
+    const items = Array.isArray(body.items) ? body.items as Array<any> : [];
+    if (!items.length) return json({ ok: true, note: "sin items" });
+    const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
+    // Nicks de OF por creadora — mismo insumo que usa el camino de Apify.
+    const nicks = new Map<string, string[]>();
+    if (ids.length) {
+      const { data: crs } = await sb.from("creators").select("id, onlyfans_url").in("id", ids);
+      for (const c of (crs ?? []) as Array<any>) { const p = ofHandleFromUrl(c.onlyfans_url); nicks.set(c.id, p ? [p] : []); }
+      const { data: ex } = await sb.from("creator_social_accounts")
+        .select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", ids);
+      for (const a of (ex ?? []) as Array<any>) {
+        const n = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!n) continue;
+        const arr = nicks.get(a.creator_id) ?? []; if (!arr.includes(n)) arr.push(n); nicks.set(a.creator_id, arr);
+      }
+    }
+    // Ya analizados → no se vuelve a gastar visión (mismo criterio que el resto).
+    const yaGuardadas = await clavesYaGuardadas(sb, { creatorIds: ids, network: "facebook" });
+    const OR_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    let visionUsed = 0, inserted = 0, promotedTotal = 0;
+    const out: unknown[] = [];
+
+    for (const it of items) {
+      const cid = it.creator_id; if (!cid) { out.push({ skip: "sin_creator_id" }); continue; }
+      const posts: Array<any> = Array.isArray(it.posts) ? it.posts : [];
+      let ins = 0, promo = 0, yaVistos = 0;
+
+      for (let i = 0; i < posts.length; i++) {
+        const p = posts[i];
+        const permalink = postUrl(p);
+        const { firstImage } = postMedia(p);
+        const dedupKey = permalink || firstImage || null;
+        if (!dedupKey) continue;
+        const clave = postKey({ permalink: dedupKey, text: postText(p), date: postDate(p), index: i });
+        const yaVisto = yaGuardadas.get(`${cid}|${clave}`);
+        if (yaVisto !== undefined) { yaVistos++; if (yaVisto) promo++; continue; }
+
+        const cls = classifyFb(p, nicks.get(cid) ?? []);
+        let { promoted, reason } = cls;
+        let imgBytes: Uint8Array | null = null, imgMime = "image/jpeg";
+        if (firstImage) { const f = await fetchImageBytes(firstImage); if (f) { imgBytes = f.bytes; imgMime = f.mime; } }
+        if (!promoted && !cls.brandAd && OR_KEY && imgBytes && visionUsed < MAX_VISION_PER_RUN) {
+          visionUsed++;
+          const v = await visionIsOfPromo(`data:${imgMime};base64,${bytesToBase64(imgBytes)}`, OR_KEY, postText(p));
+          if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
+        }
+        if (promoted) promo++;
+
+        let durable: string | null = null;
+        if (imgBytes) durable = await persistEvidence(sb, { bytes: imgBytes, mime: imgMime, creatorId: cid, key: dedupKey });
+        const d = postDate(p); const when = d ? new Date(d) : null;
+        const { error: insErr } = await sb.from("promolog_entries").insert({
+          dedup_key: clave, tenant_id: TENANT_ID, creator_id: cid,
+          date: (when && !isNaN(when.getTime()) ? when : new Date()).toISOString(),
+          promoted: promoted ? "true" : "false", network: "facebook",
+          platform: promoted ? "OnlyFans" : "Ninguna",
+          notes: (postText(p) || "").slice(0, 2000) || null,
+          evidence_url: durable || permalink || firstImage || null,
+          story_media_url: dedupKey,
+          analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: reason,
+          source_handle: (it.source_handle || "").trim() || null,
+          story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
+        });
+        if (!insErr) { ins++; inserted++; }
+        else if (!esDuplicado(insErr)) out.push({ creator_id: cid, insertError: insErr.message });
+      }
+
+      // Marcador "revisada, sin actividad": 1/día por índice único.
+      if (posts.length === 0) {
+        await sb.from("promolog_entries").insert({
+          dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(),
+          promoted: "false", network: "facebook", platform: "Ninguna",
+          analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: "sin-actividad",
+          scraped_at: new Date().toISOString(),
+        });
+      }
+      promotedTotal += promo;
+      out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins, ya_analizados: yaVistos });
+    }
+    return json({ ok: true, mode: "ingest", source: "local", inserted, promoted: promotedTotal, results: out });
+  }
+
   if (!APIFY_TOKEN) return json({ error: "falta APIFY_TOKEN" }, 500);
 
-  const body = await req.json().catch(() => ({} as Record<string, unknown>));
   const hours = Number(body.hours) || 24;
   const onlyIds = Array.isArray(body.only_creator_ids) ? body.only_creator_ids as string[] : null;
   const limit = Number(body.limit) || 0;

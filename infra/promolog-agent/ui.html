@@ -109,11 +109,12 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const netsEl = $("#nets"), logEl = $("#log"), resultsEl = $("#results");
-const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏" };
+const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏", facebook:"f" };
 const NOTE = {
   instagram:"cada cuenta lee su parte (residencial). Más cuentas = menos volumen c/u = menos ban.",
   telegram:"los canales públicos (@usuario) se leen sin cuenta; los privados (link de invitación) solo si la cuenta logueada es miembro.",
   x:"cada cuenta logueada navega su parte de los perfiles.",
+  facebook:"lee el muro de cada página con una cuenta logueada. Reemplaza el scan por Apify, que hoy corre 6 veces al día.",
 };
 let LOGIN = {}; // "network:id" → "open"
 
