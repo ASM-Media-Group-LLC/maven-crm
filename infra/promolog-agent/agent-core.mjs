@@ -78,7 +78,12 @@ export async function postToIngest(creators) {
   if (!creators.length) return { ok: true, note: "nada que postear" };
   const r = await fetch(`${MAVEN_URL}/functions/v1/promolog-ingest-stories`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-ext-token": EXT_TOKEN },
-    body: JSON.stringify({ creators }),
+    // `source`: este endpoint lo comparten la extensión de Chrome y este agente, con
+    // el mismo token. Sin declararlo, las filas de los dos quedaban idénticas en la
+    // base (el edge etiquetaba TODO como "extension") y era imposible responder
+    // "¿esto lo escaneó la extensión o el agente?" — que es exactamente lo que se
+    // preguntó el 01/08 y no se pudo contestar con datos.
+    body: JSON.stringify({ creators, source: "agente-local" }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`ingest ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);

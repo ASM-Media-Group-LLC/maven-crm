@@ -51,18 +51,31 @@ Deno.serve(async (req) => {
   if (!OPENROUTER_API_KEY) return json({ error: "OPENROUTER_API_KEY no configurado" }, 500);
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const body = await req.json().catch(() => ({})) as { creators?: any[] };
+  const body = await req.json().catch(() => ({})) as { creators?: any[]; source?: string };
   const incoming = Array.isArray(body.creators) ? body.creators : [];
   if (!incoming.length) return json({ ok: true, note: "sin creadoras" });
 
-  // dispatch_run (source=extension) para correlacionar entries + evidencia.
+  // ── QUIÉN MANDÓ ESTO ────────────────────────────────────────────────────────
+  // Este endpoint lo usan DOS clientes: la extensión de Chrome y el agente local
+  // (infra/promolog-agent), con el mismo token. Hasta el 01/08 el origen se
+  // escribía FIJO como "extension" y el apify_run_id salía siempre con prefijo
+  // `ext:` — así que las filas de los dos caminos eran indistinguibles. Cuando
+  // Jhon preguntó "¿esto lo hizo la extensión o mi agente?", la respuesta no
+  // estaba en ningún lado, y yo llegué a afirmar que era la extensión leyendo un
+  // prefijo que en realidad se le pone a todo. Ahora el cliente lo declara.
+  const ORIGENES = new Set(["extension", "agente-local"]);
+  const origen = ORIGENES.has(String(body.source ?? "")) ? String(body.source) : "extension";
+  const prefijo = origen === "agente-local" ? "local" : "ext";
+
   const { data: run } = await (sb as any).from("promolog_dispatch_runs").insert({
-    tenant_id: TENANT_ID, apify_actor_id: "browser-extension", status: "running",
-    creators_count: incoming.length, payload: { source: "extension" },
+    tenant_id: TENANT_ID,
+    apify_actor_id: origen === "agente-local" ? "promolog-agent" : "browser-extension",
+    status: "running",
+    creators_count: incoming.length, payload: { source: origen },
   }).select("id, created_at").single();
   const runId = run?.id as string;
   const scanDate = run?.created_at ?? new Date().toISOString();
-  const runCtx: RunCtx = { dispatchRunId: runId, apifyRunId: `ext:${runId}`, scanDate, openrouterKey: OPENROUTER_API_KEY };
+  const runCtx: RunCtx = { dispatchRunId: runId, apifyRunId: `${prefijo}:${runId}`, scanDate, openrouterKey: OPENROUTER_API_KEY };
 
   // metadata de las creadoras (para el análisis: nicks OF, funnel, plataforma).
   const ids = incoming.map((c) => c.creator_id).filter(Boolean);
@@ -98,7 +111,7 @@ Deno.serve(async (req) => {
       // en error_reason/notas. Antes todo se aplanaba a "read_failed" y era IMPOSIBLE
       // distinguir throttle de IG vs red vs handle roto al diagnosticar los ⏳.
       const errLabel = String(c.error).toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24) || "read_failed";
-      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: errLabel, source_handle: handle });
+      await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: runCtx.apifyRunId, scan_date: scanDate, reason: errLabel, source_handle: handle });
       pending++; results.push({ handle, outcome: "pending", reason: String(c.error).slice(0, 60) }); continue;
     }
     const rawItems: any[] = Array.isArray(c.reel_items) ? c.reel_items : [];
@@ -119,20 +132,20 @@ Deno.serve(async (req) => {
       // se muestra como "No · no verificado").
       const isReadable = c.is_private === false || (c.is_private === true && c.following === true);
       if (c.is_private === true && c.following !== true) {
-        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "follow_pending", source_handle: handle });
+        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: runCtx.apifyRunId, scan_date: scanDate, reason: "follow_pending", source_handle: handle });
         pending++; results.push({ handle, outcome: "pending", reason: "follow_pending" });
       } else if (isReadable) {
-        await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, source_handle: handle });
+        await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: runCtx.apifyRunId, scan_date: scanDate, source_handle: handle });
         no++; results.push({ handle, outcome: "no", story_items: 0 });
       } else {
-        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, reason: "read_failed", source_handle: handle });
+        await insertNoDataEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: runCtx.apifyRunId, scan_date: scanDate, reason: "read_failed", source_handle: handle });
         pending++; results.push({ handle, outcome: "pending", reason: "unconfirmed_empty" });
       }
       continue;
     }
     const items = rawItems.map(mapReelItem).filter((s) => s.mediaUrl);
     if (items.length === 0) {
-      await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: `ext:${runId}`, scan_date: scanDate, source_handle: handle });
+      await insertEmptyEntry(sb, { creator_id: cid, dispatch_run_id: runId, apify_run_id: runCtx.apifyRunId, scan_date: scanDate, source_handle: handle });
       no++; results.push({ handle, outcome: "no", note: "items sin media" }); continue;
     }
     const nick = ofNickFromUrl(meta.onlyfans_url ?? "");
