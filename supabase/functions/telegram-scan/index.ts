@@ -23,7 +23,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyLinkDestination } from "../_shared/link-classifier.ts";
-import { postKey, MARKER_KEY, esDuplicado } from "../_shared/promolog-dedup.ts";
+import { postKey, MARKER_KEY, esDuplicado, clavesYaGuardadas } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (igual que promolog-dispatch)
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
@@ -180,15 +180,23 @@ Deno.serve(async (req: Request) => {
       for (const a of (extra ?? []) as any[]) { const nick = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!nick) continue; const arr = nicksByCreator.get(a.creator_id) ?? []; if (!arr.includes(nick)) arr.push(nick); nicksByCreator.set(a.creator_id, arr); }
     }
     let inserted = 0, promotedTotal = 0, llmUsed2 = 0;
+    // Lo ya analizado no vuelve a pasar por el LLM (ver clavesYaGuardadas).
+    const yaGuardadas = await clavesYaGuardadas(sb, { creatorIds: ids, network: "telegram" });
     const out: unknown[] = [];
     for (const it of items) {
       const cid = it.creator_id;
       if (!cid) { out.push({ skip: "sin_creator_id" }); continue; }
       const nicks = nicksByCreator.get(cid) ?? [];
       const posts: Array<{ text?: string; permalink?: string; date?: number }> = Array.isArray(it.posts) ? it.posts : [];
-      let ins = 0, promo = 0;
+      let ins = 0, promo = 0, yaVistos = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
+        // La clave se calcula ANTES de clasificar: si el post ya está guardado no hay
+        // nada que analizar. El veredicto guardado se reusa para que el conteo de
+        // promos del informe siga siendo correcto.
+        const clave = postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i });
+        const yaVisto = yaGuardadas.get(`${cid}|${clave}`);
+        if (yaVisto !== undefined) { yaVistos++; if (yaVisto) promo++; continue; }
         let { promoted, reason } = classifyPromo(p.text || "", nicks);
         let aiModel = "heuristic-of-v1";
         if (!promoted && reason === "sin-señales" && OPENROUTER && llmUsed2 < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
@@ -201,7 +209,7 @@ Deno.serve(async (req: Request) => {
         // Ya no hay "buscá antes de insertar": la clave viaja en la fila y el índice
         // único la rechaza si ya está. Reprocesar es inofensivo y no hay carrera.
         const { error: insErr } = await sb.from("promolog_entries").insert({
-          dedup_key: postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i }),
+          dedup_key: clave,
           tenant_id: TENANT_ID, creator_id: cid,
           date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
           promoted: promoted ? "true" : "false", network: "telegram",
@@ -222,7 +230,7 @@ Deno.serve(async (req: Request) => {
         await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "telegram", platform: "Ninguna", analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;
-      out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins });
+      out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins, ya_analizados: yaVistos });
     }
 
     // ── INFORME DE LA CORRIDA (queda accesible para el bot) ───────────────────
@@ -298,6 +306,9 @@ Deno.serve(async (req: Request) => {
   for (const c of creators || []) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
   const tgExtraByCreator = new Map<string, string[]>();
   const creatorIds = (creators || []).map((c: any) => c.id);
+  // Posts ya analizados: se consultan UNA vez para toda la corrida y evitan repetir
+  // el LLM en cada escaneo del día (ver clavesYaGuardadas).
+  const yaGuardadasTg = await clavesYaGuardadas(sb, { creatorIds, network: "telegram" });
   if (creatorIds.length) {
     const { data: extra } = await sb.from("creator_social_accounts")
       .select("creator_id, network, username").in("network", ["onlyfans", "telegram"]).eq("active", true).in("creator_id", creatorIds);
@@ -406,10 +417,14 @@ Deno.serve(async (req: Request) => {
       // `date` (unix s) lo devuelve el gateway y ya se usaba abajo para que la fila
       // caiga en SU día; faltaba en el tipo nomás.
       const posts: Array<{ id: number; date?: number; text: string; permalink: string; hasMedia: boolean; mediaDownloadable: boolean }> = j.posts || [];
-      let inserted = 0, promotedCount = 0, skipped = 0;
+      let inserted = 0, promotedCount = 0, skipped = 0, yaAnalizados = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
         const nicks = ofNicksByCreator.get(c.id) ?? [];
+        // Ya analizado → se reusa el veredicto y no se gasta LLM (ver clavesYaGuardadas).
+        const claveTg = postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i });
+        const yaVistoTg = yaGuardadasTg.get(`${c.id}|${claveTg}`);
+        if (yaVistoTg !== undefined) { yaAnalizados++; if (yaVistoTg) promotedCount++; continue; }
         let { promoted, reason } = classifyPromo(p.text, nicks);
         let aiModel = "heuristic-of-v1";
         // Repesca IA: solo cuando la heurística NO vio nada ("sin-señales" — un guard
@@ -429,7 +444,7 @@ Deno.serve(async (req: Request) => {
         // chequeo se salteaba entero cuando no había permalink (canales privados) y
         // además dos corridas simultáneas lo pasaban las dos.
         const { error: insErr } = await sb.from("promolog_entries").insert({
-          dedup_key: postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i }),
+          dedup_key: claveTg,
           tenant_id: TENANT_ID,
           creator_id: c.id,
           // Telegram tiene fecha real por post → la usamos (a diferencia de IG
@@ -470,7 +485,7 @@ Deno.serve(async (req: Request) => {
       }
       results.push({
         creator: c.name, ok: true, channel: j.channel?.title ?? null, protected: !!j.protected,
-        joined: !!j.joined, alreadyMember: !!j.alreadyMember, posts: posts.length, promoted: promotedCount,
+        joined: !!j.joined, alreadyMember: !!j.alreadyMember, posts: posts.length, promoted: promotedCount, ya_analizados: yaAnalizados,
         inserted, skipped, ...(dryRun ? { dry_run: true } : {}),
       });
     } catch (e) {

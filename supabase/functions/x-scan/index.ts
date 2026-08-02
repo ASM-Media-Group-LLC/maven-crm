@@ -20,7 +20,7 @@
 // SECRETOS: APIFY_TOKEN (ya seteado para IG), CRON_INTERNAL_TOKEN.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { postKey, MARKER_KEY, esDuplicado } from "../_shared/promolog-dedup.ts";
+import { postKey, MARKER_KEY, esDuplicado, clavesYaGuardadas } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apidojo~tweet-scraper";
@@ -337,19 +337,9 @@ Deno.serve(async (req: Request) => {
     // día corre antes). Pero volver a CLASIFICARLOS es puro desperdicio: gasta una
     // llamada de visión por imagen y termina chocando con el índice único.
     // Se traen de una sola query las claves ya guardadas de los últimos 2 días.
-    // Guarda el veredicto guardado, no sólo la existencia: así el panel puede decir
-    // "promo del 31/07, ya registrada" sin volver a clasificar nada.
-    const yaGuardadas = new Map<string, boolean>();
-    {
-      const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
-      const ayerBog = new Date(Date.now() - 29 * 3600_000).toISOString().slice(0, 10);
-      const { data: prev } = await sb.from("promolog_entries")
-        .select("creator_id, dedup_key, promoted, date")
-        .eq("network", "x").in("creator_id", ids).in("dia", [hoyBog, ayerBog]);
-      for (const p of (prev ?? []) as Array<{ creator_id: string; dedup_key: string | null; promoted: string | null }>) {
-        if (p.dedup_key) yaGuardadas.set(`${p.creator_id}|${p.dedup_key}`, p.promoted === "true");
-      }
-    }
+    // Guarda el veredicto, no sólo la existencia: así el panel puede decir "promo del
+    // 31/07, ya registrada" sin volver a clasificar nada.
+    const yaGuardadas = await clavesYaGuardadas(sb, { creatorIds: ids, network: "x" });
 
     const out: unknown[] = [];
     for (const it of items) {
@@ -537,6 +527,8 @@ Deno.serve(async (req: Request) => {
   const ofNicksByCreator = new Map<string, string[]>();
   for (const c of list) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
   const creatorIds = list.map((c) => c.id);
+  // Tweets ya analizados: una sola query para toda la corrida (ver clavesYaGuardadas).
+  const yaGuardadasX = await clavesYaGuardadas(sb, { creatorIds, network: "x" });
   if (creatorIds.length) {
     const cById = new Map(list.map((c) => [c.id, c]));
     const { data: extra } = await sb.from("creator_social_accounts")
@@ -680,11 +672,20 @@ Deno.serve(async (req: Request) => {
       // parcial (con lo insertado); el chequeo del loop externo difiere las que siguen.
       if (Date.now() - handlerStart > RUN_BUDGET_MS) break;
       const it = tweets[i];
-      const clsX = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
-      let { promoted, reason } = clsX;
       const srcHandle = normHandle(it?.author?.userName || it?.author?.username || it?.username || "") || null;
       const permalink: string = it?.url || it?.twitterUrl || "";
       const { firstImage } = tweetMedia(it);
+
+      // Ya analizado → se reusa el veredicto y NO se gasta visión. Antes este camino
+      // clasificaba y llamaba a la visión en cada corrida, y sólo al insertar descubría
+      // que el tweet ya estaba: con 3 escaneos al día, 3 llamadas para descartar 2.
+      // (Facebook ya lo hacía; este quedó sin hacer cuando se sacó el SELECT roto.)
+      const claveX = postKey({ permalink, text: (it?.text || it?.fullText || "") as string, date: it?.createdAt || it?.created_at, index: i });
+      const yaVistoX = yaGuardadasX.get(`${c.id}|${claveX}`);
+      if (yaVistoX !== undefined) { skipped++; if (yaVistoX) promotedCount++; continue; }
+
+      const clsX = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
+      let { promoted, reason } = clsX;
       // Visión SOLO si no hubo señal de texto pero hay imagen (el promo puede estar
       // quemado en el arte). El modelo decide; una foto/meme personal → No.
       if (!promoted && !clsX.brandAd && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
@@ -698,10 +699,11 @@ Deno.serve(async (req: Request) => {
       // pbs.twimg.com cambia entre scans → no sirve de clave (duplicaba el mismo tweet).
       const dedupKey = permalink || firstImage || null;
       if (dryRun) continue;
-      // La clave ya no puede faltar (cae al texto o a la fecha del tweet), así que
-      // un tweet sin link deja de perderse; y la unicidad la impone el índice, no
-      // un SELECT previo que además comparaba contra NULL cuando la clave faltaba.
-      const clave = postKey({ permalink, text: (it?.text || it?.fullText || "") as string, date: it?.createdAt || it?.created_at, index: i });
+      // `claveX` se calculó arriba, antes de clasificar. La clave ya no puede faltar
+      // (cae al texto o a la fecha del tweet), así que un tweet sin link deja de
+      // perderse; y la unicidad la impone el índice, no un SELECT previo que además
+      // comparaba contra NULL cuando la clave faltaba.
+      const clave = claveX;
 
       // Evidencia DURABLE: guardamos la imagen en nuestro bucket SOLO para los tweets que
       // SÍ son promo (la evidencia que de verdad importa). Bajar+subir la foto de CADA

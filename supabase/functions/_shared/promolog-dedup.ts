@@ -50,3 +50,34 @@ export function esDuplicado(err: unknown): boolean {
   const e = err as { code?: string; message?: string } | null;
   return !!e && (e.code === "23505" || /duplicate key value|promolog_entries_dedup_uk/i.test(e.message ?? ""));
 }
+
+/** Claves ya guardadas → veredicto, para NO volver a pasar por la IA un post que ya
+ *  se analizó.
+ *
+ *  POR QUÉ: el índice único evita la fila duplicada, pero recién AL ESCRIBIR — o sea
+ *  después de haber llamado (y pagado) a Gemini/visión. Con 3 escaneos por día, el
+ *  mismo post se analizaba 3 veces para descartar 2. Instagram ya se ahorraba esto
+ *  chequeando el `story_pk` antes de analizar; el resto de las redes no.
+ *
+ *  Se consultan varios días porque la ventana de scrapeo (24-36h) es más ancha que
+ *  "hoy": un escaneo de la tarde alcanza los posts de anoche, que pertenecen a AYER.
+ *  El `dia` de promolog ya está en hora de Bogotá (UTC-5). */
+export async function clavesYaGuardadas(
+  sb: { from: (t: string) => any },
+  opts: { creatorIds: string[]; network: string; dias?: number },
+): Promise<Map<string, boolean>> {
+  const m = new Map<string, boolean>();
+  const ids = [...new Set(opts.creatorIds.filter(Boolean))];
+  if (!ids.length) return m;
+  const dias: string[] = [];
+  for (let i = 0; i < Math.max(1, opts.dias ?? 2); i++) {
+    dias.push(new Date(Date.now() - 5 * 3600_000 - i * 86_400_000).toISOString().slice(0, 10));
+  }
+  const { data } = await sb.from("promolog_entries")
+    .select("creator_id, dedup_key, promoted")
+    .eq("network", opts.network).in("creator_id", ids).in("dia", dias);
+  for (const r of (data ?? []) as Array<{ creator_id: string; dedup_key: string | null; promoted: string | null }>) {
+    if (r.dedup_key) m.set(`${r.creator_id}|${r.dedup_key}`, r.promoted === "true");
+  }
+  return m;
+}
