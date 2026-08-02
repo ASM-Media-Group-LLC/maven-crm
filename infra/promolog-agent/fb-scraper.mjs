@@ -13,7 +13,6 @@
 // cambie el markup. El resto (targets, tandas, informe) no depende del DOM.
 
 import { chromium } from "playwright";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { MAVEN_URL, CRON_TOKEN, SESSIONS_DIR, HEADFUL, PACING } from "./config.mjs";
 import { sleep } from "./agent-core.mjs";

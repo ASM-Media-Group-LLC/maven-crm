@@ -14,6 +14,7 @@ import { runTelegram } from "./tg-scraper.mjs";
 import { runJoin } from "./tg-join.mjs";
 import { runX } from "./x-scraper.mjs";
 import { runFacebook } from "./fb-scraper.mjs";
+import { runFollowFb } from "./fb-follow.mjs";
 import { NETWORKS, accountsOf, addAccount, removeAccount, sessionPath } from "./accounts.mjs";
 import { getSchedules, setSchedule, marcarCorrida, vencidas, proximaCorrida, INTERVALOS } from "./schedules.mjs";
 
@@ -292,6 +293,20 @@ const server = createServer(async (req, res) => {
     runScan(network, Array.isArray(b.ids) && b.ids.length ? b.ids : null);
     return json(res, 200, { ok: true });
   }
+  // seguir cuentas de Facebook:  POST /api/fb-follow  {seguir?, amistad?, max?}
+  // Sin `seguir` solo releva. `amistad` va aparte a propósito: la solicitud le llega
+  // a la creadora con nombre y foto de la cuenta, así que no se manda de rebote.
+  if (req.method === "POST" && u.pathname === "/api/fb-follow") {
+    if (running) return json(res, 409, { ok: false, error: "ya_corriendo" });
+    const b = await readBody(req);
+    running = true; stopFlag = false; broadcast("status", statusPayload());
+    runFollowFb({ seguir: !!b.seguir, amistad: !!b.amistad, max: Number(b.max) || 6 },
+                { log, onResult: (r) => broadcast("result", r), shouldStop: () => stopFlag })
+      .catch((e) => log(`Facebook/seguir falló: ${e.message}`))
+      .finally(() => { running = false; broadcast("done", { at: Date.now() }); broadcast("status", statusPayload()); });
+    return json(res, 200, { ok: true });
+  }
+
   // canales de Telegram:  POST /api/tg-join  {join?, max?, aprobacion?}
   // Sin `join` solo releva (no se une a nada). Comparte el candado `running` con el
   // scan: una sola cuenta de Telegram, un solo navegador a la vez.

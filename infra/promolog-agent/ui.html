@@ -244,6 +244,10 @@ function render(st){
         ${net.network==="telegram" ? `<span style="width:1px;height:22px;background:var(--line)"></span>
         <button class="secondary" data-tgcheck="1" ${busy?"disabled":""} title="Mira en cuáles de los canales privados ya está metida la cuenta. No se une a nada.">🔎 ¿En qué canales estoy?</button>
         <button class="secondary" data-tgjoin="1" ${busy?"disabled":""} title="Se une a los canales privados que falten, de a 4 por vez.">🚪 Unirme a los que faltan</button>` : ""}
+        ${net.network==="facebook" ? `<span style="width:1px;height:22px;background:var(--line)"></span>
+        <button class="secondary" data-fbcheck="1" ${busy?"disabled":""} title="Mira cuáles cuentas ya se pueden leer y cuáles no. No toca nada.">🔎 ¿A cuáles llego?</button>
+        <button class="secondary" data-fbfollow="1" ${busy?"disabled":""} title="Sigue las páginas que falten. Es pasivo: la creadora no recibe ninguna notificación.">➕ Seguir las páginas</button>
+        <button class="secondary" data-fbamistad="1" ${busy?"disabled":""} title="Manda solicitud de amistad a los perfiles personales. OJO: le llega a la creadora con el nombre y la foto de la cuenta.">📨 Mandar solicitud de amistad</button>` : ""}
       </div></div>`;
   }).join("");
   $("#stop").disabled = !busy;
@@ -291,6 +295,14 @@ document.addEventListener("click", async (e) => {
     await refresh();
   }
   else if (d.scan){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post(`/api/scan/${d.scan}`); }
+  else if (d.fbcheck){ await post("/api/fb-follow", { seguir:false }); }
+  else if (d.fbfollow){ await post("/api/fb-follow", { seguir:true, amistad:false, max:6 }); }
+  // La solicitud de amistad le llega a la creadora con nombre y foto de la cuenta
+  // scanner. Se confirma a mano: es la única acción del panel que ve otra persona.
+  else if (d.fbamistad){
+    if (!confirm("Se le va a mandar SOLICITUD DE AMISTAD a los perfiles personales.\n\nA la creadora le llega una notificación con el nombre y la foto de la cuenta scanner, y tiene que aceptarla.\n\n¿Seguimos?")) return;
+    await post("/api/fb-follow", { seguir:true, amistad:true, max:6 });
+  }
   else if (d.tgcheck){ await post("/api/tg-join", { join:false }); }
   // De a 4 por tanda: unirse a muchos canales seguidos es lo que dispara el límite
   // de Telegram, y esta cuenta es la única que ve los canales privados.

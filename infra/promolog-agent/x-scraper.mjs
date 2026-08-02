@@ -8,7 +8,7 @@
 // extracción de tweets vive en extractTweets() — es el único punto a ajustar.
 
 import { chromium } from "playwright";
-import { existsSync } from "node:fs";
+
 import { MAVEN_URL, CRON_TOKEN, X_SESSION, HEADFUL, PACING } from "./config.mjs";
 import { sleep } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
