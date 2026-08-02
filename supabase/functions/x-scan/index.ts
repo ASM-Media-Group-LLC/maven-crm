@@ -417,7 +417,13 @@ Deno.serve(async (req: Request) => {
       // pasadas las 19:00 de Bogotá eso ya es MAÑANA, no encontraba el marcador del
       // día y lo reinsertaba en cada corrida — de ahí los duplicados de X. Ahora la
       // unicidad la da el índice sobre `dia`, que ya está en hora de Bogotá.
-      if (tweets.length === 0 && !dryRun) {
+      // ⚠️ SOLO si el timeline se pudo LEER. `legible: false` = el scraper abrió el
+      // perfil y X no le mostró tweets (sesión caída, cuenta protegida/suspendida,
+      // intersticial de contenido sensible sin pasar). Escribir el marcador ahí es
+      // afirmar "no promocionó" sobre algo que nunca se vio.
+      // Pasó el 02/08: se corrió X desde la Mac Mini con una sesión anónima y los
+      // perfiles dieron 0 tweets EN BLOQUE — cada uno se guardó como "no promocionó".
+      if (tweets.length === 0 && !dryRun && it.legible !== false) {
         await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "x", platform: "Ninguna", analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;

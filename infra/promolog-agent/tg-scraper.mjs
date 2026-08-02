@@ -20,6 +20,7 @@ import { sleep } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
 import { parseHandle } from "./tg-links.mjs";
 import { abrir, snapshot, estado, inviteVivo } from "./tg-web.mjs";
+import { sesionUsable } from "./session-check.mjs";
 
 async function fetchTargets() {
   const r = await fetch(`${MAVEN_URL}/functions/v1/telegram-scan`, {
@@ -236,7 +237,13 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
   // 2) POR SESIÓN (Telegram Web): los públicos sin preview + los privados por invite.
   const porSesion = [...porWeb, ...priv];
   if (porSesion.length) {
-    if (!existsSync(sessionFile)) { for (const t of porSesion) noLegibles.push({ handle: t.name, reason: "necesita cuenta de Telegram logueada en el agente (no hay sesión)" }); log(`⚠️ ${porSesion.length} canales sin leer: falta login de la cuenta de Telegram (logueala en el panel).`); }
+    // Se mira el CONTENIDO, no solo que el archivo exista: una sesión vacía haría
+    // abrir web.telegram.org deslogueado y leer 0 mensajes en todos los canales.
+    // Acá el daño ya estaba contenido (van a noLegibles, no a "no promocionó"),
+    // pero el motivo que se reportaba era "no hay sesión" incluso cuando el archivo
+    // estaba y lo que fallaba era el login — dos arreglos distintos.
+    const sesionTg = sesionUsable(sessionFile, "telegram");
+    if (!sesionTg.ok) { for (const t of porSesion) noLegibles.push({ handle: t.name, reason: `Telegram: ${sesionTg.motivo}` }); log(`⚠️ ${porSesion.length} canales sin leer — ${sesionTg.motivo}.`); }
     else if (!shouldStop()) {
       const browser = await chromium.launch({ headless: !HEADFUL });
       const context = await browser.newContext({ storageState: sessionFile, viewport: { width: 1280, height: 900 } });

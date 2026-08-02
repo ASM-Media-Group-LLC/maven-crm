@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { MAVEN_URL, CRON_TOKEN, SESSIONS_DIR, HEADFUL, PACING } from "./config.mjs";
 import { sleep } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
+import { sesionUsable } from "./session-check.mjs";
 
 export const FB_SESSION = join(SESSIONS_DIR, "facebook.json");
 
@@ -319,7 +320,14 @@ function aplicarVeredictos(res, acc, onResult, log) {
 export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 0, count: 1 }, log = () => {}, onResult = () => {}, shouldStop = () => false } = {}) {
   if (!CRON_TOKEN) { log("⚠️ Falta CRON_INTERNAL_TOKEN en el .env."); return; }
   const { sessionFile, index, count } = account;
-  if (!existsSync(sessionFile)) { log("⚠️ Falta login de esta cuenta de Facebook (logueala en el panel)."); return; }
+  // Igual que en X: un archivo de sesión vacío haría escanear todo sin login, y
+  // Facebook sin sesión no muestra muros → una corrida entera de "No" falsos.
+  const sesion = sesionUsable(sessionFile, "facebook");
+  if (!sesion.ok) {
+    log(`⚠️ Facebook: ${sesion.motivo}. NO se escanea (correr sin sesión solo produce falsos "no promocionó").`);
+    log("   Logueá la cuenta en el panel, o importala de Chrome:  node import-session.mjs facebook");
+    return;
+  }
 
   let targets = await fetchTargets();
   if (count > 1) targets = targets.filter((t) => creatorSlot(t.creator_id, count) === index);

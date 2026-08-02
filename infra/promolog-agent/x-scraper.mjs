@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import { MAVEN_URL, CRON_TOKEN, X_SESSION, HEADFUL, PACING } from "./config.mjs";
 import { sleep } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
+import { sesionUsable } from "./session-check.mjs";
 
 async function fetchTargets() {
   const r = await fetch(`${MAVEN_URL}/functions/v1/x-scan`, {
@@ -116,7 +117,15 @@ function aplicarVeredictos(res, acc, onResult, log) {
 export async function runX({ account = { sessionFile: X_SESSION, index: 0, count: 1 }, log = () => {}, onResult = () => {}, shouldStop = () => false } = {}) {
   if (!CRON_TOKEN) { log("⚠️ Falta CRON_INTERNAL_TOKEN en el .env."); return; }
   const { sessionFile, index, count } = account;
-  if (!existsSync(sessionFile)) { log("⚠️ Falta login de esta cuenta de X (logueala en el panel)."); return; }
+  // No alcanza con que el archivo exista: una sesión anónima deja pasar el scraper y
+  // X sin login no muestra timeline → 0 tweets en TODOS los perfiles, que el edge
+  // escribe como "no promocionó". Pasó el 02/08 en la Mac Mini. Se corta acá.
+  const sesion = sesionUsable(sessionFile, "x");
+  if (!sesion.ok) {
+    log(`⚠️ X: ${sesion.motivo}. NO se escanea (correr sin sesión solo produce falsos "no promocionó").`);
+    log("   X bloquea el login automatizado: logueate en Chrome, cerralo, y corré  node import-session.mjs x");
+    return;
+  }
   let targets = await fetchTargets();
   if (count > 1) targets = targets.filter((t) => creatorSlot(t.creator_id, count) === index);
   log(`▶️ X cuenta ${index + 1}/${count}: ${targets.length} perfiles (en vivo desde Maven).`);
@@ -150,7 +159,35 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
       try { await page.waitForSelector("article", { timeout: 15000 }); } catch { /* perfil sin tweets visibles */ }
       await sleep(1200 + Math.random() * 1000);
       const tweets = await extractTweets(page, handle);
-      batch.push({ creator_id: t.creator_id, source_handle: handle, tweets });
+
+      // ⚠️ 0 tweets tiene DOS causas muy distintas y hasta ahora se trataban igual:
+      //   (a) el timeline cargó y no hay nada en la ventana → "no promocionó" legítimo
+      //   (b) no pudimos ver el timeline (sesión caída, perfil protegido, suspendido,
+      //       intersticial que no se pudo pasar) → NO SABEMOS, y decir "No" es inventar.
+      // El discriminador es si hay <article> en el DOM: los tweets que extractTweets
+      // descarta por fecha igual cuentan como "el timeline se vio".
+      if (tweets.length === 0) {
+        const estado = await page.evaluate(() => ({
+          articulos: document.querySelectorAll("article").length,
+          txt: (document.body.innerText || "").slice(0, 400).toLowerCase(),
+        }));
+        if (estado.articulos === 0) {
+          const motivo =
+            /these posts are protected|estos posts están protegidos|cuenta protegida/.test(estado.txt) ? "cuenta_protegida"
+            : /account suspended|cuenta suspendida/.test(estado.txt) ? "cuenta_suspendida"
+            : /doesn't exist|no existe esta cuenta|esta cuenta no existe/.test(estado.txt) ? "cuenta_no_existe"
+            : /sign in|iniciar sesión|log in/.test(estado.txt) ? "pide_login"
+            : "timeline_no_visible";
+          noLegibles.push({ handle, reason: motivo });
+          log(`🔒 @${handle}: no se pudo leer el timeline — ${motivo}`);
+          onResult({ handle, outcome: "no_legible", motivo, red: "x" });
+          done++;
+          await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
+          continue;
+        }
+      }
+
+      batch.push({ creator_id: t.creator_id, source_handle: handle, tweets, legible: true });
       log(`${tweets.length ? "✅" : "·"} @${handle}: ${tweets.length} tweets`);
       onResult({ handle, outcome: tweets.length ? "historias" : "sin_promo", stories: tweets.length, red: "x" });
     } catch (e) {

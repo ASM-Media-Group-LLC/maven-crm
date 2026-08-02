@@ -11,6 +11,8 @@
 // Y el único chequeo que había —la cookie `sessionid`— es de INSTAGRAM: no existe en
 // X, Facebook ni Telegram, así que para esas tres habría dado siempre negativo.
 
+import { readFileSync } from "node:fs";
+
 const cookieCon = (d, nombre) => (d.cookies || []).some((c) => c.name === nombre && c.value);
 const lsCon = (d, origen, re) =>
   (d.origins || []).some((o) => o.origin === origen && (o.localStorage || []).some((k) => re.test(k.name) && k.value));
@@ -40,4 +42,24 @@ export const QUE_FALTA = {
 export function tieneSesion(storageState, network) {
   const m = MARCADOR_SESION[network];
   return m ? !!m(storageState) : null;
+}
+
+// ── PUERTA DE ENTRADA DE TODO SCRAPER ────────────────────────────────────────
+// Los scrapers arrancaban con `if (!existsSync(sessionFile))`, o sea que un archivo
+// de sesión VACÍO los dejaba pasar. Eso es exactamente lo que pasó el 02/08 en la
+// Mac Mini con X: se guardó una sesión anónima, el scraper la aceptó, X sin sesión
+// no muestra timeline, y los 37 perfiles salieron con 0 tweets → el edge los escribió
+// como "no promocionó". Una corrida entera de "No" falsos por no mirar el archivo.
+//
+// Correr sin sesión NUNCA produce un dato válido: no hay nada que rescatar de esa
+// corrida. Por eso se aborta antes de abrir el navegador, en vez de descubrirlo
+// perfil por perfil.
+export function sesionUsable(sessionFile, network) {
+  let datos;
+  try { datos = JSON.parse(readFileSync(sessionFile, "utf8")); }
+  catch { return { ok: false, motivo: "no hay sesión guardada para esta cuenta" }; }
+  if (tieneSesion(datos, network) === false) {
+    return { ok: false, motivo: `la sesión guardada no tiene login (falta ${QUE_FALTA[network]})` };
+  }
+  return { ok: true };
 }
