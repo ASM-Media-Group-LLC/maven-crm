@@ -20,7 +20,7 @@
 // SECRETOS: APIFY_TOKEN (ya seteado para IG), CRON_INTERNAL_TOKEN.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { postKey, MARKER_KEY } from "../_shared/promolog-dedup.ts";
+import { postKey, MARKER_KEY, esDuplicado } from "../_shared/promolog-dedup.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const APIFY_ACTOR = "apidojo~tweet-scraper";
@@ -324,14 +324,62 @@ Deno.serve(async (req: Request) => {
       for (const a of (extra ?? []) as any[]) { const nick = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!nick) continue; const arr = nicksByCreator.get(a.creator_id) ?? []; if (!arr.includes(nick)) arr.push(nick); nicksByCreator.set(a.creator_id, arr); }
     }
     let vis = 0, inserted = 0, promotedTotal = 0;
+    // Ventana: un tweet más viejo que esto NO se procesa. Sin este corte, una
+    // corrida de hoy reinserta posts de días pasados y les pone el `dia` de
+    // ENTONCES → aparecen promos retroactivas (el bug de "tweets de 2024" del
+    // #1046, que se arregló sólo en el camino de Apify y no acá).
+    const desdeMsIngest = Date.now() - X_WINDOW_HOURS * 3600_000;
+
+    // ── LO QUE YA ESTÁ REGISTRADO NO SE VUELVE A ANALIZAR ─────────────────────
+    // La ventana son 24-36h hacia atrás, no "hoy": un escaneo de las 16:40 alcanza
+    // los posts de anoche, que pertenecen a AYER. Eso es a propósito (si sólo
+    // mirara hoy, una promo de las 23:00 se perdería cuando el último escaneo del
+    // día corre antes). Pero volver a CLASIFICARLOS es puro desperdicio: gasta una
+    // llamada de visión por imagen y termina chocando con el índice único.
+    // Se traen de una sola query las claves ya guardadas de los últimos 2 días.
+    // Guarda el veredicto guardado, no sólo la existencia: así el panel puede decir
+    // "promo del 31/07, ya registrada" sin volver a clasificar nada.
+    const yaGuardadas = new Map<string, boolean>();
+    {
+      const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+      const ayerBog = new Date(Date.now() - 29 * 3600_000).toISOString().slice(0, 10);
+      const { data: prev } = await sb.from("promolog_entries")
+        .select("creator_id, dedup_key, promoted, date")
+        .eq("network", "x").in("creator_id", ids).in("dia", [hoyBog, ayerBog]);
+      for (const p of (prev ?? []) as Array<{ creator_id: string; dedup_key: string | null; promoted: string | null }>) {
+        if (p.dedup_key) yaGuardadas.set(`${p.creator_id}|${p.dedup_key}`, p.promoted === "true");
+      }
+    }
+
     const out: unknown[] = [];
     for (const it of items) {
       const cid = it.creator_id; if (!cid) { out.push({ skip: "sin_creator_id" }); continue; }
       const nicks = nicksByCreator.get(cid) ?? [];
       const tweets: Array<{ text?: string; permalink?: string; date?: string; imageUrl?: string }> = Array.isArray(it.tweets) ? it.tweets : [];
       let ins = 0, promo = 0;
+      // Desglose para que el panel diga la VERDAD. Antes sólo se contaba `promo`
+      // (clasificaciones) y el insert fallido se tragaba en silencio: el panel
+      // cantaba "PROMOCIONÓ" por un tweet de anoche que ya estaba registrado
+      // ayer, y Jhon no veía la entrada nueva porque no la había (01/08).
+      let promosNuevas = 0, promosYaRegistradas = 0, fueraVentana = 0, fallidos = 0;
+      const fechasPromo: Array<{ fecha: string | null; nueva: boolean }> = [];
       for (let i = 0; i < tweets.length; i++) {
         const tw = tweets[i];
+        const when = parseTweetDate(tw.date || "");
+        // Fuera de ventana: ni se clasifica ni se escribe, pero SE REPORTA (no se
+        // descarta en silencio, que es como se pierde la pista de un scrape raro).
+        if (when && when.getTime() < desdeMsIngest) { fueraVentana++; continue; }
+
+        // La clave se calcula ANTES de clasificar: si el post ya está guardado no
+        // hay nada que analizar. Antes se clasificaba igual (con llamada de visión
+        // incluida si traía imagen) y recién al insertar se descubría que ya estaba.
+        const clave = postKey({ permalink: tw.permalink, text: tw.text, date: tw.date, index: i });
+        const yaVisto = yaGuardadas.get(`${cid}|${clave}`);
+        if (yaVisto !== undefined) {
+          if (yaVisto) { promo++; promosYaRegistradas++; fechasPromo.push({ fecha: when ? when.toISOString() : null, nueva: false }); }
+          continue;
+        }
+
         // Objeto mínimo que classifyX entiende (lee text/url/createdAt).
         const fake = { text: tw.text || "", url: tw.permalink || "", createdAt: tw.date || "" };
         const clsX = classifyX(fake, nicks);
@@ -344,14 +392,13 @@ Deno.serve(async (req: Request) => {
         if (promoted) promo++;
         const dedupKey = tw.permalink || tw.imageUrl || null;
         if (dryRun) continue;
-        // Antes: `if (!dedupKey) continue` → el tweet sin link NI SE GUARDABA, y el
-        // chequeo de duplicado comparaba `.eq(col, null)`, que en SQL no matchea
-        // nunca. Ahora la clave siempre existe (cae al texto o a la fecha) y de la
-        // unicidad se ocupa el índice.
-        const clave = postKey({ permalink: tw.permalink, text: tw.text, date: tw.date, index: i });
+        // `clave` se calculó arriba, antes de clasificar. Antes: `if (!dedupKey)
+        // continue` → el tweet sin link NI SE GUARDABA, y el chequeo de duplicado
+        // comparaba `.eq(col, null)`, que en SQL no matchea nunca. Ahora la clave
+        // siempre existe (cae al texto o a la fecha) y de la unicidad se ocupa el
+        // índice — el Map de arriba es sólo para no re-analizar.
         let evidenceUrl: string = tw.imageUrl || tw.permalink || "";
         if (promoted && tw.imageUrl) { const durable = await persistTweetImage(sb, tw.imageUrl, `${cid}/${i}`); if (durable) evidenceUrl = durable; }
-        const when = parseTweetDate(tw.date || "");
         const { error: insErr } = await sb.from("promolog_entries").insert({
           dedup_key: clave,
           tenant_id: TENANT_ID, creator_id: cid, date: (when || new Date()).toISOString(),
@@ -363,7 +410,18 @@ Deno.serve(async (req: Request) => {
           source_handle: (it.source_handle || "").replace(/^@+/, "").toLowerCase() || null,
           story_index: i, story_count: tweets.length, scraped_at: new Date().toISOString(),
         });
-        if (!insErr) { ins++; inserted++; }
+        // El resultado del insert se CLASIFICA en vez de tragarse. Duplicado no es
+        // error (el post ya estaba registrado, típicamente de una corrida anterior
+        // o del día en que se publicó); cualquier otro fallo sí, y hay que verlo.
+        if (!insErr) {
+          ins++; inserted++;
+          if (promoted) { promosNuevas++; fechasPromo.push({ fecha: when ? when.toISOString() : null, nueva: true }); }
+        } else if (esDuplicado(insErr)) {
+          if (promoted) { promosYaRegistradas++; fechasPromo.push({ fecha: when ? when.toISOString() : null, nueva: false }); }
+        } else {
+          fallidos++;
+          console.warn("x-scan ingest insert falló:", (insErr as { message?: string }).message);
+        }
       }
       // Marker "sin actividad" (1/día). El chequeo miraba `date >= hoy-en-UTC`:
       // pasadas las 19:00 de Bogotá eso ya es MAÑANA, no encontraba el marcador del
@@ -373,7 +431,17 @@ Deno.serve(async (req: Request) => {
         await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "x", platform: "Ninguna", analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;
-      out.push({ creator_id: cid, source_handle: it.source_handle, tweets: tweets.length, promoted: promo, inserted: ins });
+      out.push({
+        creator_id: cid, source_handle: it.source_handle,
+        tweets: tweets.length,
+        promoted: promo,            // clasificadas como promo (incluye las ya registradas)
+        inserted: ins,
+        promos_nuevas: promosNuevas,           // las que de verdad entraron HOY
+        promos_ya_registradas: promosYaRegistradas,
+        fechas_promo: fechasPromo,             // para que el panel muestre CUÁNDO fue
+        fuera_de_ventana: fueraVentana,
+        fallidos,
+      });
     }
 
     // Informe de la corrida (accesible para el bot; ver telegram-scan).

@@ -69,13 +69,46 @@ async function extractTweets(page, handle, hours = 24) {
   });
 }
 
+/** "31/07 21:46" — para mostrar CUÁNDO se publicó la promo, no sólo que la hubo. */
+function fechaCorta(iso) {
+  if (!iso) return "sin fecha";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "sin fecha";
+  return d.toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 // Refleja el veredicto del server por perfil y acumula los totales de la tanda.
+//
+// ⚠️ ANTES ESTO MENTÍA. Mostraba "PROMOCIONÓ" con `r.promoted`, que cuenta
+// CLASIFICACIONES, no filas guardadas. Un tweet de anoche se vuelve a leer hoy, se
+// vuelve a clasificar como promo, y al guardarlo choca con la fila que ya existe
+// del día en que se publicó → el panel cantaba promo y en Maven no aparecía nada
+// nuevo. Pasó el 01/08 con @adribarrientos y @iamlinagallegos, y parecía un bug
+// de promolog cuando el dato estaba bien: la promo era de AYER.
+//
+// Ahora se separa lo NUEVO de lo ya registrado y se muestra la fecha del post.
 function aplicarVeredictos(res, acc, onResult, log) {
   for (const r of (res?.results ?? [])) {
     const h = r.source_handle ?? "?";
     acc.leidos++;
-    if (r.promoted > 0) { acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: r.promoted }); onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "x" }); log(`   ✅ @${h} PROMOCIONÓ (${r.promoted})`); }
-    else if (r.tweets > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.tweets, red: "x" }); }
+    const nuevas = r.promos_nuevas ?? r.promoted ?? 0;      // fallback si el edge es viejo
+    const yaEstaban = r.promos_ya_registradas ?? 0;
+    const fechas = Array.isArray(r.fechas_promo) ? r.fechas_promo : [];
+    const cuando = (soloNuevas) => fechas.filter((f) => f.nueva === soloNuevas).map((f) => fechaCorta(f.fecha)).join(", ");
+
+    if (r.fuera_de_ventana > 0) log(`   ⏳ @${h}: ${r.fuera_de_ventana} post(s) viejos, fuera de la ventana → no se cuentan`);
+    if (r.fallidos > 0) log(`   ⚠️ @${h}: ${r.fallidos} no se pudieron guardar (revisar logs del edge)`);
+
+    if (nuevas > 0) {
+      acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: nuevas });
+      onResult({ handle: h, outcome: "con_promo", stories: nuevas, red: "x", cuando: cuando(true) });
+      log(`   ✅ @${h} PROMOCIONÓ (${nuevas}) — ${cuando(true)}`);
+    } else if (yaEstaban > 0) {
+      // Promocionó, pero ya estaba registrado: NO es hallazgo de hoy ni es un fallo.
+      onResult({ handle: h, outcome: "ya_registrado", stories: yaEstaban, red: "x", cuando: cuando(false) });
+      log(`   ↩️ @${h}: promo del ${cuando(false)} — ya estaba registrada, no se duplica`);
+      acc.leidos_sin_posts++;
+    } else if (r.tweets > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.tweets, red: "x" }); }
     else { acc.leidos_sin_posts++; }
   }
 }
