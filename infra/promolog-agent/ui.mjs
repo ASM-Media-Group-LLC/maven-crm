@@ -3,6 +3,7 @@
 // y sirve ui.html. Se lanza con `npm run ui` o doble clic en abrir-panel.command.
 
 import { createServer } from "node:http";
+import { execFile } from "node:child_process";
 import { hostname as osHostname } from "node:os";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +27,14 @@ const LOGIN_URL = {
   facebook: "https://www.facebook.com/login",
 };
 const NET_LABEL = { instagram: "Instagram", telegram: "Telegram", x: "X", facebook: "Facebook" };
+
+// Qué commit está sirviendo ESTE panel. Se llena más abajo (después de definir
+// `correr`, que depende de constantes que todavía no existen acá).
+// El 01/08 un panel de hacía horas seguía tomado al puerto 4599 sirviendo código
+// viejo y parecía que los cambios no llegaban nunca: media hora de depuración que
+// se evita con tenerlo a la vista. Con 5 máquinas, además, es la única forma de
+// saber cuál quedó atrás.
+let VERSION = { commit: "?", fecha: null };
 
 // ── SSE ───────────────────────────────────────────────────────────────────
 const clients = new Set();
@@ -60,14 +69,18 @@ function statusPayload() {
   return {
     running, token_ok: !!EXT_TOKEN, cron_ok: !!CRON_TOKEN,
     intervalos: INTERVALOS,
+    agente: AGENT_ID, version: VERSION,
     networks: NETWORKS.map((net) => ({
       network: net, label: NET_LABEL[net],
       ultima_corrida: ultimasCorridas.redes?.[net] ?? null,
       programacion: { ...sch[net], proxima: proximaCorrida(sch[net]) },
       accounts: accountsOf(net).map((a, i) => {
-        const si = sessionInfo(sessionPath(a.session));
+        // logged_in mira el MARCADOR de la red, no si el archivo existe: hasta el
+        // 02/08 esto decía `si.exists` y pintaba verde cualquier archivo, aunque
+        // adentro no hubiera sesión (así se creyó logueada una cuenta de X que no lo estaba).
+        const si = sessionInfo(sessionPath(a.session), net);
         const cd = cds[a.id] && Date.now() < cds[a.id] ? cds[a.id] : null;
-        return { id: a.id, index: i, logged_in: si.exists, cooldown_until: cd };
+        return { id: a.id, index: i, logged_in: si.loggedIn === true, sesion_vacia: si.exists && si.loggedIn === false, cooldown_until: cd };
       }),
     })),
     last_results: lastResults,
@@ -100,6 +113,15 @@ async function latir() {
           // quedó sin nada activo (que es una caída silenciosa distinta).
           programadas: NETWORKS.filter((n) => sch[n]?.activo),
           arrancado_at: ARRANCADO_AT,
+          // Qué código corre esta máquina. Con varias Mac Minis, una que quedó sin
+          // actualizar produce resultados distintos y no hay forma de notarlo desde
+          // Maven si no lo informa: se compara el commit entre agentes.
+          version: VERSION.commit,
+          // Qué sesiones tiene REALMENTE logueadas (verificado por marcador, no por
+          // "existe el archivo"). Una máquina sin sesión de X escanea X y no trae nada.
+          sesiones: Object.fromEntries(NETWORKS.map((n) => [
+            n, accountsOf(n).filter((a) => sessionInfo(sessionPath(a.session), n).loggedIn === true).length,
+          ])),
         },
       }),
     });
@@ -138,6 +160,69 @@ async function runScan(network, onlyIds) {
   broadcast("status", statusPayload());
 }
 
+// ── ACTUALIZAR EL AGENTE ─────────────────────────────────────────────────────
+// Con 5 Mac Minis corriendo esto, "ya lo arreglé" no significa nada hasta que CADA
+// máquina baja el código: cada una tiene su propio clon. Sin este botón había que
+// entrar por Tailscale a las cinco, una por una.
+//
+// Es `git pull --ff-only` y nada más: no mergea, no rebasea, no descarta nada. Si
+// la máquina tiene cambios sin commitear, NO toca nada y lo dice — así el botón es
+// inofensivo también en la laptop donde se desarrolla, que es el mismo repo.
+//
+// El reinicio se lo delegamos a launchd (KeepAlive): salir del proceso ES el
+// reinicio, y arranca ya con el código nuevo. Si el panel se abrió a mano no hay
+// quien lo levante, así que ahí no salimos y avisamos que hay que reabrirlo.
+const ENV_GIT = { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" };
+function correr(cmd, args, timeout = 180_000) {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { cwd: ROOT, timeout, env: ENV_GIT, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: String(stdout ?? "").trim(), err: String(stderr ?? "").trim() || (err ? err.message : "") }));
+  });
+}
+
+async function actualizarAgente() {
+  const g = (...a) => correr("git", a);
+  if (!(await g("rev-parse", "--git-dir")).ok) return { ok: false, error: "Esta copia del agente no es un clon de git: actualizala a mano." };
+
+  const sucio = await g("status", "--porcelain");
+  if (sucio.ok && sucio.out) {
+    return { ok: false, error: `Hay ${sucio.out.split("\n").length} archivo(s) con cambios sin guardar en esta máquina. No toco nada.`, detalle: sucio.out.slice(0, 500) };
+  }
+
+  const antes = (await g("rev-parse", "HEAD")).out;
+  log("actualizando: git pull…");
+  const pull = await g("pull", "--ff-only");
+  if (!pull.ok) return { ok: false, error: `git pull falló: ${(pull.err || pull.out).split("\n")[0]}` };
+
+  const despues = (await g("rev-parse", "HEAD")).out;
+  if (antes === despues) { log("ya estaba al día."); return { ok: true, cambio: false, commit: despues.slice(0, 8) }; }
+
+  // Solo reinstalamos si cambiaron las dependencias: npm install tarda y casi nunca
+  // hace falta. `git diff --name-only` entre los dos commits lo dice exacto.
+  const tocados = (await g("diff", "--name-only", antes, despues)).out;
+  if (/package(-lock)?\.json/.test(tocados)) {
+    log("cambiaron las dependencias: npm install…");
+    const npm = await correr("npm", ["install", "--no-audit", "--no-fund"], 300_000);
+    if (!npm.ok) return { ok: false, error: `npm install falló: ${(npm.err || npm.out).split("\n").slice(-1)[0]}` };
+  }
+
+  const gestionado = process.env.MANAGED_BY === "launchd";
+  const nCommits = (await g("rev-list", "--count", `${antes}..${despues}`)).out || "?";
+  log(`actualizado a ${despues.slice(0, 8)} (${nCommits} commit/s).`);
+  if (gestionado) {
+    log("reiniciando el agente para tomar el código nuevo…");
+    setTimeout(() => process.exit(0), 800);   // launchd (KeepAlive) lo vuelve a levantar
+  }
+  return { ok: true, cambio: true, commit: despues.slice(0, 8), commits: nCommits, reinicia: gestionado };
+}
+
+// Se lee UNA vez al arrancar: mientras el proceso vive, el código que sirve es el
+// que cargó al arrancar aunque el checkout cambie por debajo.
+async function leerVersion() {
+  const r = await correr("git", ["log", "-1", "--format=%h|%cI"]);
+  if (r.ok && r.out.includes("|")) { const [commit, fecha] = r.out.split("|"); VERSION = { commit, fecha }; }
+}
+
 function json(res, code, body) { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); }
 function readBody(req) { return new Promise((r) => { let d = ""; req.on("data", (c) => d += c); req.on("end", () => { try { r(JSON.parse(d || "{}")); } catch { r({}); } }); }); }
 
@@ -158,6 +243,13 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === "GET" && u.pathname === "/api/status") { await refrescarUltimasCorridas(); return json(res, 200, statusPayload()); }
 
+  // actualizar el agente:  POST /api/actualizar
+  if (req.method === "POST" && parts[1] === "actualizar") {
+    if (running) return json(res, 409, { ok: false, error: "Hay un escaneo corriendo. Esperá a que termine." });
+    try { return json(res, 200, await actualizarAgente()); }
+    catch (e) { return json(res, 500, { ok: false, error: e.message }); }
+  }
+
   // agregar / quitar cuenta:  POST /api/account/<network>/add | /remove  {id?}
   if (req.method === "POST" && parts[1] === "account") {
     const network = parts[2], action = parts[3];
@@ -174,7 +266,7 @@ const server = createServer(async (req, res) => {
     const key = `${network}:${id}`;
     try {
       if (action === "open") await openLoginTo(key, LOGIN_URL[network]);
-      else if (action === "save") { await saveLoginTo(key, sessionPath(acct.session)); broadcast("status", statusPayload()); }
+      else if (action === "save") { await saveLoginTo(key, sessionPath(acct.session), network); broadcast("status", statusPayload()); }
       else return json(res, 404, { ok: false });
       return json(res, 200, { ok: true });
     } catch (e) { return json(res, 500, { ok: false, error: e.message }); }
@@ -245,9 +337,10 @@ setInterval(() => {
 latir();
 setInterval(latir, 5 * 60_000);
 
+await leerVersion();
 server.listen(PORT, HOST, () => {
   console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}`);
-  console.log(`   agente: ${AGENT_ID}  ·  escuchando en ${HOST}:${PORT}`);
+  console.log(`   agente: ${AGENT_ID}  ·  versión ${VERSION.commit}  ·  escuchando en ${HOST}:${PORT}`);
   if (HOST === "127.0.0.1") console.log(`   (solo esta máquina. Para entrar por Tailscale: UI_HOST=<tu IP 100.x.y.z>)`);
   console.log("");
 });

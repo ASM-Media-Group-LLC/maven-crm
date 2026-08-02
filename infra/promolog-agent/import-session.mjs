@@ -19,17 +19,30 @@ import { createDecipheriv, pbkdf2Sync } from "node:crypto";
 import { homedir } from "node:os";
 import { SESSIONS_DIR } from "./config.mjs";
 import { accountsOf, sessionPath } from "./accounts.mjs";
+import { tieneSesion, QUE_FALTA } from "./session-check.mjs";
 
 const SITES = {
   x: { hosts: ["x.com", "twitter.com"], origin: "https://x.com" },
   instagram: { hosts: ["instagram.com"], origin: "https://www.instagram.com" },
   telegram: { hosts: ["telegram.org", "web.telegram.org"], origin: "https://web.telegram.org" },
+  facebook: { hosts: ["facebook.com"], origin: "https://www.facebook.com" },
 };
 
 const site = (process.argv[2] || "").toLowerCase();
 const acctId = process.argv[3] && !process.argv[3].startsWith("--") ? process.argv[3] : null;
 const useBrave = process.argv.includes("--brave");
-if (!SITES[site]) { console.error(`Uso: node import-session.mjs <x|instagram|telegram> [accountId] [--brave]`); process.exit(1); }
+if (!SITES[site]) { console.error(`Uso: node import-session.mjs <x|instagram|facebook|telegram> [accountId] [--brave]`); process.exit(1); }
+
+// ⚠️ Telegram no se puede importar por acá y hay que decirlo ANTES de trabajar:
+// su sesión no vive en cookies sino en el localStorage de web.telegram.org, que
+// Chrome guarda en un LevelDB aparte (no en la base de cookies que leemos abajo).
+// Sin este corte el importador terminaba "bien" y escribía un archivo con dos
+// cookies inservibles — el mismo falso éxito que el botón "ya me logueé".
+if (site === "telegram") {
+  console.error("Telegram no se importa desde el navegador: su sesión vive en el localStorage, no en las cookies.");
+  console.error("Usá el panel → Telegram → Loguear, y escaneá el QR desde el celular.");
+  process.exit(1);
+}
 
 const base = useBrave
   ? join(homedir(), "Library/Application Support/BraveSoftware/Brave-Browser/Default")
@@ -96,13 +109,25 @@ for (const line of rows) {
 }
 if (!cookies.length) { console.error("No se encontraron cookies de ese sitio (¿estás logueado en ese navegador?)."); process.exit(1); }
 
+// ── VERIFICAR ANTES DE ESCRIBIR ──────────────────────────────────────────────
+// Encontrar cookies del dominio NO es lo mismo que encontrar una sesión: un Chrome
+// deslogueado igual tiene guest_id, datr, lang… Antes se escribía el archivo igual
+// y solo se avisaba con un "(ojo: no veo cookies de sesión)" al final, que es fácil
+// de pasar por alto — y deja una sesión rota que recién falla en el próximo scan.
+const estado = { cookies, origins: [] };
+if (!tieneSesion(estado, site)) {
+  console.error(`❌ Hay ${cookies.length} cookies de ${site}, pero falta ${QUE_FALTA[site]}: ese navegador NO está logueado.`);
+  console.error(`   Abrí ${SITES[site].origin} en ${useBrave ? "Brave" : "Chrome"}, logueate, CERRÁ el navegador y repetí.`);
+  console.error("   (No escribí nada: la sesión anterior queda como estaba.)");
+  process.exit(1);
+}
+
 // destino: la cuenta indicada, o la primera de esa red
-const list = accountsOf(site === "x" ? "x" : site);
+const list = accountsOf(site);
 const acct = acctId ? list.find((a) => a.id === acctId) : list[0];
 const dest = acct ? sessionPath(acct.session) : join(SESSIONS_DIR, `${site}.json`);
 mkdirSync(SESSIONS_DIR, { recursive: true });
-writeFileSync(dest, JSON.stringify({ cookies, origins: [] }, null, 2));
+writeFileSync(dest, JSON.stringify(estado, null, 2));
 
-const key_names = cookies.map((c) => c.name);
-console.log(`✅ Importadas ${cookies.length} cookies de ${site} (${useBrave ? "Brave" : "Chrome"}) → ${dest}`);
-console.log(`   auth: ${["auth_token", "ct0", "sessionid"].filter((k) => key_names.includes(k)).join(", ") || "(ojo: no veo cookies de sesión)"}`);
+console.log(`✅ Sesión de ${site} importada desde ${useBrave ? "Brave" : "Chrome"} → ${dest}`);
+console.log(`   ${cookies.length} cookies · login verificado (${QUE_FALTA[site]}).`);

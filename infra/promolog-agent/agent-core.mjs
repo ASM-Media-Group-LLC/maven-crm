@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { SESSIONS_DIR, MAVEN_URL, EXT_TOKEN, SLOTS_COUNT, PACING, SOFTBLOCK, HEADFUL } from "./config.mjs";
+import { tieneSesion, QUE_FALTA } from "./session-check.mjs";
 
 const COOLDOWN_FILE = join(SESSIONS_DIR, "cooldown.json");
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -19,11 +20,14 @@ export function writeCooldown(slot, until) {
   const c = readCooldowns(); if (until) c[slot] = until; else delete c[slot];
   writeFileSync(COOLDOWN_FILE, JSON.stringify(c, null, 2));
 }
-export function sessionInfo(sessionFile) {
+// ¿Hay sesión de verdad en el archivo? El chequeo por red vive en session-check.mjs
+// (lo comparten el panel, el importador de cookies y los scrapers).
+// `network` es opcional solo por compatibilidad con llamadas viejas; sin ella no se
+// puede afirmar nada sobre el login, y devolvemos null en vez de inventar un true.
+export function sessionInfo(sessionFile, network) {
   try {
     const d = JSON.parse(readFileSync(sessionFile, "utf8"));
-    const hasSid = (d.cookies || []).some((c) => c.name === "sessionid" && c.value);
-    return { exists: true, loggedIn: hasSid };
+    return { exists: true, loggedIn: tieneSesion(d, network) };
   } catch { return { exists: false, loggedIn: false }; }
 }
 
@@ -158,10 +162,21 @@ export async function openLoginTo(key, url) {
   await page.goto(url, { waitUntil: "domcontentloaded" });
   openLogins.set(key, { browser, context });
 }
-export async function saveLoginTo(key, sessionFile) {
+// Guarda SOLO si la sesión tiene el marcador de la red. Si no lo tiene, NO escribe
+// el archivo y DEJA LA VENTANA ABIERTA para que termines de loguearte y le des otra
+// vez — cerrarla te obligaba a empezar de cero sin saber por qué había fallado.
+export async function saveLoginTo(key, sessionFile, network) {
   const l = openLogins.get(key);
   if (!l) throw new Error("no hay login abierto para " + key);
-  await l.context.storageState({ path: sessionFile });
+  const estado = await l.context.storageState();
+  if (tieneSesion(estado, network) === false) {
+    throw new Error(
+      `Todavía no hay sesión: falta ${QUE_FALTA[network]}. ` +
+      `Terminá de loguearte en la ventana que quedó abierta (incluido el 2FA) y volvé a apretar “Ya me logueé”.` +
+      (network === "x" ? " Ojo: X bloquea el login automatizado — para X hay que importar la sesión de Chrome: node import-session.mjs x" : ""),
+    );
+  }
+  writeFileSync(sessionFile, JSON.stringify(estado, null, 2));
   await l.browser.close();
   openLogins.delete(key);
 }

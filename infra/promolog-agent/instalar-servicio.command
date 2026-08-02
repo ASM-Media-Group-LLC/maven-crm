@@ -72,6 +72,10 @@ cat > "$PLIST" <<PLISTEOF
   <dict>
     <key>UI_HOST</key><string>$HOST_BIND</string>
     <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- Le dice al panel que hay quien lo relevante: con esto el botón "Actualizar"
+         sale del proceso después del git pull y launchd lo vuelve a levantar ya con
+         el código nuevo. Sin esta marca no se suicida (nadie lo levantaría). -->
+    <key>MANAGED_BY</key><string>launchd</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <!-- Se vuelve a levantar si se cae. Es la mitad del punto de esto. -->

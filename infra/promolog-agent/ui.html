@@ -13,6 +13,11 @@
   * { box-sizing:border-box; } body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
   header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; } header .sub { color:var(--mut); font-size:13px; }
+  /* Identidad de la máquina: a la derecha, discreta, pero siempre visible. */
+  header .ident { margin-left:auto; text-align:right; font-size:12.5px; }
+  header .ident #agente { font-weight:600; }
+  header .ident #version { font-variant-numeric:tabular-nums; font-size:12px; }
+  header .ident.atrasada #version { color:var(--warn); }
   main { max-width:960px; margin:0 auto; padding:20px; }
   .net { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; }
   .net > h2 { margin:0 0 4px; font-size:16px; display:flex; align-items:center; gap:8px; }
@@ -23,6 +28,10 @@
   .acct .name { font-weight:600; font-size:14px; display:flex; align-items:center; gap:7px; }
   .dot { width:9px; height:9px; border-radius:50%; background:var(--mut); display:inline-block; }
   .dot.ok{ background:var(--ok); } .dot.bad{ background:var(--bad); } .dot.warn{ background:var(--warn); }
+  /* Por qué falló el último "Ya me logueé". Va con franja roja al costado porque es
+     la diferencia entre "guardé" y "creí que guardé", y hay que verla sin buscarla. */
+  .loginerr{ margin-top:8px; padding:8px 10px; border-left:3px solid var(--bad);
+             background:rgba(231,76,60,.12); border-radius:0 6px 6px 0; font-size:12.5px; line-height:1.45; }
   .muted { color:var(--mut); font-size:12.5px; }
   button { font:inherit; border:0; border-radius:9px; padding:8px 13px; cursor:pointer; background:var(--accent); color:#fff; font-size:13.5px; }
   button.secondary { background:transparent; color:var(--fg); border:1px solid var(--line); }
@@ -93,6 +102,15 @@
 <header>
   <span style="font-size:22px">📸</span>
   <div><h1>Promolog Scanner</h1><div class="sub">Tu red · cuentas por red · el scan se reparte entre las cuentas que agregues</div></div>
+  <!-- Qué máquina y qué código. Con varias Mac Minis corriendo lo mismo, no saber
+       cuál estás mirando (ni si quedó atrasada) es la primera fuente de confusión. -->
+  <div class="ident">
+    <div><span id="agente">—</span></div>
+    <div class="row" style="gap:8px;justify-content:flex-end;margin-top:4px">
+      <span id="version" class="muted" title="commit que sirve este panel">—</span>
+      <button id="actualizar" class="tiny secondary">↻ Actualizar</button>
+    </div>
+  </div>
 </header>
 <main>
   <div id="warn" class="net" style="display:none;border-color:var(--bad)"></div>
@@ -113,10 +131,11 @@ const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏", facebook:"f" };
 const NOTE = {
   instagram:"cada cuenta lee su parte (residencial). Más cuentas = menos volumen c/u = menos ban.",
   telegram:"los canales públicos (@usuario) se leen sin cuenta; los privados (link de invitación) solo si la cuenta logueada es miembro.",
-  x:"cada cuenta logueada navega su parte de los perfiles.",
+  x:"cada cuenta logueada navega su parte de los perfiles. ⚠️ X bloquea el login automatizado (mete un control anti-bot que no avanza): logueate en Chrome normal, cerralo, y corré <code>node import-session.mjs x</code>.",
   facebook:"lee el muro de cada página con una cuenta logueada. Reemplaza el scan por Apify, que hoy corre 6 veces al día.",
 };
-let LOGIN = {}; // "network:id" → "open"
+let LOGIN = {};    // "network:id" → "open"
+let LOGINERR = {}; // "network:id" → por qué falló el último intento de guardar
 
 function fmtCd(ts){ if(!ts) return ""; const m=Math.max(0,Math.round((ts-Date.now())/60000)); return `cooldown ${m}min`; }
 
@@ -184,19 +203,33 @@ function bloqueAuto(net, intervalos){
 }
 
 function render(st){
+  $("#agente").textContent = st.agente || "—";
+  const v = st.version || {};
+  const dias = v.fecha ? Math.floor((Date.now() - new Date(v.fecha)) / 86400000) : null;
+  $("#version").textContent = v.commit && v.commit !== "?"
+    ? `${v.commit}${dias === null ? "" : dias === 0 ? " · hoy" : ` · hace ${dias}d`}` : "sin git";
+  // Se marca en ámbar a partir de 2 días: no es un error, pero con 5 máquinas es
+  // la pista de que ésta se quedó atrás del resto.
+  $(".ident").classList.toggle("atrasada", dias !== null && dias >= 2);
   $("#warn").style.display = (st.token_ok && st.cron_ok) ? "none" : "block";
   $("#warn").textContent = !st.token_ok ? "⚠️ Falta PROMOLOG_EXT_TOKEN en el .env." : (!st.cron_ok ? "⚠️ Falta CRON_INTERNAL_TOKEN (lo usan Telegram y X)." : "");
   const busy = st.running;
   netsEl.innerHTML = st.networks.map(net => {
     const accts = net.accounts.map(a => {
       const cls = a.cooldown_until ? "warn" : (a.logged_in ? "ok" : "bad");
-      const estado = a.cooldown_until ? fmtCd(a.cooldown_until) : (a.logged_in ? "sesión lista" : "sin login");
+      // "sin login" y "archivo sin sesión" son distintos: el segundo significa que
+      // se guardó algo que NO tiene la cookie de la red (típico de apretar "ya me
+      // logueé" antes de tiempo). Decirlos igual es lo que hizo creer que X estaba lista.
+      const estado = a.cooldown_until ? fmtCd(a.cooldown_until)
+        : (a.logged_in ? "sesión lista" : (a.sesion_vacia ? "archivo guardado, pero SIN sesión" : "sin login"));
       const key = net.network+":"+a.id;
       const loginBtn = LOGIN[key]==="open"
         ? `<button class="tiny" data-save="${key}">✓ Ya me logueé</button>`
         : `<button class="tiny secondary" data-login="${key}">${a.logged_in?"Re-loguear":"Loguear"}</button>`;
       const rm = net.accounts.length>1 ? `<button class="ghost" title="quitar" data-remove="${key}">✕</button>` : "";
-      const hint = LOGIN[key]==="open" ? `<div class="muted" style="margin-top:6px">Logueate en la ventana${net.network==="telegram"?" (escaneá el QR)":""} y apretá “Ya me logueé”.</div>` : "";
+      const hint = LOGINERR[key]
+        ? `<div class="loginerr">${LOGINERR[key]}</div>`
+        : (LOGIN[key]==="open" ? `<div class="muted" style="margin-top:6px">Logueate en la ventana${net.network==="telegram"?" (escaneá el QR)":""} y apretá “Ya me logueé”.</div>` : "");
       return `<div class="acct"><div class="top"><span class="name"><span class="dot ${cls}"></span>${a.id}</span>${rm}</div>
         <div class="muted" style="margin:4px 0 8px">${estado}</div><div class="row">${loginBtn}</div>${hint}</div>`;
     }).join("");
@@ -247,14 +280,42 @@ document.addEventListener("click", async (e) => {
   if (d.add){ await post(`/api/account/${d.add}/add`); await refresh(); }
   else if (d.remove){ const [n,id]=d.remove.split(":"); await post(`/api/account/${n}/remove`,{id}); await refresh(); }
   else if (d.login){ LOGIN[d.login]="open"; const [n,id]=d.login.split(":"); await post(`/api/login/${n}/${id}/open`); await refresh(); }
-  else if (d.save){ const [n,id]=d.save.split(":"); await post(`/api/login/${n}/${id}/save`); LOGIN[d.save]=null; await refresh(); }
+  // Guardar puede FALLAR (no hay sesión en el navegador todavía). Antes se ignoraba
+  // la respuesta y se cerraba el flujo igual → parecía que había guardado. Si falla,
+  // el login sigue abierto y el motivo se muestra en la tarjeta.
+  else if (d.save){
+    const [n,id]=d.save.split(":");
+    const r = await post(`/api/login/${n}/${id}/save`);
+    if (r.ok){ LOGIN[d.save]=null; delete LOGINERR[d.save]; }
+    else { LOGINERR[d.save] = r.error || "no se pudo guardar la sesión"; }
+    await refresh();
+  }
   else if (d.scan){ resultsEl.innerHTML=""; $("#counts").textContent=0; await post(`/api/scan/${d.scan}`); }
   else if (d.tgcheck){ await post("/api/tg-join", { join:false }); }
   // De a 4 por tanda: unirse a muchos canales seguidos es lo que dispara el límite
   // de Telegram, y esta cuenta es la única que ve los canales privados.
   else if (d.tgjoin){ await post("/api/tg-join", { join:true, max:4 }); }
   else if (t.id==="stop"){ await post("/api/stop"); }
+  else if (t.id==="actualizar"){
+    t.disabled = true; t.textContent = "actualizando…";
+    const r = await post("/api/actualizar");
+    if (!r.ok){ addLog("⚠️ " + (r.error||"no se pudo actualizar") + (r.detalle ? "\n" + r.detalle : "")); }
+    else if (!r.cambio){ addLog("✓ ya estaba al día (" + r.commit + ")"); }
+    else if (r.reinicia){ addLog(`✓ actualizado a ${r.commit} (${r.commits} commit/s). Reiniciando…`); esperarReinicio(); return; }
+    else { addLog(`✓ actualizado a ${r.commit} (${r.commits} commit/s). CERRÁ Y VOLVÉ A ABRIR el panel para que tome el código nuevo.`); }
+    t.disabled = false; t.textContent = "↻ Actualizar"; await refresh();
+  }
 });
+
+// Tras un reinicio por launchd el server tarda un par de segundos en volver. En vez
+// de dejar la página muerta, se sondea hasta que responde y se recarga sola.
+async function esperarReinicio(){
+  for (let i=0; i<30; i++){
+    await new Promise(r=>setTimeout(r,1000));
+    try { const r = await fetch("/api/status",{cache:"no-store"}); if (r.ok){ location.reload(); return; } } catch {}
+  }
+  addLog("⚠️ El agente no volvió solo. Revisá logs/agente.error.log");
+}
 
 // Programación automática. Va por "change" y no por "click" porque son selects e
 // inputs; el switch entra igual (un checkbox emite change).
