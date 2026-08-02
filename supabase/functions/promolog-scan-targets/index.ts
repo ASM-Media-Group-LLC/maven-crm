@@ -20,6 +20,45 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
+  // ── ?mode=estado — ÚLTIMA CORRIDA POR RED ─────────────────────────────────
+  // El panel local no tenía forma de saber cuándo fue el último scan de cada red
+  // ni cómo salió: había que abrir Maven o preguntarle al bot. Se sirve desde acá
+  // (y no en una función nueva) porque el agente YA llama a este endpoint con el
+  // mismo token — cero configuración extra.
+  //
+  // Los datos salen de promolog_dispatch_runs, que es donde cada corrida deja su
+  // resumen; se derivan del MISMO payload que lee get_promolog_scan_report, así
+  // que el panel y el bot cuentan la misma historia.
+  if ((new URL(req.url)).searchParams.get("mode") === "estado") {
+    const { data, error } = await sb.from("promolog_dispatch_runs")
+      .select("created_at, apify_actor_id, creators_count, entries_created, payload")
+      .order("created_at", { ascending: false }).limit(120);
+    if (error) return json({ error: error.message }, 500);
+
+    const porRed: Record<string, unknown> = {};
+    for (const r of (data ?? []) as Array<any>) {
+      // La red viene del payload (Telegram/X la declaran) o se infiere del actor:
+      // las corridas de IG son las de la extensión / el agente local.
+      // OJO con los nombres de actor: Telegram/X locales escriben "local-agent",
+      // el ingest de IG del agente escribe "promolog-agent" y la extensión
+      // "browser-extension". Solo las corridas de IG carecen de payload.network.
+      const actor = String(r.apify_actor_id ?? "");
+      const esIG = actor === "browser-extension" || actor === "promolog-agent";
+      const red = String(r.payload?.network ?? "").toLowerCase() || (esIG ? "instagram" : "");
+      if (!red || porRed[red]) continue;   // ya tenemos la más reciente de esa red
+      porRed[red] = {
+        cuando: r.created_at,
+        origen: actor === "browser-extension" ? "extensión"
+              : (actor === "promolog-agent" || actor === "local-agent" || r.payload?.source === "local")
+                ? "agente local" : "servidor",
+        creadoras: r.creators_count ?? null,
+        entradas: r.entries_created ?? null,
+        resumen: r.payload?.resumen ?? null,
+      };
+    }
+    return json({ ok: true, redes: porRed });
+  }
+
   // ── REPARTO DE CARGA ENTRE CUENTAS SCANNER (slot A/B) ─────────────────────
   // El burn de IG es por VOLUMEN por sesión: una cuenta haciendo 75 lecturas se
   // sensibiliza y cae; dos cuentas haciendo ~37 c/u no. Cada cliente lector se

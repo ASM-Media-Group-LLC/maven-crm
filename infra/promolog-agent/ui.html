@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Promolog Scanner</title>
 <style>
-  :root { color-scheme: light dark; --bg:#0f1115; --card:#1a1d24; --fg:#e8eaed; --mut:#9aa0aa; --line:#2a2e37; --ok:#2ecc71; --warn:#f1c40f; --bad:#e74c3c; --accent:#6c8cff; }
-  @media (prefers-color-scheme: light){ :root{ --bg:#f4f5f7; --card:#fff; --fg:#1a1d24; --mut:#667; --line:#e3e5e9; } }
+  :root { color-scheme: light dark; --bg:#0f1115; --card:#1a1d24; --fg:#e8eaed; --mut:#9aa0aa; --line:#2a2e37; --ok:#2ecc71; --warn:#f1c40f; --bad:#e74c3c; --accent:#6c8cff;
+          /* El log tenía el fondo #0b0d11 escrito a mano: en tema claro quedaba un
+             rectángulo negro en medio de una página blanca. Ahora es token. */
+          --code-bg:#0b0d11; --code-fg:#cbd2dc; }
+  @media (prefers-color-scheme: light){ :root{ --bg:#f4f5f7; --card:#fff; --fg:#1a1d24; --mut:#667; --line:#e3e5e9; --code-bg:#f7f8fa; --code-fg:#2b3038; } }
   * { box-sizing:border-box; } body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
   header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; } header .sub { color:var(--mut); font-size:13px; }
@@ -30,7 +33,26 @@
   .netactions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
   @media (max-width:680px){ .split{ grid-template-columns:1fr; } .accts{ grid-template-columns:1fr; } }
-  #log { background:#0b0d11; color:#cbd2dc; border:1px solid var(--line); border-radius:12px; padding:12px; height:320px; overflow:auto; font:12.5px/1.5 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
+  #log { background:var(--code-bg); color:var(--code-fg); border:1px solid var(--line); border-radius:12px; padding:12px; height:320px; overflow:auto; font:12.5px/1.5 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
+
+  /* ── Última corrida ────────────────────────────────────────────────────────
+     Es lo primero que se mira al abrir el panel ("¿esto corrió? ¿cómo salió?"),
+     así que va ARRIBA de las cuentas: resumen antes que detalle. La antigüedad
+     se codifica en la FRANJA de la izquierda además de en el texto, para que se
+     lea de un vistazo sin tener que interpretar "hace 9 h". */
+  .ultima { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
+            border-left:3px solid var(--line); background:color-mix(in srgb, var(--fg) 4%, transparent);
+            border-radius:0 8px 8px 0; padding:8px 12px; margin-bottom:12px; font-size:13px; }
+  .ultima.fresca { border-left-color:var(--ok); }
+  .ultima.tibia  { border-left-color:var(--warn); }
+  .ultima.vieja  { border-left-color:var(--bad); }
+  .ultima .cuando { font-weight:600; }
+  .ultima .stats { display:flex; flex-wrap:wrap; gap:10px; color:var(--mut); }
+  /* tabular-nums: los números quedan alineados entre redes al comparar de un vistazo */
+  .ultima .n { font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); }
+  .ultima .n.si  { color:var(--ok); }
+  .ultima .n.bad { color:var(--bad); }
+  .ultima.sindatos { color:var(--mut); }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:600; }
@@ -76,6 +98,45 @@ let LOGIN = {}; // "network:id" → "open"
 
 function fmtCd(ts){ if(!ts) return ""; const m=Math.max(0,Math.round((ts-Date.now())/60000)); return `cooldown ${m}min`; }
 
+// "hace 12 min" / "hace 3 h" / "ayer 21:40". Relativo hasta el día, porque lo que
+// importa es la ANTIGÜEDAD ("¿esto está fresco?"), no la hora exacta.
+function haceCuanto(iso){
+  const t = Date.parse(iso); if(!Number.isFinite(t)) return { txt:"—", horas:Infinity };
+  const min = Math.max(0, Math.round((Date.now()-t)/60000));
+  const horas = min/60;
+  const hora = new Date(t).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit",hour12:false});
+  if (min < 1)  return { txt:"recién", horas };
+  if (min < 60) return { txt:`hace ${min} min`, horas };
+  if (horas < 24) return { txt:`hace ${Math.round(horas)} h · ${hora}`, horas };
+  const dias = Math.round(horas/24);
+  return { txt: dias === 1 ? `ayer ${hora}` : `hace ${dias} días`, horas };
+}
+
+// Franja de la última corrida. Sin datos NO se oculta: "nunca corrió" es
+// justamente lo que hay que ver (fue el caso del agente local de IG el 01/08).
+function ultimaCorrida(u){
+  if (!u) return `<div class="ultima sindatos">Sin corridas registradas todavía</div>`;
+  const { txt, horas } = haceCuanto(u.cuando);
+  const clase = horas < 3 ? "fresca" : horas < 14 ? "tibia" : "vieja";
+  const r = u.resumen || {};
+  const stat = (n, label, cls="") =>
+    (n === undefined || n === null) ? "" : `<span><span class="n ${cls}">${n}</span> ${label}</span>`;
+  const stats = [
+    stat(r.con_promo, "con promo", "si"),
+    stat(r.sin_promo, "sin promo"),
+    stat(r.leidos_sin_posts, "sin posts"),
+    stat(r.no_legibles, "no legibles", r.no_legibles > 0 ? "bad" : ""),
+  ].filter(Boolean).join("");
+  // Sin resumen (corridas del server) igual se muestran las entradas creadas: es
+  // preferible un dato pobre a una franja vacía que parece un error.
+  const fallback = stats ? "" : stat(u.entradas, "entradas guardadas");
+  return `<div class="ultima ${clase}" title="${new Date(u.cuando).toLocaleString("es-CO")}">
+    <span class="cuando">${txt}</span>
+    <span class="muted">${u.origen ?? ""}</span>
+    <span class="stats">${stats || fallback || '<span class="muted">sin resumen</span>'}</span>
+  </div>`;
+}
+
 function render(st){
   $("#warn").style.display = (st.token_ok && st.cron_ok) ? "none" : "block";
   $("#warn").textContent = !st.token_ok ? "⚠️ Falta PROMOLOG_EXT_TOKEN en el .env." : (!st.cron_ok ? "⚠️ Falta CRON_INTERNAL_TOKEN (lo usan Telegram y X)." : "");
@@ -95,6 +156,7 @@ function render(st){
     }).join("");
     return `<div class="net"><h2>${EMO[net.network]} ${net.label} <span class="muted" style="font-weight:400">· ${net.accounts.length} cuenta(s)</span></h2>
       <div class="netsub">${NOTE[net.network]}</div>
+      ${ultimaCorrida(net.ultima_corrida)}
       <div class="accts">${accts}</div>
       <div class="netactions">
         <button data-scan="${net.network}" ${busy?"disabled":""}>▶︎ Escanear ${net.label}</button>

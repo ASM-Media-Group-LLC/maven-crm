@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EXT_TOKEN, CRON_TOKEN } from "./config.mjs";
+import { EXT_TOKEN, CRON_TOKEN, MAVEN_URL } from "./config.mjs";
 import { runAccount, sleep, readCooldowns, sessionInfo, openLoginTo, saveLoginTo } from "./agent-core.mjs";
 import { runTelegram } from "./tg-scraper.mjs";
 import { runJoin } from "./tg-join.mjs";
@@ -28,12 +28,34 @@ let running = false, stopFlag = false, lastResults = [];
 function broadcast(evt, data) { const line = `event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`; for (const r of clients) { try { r.write(line); } catch { /* */ } } }
 const log = (msg) => broadcast("log", { msg, t: Date.now() });
 
+// Última corrida por red, servida por promolog-scan-targets?mode=estado. Se
+// cachea 60s: el estado se re-emite en cada cambio de la UI (agregar cuenta,
+// abrir login…) y sin caché eso serían decenas de llamadas por minuto.
+// Best-effort a propósito: si Maven no responde, el panel muestra el resto
+// igual — el estado de las corridas es informativo, no bloquea escanear.
+let ultimasCorridas = { redes: {}, at: 0, error: null };
+async function refrescarUltimasCorridas() {
+  if (!EXT_TOKEN || Date.now() - ultimasCorridas.at < 60_000) return;
+  try {
+    const r = await fetch(`${MAVEN_URL}/functions/v1/promolog-scan-targets?mode=estado`, {
+      headers: { "x-ext-token": EXT_TOKEN },
+    });
+    const j = await r.json();
+    ultimasCorridas = r.ok && j.ok
+      ? { redes: j.redes ?? {}, at: Date.now(), error: null }
+      : { redes: ultimasCorridas.redes, at: Date.now(), error: j.error || `HTTP ${r.status}` };
+  } catch (e) {
+    ultimasCorridas = { redes: ultimasCorridas.redes, at: Date.now(), error: e.message };
+  }
+}
+
 function statusPayload() {
   const cds = readCooldowns();
   return {
     running, token_ok: !!EXT_TOKEN, cron_ok: !!CRON_TOKEN,
     networks: NETWORKS.map((net) => ({
       network: net, label: NET_LABEL[net],
+      ultima_corrida: ultimasCorridas.redes?.[net] ?? null,
       accounts: accountsOf(net).map((a, i) => {
         const si = sessionInfo(sessionPath(a.session));
         const cd = cds[a.id] && Date.now() < cds[a.id] ? cds[a.id] : null;
@@ -64,7 +86,12 @@ async function runScan(network, onlyIds) {
     await sleep(4000 + Math.random() * 4000);
   }
   running = false;
-  log("— corrida terminada —"); broadcast("done", { at: Date.now() }); broadcast("status", statusPayload());
+  log("— corrida terminada —"); broadcast("done", { at: Date.now() });
+  // La corrida que acaba de terminar es justo la que hay que mostrar: se fuerza el
+  // refresco (salteando la caché) para que el panel no siga mostrando la anterior.
+  ultimasCorridas.at = 0;
+  await refrescarUltimasCorridas();
+  broadcast("status", statusPayload());
 }
 
 function json(res, code, body) { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); }
@@ -78,11 +105,14 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); return res.end(readFileSync(join(ROOT, "ui.html"), "utf8"));
   }
   if (req.method === "GET" && u.pathname === "/api/stream") {
+    // Al abrir el panel se busca el estado de las corridas antes del primer envío,
+    // para que no aparezca "sin datos" y un segundo después se rellene.
+    await refrescarUltimasCorridas();
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" });
     res.write(`event: status\ndata: ${JSON.stringify(statusPayload())}\n\n`);
     clients.add(res); req.on("close", () => clients.delete(res)); return;
   }
-  if (req.method === "GET" && u.pathname === "/api/status") return json(res, 200, statusPayload());
+  if (req.method === "GET" && u.pathname === "/api/status") { await refrescarUltimasCorridas(); return json(res, 200, statusPayload()); }
 
   // agregar / quitar cuenta:  POST /api/account/<network>/add | /remove  {id?}
   if (req.method === "POST" && parts[1] === "account") {
