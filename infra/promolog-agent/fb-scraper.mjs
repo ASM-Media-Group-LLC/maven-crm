@@ -31,11 +31,16 @@ async function fetchTargets() {
   return Array.isArray(j.targets) ? j.targets : [];
 }
 
-async function postIngest(items) {
-  if (!items.length) return { ok: true, results: [] };
+// Mismo contrato que Telegram y X: `unreadable` lleva lo que NO se pudo leer (con
+// motivo), `acumulado` los totales de las tandas previas y `final` marca la última,
+// que es la que hace que el edge escriba el informe de la corrida UNA vez.
+// Facebook mandaba solo `items` → sus corridas no quedaban registradas en Maven
+// (ni el panel ni el bot las veían) y no tenía por dónde reportar lo ilegible.
+async function postIngest(items, unreadable = [], { acumulado = null, final = true } = {}) {
+  if (!items.length && !unreadable.length && final !== true) return { ok: true, results: [] };
   const r = await fetch(`${MAVEN_URL}/functions/v1/fb-scan`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-cron-token": CRON_TOKEN },
-    body: JSON.stringify({ mode: "ingest", items }),
+    body: JSON.stringify({ mode: "ingest", items, unreadable, acumulado, final }),
   });
   return r.json().catch(() => ({ ok: false, results: [] }));
 }
@@ -120,7 +125,44 @@ async function extractPosts(page, desdeMs) {
       links: p.links,
     });
   }
-  return salida;
+  // `vistos` = posts que había en el DOM, ANTES de filtrar por fecha. Es el dato que
+  // distingue "leí el muro y no publicó hoy" (vistos > 0, salida vacía) de "no pude
+  // leer el muro" (vistos === 0). Sin él, las dos cosas terminaban como "no promocionó".
+  return { posts: salida, vistos: crudos.length };
+}
+
+/** ¿Pudimos ver el muro de esta página, o Facebook nos mostró otra cosa?
+ *
+ *  ⚠️ ESTA ES LA FUNCIÓN QUE EVITA LOS "No" FALSOS. Facebook no siempre manda a
+ *  /login cuando no te deja ver algo: si la cuenta scanner NO sigue el perfil, o el
+ *  perfil restringe sus publicaciones, la página CARGA BIEN y muestra un cartel
+ *  ("este contenido no está disponible", un muro de registro embebido, o
+ *  directamente un perfil sin publicaciones visibles). El scraper leía cero posts,
+ *  los mandaba como `posts: []`, y el edge los escribía como "no promocionó".
+ *  Eso es inventar un veredicto sobre algo que nunca se vio.
+ *
+ *  Devuelve null si el muro se pudo leer, o el MOTIVO si no.
+ *  Ante la duda decimos "no legible": perder cobertura se ve en el informe y se
+ *  arregla; un "No" falso se cuela como dato bueno y nadie lo revisa.
+ */
+async function motivoIlegible(page, postsVistos) {
+  if (postsVistos > 0) return null;   // vimos publicaciones: el muro se leyó
+  return await page.evaluate(() => {
+    const txt = (document.body.innerText || "").toLowerCase();
+    const tiene = (...frases) => frases.some((f) => txt.includes(f));
+    // Muro de login embebido (pasa con perfiles que exigen sesión aunque la haya).
+    if (document.querySelector('[data-testid="royal_login_form"], form[action*="login"] input[name="pass"]')) return "muro_de_login";
+    if (tiene("contenido no está disponible", "content isn't available", "content isn't available right now",
+              "este contenido no está disponible")) return "contenido_no_disponible";
+    if (tiene("esta página no está disponible", "this page isn't available", "página no encontrada", "page not found")) return "pagina_no_existe";
+    if (tiene("inicia sesión", "iniciar sesión", "log in to continue", "you must log in")) return "pide_login";
+    if (tiene("solo sus amigos", "friends only", "solo amigos")) return "solo_amigos";
+    // Sin cartel reconocible y sin un solo [role=article]: no podemos afirmar que
+    // leímos el muro. Puede ser un perfil restringido, un cambio de maquetado de FB
+    // o una carga a medias — las tres cosas requieren mirar, no asumir.
+    if (!document.querySelector('[role="article"]')) return "sin_publicaciones_visibles";
+    return null;
+  });
 }
 
 /** Identificador de la página para armar la URL del visor de historias.
@@ -269,6 +311,7 @@ function aplicarVeredictos(res, acc, onResult, log) {
       log(`   ✅ ${h} PROMOCIONÓ (${r.promoted})`);
     } else if (r.posts > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.posts, red: "facebook" }); }
     else { acc.leidos_sin_posts++; }
+    acc.insertadas += (r.inserted ?? 0);
     if (r.ya_analizados > 0) log(`   ↩️ ${h}: ${r.ya_analizados} post(s) ya analizados antes`);
   }
 }
@@ -287,7 +330,13 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
   const page = await context.newPage();
 
   const batch = [];
-  const acc = { leidos: 0, con_promo: 0, sin_promo: 0, leidos_sin_posts: 0, no_legibles: 0, detalle_con_promo: [] };
+  // `insertadas` acumula entre tandas para que el informe de la corrida diga cuántas
+  // filas se crearon EN TOTAL y no solo en la última tanda (que es lo que ve el panel).
+  const acc = { leidos: 0, con_promo: 0, sin_promo: 0, leidos_sin_posts: 0, no_legibles: 0, insertadas: 0, detalle_con_promo: [] };
+  // Páginas que NO se pudieron leer, con el motivo. Viajan aparte de `items`: lo que
+  // no se vio no genera fila (para no escribir un "No" falso), pero sí tiene que
+  // aparecer en el informe — si no, queda invisible y nadie sabe que faltó revisarla.
+  const noLegibles = [];
   const desdeMs = Date.now() - HOURS * 3600_000;
   let done = 0;
 
@@ -301,37 +350,65 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
         // ¿nos mandó a login? → sesión caída: cortamos la corrida entera (seguir
         // sería marcar "sin posts" a todas, que es un "No" falso masivo).
         if (/\/login|checkpoint/.test(page.url())) { log("⛔ Facebook: sesión caída, re-logueá la cuenta."); break; }
-        try { await page.waitForSelector('[role="article"]', { timeout: 15000 }); } catch { /* muro sin posts visibles */ }
+        try { await page.waitForSelector('[role="article"]', { timeout: 15000 }); } catch { /* puede no haber muro legible: se decide abajo */ }
         await sleep(1200 + Math.random() * 1200);
-        const posts = await extractPosts(page, desdeMs);
+        const { posts, vistos } = await extractPosts(page, desdeMs);
+
+        // ⚠️ ANTES DE MANDAR NADA: ¿de verdad leímos esta página? Si no, se cuenta
+        // como no legible y NO se postea — mandar `posts: []` hace que el edge
+        // escriba "no promocionó" sobre una página que nunca vimos.
+        const ilegible = await motivoIlegible(page, vistos);
+        if (ilegible) {
+          acc.no_legibles++;
+          noLegibles.push({ handle: etiqueta, reason: ilegible });
+          log(`🔒 ${etiqueta}: no se pudo leer — ${ilegible}`);
+          onResult({ handle: etiqueta, outcome: "no_legible", motivo: ilegible, red: "facebook" });
+          done++;
+          await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
+          continue;
+        }
+
         // Las HISTORIAS van en el mismo lote: para promolog la pregunta es
         // "¿promocionó hoy?", y da igual si fue por muro o por historia. El edge
         // las clasifica con la misma regla (y con visión, que es lo que decide en
         // una historia, que casi siempre es imagen sin texto).
         const stories = await extractStories(page, t, desdeMs, log);
         const todo = [...posts, ...stories];
-        batch.push({ creator_id: t.creator_id, source_handle: etiqueta, posts: todo });
-        log(`${todo.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts · ${stories.length} historias`);
+        batch.push({ creator_id: t.creator_id, source_handle: etiqueta, posts: todo, legible: true });
+        log(`${todo.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts · ${stories.length} historias (${vistos} en el muro)`);
         onResult({ handle: etiqueta, outcome: todo.length ? "historias" : "sin_promo", stories: todo.length, red: "facebook" });
       } catch (e) {
         // No se pudo abrir → NO se manda como "sin posts" (sería un No falso).
         acc.no_legibles++;
-        log(`🔒 ${etiqueta}: no se pudo leer — ${String(e.message).slice(0, 40)}`);
-        onResult({ handle: etiqueta, outcome: "no_legible", red: "facebook" });
+        const motivo = `navegacion: ${String(e.message).slice(0, 60)}`;
+        noLegibles.push({ handle: etiqueta, reason: motivo });
+        log(`🔒 ${etiqueta}: no se pudo leer — ${motivo}`);
+        onResult({ handle: etiqueta, outcome: "no_legible", motivo, red: "facebook" });
       }
       done++;
       if (batch.length >= FLUSH_EVERY) {
-        aplicarVeredictos(await postIngest(batch.splice(0, batch.length)), acc, onResult, log);
+        aplicarVeredictos(await postIngest(batch.splice(0, batch.length), [], { acumulado: acc, final: false }), acc, onResult, log);
       }
       await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
     }
-    if (batch.length) aplicarVeredictos(await postIngest(batch), acc, onResult, log);
+    // Tanda final: va SIEMPRE, aunque no haya quedado nada por postear. Es la que
+    // lleva los no legibles y la que hace que el edge registre la corrida — sin
+    // esto, un scan donde todo salió ilegible no dejaba ni rastro en Maven.
+    aplicarVeredictos(await postIngest(batch, noLegibles, { acumulado: acc, final: true }), acc, onResult, log);
   } finally {
     await browser.close().catch(() => {});
   }
 
   log(`—— INFORME Facebook ——`);
   log(`✅ con promo: ${acc.con_promo}  ·  sin promo: ${acc.sin_promo}  ·  sin posts: ${acc.leidos_sin_posts}`);
-  if (acc.no_legibles) log(`🔒 NO se pudieron revisar: ${acc.no_legibles}`);
+  if (acc.no_legibles) {
+    // El motivo importa: "no la seguimos" se arregla siguiéndola, "muro de login"
+    // es re-loguear, "no existe" es corregir el handle en Maven. Un motivo genérico
+    // hizo creer una vez que faltaban 32 membresías de Telegram cuando faltaban 2.
+    log(`🔒 NO se pudieron revisar: ${acc.no_legibles}`);
+    const porMotivo = {};
+    for (const u of noLegibles) porMotivo[u.reason] = (porMotivo[u.reason] || 0) + 1;
+    for (const [m, n] of Object.entries(porMotivo)) log(`   · ${m}: ${n}`);
+  }
   log(`— corrida terminada —`);
 }

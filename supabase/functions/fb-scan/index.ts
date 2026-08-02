@@ -300,7 +300,12 @@ Deno.serve(async (req: Request) => {
 
   if (modo === "ingest") {
     const items = Array.isArray(body.items) ? body.items as Array<any> : [];
-    if (!items.length) return json({ ok: true, note: "sin items" });
+    // OJO: no se corta por `items` vacío si la tanda es la FINAL o trae ilegibles.
+    // Una corrida donde todo salió ilegible tiene 0 items y es justo la que hay que
+    // registrar — si no, el peor scan posible es el único que no deja rastro.
+    if (!items.length && !(body.final !== false || (Array.isArray(body.unreadable) && body.unreadable.length))) {
+      return json({ ok: true, note: "sin items" });
+    }
     const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
     // Nicks de OF por creadora — mismo insumo que usa el camino de Apify.
     const nicks = new Map<string, string[]>();
@@ -371,7 +376,13 @@ Deno.serve(async (req: Request) => {
       }
 
       // Marcador "revisada, sin actividad": 1/día por índice único.
-      if (posts.length === 0) {
+      // ⚠️ SOLO si la página se pudo LEER. `legible: false` significa que el scraper
+      // abrió el perfil y Facebook no le mostró el muro (no lo seguimos, perfil
+      // restringido, muro de login embebido). Escribir el marcador ahí es afirmar
+      // "no promocionó" sobre algo que nunca se vio — pasó el 02/08 con 4 creadoras.
+      // El scraper actual ya ni las manda; esta guarda es para cualquier otro cliente
+      // del ingest, porque quien ESCRIBE es esta función y acá tiene que decidirse.
+      if (posts.length === 0 && it.legible !== false) {
         await sb.from("promolog_entries").insert({
           dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(),
           promoted: "false", network: "facebook", platform: "Ninguna",
@@ -382,7 +393,45 @@ Deno.serve(async (req: Request) => {
       promotedTotal += promo;
       out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins, ya_analizados: yaVistos });
     }
-    return json({ ok: true, mode: "ingest", source: "local", inserted, promoted: promotedTotal, results: out });
+
+    // ── INFORME DE LA CORRIDA ─────────────────────────────────────────────────
+    // Facebook era la única red local que NO registraba corrida: ni el panel ni el
+    // bot podían ver un scan de FB, y lo ilegible no quedaba en ningún lado.
+    // Mismo formato que telegram-scan a propósito, para que el bot lea las cuatro
+    // redes igual (get_promolog_scan_report).
+    const noLegibles = Array.isArray(body.unreadable) ? body.unreadable as Array<any> : [];
+    const acumulado = (body.acumulado ?? null) as any;
+    const esFinal = body.final !== false;
+    const conPromo = out.filter((r: any) => r.promoted > 0);
+    const sinPromo = out.filter((r: any) => r.promoted === 0 && r.posts > 0);
+    const sinPosts = out.filter((r: any) => r.posts === 0);
+    const resumen = {
+      red: "facebook", origen: "agente local",
+      paginas_leidas: out.length + (acumulado?.leidos ?? 0),
+      con_promo: conPromo.length + (acumulado?.con_promo ?? 0),
+      sin_promo: sinPromo.length + (acumulado?.sin_promo ?? 0),
+      leidos_sin_posts: sinPosts.length + (acumulado?.leidos_sin_posts ?? 0),
+      no_legibles: noLegibles.length,
+      detalle_con_promo: [...(acumulado?.detalle_con_promo ?? []), ...conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted }))],
+      // Con motivo, no genérico: "no la seguimos" se arregla siguiéndola, "muro de
+      // login" es re-loguear y "no existe" es corregir el handle en Maven.
+      detalle_no_legibles: noLegibles.map((u: any) => ({ handle: u.handle ?? u.source_handle, motivo: u.reason ?? "desconocido" })),
+    };
+    if (esFinal) {
+      // Los totales van sobre TODA la corrida (acumulado + esta tanda), no sobre la
+      // última: contar solo la última tanda y presentarlo como el total es el mismo
+      // antipatrón de "la muestra publicada como universo".
+      await sb.from("promolog_dispatch_runs").insert({
+        tenant_id: TENANT_ID, apify_actor_id: "local-agent", status: "succeeded",
+        creators_count: resumen.paginas_leidas + noLegibles.length,
+        creators_succeeded: resumen.paginas_leidas,
+        creators_failed: noLegibles.length,
+        entries_created: inserted + (acumulado?.insertadas ?? 0),
+        payload: { source: "local", network: "facebook", resumen },
+        finished_at: new Date().toISOString(),
+      });
+    }
+    return json({ ok: true, mode: "ingest", source: "local", inserted, promoted: promotedTotal, resumen, results: out });
   }
 
   if (!APIFY_TOKEN) return json({ error: "falta APIFY_TOKEN" }, 500);
