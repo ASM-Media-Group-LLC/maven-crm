@@ -123,6 +123,34 @@ async function extractPosts(page, desdeMs) {
   return salida;
 }
 
+/** Identificador de la página para armar la URL del visor de historias.
+ *  `mode=targets` manda {handle, url} y el handle puede venir en tres formas:
+ *  username pelado, URL completa, o profile.php?id=<número>. Las tres se
+ *  reducen a lo que /stories/<id> necesita. */
+export function idDeFacebook(target) {
+  const bruto = String(target?.handle || target?.url || "").trim();
+  if (!bruto) return null;
+  const numerico = bruto.match(/(?:profile\.php\?id=|\/)(\d{5,})/);
+  if (numerico) return numerico[1];
+  const conUrl = bruto.match(/facebook\.com\/([^/?#]+)/i);
+  const user = (conUrl ? conUrl[1] : bruto).replace(/^@+/, "").trim();
+  return /^[A-Za-z0-9._-]+$/.test(user) ? user : null;
+}
+
+/** Clave ESTABLE a partir de una URL de Facebook.
+ *
+ *  Las URLs de imagen de fbcdn traen tokens que cambian en CADA lectura
+ *  (`oe=`, `oh=`, `_nc_ht`…): usarlas como identidad hace que el mismo contenido
+ *  entre otra vez en cada corrida. Nos quedamos con el path, que sí identifica al
+ *  archivo, y descartamos la query entera.
+ */
+export function claveEstableFb(url) {
+  const s = String(url || "").trim();
+  if (!s) return null;
+  try { const u = new URL(s); return `${u.origin}${u.pathname}`; }
+  catch { return s.split("?")[0] || null; }
+}
+
 /** "hace 2 h" / "2 h" / "31 de julio de 2026 a las 21:40" / "Yesterday at 9:40 PM"
  *  → epoch ms, o null si no se entiende (y entonces el post se descarta). */
 export function parseFechaFb(txt) {
@@ -144,6 +172,89 @@ export function parseFechaFb(txt) {
   // Absolutas: dejamos que Date las intente (FB suele dar formato local completo).
   const d = Date.parse(txt);
   return Number.isFinite(d) ? d : null;
+}
+
+/** ⚠️ SEGUNDO PUNTO A TUNEAR. Lee las HISTORIAS (stories) de la página.
+ *
+ *  Por qué importan: en Facebook, igual que en Instagram, la promo del OF suele ir
+ *  en la historia —efímera, con sticker de link— y no en el muro. El actor de
+ *  Apify que usa el cron es `facebook-posts-scraper`: SOLO muro. O sea que las
+ *  historias de Facebook nunca se escanearon, por ningún camino.
+ *
+ *  Casi siempre son IMAGEN sin texto, así que el veredicto lo va a dar la VISIÓN
+ *  del edge (que ya corre cuando hay imagen y el texto no dio señal). Acá solo
+ *  hay que traerlas bien identificadas.
+ *
+ *  ⚠️ CLAVE ESTABLE: se prefiere la URL de la historia (trae su id y no cambia).
+ *  Si no se puede leer, se cae al path de la imagen SIN la query — nunca a la URL
+ *  completa de fbcdn, que trae tokens nuevos en cada lectura y duplicaría la fila
+ *  en cada corrida.
+ *
+ *  ⚠️ EFECTO REAL: abrir el visor MARCA LA HISTORIA COMO VISTA. La creadora va a
+ *  ver a esta cuenta en su lista de espectadores. Es inevitable leyendo por
+ *  navegador; hay que decidirlo, no descubrirlo.
+ */
+async function extractStories(page, target, desdeMs, log) {
+  const historias = [];
+  const vistas = new Set();
+  const id = idDeFacebook(target);
+  if (!id) return historias;
+  try {
+    await page.goto(`https://www.facebook.com/stories/${encodeURIComponent(id)}`,
+      { waitUntil: "domcontentloaded", timeout: PACING.navTimeoutMs });
+  } catch { return historias; }
+
+  // Sin visor abierto = no hay historias activas. No es un error.
+  try { await page.waitForSelector('[role="dialog"], [data-pagelet*="Stories"], video, img', { timeout: 8000 }); }
+  catch { return historias; }
+
+  for (let i = 0; i < 20; i++) {
+    await sleep(900 + Math.random() * 600);
+    const actual = await page.evaluate(() => {
+      const dlg = document.querySelector('[role="dialog"]') || document.body;
+      // Imagen grande = el contenido de la historia (se descartan íconos/avatares).
+      let media = null, w = 0;
+      for (const img of dlg.querySelectorAll("img")) {
+        const src = img.getAttribute("src") || "";
+        if (!src || /emoji|rsrc\.php|static\.xx/.test(src)) continue;
+        const ancho = img.naturalWidth || img.width || 0;
+        if (ancho > w) { w = ancho; media = src; }
+      }
+      const video = dlg.querySelector("video");
+      // Texto sobreimpreso + links del sticker.
+      const texto = (dlg.innerText || "").slice(0, 1500);
+      const links = [];
+      for (const a of dlg.querySelectorAll("a[href]")) {
+        const h = a.getAttribute("href") || "";
+        const m = h.match(/[?&]u=([^&]+)/);
+        const real = m ? decodeURIComponent(m[1]) : h;
+        if (/^https?:\/\//.test(real) && !/facebook\.com/.test(real)) links.push(real);
+      }
+      return { media: media || (video?.getAttribute("poster") ?? null), texto, links, url: location.href };
+    });
+
+    const clave = claveEstableFb(actual.url) || claveEstableFb(actual.media);
+    if (!clave || vistas.has(clave)) break;      // el visor dejó de avanzar → terminamos
+    vistas.add(clave);
+
+    if (actual.media || actual.links.length) {
+      historias.push({
+        text: actual.texto,
+        permalink: clave,                        // clave estable, no la URL con tokens
+        // El visor no expone la hora de publicación de forma legible. Una historia
+        // ACTIVA dura 24h por definición, así que se registra como de ahora: es la
+        // misma suposición que hace el scan de Instagram y es correcta por diseño.
+        date: new Date().toISOString(),
+        imageUrl: actual.media,
+        link: actual.links[0] || null,
+        es_historia: true,
+      });
+    }
+    // Avanzar. ArrowRight es lo más estable del visor de FB.
+    await page.keyboard.press("ArrowRight").catch(() => {});
+  }
+  if (historias.length) log(`   📖 ${historias.length} historia(s)`);
+  return historias;
 }
 
 // Refleja el veredicto del server y acumula los totales de la tanda.
@@ -193,9 +304,15 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
         try { await page.waitForSelector('[role="article"]', { timeout: 15000 }); } catch { /* muro sin posts visibles */ }
         await sleep(1200 + Math.random() * 1200);
         const posts = await extractPosts(page, desdeMs);
-        batch.push({ creator_id: t.creator_id, source_handle: etiqueta, posts });
-        log(`${posts.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts`);
-        onResult({ handle: etiqueta, outcome: posts.length ? "historias" : "sin_promo", stories: posts.length, red: "facebook" });
+        // Las HISTORIAS van en el mismo lote: para promolog la pregunta es
+        // "¿promocionó hoy?", y da igual si fue por muro o por historia. El edge
+        // las clasifica con la misma regla (y con visión, que es lo que decide en
+        // una historia, que casi siempre es imagen sin texto).
+        const stories = await extractStories(page, t, desdeMs, log);
+        const todo = [...posts, ...stories];
+        batch.push({ creator_id: t.creator_id, source_handle: etiqueta, posts: todo });
+        log(`${todo.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts · ${stories.length} historias`);
+        onResult({ handle: etiqueta, outcome: todo.length ? "historias" : "sin_promo", stories: todo.length, red: "facebook" });
       } catch (e) {
         // No se pudo abrir → NO se manda como "sin posts" (sería un No falso).
         acc.no_legibles++;

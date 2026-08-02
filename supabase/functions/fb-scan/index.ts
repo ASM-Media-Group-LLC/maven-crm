@@ -357,7 +357,12 @@ Deno.serve(async (req: Request) => {
           notes: (postText(p) || "").slice(0, 2000) || null,
           evidence_url: durable || permalink || firstImage || null,
           story_media_url: dedupKey,
-          analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: reason,
+          // Historias vs muro: la pregunta de promolog ("¿promocionó hoy?") es la
+          // misma, pero conviene saber POR DÓNDE — el actor de Apify solo lee muro,
+          // así que una promo hallada en historia es cobertura que el cron no tiene.
+          story_pk: p?.es_historia ? clave : null,
+          analyzed_by_ai: true, ai_model: "regla-texto-fb",
+          ai_reasoning: p?.es_historia ? `historia · ${reason}` : reason,
           source_handle: (it.source_handle || "").trim() || null,
           story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
         });
