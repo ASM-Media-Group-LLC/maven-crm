@@ -12,6 +12,7 @@ import { runTelegram } from "./tg-scraper.mjs";
 import { runJoin } from "./tg-join.mjs";
 import { runX } from "./x-scraper.mjs";
 import { NETWORKS, accountsOf, addAccount, removeAccount, sessionPath } from "./accounts.mjs";
+import { getSchedules, setSchedule, marcarCorrida, vencidas, proximaCorrida, INTERVALOS } from "./schedules.mjs";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PORT = Number(process.env.UI_PORT || 4599);
@@ -51,11 +52,14 @@ async function refrescarUltimasCorridas() {
 
 function statusPayload() {
   const cds = readCooldowns();
+  const sch = getSchedules();
   return {
     running, token_ok: !!EXT_TOKEN, cron_ok: !!CRON_TOKEN,
+    intervalos: INTERVALOS,
     networks: NETWORKS.map((net) => ({
       network: net, label: NET_LABEL[net],
       ultima_corrida: ultimasCorridas.redes?.[net] ?? null,
+      programacion: { ...sch[net], proxima: proximaCorrida(sch[net]) },
       accounts: accountsOf(net).map((a, i) => {
         const si = sessionInfo(sessionPath(a.session));
         const cd = cds[a.id] && Date.now() < cds[a.id] ? cds[a.id] : null;
@@ -68,6 +72,9 @@ function statusPayload() {
 
 async function runScan(network, onlyIds) {
   if (running) return;
+  // El intervalo se cuenta desde la última lectura REAL, sea automática o a mano:
+  // si acabás de escanear Telegram, el reloj no lo repite 3 minutos después.
+  marcarCorrida(network);
   running = true; stopFlag = false; lastResults = [];
   broadcast("status", statusPayload());
   let accts = accountsOf(network);
@@ -136,6 +143,17 @@ const server = createServer(async (req, res) => {
     } catch (e) { return json(res, 500, { ok: false, error: e.message }); }
   }
 
+  // programación automática:  POST /api/schedule/<network>  {activo?, cada_horas?, desde?, hasta?}
+  if (req.method === "POST" && parts[1] === "schedule") {
+    const network = parts[2];
+    if (!NETWORKS.includes(network)) return json(res, 404, { ok: false, error: "red" });
+    try {
+      setSchedule(network, await readBody(req));
+      broadcast("status", statusPayload());
+      return json(res, 200, { ok: true });
+    } catch (e) { return json(res, 400, { ok: false, error: e.message }); }
+  }
+
   // escanear:  POST /api/scan/<network>  {ids?}
   if (req.method === "POST" && parts[1] === "scan") {
     const network = parts[2];
@@ -173,4 +191,17 @@ server.on("error", (e) => {
   console.error(`\n⚠️  No se pudo levantar el panel: ${e.message}\n`);
   process.exit(1);
 });
+// ── RELOJ DE LAS CORRIDAS AUTOMÁTICAS ──────────────────────────────────────
+// Un tick por minuto: barato, y con intervalos de horas no hace falta más fino.
+// Dispara UNA red por vez porque hay un solo navegador y un solo lock: si hay dos
+// vencidas, la segunda sale en el tick siguiente (no se pierde, se corre después).
+// Si ya hay una corrida en curso —automática o lanzada a mano— no se toca nada.
+setInterval(() => {
+  if (running) return;
+  const [red] = vencidas();
+  if (!red) return;
+  log(`⏰ corrida automática de ${NET_LABEL[red] ?? red}`);
+  runScan(red, null).catch((e) => log(`⏰ ${red} falló: ${e.message}`));
+}, 60_000);
+
 server.listen(PORT, () => console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}\n`));

@@ -53,6 +53,27 @@
   .ultima .n.si  { color:var(--ok); }
   .ultima .n.bad { color:var(--bad); }
   .ultima.sindatos { color:var(--mut); }
+
+  /* ── Programación automática ───────────────────────────────────────────────
+     Fila de controles, no tarjeta aparte: es una PROPIEDAD de la red, no otra
+     sección. Apagada queda en gris y sin ruido; encendida se destaca sola. */
+  .auto { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+          border:1px dashed var(--line); border-radius:10px; padding:8px 11px;
+          margin-bottom:12px; font-size:13px; color:var(--mut); }
+  .auto.on { border-style:solid; border-color:color-mix(in srgb, var(--ok) 45%, var(--line)); color:var(--fg); }
+  .auto select, .auto input[type=time] { font:inherit; font-size:13px; padding:3px 6px; border-radius:7px;
+          border:1px solid var(--line); background:var(--card); color:var(--fg); }
+  .auto .proxima { margin-left:auto; font-variant-numeric:tabular-nums; }
+  /* El switch es un checkbox real: navegable con teclado y con foco visible. */
+  .sw { position:relative; display:inline-block; width:36px; height:20px; flex:none; }
+  .sw input { opacity:0; width:0; height:0; }
+  .sw span { position:absolute; inset:0; background:var(--line); border-radius:20px; transition:background .15s; cursor:pointer; }
+  .sw span::before { content:""; position:absolute; width:14px; height:14px; left:3px; top:3px;
+          background:#fff; border-radius:50%; transition:transform .15s; }
+  .sw input:checked + span { background:var(--ok); }
+  .sw input:checked + span::before { transform:translateX(16px); }
+  .sw input:focus-visible + span { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce){ .sw span, .sw span::before { transition:none; } }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:600; }
@@ -137,6 +158,30 @@ function ultimaCorrida(u){
   </div>`;
 }
 
+// Controles de corrida automática. `intervalos` viene del server para no tener
+// la lista duplicada en dos archivos.
+function bloqueAuto(net, intervalos){
+  const p = net.programacion || {};
+  const on = !!p.activo;
+  const opts = (intervalos||[1,2,3,4,6,8,12,24]).map(h =>
+    `<option value="${h}" ${Number(p.cada_horas)===h?"selected":""}>cada ${h} h</option>`).join("");
+  // Con el reloj apagado, mostrar "próxima" sería mentira; se muestra solo si corre.
+  const prox = on && p.proxima
+    ? `<span class="proxima">próxima ${new Date(p.proxima).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit",hour12:false})}</span>`
+    : "";
+  return `<div class="auto ${on?"on":""}">
+    <label class="sw"><input type="checkbox" data-auto="${net.network}" ${on?"checked":""}
+      aria-label="Corridas automáticas de ${net.label}"><span></span></label>
+    <span>Automático</span>
+    <select data-cada="${net.network}" ${on?"":"disabled"}>${opts}</select>
+    <span>entre</span>
+    <input type="time" data-desde="${net.network}" value="${p.desde||"06:00"}" ${on?"":"disabled"}>
+    <span>y</span>
+    <input type="time" data-hasta="${net.network}" value="${p.hasta||"23:59"}" ${on?"":"disabled"}>
+    ${prox}
+  </div>`;
+}
+
 function render(st){
   $("#warn").style.display = (st.token_ok && st.cron_ok) ? "none" : "block";
   $("#warn").textContent = !st.token_ok ? "⚠️ Falta PROMOLOG_EXT_TOKEN en el .env." : (!st.cron_ok ? "⚠️ Falta CRON_INTERNAL_TOKEN (lo usan Telegram y X)." : "");
@@ -157,6 +202,7 @@ function render(st){
     return `<div class="net"><h2>${EMO[net.network]} ${net.label} <span class="muted" style="font-weight:400">· ${net.accounts.length} cuenta(s)</span></h2>
       <div class="netsub">${NOTE[net.network]}</div>
       ${ultimaCorrida(net.ultima_corrida)}
+      ${bloqueAuto(net, st.intervalos)}
       <div class="accts">${accts}</div>
       <div class="netactions">
         <button data-scan="${net.network}" ${busy?"disabled":""}>▶︎ Escanear ${net.label}</button>
@@ -207,6 +253,20 @@ document.addEventListener("click", async (e) => {
   // de Telegram, y esta cuenta es la única que ve los canales privados.
   else if (d.tgjoin){ await post("/api/tg-join", { join:true, max:4 }); }
   else if (t.id==="stop"){ await post("/api/stop"); }
+});
+
+// Programación automática. Va por "change" y no por "click" porque son selects e
+// inputs; el switch entra igual (un checkbox emite change).
+document.addEventListener("change", async (e) => {
+  const d = e.target.dataset || {};
+  const red = d.auto || d.cada || d.desde || d.hasta;
+  if (!red) return;
+  const patch = d.auto   ? { activo: e.target.checked }
+              : d.cada   ? { cada_horas: Number(e.target.value) }
+              : d.desde  ? { desde: e.target.value }
+              :            { hasta: e.target.value };
+  await post(`/api/schedule/${red}`, patch);
+  await refresh();
 });
 </script>
 </body>
