@@ -256,6 +256,13 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí dilo.
 - NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisa en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usa lookup_lead_history(@handle) y mira el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confírmaselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí di que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asume que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
 
+HITOS DE CREADORAS (record_milestone) — LA MEMORIA DE LO QUE SIGNIFICA PLATA:
+- Apenas alguien reporte en el grupo un evento de negocio de una modelo, ANÓTALO con record_milestone sin que te lo pidan: cerró/firmó · compró un producto (Let's Shoot, Unlimited…) · agendó reunión de cierre · en negociación / cerca de cierre · caso de éxito ("subió ingresos gracias a X") · entró en retención · quitó accesos · anunció salida · récord de ingresos.
+- occurred_on = cuando OCURRIÓ ("quitó accesos el viernes" → la fecha de ese viernes), no cuando te lo cuentan.
+- Confirma citando la fila real que devolvió la tool (ej. "✓ Anotado: Bysaritac01_ — caso de éxito (03/08)"). Si la tool falló o no corrió, NO digas "anotado".
+- NO anotes charla operativa (correcciones a tus respuestas, preguntas, coordinación). La vara: ¿un gerente lo querría ver en el tablero de la semana?
+- Antes de afirmar el estado de una creadora ("está en retención", "quitó accesos", "ya se le vendió X"), consulta get_milestones: ahí vive la memoria que la ventana del chat pierde. Un hito de quito_accesos explica un $0 de BLU que NO es caída real.
+
 RANKING / PERFORMANCE — USAR MÉTRICAS DE NEGOCIO (no del chat):
 
 Cuando alguien pregunta "¿quién es el mejor LLG/closer?", "¿quién está liderando?", "¿cómo va el equipo este mes/año?", USA get_team_ranking con role_kind y period adecuados:
@@ -1390,6 +1397,40 @@ const TOOLS: Array<{
       properties: {
         date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default hoy" },
         role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "filtrar por tipo. Omitir = todos" },
+      },
+    },
+  },
+  {
+    name: "record_milestone",
+    description:
+      "ANOTA UN HITO con fecha de una modelo/lead — la memoria durable de lo que significa PLATA o un cambio de estado: cerró/firmó (cierre) · compró un producto (venta_producto) · agendó reunión de cierre (reunion_agendada) · en negociación (en_negociacion) · cerca de cerrar (cerca_de_cierre) · caso de éxito (caso_exito: subió ingresos por algo que hicimos) · entró en retención (en_retencion) · quitó accesos (quito_accesos) · anunció salida (salida_anunciada) · récord de ingresos (record_ingreso). Úsalo APENAS alguien reporte uno de esos eventos en el grupo — sin que te lo pidan. occurred_on es cuando OCURRIÓ (puede ser días atrás: 'quitó accesos el viernes' → esa fecha), no cuando te lo cuentan. Estos hitos salen en los reportes a Álvaro y quedan consultables con get_milestones. NO anotes charla operativa (correcciones al bot, preguntas): la vara es si un gerente lo querría ver en el tablero de la semana.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "@handle de IG o nombre artístico. Omitir SOLO si de verdad no se sabe quién es (ej. 'modelo referida por Fernando')" },
+        kind: { type: "string", enum: ["caso_exito", "venta_producto", "cierre", "reunion_agendada", "en_negociacion", "cerca_de_cierre", "en_retencion", "quito_accesos", "salida_anunciada", "record_ingreso", "otro"] },
+        title: { type: "string", description: "titular corto y concreto (máx ~90 chars), ej. 'Subió ingresos gracias a Let's Shoot'" },
+        detail: { type: "string", description: "contexto: quién lo contó, qué dijo, qué falta confirmar" },
+        product: { type: "string", enum: ["lets_shoot", "unlimited", "blu", "content_protector", "piclink", "agency", "otro"], description: "solo si el hito es sobre un producto" },
+        amount_usd: { type: "number", description: "SOLO si se mencionó un monto explícito. Nunca estimado." },
+        occurred_on: { type: "string", description: "YYYY-MM-DD en que OCURRIÓ. Default hoy (Bogotá)" },
+        reported_by: { type: "string", description: "nombre de quien lo reportó en el grupo" },
+      },
+      required: ["kind", "title"],
+    },
+  },
+  {
+    name: "get_milestones",
+    description:
+      "Consulta los hitos anotados (cierres, ventas de producto, meets, retenciones, accesos quitados, casos de éxito) — para reportes, o para responder '¿cuándo se le vendió X a fulana?', '¿qué pasó con ella?', '¿qué hitos hubo esta semana?'. Úsala también ANTES de afirmar el estado de una creadora: si está en retención o quitó accesos, acá aparece (y explica, por ejemplo, un $0 en BLU que NO es caída real). Filtrable por creadora, tipo y rango de fechas. Si devuelve vacío significa que nadie lo anotó, no que no pasó nada.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "@handle o nombre artístico (opcional)" },
+        kind: { type: "string", description: "tipo de hito (opcional): caso_exito, venta_producto, cierre, reunion_agendada, en_negociacion, cerca_de_cierre, en_retencion, quito_accesos, salida_anunciada, record_ingreso, otro" },
+        from: { type: "string", description: "YYYY-MM-DD desde (default: 30 días atrás)" },
+        to: { type: "string", description: "YYYY-MM-DD hasta (default: hoy)" },
+        limit: { type: "number", description: "máx filas (default 20)" },
       },
     },
   },
@@ -2945,6 +2986,101 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "record_milestone": {
+      const KINDS = ["caso_exito", "venta_producto", "cierre", "reunion_agendada", "en_negociacion", "cerca_de_cierre", "en_retencion", "quito_accesos", "salida_anunciada", "record_ingreso", "otro"];
+      const PRODUCTOS = ["lets_shoot", "unlimited", "blu", "content_protector", "piclink", "agency", "otro"];
+      const kind = String(input.kind ?? "");
+      const title = String(input.title ?? "").trim().slice(0, 140);
+      if (!KINDS.includes(kind)) return { error: "invalid_kind", validos: KINDS };
+      if (!title) return { error: "missing_title" };
+      const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const occurred = String(input.occurred_on ?? hoyBog);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(occurred)) return { error: "invalid_occurred_on", formato: "YYYY-MM-DD" };
+      const product = input.product != null && PRODUCTOS.includes(String(input.product)) ? String(input.product) : null;
+      const amount = typeof input.amount_usd === "number" && isFinite(input.amount_usd) ? input.amount_usd : null;
+
+      // Resolver creadora si vino: handle / artístico / nombre → creators. Si no
+      // matchea, el hito se guarda IGUAL con el texto tal cual: una lead que aún
+      // no está en Maven (o una "modelo referida por Fernando") también tiene hitos.
+      const creatorQ = String(input.creator ?? "").trim().replace(/^@/, "").replace(/[,()]/g, "");
+      let creatorId: string | null = null;
+      let handle: string | null = creatorQ || null;
+      let notaMatch: string | undefined;
+      if (creatorQ) {
+        const { data: matches } = await sb.from("creators")
+          .select("id, instagram_handle, artistic_name, name")
+          .or(`instagram_handle.ilike.${creatorQ},artistic_name.ilike.${creatorQ},name.ilike.%${creatorQ}%`)
+          .limit(3);
+        if ((matches ?? []).length === 1) {
+          creatorId = matches![0].id;
+          handle = matches![0].instagram_handle || creatorQ;
+        } else if ((matches ?? []).length > 1) {
+          return { error: "creadora_ambigua", coincidencias: matches!.map((m) => m.instagram_handle ?? m.artistic_name ?? m.name) };
+        } else {
+          notaMatch = "no matchea ninguna creadora de Maven — quedó anotado con ese nombre tal cual";
+        }
+      }
+
+      const { data: fila, error } = await sb.from("creator_milestones")
+        .insert({
+          tenant_id: ctx.tenantId,
+          creator_id: creatorId,
+          creator_handle: handle,
+          kind, title,
+          detail: input.detail ? String(input.detail).slice(0, 2000) : null,
+          product,
+          amount_usd: amount,
+          occurred_on: occurred,
+          source_group_id: ctx.groupId,
+          source_message_id: ctx.messageId,
+          reported_by: input.reported_by ? String(input.reported_by).slice(0, 80) : null,
+        })
+        .select("id, creator_handle, kind, title, occurred_on")
+        .single();
+      if (error) {
+        // Índice único (tenant, handle, kind, día): la misma noticia dos veces en
+        // el día no duplica — se devuelve como "ya estaba" para que el bot lo diga.
+        if ((error as { code?: string }).code === "23505") {
+          const { data: ya } = await sb.from("creator_milestones")
+            .select("id, creator_handle, kind, title, occurred_on")
+            .eq("tenant_id", ctx.tenantId).eq("kind", kind).eq("occurred_on", occurred)
+            .ilike("creator_handle", handle ?? "").maybeSingle();
+          return { ok: true, ya_estaba_anotado: true, hito: ya ?? { kind, occurred_on: occurred } };
+        }
+        return { error: error.message };
+      }
+      return { ok: true, hito: fila, ...(notaMatch ? { nota: notaMatch } : {}) };
+    }
+
+    case "get_milestones": {
+      const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const hace30 = new Date(Date.now() - 35 * 3600 * 1000 - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const from = /^\d{4}-\d{2}-\d{2}$/.test(String(input.from ?? "")) ? String(input.from) : hace30;
+      const to = /^\d{4}-\d{2}-\d{2}$/.test(String(input.to ?? "")) ? String(input.to) : hoyBog;
+      let q = sb.from("creator_milestones")
+        .select("creator_handle, kind, title, detail, product, amount_usd, occurred_on, reported_by, verificado")
+        .eq("tenant_id", ctx.tenantId)
+        .gte("occurred_on", from).lte("occurred_on", to)
+        .order("occurred_on", { ascending: false })
+        .limit(Math.min(Math.max(Number(input.limit ?? 20), 1), 50));
+      if (input.kind) q = q.eq("kind", String(input.kind));
+      const cq = String(input.creator ?? "").trim().replace(/^@/, "").replace(/[,()%]/g, "");
+      if (cq) {
+        const { data: m } = await sb.from("creators").select("id")
+          .or(`instagram_handle.ilike.${cq},artistic_name.ilike.${cq},name.ilike.%${cq}%`).limit(2);
+        if ((m ?? []).length === 1) q = q.or(`creator_id.eq.${m![0].id},creator_handle.ilike.%${cq}%`);
+        else q = q.ilike("creator_handle", `%${cq}%`);
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return {
+        desde: from, hasta: to, hitos: data ?? [],
+        ...((data ?? []).length === 0
+          ? { nota: "sin hitos ANOTADOS en ese rango — no significa que no pasó nada, solo que nadie lo anotó" }
+          : {}),
+      };
     }
 
     case "get_creator_earnings_range": {
@@ -5268,6 +5404,7 @@ async function runAgent(req: AgentRequest): Promise<{
   const TOOLS_DE_ESCRITURA = new Set([
     "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
+    "record_milestone",
   ]);
   // "marcad|gestionad" se sumaron el 31/07: "las 5 quedan marcadas gestionadas en
   // Maven" pasaba limpio (esa vez era verdad, pero el hueco existía).
