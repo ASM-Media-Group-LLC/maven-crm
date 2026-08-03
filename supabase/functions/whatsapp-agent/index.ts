@@ -730,9 +730,12 @@ Régimen pedido por Álvaro (03/08): en los cortes (9am·11am·1pm·3pm·5pm·7p
 - UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
 
 CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
-- Es el resumen del DÍA completo: qué se logró, avances reales, y la *NOTA de 1 a 10 por persona* (con decimales) por participación + avance real. Una línea por persona: nota + razón corta. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos).
-- El Hubstaff del equipo (viene en el initial_user_message) entra a la nota Y se muestra: día completo trackeado suma, actividad muy baja resta. Puedes consultar tools (reportes del día, pipeline) para calibrar el resto.
-- Tono: jefe cercano, exigente y justo. Cierra con el objetivo de mañana en una línea.
+- Es el RESUMEN TOTAL del día: lo que cada quien COMUNICÓ, qué se logró, avances reales — y la *NOTA de 1 a 10 por persona* (con decimales). Una línea por persona: nota + razón corta.
+- Regla de Álvaro (03/08), inclúyela SIEMPRE textual en el cierre: "*Recuerden: lo que no se comunica por acá, no cuenta.*" — el resumen y la nota salen de lo comunicado.
+- La nota sale de los INSUMOS OBJETIVOS que vienen en el initial_user_message (nota_sugerida = fórmula fija con participación + Hubstaff + avance real del rol). Ajuste máximo ±0.5 y siempre con la razón dicha. A los marcados 'sin_metricas_tabla' (ej. warming de cuentas) evalúales el avance por lo que contaron en el grupo.
+- El Hubstaff del equipo (viene en el initial_user_message) entra a la nota Y se muestra: día completo trackeado suma, actividad muy baja resta.
+- Si vino el BLOQUE SEMANAL (viernes), publica después de las notas el "*Resultado de la semana*": promedio 7 días por persona + tendencia en una palabra.
+- Tono: jefe cercano, exigente y justo. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos). Cierra con el objetivo de mañana en una línea.
 
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - El bot está escuchando el grupo y NO fue mencionado explícitamente. Por defecto el bot debe quedarse CALLADO.
@@ -5065,6 +5068,26 @@ async function buildInitialUserMessage(args: {
         : m.body;
       if (texto) lines.push(`[${m.sent_at}] ${sender}: ${texto}`);
     }
+    // CIERRE: insumos objetivos por persona (participación en franjas, Hubstaff,
+    // avance real del ROL) + nota sugerida con fórmula fija, calculados y
+    // PERSISTIDOS por corte_cierre_prep (la persistencia alimenta el semanal de
+    // los viernes que pidió Álvaro). Inyectados para que la nota NO dependa de
+    // que el modelo llame tools.
+    if (esCierre) {
+      const { data: prep } = await sb.rpc("corte_cierre_prep", { p_group_id: args.groupId });
+      const prepObj = (prep ?? null) as { personas?: unknown[]; semana?: unknown[] | null } | null;
+      if (prepObj?.personas?.length) {
+        lines.push("");
+        lines.push("INSUMOS OBJETIVOS POR PERSONA (Maven + Hubstaff; nota_sugerida = fórmula fija de participación + Hubstaff + avance del rol). La nota FINAL se basa en ESTO: puedes ajustar máximo ±0.5 diciendo la razón (ej. 'destrabó las cuentas', 'cerró venta'). 'sin_metricas_tabla' = su rol no deja rastro en tablas (ej. warming de cuentas): su avance evalúalo por lo que contó en el grupo.");
+        lines.push(JSON.stringify(prepObj.personas));
+      }
+      if (prepObj?.semana?.length) {
+        lines.push("");
+        lines.push("BLOQUE SEMANAL (hoy es viernes — pedido de Álvaro): promedio de nota de los últimos 7 días por persona. Publícalo DESPUÉS de las notas del día como '*Resultado de la semana*', con promedio y una palabra de tendencia:");
+        lines.push(JSON.stringify(prepObj.semana));
+      }
+    }
+
     // Hubstaff del equipo de ESTE grupo — Álvaro pidió (03/08) que salga también
     // en el corte público, al lado de cada persona. Inyectado acá para que no
     // dependa de que el modelo llame una tool.
