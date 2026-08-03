@@ -13,7 +13,10 @@
 -- Daniel sacaba 8.0 con 0/3 números de su meta y los roles sin métrica llegaban
 -- a 8.4 solo por hablar):
 --   nota = 5.0 + 1.0·(franjas/5) + 1.0·hub + 3.0·avance → clamp [1,10]
---   hub    = 0.7·min(horas/7,1) + 0.3·min(act%/50,1)
+--   hub    = 0.7·min(horas/7,1) + 0.3·min(act%/50,1) · v1.2: hub_h NULL (persona
+--            SIN cuenta de Hubstaff, ej. Juanse) ⇒ el componente se reemplaza por
+--            participación — no se castiga lo que no puede tener; el bloque
+--            público dice "sin cuenta de Hubstaff (no aplica)" en vez de "sin fichar".
 --   avance = por rol (warming contactos: números vs meta 3 + textos · contenido:
 --            piezas · managers: contactadas + promos roster · ventas: won hoy
 --            1.0 > confirmada 0.85 > contactos). Sin métrica en tablas (Brayan,
@@ -36,7 +39,8 @@ create or replace function public.corte_nota_formula(
   select round(greatest(1.0, least(10.0,
     5.0
     + 1.0 * (p_franjas / 5.0)
-    + 1.0 * (0.7 * least(p_hub_h / 7.0, 1) + 0.3 * least(coalesce(p_hub_act,0) / 50.0, 1))
+    + 1.0 * (case when p_hub_h is null then p_franjas / 5.0
+                  else 0.7 * least(p_hub_h / 7.0, 1) + 0.3 * least(coalesce(p_hub_act,0) / 50.0, 1) end)
     + 3.0 * coalesce(p_avance, 0.75 * p_franjas / 5.0)
   ))::numeric, 1)
 $f$;
