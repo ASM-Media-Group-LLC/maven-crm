@@ -44,11 +44,18 @@ const FLUSH_EVERY = 6;
 // filtro se insertaban promos con fecha 2024-12-11, 2025-08-31, 2026-01-12…, o
 // sea días de promo RETROACTIVOS en meses ya cerrados (verificado en la corrida
 // del 31/07). El path server-side (Apify) ya filtra por `start`; este también.
+// Devuelve { tweets, articulos, delPerfil, sinFecha, fueraVentana }.
+// ⚠️ Los contadores no son adorno: "0 tweets" esconde cuatro causas que se arreglan
+// distinto —no tuiteó / no cargó el timeline / los tweets son de otra cuenta (handle
+// mal cargado en Maven o renombrado) / no se les pudo leer la fecha— y las cuatro
+// terminaban guardadas como "no promocionó".
 async function extractTweets(page, handle, hours = 24) {
   const desde = Date.now() - hours * 3600e3;
-  const all = await page.evaluate((h) => {
+  const { out: all, articulos } = await page.evaluate((h) => {
     const out = [];
+    let articulos = 0;
     for (const art of document.querySelectorAll("article")) {
+      articulos++;
       const textEl = art.querySelector('[data-testid="tweetText"]');
       const text = textEl ? textEl.innerText : "";
       const linkEl = art.querySelector('a[href*="/status/"]');
@@ -62,12 +69,16 @@ async function extractTweets(page, handle, hours = 24) {
         out.push({ text, permalink, date, imageUrl });
       }
     }
-    return out.slice(0, 20);
+    return { out: out.slice(0, 20), articulos };
   }, handle);
-  return all.filter((t) => {
+  let sinFecha = 0, fueraVentana = 0;
+  const tweets = all.filter((t) => {
     const ts = Date.parse(t.date || "");
-    return Number.isFinite(ts) && ts >= desde;   // sin fecha legible → fuera (no inventamos)
+    if (!Number.isFinite(ts)) { sinFecha++; return false; }   // sin fecha legible → fuera (no inventamos)
+    if (ts < desde) { fueraVentana++; return false; }
+    return true;
   });
+  return { tweets, articulos, delPerfil: all.length, sinFecha, fueraVentana };
 }
 
 
@@ -151,37 +162,47 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
       // El timeline es lazy: esperar a que aparezca el primer <article>.
       try { await page.waitForSelector("article", { timeout: 15000 }); } catch { /* perfil sin tweets visibles */ }
       await sleep(1200 + Math.random() * 1000);
-      const tweets = await extractTweets(page, handle);
+      const { tweets, articulos, delPerfil, sinFecha, fueraVentana } = await extractTweets(page, handle);
 
-      // ⚠️ 0 tweets tiene DOS causas muy distintas y hasta ahora se trataban igual:
+      // ⚠️ 0 tweets tiene CUATRO causas que se arreglan distinto, y se trataban igual:
       //   (a) el timeline cargó y no hay nada en la ventana → "no promocionó" legítimo
-      //   (b) no pudimos ver el timeline (sesión caída, perfil protegido, suspendido,
-      //       intersticial que no se pudo pasar) → NO SABEMOS, y decir "No" es inventar.
-      // El discriminador es si hay <article> en el DOM: los tweets que extractTweets
-      // descarta por fecha igual cuentan como "el timeline se vio".
+      //   (b) no pudimos ver el timeline (sesión caída, protegido, suspendido,
+      //       intersticial sin pasar) → NO SABEMOS
+      //   (c) hay tweets pero NINGUNO es de este handle → la cuenta se renombró o el
+      //       handle está mal cargado en Maven. Se arregla en Maven, no acá.
+      //   (d) hay tweets del perfil pero sin fecha legible → cambió el markup de X.
+      // Decir "No" en (b), (c) o (d) es inventar un veredicto.
+      let motivo = null;
       if (tweets.length === 0) {
-        const estado = await page.evaluate(() => ({
-          articulos: document.querySelectorAll("article").length,
-          txt: (document.body.innerText || "").slice(0, 400).toLowerCase(),
-        }));
-        if (estado.articulos === 0) {
-          const motivo =
-            /these posts are protected|estos posts están protegidos|cuenta protegida/.test(estado.txt) ? "cuenta_protegida"
-            : /account suspended|cuenta suspendida/.test(estado.txt) ? "cuenta_suspendida"
-            : /doesn't exist|no existe esta cuenta|esta cuenta no existe/.test(estado.txt) ? "cuenta_no_existe"
-            : /sign in|iniciar sesión|log in/.test(estado.txt) ? "pide_login"
+        if (articulos === 0) {
+          const txt = await page.evaluate(() => (document.body.innerText || "").slice(0, 400).toLowerCase());
+          motivo =
+            /these posts are protected|estos posts están protegidos|cuenta protegida/.test(txt) ? "cuenta_protegida"
+            : /account suspended|cuenta suspendida/.test(txt) ? "cuenta_suspendida"
+            : /doesn't exist|no existe esta cuenta|esta cuenta no existe/.test(txt) ? "cuenta_no_existe"
+            : /sign in|iniciar sesión|log in/.test(txt) ? "pide_login"
             : "timeline_no_visible";
-          noLegibles.push({ handle, reason: motivo });
-          log(`🔒 @${handle}: no se pudo leer el timeline — ${motivo}`);
-          onResult({ handle, outcome: "no_legible", motivo, red: "x" });
-          done++;
-          await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
-          continue;
+        } else if (delPerfil === 0) {
+          motivo = `ningun_tweet_de_@${handle}(${articulos}_en_pantalla)`;
+        } else if (sinFecha === delPerfil) {
+          motivo = `fechas_ilegibles(${delPerfil}_tweets)`;
         }
+        // Si llegó acá con fueraVentana > 0, es honesto: tuiteó, pero no en 24h.
+      }
+      if (motivo) {
+        noLegibles.push({ handle, reason: motivo });
+        log(`🔒 @${handle}: no se pudo leer el timeline — ${motivo}`);
+        onResult({ handle, outcome: "no_legible", motivo, red: "x" });
+        done++;
+        await sleep(PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs));
+        continue;
       }
 
       batch.push({ creator_id: t.creator_id, source_handle: handle, tweets, legible: true });
-      log(`${tweets.length ? "✅" : "·"} @${handle}: ${tweets.length} tweets`);
+      // El desglose es lo que permite tunear: "0 tweets" no dice nada; "18 en pantalla ·
+      // 12 del perfil · 12 viejos" sí (no tuiteó hoy, todo bien).
+      const desglose = articulos > 0 ? ` [${articulos} en pantalla · ${delPerfil} del perfil · ${fueraVentana} viejos · ${sinFecha} sin fecha]` : "";
+      log(`${tweets.length ? "✅" : "·"} @${handle}: ${tweets.length} tweets${desglose}`);
       onResult({ handle, outcome: tweets.length ? "historias" : "sin_promo", stories: tweets.length, red: "x" });
     } catch (e) {
       // Error al abrir el perfil → NO se manda como "sin tweets" (sería un "No"

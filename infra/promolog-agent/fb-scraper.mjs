@@ -111,11 +111,19 @@ async function extractPosts(page, desdeMs) {
   // La fecha se parsea en Node (no en el navegador): acá tenemos Date completo y
   // es más fácil de testear. FB escribe "31 de julio de 2026 a las 21:40" o
   // "hace 2 h" según el idioma/formato.
+  // ⚠️ CONTAR POR QUÉ SE DESCARTA CADA POST. "9 páginas sin posts" no dice nada:
+  // esconde tres cosas que se arreglan distinto —no publicó / no encontré los posts /
+  // los encontré y no pude leerles la fecha— y las tres terminaban en "no promocionó".
+  // `muestraFecha` guarda el texto crudo de fecha del primer post: es lo único que
+  // dice en qué formato lo está escribiendo Facebook EN ESA MÁQUINA (cambia con el
+  // idioma del navegador), y sin eso el parser se tunea a ciegas.
   const salida = [];
+  let sinFecha = 0, fueraVentana = 0;
+  const muestraFecha = crudos.find((p) => (p.fechaTxt || "").trim())?.fechaTxt?.slice(0, 60) ?? null;
   for (const p of crudos) {
     const ts = parseFechaFb(p.fechaTxt);
-    if (ts === null) continue;             // sin fecha legible → fuera (no inventamos)
-    if (ts < desdeMs) continue;            // fuera de ventana
+    if (ts === null) { sinFecha++; continue; }   // sin fecha legible → fuera (no inventamos)
+    if (ts < desdeMs) { fueraVentana++; continue; }
     salida.push({
       text: p.texto,
       permalink: p.permalink || null,
@@ -128,7 +136,7 @@ async function extractPosts(page, desdeMs) {
   // `vistos` = posts que había en el DOM, ANTES de filtrar por fecha. Es el dato que
   // distingue "leí el muro y no publicó hoy" (vistos > 0, salida vacía) de "no pude
   // leer el muro" (vistos === 0). Sin él, las dos cosas terminaban como "no promocionó".
-  return { posts: salida, vistos: crudos.length };
+  return { posts: salida, vistos: crudos.length, sinFecha, fueraVentana, muestraFecha };
 }
 
 /** ¿Pudimos ver el muro de esta página, o Facebook nos mostró otra cosa?
@@ -199,21 +207,68 @@ export function parseFechaFb(txt) {
   const s = String(txt || "").trim().toLowerCase();
   if (!s) return null;
   const ahora = Date.now();
-  // Relativas: "hace 2 h", "2 h", "45 min", "hace 3 días"
-  const rel = s.match(/(?:hace\s+)?(\d+)\s*(m|min|minutos?|h|hora?s?|d|d[ií]as?|sem)/);
+
+  // ── Relativas: "hace 2 h", "2 h", "45 min", "3d" ───────────────────────────
+  // ⚠️ EL `\b` DEL FINAL NO ES DECORATIVO. Sin él, "1 de agosto de 2026" matcheaba
+  // el `1` seguido de la `d` de "de" y devolvía "hace 1 día": una fecha reciente,
+  // plausible y FALSA para un post que podía ser de hace meses. Un post viejo
+  // contado como de hoy inventa un día de promo que no existió — es el mismo bug
+  // que metió promos con fecha 2024 en X. Preferimos null (se descarta) antes que
+  // una fecha inventada.
+  // Las alternativas van de la más larga a la más corta: si `d` fuera primero,
+  // "días" matchearía solo la `d`.
+  const rel = s.match(/(?:hace\s+)?(\d+)\s*(minutos?|mins?|m|horas?|hrs?|hs|h|d[ií]as?|d|semanas?|sem)\b/);
   if (rel) {
     const n = Number(rel[1]); const u = rel[2];
-    const ms = /^m/.test(u) ? n * 60_000
-             : /^h/.test(u) ? n * 3600_000
+    const ms = /^(m|min)/.test(u) ? n * 60_000
+             : /^(h|hr|hs)/.test(u) ? n * 3600_000
              : /^d/.test(u) ? n * 86_400_000
              : n * 7 * 86_400_000;
     return ahora - ms;
   }
   if (/\bayer\b|\byesterday\b/.test(s)) return ahora - 86_400_000;
   if (/\bhoy\b|\btoday\b/.test(s)) return ahora - 3600_000;   // hoy, hora desconocida
-  // Absolutas: dejamos que Date las intente (FB suele dar formato local completo).
-  const d = Date.parse(txt);
-  return Number.isFinite(d) ? d : null;
+
+  // ── Absolutas ──────────────────────────────────────────────────────────────
+  // Date.parse NO entiende ninguno de los formatos que escribe Facebook ("1 de
+  // agosto de 2026 a las 21:40", "August 1, 2026 at 9:22 PM", "31 July at 21:40"):
+  // todos llevan "de"/"at"/"a las" en el medio. Se parsean a mano, en los dos
+  // idiomas, porque el idioma lo decide el navegador de cada máquina y no lo
+  // controlamos. Cuando FB omite el año, es el año en curso.
+  const MESES = {
+    enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6, agosto: 7,
+    septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7,
+    september: 8, october: 9, november: 10, december: 11,
+    ene: 0, feb: 1, mar: 2, abr: 3, jun: 5, jul: 6, ago: 7, sep: 8, oct: 9, nov: 10, dic: 11,
+    jan: 0, apr: 3, aug: 7, dec: 11,
+  };
+  const mesRe = Object.keys(MESES).sort((a, b) => b.length - a.length).join("|");
+  // "1 de agosto de 2026" · "31 July 2026" · "31 July"
+  let m = s.match(new RegExp(`\\b(\\d{1,2})\\s*(?:de\\s+)?(${mesRe})\\b(?:\\s*(?:de\\s+)?(\\d{4}))?`));
+  // "August 1, 2026" · "Aug 1"
+  if (!m) {
+    const m2 = s.match(new RegExp(`\\b(${mesRe})\\s+(\\d{1,2})\\b(?:\\s*,?\\s*(\\d{4}))?`));
+    if (m2) m = [m2[0], m2[2], m2[1], m2[3]];
+  }
+  if (!m) return null;
+
+  const dia = Number(m[1]), mes = MESES[m[2]];
+  const anio = m[3] ? Number(m[3]) : new Date(ahora).getFullYear();
+  // Hora: "a las 21:40" / "at 9:22 PM" / "21:40". Sin hora, mediodía — así el post
+  // no se corre de día por el redondeo a las 00:00.
+  const hm = s.match(/(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?/);
+  let hora = 12, min = 0;
+  if (hm) {
+    hora = Number(hm[1]); min = Number(hm[2]);
+    if (/^p/.test(hm[3] ?? "") && hora < 12) hora += 12;
+    if (/^a/.test(hm[3] ?? "") && hora === 12) hora = 0;
+  }
+  const ts = new Date(anio, mes, dia, hora, min).getTime();
+  if (!Number.isFinite(ts)) return null;
+  // Si sin año quedó en el futuro (post de diciembre leído en enero), es del año
+  // anterior. Sin esto, un post de hace 11 meses entraría como del mes que viene.
+  return (!m[3] && ts > ahora + 86_400_000) ? new Date(anio - 1, mes, dia, hora, min).getTime() : ts;
 }
 
 /** ⚠️ SEGUNDO PUNTO A TUNEAR. Lee las HISTORIAS (stories) de la página.
@@ -359,12 +414,21 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
         if (/\/login|checkpoint/.test(page.url())) { log("⛔ Facebook: sesión caída, re-logueá la cuenta."); break; }
         try { await page.waitForSelector('[role="article"]', { timeout: 15000 }); } catch { /* puede no haber muro legible: se decide abajo */ }
         await sleep(1200 + Math.random() * 1200);
-        const { posts, vistos } = await extractPosts(page, desdeMs);
+        const { posts, vistos, sinFecha, fueraVentana, muestraFecha } = await extractPosts(page, desdeMs);
 
         // ⚠️ ANTES DE MANDAR NADA: ¿de verdad leímos esta página? Si no, se cuenta
         // como no legible y NO se postea — mandar `posts: []` hace que el edge
         // escriba "no promocionó" sobre una página que nunca vimos.
-        const ilegible = await motivoIlegible(page, vistos);
+        let ilegible = await motivoIlegible(page, vistos);
+
+        // Y un caso que se colaba: había posts en el DOM pero NINGUNO tenía fecha
+        // legible. Eso no es "no publicó" — es que no supimos leer el muro (formato
+        // de fecha distinto por idioma del navegador, o cambió el markup de FB).
+        // Sin esta regla, un parser de fechas roto se ve exactamente igual que una
+        // creadora inactiva, y se guarda como "no promocionó" en las dos.
+        if (!ilegible && vistos > 0 && sinFecha === vistos) {
+          ilegible = `fechas_ilegibles(${vistos} posts, ej: "${(muestraFecha || "").slice(0, 40) || "vacío"}")`;
+        }
         if (ilegible) {
           acc.no_legibles++;
           noLegibles.push({ handle: etiqueta, reason: ilegible });
@@ -382,7 +446,11 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
         const stories = await extractStories(page, t, desdeMs, log);
         const todo = [...posts, ...stories];
         batch.push({ creator_id: t.creator_id, source_handle: etiqueta, posts: todo, legible: true });
-        log(`${todo.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts · ${stories.length} historias (${vistos} en el muro)`);
+        // El desglose es lo que permite tunear: "0 posts" no dice nada, pero
+        // "12 vistos · 12 fuera de ventana" sí (la creadora no publicó hoy) y
+        // "12 vistos · 12 sin fecha" también (el parser está roto).
+        const desglose = vistos > 0 ? ` [${vistos} vistos · ${fueraVentana} viejos · ${sinFecha} sin fecha]` : "";
+        log(`${todo.length ? "✅" : "·"} ${etiqueta}: ${posts.length} posts · ${stories.length} historias${desglose}`);
         onResult({ handle: etiqueta, outcome: todo.length ? "historias" : "sin_promo", stories: todo.length, red: "facebook" });
       } catch (e) {
         // No se pudo abrir → NO se manda como "sin posts" (sería un No falso).
