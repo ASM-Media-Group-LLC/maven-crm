@@ -1363,14 +1363,14 @@ const TOOLS: Array<{
   {
     name: "post_to_group",
     description:
-      "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\n⚠️ FLUJO OBLIGATORIO EN DOS PASOS — nunca se manda de una:\n1) Primero llamala SIN pending_id, con group_name y body. NO se envía: te devuelve un pending_id y el texto. Muéstrale a la persona el texto EXACTO que se publicaría y preguntale si lo mandas así.\n2) Solo cuando te diga que sí, llamala de nuevo con ese pending_id y confirm=true. Ahí se publica.\nSi te pide cambios, vuelve al paso 1 con el texto corregido (se genera un pending_id nuevo).",
+      "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\nSE ENVÍA DE UNA (group_name + body): la orden explícita de la persona ('mándalo', 'publícalo', 'diles que…', 'avisales') ES la autorización — NO vuelvas a preguntar '¿lo mando?' (regla del 03/08: los borradores con pregunta al final nunca se enviaban y frustraban). Después de publicar confirma en el DM con '✓ Publicado en <grupo>:' + el texto tal cual salió, para que pueda pedirte corrección.\nSOLO pregunta antes en DOS casos: (1) la idea de publicar es TUYA (nadie te lo pidió), o (2) la instrucción no te deja claro el CONTENIDO o el GRUPO destino (audio confuso, varios grupos posibles). Si te piden cambios sobre algo ya publicado, publica la corrección.",
     input_schema: {
       type: "object",
       properties: {
         group_name: { type: "string", description: "nombre del grupo destino (ej. 'Managers', 'Marketing/Ventas', 'AI WARMING')" },
         body: { type: "string", description: "texto EXACTO a publicar. Paso 1 solamente." },
-        pending_id: { type: "string", description: "id devuelto en el paso 1. Solo en el paso 2." },
-        confirm: { type: "boolean", description: "true SOLO cuando la persona ya confirmó explícitamente. Requiere pending_id." },
+        pending_id: { type: "string", description: "LEGADO (flujo viejo de dos pasos): id de un borrador pendiente previo. Ya no hace falta — con group_name + body se publica directo." },
+        confirm: { type: "boolean", description: "LEGADO: solo acompaña a pending_id." },
       },
     },
   },
@@ -3273,7 +3273,13 @@ async function executeTool(
         return { ok: true, publicado_en: pend.target_group_id, resultado: enviado };
       }
 
-      // ── PASO 1: componer y devolver para confirmación (NO envía) ──────────
+      // ── ENVÍO DIRECTO (03/08, pedido de Jhon): la orden del dueño ES la
+      // autorización. El flujo de dos pasos ("¿lo mando así?") murió porque
+      // Álvaro nunca leía la pregunta al final del borrador: los textos quedaban
+      // en pending para siempre y nada llegaba a los grupos. El juicio de CUÁNDO
+      // preguntar (iniciativa propia / instrucción ambigua) vive en la
+      // descripción de la tool; acá se publica. La rama pending_id de arriba
+      // queda solo para drenar borradores del flujo viejo.
       const groupName = String(input.group_name ?? "").trim();
       const body = String(input.body ?? "").trim();
       if (!groupName || !body) return { error: "faltan_group_name_o_body" };
@@ -3296,25 +3302,34 @@ async function executeTool(
         return { error: "grupo_ambiguo", coincidencias: opciones.map((g) => g.name), message: "Pregunta a cuál de estos se refiere." };
       }
 
-      const { data: nuevo, error: insErr } = await sb
-        .from("whatsapp_pending_posts")
-        .insert({
-          tenant_id: ctx.tenantId,
-          target_group_id: opciones[0].id,
-          requested_from_group_id: ctx.groupId,
-          requested_by_user_id: ctx.senderUserId,
-          body,
-        })
-        .select("id")
-        .single();
-      if (insErr) return { error: insErr.message };
+      const enviado = await executeTool("reply_to_group", { body } as ToolInput, {
+        groupId: opciones[0].id,
+        tenantId: ctx.tenantId,
+        isOwner: ctx.isOwner,
+        senderUserId: ctx.senderUserId,
+        messageId: null,
+        department: ctx.department ?? null,
+        inboxDepartments: ctx.inboxDepartments ?? null,
+      });
+      if ((enviado as { error?: unknown }).error) {
+        return { error: "fallo_el_envio", detalle: enviado, grupo_destino: opciones[0].name };
+      }
+      // Rastro de auditoría: misma tabla del flujo viejo, directo en 'sent'
+      // (quién pidió publicar qué, dónde y cuándo).
+      await sb.from("whatsapp_pending_posts").insert({
+        tenant_id: ctx.tenantId,
+        target_group_id: opciones[0].id,
+        requested_from_group_id: ctx.groupId,
+        requested_by_user_id: ctx.senderUserId,
+        body,
+        status: "sent",
+        sent_at: new Date().toISOString(),
+      });
       return {
-        paso: "confirmacion_pendiente",
-        enviado: false,
-        pending_id: nuevo?.id,
-        grupo_destino: opciones[0].name,
-        texto_a_publicar: body,
-        instruccion: "NO se envió todavía. Muéstrale a la persona el grupo destino y el texto EXACTO, y preguntale si lo publicás así. Si dice que sí, llama post_to_group con este pending_id y confirm=true.",
+        ok: true,
+        publicado_en: opciones[0].name,
+        texto_publicado: body,
+        instruccion: "Ya está PUBLICADO en el grupo. Confirma en el DM con '✓ Publicado en " + opciones[0].name + ":' + el texto tal cual — sin preguntar nada.",
       };
     }
 
