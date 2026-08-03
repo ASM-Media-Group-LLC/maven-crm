@@ -50,8 +50,9 @@ function fireAgente(groupId: string, messageId: string | null, invokedBy: string
 }
 
 serve(async (req) => {
-  const auth = await authorizeCronOrJwt(req);
-  if (!auth.ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+  // authorizeCronOrJwt devuelve BOOLEAN (no {ok}) — el estreno de las 17:00
+  // (03/08) murió en 401 por tratarlo como objeto: true.ok === undefined.
+  if (!authorizeCronOrJwt(req)) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
 
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "true";
