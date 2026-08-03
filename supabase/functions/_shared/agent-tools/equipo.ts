@@ -105,22 +105,22 @@ async function resolverFunciones(
   if (!uids.length) return out;
 
   // 1) Proyectos en los que fichó cada uno en el rango.
+  // ⚠️ VA POR RPC, NO por select directo: hubstaff_activities tiene ~700 filas POR
+  // DÍA, y con el rango default de 7 días PostgREST corta en 1000 SIN AVISAR. Los
+  // que quedaran fuera del corte saldrían como "sin proyecto" y el filtro de
+  // chatters los perdería — una muestra truncada presentada como el universo.
+  // El RPC agrega en la base: 33 filas en vez de ~5.000.
   const proyectosPorUid = new Map<string, Set<string>>();
   try {
-    const { data: acts } = await sb
-      .from("hubstaff_activities")
-      .select("project_name, hubstaff_members!inner(hubstaff_user_id)")
-      .not("project_name", "is", null)
-      .gte("starts_at", `${desde}T00:00:00Z`)
-      .lte("starts_at", `${hasta}T23:59:59Z`);
-    for (const a of (acts ?? []) as Array<Record<string, any>>) {
-      const uid = String(a.hubstaff_members?.hubstaff_user_id ?? "");
+    const { data: acts } = await sb.rpc("hubstaff_projects_by_member", { p_from: desde, p_to: hasta });
+    for (const a of (acts ?? []) as Array<{ hubstaff_user_id: string; project_name: string }>) {
+      const uid = String(a.hubstaff_user_id ?? "");
       const p = String(a.project_name ?? "").trim();
       if (!uid || !p) continue;
       if (!proyectosPorUid.has(uid)) proyectosPorUid.set(uid, new Set());
       proyectosPorUid.get(uid)!.add(p);
     }
-  } catch { /* si la tabla no responde, se cae al rol de Maven */ }
+  } catch { /* sin proyectos: todos quedan "sin clasificar", que es lo honesto */ }
 
   // 2) Rol de Maven de los que sí tienen cuenta.
   const rolPorPid = new Map<string, string>();
