@@ -36,7 +36,30 @@ export const managersTools: AgentTool[] = [
     handler: async (args, ctx) => {
       const { data, error } = await ctx.sb.rpc("get_manager_growth_feed", { p_tenant: ctx.tenantId });
       if (error) throw new Error(`get_manager_growth_feed: ${error.message}`);
-      let rows = (data ?? []) as Array<Record<string, unknown>>;
+      const todas = (data ?? []) as Array<Record<string, unknown>>;
+
+      // ── FEED VACÍO A INICIO DE MES ≠ "TODO BIEN" ──────────────────────────
+      // El RPC exige covered_days >= 5 (días LEÍDOS del mes en curso, umbral
+      // deliberado) → los primeros días de CADA mes ninguna creadora es evaluable
+      // y el feed devuelve []. El bot leía ese [] como "sin alertas" y el lunes
+      // 03/08 abrió la semana con "ninguna creadora está en caída — buena
+      // noticia"... con Elizabeth Loaiza cayendo -75%. Es el mismo bug que #1095
+      // arregló en alvaro_pulse; este es el camino del agente conversacional.
+      if (todas.length === 0) {
+        const diaBogota = new Date(Date.now() - 5 * 3600_000).getUTCDate();
+        if (diaBogota <= 5) {
+          return {
+            alertas: [],
+            nota:
+              `El radar exige ≥5 días LEÍDOS del mes por creadora y hoy es día ${diaBogota}: ninguna es evaluable ` +
+              "todavía. Este vacío significa 'AÚN NO PUEDO MEDIR', NO 'todo bien' — PROHIBIDO decir 'sin alertas' " +
+              "o 'ninguna en caída'. Di que el radar aún no es evaluable este mes; para una caída de ingreso " +
+              "puntual usa get_creator_earnings, que sí funciona desde el día 1.",
+          };
+        }
+      }
+
+      let rows = todas;
       const mgr = String(args?.manager_name ?? "").trim().toLowerCase();
       if (mgr) rows = rows.filter((r) => String(r.manager_name ?? "").toLowerCase().includes(mgr));
       const q = String(args?.quadrant ?? "").trim().toLowerCase();
@@ -88,9 +111,40 @@ export const managersTools: AgentTool[] = [
       const g7 = sumBetween(7, 0), gPrev7 = sumBetween(14, 7), g30 = es.reduce((a, r) => a + (Number(r.total_gross) || 0), 0);
       const latestFans = es.find((r) => r.active_fans != null);
 
+      // ── ¿CORTE DE LECTURA? ────────────────────────────────────────────────
+      // Cuando una creadora QUITA LOS ACCESOS (o sale), BLU deja de leer su cuenta
+      // y escribe días en $0.00 LITERAL — indistinguibles de "no facturó nada" si
+      // no conoces el evento. El 03/08 el bot le propuso a Carolina usar ese $0
+      // como "palanca real" para la reunión de retención de Elizabeth: el promedio
+      // previo era ~$1.100/día y los ceros eran solo que Maven ya no ve su BLU.
+      // Jhon lo tuvo que corregir a mano.
+      // El patrón es detectable: racha final de días en ~cero tras un promedio
+      // claramente > 0. Se marca como POSIBLE (el bot pregunta/verifica), no se
+      // afirma — una creadora chica puede tener días en cero legítimos.
+      let rachaCero = 0;
+      for (const r of es) {                     // es viene ordenado date DESC
+        if ((Number(r.total_gross) || 0) < 5) rachaCero++;
+        else break;
+      }
+      const previas = es.slice(rachaCero, rachaCero + 14);
+      const promedioPrevio = previas.length
+        ? previas.reduce((a, r) => a + (Number(r.total_gross) || 0), 0) / previas.length
+        : 0;
+      const posibleCorte = rachaCero >= 2 && promedioPrevio > 100;
+
       return {
         found: true,
         creator: { name: c.artistic_name || c.name, instagram_handle: c.instagram_handle, status: c.status },
+        ...(posibleCorte ? {
+          posible_corte_de_lectura: true,
+          dias_en_cero: rachaCero,
+          promedio_diario_previo: Math.round(promedioPrevio),
+          nota_corte:
+            `⚠️ Los últimos ${rachaCero} días están en ~$0 tras un promedio de $${Math.round(promedioPrevio)}/día. ` +
+            "Ese patrón casi siempre es PÉRDIDA DE LECTURA de BLU (quitó accesos o salió), NO una caída real de " +
+            "ventas. PROHIBIDO presentarlo como caída, tendencia o 'palanca' de negociación: di que desde esa fecha " +
+            "no hay lectura y pregunta/verifica si quitó accesos. La tendencia real se mide hasta el último día CON lectura.",
+        } : {}),
         income_7d: Math.round(g7),
         income_prev7d: Math.round(gPrev7),
         income_30d: Math.round(g30),
