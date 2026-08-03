@@ -157,8 +157,20 @@ export async function runAccount(acct, { log = () => {}, onResult = () => {}, sh
   await browser.close();
   if (softBlocked) writeCooldown(acct.id, Date.now() + SOFTBLOCK.cooldownHours * 3600_000);
   const ingest = await postToIngest(out).catch((e) => ({ ok: false, error: e.message }));
-  log(`◀️ slot ${acct.id}: leídas ${done} (✅${sis} ·${nos} ⚠️${pend}). Ingest ok=${ingest.ok !== false}.`);
-  return { slot: acct.id, leidas: done, si: sis, no: nos, pending: pend, softBlocked };
+  // El VEREDICTO de promo lo pone el ingest (link stickers, puente IG→TG), no este
+  // agente: acá solo se leen historias. Antes se tiraba la respuesta y el panel
+  // quedaba en "leído" para siempre — y el "✅14" del resumen se leyó como "14
+  // promos" (03/08, no lo eran: eran cuentas con historias). Ahora se reemite el
+  // veredicto por cuenta (la UI reemplaza la fila) y el resumen lo dice en letras.
+  const verds = Array.isArray(ingest.results) ? ingest.results.filter((x) => x && x.handle && (x.outcome === "si" || x.outcome === "no")) : [];
+  for (const v of verds) {
+    onResult({ handle: v.handle, outcome: v.outcome === "si" ? "con_promo" : "sin_promo", stories: v.story_items });
+  }
+  const vtxt = ingest.ok === false
+    ? `Ingest FALLÓ: ${String(ingest.error ?? "?").slice(0, 120)}`
+    : `Veredicto: ✅${ingest.si ?? 0} SÍ promocionaron · ${ingest.no ?? 0} no · ${ingest.pending ?? 0} pendientes.`;
+  log(`◀️ slot ${acct.id}: leídas ${done} (con historias ${sis} · sin historias ${nos} · ⚠️${pend}). ${vtxt}`);
+  return { slot: acct.id, leidas: done, si: ingest.si ?? 0, no: ingest.no ?? nos, pending: ingest.pending ?? pend, softBlocked };
 }
 
 // ── Login por UI: abrir navegador headed, guardar sesión cuando el usuario avisa ──
