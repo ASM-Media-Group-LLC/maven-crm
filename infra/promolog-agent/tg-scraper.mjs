@@ -16,7 +16,7 @@
 import { chromium } from "playwright";
 import { existsSync } from "node:fs";
 import { MAVEN_URL, CRON_TOKEN, TG_SESSION, HEADFUL } from "./config.mjs";
-import { sleep } from "./agent-core.mjs";
+import { sleep, fechaCorta } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
 import { parseHandle } from "./tg-links.mjs";
 import { abrir, snapshot, estado, inviteVivo } from "./tg-web.mjs";
@@ -212,8 +212,28 @@ export async function runTelegram({ account = { sessionFile: TG_SESSION, index: 
     for (const r of (res?.results ?? [])) {
       const h = handleByCreator.get(r.creator_id) ?? r.source_handle ?? "?";
       acc.leidos++;
-      if (r.promoted > 0) { acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: r.promoted }); onResult({ handle: h, outcome: "con_promo", stories: r.promoted, red: "telegram" }); log(`   ✅ @${h} PROMOCIONÓ (${r.promoted})`); }
-      else if (r.posts > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.posts, red: "telegram" }); }
+      // ⚠️ ANTES ESTO MENTÍA POR OMISIÓN. Decía "PROMOCIONÓ" con `r.promoted`, que
+      // cuenta CLASIFICACIONES: la ventana es de 24h, así que un post de anoche se
+      // relee hoy y se cuenta igual. La fila se guarda bien (con el día en que se
+      // publicó), pero en promolog de HOY no aparece nada y parece que se perdió.
+      // Pasó el 02/08 con Martina Smith (promo del 01/08 23:22) y Jossgaleana (20:11).
+      // Mismo arreglo que ya tenía x-scraper: separar lo de hoy y mostrar la FECHA.
+      const hoy = r.promos_hoy ?? r.promoted ?? 0;          // fallback si el edge es viejo
+      const otroDia = r.promos_otro_dia ?? 0;
+      const fechas = Array.isArray(r.fechas_promo) ? r.fechas_promo : [];
+      const cuando = (deHoy) => fechas.filter((f) => !!f.hoy === deHoy).map((f) => fechaCorta(f.fecha)).join(", ");
+
+      if (hoy > 0) {
+        acc.con_promo++; acc.detalle_con_promo.push({ handle: h, promos: hoy });
+        onResult({ handle: h, outcome: "con_promo", stories: hoy, red: "telegram", cuando: cuando(true) });
+        log(`   ✅ @${h} PROMOCIONÓ (${hoy}) — ${cuando(true) || "hoy"}`);
+      } else if (otroDia > 0) {
+        // Promo REAL, pero de otro día: ni hallazgo de hoy ni fallo. Si esto se cantara
+        // como promo, el conteo del día quedaría inflado y nadie encontraría la entrada.
+        onResult({ handle: h, outcome: "ya_registrado", stories: otroDia, red: "telegram", cuando: cuando(false) });
+        log(`   ↩️ @${h}: promo del ${cuando(false)} — ya guardada en ESE día, no es de hoy`);
+        acc.leidos_sin_posts++;
+      } else if (r.posts > 0) { acc.sin_promo++; onResult({ handle: h, outcome: "sin_promo", stories: r.posts, red: "telegram" }); }
       else { acc.leidos_sin_posts++; }
     }
   };

@@ -189,14 +189,34 @@ Deno.serve(async (req: Request) => {
       const nicks = nicksByCreator.get(cid) ?? [];
       const posts: Array<{ text?: string; permalink?: string; date?: number }> = Array.isArray(it.posts) ? it.posts : [];
       let ins = 0, promo = 0, yaVistos = 0;
+      // ⚠️ `promo` cuenta CLASIFICACIONES, no días de promo nuevos. Un post de anoche
+      // se relee hoy (la ventana es de 24h), se vuelve a clasificar como promo, y se
+      // guarda —bien— con el día en que se PUBLICÓ. El panel cantaba "PROMOCIONÓ" y
+      // en promolog de HOY no aparecía nada: parecía que se había perdido la entrada.
+      // Pasó el 02/08 con Martina Smith y Jossgaleana (promos del 01/08 a las 23:22
+      // y 20:11). El mismo bug se arregló en x-scan el 01/08; acá faltaba portarlo.
+      // Se separa lo de HOY de lo de otros días, y se manda la FECHA de cada promo.
+      let promosHoy = 0, promosOtroDia = 0;
+      const fechasPromo: Array<{ fecha: string | null; hoy: boolean }> = [];
+      // Día de Bogotá = UTC-5. Mismo criterio que la columna generada `dia`.
+      const hoyBogota = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+      const esDeHoy = (iso: string | null) => !!iso && new Date(new Date(iso).getTime() - 5 * 3600e3).toISOString().slice(0, 10) === hoyBogota;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
+        const fechaIso = p.date ? new Date(p.date * 1000).toISOString() : null;
         // La clave se calcula ANTES de clasificar: si el post ya está guardado no hay
         // nada que analizar. El veredicto guardado se reusa para que el conteo de
         // promos del informe siga siendo correcto.
         const clave = postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i });
         const yaVisto = yaGuardadas.get(`${cid}|${clave}`);
-        if (yaVisto !== undefined) { yaVistos++; if (yaVisto) promo++; continue; }
+        if (yaVisto !== undefined) {
+          yaVistos++;
+          // Ya estaba guardado de una corrida anterior: cuenta como promo del informe,
+          // pero NO es un hallazgo nuevo. Se marca así para que el panel no lo cante
+          // como si acabara de pasar.
+          if (yaVisto) { promo++; promosOtroDia++; fechasPromo.push({ fecha: fechaIso, hoy: false }); }
+          continue;
+        }
         let { promoted, reason } = classifyPromo(p.text || "", nicks);
         let aiModel = "heuristic-of-v1";
         if (!promoted && reason === "sin-señales" && OPENROUTER && llmUsed2 < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
@@ -204,7 +224,13 @@ Deno.serve(async (req: Request) => {
           const v = await llmSecondOpinion(p.text || "", nicks, OPENROUTER);
           if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
         }
-        if (promoted) promo++;
+        if (promoted) {
+          promo++;
+          // La fecha que decide es la del POST, no la de la corrida: un post de anoche
+          // leído hoy es un día de promo de AYER, y así se guarda (columna `dia`).
+          if (esDeHoy(fechaIso)) { promosHoy++; fechasPromo.push({ fecha: fechaIso, hoy: true }); }
+          else { promosOtroDia++; fechasPromo.push({ fecha: fechaIso, hoy: false }); }
+        }
         if (dryRun) continue;
         // Ya no hay "buscá antes de insertar": la clave viaja en la fila y el índice
         // único la rechaza si ya está. Reprocesar es inofensivo y no hay carrera.
@@ -230,7 +256,14 @@ Deno.serve(async (req: Request) => {
         await sb.from("promolog_entries").insert({ dedup_key: MARKER_KEY, tenant_id: TENANT_ID, creator_id: cid, date: new Date().toISOString(), promoted: "false", network: "telegram", platform: "Ninguna", analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad", scraped_at: new Date().toISOString() });
       }
       promotedTotal += promo;
-      out.push({ creator_id: cid, source_handle: it.source_handle, posts: posts.length, promoted: promo, inserted: ins, ya_analizados: yaVistos });
+      out.push({
+        creator_id: cid, source_handle: it.source_handle, posts: posts.length,
+        promoted: promo,                 // clasificaciones (incluye promos de otros días)
+        promos_hoy: promosHoy,           // días de promo que son de HOY
+        promos_otro_dia: promosOtroDia,  // promo real, pero de otro día
+        fechas_promo: fechasPromo,       // para que el panel muestre CUÁNDO fue
+        inserted: ins, ya_analizados: yaVistos,
+      });
     }
 
     // ── INFORME DE LA CORRIDA (queda accesible para el bot) ───────────────────
@@ -243,7 +276,11 @@ Deno.serve(async (req: Request) => {
     // de las tandas previas y `final` marca la última: el informe se escribe UNA vez.
     const acumulado = (body.acumulado ?? null) as any;
     const esFinal = body.final !== false;
-    const conPromo = out.filter((r: any) => r.promoted > 0);
+    // "con promo" del informe = promo de HOY. Antes contaba cualquier clasificación,
+    // así que una promo de anoche releída hoy inflaba el conteo del día — y el bot,
+    // que lee este informe, lo repetía como si hubiera pasado hoy.
+    const conPromo = out.filter((r: any) => (r.promos_hoy ?? r.promoted) > 0);
+    const conPromoOtroDia = out.filter((r: any) => (r.promos_hoy ?? 0) === 0 && (r.promos_otro_dia ?? 0) > 0);
     const sinPromo = out.filter((r: any) => r.promoted === 0 && r.posts > 0);
     const sinPosts = out.filter((r: any) => r.posts === 0);
     const resumen = {
@@ -253,7 +290,15 @@ Deno.serve(async (req: Request) => {
       sin_promo: sinPromo.length + (acumulado?.sin_promo ?? 0),
       leidos_sin_posts: sinPosts.length + (acumulado?.leidos_sin_posts ?? 0),
       no_legibles: noLegibles.length,
-      detalle_con_promo: [...(acumulado?.detalle_con_promo ?? []), ...conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promoted }))],
+      // Promos REALES pero de días anteriores (la ventana es de 24h, así que un post
+      // de anoche entra hoy). No son hallazgos del día y se cuentan aparte para que
+      // nadie las sume al total de hoy.
+      con_promo_otro_dia: conPromoOtroDia.length + (acumulado?.con_promo_otro_dia ?? 0),
+      detalle_con_promo: [...(acumulado?.detalle_con_promo ?? []), ...conPromo.map((r: any) => ({ handle: r.source_handle, promos: r.promos_hoy ?? r.promoted }))],
+      detalle_promo_otro_dia: conPromoOtroDia.map((r: any) => ({
+        handle: r.source_handle,
+        fechas: (r.fechas_promo ?? []).filter((f: any) => !f.hoy).map((f: any) => f.fecha),
+      })),
       detalle_no_legibles: noLegibles.map((u: any) => ({ handle: u.handle ?? u.source_handle, motivo: u.reason ?? "desconocido" })),
     };
     if (!dryRun && esFinal) {

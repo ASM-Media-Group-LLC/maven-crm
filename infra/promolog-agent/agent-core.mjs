@@ -14,6 +14,17 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jitter = () => PACING.minDelayMs + Math.random() * (PACING.maxDelayMs - PACING.minDelayMs);
 export const norm = (s) => String(s ?? "").toLowerCase().replace(/[@/\s]/g, "").trim();
 
+/** "31/07 21:46" en hora de Bogotá — para mostrar CUÁNDO se publicó una promo, no
+ *  sólo que la hubo. Vive acá porque lo usan X y Telegram: la ventana de lectura es
+ *  de 24h, así que las dos redes releen posts de anoche y sin la fecha el panel
+ *  parece estar anunciando algo de hoy. */
+export function fechaCorta(iso) {
+  if (!iso) return "sin fecha";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "sin fecha";
+  return d.toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 export function readCooldowns() { try { return JSON.parse(readFileSync(COOLDOWN_FILE, "utf8")); } catch { return {}; } }
 export function writeCooldown(slot, until) {
   mkdirSync(SESSIONS_DIR, { recursive: true });

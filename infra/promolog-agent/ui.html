@@ -18,7 +18,13 @@
   header .ident #agente { font-weight:600; }
   header .ident #version { font-variant-numeric:tabular-nums; font-size:12px; }
   header .ident.atrasada #version { color:var(--warn); }
-  main { max-width:960px; margin:0 auto; padding:20px; }
+  /* 960px alcanzaba cuando el panel era una lista. Con el log y los resultados lado
+     a lado en el monitor de una Mac Mini, dejaba las dos columnas apretadas mientras
+     sobraba pantalla a los costados. */
+  main { max-width:1240px; margin:0 auto; padding:20px; }
+  /* Ningún ancho de ventana debe hacer scrollear la página de costado: lo que se
+     desborde scrollea DENTRO de su caja. */
+  html, body { overflow-x:hidden; }
   .net { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; }
   .net > h2 { margin:0 0 4px; font-size:16px; display:flex; align-items:center; gap:8px; }
   .net .netsub { color:var(--mut); font-size:12.5px; margin-bottom:12px; }
@@ -40,7 +46,17 @@
   button:disabled { opacity:.45; cursor:not-allowed; }
   .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .netactions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+  /* ⚠️ `min-width:0` NO es opcional. Un hijo de grid arranca con min-width:auto, o
+     sea que NO puede achicarse por debajo del ancho de su contenido — aunque tenga
+     overflow:auto. Las líneas largas del log inflaban su columna, el grid se hacía
+     más ancho que `main`, y la tabla de resultados quedaba empujada fuera de la
+     ventana: se veía la columna Cuenta y las otras dos cortadas.
+     Se veía en la Mac Mini y no acá porque depende del ancho de la ventana. */
+  .split { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-top:16px; }
+  .split > * { min-width:0; }
+  /* En pantallas grandes el log necesita menos ancho que la tabla de resultados,
+     que es la que se lee a un golpe de vista. */
+  @media (min-width:1100px){ .split{ grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); } }
   @media (max-width:680px){ .split{ grid-template-columns:1fr; } .accts{ grid-template-columns:1fr; } }
   #log { background:var(--code-bg); color:var(--code-fg); border:1px solid var(--line); border-radius:12px; padding:12px; height:320px; overflow:auto; font:12.5px/1.5 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
 
@@ -83,9 +99,21 @@
   .sw input:checked + span::before { transform:translateX(16px); }
   .sw input:focus-visible + span { outline:2px solid var(--accent); outline-offset:2px; }
   @media (prefers-reduced-motion: reduce){ .sw span, .sw span::before { transition:none; } }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); }
+  /* `table-layout:fixed` + anchos explícitos: sin esto el navegador reparte según el
+     contenido, y un handle largo (los de Facebook son URLs enteras) se comía las
+     columnas Resultado e Items, que son justo las que se leen. */
+  table { width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+  th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { color:var(--mut); font-weight:600; }
+  /* La cabecera queda fija: la lista scrollea y sin esto uno pierde de vista qué
+     columna es cuál justo cuando hay muchos resultados, que es cuando importa. */
+  thead th { position:sticky; top:-12px; background:var(--card); z-index:1; }
+  /* Cuenta: se trunca con "…" y el nombre completo queda en el tooltip. Es preferible
+     a que empuje al resto — el veredicto es lo que hay que poder leer de un vistazo. */
+  td.cuenta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  col.c-cuenta { width:38%; } col.c-items { width:64px; }
+  td.items { text-align:right; font-variant-numeric:tabular-nums; color:var(--mut); }
+  td.res { white-space:normal; }
   .pill { padding:2px 8px; border-radius:20px; font-size:12px; }
   .pill.historias,.pill.leido{ background:rgba(108,140,255,.16); color:var(--accent); }
   .pill.con_promo{ background:rgba(46,204,113,.2); color:var(--ok); font-weight:600; }
@@ -120,7 +148,10 @@
   <div class="split">
     <div><div class="muted" style="margin-bottom:6px">Progreso en vivo</div><div id="log"></div></div>
     <div><div class="muted" style="margin-bottom:6px">Resultados <span id="counts" class="badge">0</span></div>
-      <div class="results-wrap"><table><thead><tr><th>Cuenta</th><th>Resultado</th><th>Items</th></tr></thead><tbody id="results"></tbody></table></div></div>
+      <div class="results-wrap"><table>
+        <colgroup><col class="c-cuenta"><col><col class="c-items"></colgroup>
+        <thead><tr><th>Cuenta</th><th>Resultado</th><th>Items</th></tr></thead>
+        <tbody id="results"></tbody></table></div></div>
   </div>
 </main>
 
@@ -260,7 +291,12 @@ function addResult(r){
   // `cuando` = fecha del post. Va SIEMPRE que venga: sin ella, una promo de anoche
   // releída hoy se lee como hallazgo de hoy y parece que promolog perdió la entrada.
   const cuando = r.cuando ? `<div class="muted" style="font-size:11px">${r.cuando}</div>` : "";
-  tr.innerHTML=`<td>@${r.handle}</td><td><span class="pill ${r.outcome}">${txt}</span>${cuando}</td><td>${r.stories??""}</td>`;
+  // El MOTIVO de un "no se pudo leer" es la mitad del dato: "no la seguimos" se
+  // arregla siguiéndola y "el handle no existe" se corrige en Maven. Sin mostrarlo,
+  // todos los ilegibles se leen igual y no se sabe qué hacer con ninguno.
+  const motivo = r.motivo ? `<div class="muted" style="font-size:11px">${r.motivo.replace(/_/g," ")}</div>` : "";
+  // title = el handle completo: la celda se trunca, pero el dato no se pierde.
+  tr.innerHTML=`<td class="cuenta" title="@${r.handle}">@${r.handle}</td><td class="res"><span class="pill ${r.outcome}">${txt}</span>${cuando}${motivo}</td><td class="items">${r.stories??""}</td>`;
   // el veredicto final (con_promo/sin_promo/ya_registrado) reemplaza la fila previa del mismo handle
   if (r.outcome==="con_promo" || r.outcome==="sin_promo" || r.outcome==="ya_registrado") {
     const prev=[...resultsEl.children].find(x=>x.firstChild.textContent==="@"+r.handle);

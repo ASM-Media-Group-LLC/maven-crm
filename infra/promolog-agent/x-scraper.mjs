@@ -10,7 +10,7 @@
 import { chromium } from "playwright";
 
 import { MAVEN_URL, CRON_TOKEN, X_SESSION, HEADFUL, PACING } from "./config.mjs";
-import { sleep } from "./agent-core.mjs";
+import { sleep, fechaCorta } from "./agent-core.mjs";
 import { creatorSlot } from "./accounts.mjs";
 import { sesionUsable } from "./session-check.mjs";
 
@@ -70,13 +70,6 @@ async function extractTweets(page, handle, hours = 24) {
   });
 }
 
-/** "31/07 21:46" — para mostrar CUÁNDO se publicó la promo, no sólo que la hubo. */
-function fechaCorta(iso) {
-  if (!iso) return "sin fecha";
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "sin fecha";
-  return d.toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
-}
 
 // Refleja el veredicto del server por perfil y acumula los totales de la tanda.
 //
