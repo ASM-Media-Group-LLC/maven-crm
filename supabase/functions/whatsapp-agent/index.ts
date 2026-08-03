@@ -58,6 +58,11 @@ function pickModel(invokedBy: string | undefined, hasReportKind: boolean): strin
 }
 const MAX_ITERATIONS = 8;
 const MAX_WALL_MS = 30_000;
+// Último recinto antes del 504 de la plataforma (~150s; ver telegram-scan:409 y
+// x-scan:33-43, que presupuestan a 100s dejando ~50s de aire). No es el presupuesto
+// de trabajo —ese es MAX_WALL_MS—: es la garantía de devolver algo propio en vez de
+// que la corrida se pierda entera contra el timeout del edge.
+const HARD_GUARD_MS = 140_000;
 
 // ── MOTOR (reutilizable por TODO bot) ──────────────────────────────────────
 // Cómo piensa el asistente: rol, estilo, no-alucinar, cómo habla, zonas
@@ -4932,6 +4937,11 @@ async function runAgent(req: AgentRequest): Promise<{
   final_reply?: string;
   error?: string;
 }> {
+  // Reloj de PARED de toda la corrida, desde que entra la request. Distinto de
+  // `startedAt`, que arranca recién antes del loop y mide sólo el TRABAJO. Los dos hacen
+  // falta: el 03/08 una corrida reportó "2 iteraciones, presupuesto de 30s" y por afuera
+  // había durado 165 — sin `ms_total` esa diferencia no era visible desde ningún lado.
+  const iniciadoAt = Date.now();
   const sb = adminClient();
 
   // Resolver group_id si vino message_id en su lugar.
@@ -5181,10 +5191,16 @@ async function runAgent(req: AgentRequest): Promise<{
   // Se cuenta lo PEDIDO, no lo ejecutado — una tool que el modelo pide y que una
   // guarda bloquea igual tiene que seguir en la lista.
   const toolsPedidas = new Map<string, number>();
+  // Milisegundos acumulados por tool. Va al log de uso junto a las veces que se pidió:
+  // "se llamó 3 veces" y "se comió 24s" son dos cosas distintas y sólo la segunda explica
+  // por qué la corrida no llegó a responder.
+  const msPorTool = new Map<string, number>();
 
   let finalReply: string | null = null;
   // Por qué la corrida terminó sin publicar nada (se reporta en el evento agent_silent).
   let silentReason: string = "loop_agotado";
+  // Mensaje de la excepción que mató el loop, si la hubo (ver el `catch` del loop).
+  let errorDelLoop: string | null = null;
   // Un solo empujón para que reenvíe por reply_to_group si redactó la respuesta como texto.
   let nudgedToReply = false;
   let iter = 0;
@@ -5226,6 +5242,11 @@ async function runAgent(req: AgentRequest): Promise<{
   // ya vemos su respuesta en la ventana de contexto (30 msgs) → el modelo no la
   // repite. Si sigue tomado al vencer la espera, seguimos igual (nunca mudo).
   const lockHolder = crypto.randomUUID();
+  // Medición (no cambia comportamiento): cuánto se esperó y si al final se entró SIN
+  // el lock. Ese segundo caso —la espera vence y la corrida procede igual— hoy es
+  // completamente invisible, y es justo el que produce corridas en paralelo.
+  let msEsperaLock = 0;
+  let lockObtenido = false;
   {
     // La espera tiene que cubrir lo que dura una corrida REAL (MAX_WALL_MS = 30s). Con
     // los 8s de antes, la 2ª corrida se rendía y arrancaba mientras la 1ª seguía
@@ -5237,6 +5258,8 @@ async function runAgent(req: AgentRequest): Promise<{
       await new Promise((r) => setTimeout(r, 1000));
       got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
     }
+    msEsperaLock = Date.now() - esperaInicio;
+    lockObtenido = got;
   }
 
   // ⚠️ startedAt va DESPUÉS de la espera del lock, no antes. El presupuesto de pared
@@ -5246,6 +5269,11 @@ async function runAgent(req: AgentRequest): Promise<{
   // devolvía ok:true SIN responder y SIN loguear nada: el bot quedaba mudo justo en el
   // caso que el single-flight venía a resolver. No se disparó en prod, pero estaba armado.
   const startedAt = Date.now();
+  // Relojes de la corrida. Sirven para saber en qué se fue el tiempo: hoy `agent_silent`
+  // trae `iterations` pero ni un milisegundo, así que los 165s de la corrida de María
+  // (03/08) no se pueden atribuir a lock, transcripción, modelo o tools. Sin esto, subir
+  // o bajar cualquier presupuesto es adivinar.
+  let msLlm = 0, msTools = 0, msPrompt = 0;
 
   // ⚠️ El prompt se arma DESPUÉS del lock, no antes. Si se arma antes, la ventana de
   // contexto queda congelada en el instante en que la corrida entró a la cola: la 2ª
@@ -5253,6 +5281,7 @@ async function runAgent(req: AgentRequest): Promise<{
   // del grupo, sin ver la respuesta que la 1ª acababa de publicar. Ese desfase es el que
   // producía los duplicados del 30/07 (dos respuestas contradictorias a 10s, la misma
   // cifra repetida a 3s, cuatro mensajes casi iguales en 41s) pese al single-flight.
+  const tPrompt = Date.now();
   const initialUser = await buildInitialUserMessage({
     req,
     groupId: group.id,
@@ -5261,6 +5290,10 @@ async function runAgent(req: AgentRequest): Promise<{
     isOwner: senderCtx.isOwner,
     department: botCfg?.department ?? null,
   });
+  // Armar el prompt puede esperar hasta ~24s a que Whisper termine un audio pendiente
+  // (buildInitialUserMessage). Hoy ese tiempo sale del MISMO presupuesto que el trabajo:
+  // medirlo aparte es el primer paso para dejar de cobrárselo al loop.
+  msPrompt = Date.now() - tPrompt;
 
   // ⚠️ Las reglas del owner se repiten ACÁ, en el mensaje de usuario, además de estar
   // al final del system prompt. No es redundancia gratuita: el 31/07 Álvaro dictó por
@@ -5390,6 +5423,7 @@ async function runAgent(req: AgentRequest): Promise<{
     //      modelo que no responder.
     let resp: Response | null = null;
     let lastRetryable = false;
+    const tLlm = Date.now();
     for (let attempt = 0; attempt < 3; attempt += 1) {
       resp = await callAnthropic(modelToUse);
       if (resp.ok) break;
@@ -5412,6 +5446,10 @@ async function runAgent(req: AgentRequest): Promise<{
         }
       }
     }
+
+    // Se mide DESPUÉS del fallback: los reintentos y el modelo de respaldo son parte de
+    // lo que la corrida esperó al modelo, y son justo los sospechosos de desbordar.
+    msLlm += Date.now() - tLlm;
 
     if (!resp || !resp.ok) {
       const txt = resp ? await resp.text() : "no response";
@@ -5540,6 +5578,10 @@ async function runAgent(req: AgentRequest): Promise<{
           continue;
         }
       }
+      // Cronómetro por tool: es lo que va a decir si el presupuesto se lo come una sola
+      // llamada. read_webpage, por ejemplo, aborta recién a los 28s — el 93% de los 30
+      // del agente. Sin medirlo, "la corrida tardó mucho" no señala a nadie.
+      const tTool = Date.now();
       const result = await executeTool(
         String(t.name),
         (t.input as ToolInput) ?? {},
@@ -5555,6 +5597,9 @@ async function runAgent(req: AgentRequest): Promise<{
           canSeePhones,
         },
       );
+      const msEstaTool = Date.now() - tTool;
+      msTools += msEstaTool;
+      msPorTool.set(String(t.name), (msPorTool.get(String(t.name)) ?? 0) + msEstaTool);
       // Escrituras exitosas de la corrida: habilitan que el bot pueda decir "registrado".
       if (
         TOOLS_DE_ESCRITURA.has(String(t.name)) &&
@@ -5590,9 +5635,46 @@ async function runAgent(req: AgentRequest): Promise<{
     // Si el modelo llamó reply_to_group exitosamente, salimos.
     if (finalReply) break;
   }
+  } catch (e) {
+    // ⚠️ ESTE `catch` NO EXISTÍA y el `try` cerraba directo en `finally`. Cualquier
+    // excepción —red de Anthropic, un `resp.json()` malformado, una tool que tira—
+    // se propagaba hacia arriba y se SALTEABA las dos cosas que vienen después: el
+    // aviso al usuario (#1096) y el evento `agent_silent`. O sea, silencio total y
+    // sin rastro: salía un 500 que nadie lee, porque quien invoca al agente
+    // (whatsapp-ingest/fireAgent) es fire-and-forget y no mira la respuesta.
+    // Medido antes de este cambio: 18 corridas en 7 días con `agent_invoked` y
+    // NINGÚN evento terminal. Eso son 18 personas que le hablaron al bot y no
+    // supieron nunca por qué no les contestó.
+    //
+    // No se relanza a propósito: se marca el motivo y se deja caer el flujo al
+    // bloque `if (!finalReply)` de abajo, que es donde viven el aviso y el evento.
+    const msg = e instanceof Error ? e.message : String(e);
+    // Un abort del deadline (lo introduce el PR de contabilidad) es agotamiento de
+    // presupuesto, no una falla: se marca como tal para que el aviso ya escrito aplique.
+    const esAbort = (e instanceof Error && e.name === "AbortError") || /aborted|timed? ?out/i.test(msg);
+    silentReason = esAbort ? "presupuesto_de_pared" : "excepcion_en_el_loop";
+    errorDelLoop = msg.slice(0, 300);
+    console.error(`[whatsapp-agent] excepción en el loop (${silentReason}):`, msg);
   } finally {
     await releaseAgentLock(sb, group.id, lockHolder);
   }
+
+  // Timings de la corrida, compartidos por el evento de éxito y el de silencio. Van
+  // juntos a propósito: sin la distribución de las corridas EXITOSAS no se puede decidir
+  // ningún presupuesto — sólo se vería la cola de las que fallaron.
+  const timings = {
+    ms_total: Date.now() - iniciadoAt,
+    ms_espera_lock: msEsperaLock,
+    ms_prompt: msPrompt,
+    ms_loop: Date.now() - startedAt,
+    ms_llm: msLlm,
+    ms_tools: msTools,
+    lock_obtenido: lockObtenido,
+    presupuesto_ms: MAX_WALL_MS,
+    iterations: iter + 1,
+    invoked_by: req.invoked_by,
+    message_id: req.message_id ?? null,
+  };
 
   await logAnthropicUsage({
     operation: "whatsapp_agent",
@@ -5607,9 +5689,23 @@ async function runAgent(req: AgentRequest): Promise<{
       // es el denominador: sin él no se sabe si una tool no se usó porque sobra o
       // porque ese bot ni la tenía.
       tools_usadas: Object.fromEntries(toolsPedidas),
+      tools_ms: Object.fromEntries(msPorTool),
       tools_ofrecidas: activeTools.length,
     },
   });
+
+  // ── OBSERVABILIDAD: la corrida SÍ respondió ─────────────────────────────────
+  // Hasta ahora el único rastro de éxito era `message_out` (lo escribe whatsapp-send),
+  // que no tiene timings ni forma de atarse a la corrida que lo produjo. Sin esto, la
+  // única muestra medible era la de las corridas que fallaban — sesgo puro.
+  if (finalReply) {
+    await logEvent(sb, {
+      tenantId: group.tenant_id,
+      groupId: group.id,
+      kind: "agent_respondio",
+      payload: timings,
+    });
+  }
 
   // ── OBSERVABILIDAD: dejar rastro cuando la corrida termina SIN hablar ────────
   // Esta función nunca logueaba un evento de fallo: una corrida que salía muda era
@@ -5642,7 +5738,11 @@ async function runAgent(req: AgentRequest): Promise<{
     // presupuesto, y quedó en visto.
     // Un aviso corto y honesto no arregla el timeout, pero convierte un silencio
     // inexplicable en algo accionable: reintentar o partir el pedido.
-    if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado")) {
+    // `excepcion_en_el_loop` entra acá igual: desde el lado de quien preguntó es la
+    // MISMA situación —le habló al bot y no le contestó—, y hasta ahora ese caso ni
+    // siquiera llegaba a este bloque.
+    if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
+                     silentReason === "excepcion_en_el_loop")) {
       try {
         // A quién le habla: en un grupo con varios, un aviso sin nombre no se sabe
         // para quién es. Se prefiere el full_name del profile sobre el display name
@@ -5668,7 +5768,10 @@ async function runAgent(req: AgentRequest): Promise<{
           headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
           body: JSON.stringify({
             group_id: group.id,
-            body: `${quien}me quedé sin tiempo armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
+            // Texto único para timeout y excepción: "me quedé sin tiempo" sería FALSO
+            // ante una excepción, y quien pregunta no necesita saber cuál de las dos fue
+            // — necesita saber que falló y qué hacer.
+            body: `${quien}se me cortó armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
           }),
         });
       } catch (_e) { /* si tampoco se puede avisar, al menos queda el evento */ }
@@ -5679,12 +5782,11 @@ async function runAgent(req: AgentRequest): Promise<{
       groupId: group.id,
       kind: "agent_silent",
       payload: {
+        ...timings,
         motivo: silentReason,
         esperado: !dirigido,
-        invoked_by: req.invoked_by,
-        message_id: req.message_id ?? null,
-        iterations: iter + 1,
         output_tokens: totalUsage.output_tokens,
+        ...(errorDelLoop ? { error: errorDelLoop } : {}),
       },
     });
   }
@@ -5719,7 +5821,18 @@ serve(async (req) => {
   }
 
   try {
-    const result = await runAgent(body);
+    // ── GUARDA DURA DE PLATAFORMA ─────────────────────────────────────────────
+    // El techo del edge es ~150s (documentado en telegram-scan y x-scan, que
+    // presupuestan a 100s dejando ~50s de aire). Pasado eso llega un 504 IDLE_TIMEOUT
+    // y se pierde TODO: la respuesta y cualquier rastro. Con 140s devolvemos algo
+    // propio antes de que la plataforma corte.
+    // ⚠️ HONESTIDAD SOBRE QUÉ HACE ESTO: el race NO mata la corrida — Deno la deja
+    // seguir en background. Su valor es que la respuesta HTTP y el evento existen.
+    // Mismo patrón que whatsapp-audit-history:530.
+    const guarda = new Promise<{ ok: false; error: string }>((resolve) =>
+      setTimeout(() => resolve({ ok: false, error: "hard_guard_timeout" }), HARD_GUARD_MS)
+    );
+    const result = await Promise.race([runAgent(body), guarda]);
     return new Response(JSON.stringify(result), {
       status: result.ok ? 200 : 500,
       headers: { ...whatsappCors, "Content-Type": "application/json" },
