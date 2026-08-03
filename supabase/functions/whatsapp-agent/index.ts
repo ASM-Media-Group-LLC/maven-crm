@@ -312,10 +312,10 @@ LISTAS DE GENTE (membresía de grupos — regla dura):
   "¿Cuántos chatters/cordis hay conectados en Hubstaff?" → get_hubstaff_activity({funcion:"chatters"}),
   que clasifica por el PROYECTO de Hubstaff (ahí "chatters" incluye Chatter Supervisor y Chatters Meeting:
   es un solo grupo). El rol de Maven NO responde esa pregunta: es otro padrón y 24 de 63 miembros activos
-  de Hubstaff ni siquiera tienen cuenta en Maven. Si la tool devuelve `sin_dato_de_proyecto`, decí que falta
+  de Hubstaff ni siquiera tienen cuenta en Maven. Si la tool devuelve "sin_dato_de_proyecto", di que falta
   ese dato — NO contestes con roles de Maven como si fueran de Hubstaff.
   Es UNA PREGUNTA DISTINTA de "del grupo X, ¿cuántos están conectados?": eso arranca por get_group_members
-  (la membresía del grupo) y recién después se cruza con Hubstaff. No las confundas.
+  (la membresía del grupo) y después se cruza con Hubstaff. No las confundas.
 
 RELATOS DEL OWNER ≠ ÓRDENES (regla dura):
 - Si el owner CUENTA algo que hizo o que le pidió a otra persona ("le mandé el texto a Luis", "ya hablé con X", "le pedí a Y que..."), eso es CONTEXTO para que estés al tanto — NO es una orden de cancelar tu tarea ni de traspasársela a esa persona.
@@ -5271,15 +5271,36 @@ async function runAgent(req: AgentRequest): Promise<{
   // system prompt de ~5K tokens y compitiendo con todo el manual de ventas. Acá quedan
   // pegadas al mensaje que el modelo está por contestar, que es donde más atiende.
   const recordatorioReglas = activeRules.length > 0
-    ? `\n\n⚠️ REGLAS DEL OWNER VIGENTES — aplicalas a CUALQUIER mensaje de venta, pitch u ` +
+    ? `\n\n⚠️ REGLAS DEL OWNER VIGENTES — aplícalas a CUALQUIER mensaje de venta, pitch u ` +
       `opener que redactes en este turno, aunque nadie te las recuerde:\n` +
       activeRules.map((r, i) => `${i + 1}. ${r.rule_text}`).join("\n") +
-      `\nSi lo que ibas a escribir no las cumple, reescribilo antes de mandarlo.`
+      `\nSi lo que ibas a escribir no las cumple, reescríbelo antes de mandarlo.`
+    : "";
+
+  // ⚠️ PITCHES GENÉRICOS. La regla "PROHIBIDO una estrategia que serviría para
+  // cualquier modelo" ya está en el manual de ventas del system prompt… y el 03/08 el
+  // bot igual le mandó a Miguel 4 escenarios plantilla (LEAK / CONTENIDO / AUDIENCIA
+  // DORMIDA) sin nombrar NI UNA de sus 16 leads vencidas — que él mismo tenía listadas
+  // en el grupo desde las 09:00. En el mismo rato, a María sí le armó algo afilado
+  // porque fue a buscar datos ("facturó ~$286k, viene desconfiada").
+  // La diferencia no fue la regla: fue que en un caso buscó datos y en el otro no.
+  // Enterrada al final de ~5K tokens la regla compite con todo; pegada al mensaje que
+  // está por contestar, gana (mismo hallazgo que las reglas del owner, arriba).
+  const pideMensajes = /\b(opener|openers|pitch|pitches|escenarios?|mensajes? para|qu[ée] le (escribo|digo|mando)|c[óo]mo le entro|estrategia de (venta|entrada)|romper el hielo)\b/i
+    .test(initialUser.slice(-4000));
+  const recordatorioPersonalizacion = pideMensajes
+    ? `\n\n⚠️ TE ESTÁN PIDIENDO MENSAJES/OPENERS. No entregues plantillas que servirían para ` +
+      `cualquier creadora: eso es justo lo que ya no les está funcionando. Ancla al menos 2-3 de ` +
+      `los escenarios a leads REALES de quien pregunta —por nombre— con una observación concreta ` +
+      `de cada una (lo que dice su bio, qué postea, su nota en Maven, su calidad, si tiene agencia). ` +
+      `Si no tienes esos datos, búscalos ANTES de escribir (lookup_lead_history / analyze_profile_deep / ` +
+      `get_closer_pipeline_status); si aun así no hay, di de cuáles no pudiste y entrega el resto anclado. ` +
+      `Un escenario suelto está bien como complemento, NUNCA como toda la respuesta.`
     : "";
 
   // Loop messages array per Anthropic spec.
   const messages: Array<Record<string, unknown>> = [
-    { role: "user", content: initialUser + recordatorioReglas },
+    { role: "user", content: initialUser + recordatorioReglas + recordatorioPersonalizacion },
   ];
 
   try {
@@ -5612,6 +5633,47 @@ async function runAgent(req: AgentRequest): Promise<{
     const dirigido = req.invoked_by === "mention" || req.invoked_by === "audio_mention" ||
       req.invoked_by === "image_mention" || group.is_direct === true ||
       senderCtx.isOwner || req.invoked_by === "profile_analysis_complete";
+
+    // ⚠️ DEJAR EN VISTO POR TIMEOUT. `presupuesto_de_pared` y `loop_agotado` NO son
+    // el bot decidiendo callarse: es que estaba trabajando y se le acabó el tiempo.
+    // Si además le hablaron a él, la persona queda esperando una respuesta que nunca
+    // llega y no tiene forma de saber que falló — el 03/08 María pidió una estructura
+    // de cierre para una reunión de esa tarde, el agente cortó a las 2 iteraciones por
+    // presupuesto, y quedó en visto.
+    // Un aviso corto y honesto no arregla el timeout, pero convierte un silencio
+    // inexplicable en algo accionable: reintentar o partir el pedido.
+    if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado")) {
+      try {
+        // A quién le habla: en un grupo con varios, un aviso sin nombre no se sabe
+        // para quién es. Se prefiere el full_name del profile sobre el display name
+        // de WhatsApp ("Msv" es María).
+        let quien = "";
+        if (req.message_id) {
+          const { data: m } = await sb.from("whatsapp_messages")
+            .select("sender_display_name, member_id").eq("id", req.message_id).maybeSingle();
+          let nombre = (m?.sender_display_name ?? "").trim();
+          if (m?.member_id) {
+            const { data: mem } = await sb.from("whatsapp_members")
+              .select("user_id").eq("id", m.member_id).maybeSingle();
+            if (mem?.user_id) {
+              const { data: prof } = await sb.from("profiles")
+                .select("full_name").eq("id", mem.user_id).maybeSingle();
+              if (prof?.full_name) nombre = String(prof.full_name).split(" ")[0];
+            }
+          }
+          if (nombre) quien = `${nombre}, `;
+        }
+        await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+          body: JSON.stringify({
+            group_id: group.id,
+            body: `${quien}me quedé sin tiempo armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
+          }),
+        });
+      } catch (_e) { /* si tampoco se puede avisar, al menos queda el evento */ }
+    }
+
     await logEvent(sb, {
       tenantId: group.tenant_id,
       groupId: group.id,
