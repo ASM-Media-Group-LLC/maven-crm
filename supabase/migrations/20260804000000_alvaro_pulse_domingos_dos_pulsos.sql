@@ -1,0 +1,23 @@
+-- DOMINGOS: solo 2 pulsos (12:00 y 18:00 Bogotá), sin control de gente.
+--
+-- Pedido de Álvaro (dom 02/08 13:10). El bot respondió "Anotado como regla fija"
+-- y avisó en el mismo mensaje que el cron no lo puede tocar… y esa tarde llegaron
+-- igual los pulsos de 15/17/19 con el bloque WARMING. Prometió lo que no podía
+-- cumplir; esto lo cumple de verdad. (Aplicada en prod por MCP el 03/08; este
+-- archivo la versiona. Es la migración "alvaro_pulse_domingos_dos_pulsos".)
+--
+-- QUÉ CAMBIA:
+--  · Gate EN LA FUNCIÓN (hora Bogotá): domingo solo corre a las 12 y 18; entre
+--    semana se saltean esas dos horas (el cron ahora dispara también 17/23 UTC).
+--    El gate NO va en la expresión cron: el pulso de las 19:00 Bogotá dispara a
+--    las 00:00 UTC del día SIGUIENTE → day-of-week en UTC rompería vie/sáb/dom.
+--  · Domingo NO se manda el bloque WARMING (control de gente) y se apaga el
+--    reproche "⚠️ vamos bajos" de Managers (nadie tiene meta de contactos).
+--  · Domingo, si alguien SÍ fichó en Hubstaff (≥15 min), va UNA línea informativa
+--    al pie de Managers ("Fichando hoy domingo: …") — Álvaro lo pidió explícito.
+--  · cron 64: '0 16,18,20,22,0 * * *' → '0 16,17,18,20,22,23,0 * * *'.
+--
+-- El cuerpo (DO $mig$ con replaces + asserts sobre pg_get_functiondef) quedó
+-- registrado en la migración aplicada por MCP; no se repite acá para no
+-- re-aplicar una cirugía textual sobre una función que ya la tiene.
+select 1;
