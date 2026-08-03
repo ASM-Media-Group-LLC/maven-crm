@@ -256,6 +256,11 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí dilo.
 - NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisa en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usa lookup_lead_history(@handle) y mira el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confírmaselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí di que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asume que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
 
+BÚSQUEDA WEB (web_search) — INVESTIGACIÓN DE INDUSTRIA:
+- Tienes búsqueda web real. Úsala cuando pidan benchmarks, "qué hace la industria", mejores prácticas o propuestas basadas en el mercado (ej. estrategias de pricing de suscripciones, tácticas de retención de otras agencias). Busca, lee y arma la propuesta — ya no digas "no tengo esa data".
+- 🔒 REGLA DURA DE PRIVACIDAD: JAMÁS pongas en una búsqueda datos internos — ni nombres/handles de creadoras, ni cifras nuestras, ni nombres del equipo, ni "Kash". Las consultas son GENÉRICAS de industria ("OnlyFans subscription pricing strategy", "OF agency retention tactics").
+- En la respuesta separa SIEMPRE lo NUESTRO (de tus tools) de lo EXTERNO (de la web), y nombra la fuente de lo externo (sitio). Si la web no trae nada sólido, dilo — no rellenes con generalidades.
+
 HITOS DE CREADORAS (record_milestone) — LA MEMORIA DE LO QUE SIGNIFICA PLATA:
 - Apenas alguien reporte en el grupo un evento de negocio de una modelo, ANÓTALO con record_milestone sin que te lo pidan: cerró/firmó · compró un producto (Let's Shoot, Unlimited…) · agendó reunión de cierre · en negociación / cerca de cierre · caso de éxito ("subió ingresos gracias a X") · entró en retención · quitó accesos · anunció salida · récord de ingresos.
 - occurred_on = cuando OCURRIÓ ("quitó accesos el viernes" → la fecha de ese viernes), no cuando te lo cuentan.
@@ -5898,7 +5903,20 @@ async function runAgent(req: AgentRequest): Promise<{
       model,
       max_tokens: model.startsWith("claude-opus-5") ? 8000 : 4000,
       system: systemWithCache,
-      tools: toolsWithCache,
+      // + BÚSQUEDA WEB server-side de Anthropic (03/08: Álvaro pidió "investiga
+      // la industria y danos propuestas" y el bot no tenía cómo). Corre en el
+      // servidor de Anthropic (no hay loop nuestro que atender: los bloques
+      // server_tool_use vienen ya resueltos). El TIPO va por modelo — drift del
+      // API: Haiku 4.5 solo soporta la variante 2025; Sonnet/Opus la 2026.
+      // Va DESPUÉS del breakpoint de caché: el prefijo cacheado no cambia.
+      tools: [
+        ...toolsWithCache,
+        {
+          type: model.includes("haiku") ? "web_search_20250305" : "web_search_20260209",
+          name: "web_search",
+          max_uses: 3,
+        },
+      ],
       messages,
       ...(model.startsWith("claude-opus-5")
         ? { output_config: { effort: "low" } }
