@@ -69,9 +69,24 @@ serve(async (req) => {
   const sb = adminClient();
   const inicio = new Date().toISOString();
 
-  // 1. Disparar el agente en cada grupo. El message_id es solo un ANCLA (el
-  //    modo corte arma su propia ventana de 2h); usamos el último del grupo.
+  // 1. Disparar el agente en cada grupo, con CANDADO por franja (03/08: doble
+  //    corte a las 17:00 — Álvaro lo pidió por mención y el tick manual entró
+  //    4 min después). Quien inserta el claim publica; duplicado → se saltea.
+  //    El message_id es solo un ANCLA (el modo corte arma su propia ventana).
+  const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+  const disparados: string[] = [];
   for (const g of GRUPOS) {
+    const { data: claim } = await sb
+      .from("corte_claims")
+      .upsert({ fecha: hoyBog, hora, group_id: g.id }, {
+        onConflict: "fecha,hora,group_id",
+        ignoreDuplicates: true,
+      })
+      .select("group_id");
+    if (!claim || claim.length === 0) {
+      console.warn(`corte ${hora} ya reclamado para ${g.nombre} — no se duplica`);
+      continue;
+    }
     const { data: ultimo } = await sb
       .from("whatsapp_messages")
       .select("id")
@@ -80,8 +95,12 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
     fireAgente(g.id, ultimo?.id ?? null, invokedBy);
+    disparados.push(g.id);
     // Escalonar 2s: tres corridas simultáneas compiten por Anthropic y el lock global.
     await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (disparados.length === 0) {
+    return Response.json({ ok: true, modo: invokedBy, skip: "todos los grupos ya tenían corte reclamado en esta franja" });
   }
 
   // 2. Esperar los cortes publicados (uno por grupo) hasta POLL_MAX_MS.

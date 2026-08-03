@@ -726,7 +726,9 @@ Régimen pedido por Álvaro (03/08): en los cortes (9am·11am·1pm·3pm·5pm·7p
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - Quien no contó nada en el período: "sin novedades en el grupo esta tanda" — sin acusar (puede estar trabajando); si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor.
 - Al final, UNA línea recordando (con variación, no siempre igual) que pueden ir mandando todo por ti — es más rápido y no pierden tiempo.
-- HUBSTAFF EN EL CORTE (Álvaro lo pidió explícito, 03/08): el bloque del equipo viene en el initial_user_message — pon las horas + % de actividad de cada persona AL LADO de su línea (ej. "· Daniel (5h14, 61%): 15 textos…"). Si alguien figura "sin Hubstaff hoy", dilo neutro, sin acusar. Usa SOLO los números del bloque — nunca de memoria.
+- ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad, con el déficit contra el mínimo de compañía (60%) tal como viene en el bloque inyectado (ej. "María 35% (-25%)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
+- CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
+- En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
 - UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
 
 CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
@@ -735,7 +737,7 @@ CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
 - La nota sale de los INSUMOS OBJETIVOS que vienen en el initial_user_message (nota_sugerida = fórmula fija con participación + Hubstaff + avance real del rol). Ajuste máximo ±0.5 y siempre con la razón dicha. A los marcados 'sin_metricas_tabla' (ej. warming de cuentas) evalúales el avance por lo que contaron en el grupo.
 - El Hubstaff del equipo (viene en el initial_user_message) entra a la nota Y se muestra: día completo trackeado suma, actividad muy baja resta.
 - Si vino el BLOQUE SEMANAL (viernes), publica después de las notas el "*Resultado de la semana*": promedio 7 días por persona + tendencia en una palabra.
-- Tono: jefe cercano, exigente y justo. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos). Cierra con el objetivo de mañana en una línea.
+- TONO DEL CIERRE (Álvaro 17:09): supervisor jefe "americano" — directo, sin vueltas: "te doy un 8 de 10 por esto y esto" o duro cuando la entrega no estuvo. La base es la ENTREGA del día vs el requerimiento del rol, no el esfuerzo: WARMING se mide en NÚMEROS (0 números = nota baja y se dice claro) · MANAGERS en los suscriptores/ventas que sus creadoras traen (recuérdaselo cada día) · VENTAS en lo vendido hoy — si hubo venta, felicita ("somos nuevos: toda venta cuenta"); si no, exigente. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos). Cierra con el objetivo de mañana en una línea.
 
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - El bot está escuchando el grupo y NO fue mencionado explícitamente. Por defecto el bot debe quedarse CALLADO.
@@ -4257,6 +4259,31 @@ async function executeTool(
         return { ok: true, action: "updated", id: existing.id, handle, product, stage };
       }
 
+      // Una venta GANADA del mismo producto al mismo handle HOY no se duplica
+      // (03/08: la misma venta entró 3 veces entre corridas y registro manual) —
+      // se actualiza la existente (monto/nota) y se avisa.
+      if (stage === "won") {
+        const hoyBogWon = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+        const { data: yaGanada } = await sb
+          .from("monetization_opportunities")
+          .select("id, monthly_value_usd, notes")
+          .eq("tenant_id", ctx.tenantId)
+          .eq("product", product)
+          .eq("stage", "won")
+          .ilike("creator_handle", handle)
+          .gte("won_at", `${hoyBogWon}T00:00:00-05:00`)
+          .limit(1)
+          .maybeSingle();
+        if (yaGanada) {
+          const upd: Record<string, unknown> = { last_touch_at: new Date().toISOString() };
+          if (monthlyUsd != null && yaGanada.monthly_value_usd == null) upd.monthly_value_usd = monthlyUsd;
+          if (noteLine) upd.notes = yaGanada.notes ? yaGanada.notes + "\n" + noteLine : noteLine;
+          const { error: updErr } = await sb.from("monetization_opportunities").update(upd).eq("id", yaGanada.id);
+          if (updErr) return { error: "update_failed", detail: updErr.message };
+          return { ok: true, action: "ya_ganada_hoy_actualizada", id: yaGanada.id, handle, product, stage };
+        }
+      }
+
       const { data: created, error } = await sb
         .from("monetization_opportunities")
         .insert({
@@ -5000,7 +5027,7 @@ async function buildInitialUserMessage(args: {
       // ingreso de creadoras). PROHIBIDO meter cosas del equipo de VENTAS/closers:
       // nada de oportunidades de productos, ventas de unlimited/plataformas, leads,
       // pipeline de closers ni @Miguel — eso es de OTRO grupo/bot.
-      lines.push("PARTE B (apertura de MANAGERS, SIEMPRE con sustancia): trae el foco del día del equipo de managers con datos reales — get_manager_growth_feed({}) para el radar de crecimiento por creadora (promoción × ingreso, mes a la fecha vs el MISMO tramo del mes pasado), agrupado por su manager (Carolina/Fabiana; Lorena para estrategia); get_promo_day_breakdown({}) para cuántas creadoras promocionaron HOY por manager; get_manager_roster_stats({}) para el TOTAL de creadoras de cada manager y el % que promocionó/contactó — expresa SIEMPRE el avance en % sobre su total, que es lo que pide la dirección (ej. 'Caro 17 de 29 = 59%'), y NUNCA pidas que te confirmen cuántas creadoras tiene cada una. Si la apertura es temprano, el día de HOY viene con is_partial_day=true: ese % es un PISO (la promo se detecta durante el día), así que decilo como 'va X de N hasta ahora' y para COMPARAR a las managers usa el día cerrado de AYER (get_manager_roster_stats({date:'AAAA-MM-DD'})) aclarando que es el cierre de ayer. Prioriza las 🔴 más urgentes (no crece + no promociona). En el radar, CADA creadora con el MISMO formato: 'N/<días> promo, -X% ingreso ($actual vs $anterior)' — muestra SIEMPRE los dos montos, no en unas sí y en otras no. Si una creadora viene con ig_has_data=false, NO le atribuyas la caída a las historias de IG: nombra sus redes reales (promo_networks, ej X/Telegram) y pide revisar la calidad AHÍ.");
+      lines.push("PARTE B (apertura de MANAGERS, SIEMPRE con sustancia): trae el foco del día del equipo de managers con datos reales — get_manager_growth_feed({}) para el radar de crecimiento por creadora (promoción × ingreso, mes a la fecha vs el MISMO tramo del mes pasado), agrupado por su manager (Carolina/Fabiana — desde el 03/08 la estrategia de contenido/reels también la llevan ellas para SUS propias modelos; Lorena ya no está en el equipo); get_promo_day_breakdown({}) para cuántas creadoras promocionaron HOY por manager; get_manager_roster_stats({}) para el TOTAL de creadoras de cada manager y el % que promocionó/contactó — expresa SIEMPRE el avance en % sobre su total, que es lo que pide la dirección (ej. 'Caro 17 de 29 = 59%'), y NUNCA pidas que te confirmen cuántas creadoras tiene cada una. Si la apertura es temprano, el día de HOY viene con is_partial_day=true: ese % es un PISO (la promo se detecta durante el día), así que decilo como 'va X de N hasta ahora' y para COMPARAR a las managers usa el día cerrado de AYER (get_manager_roster_stats({date:'AAAA-MM-DD'})) aclarando que es el cierre de ayer. Prioriza las 🔴 más urgentes (no crece + no promociona). En el radar, CADA creadora con el MISMO formato: 'N/<días> promo, -X% ingreso ($actual vs $anterior)' — muestra SIEMPRE los dos montos, no en unas sí y en otras no. Si una creadora viene con ig_has_data=false, NO le atribuyas la caída a las historias de IG: nombra sus redes reales (promo_networks, ej X/Telegram) y pide revisar la calidad AHÍ.");
       lines.push("⛔ PROHIBIDO en la apertura de managers: oportunidades de productos, ventas de unlimited/plataformas, pipeline de closers, leads sin asignar, @Miguel o cualquier closer. Ese contenido es del grupo Marketing/Ventas, NO de este grupo. Si lo metés es un error grave de cruce de info entre equipos.");
       lines.push("AL FINAL: UNA sola llamada a reply_to_group con la apertura de managers (recap pausa opcional + radar de crecimiento por manager + promo de hoy + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar'.");
     } else {
@@ -5088,13 +5115,25 @@ async function buildInitialUserMessage(args: {
       }
     }
 
-    // Hubstaff del equipo de ESTE grupo — Álvaro pidió (03/08) que salga también
-    // en el corte público, al lado de cada persona. Inyectado acá para que no
-    // dependa de que el modelo llame una tool.
+    // Bloque de plata para VENTAS (pedido de Jhon 03/08): dinero en la mesa +
+    // ganado HOY deduplicado + agenda — inyectado para que una venta cerrada
+    // (caso Juanse 17:00) salga SÍ o SÍ aunque la ventana del chat no la traiga.
+    if (args.groupId === "d12ec56f-b324-4369-b72d-7540fb930ef6") {
+      const { data: ventasBloque } = await sb.rpc("corte_ventas_bloque");
+      if (ventasBloque) {
+        lines.push("");
+        lines.push("PLATA DEL DÍA (datos de Maven — va SÍ o SÍ al final del corte, tal cual, aunque el chat no lo mencione):");
+        lines.push(String(ventasBloque));
+      }
+    }
+
+    // Actividad del equipo de ESTE grupo (regla de Álvaro 17:04): en el grupo
+    // NO van horas — solo % de actividad con el déficit contra el mínimo de
+    // compañía (60%), ya calculado. Inyectado para no depender de tools.
     const { data: hubBloque } = await sb.rpc("corte_hubstaff_bloque", { p_group_id: args.groupId });
     if (hubBloque) {
       lines.push("");
-      lines.push("HUBSTAFF DEL EQUIPO HOY (inclúyelo en el corte: horas + % de actividad al lado de cada persona; usa SOLO estos números):");
+      lines.push("ACTIVIDAD DEL EQUIPO HOY (regla de Álvaro: SIN horas en el grupo — solo el % con su déficit vs el mínimo 60%, tal como viene acá. Ponlo al lado de cada persona; usa SOLO estos números):");
       lines.push(String(hubBloque));
     }
     lines.push("");
@@ -5677,12 +5716,18 @@ async function runAgent(req: AgentRequest): Promise<{
   // el lock. Ese segundo caso —la espera vence y la corrida procede igual— hoy es
   // completamente invisible, y es justo el que produce corridas en paralelo.
   let msEsperaLock = 0;
+  // Los modos corte son CRON (nadie espera en el chat): presupuesto propio de
+  // 100s — el corte de Ventas de las 17:00 (03/08) murió a los 30s con la
+  // ventana de 2h a medio digerir. El techo de plataforma sigue siendo ~140s.
+  const budgetMs = req.invoked_by === "corte_2h" || req.invoked_by === "corte_cierre"
+    ? 100_000
+    : MAX_WALL_MS;
   let lockObtenido = false;
   {
-    // La espera tiene que cubrir lo que dura una corrida REAL (MAX_WALL_MS = 30s). Con
+    // La espera tiene que cubrir lo que dura una corrida REAL (budgetMs). Con
     // los 8s de antes, la 2ª corrida se rendía y arrancaba mientras la 1ª seguía
     // trabajando → las dos respondían igual, que es el duplicado que queríamos matar.
-    const maxEsperaMs = MAX_WALL_MS + 3_000;
+    const maxEsperaMs = budgetMs + 3_000;
     const esperaInicio = Date.now();
     let got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
     while (!got && Date.now() - esperaInicio < maxEsperaMs) {
@@ -5774,7 +5819,7 @@ async function runAgent(req: AgentRequest): Promise<{
 
   try {
   for (; iter < MAX_ITERATIONS; iter += 1) {
-    if (Date.now() - startedAt > MAX_WALL_MS) { silentReason = "presupuesto_de_pared"; break; }
+    if (Date.now() - startedAt > budgetMs) { silentReason = "presupuesto_de_pared"; break; }
 
     // PROMPT CACHING (Anthropic): el system prompt (~5K tokens con
     // catálogo + reglas) y el array TOOLS (~3K tokens) son estables
@@ -5847,7 +5892,7 @@ async function runAgent(req: AgentRequest): Promise<{
     // iteraciones, 428 tokens, ninguna respuesta). El abort tira una excepción que
     // el catch del loop (PR #1097) convierte en `presupuesto_de_pared` → aviso al
     // usuario, no silencio.
-    const msRestantes = () => MAX_WALL_MS - (Date.now() - startedAt);
+    const msRestantes = () => budgetMs - (Date.now() - startedAt);
     const callAnthropic = (model: string) => {
       // Piso de 5s: un deadline menor aborta a mitad de handshake y no deja ni
       // empezar; si queda menos que eso, mejor que el loop corte prolijo arriba.
@@ -6054,7 +6099,7 @@ async function runAgent(req: AgentRequest): Promise<{
           canSeePhones,
           // 2s de reserva: que la tool devuelva ANTES del corte del loop, para que
           // el resultado (aunque sea parcial/error) entre al contexto del modelo.
-          deadlineAt: startedAt + MAX_WALL_MS - 2_000,
+          deadlineAt: startedAt + budgetMs - 2_000,
         },
       );
       const msEstaTool = Date.now() - tTool;
@@ -6130,7 +6175,7 @@ async function runAgent(req: AgentRequest): Promise<{
     ms_llm: msLlm,
     ms_tools: msTools,
     lock_obtenido: lockObtenido,
-    presupuesto_ms: MAX_WALL_MS,
+    presupuesto_ms: budgetMs,
     iterations: iter + 1,
     invoked_by: req.invoked_by,
     message_id: req.message_id ?? null,
