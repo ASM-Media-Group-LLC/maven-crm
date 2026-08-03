@@ -859,6 +859,31 @@ app.get('/manager/groups', async (_req, res) => {
   }
 });
 
+// Participantes REALES por grupo de la línea principal — para reconciliar
+// whatsapp_members.active en Maven. 03/08: Lizeth y Lorena salieron de grupos
+// y sus filas quedaron activas: el bot las siguió sugiriendo ("pásale el handle
+// a Lizeth" en Ventas) y los cortes las siguieron contando. El gateway es la
+// única fuente de verdad de quién está HOY en cada grupo. Se devuelven las 3
+// variantes de id de cada participante (id/jid/lid): según la época del grupo,
+// whatsapp_members.external_id puede tener cualquiera de las formas.
+app.get('/groups/participants', async (req, res) => {
+  if (!state.sock || state.connection !== 'open') {
+    return res.json({ groups: [], error: 'not_connected' });
+  }
+  try {
+    const raw = await state.sock.groupFetchAllParticipating();
+    const groups = Object.values(raw || {}).map((g) => ({
+      jid: g.id,
+      participants: (Array.isArray(g.participants) ? g.participants : [])
+        .flatMap((p) => [p.id, p.jid, p.lid].filter(Boolean)),
+    }));
+    res.json({ groups });
+  } catch (e) {
+    logger.warn({ err: e.message }, 'groups/participants failed');
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Grupos de UNA línea específica (para el drill-in del dashboard).
 app.get('/manager/groups/:instance', async (req, res) => {
   const s = sessionFromReq(req);
