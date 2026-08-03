@@ -261,19 +261,43 @@ function channelMeta(entity) {
   if (!entity) return null;
   return { id: entity.id != null ? String(entity.id) : null, title: entity.title || null, username: entity.username || null, protected: !!entity.noforwards };
 }
+// Tope de thumbnails que viajan por respuesta. La imagen alimenta la VISIÓN de
+// promolog (posts solo-imagen: sin esto, 624 promos con el link quemado en el
+// arte se registraron como "no promocionó" — caso Marcy, 03/08). Son thumbs
+// (~20-80KB), no la foto completa: para leer un logo/link de OF alcanza y el
+// payload no explota.
+const MAX_POST_IMAGES = 10;
+const MAX_POST_IMAGE_BYTES = 400 * 1024;
+
 async function recentPosts(c, entity, hours) {
   const sinceSec = Math.floor(Date.now() / 1000) - hours * 3600;
   const msgs = await c.getMessages(entity, { limit: 50 });
   const posts = [];
+  let imagenes = 0;
   for (const m of msgs) {
     if (!m || !m.date || m.date < sinceSec) continue;
     const text = m.message || "";
     const hasMedia = !!m.media;
     let mediaDownloadable = false;
+    let image_b64 = null;
     if (hasMedia) {
-      try { const buf = await c.downloadMedia(m, { thumb: -1 }); mediaDownloadable = !!buf && buf.length > 0; } catch (_) { mediaDownloadable = false; }
+      // El thumb YA se bajaba para chequear si la media es descargable… y se
+      // tiraba el buffer. Ahora, si es imagen razonable, viaja en la respuesta
+      // para que telegram-scan pueda pasarla por visión.
+      try {
+        const buf = await c.downloadMedia(m, { thumb: -1 });
+        mediaDownloadable = !!buf && buf.length > 0;
+        if (mediaDownloadable && imagenes < MAX_POST_IMAGES && buf.length <= MAX_POST_IMAGE_BYTES) {
+          image_b64 = Buffer.from(buf).toString("base64");
+          imagenes++;
+        }
+      } catch (_) { mediaDownloadable = false; }
     }
-    posts.push({ id: m.id, date: m.date, text, links: text.match(URL_RE) || [], hasMedia, mediaDownloadable, permalink: permalinkFor(entity, m.id) });
+    posts.push({
+      id: m.id, date: m.date, text, links: text.match(URL_RE) || [],
+      hasMedia, mediaDownloadable, permalink: permalinkFor(entity, m.id),
+      ...(image_b64 ? { image_b64, image_mime: "image/jpeg" } : {}),
+    });
   }
   return posts;
 }

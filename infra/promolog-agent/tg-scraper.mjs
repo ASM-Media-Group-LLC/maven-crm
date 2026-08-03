@@ -81,10 +81,15 @@ async function scrapePublic(user, hours = 24) {
       .replace(/<br\s*\/?>/g, "\n").replace(/<[^>]+>/g, "")
       .replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, " ")
       .trim();
+    // Foto del post (si tiene): t.me/s la trae como background-image en el wrap.
+    // Es una URL pública del CDN → viaja como image_url y el edge la baja para
+    // VISIÓN cuando el texto no alcanza (posts solo-imagen = caso Marcy).
+    const fotoM = b.match(/tgme_widget_message_photo_wrap[^>]*style="[^"]*background-image:url\('([^']+)'\)/);
     posts.push({
       text,
       permalink: `https://t.me/${idM[1]}`,
       ...(Number.isFinite(ts) ? { date: Math.floor(ts / 1000) } : {}),
+      ...(fotoM ? { image_url: fotoM[1] } : {}),
     });
     if (posts.length >= 30) break;
   }
@@ -156,6 +161,7 @@ async function scrapeTelegramWeb(page, p, hours = 24) {
         return Number.isFinite(n) ? (n % 4294967296) : null;   // 2³²
       };
       const out = [];
+      const soloImagen = [];
       let conFecha = 0, enVentana = 0;
       for (const el of document.querySelectorAll(".bubble")) {
         const tsRaw = el.getAttribute("data-timestamp") || el.querySelector("[data-timestamp]")?.getAttribute("data-timestamp");
@@ -165,7 +171,6 @@ async function scrapeTelegramWeb(page, p, hours = 24) {
         if (ts < cut) continue;                                // viejo → fuera
         enVentana++;
         const txt = (el.querySelector(".message")?.innerText || "").trim();
-        if (!txt) continue;                                    // solo imagen/video sin epígrafe
         const mid = midReal(el.getAttribute("data-mid"));
         const peer = Number(el.getAttribute("data-peer-id"));
         let permalink = null;
@@ -173,10 +178,41 @@ async function scrapeTelegramWeb(page, p, hours = 24) {
           if (uname) permalink = `https://t.me/${uname}/${mid}`;
           else if (Number.isFinite(peer) && peer !== 0) permalink = `https://t.me/c/${Math.abs(peer)}/${mid}`;
         }
+        if (!txt) {
+          // Solo imagen/video sin epígrafe. Antes se DESCARTABA acá — y así 624
+          // promos con el link quemado en el arte quedaron como "no promocionó"
+          // (caso Marcy). Ahora la imagen viaja en base64 para que el edge la pase
+          // por VISIÓN. Cap de 3 por canal: alcanza para el patrón imagen+link y
+          // el payload no explota (van dentro del POST del ingest).
+          const img = el.querySelector("img.media-photo, .attachment img, .media-container img");
+          const src = img?.src || "";
+          if (permalink && src && soloImagen.length < 3) soloImagen.push({ src, date: ts, permalink });
+          continue;
+        }
         out.push({ text: txt.slice(0, 1500), date: ts, permalink });
       }
-      return { msgs: out.slice(-30), conFecha, enVentana };
+      return { msgs: out.slice(-30), conFecha, enVentana, soloImagen };
     }, { cut: cutoff, uname: user });
+
+    // Las imágenes de las burbujas sin texto se bajan DENTRO de la página (los
+    // blob:/https del CDN de Telegram requieren la sesión del navegador; desde
+    // Node no se pueden pedir). Tope de tamaño por imagen: es para leer un logo
+    // o un link quemado, no para archivarla.
+    for (const si of (lectura?.soloImagen ?? [])) {
+      try {
+        const b64 = await page.evaluate(async (src) => {
+          const r = await fetch(src);
+          if (!r.ok) return null;
+          const blob = await r.blob();
+          if (blob.size > 450_000) return null;
+          const fr = new FileReader();
+          return await new Promise((res) => { fr.onloadend = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(blob); });
+        }, si.src);
+        if (b64 && typeof b64 === "string" && b64.startsWith("data:image")) {
+          lectura.msgs.push({ text: "", date: si.date, permalink: si.permalink, image_b64: b64 });
+        }
+      } catch { /* sin imagen: el post queda como sin_texto/pending en el edge */ }
+    }
     // GUARDA DE IDENTIDAD: además de abrir, hay que confirmar QUÉ chat se abrió.
     // Devolvemos el título del canal; el caller verifica que no se repita entre
     // creadoras distintas (así un fallo de navegación no vuelve a atribuir mal).

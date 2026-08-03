@@ -24,6 +24,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyLinkDestination } from "../_shared/link-classifier.ts";
 import { postKey, MARKER_KEY, esDuplicado, clavesYaGuardadas } from "../_shared/promolog-dedup.ts";
+import { visionPromo, fetchImageAsDataUri } from "../_shared/promolog-vision.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (igual que promolog-dispatch)
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
@@ -94,6 +95,33 @@ function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; 
 // Cap por corrida + best-effort: si la IA falla, queda el veredicto heurístico.
 const LLM_MODEL = "google/gemini-2.5-flash";
 const LLM_CAP_PER_RUN = 40;
+
+// ── VISIÓN (03/08) ───────────────────────────────────────────────────────────
+// Telegram era la única red SIN visión, y su promo típica es imagen+link: 624
+// posts solo-imagen terminaron guardados como "no promocionó" (caso Marcy). Ahora
+// un post sin texto (o sin señales en el texto) CON imagen pasa por visión — la
+// misma familia de vision-of que FB y X, con la regla de Telegram del dueño.
+// ⚠️ La visión NUNCA se gasta en un post ya guardado: la clave se consulta ANTES
+// (clavesYaGuardadas), igual que en FB/X. Cap por corrida para el costo.
+const MAX_VISION_PER_RUN = 40;
+const TG_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Vas a ver una IMAGEN de un post del canal de Telegram de una creadora. REGLA ESTRICTA del dueño: cuenta como PROMOCIÓN DE SU ONLYFANS solo si la imagen (o su texto quemado) APUNTA a contenido de pago FUERA de Telegram: logo/marca/captura de OnlyFans, un link o handle de OF visible, otra plataforma de pago (Fansly, Fanvue, ManyVids), o un funnel/link-in-bio (linktr.ee, beacons, piclink, stan store, allmylinks).
+NO cuenta (promoted=false): foto/selfie sugerente SIN destino de pago visible, promoción de su propio canal/grupo VIP de Telegram, venta de packs por DM ("escríbeme", "mp"), publicidad de marcas/tiendas, casino/apuestas. Si es ambiguo → promoted=false.
+Respondé SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
+
+// Post con imagen → data URI para visión: base64 directo (lector web local /
+// gateway) o URL pública (t.me/s). null = no hay imagen utilizable.
+async function imagenDelPost(p: { image_b64?: string; image_mime?: string; image_url?: string }): Promise<string | null> {
+  if (p.image_b64) {
+    const b64 = String(p.image_b64);
+    if (b64.startsWith("data:")) return b64.length < 900_000 ? b64 : null;
+    if (b64.length > 800_000) return null;   // ~600KB reales; thumbs vienen mucho más chicos
+    return `data:${p.image_mime || "image/jpeg"};base64,${b64}`;
+  }
+  if (p.image_url && /^https?:\/\//i.test(String(p.image_url))) {
+    return await fetchImageAsDataUri(String(p.image_url));
+  }
+  return null;
+}
 const TG_LLM_PROMPT = `Sos analista de una agencia de OnlyFans. REGLA ESTRICTA del dueño: un post del canal de Telegram de una creadora cuenta como PROMOCIÓN DE SU ONLYFANS solo si APUNTA a su contenido de pago FUERA de Telegram: menciona OnlyFans (incluye typos, leet o letras estilizadas: 0nlyfans, onlifans, 𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺, "mi OF", "mi Only"), otra plataforma de pago (Fansly, Fanvue, ManyVids), un funnel/link-in-bio (linktr.ee, bybio, beacons, piclink, stan store, allmylinks), o el nick de OF de la creadora.
 NO cuenta (promoted=false): promocionar su propio canal/grupo VIP de Telegram, vender packs por DM ("escríbeme", "mp"), contenido +18/🔞 SIN destino de pago nombrado, publicidad de marcas/tiendas, casino/apuestas/trading/"gana dinero", saludos y vida diaria. Si la referencia es ambigua o implícita sin destino claro → promoted=false.
 Respondé SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
@@ -179,7 +207,7 @@ Deno.serve(async (req: Request) => {
       const { data: extra } = await sb.from("creator_social_accounts").select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", ids);
       for (const a of (extra ?? []) as any[]) { const nick = String(a.username || "").replace(/^@+/, "").toLowerCase(); if (!nick) continue; const arr = nicksByCreator.get(a.creator_id) ?? []; if (!arr.includes(nick)) arr.push(nick); nicksByCreator.set(a.creator_id, arr); }
     }
-    let inserted = 0, promotedTotal = 0, llmUsed2 = 0;
+    let inserted = 0, promotedTotal = 0, llmUsed2 = 0, visionUsed2 = 0;
     // Lo ya analizado no vuelve a pasar por el LLM (ver clavesYaGuardadas).
     const yaGuardadas = await clavesYaGuardadas(sb, { creatorIds: ids, network: "telegram" });
     const out: unknown[] = [];
@@ -233,14 +261,38 @@ Deno.serve(async (req: Request) => {
         const textoPost = (p.text || "").trim();
         if (!textoPost) {
           conSoloMedia++;
+          // VISIÓN (03/08): la imagen es lo único que hay. La clave ya se consultó
+          // arriba (yaGuardadas), así que un post ya guardado JAMÁS llega acá — la
+          // visión no se re-gasta (pedido explícito de Jhon, mismo criterio FB/X).
+          //   · visión dice promo   → true  (vision-of:…)
+          //   · visión dice que no  → false (vision-no:… — ahora SÍ miramos la imagen)
+          //   · sin imagen / error  → pending 'sin_texto' (como #1101: no inventamos)
+          let vTg: { promoted: boolean; reason: string } | null = null;
+          if (OPENROUTER && visionUsed2 < MAX_VISION_PER_RUN) {
+            const dataUri = await imagenDelPost(p as { image_b64?: string; image_mime?: string; image_url?: string });
+            if (dataUri) {
+              visionUsed2++;
+              vTg = await visionPromo({ dataUri, apiKey: OPENROUTER, prompt: TG_VISION_PROMPT, refTitle: "Maven Promolog TG" });
+            }
+          }
+          const fallaVision = !vTg || /^(or_|vision_parse|vision:)/.test(vTg.reason);
+          const esPromoVision = !!vTg && vTg.promoted;
+          if (esPromoVision) {
+            promo++;
+            if (esDeHoy(fechaIso)) { promosHoy++; fechasPromo.push({ fecha: fechaIso, hoy: true }); }
+            else { promosOtroDia++; fechasPromo.push({ fecha: fechaIso, hoy: false }); }
+          }
           if (!dryRun) {
             const { error: insErr } = await sb.from("promolog_entries").insert({
               dedup_key: clave,
               tenant_id: TENANT_ID, creator_id: cid,
               date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
-              promoted: "pending", network: "telegram", platform: "Ninguna",
+              promoted: esPromoVision ? "true" : (fallaVision ? "pending" : "false"),
+              network: "telegram", platform: esPromoVision ? "OnlyFans" : "Ninguna",
               notes: null, evidence_url: p.permalink || null,
-              analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin_texto",
+              analyzed_by_ai: true,
+              ai_model: fallaVision ? "heuristic-of-v1" : "vision-tg-v1",
+              ai_reasoning: esPromoVision ? `vision-of:${vTg!.reason}` : (fallaVision ? "sin_texto" : `vision-no:${vTg!.reason}`),
               source_handle: (it.source_handle || "").trim() || null,
               story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
             });
@@ -256,6 +308,17 @@ Deno.serve(async (req: Request) => {
           llmUsed2++;
           const v = await llmSecondOpinion(p.text || "", nicks, OPENROUTER);
           if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
+        }
+        // La promo puede estar QUEMADA en el arte con un caption neutro ("nuevo
+        // contenido 🔥"): si ni la heurística ni la IA de texto vieron nada y el
+        // post trae imagen, la mira visión (mismo orden que FB/X).
+        if (!promoted && reason === "sin-señales" && OPENROUTER && visionUsed2 < MAX_VISION_PER_RUN) {
+          const dataUri = await imagenDelPost(p as { image_b64?: string; image_mime?: string; image_url?: string });
+          if (dataUri) {
+            visionUsed2++;
+            const v = await visionPromo({ dataUri, apiKey: OPENROUTER, prompt: TG_VISION_PROMPT, text: textoPost, refTitle: "Maven Promolog TG" });
+            if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; aiModel = "heuristic+vision-tg-v1"; }
+          }
         }
         if (promoted) {
           promo++;
@@ -455,6 +518,7 @@ Deno.serve(async (req: Request) => {
 
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
   let llmUsed = 0; // cap de costo/tiempo por corrida (solo repesca de "sin-señales")
+  let visionUsed = 0; // cap de visión por corrida (posts con imagen sin señal de texto)
 
   const results: unknown[] = [];
   const runStarted = Date.now();
@@ -499,7 +563,7 @@ Deno.serve(async (req: Request) => {
 
       // `date` (unix s) lo devuelve el gateway y ya se usaba abajo para que la fila
       // caiga en SU día; faltaba en el tipo nomás.
-      const posts: Array<{ id: number; date?: number; text: string; permalink: string; hasMedia: boolean; mediaDownloadable: boolean }> = j.posts || [];
+      const posts: Array<{ id: number; date?: number; text: string; permalink: string; hasMedia: boolean; mediaDownloadable: boolean; image_b64?: string; image_mime?: string }> = j.posts || [];
       let inserted = 0, promotedCount = 0, skipped = 0, yaAnalizados = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
@@ -508,6 +572,46 @@ Deno.serve(async (req: Request) => {
         const claveTg = postKey({ permalink: p.permalink, text: p.text, date: p.date, index: i });
         const yaVistoTg = yaGuardadasTg.get(`${c.id}|${claveTg}`);
         if (yaVistoTg !== undefined) { yaAnalizados++; if (yaVistoTg) promotedCount++; continue; }
+        // ── POST SIN TEXTO: visión o pending, JAMÁS "no promocionó" ──────────
+        // Este camino (el de los crons) fue el que fabricó las 624 filas falsas de
+        // posts solo-imagen (caso Marcy): texto vacío → "sin-señales" → false. El
+        // ingest se arregló en #1101; acá faltaba. Ahora: la clave ya se consultó
+        // arriba (la visión nunca se re-gasta en un post guardado), y con imagen
+        // disponible decide visión; sin imagen o sin presupuesto, queda pending.
+        const textoTg = (p.text || "").trim();
+        const presupuestoVision = (Date.now() - runStarted) < (RUN_BUDGET_MS - 35_000);
+        if (!textoTg) {
+          let vTg: { promoted: boolean; reason: string } | null = null;
+          if (OPENROUTER_API_KEY && presupuestoVision && visionUsed < MAX_VISION_PER_RUN) {
+            const dataUri = await imagenDelPost(p);
+            if (dataUri) {
+              visionUsed++;
+              vTg = await visionPromo({ dataUri, apiKey: OPENROUTER_API_KEY, prompt: TG_VISION_PROMPT, refTitle: "Maven Promolog TG" });
+            }
+          }
+          const fallaVision = !vTg || /^(or_|vision_parse|vision:)/.test(vTg.reason);
+          const esPromoVision = !!vTg && vTg.promoted;
+          if (esPromoVision) promotedCount++;
+          if (!dryRun) {
+            const { error: insErr } = await sb.from("promolog_entries").insert({
+              dedup_key: claveTg,
+              tenant_id: TENANT_ID, creator_id: c.id,
+              date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
+              promoted: esPromoVision ? "true" : (fallaVision ? "pending" : "false"),
+              network: "telegram", platform: esPromoVision ? "OnlyFans" : "Ninguna",
+              notes: null, evidence_url: p.permalink || null,
+              analyzed_by_ai: true,
+              ai_model: fallaVision ? "heuristic-of-v1" : "vision-tg-v1",
+              ai_reasoning: esPromoVision ? `vision-of:${vTg!.reason}` : (fallaVision ? "sin_texto" : `vision-no:${vTg!.reason}`),
+              source_handle: (handle || "").trim() || null,
+              story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
+            });
+            if (insErr) { if (esDuplicado(insErr)) skipped++; else results.push({ creator: c.name, insertError: insErr.message }); }
+            else inserted++;
+          }
+          continue;
+        }
+
         let { promoted, reason } = classifyPromo(p.text, nicks);
         let aiModel = "heuristic-of-v1";
         // Repesca IA: solo cuando la heurística NO vio nada ("sin-señales" — un guard
@@ -519,6 +623,16 @@ Deno.serve(async (req: Request) => {
           llmUsed++;
           const v = await llmSecondOpinion(p.text, nicks, OPENROUTER_API_KEY);
           if (v.promoted) { promoted = true; reason = `llm:${v.reason}`; aiModel = "heuristic+gemini-text-v1"; }
+        }
+        // Promo QUEMADA en el arte con caption neutro: si texto e IA de texto no
+        // vieron nada y el post trae imagen (thumb del gateway), decide visión.
+        if (!promoted && reason === "sin-señales" && OPENROUTER_API_KEY && presupuestoVision && visionUsed < MAX_VISION_PER_RUN) {
+          const dataUri = await imagenDelPost(p);
+          if (dataUri) {
+            visionUsed++;
+            const v = await visionPromo({ dataUri, apiKey: OPENROUTER_API_KEY, prompt: TG_VISION_PROMPT, text: textoTg, refTitle: "Maven Promolog TG" });
+            if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; aiModel = "heuristic+vision-tg-v1"; }
+          }
         }
         if (promoted) promotedCount++;
         if (dryRun) continue;
