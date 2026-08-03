@@ -72,16 +72,26 @@ const horasHM = (secs: number): string => `${Math.floor(secs / 3600)}h${String(M
 // El `rol` que sí devolvía es el rol de PERMISOS de Hubstaff (owner/user), no el
 // puesto, y eso confunde más de lo que ayuda.
 //
-// Dos fuentes, en este orden:
-//   1) PROYECTO de Hubstaff — vale para TODOS los que fichan. Es la buena: 24 de 63
-//      miembros activos NO tienen cuenta en Maven, así que el rol de Maven solo por
-//      sí mismo borraría al 38% de la gente, chatters reales incluidos.
-//   2) ROL de Maven (user_roles) — solo para los linkeados.
+// ⚠️ SI LA PREGUNTA ES DE HUBSTAFF, LA RESPUESTA SALE DE HUBSTAFF. Regla de Jhon
+// (03/08): "si dice cuántos chatters hay conectados en hubstaff, ahí hay que mirar
+// el rol en hubstaff y no en maven, ni ningún otro lado".
+// Y en Hubstaff el puesto vive en el PROYECTO ("Chatters", "Chatters Meeting"):
+// `hubstaff_members.hubstaff_role` es solo user/manager/owner —permisos, no puesto—
+// (verificado: 57 user, 3 manager, 3 owner).
 //
-// Si ninguna resuelve, la función queda en null y ESO SE INFORMA. Una persona sin
+// El rol de Maven se devuelve como CONTEXTO, nunca como respuesta a una pregunta de
+// Hubstaff: son dos padrones distintos y 24 de 63 miembros activos ni siquiera
+// tienen cuenta en Maven. Sustituir una fuente por otra sin decirlo es cómo se
+// arma una respuesta que suena bien y es de otra cosa.
+//
+// Si no hay proyecto, la función queda en null y ESO SE INFORMA. Una persona sin
 // clasificar no puede desaparecer de un filtro en silencio: quien pregunta creería
 // que no fichó. Es el mismo error que "no pude leer" convertido en "no promocionó".
-type Funcion = { funcion: string | null; fuente: "proyecto_hubstaff" | "rol_maven" | null; proyectos: string[] };
+type Funcion = {
+  funcion: string | null;        // el proyecto de Hubstaff — la única fuente para preguntas de Hubstaff
+  proyectos: string[];
+  rol_maven: string | null;      // CONTEXTO, no clasificador
+};
 
 async function resolverFunciones(
   sb: AgentCtx["sb"],
@@ -129,24 +139,23 @@ async function resolverFunciones(
     if (!uid) continue;
     const proys = [...(proyectosPorUid.get(uid) ?? [])];
     const pid = String(r.profile_id ?? "");
-    const rolMaven = pid ? rolPorPid.get(pid) ?? null : null;
-    out.set(uid, proys.length
-      ? { funcion: proys[0], fuente: "proyecto_hubstaff", proyectos: proys }
-      : rolMaven
-        ? { funcion: rolMaven, fuente: "rol_maven", proyectos: [] }
-        : { funcion: null, fuente: null, proyectos: [] });
+    out.set(uid, {
+      funcion: proys[0] ?? null,
+      proyectos: proys,
+      rol_maven: pid ? rolPorPid.get(pid) ?? null : null,
+    });
   }
   return out;
 }
 
-// ¿Esta persona entra en lo que se pidió ("chatters", "closers", "managers")?
-// Compara sin acentos y por inclusión, para que "chatter" matchee "Chatter",
-// "Chatter Supervisor" y el proyecto "Chatters Meeting".
+// ¿Esta persona entra en lo que se pidió ("chatters", "closers", "cordis")?
+// Se compara SOLO contra los proyectos de Hubstaff, sin acentos y por inclusión:
+// pedir "chatters" tiene que traer también "Chatter Supervisor" y "Chatters
+// Meeting" — Jhon lo pidió explícito, es UN grupo aunque estén en varios proyectos.
 function coincideFuncion(f: Funcion, pedido: string): boolean {
   const q = normName(pedido).replace(/e?s$/, "");   // "chatters" → "chatter"
   if (!q) return true;
-  const campos = [f.funcion ?? "", ...f.proyectos];
-  return campos.some((c) => normName(c).includes(q));
+  return f.proyectos.some((c) => normName(c).includes(q));
 }
 
 export const equipoTools: AgentTool[] = [
@@ -422,9 +431,12 @@ export const equipoTools: AgentTool[] = [
         funcion: {
           type: "string",
           description:
-            "filtrar por función/área: 'chatters', 'closers', 'managers', 'warming'… Usalo SIEMPRE que pidan " +
-            "un grupo ('las horas de los chatters'). Matchea contra el proyecto de Hubstaff y el rol de Maven. " +
-            "La respuesta trae aparte a los que no se pudieron clasificar — nombralos, no los escondas.",
+            "filtrar por puesto DENTRO de Hubstaff: 'chatters', 'closers', 'cordis'… Usalo SIEMPRE que pidan un " +
+            "grupo ('cuántos chatters hay conectados en hubstaff', 'las horas de los chatters'). Matchea contra el " +
+            "PROYECTO de Hubstaff y trae todos sus proyectos: pedir 'chatters' incluye 'Chatter Supervisor' y " +
+            "'Chatters Meeting'. NO uses esto para preguntas de GRUPOS DE WHATSAPP ('del grupo X, cuántos están " +
+            "conectados') — eso es otra cosa: ahí primero get_group_members y después cruzás. " +
+            "La respuesta trae aparte a los que ficharon sin proyecto — nombralos, no los escondas.",
         },
         days: { type: "number", description: "últimos N días (default 7, máx 92). Ignorado si pasas from/to." },
         from: { type: "string", description: "fecha desde YYYY-MM-DD (opcional)" },
@@ -523,26 +535,45 @@ export const equipoTools: AgentTool[] = [
       // Función de cada persona (proyecto de Hubstaff > rol de Maven). Ver resolverFunciones.
       const funciones = await resolverFunciones(ctx.sb, rows as Array<Record<string, unknown>>, from, to);
       const fnDe = (r: Record<string, unknown>): Funcion =>
-        funciones.get(String(r.hubstaff_user_id ?? "")) ?? { funcion: null, fuente: null, proyectos: [] };
+        funciones.get(String(r.hubstaff_user_id ?? "")) ?? { funcion: null, proyectos: [], rol_maven: null };
 
       const pedido = String(args.funcion ?? "").trim();
       // Al filtrar por función se parte en TRES, no en dos: los que entran, los que
       // quedan fuera y —clave— los que NO se pudieron clasificar. Estos últimos no
       // pueden desaparecer: quien pregunta creería que no ficharon.
-      const conFuncion = rows.filter((r) => fnDe(r as Record<string, unknown>).funcion !== null);
       const sinClasificar = rows.filter((r) => fnDe(r as Record<string, unknown>).funcion === null);
       const filtradas = pedido
-        ? conFuncion.filter((r) => coincideFuncion(fnDe(r as Record<string, unknown>), pedido))
+        ? rows.filter((r) => coincideFuncion(fnDe(r as Record<string, unknown>), pedido))
         : rows;
+
+      // ⚠️ Si NADIE tiene proyecto, el filtro no puede responder — y contestar con el
+      // rol de Maven sería responder otra cosa (son padrones distintos: 24 de 63
+      // miembros no tienen cuenta en Maven). Se dice que falta el dato y por qué.
+      if (pedido && sinClasificar.length === rows.length) {
+        return {
+          error: "sin_dato_de_proyecto",
+          filtrado_por: pedido,
+          personas_en_el_rango: rows.length,
+          nota:
+            "Hubstaff no está trayendo el proyecto de cada persona (hubstaff_activities.project_name vacío), " +
+            "que es lo ÚNICO que dice quién es chatter/closer/cordi DENTRO de Hubstaff — el rol de Hubstaff es " +
+            "solo user/manager/owner. NO respondas con el rol de Maven: es otro padrón y 24 de 63 miembros ni " +
+            "siquiera tienen cuenta en Maven. Decí que falta ese dato y que hay que redesplegar el bridge; " +
+            "ofrecé el listado COMPLETO de quienes ficharon (sin separar por función) si le sirve igual.",
+        };
+      }
 
       const mapear = (r: Record<string, unknown>) => {
         const f = fnDe(r);
         return {
           nombre: r.name,
-          funcion: f.funcion,                       // qué HACE (chatter, manager…)
-          funcion_segun: f.fuente,                  // de dónde salió, para poder discutirlo
+          // Proyecto de Hubstaff = el puesto DENTRO de Hubstaff. Única fuente válida
+          // para "cuántos chatters/cordis hay conectados".
+          proyecto_hubstaff: f.funcion,
           ...(f.proyectos.length > 1 ? { proyectos: f.proyectos } : {}),
           rol_permisos_hubstaff: r.hubstaff_role,   // owner/user — NO es el puesto
+          // Contexto, NO clasificador: es el padrón de Maven, no el de Hubstaff.
+          rol_en_maven: f.rol_maven,
           en_maven: r.mapped_to_maven,
           horas: r.total_hours,
           actividad_pct: r.avg_activity_pct,
@@ -566,9 +597,10 @@ export const equipoTools: AgentTool[] = [
             horas: (r as Record<string, unknown>).total_hours,
           })),
           nota_sin_clasificar:
-            `${sinClasificar.length} persona(s) fichan pero no sé qué función tienen (sin proyecto en Hubstaff y ` +
-            `sin rol en Maven; hay 24 de 63 miembros sin cuenta en Maven). NO entraron en el filtro "${pedido}" ` +
-            "Y PODRÍAN SER DEL GRUPO. Nombralas aparte como \"sin clasificar\": omitirlas haría creer que no ficharon.",
+            `${sinClasificar.length} persona(s) ficharon SIN proyecto asignado en Hubstaff, así que Hubstaff no ` +
+            `dice qué son. NO entraron en el filtro "${pedido}" Y PODRÍAN SER DEL GRUPO. Nombralas aparte como ` +
+            "\"sin proyecto asignado\": omitirlas haría creer que no ficharon. Si alguna trae `rol_en_maven`, " +
+            "podés mencionarlo como pista DICIENDO que sale de Maven y no de Hubstaff — nunca como si fuera el dato de Hubstaff.",
         } : { sin_funcion_registrada: sinClasificar.length }) : {}),
       };
 
