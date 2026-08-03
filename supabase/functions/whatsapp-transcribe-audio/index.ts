@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
-import { logGroqAudioUsage } from "../_shared/usage.ts";
+import { logElevenLabsUsage, logGroqAudioUsage } from "../_shared/usage.ts";
 import { corregirTerminos } from "../_shared/whisper-postfix.ts";
 
 // whatsapp-transcribe-audio — transcribe audios del grupo con Whisper.
@@ -51,6 +51,21 @@ const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 // diferir si en el futuro Groq cambia el alias).
 const GROQ_BILLING_MODEL = "whisper-large-v3-turbo";
 
+// ── Audios de ÁLVARO → ElevenLabs Scribe PRIMERO (pedido de Jhon, 03/08) ──
+// Ese día Whisper tardó 40s con un audio suyo, el edge murió en 520 y el bot
+// publicó en 3 grupos sin la última instrucción; el rescate salió además
+// "[transcripción dudosa]". Sus audios son órdenes operativas: acá mandan
+// calidad y disponibilidad, no el costo ($0.40/h, solo sus audios). Whisper
+// (self-hosted → Groq) queda de RESPALDO si Scribe no responde.
+// Las dos identidades son del mismo Álvaro (lid global + jid del DM).
+// ⚠️ "Alvaro Mejia" (114426585833505@lid) es OTRA persona: no va acá.
+const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
+const SCRIBE_TIMEOUT_MS = 30_000;
+const SCRIBE_FIRST_SENDERS = new Set([
+  "192457652338690@lid",
+  "17866946354@s.whatsapp.net",
+]);
+
 interface TranscribeRequest {
   message_id?: string;
   // Modo batch: procesa audios pending (catch-up).
@@ -83,7 +98,7 @@ interface WhisperResponse {
 }
 
 type TranscribeResult =
-  | { ok: true; text: string; duration_s: number; provider: "self_hosted" | "groq"; dudosa: boolean; confianza: string }
+  | { ok: true; text: string; duration_s: number; provider: "self_hosted" | "groq" | "elevenlabs"; dudosa: boolean; confianza: string }
   | { ok: false; error: string };
 
 // ¿La transcripción es confiable? Whisper lo venía diciendo y no lo mirábamos.
@@ -238,9 +253,64 @@ async function callWhisperEndpoint(
   }
 }
 
+// ElevenLabs Scribe — primario para los audios de Álvaro. Mismo request que
+// qa-transcribe (misma key, mismo endpoint); acá sin diarización (una sola voz).
+async function transcribeScribe(blob: Blob): Promise<TranscribeResult> {
+  const mime = blob.type || "audio/ogg";
+  const ext = mime.includes("mp4") || mime.includes("m4a")
+    ? "m4a"
+    : mime.includes("mpeg")
+    ? "mp3"
+    : mime.includes("wav")
+    ? "wav"
+    : mime.includes("webm")
+    ? "webm"
+    : "ogg";
+  const form = new FormData();
+  form.append("file", new File([blob], `wa_audio.${ext}`, { type: mime }));
+  form.append("model_id", "scribe_v1");
+  form.append("language_code", "spa");
+  // Timestamps por palabra: la duración (fin de la última palabra) alimenta el
+  // log de costo — Scribe no devuelve duration como Whisper.
+  form.append("timestamps_granularity", "word");
+
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), SCRIBE_TIMEOUT_MS);
+  try {
+    const resp = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+      method: "POST",
+      headers: { "xi-api-key": ELEVENLABS_API_KEY },
+      body: form,
+      signal: ac.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      return { ok: false, error: `scribe ${resp.status}: ${errText.slice(0, 200)}` };
+    }
+    const data = (await resp.json()) as { text?: string; words?: Array<{ end?: number }> };
+    const text = (data.text ?? "").trim();
+    if (!text) return { ok: false, error: "scribe_empty_transcript" };
+    const dur = data.words?.length ? Math.ceil(data.words[data.words.length - 1].end ?? 0) : 0;
+    // Scribe no expone logprobs tipo Whisper → sin heurística de confianza. Su
+    // precisión en español es justamente la razón de usarlo acá.
+    return { ok: true, text, duration_s: dur, provider: "elevenlabs", dudosa: false, confianza: "scribe_v1" };
+  } catch (e) {
+    clearTimeout(timeoutId);
+    const aborted = (e as Error).name === "AbortError";
+    return { ok: false, error: aborted ? `scribe_timeout_${SCRIBE_TIMEOUT_MS / 1000}s` : (e as Error).message };
+  }
+}
+
 // Transcribe usando self-hosted primero, fallback a Groq si falla.
+// Con scribeFirst (audios de Álvaro): ElevenLabs primero y Whisper de respaldo.
 // Devuelve qué provider terminó atendiendo, para el logging y telemetría.
-async function transcribeWithFallback(blob: Blob): Promise<TranscribeResult> {
+async function transcribeWithFallback(blob: Blob, scribeFirst = false): Promise<TranscribeResult> {
+  if (scribeFirst && ELEVENLABS_API_KEY) {
+    const r = await transcribeScribe(blob);
+    if (r.ok) return r;
+    console.warn("scribe (audio de Álvaro) falló → sigue Whisper:", r.error);
+  }
   // 1. Self-hosted (preferido si está configurado).
   if (SELF_HOSTED_URL) {
     const authHeader = SELF_HOSTED_KEY ? `Bearer ${SELF_HOSTED_KEY}` : null;
@@ -312,7 +382,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
 
   const { data: msg, error: msgErr } = await sb
     .from("whatsapp_messages")
-    .select("id, tenant_id, group_id, msg_type, media_url, transcribed_text, analyzed_at, is_from_bot, raw")
+    .select("id, tenant_id, group_id, msg_type, media_url, transcribed_text, analyzed_at, is_from_bot, raw, sender_external_id")
     .eq("id", messageId)
     .single();
 
@@ -384,7 +454,10 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: blob.error };
   }
 
-  const result = await transcribeWithFallback(blob);
+  const result = await transcribeWithFallback(
+    blob,
+    SCRIBE_FIRST_SENDERS.has(String(msg.sender_external_id ?? "")),
+  );
   if (!result.ok) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,
@@ -424,6 +497,15 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
       characters: result.text.length,
       tenantId: msg.tenant_id,
       context: { message_id: msg.id, group_id: msg.group_id, provider: "groq" },
+    });
+  } else if (result.provider === "elevenlabs") {
+    void logElevenLabsUsage({
+      operation: "whatsapp-transcribe-audio",
+      model: "scribe_v1",
+      audioSeconds: result.duration_s,
+      characters: result.text.length,
+      tenantId: msg.tenant_id,
+      context: { message_id: msg.id, group_id: msg.group_id, provider: "elevenlabs" },
     });
   }
 
