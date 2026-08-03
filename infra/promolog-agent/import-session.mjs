@@ -13,14 +13,20 @@
 //   node import-session.mjs instagram a    # instagram.com → sessions/a.json
 //   node import-session.mjs x --testing    # forzar un navegador (ver lista abajo)
 //
-// Detecta solo qué navegadores hay instalados y usa el más recientemente usado.
-// Importa: en las Mac Minis puede haber SOLO "Chrome for Testing" (el que instala
-// Playwright), que guarda su perfil en otra carpeta que Chrome normal.
+// NO adivina dónde está la sesión: revisa TODOS los navegadores instalados y TODOS
+// sus perfiles, y usa el que de verdad tiene la cookie de login. Dos cosas que
+// rompían la adivinanza:
+//   · en las Mac Minis puede haber solo "Chrome for Testing" (el que instala
+//     Playwright), con su perfil en otra carpeta que Chrome normal;
+//   · un mismo Chrome tiene un perfil por cuenta ("Default", "Profile 1"…) y las
+//     cookies del perfil "Work" no están en Default.
+// Mirando un solo lugar, el error era "no estás logueado" — falso, y mandaba a
+// re-loguearse donde no correspondía.
 //
 // Requiere el navegador CERRADO (macOS bloquea el archivo de cookies si está abierto).
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, unlinkSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, unlinkSync, existsSync, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createDecipheriv, pbkdf2Sync } from "node:crypto";
 import { homedir } from "node:os";
@@ -66,48 +72,60 @@ const NAVEGADORES = [
   { flag: "--edge", nombre: "Microsoft Edge", dir: join(APP_SUPPORT, "Microsoft Edge"), llavero: [["Microsoft Edge Safe Storage", "Microsoft Edge"]] },
 ];
 
-const cookiesDe = (n) => join(n.dir, "Default", "Cookies");
-const instalados = NAVEGADORES.filter((n) => existsSync(cookiesDe(n)));
-if (!instalados.length) {
-  console.error("No encontré ningún navegador con perfil en esta máquina.");
-  console.error("Buscado en: " + NAVEGADORES.map((n) => n.dir.replace(homedir(), "~")).join(", "));
-  process.exit(1);
+// ── PERFILES ─────────────────────────────────────────────────────────────────
+// ⚠️ Un navegador NO tiene una sola carpeta de cookies. Chrome guarda cada perfil
+// aparte: "Default", "Profile 1", "Profile 2"… Si la persona usa un perfil con
+// nombre (el chip "Work" arriba a la derecha), sus cookies NO están en Default —
+// y mirar solo ahí daba "no se encontraron cookies de ese sitio (¿estás logueado?)",
+// que es un diagnóstico equivocado: sí estaba logueada, en otro perfil.
+// Pasó el 02/08 en la Mac Mini.
+function perfilesDe(nav) {
+  if (!existsSync(nav.dir)) return [];
+  // Nombre lindo del perfil ("Work", "Personal") desde Local State, si está.
+  let nombres = {};
+  try {
+    const ls = JSON.parse(readFileSync(join(nav.dir, "Local State"), "utf8"));
+    for (const [dir, info] of Object.entries(ls?.profile?.info_cache ?? {})) nombres[dir] = info?.name;
+  } catch { /* sin Local State: se usan los nombres de carpeta */ }
+  return readdirSync(nav.dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(join(nav.dir, d.name, "Cookies")))
+    .map((d) => ({
+      nav, carpeta: d.name, nombre: nombres[d.name] || d.name,
+      cookiesDb: join(nav.dir, d.name, "Cookies"),
+      usado: statSync(join(nav.dir, d.name, "Cookies")).mtimeMs,
+    }));
 }
-// Si se pidió uno explícitamente y NO está instalado, se corta. Caer al que sí
-// está sería importar la sesión equivocada sin avisar: la persona pidió ese
-// navegador porque es donde se logueó.
+
 const flagPedido = NAVEGADORES.find((n) => process.argv.includes(n.flag));
-if (flagPedido && !existsSync(cookiesDe(flagPedido))) {
-  console.error(`Pediste ${flagPedido.nombre}, pero no tiene perfil en esta máquina (${flagPedido.dir.replace(homedir(), "~")}).`);
-  console.error(`Instalados acá: ${instalados.map((n) => `${n.nombre} (${n.flag})`).join(", ")}`);
+const candidatos = (flagPedido ? [flagPedido] : NAVEGADORES).flatMap(perfilesDe).sort((a, b) => b.usado - a.usado);
+if (!candidatos.length) {
+  if (flagPedido) {
+    console.error(`Pediste ${flagPedido.nombre}, pero no tiene ningún perfil en esta máquina (${flagPedido.dir.replace(homedir(), "~")}).`);
+    console.error(`Con perfil acá: ${NAVEGADORES.flatMap(perfilesDe).map((p) => `${p.nav.nombre} ${p.nav.flag}`).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "ninguno"}`);
+  } else {
+    console.error("No encontré ningún navegador con perfil en esta máquina.");
+    console.error("Buscado en: " + NAVEGADORES.map((n) => n.dir.replace(homedir(), "~")).join(", "));
+  }
   process.exit(1);
 }
-const pedido = flagPedido ?? null;
-// Sin flag: el que se usó más recientemente. Es casi siempre en el que la persona
-// acaba de loguearse, que es justo lo que se quiere importar.
-const nav = pedido ?? instalados.map((n) => ({ n, t: statSync(cookiesDe(n)).mtimeMs })).sort((a, b) => b.t - a.t)[0].n;
+console.log(`🔎 Perfiles a revisar (${candidatos.length}): ${candidatos.map((p) => `${p.nav.nombre}/${p.nombre}`).join(" · ")}`);
 
-console.log(`🌐 Navegador: ${nav.nombre}${pedido ? "" : "  (el usado más recientemente)"}`);
-if (instalados.length > 1) {
-  console.log(`   Otros disponibles: ${instalados.filter((n) => n !== nav).map((n) => `${n.nombre} (${n.flag})`).join(", ")}`);
-}
-const cookiesDb = cookiesDe(nav);
-
-// 1) Clave de cifrado: viene del Llavero de macOS. Cada navegador guarda la suya
-// con su propio nombre de servicio; Chrome for Testing puede usar el de Chrome o
-// el de Chromium según cómo se haya construido, así que se prueban los dos.
-function chromeKey() {
-  const fallos = [];
+// La clave del Llavero es POR NAVEGADOR (no por perfil). Se cachea: si no, macOS
+// pediría permiso una vez por perfil revisado.
+const clavesCache = new Map();
+function claveDe(nav) {
+  if (clavesCache.has(nav.nombre)) return clavesCache.get(nav.nombre);
+  let clave = null;
   for (const [service, account] of nav.llavero) {
     try {
       const pass = execFileSync("security", ["find-generic-password", "-w", "-s", service, "-a", account],
         { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-      return pbkdf2Sync(pass, "saltysalt", 1003, 16, "sha1");
-    } catch (e) { fallos.push(`${service}/${account}`); }
+      clave = pbkdf2Sync(pass, "saltysalt", 1003, 16, "sha1");
+      break;
+    } catch { /* probamos el siguiente nombre de servicio */ }
   }
-  console.error(`No pude leer la clave de cifrado de ${nav.nombre} en el Llavero (probé: ${fallos.join(", ")}).`);
-  console.error("Si macOS mostró un cuadro de diálogo pidiendo permiso, hay que darle a «Permitir siempre».");
-  process.exit(1);
+  clavesCache.set(nav.nombre, clave);
+  return clave;
 }
 function decryptCookie(buf, key) {
   if (!buf || buf.length === 0) return "";
@@ -127,53 +145,75 @@ function decryptCookie(buf, key) {
   return out.toString("utf8").replace(/[\x00-\x1F\x7F]/g, "");
 }
 
-const tmp = "/tmp/promolog-cookies.db";
-try { copyFileSync(cookiesDb, tmp); } catch (e) { console.error(`No pude leer ${cookiesDb}: ${e.message}`); process.exit(1); }
-
 // OJO: LIKE '%x.com' también matchea netflix.com (termina en "x.com"). Hay que
 // anclar al límite del dominio: exacto, o subdominio (".x.com").
 const hostFilter = SITES[site].hosts.map((h) => `host_key = '${h}' OR host_key = '.${h}' OR host_key LIKE '%.${h}'`).join(" OR ");
-const rows = execFileSync("sqlite3", ["-separator", "\t", tmp,
-  `SELECT host_key, name, hex(encrypted_value), path, expires_utc, is_secure, is_httponly, samesite FROM cookies WHERE ${hostFilter};`,
-], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }).trim().split("\n").filter(Boolean);
-unlinkSync(tmp);
 
-const key = chromeKey();
-const cookies = [];
-for (const line of rows) {
-  const [host, name, hexVal, path, expires, secure, httponly, samesite] = line.split("\t");
-  let value = "";
-  try { value = decryptCookie(Buffer.from(hexVal, "hex"), key); } catch { /* */ }
-  if (!value) continue;
-  // Chrome guarda expires en microsegundos desde 1601; Playwright quiere segundos unix.
-  const exp = Number(expires) > 0 ? Math.floor(Number(expires) / 1e6 - 11644473600) : -1;
-  // Playwright valida el shape: sameSite:"None" EXIGE secure:true (si no, rechaza
-  // TODO el storageState con "Invalid cookie fields"). Normalizamos.
-  const isSecure = secure === "1";
-  let sameSite = samesite === "2" ? "Strict" : samesite === "1" ? "Lax" : "None";
-  if (sameSite === "None" && !isSecure) sameSite = "Lax";
-  if (!name) continue;
-  cookies.push({
-    name, value, domain: host, path: path || "/",
-    expires: Number.isFinite(exp) && exp > 0 ? exp : -1,
-    httpOnly: httponly === "1", secure: isSecure, sameSite,
-  });
+// Lee las cookies del sitio en UN perfil. Devuelve [] si no hay o si no se pudo.
+function cookiesDelPerfil(p) {
+  const tmp = "/tmp/promolog-cookies.db";
+  try { copyFileSync(p.cookiesDb, tmp); } catch { return []; }
+  let rows = [];
+  try {
+    rows = execFileSync("sqlite3", ["-separator", "\t", tmp,
+      `SELECT host_key, name, hex(encrypted_value), path, expires_utc, is_secure, is_httponly, samesite FROM cookies WHERE ${hostFilter};`,
+    ], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n").filter(Boolean);
+  } catch { /* base bloqueada o corrupta */ }
+  try { unlinkSync(tmp); } catch { /* */ }
+  const key = claveDe(p.nav);
+  if (!key) return [];
+  const out = [];
+  for (const line of rows) {
+    const [host, name, hexVal, path, expires, secure, httponly, samesite] = line.split("\t");
+    let value = "";
+    try { value = decryptCookie(Buffer.from(hexVal, "hex"), key); } catch { /* */ }
+    if (!value || !name) continue;
+    // Chrome guarda expires en microsegundos desde 1601; Playwright quiere segundos unix.
+    const exp = Number(expires) > 0 ? Math.floor(Number(expires) / 1e6 - 11644473600) : -1;
+    // Playwright valida el shape: sameSite:"None" EXIGE secure:true (si no, rechaza
+    // TODO el storageState con "Invalid cookie fields"). Normalizamos.
+    const isSecure = secure === "1";
+    let sameSite = samesite === "2" ? "Strict" : samesite === "1" ? "Lax" : "None";
+    if (sameSite === "None" && !isSecure) sameSite = "Lax";
+    out.push({
+      name, value, domain: host, path: path || "/",
+      expires: Number.isFinite(exp) && exp > 0 ? exp : -1,
+      httpOnly: httponly === "1", secure: isSecure, sameSite,
+    });
+  }
+  return out;
 }
-if (!cookies.length) { console.error("No se encontraron cookies de ese sitio (¿estás logueado en ese navegador?)."); process.exit(1); }
 
-// ── VERIFICAR ANTES DE ESCRIBIR ──────────────────────────────────────────────
-// Encontrar cookies del dominio NO es lo mismo que encontrar una sesión: un Chrome
-// deslogueado igual tiene guest_id, datr, lang… Antes se escribía el archivo igual
-// y solo se avisaba con un "(ojo: no veo cookies de sesión)" al final, que es fácil
-// de pasar por alto — y deja una sesión rota que recién falla en el próximo scan.
-const estado = { cookies, origins: [] };
-if (!tieneSesion(estado, site)) {
-  console.error(`❌ Hay ${cookies.length} cookies de ${site}, pero falta ${QUE_FALTA[site]}: ese navegador NO está logueado.`);
-  console.error(`   Abrí ${SITES[site].origin} EN ${nav.nombre.toUpperCase()} (no en otro), logueate, CERRÁ el navegador y repetí.`);
-  if (instalados.length > 1) console.error(`   Si te logueaste en otro, elegilo: ${instalados.filter((n) => n !== nav).map((n) => n.flag).join(" o ")}`);
+// ── BUSCAR LA SESIÓN, NO ADIVINAR DÓNDE ESTÁ ─────────────────────────────────
+// Antes se elegía un navegador/perfil por heurística y se importaba de ahí. Si la
+// corazonada fallaba, el mensaje era "no estás logueado" — un diagnóstico falso.
+// Ahora se revisan TODOS y se usa el que de verdad tiene la cookie de sesión; el
+// informe dice qué se miró y qué se encontró en cada uno.
+const revisados = [];
+let elegido = null;
+for (const p of candidatos) {
+  const cookies = cookiesDelPerfil(p);
+  const logueado = cookies.length > 0 && tieneSesion({ cookies, origins: [] }, site) === true;
+  revisados.push({ p, n: cookies.length, logueado });
+  if (logueado && !elegido) { elegido = { p, cookies }; break; }   // el más recién usado gana
+}
+
+for (const r of revisados) {
+  const etiqueta = `${r.p.nav.nombre}/${r.p.nombre}`.padEnd(34);
+  console.log(`   ${r.logueado ? "✅" : "· "} ${etiqueta} ${r.n === 0 ? "sin cookies del sitio" : `${r.n} cookies, ${r.logueado ? "LOGUEADO" : "sin sesión"}`}`);
+}
+
+if (!elegido) {
+  console.error(`\n❌ Ninguno de los ${revisados.length} perfiles revisados tiene sesión de ${site} (falta ${QUE_FALTA[site]}).`);
+  console.error(`   Abrí ${SITES[site].origin}, logueate, CERRÁ el navegador entero y repetí.`);
+  console.error("   Si te logueaste recién, puede que el navegador todavía no haya escrito las cookies al disco: cerralo del todo (Cmd+Q).");
   console.error("   (No escribí nada: la sesión anterior queda como estaba.)");
   process.exit(1);
 }
+const { p: nav_perfil, cookies } = elegido;
+const nav = nav_perfil.nav;
+console.log(`\n🌐 Uso: ${nav.nombre} · perfil "${nav_perfil.nombre}"`);
+const estado = { cookies, origins: [] };
 
 // destino: la cuenta indicada, o la primera de esa red
 const list = accountsOf(site);
