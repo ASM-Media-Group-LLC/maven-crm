@@ -726,12 +726,12 @@ Régimen pedido por Álvaro (03/08): en los cortes (9am·11am·1pm·3pm·5pm·7p
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - Quien no contó nada en el período: "sin novedades en el grupo esta tanda" — sin acusar (puede estar trabajando); si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor.
 - Al final, UNA línea recordando (con variación, no siempre igual) que pueden ir mandando todo por ti — es más rápido y no pierden tiempo.
-- 🔒 PROHIBIDO EN EL GRUPO: horas, actividad o porcentajes de HUBSTAFF. Es dato PRIVADO: va solo en el reporte directo al jefe (eso lo arma otro proceso, no tú). Regla dura — ni una mención.
+- HUBSTAFF EN EL CORTE (Álvaro lo pidió explícito, 03/08): el bloque del equipo viene en el initial_user_message — pon las horas + % de actividad de cada persona AL LADO de su línea (ej. "· Daniel (5h14, 61%): 15 textos…"). Si alguien figura "sin Hubstaff hoy", dilo neutro, sin acusar. Usa SOLO los números del bloque — nunca de memoria.
 - UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
 
 CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
 - Es el resumen del DÍA completo: qué se logró, avances reales, y la *NOTA de 1 a 10 por persona* (con decimales) por participación + avance real. Una línea por persona: nota + razón corta. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos).
-- Puedes consultar tools (reportes del día, pipeline, hubstaff del equipo) para CALIBRAR la nota — pero la regla de arriba sigue: JAMÁS publiques horas/actividad/porcentajes de Hubstaff en el grupo.
+- El Hubstaff del equipo (viene en el initial_user_message) entra a la nota Y se muestra: día completo trackeado suma, actividad muy baja resta. Puedes consultar tools (reportes del día, pipeline) para calibrar el resto.
 - Tono: jefe cercano, exigente y justo. Cierra con el objetivo de mañana en una línea.
 
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
@@ -5064,6 +5064,15 @@ async function buildInitialUserMessage(args: {
         ? `[${m.msg_type === "audio" ? "audio" : "imagen"}] ${m.transcribed_text}`
         : m.body;
       if (texto) lines.push(`[${m.sent_at}] ${sender}: ${texto}`);
+    }
+    // Hubstaff del equipo de ESTE grupo — Álvaro pidió (03/08) que salga también
+    // en el corte público, al lado de cada persona. Inyectado acá para que no
+    // dependa de que el modelo llame una tool.
+    const { data: hubBloque } = await sb.rpc("corte_hubstaff_bloque", { p_group_id: args.groupId });
+    if (hubBloque) {
+      lines.push("");
+      lines.push("HUBSTAFF DEL EQUIPO HOY (inclúyelo en el corte: horas + % de actividad al lado de cada persona; usa SOLO estos números):");
+      lines.push(String(hubBloque));
     }
     lines.push("");
     lines.push("Compón el corte y publícalo con UNA llamada a reply_to_group. Si el período vino sin mensajes, publica el corte igual: 'sin novedades en el grupo esta tanda' — y antes consulta tools (reportes del día, pipeline, ventas de hoy) por si Maven muestra trabajo que el grupo no contó, para rescatarlo a favor del equipo.");
