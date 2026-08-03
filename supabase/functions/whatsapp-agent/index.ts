@@ -256,6 +256,13 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí dilo.
 - NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisa en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usa lookup_lead_history(@handle) y mira el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confírmaselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí di que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asume que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
 
+IMÁGENES QUE NO SE PUDIERON VER:
+- Si una imagen del contexto aparece como "[análisis falló: …]", NO pudiste verla. Dilo tal cual ("no pude ver la imagen que mandaste — ¿me la reenvías o me cuentas qué muestra?") y sigue con lo que sí sabes. PROHIBIDO responder como si la hubieras visto ("recibido, con foto…" cuando el análisis falló es mentirle a la persona — pasó el 03/08 con las capturas de Lizeth).
+
+PREFERENCIAS DE MIEMBROS DEL EQUIPO (no-owner):
+- Cuando alguien del equipo te corrige CÓMO trabajar con él/ella ("yo contacto solo por WhatsApp, no IG", "pásame los números en lista"), eso se persiste con remember_fact sobre ESA persona + confirmación corta. add_persistent_rule es SOLO para el owner/Álvaro.
+- PROHIBIDO decir "guardado/lo tengo/anotado" sin haber llamado una tool de escritura en ESTA corrida — la guarda de salida te va a rebotar el mensaje.
+
 BÚSQUEDA WEB (web_search) — INVESTIGACIÓN DE INDUSTRIA:
 - Tienes búsqueda web real. Úsala cuando pidan benchmarks, "qué hace la industria", mejores prácticas o propuestas basadas en el mercado (ej. estrategias de pricing de suscripciones, tácticas de retención de otras agencias). Busca, lee y arma la propuesta — ya no digas "no tengo esa data".
 - 🔒 REGLA DURA DE PRIVACIDAD: JAMÁS pongas en una búsqueda datos internos — ni nombres/handles de creadoras, ni cifras nuestras, ni nombres del equipo, ni "Kash". Las consultas son GENÉRICAS de industria ("OnlyFans subscription pricing strategy", "OF agency retention tactics").
@@ -5637,10 +5644,13 @@ async function runAgent(req: AgentRequest): Promise<{
   // "marcad|gestionad" se sumaron el 31/07: "las 5 quedan marcadas gestionadas en
   // Maven" pasaba limpio (esa vez era verdad, pero el hueco existía).
   const PATRONES_ACK_FALSO: RegExp[] = [
-    /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad)/i,
-    /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad)/i,
-    /\b(?:lo|la|los|las)\s+(?:registr|anot|agend)(?:é|e|amos|ó)\b/i,
-    /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend)/i,
+    // "guardad" se sumó el 03/08: "Ya lo tengo guardado" (a María, sin tool de
+    // escritura en la corrida) pasó limpio por no estar el participio.
+    /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
+    /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
+    /\b(?:lo|la|los|las)\s+tengo\s+guardad/i,
+    /\b(?:lo|la|los|las)\s+(?:registr|anot|agend|guard)(?:é|e|amos|ó)\b/i,
+    /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend|guard|teng)/i,
     /\bte\s+lo\s+(?:registr|anot|agend|dej)/i,
     // Participio suelto al inicio de mensaje O DE LÍNEA (flag m): "Anotado: ...",
     // "Registrado.", "Listo, anotado", "Anotadas las 3 cuentas", "Dale.\nAnotado: ...".
@@ -5648,7 +5658,7 @@ async function runAgent(req: AgentRequest): Promise<{
     // creyó guardada una preferencia de formato que nunca se escribió. El imperativo
     // ("anotá esto") NO matchea (exige la d del participio) y "listo" solo dispara
     // si le sigue el participio ("Listo, no lo mando yo" pasa).
-    /^\s*(?:listo[,!.]?\s+)?(?:anotad|registrad|agendad|apuntad|marcad|gestionad)[oa]s?\b/im,
+    /^\s*(?:listo[,!.]?\s+)?(?:anotad|registrad|agendad|apuntad|marcad|gestionad|guardad)[oa]s?\b/im,
     // "Tomo/tomé nota" = la misma promesa de registro con otras palabras.
     /\btom[oé]\s+nota\b/i,
   ];

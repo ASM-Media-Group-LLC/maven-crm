@@ -176,6 +176,7 @@ async function callLlmVision(
   imageBytes: Uint8Array,
   mime: string,
   contextHint: string | null,
+  modelOverride?: string,
 ): Promise<{ analysis: VisionAnalysis; usage: Record<string, number> } | { error: string }> {
   const dataUri = `data:${mime};base64,${bytesToBase64(imageBytes)}`;
   const promptText = contextHint
@@ -183,7 +184,7 @@ async function callLlmVision(
     : VISION_PROMPT;
 
   const body = {
-    model: LLM_MODEL,
+    model: modelOverride ?? LLM_MODEL,
     messages: [
       {
         role: "user",
@@ -358,7 +359,15 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // priorice extraer info relevante a ese contexto.
   const contextHint = msg.body && msg.body !== "[imagen]" ? msg.body : null;
 
-  const result = await callLlmVision(downloaded.data, downloaded.mime, contextHint);
+  let result = await callLlmVision(downloaded.data, downloaded.mime, contextHint);
+  // Gemini a veces rechaza la imagen entera ("Unable to process input image",
+  // 400) — pasó el 03/08 con las capturas de Lizeth: el bot quedó ciego y
+  // encima respondió como si la hubiera visto. Ante un 4xx del provider se
+  // reintenta UNA vez con un modelo de visión distinto antes de rendirse.
+  if ("error" in result && /openrouter 4\d\d/.test(result.error)) {
+    console.warn("vision primario rechazó la imagen, reintento con fallback:", result.error.slice(0, 120));
+    result = await callLlmVision(downloaded.data, downloaded.mime, contextHint, "openai/gpt-4o-mini");
+  }
   if ("error" in result) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,

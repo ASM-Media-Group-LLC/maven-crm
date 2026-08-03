@@ -250,8 +250,18 @@ async function checkCloser(
       .filter((r) => closerIds.has(r.user_id));
     if (closers.length === 0) return;
 
+    // Nombre REAL del perfil, no el display de WhatsApp: María figura como
+    // "Msv" y el primer mensaje grupal salió "@Msv" (03/08).
+    const { data: profs } = await sb
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", closers.map((c) => c.user_id));
+    const nombreDe = new Map(
+      ((profs ?? []) as Array<{ id: string; full_name: string | null }>)
+        .map((p) => [p.id, String(p.full_name ?? "").trim().split(" ")[0]]),
+    );
     const porCloser = await Promise.all(closers.map(async (c) => ({
-      nombre: (c.display_name ?? "").trim().split(" ")[0] || "closer",
+      nombre: nombreDe.get(c.user_id) || (c.display_name ?? "").trim().split(" ")[0] || "closer",
       s: await getCloserStatsToday(sb, c.user_id, now.date),
     })));
     const total = porCloser.reduce((a, x) => a + x.s.calls, 0);
