@@ -32,6 +32,12 @@ export interface AgentCtx {
   // closers) y no existe ninguna línea 'sales'. undefined ⇒ solo su propio
   // department; [] ⇒ no lee bandeja. El modelo no puede salirse de la lista.
   inboxDepartments?: string[] | null;
+  // Instante (ms epoch) en que se agota el presupuesto de la corrida del agente.
+  // Las tools con esperas largas (read_webpage, refresh de Hubstaff) deben clampear
+  // sus timeouts a lo que quede: read_webpage abortaba a los 28s — el 93% del
+  // presupuesto de 30s del agente en UNA llamada (parte de los 165s del caso María,
+  // 03/08). undefined ⇒ sin presupuesto (invocación fuera del agente): timeouts propios.
+  deadlineAt?: number;
 }
 
 export interface AgentTool {

@@ -14,9 +14,19 @@ import type { AgentTool, AgentCtx } from "./types.ts";
 // verde falsa). Tampoco medirla por el espaciado entre starts_at.
 const HUBSTAFF_FEED_STALE_MIN = 30;
 // Espera máxima del refresh on-demand (cola hubstaff_sync_requests, la consume
-// el bridge). El agente tiene 30s de pared: 12s dejan margen para el resto de
-// la corrida. Si no llega a tiempo, se responde igual con el feed actual.
+// el bridge). 12s es el techo PROPIO; en una corrida del agente se clampea además
+// al presupuesto que quede (ctx.deadlineAt, ver clampAlPresupuesto). Si no llega
+// a tiempo, se responde igual con el feed actual.
 const HUBSTAFF_REFRESH_WAIT_MS = 12_000;
+
+// Clampea un timeout propio al presupuesto que le queda a la corrida del agente
+// (ctx.deadlineAt). Sin esto, una sola tool podía comerse el presupuesto entero:
+// read_webpage abortaba a los 28s — el 93% de los 30s del agente (parte de los
+// 165s del caso María, 03/08). Piso de 1.5s: un timeout menor no deja ni resolver
+// DNS y conviene fallar rápido y claro. Sin deadlineAt (invocación fuera del
+// agente) se usa el timeout propio.
+const clampAlPresupuesto = (propioMs: number, deadlineAt?: number): number =>
+  deadlineAt ? Math.max(1_500, Math.min(propioMs, deadlineAt - Date.now())) : propioMs;
 
 const horaBogota = (ts: string | null): string | null =>
   ts ? new Date(Date.parse(ts) - 5 * 3600_000).toISOString().slice(11, 16) : null;
@@ -314,11 +324,11 @@ export const equipoTools: AgentTool[] = [
     },
     domain: "equipo",
     scope: "read",
-    handler: async (args, _ctx) => {
-      // GET público sin auth (lo pasó Brayan 31/07). Timeout corto: el agente
-      // tiene 30s de pared y esto es un JSON chico servido por su dashboard.
+    handler: async (args, ctx) => {
+      // GET público sin auth (lo pasó Brayan 31/07). Timeout corto (8s propio,
+      // clampeado al presupuesto restante del agente): es un JSON chico.
       const ac = new AbortController();
-      const t = setTimeout(() => ac.abort(), 8_000);
+      const t = setTimeout(() => ac.abort(), clampAlPresupuesto(8_000, ctx.deadlineAt));
       let data: {
         updated?: string | null;
         counts?: { total?: number; activas?: number; baneadas?: number; porCrear?: number };
@@ -381,14 +391,14 @@ export const equipoTools: AgentTool[] = [
     },
     domain: "equipo",
     scope: "read",
-    handler: async (args, _ctx) => {
+    handler: async (args, ctx) => {
       const url = String(args?.url ?? "").trim();
       if (!/^https?:\/\//i.test(url)) return { error: "url_invalida", nota: "Pasá una URL completa https://…" };
       const READER_URL = (Deno.env.get("WEB_READER_URL") ?? "").replace(/\/+$/, "");
       const READER_TOKEN = Deno.env.get("WEB_READER_TOKEN") ?? "";
       if (!READER_URL || !READER_TOKEN) return { error: "lector_no_configurado", nota: "El micro web-reader todavía no está desplegado/cableado (WEB_READER_URL/WEB_READER_TOKEN). Decí que aún no podés leer páginas web, no inventes." };
       const ac = new AbortController();
-      const t = setTimeout(() => ac.abort(), 28_000);
+      const t = setTimeout(() => ac.abort(), clampAlPresupuesto(28_000, ctx.deadlineAt));
       try {
         const resp = await fetch(`${READER_URL}/read`, {
           method: "POST",
@@ -639,7 +649,7 @@ export const equipoTools: AgentTool[] = [
             .single();
           if (reqRow?.id != null) {
             refresh.pedido = true;
-            const deadline = Date.now() + HUBSTAFF_REFRESH_WAIT_MS;
+            const deadline = Date.now() + clampAlPresupuesto(HUBSTAFF_REFRESH_WAIT_MS, ctx.deadlineAt);
             let estado = "pending";
             while (Date.now() < deadline) {
               await new Promise((r) => setTimeout(r, 2_000));

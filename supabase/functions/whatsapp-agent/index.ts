@@ -1708,7 +1708,7 @@ async function resolveMembersByName(
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; inboxDepartments?: string[] | null; privileged?: boolean; canSeePhones?: boolean },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; inboxDepartments?: string[] | null; privileged?: boolean; canSeePhones?: boolean; deadlineAt?: number },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -4309,6 +4309,7 @@ async function executeTool(
             inboxDepartments: ctx.inboxDepartments ?? null,
             privileged: ctx.privileged,
             canSeePhones: ctx.canSeePhones,
+            deadlineAt: ctx.deadlineAt,
           });
           return { result };
         } catch (e) {
@@ -5374,13 +5375,6 @@ async function runAgent(req: AgentRequest): Promise<{
     lockObtenido = got;
   }
 
-  // ⚠️ startedAt va DESPUÉS de la espera del lock, no antes. El presupuesto de pared
-  // (MAX_WALL_MS = 30s) mide cuánto puede trabajar la corrida, NO cuánto estuvo
-  // haciendo cola. Con el reloj arrancando antes de la espera (que llega a 33s), una
-  // corrida que esperaba el lock entraba al loop ya vencida, rompía en iter=0 y
-  // devolvía ok:true SIN responder y SIN loguear nada: el bot quedaba mudo justo en el
-  // caso que el single-flight venía a resolver. No se disparó en prod, pero estaba armado.
-  const startedAt = Date.now();
   // Relojes de la corrida. Sirven para saber en qué se fue el tiempo: hoy `agent_silent`
   // trae `iterations` pero ni un milisegundo, así que los 165s de la corrida de María
   // (03/08) no se pueden atribuir a lock, transcripción, modelo o tools. Sin esto, subir
@@ -5402,10 +5396,22 @@ async function runAgent(req: AgentRequest): Promise<{
     isOwner: senderCtx.isOwner,
     department: botCfg?.department ?? null,
   });
-  // Armar el prompt puede esperar hasta ~24s a que Whisper termine un audio pendiente
-  // (buildInitialUserMessage). Hoy ese tiempo sale del MISMO presupuesto que el trabajo:
-  // medirlo aparte es el primer paso para dejar de cobrárselo al loop.
   msPrompt = Date.now() - tPrompt;
+
+  // ⚠️ startedAt va DESPUÉS de la espera del lock Y del armado del prompt. El
+  // presupuesto de pared (MAX_WALL_MS) mide cuánto puede TRABAJAR la corrida, no
+  // cuánto estuvo haciendo cola ni cuánto esperó a Whisper:
+  //  · Lock: con el reloj arrancando antes de la espera (hasta 33s), una corrida
+  //    que esperaba entraba al loop ya vencida y devolvía ok:true sin responder ni
+  //    loguear — mudo justo en el caso que el single-flight venía a resolver.
+  //  · Prompt: buildInitialUserMessage puede esperar hasta ~24s (12×2s, su propio
+  //    tope = el presupuesto de preparación) a que se transcriba un audio. Con el
+  //    reloj viejo, una corrida con audio entraba al loop con ~6 de sus 30s — y esa
+  //    es una de las patas de los 165s del caso María (03/08).
+  // El prompt se arma después del lock A PROPÓSITO (ver comentario de arriba): si
+  // se arma antes, la 2ª corrida razona sobre una foto vieja del grupo (duplicados
+  // del 30/07).
+  const startedAt = Date.now();
 
   // ⚠️ Las reglas del owner se repiten ACÁ, en el mensaje de usuario, además de estar
   // al final del system prompt. No es redundancia gratuita: el 31/07 Álvaro dictó por
@@ -5515,8 +5521,20 @@ async function runAgent(req: AgentRequest): Promise<{
         ? { thinking: { type: "disabled" } }
         : {}),
     }, sanearStrings);
-    const callAnthropic = (model: string) =>
-      fetch("https://api.anthropic.com/v1/messages", {
+    // ── DEADLINE REAL EN LA LLAMADA ─────────────────────────────────────────
+    // Esta llamada no tenía timeout: el corte de presupuesto solo se chequeaba AL
+    // TOPE de cada iteración, así que una llamada colgada (o la tormenta de
+    // reintentos + modelo de respaldo: hasta 4 llamadas secuenciales) desbordaba
+    // sin ser interrumpida. Así 30s se volvieron 165 el 03/08 (caso María: 2
+    // iteraciones, 428 tokens, ninguna respuesta). El abort tira una excepción que
+    // el catch del loop (PR #1097) convierte en `presupuesto_de_pared` → aviso al
+    // usuario, no silencio.
+    const msRestantes = () => MAX_WALL_MS - (Date.now() - startedAt);
+    const callAnthropic = (model: string) => {
+      // Piso de 5s: un deadline menor aborta a mitad de handshake y no deja ni
+      // empezar; si queda menos que eso, mejor que el loop corte prolijo arriba.
+      const deadline = Math.max(5_000, msRestantes());
+      return fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -5524,7 +5542,9 @@ async function runAgent(req: AgentRequest): Promise<{
           "anthropic-version": "2023-06-01",
         },
         body: buildBody(model),
+        signal: AbortSignal.timeout(deadline),
       });
+    };
 
     // Sobrecarga de Anthropic (429/5xx/529): sin esto el bot quedaba MUDO — se vio en
     // vivo 2026-07-29, Sonnet 5 sobrecargado dejó "en visto" a María (Marketing/Ventas)
@@ -5537,6 +5557,9 @@ async function runAgent(req: AgentRequest): Promise<{
     let lastRetryable = false;
     const tLlm = Date.now();
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      // Reintentar solo si queda presupuesto para OTRO intento útil (~6s). Antes los
+      // 3 intentos + backoff corrían sin mirar el reloj y desbordaban el presupuesto.
+      if (attempt > 0 && msRestantes() < 6_000) break;
       resp = await callAnthropic(modelToUse);
       if (resp.ok) break;
       lastRetryable = resp.status === 429 || resp.status === 529 || (resp.status >= 500 && resp.status < 600);
@@ -5544,7 +5567,11 @@ async function runAgent(req: AgentRequest): Promise<{
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1))); // 0.8s, 1.6s
     }
 
-    if (resp && !resp.ok && lastRetryable) {
+    // El modelo de respaldo sigue existiendo (incidente 29/07: Sonnet sobrecargado
+    // dejó en visto a María y Daniel; mejor responder con otro modelo que no
+    // responder) — pero ahora SOLO si queda presupuesto para una llamada entera:
+    // gastarlo con 3s restantes garantizaba un abort y perdía el turno completo.
+    if (resp && !resp.ok && lastRetryable && msRestantes() >= 8_000) {
       const fallbackModel = modelToUse.startsWith("claude-sonnet-5")
         ? "claude-opus-5"
         : modelToUse.startsWith("claude-opus-5")
@@ -5707,6 +5734,9 @@ async function runAgent(req: AgentRequest): Promise<{
           inboxDepartments: botCfg?.inboxDepartments ?? null,
           privileged,
           canSeePhones,
+          // 2s de reserva: que la tool devuelva ANTES del corte del loop, para que
+          // el resultado (aunque sea parcial/error) entre al contexto del modelo.
+          deadlineAt: startedAt + MAX_WALL_MS - 2_000,
         },
       );
       const msEstaTool = Date.now() - tTool;
