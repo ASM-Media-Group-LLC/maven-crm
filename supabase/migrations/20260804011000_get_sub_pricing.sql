@@ -1,0 +1,15 @@
+-- Precio de suscripción por creadora (pedido de Carolina/Álvaro 03/08 17:13 en
+-- Managers: estrategia $3 vs $5 y saber si la cuenta es gratis o paga — el bot
+-- dijo "no tengo la tool"). Aplicada en prod vía MCP; este archivo la versiona
+-- (definición completa en la migración MCP get_sub_pricing).
+--
+-- No existe precio de LISTA en ninguna tabla (of_gross_earnings muerta desde
+-- el 09/05; precios_contenido es de contenido custom). Derivación desde
+-- creator_daily_earnings (BLU, fresca a diario):
+--   precio_efectivo = new_sub_gross / new_fans   (ventana default 30d)
+--   cuenta GRATIS   = fans nuevos >= 5 con plata de subs ~$0
+-- Con p_query → una creadora; sin p_query → todas + BANDAS (gratis/<$4/$4-6/
+-- >$6) con ingreso promedio por banda (la comparación que pedía Carolina).
+-- Validado 03/08: banda <$4 promedia $5.7k de ingreso · $4-6 → $12.4k ·
+-- >$6 → $30.5k (correlación, no causalidad — las grandes cobran más).
+-- Tool get_sub_pricing en whatsapp-agent + allowlist del Bot de Managers.

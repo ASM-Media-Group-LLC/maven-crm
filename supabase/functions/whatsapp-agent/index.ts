@@ -1411,6 +1411,18 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_sub_pricing",
+    description:
+      "PRECIO DE SUSCRIPCIÓN (efectivo) por creadora, derivado de BLU: plata de subs NUEVAS ÷ fans nuevos en la ventana (default 30 días). Úsala para '¿a cuánto está la sub de X?', '¿su cuenta es gratis o paga?' y para decisiones de pricing ($3 vs $5): sin creator devuelve TODAS las creadoras + BANDAS de precio (gratis / <$4 / $4-6 / >$6) con ingreso promedio por banda. OJO al responder: es el promedio REAL cobrado (descuentos y trials incluidos), NO el precio de lista del panel de OF — acláralo siempre. Las VISITAS al perfil no existen en ninguna fuente nuestra (solo en el panel de OF de cada cuenta).",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "@handle o nombre artístico. Omitir = todas + bandas" },
+        days: { type: "number", description: "ventana en días (default 30)" },
+      },
+    },
+  },
+  {
     name: "get_daily_reports",
     description:
       "Los reportes de jornada que el equipo YA registró hoy (o en la fecha que pidas): números/contactados de captación (llg), cierres de closers, y CONTENIDO del equipo de warming (videos, fotos, cuentas, posts). Usalo cuando pregunten '¿qué hizo hoy el equipo?', '¿fulano ya reportó?', '¿cuánto produjo warming?' — o cuando te digan 'chequea, acaba de mandar el reporte'. Devuelve una fila por persona con lo que quedó registrado.",
@@ -3113,6 +3125,16 @@ async function executeTool(
           ? { nota: "sin hitos ANOTADOS en ese rango — no significa que no pasó nada, solo que nadie lo anotó" }
           : {}),
       };
+    }
+
+    case "get_sub_pricing": {
+      const { data, error } = await sb.rpc("get_sub_pricing", {
+        p_tenant: ctx.tenantId,
+        p_query: input.creator ? String(input.creator).trim() : null,
+        p_days: Math.min(Math.max(Number(input.days ?? 30), 7), 120),
+      });
+      if (error) return { error: error.message };
+      return data as Record<string, unknown>;
     }
 
     case "get_creator_earnings_range": {
