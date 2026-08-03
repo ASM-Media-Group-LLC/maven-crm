@@ -731,7 +731,8 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · BAJO RENDIMIENTO sin explicación previa (LLG con 0 escritos sin razón en thread) → pedir contexto (ver abajo)
   · DECISIÓN DEL OWNER que requiere acción ("cancelar X", "rechazar Y", "asignar a Z") → ejecutar (ver abajo)
   · LINK DE INSTAGRAM en mensaje (handle visible) → llama lookup_lead_history para dar contexto del lead
-  · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, loguea y quedate callado.
+  · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange/Let's Shoot/Unlok/ORA) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, loguea y quedate callado.
+  · VENTA DE PRODUCTO CERRADA ("la venta quedó cerrada", "se quedó con X", "hizo upgrade a Y", "aceptó Piclink/CP", "activamos Z") → SIEMPRE actúa, NUNCA lo dejes pasar en silencio: log_monetization_opportunity(stage="won") por CADA producto vendido + record_milestone(kind="venta_producto", un hito por producto) + UN "✓" corto al grupo (ej. "✓ Anotada la venta: CP Elite + Piclink a @handle"). El 03/08 Juanse anunció "la venta quedó cerrada" (upgrade a CP Elite + Piclink) y el bot se quedó callado — una venta cerrada sin registrar es el error MÁS CARO del modo auto: no existe en Maven, no la ve el pulso de Álvaro y no se puede cruzar con BLU después.
   · FACTURACIÓN de un LEAD/CONFIRMADA mencionada o mostrada ('@x factura $24k', 'monetiza $5k', screenshot de ganancias de una que TODAVÍA no firmó) → set_lead_value(handle, monthly_usd) para que Maven la priorice por valor. Silencioso (✓ corto). OJO: si es una creadora YA COMPLETADA/activa cuyas ganancias se comparten para handoff a chatters, eso es otra cosa (ver "MONETIZACIÓN — CREADORA COMPLETADA"); set_lead_value es para leads/confirmadas EN pipeline.
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (termina el loop sin tool calls).
 - Cuando dudes si vale la pena hablar, NO hables. Mejor pasarse de prudente que ser ruidoso.
@@ -768,7 +769,7 @@ Maven tiene una "memoria de oportunidades" de venta de PRODUCTOS/plataformas a c
   · Un closer dice que OFRECIÓ un producto: "le ofrecí Piclink a @x", "le pasé el de CP a @y" → stage="offered".
   · La creadora MOSTRÓ INTERÉS: "@x quedó interesada en Blu", "@y preguntó por Piclink" → stage="interested".
   · NEGOCIANDO precio/condiciones: "viendo el Exchange con @z" → stage="negotiating".
-  · CERRÓ el producto: "@x se quedó con Piclink", "activamos CP en @y" → stage="won".
+  · CERRÓ el producto: "@x se quedó con Piclink", "activamos CP en @y" → stage="won". Al registrar un won, registra TAMBIÉN el hito (record_milestone kind="venta_producto", uno por producto): la oportunidad es el pipeline; el hito es la memoria con fecha que consultan los reportes.
   · NO quiso: "@x no le interesó el Exchange" → stage="lost" (+ lost_reason si lo dicen).
 - Si mencionan CUÁNDO volver a tocarla ("le escribo el viernes", "la sigo en 2 días"), calcula next_followup_at desde la "Hora actual" del initial_user_message. Si no lo dicen, omitilo (el humano lo pone en la pantalla).
 - Acción de registro SILENCIOSA: después de loguear NO anuncies "registré la oportunidad". Si ya vas a hablar por otra razón, suma a lo sumo un ✓ corto ("✓ anoté la oportunidad de Piclink con @x"). En modo auto, si el mensaje no amerita respuesta: loguea y callate.
@@ -1598,7 +1599,7 @@ const TOOLS: Array<{
       type: "object",
       properties: {
         creator_handle: { type: "string", description: "handle de IG de la creadora, sin @ (ej. 'catalinaofficer')" },
-        product: { type: "string", enum: ["piclink", "content_protector", "blu", "exchange", "agency", "other"], description: "producto/plataforma ofrecido" },
+        product: { type: "string", enum: ["piclink", "content_protector", "blu", "exchange", "lets_shoot", "unlok", "ora", "agency", "other"], description: "producto/plataforma ofrecido" },
         stage: { type: "string", enum: ["interested", "offered", "negotiating", "won", "lost"], description: "etapa: interested (mostró interés), offered (le ofrecimos), negotiating (precio/condiciones), won (cerró el producto), lost (no quiso). Default 'interested'." },
         notes: { type: "string", description: "contexto breve y REAL de lo que pasó (ej. 'le ofrecí Piclink gratis + CP con descuento'). No inventes." },
         next_followup_at: { type: "string", description: "opcional: ISO timestamp de cuándo volver a tocarla. Si el closer dice 'le escribo el viernes', calculalo desde la hora actual. Omitir si no lo dicen." },
@@ -4158,7 +4159,9 @@ async function executeTool(
       const monthlyUsd = input.monthly_usd != null && Number.isFinite(Number(input.monthly_usd)) && Number(input.monthly_usd) > 0
         ? Number(input.monthly_usd)
         : null;
-      const VALID_PRODUCTS = ["piclink", "content_protector", "blu", "exchange", "agency", "other"];
+      // lets_shoot/unlok/ora se sumaron el 03/08: el catálogo real ya los vendía y
+      // las ventas caían en "other" con el nombre enterrado en las notas.
+      const VALID_PRODUCTS = ["piclink", "content_protector", "blu", "exchange", "lets_shoot", "unlok", "ora", "agency", "other"];
       const VALID_STAGES = ["interested", "offered", "negotiating", "won", "lost"];
       if (!handle || !product) return { error: "missing_handle_or_product" };
       if (!VALID_PRODUCTS.includes(product)) return { error: "invalid_product", product, valid: VALID_PRODUCTS };
@@ -4192,6 +4195,7 @@ async function executeTool(
         if (noteLine) update.notes = existing.notes ? existing.notes + "\n" + noteLine : noteLine;
         if (nextFollowup) update.next_followup_at = nextFollowup;
         if (stage === "lost" && lostReason) update.lost_reason = lostReason;
+        if (stage === "won") update.won_at = new Date().toISOString();
         if (monthlyUsd != null) update.monthly_value_usd = monthlyUsd;
         const { error } = await sb.from("monetization_opportunities").update(update).eq("id", existing.id);
         if (error) return { error: "update_failed", detail: error.message };
@@ -4211,6 +4215,7 @@ async function executeTool(
           next_followup_at: nextFollowup,
           lost_reason: stage === "lost" ? (lostReason || null) : null,
           monthly_value_usd: monthlyUsd,
+          won_at: stage === "won" ? new Date().toISOString() : null,
           source: "bot",
         })
         .select("id")
