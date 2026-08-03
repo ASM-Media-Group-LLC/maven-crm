@@ -256,6 +256,19 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí dilo.
 - NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisa en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usa lookup_lead_history(@handle) y mira el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confírmaselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí di que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asume que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
 
+ESTILO DE VENTA KASH — CÓMO SE ESCRIBE UN OPENER/PITCH (aplica a TODO mensaje de venta o reactivación que redactes para creadoras, en cualquier grupo):
+
+Kash es la agencia FUERTE del mercado y escribe como tal: un par de negocios que trae una oportunidad, no un fan pidiendo permiso. La vara rápida: si el mensaje podría terminar con "porfa respóndeme 🥺", está mal escrito.
+
+1. PROHIBIDO el tono lamesuelas. Lista negra (ni estas ni sus primas): "capaz se te pasó jaja", "jaja tranquila", "sin presión", "no te quito tiempo", "cuando puedas", "perdón por molestar", "aunque sea", "solo eso". Tampoco relleno vacío ("te vi con toda tu onda", "qué bien verte activa").
+2. CALLBACK DIRECTO si hay historial: nombra el mensaje anterior de frente, sin drama ni reproche — "te escribí hace unos días y quedó ahí, te lo resumo rápido:". El visto se menciona, no se perdona con un jaja.
+3. PREGUNTA DE ESTADO BINARIA cuando aplica: "¿sigues activa con tu OF?" — corta, contestable en 2 segundos, obliga a mover la conversación.
+4. UNA LÍNEA DE FUERZA con sustancia: qué tiene Kash HOY que le conviene — crecimos desde que estuvo, herramientas a la vanguardia (Let's Shoot, Content Protector, equipo de chatters), casos de éxito verificados. Si tienes UN dato real (get_milestones, BLU, su propio historial), úsalo; JAMÁS inventes cifras — sin dato real, la frase de fuerza va sin número.
+5. CTA DE UNA SOLA ACCIÓN, pedido con seguridad: "regálame 15 min y te muestro el plan para TU cuenta" o dos opciones concretas ("¿mañana 11am o 3pm?"). Nunca "si te interesa avísame" — eso es dejarle la tarea a ella.
+6. PERSONALIZACIÓN = INFORMACIÓN, no piropos: máximo 1-2 datos observables de ELLA (su historial con nosotros, su categoría, algo concreto del perfil).
+7. Ejemplo de TONO (referencia de energía — NO plantilla: cada mensaje se arma según SU historial y datos): "Te escribí hace unos días y no me contestaste. Respóndeme si sigues activa con tu OF — desde la última vez crecimos bastante y estamos a la vanguardia con las mejores herramientas de la industria y casos de éxito verificados. Regálame un meet y te comento estrategias personalizadas para hacer crecer tu cuenta."
+8. Esto convive con la regla de sonar HUMANO (natural, imperfecto) y con el canal preferido de cada closer (ej. María = WhatsApp). Y seguro ≠ agresivo: firme, directo y con valor — sin faltar el respeto jamás.
+
 IMÁGENES QUE NO SE PUDIERON VER:
 - Si una imagen del contexto aparece como "[análisis falló: …]", NO pudiste verla. Dilo tal cual ("no pude ver la imagen que mandaste — ¿me la reenvías o me cuentas qué muestra?") y sigue con lo que sí sabes. PROHIBIDO responder como si la hubieras visto ("recibido, con foto…" cuando el análisis falló es mentirle a la persona — pasó el 03/08 con las capturas de Lizeth).
 
@@ -5847,7 +5860,10 @@ async function runAgent(req: AgentRequest): Promise<{
       `de cada una (lo que dice su bio, qué postea, su nota en Maven, su calidad, si tiene agencia). ` +
       `Si no tienes esos datos, búscalos ANTES de escribir (lookup_lead_history / analyze_profile_deep / ` +
       `get_closer_pipeline_status); si aun así no hay, di de cuáles no pudiste y entrega el resto anclado. ` +
-      `Un escenario suelto está bien como complemento, NUNCA como toda la respuesta.`
+      `Un escenario suelto está bien como complemento, NUNCA como toda la respuesta. ` +
+      `Y APLICA EL ESTILO DE VENTA KASH del system prompt: cero lamesuelas ("capaz se te pasó jaja", ` +
+      `"sin presión"), callback directo si hubo visto, una línea de fuerza de agencia (con dato real ` +
+      `solo si existe) y CTA firme de meet. Somos la agencia fuerte: se escribe con esa seguridad.`
     : "";
 
   // Loop messages array per Anthropic spec.
