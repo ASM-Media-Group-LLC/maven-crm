@@ -1,5 +1,5 @@
 // Dominio EQUIPO / pipeline de closers del catálogo (lectura).
-import type { AgentTool } from "./types.ts";
+import type { AgentTool, AgentCtx } from "./types.ts";
 
 // Frescura del feed en vivo de Hubstaff. hubstaff_activities llega en FRANJAS
 // FIJAS de 10 minutos (verificado 31/07: 862/862 pings del día en frontera de
@@ -64,6 +64,90 @@ function parecidos(
 
 // "4.13" horas decimales se leen como "4h13m" y son 4h08m — dar el formato hecho.
 const horasHM = (secs: number): string => `${Math.floor(secs / 3600)}h${String(Math.round((secs % 3600) / 60)).padStart(2, "0")}m`;
+
+// ── QUÉ HACE CADA PERSONA ────────────────────────────────────────────────────
+// ⚠️ POR QUÉ EXISTE: el 03/08 Álvaro pidió las horas de los CHATTERS y el bot le
+// devolvió a todo el que fichó — de 17 nombres, 7 no eran chatters registrados.
+// No fue un error del modelo: la tool no devolvía NINGÚN campo con la función.
+// El `rol` que sí devolvía es el rol de PERMISOS de Hubstaff (owner/user), no el
+// puesto, y eso confunde más de lo que ayuda.
+//
+// Dos fuentes, en este orden:
+//   1) PROYECTO de Hubstaff — vale para TODOS los que fichan. Es la buena: 24 de 63
+//      miembros activos NO tienen cuenta en Maven, así que el rol de Maven solo por
+//      sí mismo borraría al 38% de la gente, chatters reales incluidos.
+//   2) ROL de Maven (user_roles) — solo para los linkeados.
+//
+// Si ninguna resuelve, la función queda en null y ESO SE INFORMA. Una persona sin
+// clasificar no puede desaparecer de un filtro en silencio: quien pregunta creería
+// que no fichó. Es el mismo error que "no pude leer" convertido en "no promocionó".
+type Funcion = { funcion: string | null; fuente: "proyecto_hubstaff" | "rol_maven" | null; proyectos: string[] };
+
+async function resolverFunciones(
+  sb: AgentCtx["sb"],
+  filas: Array<{ hubstaff_user_id?: unknown; profile_id?: unknown }>,
+  desde: string,
+  hasta: string,
+): Promise<Map<string, Funcion>> {
+  const out = new Map<string, Funcion>();
+  const uids = filas.map((r) => String(r.hubstaff_user_id ?? "")).filter(Boolean);
+  const pids = filas.map((r) => String(r.profile_id ?? "")).filter((v) => v && v !== "null");
+  if (!uids.length) return out;
+
+  // 1) Proyectos en los que fichó cada uno en el rango.
+  const proyectosPorUid = new Map<string, Set<string>>();
+  try {
+    const { data: acts } = await sb
+      .from("hubstaff_activities")
+      .select("project_name, hubstaff_members!inner(hubstaff_user_id)")
+      .not("project_name", "is", null)
+      .gte("starts_at", `${desde}T00:00:00Z`)
+      .lte("starts_at", `${hasta}T23:59:59Z`);
+    for (const a of (acts ?? []) as Array<Record<string, any>>) {
+      const uid = String(a.hubstaff_members?.hubstaff_user_id ?? "");
+      const p = String(a.project_name ?? "").trim();
+      if (!uid || !p) continue;
+      if (!proyectosPorUid.has(uid)) proyectosPorUid.set(uid, new Set());
+      proyectosPorUid.get(uid)!.add(p);
+    }
+  } catch { /* si la tabla no responde, se cae al rol de Maven */ }
+
+  // 2) Rol de Maven de los que sí tienen cuenta.
+  const rolPorPid = new Map<string, string>();
+  if (pids.length) {
+    const { data: rls } = await sb.from("user_roles").select("user_id, role").in("user_id", pids);
+    for (const r of (rls ?? []) as Array<{ user_id: string; role: string }>) {
+      // Se queda con el rol más específico (el más largo suele serlo: "Chatter
+      // Supervisor" antes que "employee"), en vez de el primero que llegue.
+      const prev = rolPorPid.get(r.user_id);
+      if (!prev || String(r.role).length > prev.length) rolPorPid.set(r.user_id, String(r.role));
+    }
+  }
+
+  for (const r of filas) {
+    const uid = String(r.hubstaff_user_id ?? "");
+    if (!uid) continue;
+    const proys = [...(proyectosPorUid.get(uid) ?? [])];
+    const pid = String(r.profile_id ?? "");
+    const rolMaven = pid ? rolPorPid.get(pid) ?? null : null;
+    out.set(uid, proys.length
+      ? { funcion: proys[0], fuente: "proyecto_hubstaff", proyectos: proys }
+      : rolMaven
+        ? { funcion: rolMaven, fuente: "rol_maven", proyectos: [] }
+        : { funcion: null, fuente: null, proyectos: [] });
+  }
+  return out;
+}
+
+// ¿Esta persona entra en lo que se pidió ("chatters", "closers", "managers")?
+// Compara sin acentos y por inclusión, para que "chatter" matchee "Chatter",
+// "Chatter Supervisor" y el proyecto "Chatters Meeting".
+function coincideFuncion(f: Funcion, pedido: string): boolean {
+  const q = normName(pedido).replace(/e?s$/, "");   // "chatters" → "chatter"
+  if (!q) return true;
+  const campos = [f.funcion ?? "", ...f.proyectos];
+  return campos.some((c) => normName(c).includes(q));
+}
 
 export const equipoTools: AgentTool[] = [
   {
@@ -335,6 +419,13 @@ export const equipoTools: AgentTool[] = [
       type: "object",
       properties: {
         person: { type: "string", description: "nombre (o parte) de la persona; omitir para todo el equipo" },
+        funcion: {
+          type: "string",
+          description:
+            "filtrar por función/área: 'chatters', 'closers', 'managers', 'warming'… Usalo SIEMPRE que pidan " +
+            "un grupo ('las horas de los chatters'). Matchea contra el proyecto de Hubstaff y el rol de Maven. " +
+            "La respuesta trae aparte a los que no se pudieron clasificar — nombralos, no los escondas.",
+        },
         days: { type: "number", description: "últimos N días (default 7, máx 92). Ignorado si pasas from/to." },
         from: { type: "string", description: "fecha desde YYYY-MM-DD (opcional)" },
         to: { type: "string", description: "fecha hasta YYYY-MM-DD (opcional)" },
@@ -429,18 +520,56 @@ export const equipoTools: AgentTool[] = [
         };
       }
 
-      const result: Record<string, unknown> = {
-        rango: { desde: from, hasta: to },
-        personas: rows.length,
-        equipo: rows.slice(0, 60).map((r) => ({
+      // Función de cada persona (proyecto de Hubstaff > rol de Maven). Ver resolverFunciones.
+      const funciones = await resolverFunciones(ctx.sb, rows as Array<Record<string, unknown>>, from, to);
+      const fnDe = (r: Record<string, unknown>): Funcion =>
+        funciones.get(String(r.hubstaff_user_id ?? "")) ?? { funcion: null, fuente: null, proyectos: [] };
+
+      const pedido = String(args.funcion ?? "").trim();
+      // Al filtrar por función se parte en TRES, no en dos: los que entran, los que
+      // quedan fuera y —clave— los que NO se pudieron clasificar. Estos últimos no
+      // pueden desaparecer: quien pregunta creería que no ficharon.
+      const conFuncion = rows.filter((r) => fnDe(r as Record<string, unknown>).funcion !== null);
+      const sinClasificar = rows.filter((r) => fnDe(r as Record<string, unknown>).funcion === null);
+      const filtradas = pedido
+        ? conFuncion.filter((r) => coincideFuncion(fnDe(r as Record<string, unknown>), pedido))
+        : rows;
+
+      const mapear = (r: Record<string, unknown>) => {
+        const f = fnDe(r);
+        return {
           nombre: r.name,
-          rol: r.hubstaff_role,
+          funcion: f.funcion,                       // qué HACE (chatter, manager…)
+          funcion_segun: f.fuente,                  // de dónde salió, para poder discutirlo
+          ...(f.proyectos.length > 1 ? { proyectos: f.proyectos } : {}),
+          rol_permisos_hubstaff: r.hubstaff_role,   // owner/user — NO es el puesto
           en_maven: r.mapped_to_maven,
           horas: r.total_hours,
           actividad_pct: r.avg_activity_pct,
           dias: r.days_worked,
           ultimo_dia: r.last_day,
-        })),
+        };
+      };
+
+      const result: Record<string, unknown> = {
+        rango: { desde: from, hasta: to },
+        personas: (pedido ? filtradas : rows).length,
+        ...(pedido ? { filtrado_por: pedido, personas_totales_del_rango: rows.length } : {}),
+        equipo: (pedido ? filtradas : rows).slice(0, 60).map((r) => mapear(r as Record<string, unknown>)),
+        // Los sin clasificar se DETALLAN solo cuando hay filtro: ahí son los que
+        // quedaron fuera y hay que nombrarlos. Sin filtro no se omiten nada (están en
+        // `equipo`), así que alcanza con el conteo — listarlos otra vez sería ruido.
+        ...(sinClasificar.length ? (pedido ? {
+          sin_clasificar: sinClasificar.slice(0, 30).map((r) => ({
+            nombre: (r as Record<string, unknown>).name,
+            en_maven: (r as Record<string, unknown>).mapped_to_maven,
+            horas: (r as Record<string, unknown>).total_hours,
+          })),
+          nota_sin_clasificar:
+            `${sinClasificar.length} persona(s) fichan pero no sé qué función tienen (sin proyecto en Hubstaff y ` +
+            `sin rol en Maven; hay 24 de 63 miembros sin cuenta en Maven). NO entraron en el filtro "${pedido}" ` +
+            "Y PODRÍAN SER DEL GRUPO. Nombralas aparte como \"sin clasificar\": omitirlas haría creer que no ficharon.",
+        } : { sin_funcion_registrada: sinClasificar.length }) : {}),
       };
 
       // Desglose por día cuando se pide UNA persona y matcheó exactamente una.

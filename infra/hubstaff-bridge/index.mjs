@@ -128,6 +128,35 @@ async function hsGetAll(path, key, params = {}) {
   return out;
 }
 
+// ── PROYECTOS ────────────────────────────────────────────────────────────────
+// ⚠️ POR QUÉ EXISTE: el código guardaba `a.project?.name`, pero /activities NO manda
+// el objeto `project` — solo `project_id`. Resultado: `project_name` quedó NULL en
+// el 100% de las filas (1.915 horas de 47 personas) y nadie se enteró, porque un
+// null no falla. Se pedía "las horas de los chatters" y salía todo el mundo.
+//
+// El proyecto es EL discriminador que hace falta: 24 de 63 miembros activos de
+// Hubstaff no tienen cuenta en Maven, así que filtrar por rol de Maven borraría al
+// 38% de la gente —incluidos chatters reales—. En Hubstaff, en cambio, está todo el
+// que ficha.
+//
+// Se resuelve por id contra la lista de proyectos en vez de confiar en un `include`:
+// si el nombre del parámetro cambia, un include mal puesto vuelve a fallar EN SILENCIO.
+async function fetchProjectMap(org) {
+  const m = new Map();
+  try {
+    const projs = await hsGetAll(`/organizations/${org.id}/projects`, "projects", { status: "all" });
+    for (const p of projs) if (p?.id != null) m.set(String(p.id), p.name ?? null);
+  } catch (e) {
+    console.error(`[hubstaff-bridge] no pude leer proyectos de ${org.name}: ${e.message}`);
+  }
+  return m;
+}
+
+// Nombre del proyecto de una actividad. `a.project?.name` queda como respaldo por si
+// algún endpoint sí lo embebe.
+const nombreProyecto = (a, mapa) =>
+  a?.project?.name ?? (a?.project_id != null ? (mapa.get(String(a.project_id)) ?? null) : null);
+
 // ── Sincronización ──
 async function discoverOrgs() {
   const orgs = await hsGetAll("/organizations", "organizations");
@@ -202,6 +231,7 @@ async function syncDaily(org, days) {
   } catch (e) {
     console.error(`[hubstaff-bridge] starts (c1) de ${org.name} fallaron, sigo sin ellos: ${e.message}`);
   }
+  const projMap = await fetchProjectMap(org);   // ver fetchProjectMap: /activities solo manda project_id
   const rows = [];
   for (const a of items) {
     const uid = String(a.user_id ?? "");
@@ -218,7 +248,7 @@ async function syncDaily(org, days) {
       hubstaff_user_id: uid, hubstaff_org_id: org.id, date,
       tracked_seconds: tracked,
       overall_activity: overallPct,
-      project_name: a.project?.name ?? null,
+      project_name: nombreProyecto(a, projMap),
       first_activity_at: starts.get(uid + "|" + date) ?? null,   // null → el RPC conserva el valor previo
     });
   }
@@ -241,6 +271,7 @@ async function loadMemberMap() {
   return m;
 }
 
+
 async function syncLiveActivities() {
   await loadTokens();                       // por si el intervalo en vivo arranca antes del 1er full sync
   const orgs = await discoverOrgs();
@@ -254,6 +285,7 @@ async function syncLiveActivities() {
   // un mismo slot puede venir repetido → sumamos los segundos y recomputamos %. Sin esto, el upsert
   // falla con "ON CONFLICT DO UPDATE command cannot affect row a second time" (claves dup en el batch).
   const byKey = new Map();
+  let conProyecto = 0, totalItems = 0;
   for (const org of orgs) {
     let items = [];
     try {
@@ -264,20 +296,31 @@ async function syncLiveActivities() {
       console.error(`[hubstaff-bridge] live activities de ${org.name} falló: ${e.message}`);
       continue;
     }
+    const projMap = await fetchProjectMap(org);
     for (const a of items) {
       const member_id = memberMap.get(String(a.user_id ?? ""));
       const ts = a.time_slot || a.starts_at || null;
       if (!member_id || !ts) continue;
+      totalItems++;
+      const proyecto = nombreProyecto(a, projMap);
+      if (proyecto) conProyecto++;
       const key = member_id + "|" + ts;
       const cur = byKey.get(key) || { member_id, starts_at: ts, tracked: 0, overall: 0, mouse: 0, keyboard: 0, project_name: null, task_name: null };
       cur.tracked += Number(a.tracked) || 0;
       cur.overall += Number(a.overall) || 0;
       cur.mouse += Number(a.mouse) || 0;
       cur.keyboard += Number(a.keyboard) || 0;
-      cur.project_name = cur.project_name || a.project?.name || null;
+      cur.project_name = cur.project_name || proyecto;
       cur.task_name = cur.task_name || a.task?.name || null;
       byKey.set(key, cur);
     }
+  }
+  // ⚠️ Que el proyecto venga vacío tiene que ser RUIDOSO. Justamente por ser silencioso
+  // este campo estuvo en null durante toda la vida del bridge sin que nadie lo notara.
+  if (totalItems > 0 && conProyecto === 0) {
+    console.error(`[hubstaff-bridge] ⚠️ ${totalItems} actividades y NINGUNA con proyecto — revisar /projects o el shape de project_id`);
+  } else if (totalItems > 0) {
+    console.log(`[hubstaff-bridge] proyecto resuelto en ${conProyecto}/${totalItems} actividades`);
   }
   const rows = [...byKey.values()].map((c) => {
     const pct = (v) => (c.tracked > 0) ? Math.min(100, Math.round((v / c.tracked) * 100)) : null;
