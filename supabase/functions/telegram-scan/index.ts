@@ -189,6 +189,8 @@ Deno.serve(async (req: Request) => {
       const nicks = nicksByCreator.get(cid) ?? [];
       const posts: Array<{ text?: string; permalink?: string; date?: number }> = Array.isArray(it.posts) ? it.posts : [];
       let ins = 0, promo = 0, yaVistos = 0;
+      // Posts sin texto legible (solo imagen / caption no extraído): quedan pending.
+      let conSoloMedia = 0;
       // ⚠️ `promo` cuenta CLASIFICACIONES, no días de promo nuevos. Un post de anoche
       // se relee hoy (la ventana es de 24h), se vuelve a clasificar como promo, y se
       // guarda —bien— con el día en que se PUBLICÓ. El panel cantaba "PROMOCIONÓ" y
@@ -217,6 +219,37 @@ Deno.serve(async (req: Request) => {
           if (yaVisto) { promo++; promosOtroDia++; fechasPromo.push({ fecha: fechaIso, hoy: false }); }
           continue;
         }
+        // ── POST SIN TEXTO ≠ "SIN SEÑALES" ─────────────────────────────────
+        // Un post solo-imagen (o cuyo caption el lector no extrajo) llegaba acá con
+        // texto vacío, el clasificador no encontraba señales y se guardaba
+        // promoted=false "sin-señales": NO PODER LEER convertido en "no promocionó".
+        // Caso Marcy (03/08): 17 filas sin texto ni fecha real, todas en false —
+        // mientras Carolina contaba 11 promos de julio con link directo de OF. Sus
+        // promos son imagen+link: el pipeline las convertía TODAS en "No", y el bot
+        // le armó un plan de retención sobre ese "no promociona" falso.
+        // Mismo criterio que #818 (story_count=0 → pending, no "no promocionó"):
+        // sin contenido legible no hay veredicto. `pending` además NO cuenta como
+        // día cubierto en el radar (covered_days excluye pending), que es lo honesto.
+        const textoPost = (p.text || "").trim();
+        if (!textoPost) {
+          conSoloMedia++;
+          if (!dryRun) {
+            const { error: insErr } = await sb.from("promolog_entries").insert({
+              dedup_key: clave,
+              tenant_id: TENANT_ID, creator_id: cid,
+              date: p.date ? new Date(p.date * 1000).toISOString() : scanDate,
+              promoted: "pending", network: "telegram", platform: "Ninguna",
+              notes: null, evidence_url: p.permalink || null,
+              analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin_texto",
+              source_handle: (it.source_handle || "").trim() || null,
+              story_index: i, story_count: posts.length, scraped_at: new Date().toISOString(),
+            });
+            if (!insErr) { ins++; inserted++; }
+            else if (!esDuplicado(insErr)) out.push({ creator_id: cid, insertError: insErr.message });
+          }
+          continue;
+        }
+
         let { promoted, reason } = classifyPromo(p.text || "", nicks);
         let aiModel = "heuristic-of-v1";
         if (!promoted && reason === "sin-señales" && OPENROUTER && llmUsed2 < LLM_CAP_PER_RUN && (p.text || "").trim().length >= 8) {
@@ -261,6 +294,7 @@ Deno.serve(async (req: Request) => {
         promoted: promo,                 // clasificaciones (incluye promos de otros días)
         promos_hoy: promosHoy,           // días de promo que son de HOY
         promos_otro_dia: promosOtroDia,  // promo real, pero de otro día
+        posts_sin_texto: conSoloMedia,   // solo-imagen → pending, NO cuentan como "no promocionó"
         fechas_promo: fechasPromo,       // para que el panel muestre CUÁNDO fue
         inserted: ins, ya_analizados: yaVistos,
       });
@@ -290,6 +324,10 @@ Deno.serve(async (req: Request) => {
       sin_promo: sinPromo.length + (acumulado?.sin_promo ?? 0),
       leidos_sin_posts: sinPosts.length + (acumulado?.leidos_sin_posts ?? 0),
       no_legibles: noLegibles.length,
+      // Posts que se VIERON pero sin texto legible (solo imagen): quedaron pending.
+      // Si una creadora acumula muchos acá, su promo real puede estar invisible —
+      // el caso Marcy: promociona con imagen+link y el texto no se extrae.
+      posts_sin_texto: out.reduce((a: number, r: any) => a + (r.posts_sin_texto ?? 0), 0) + (acumulado?.posts_sin_texto ?? 0),
       // Promos REALES pero de días anteriores (la ventana es de 24h, así que un post
       // de anoche entra hoy). No son hallazgos del día y se cuentan aparte para que
       // nadie las sume al total de hoy.
