@@ -3009,10 +3009,20 @@ async function executeTool(
       let handle: string | null = creatorQ || null;
       let notaMatch: string | undefined;
       if (creatorQ) {
-        const { data: matches } = await sb.from("creators")
+        let { data: matches } = await sb.from("creators")
           .select("id, instagram_handle, artistic_name, name")
           .or(`instagram_handle.ilike.${creatorQ},artistic_name.ilike.${creatorQ},name.ilike.%${creatorQ}%`)
           .limit(3);
+        // Estreno real (03/08): Carolina escribió "SassyAndrea" y el artístico es
+        // "Sassyandreaa" (doble a) → 0 matches exactos y el hito quedó sin
+        // creator_id. Reintento difuso por handle/artístico, solo si da ÚNICO.
+        if ((matches ?? []).length === 0) {
+          const fz = await sb.from("creators")
+            .select("id, instagram_handle, artistic_name, name")
+            .or(`instagram_handle.ilike.%${creatorQ}%,artistic_name.ilike.%${creatorQ}%`)
+            .limit(3);
+          if ((fz.data ?? []).length === 1) matches = fz.data;
+        }
         if ((matches ?? []).length === 1) {
           creatorId = matches![0].id;
           handle = matches![0].instagram_handle || creatorQ;
