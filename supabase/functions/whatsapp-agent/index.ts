@@ -3240,6 +3240,27 @@ async function executeTool(
       // sería que cualquiera con acceso a un grupo hable en nombre del bot en otro.
       if (!ctx.isOwner) return { error: "no_autorizado", message: "Publicar en otros grupos es solo para el dueño." };
 
+      // GUARDA (03/08): el dueño dicta por AUDIO y confirma por texto ("Empezamos!!!").
+      // Si su último audio aún no tiene transcripción, publicar es hacerlo SIN oír la
+      // última instrucción — pasó hoy: Whisper tardó 40s, murió en 520, y los 3 textos
+      // salieron sin la corrección del audio de las 15:54. Se bloquea y se le dice.
+      const { data: audioPendiente } = await sb
+        .from("whatsapp_messages")
+        .select("id")
+        .eq("group_id", ctx.groupId)
+        .eq("msg_type", "audio")
+        .eq("is_from_bot", false)
+        .is("transcribed_text", null)
+        .gte("sent_at", new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (audioPendiente) {
+        return {
+          error: "audio_sin_transcribir",
+          message: "Hay un audio RECIENTE de la persona que aún no se pudo transcribir — puede traer la última instrucción. NO publiques todavía: dile que no alcanzaste a oír su último audio y pídele que confirme el contenido por texto o lo repita. La transcripción se reintenta sola cada minuto; apenas esté, retomas y publicas.",
+        };
+      }
+
       // ── PASO 2: confirmar y publicar ──────────────────────────────────────
       if (input.pending_id) {
         if (input.confirm !== true) {
