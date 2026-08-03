@@ -2638,6 +2638,51 @@ async function executeTool(
       else if (leadgen.length > 0) overall = "kash_lead_known";
       else if (scouter.length > 0) overall = "scouter_known";
 
+      // ── VEREDICTO DURO PARA CREADORA ACTIVA ────────────────────────────────
+      // El 03/08 el bot llamó esta tool CUATRO veces para jackyoficial_ y dio tres
+      // veredictos distintos en tres minutos ("es activa" → "dato mal migrado" →
+      // "confirmado: sí está activa"): la tool devolvía las filas crudas de las 5
+      // fuentes —incluida una fila vieja del pipeline con "No interesada" del sheet
+      // KASH— y el modelo re-interpretaba la contradicción en cada corrida. Mientras
+      // tanto le armaba a Miguel un opener para escribirle EN FRÍO a una creadora
+      // que operamos nosotros (manager Carolina, ingresos BLU los 31 días del mes).
+      // El veredicto se decide ACÁ, con los datos que cierran la discusión, y viaja
+      // primero en la respuesta. Las filas crudas siguen abajo por transparencia.
+      let creadoraActiva: Record<string, unknown> | null = null;
+      let veredicto: string | null = null;
+      if (overall === "active_creator") {
+        const activa = creators.find((c) => c.status === "active")!;
+        const [mgrRes, bluRes] = await Promise.all([
+          sb.from("creators").select("assigned_manager_profile_id").eq("id", activa.id).maybeSingle(),
+          sb.from("creator_daily_earnings")
+            .select("id", { count: "exact", head: true })
+            .eq("creator_id", activa.id)
+            .gte("date", new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10)),
+        ]);
+        let managerNombre: string | null = null;
+        const mgrId = (mgrRes.data as { assigned_manager_profile_id: string | null } | null)?.assigned_manager_profile_id;
+        if (mgrId) {
+          const { data: mp } = await sb.from("profiles").select("full_name").eq("id", mgrId).maybeSingle();
+          managerNombre = (mp as { full_name: string | null } | null)?.full_name ?? null;
+        }
+        const diasBlu = bluRes.count ?? 0;
+        creadoraActiva = {
+          handle: activa.instagram_handle,
+          nombre: activa.name,
+          manager: managerNombre,
+          dias_con_ingreso_blu_ultimos_30: diasBlu,
+        };
+        veredicto =
+          `ES CREADORA ACTIVA DE LA AGENCIA — ${activa.name}` +
+          (managerNombre ? `, manager: ${managerNombre}` : ", sin manager asignada") +
+          (diasBlu > 0 ? `, con ingresos BLU en ${diasBlu} de los últimos 30 días. ` : ". ") +
+          "NO es un lead: no se la recluta ni se le escribe en frío. Si quieres ofrecerle un producto, " +
+          "se coordina CON SU MANAGER (así se hizo con andreaesoto). Si además aparece una fila en el " +
+          "pipeline de closers, es un REGISTRO DUPLICADO del import viejo — dato a limpiar, no una " +
+          "oportunidad; no lo presentes como historial real de reclutamiento. Este veredicto no se " +
+          "re-interpreta: si en esta conversación dijiste otra cosa, corrígete UNA vez y sostén este.";
+      }
+
       // ── PROCEDENCIA ────────────────────────────────────────────────────────
       // De qué BASE salió el lead y quién lo metió. Antes el bot no tenía nada de
       // esto: el manual le decía que las tools devolvían la base, pero ninguna de
@@ -2682,6 +2727,8 @@ async function executeTool(
       return {
         handle,
         overall_status: overall,
+        // Primero el veredicto (si lo hay): es la síntesis que NO se re-interpreta.
+        ...(veredicto ? { veredicto, creadora_activa: creadoraActiva } : {}),
         procedencia,
         numero: telResumen,
         leadgen_entries: leadgen,
@@ -3282,6 +3329,36 @@ async function executeTool(
         .select("instagram_handle, category, estimated_monetization, city, created_at", { count: "exact" })
         .eq("stage", "Nuevo")
         .limit(500);
+
+      // ⚠️ EL POOL ESTÁ CONTAMINADO CON CREADORAS PROPIAS. El 03/08 esta tool le
+      // sugirió a Miguel "tomar" a jackyoficial_ y celi_lora como leads A+ "sin
+      // tomar"... y las dos son creadoras ACTIVAS de la casa, con manager asignada
+      // e ingresos BLU al día (el barrido encontró 11 así, casi todas del import
+      // del sheet KASH). El bot empujó tres veces a un closer a salir a reclutar
+      // a una modelo que ya operamos. Se filtran acá, en la tool — no por prompt:
+      // una regla de prompt ya demostró que el modelo la pisa.
+      // OJO: solo status='active'. Las EX-creadoras están en el pipeline A PROPÓSITO
+      // (base ex_creadora, #991) y esas sí se sugieren.
+      const normHandle = (s: string | null | undefined) =>
+        String(s ?? "").toLowerCase()
+          .replace(/^https?:\/\/(www\.)?instagram\.com\//, "")
+          .replace(/[@/\s]/g, "").replace(/[?#].*$/, "").trim();
+      const { data: activasRows } = await sb.from("creators")
+        .select("id, instagram_handle").eq("status", "active");
+      const activas = (activasRows ?? []) as Array<{ id: string; instagram_handle: string | null }>;
+      const handlesActivas = new Set(activas.map((a) => normHandle(a.instagram_handle)).filter(Boolean));
+      // Las cuentas EXTRA de IG de esas mismas creadoras también cuentan: un lead
+      // cargado con la segunda cuenta de una creadora activa es la misma persona.
+      if (activas.length > 0) {
+        const { data: extra } = await sb.from("creator_social_accounts")
+          .select("username").eq("network", "instagram").eq("active", true)
+          .in("creator_id", activas.map((a) => a.id));
+        for (const e of (extra ?? []) as Array<{ username: string | null }>) {
+          const h = normHandle(e.username);
+          if (h) handlesActivas.add(h);
+        }
+      }
+      const esCreadoraActiva = (h: string | null) => handlesActivas.has(normHandle(h));
       const QUALITY_RANK: Record<string, number> = {
         elite: 0, "a++": 0, "a+": 1, a: 2, "b+": 3, b: 4, "c+": 5, c: 6,
       };
@@ -3289,13 +3366,18 @@ async function executeTool(
         const k = String(cat ?? "").trim().toLowerCase();
         return k in QUALITY_RANK ? QUALITY_RANK[k] : 8; // calidad desconocida al fondo
       };
-      const sorted = ((rows ?? []) as Array<{
+      const todas = (rows ?? []) as Array<{
         instagram_handle: string | null;
         category: string | null;
         estimated_monetization: number | null;
         city: string | null;
         created_at: string;
-      }>).slice().sort((a, b) => {
+      }>;
+      // La exclusión NO es silenciosa: se devuelve cuántas y cuáles quedaron afuera,
+      // para que la contaminación del pool siga visible y alguien la limpie — un
+      // filtro mudo habría escondido el problema de datos para siempre.
+      const contaminadas = todas.filter((r) => esCreadoraActiva(r.instagram_handle));
+      const sorted = todas.filter((r) => !esCreadoraActiva(r.instagram_handle)).sort((a, b) => {
         const ra = rankOf(a.category), rb = rankOf(b.category);
         if (ra !== rb) return ra - rb;
         const ma = Number(a.estimated_monetization ?? 0), mb = Number(b.estimated_monetization ?? 0);
@@ -3308,7 +3390,17 @@ async function executeTool(
         est_monetization: r.estimated_monetization != null ? Number(r.estimated_monetization) : null,
         city: r.city ?? null,
       }));
-      return { total_unassigned: count ?? (rows ?? []).length, suggested };
+      return {
+        total_unassigned: (count ?? todas.length) - contaminadas.length,
+        suggested,
+        ...(contaminadas.length > 0 ? {
+          excluidas_por_ser_creadoras_activas: contaminadas.map((r) => r.instagram_handle),
+          nota_exclusion:
+            `${contaminadas.length} fila(s) del pool son CREADORAS ACTIVAS de la casa (dato duplicado del ` +
+            "import KASH) y se excluyeron: no se recluta a una modelo propia. NO las sugieras ni las cuentes " +
+            "como leads. Son un problema de datos a limpiar en Maven, no oportunidades.",
+        } : {}),
+      };
     }
 
     case "get_monetization_opportunities": {
