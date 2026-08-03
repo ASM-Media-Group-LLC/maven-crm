@@ -223,18 +223,60 @@ async function checkCloser(
 
   const mention = user.whatsapp_push_name ?? user.full_name?.split(" ")[0] ?? "equipo";
 
-  // 1h antes del fin del turno: preguntar cuántas llamadas hicieron.
-  // Solo si están en la última hora y no se preguntó hoy.
+  // 1h antes del fin del turno: preguntar cuántas llamadas hicieron — UNA sola
+  // pregunta GRUPAL (pedido de Jhon 03/08: le llegaba solo a Miguel; debe
+  // incluir a María y a cualquier MIEMBRO DEL GRUPO con rol closer/closer
+  // supervisor). El primer closer que entra a su última hora dispara el mensaje
+  // para todos; claim por GRUPO+día para no repetir ni spamear.
   if (endM - nowM <= 60 && endM - nowM > 30) {
-    const stats = await getCloserStatsToday(sb, user.user_id, now.date);
-    // Si no hubo llamadas en QA, preguntar abierto.
-    if (stats.calls === 0) {
-      const ok = await tryClaim(sb, user.user_id, "closer_calls_pre_close", now.date, stats);
-      if (ok) await sendToGroup(sb, group.id, `@${mention} ¿cuántas llamadas hiciste hoy? Veo 0 en QA.`);
-    } else {
-      const ok = await tryClaim(sb, user.user_id, "closer_calls_pre_close", now.date, stats);
-      if (ok) await sendToGroup(sb, group.id, `@${mention} ¿confirmás que ${stats.calls} llamadas en QA son todas las de hoy?`);
-    }
+    // Closers/supervisores PRESENTES en el grupo: miembros activos linkeados
+    // cuyo rol en Maven contenga "closer" (cubre closer y closer supervisor).
+    const { data: mrows } = await sb
+      .from("whatsapp_members")
+      .select("user_id, display_name")
+      .eq("group_id", group.id)
+      .eq("active", true)
+      .not("user_id", "is", null);
+    const ids = ((mrows ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
+    const { data: rrows } = ids.length > 0
+      ? await sb.from("user_roles").select("user_id, role").in("user_id", ids)
+      : { data: [] as Array<{ user_id: string; role: unknown }> };
+    const closerIds = new Set(
+      ((rrows ?? []) as Array<{ user_id: string; role: unknown }>)
+        .filter((r) => String(r.role).toLowerCase().includes("closer"))
+        .map((r) => r.user_id),
+    );
+    const closers = ((mrows ?? []) as Array<{ user_id: string; display_name: string | null }>)
+      .filter((r) => closerIds.has(r.user_id));
+    if (closers.length === 0) return;
+
+    const porCloser = await Promise.all(closers.map(async (c) => ({
+      nombre: (c.display_name ?? "").trim().split(" ")[0] || "closer",
+      s: await getCloserStatsToday(sb, c.user_id, now.date),
+    })));
+    const total = porCloser.reduce((a, x) => a + x.s.calls, 0);
+    const menciones = porCloser.map((x) => `@${x.nombre}`).join(" ");
+    const detalle = total > 0 && porCloser.length > 1
+      ? ` (${porCloser.map((x) => `${x.nombre} ${x.s.calls}`).join(" · ")})`
+      : "";
+
+    // Frase rotada por día (pedido de Jhon: que no sea siempre el mismo texto).
+    // Índice por día calendario: cambia a diario, estable dentro del día.
+    const VARIANTES: Array<(m: string, n: number, d: string) => string> = [
+      (m, n, d) => `${m} ¿cuántas llamadas hicieron hoy? Tenemos reportadas ${n} en QA${d}.`,
+      (m, n, d) => `${m} cierre de llamadas: QA marca ${n} hoy${d} — ¿coincide con las que hicieron?`,
+      (m, n, d) => `${m} antes de cerrar el día, ¿cuántas llamadas hubo? Llevo ${n} registradas en QA${d}.`,
+      (m, n, d) => `${m} ¿me confirman el número de llamadas de hoy? En QA hay ${n}${d}. Si falta subir alguna, este es el momento.`,
+      (m, n, d) => `${m} repaso rápido: ${n} llamadas en QA hoy${d}. ¿Están todas o quedó alguna sin subir?`,
+    ];
+    const dia = Math.floor(Date.parse(now.date) / 86_400_000);
+    const msg = VARIANTES[dia % VARIANTES.length](menciones, total, detalle);
+
+    const ok = await tryClaimGroup(sb, group.id, "closer_calls_pre_close_group", now.date, {
+      total,
+      closers: porCloser.map((x) => ({ nombre: x.nombre, llamadas: x.s.calls })),
+    });
+    if (ok) await sendToGroup(sb, group.id, msg);
     return;
   }
 
