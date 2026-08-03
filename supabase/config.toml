@@ -113,6 +113,9 @@ verify_jwt = false  # cron; check interno de X-Cron-Token
 [functions.whatsapp-transcribe-audio]
 verify_jwt = false  # transcribe audios de grupo (Whisper); auth propia
 
+[functions.whatsapp-corte-tick]
+verify_jwt = false  # ejecutor de cortes 2h de Álvaro (cron); auth propia X-Cron-Token
+
 [functions.whatsapp-analyze-image]
 verify_jwt = false  # analiza imágenes de grupo; auth propia
 

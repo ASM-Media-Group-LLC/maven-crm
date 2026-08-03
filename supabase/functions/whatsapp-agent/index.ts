@@ -718,6 +718,22 @@ REGLAS:
 - Si un handle aparece confirmado y cancelado en la pausa, prioriza el ÚLTIMO mensaje (regla de actualidad).
 - Tono: directo y con datos, como un líder que abre el día. Sin hype, sin "buen día equipo" a secas.
 
+MODO CORTE CADA 2 HORAS (cuando invoked_by="corte_2h" o "corte_cierre"):
+
+Régimen pedido por Álvaro (03/08): en los cortes (9am·11am·1pm·3pm·5pm·7pm Colombia) TÚ armas y publicas EL CORTE de este grupo. El equipo NO manda reporte formal — lo que fueron contando en el grupo mientras trabajan ES el insumo; tu trabajo es leerlo y componer el resumen. Los mensajes del período vienen en el initial_user_message.
+
+- Formato WhatsApp corto: título *CORTE H:MM* y una línea por persona con lo CONCRETO que contaron: a quién contactaron, qué hablaron, qué estrategia, posts/videos/textos, confirmadas, ventas. En AI WARMING separa los dos perfiles: números (contactados · resp · números) y contenido (videos/fotos/posts/cuentas).
+- Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
+- Quien no contó nada en el período: "sin novedades en el grupo esta tanda" — sin acusar (puede estar trabajando); si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor.
+- Al final, UNA línea recordando (con variación, no siempre igual) que pueden ir mandando todo por ti — es más rápido y no pierden tiempo.
+- 🔒 PROHIBIDO EN EL GRUPO: horas, actividad o porcentajes de HUBSTAFF. Es dato PRIVADO: va solo en el reporte directo al jefe (eso lo arma otro proceso, no tú). Regla dura — ni una mención.
+- UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
+
+CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
+- Es el resumen del DÍA completo: qué se logró, avances reales, y la *NOTA de 1 a 10 por persona* (con decimales) por participación + avance real. Una línea por persona: nota + razón corta. Sé consistente con los ejemplos anunciados (participó y avanzó ≈ 8.5 · a medias ≈ 6.5 · sin señales ≈ 5.5 o menos).
+- Puedes consultar tools (reportes del día, pipeline, hubstaff del equipo) para CALIBRAR la nota — pero la regla de arriba sigue: JAMÁS publiques horas/actividad/porcentajes de Hubstaff en el grupo.
+- Tono: jefe cercano, exigente y justo. Cierra con el objetivo de mañana en una línea.
+
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - El bot está escuchando el grupo y NO fue mencionado explícitamente. Por defecto el bot debe quedarse CALLADO.
 - Solo responde via reply_to_group si el mensaje cae claramente en uno de estos casos de alto valor:
@@ -4989,6 +5005,68 @@ async function buildInitialUserMessage(args: {
       lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abres con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
     }
     lines.push("NO respondas a cada mensaje individual.");
+    return lines.join("\n");
+  }
+
+  // ── MODO CORTE (cron cada 2h — pedido de Álvaro 03/08) ────────────────────
+  // Sin mensaje disparador humano: el tick pasa el último message_id del grupo
+  // solo como ancla. El insumo es TODO lo que el equipo habló en el período
+  // (el equipo NO manda reporte formal: la conversación ES el reporte).
+  if (args.req.invoked_by === "corte_2h" || args.req.invoked_by === "corte_cierre") {
+    const sb = adminClient();
+    const esCierre = args.req.invoked_by === "corte_cierre";
+    // corte_2h: ventana 2h10m. corte_cierre: el día laboral entero (8:50 Bogotá).
+    const desde = esCierre
+      ? (() => {
+        const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+        return `${hoyBog}T08:50:00-05:00`;
+      })()
+      : new Date(Date.now() - 130 * 60_000).toISOString();
+    const { data: tanda } = await sb
+      .from("whatsapp_messages")
+      .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+      .eq("group_id", args.groupId)
+      .eq("is_from_bot", false)
+      .gt("sent_at", desde)
+      .order("sent_at", { ascending: true })
+      .limit(esCierre ? 220 : 120);
+
+    // Nombres reales (mismo criterio que night_catchup: display de WA es ambiguo).
+    const extIds = new Set<string>();
+    for (const m of tanda ?? []) if (m.sender_external_id) extIds.add(m.sender_external_id);
+    const extToNombre = new Map<string, string>();
+    if (extIds.size > 0) {
+      const { data: members } = await sb
+        .from("whatsapp_members")
+        .select("external_id, user_id")
+        .eq("group_id", args.groupId)
+        .in("external_id", Array.from(extIds));
+      const uids = (members ?? []).map((m) => m.user_id).filter((u): u is string => Boolean(u));
+      if (uids.length > 0) {
+        const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", uids);
+        const pm = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+        for (const m of members ?? []) {
+          const fn = m.user_id ? pm.get(m.user_id) : null;
+          if (fn) extToNombre.set(m.external_id, String(fn).split(" ")[0]);
+        }
+      }
+    }
+
+    lines.push(esCierre
+      ? "Tarea: CORTE DE CIERRE (7pm) — resumen del DÍA completo de ESTE grupo + NOTA 1-10 por persona. Sigue al pie de la letra la sección 'MODO CORTE CADA 2 HORAS' y 'CORTE DE CIERRE' del system prompt. HUBSTAFF PROHIBIDO en el grupo."
+      : "Tarea: CORTE CADA 2 HORAS — resumen del período de ESTE grupo. Sigue al pie de la letra la sección 'MODO CORTE CADA 2 HORAS' del system prompt. HUBSTAFF PROHIBIDO en el grupo.");
+    lines.push("");
+    lines.push(`Mensajes del período (${(tanda ?? []).length}):`);
+    for (const m of tanda ?? []) {
+      const sender = (m.sender_external_id ? extToNombre.get(m.sender_external_id) : null) ??
+        ((m.sender_display_name ?? "").trim() || "(desconocido)");
+      const texto = (m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text
+        ? `[${m.msg_type === "audio" ? "audio" : "imagen"}] ${m.transcribed_text}`
+        : m.body;
+      if (texto) lines.push(`[${m.sent_at}] ${sender}: ${texto}`);
+    }
+    lines.push("");
+    lines.push("Compón el corte y publícalo con UNA llamada a reply_to_group. Si el período vino sin mensajes, publica el corte igual: 'sin novedades en el grupo esta tanda' — y antes consulta tools (reportes del día, pipeline, ventas de hoy) por si Maven muestra trabajo que el grupo no contó, para rescatarlo a favor del equipo.");
     return lines.join("\n");
   }
 
