@@ -1,0 +1,10 @@
+-- Aplicado vía MCP (04/08). "El bot no sabe ni qué creadoras tenemos" (Jhon):
+-- Carolina Romo y Julieta Rodríguez SÍ existen (activas) pero como
+-- "CarolinaRomo"/"JulietaRodriguezok" — la gente escribe nombres CON espacios
+-- y acentos y la base los tiene pegados y sin tilde, y search_creator hacía
+-- ilike literal (además solo sobre ACTIVAS: una 'leaving' salía "no existe",
+-- caso Zaragif). RPC search_creators_fuzzy: normaliza minúsculas + sin
+-- espacios + sin acentos en AMBOS lados sobre handle/artístico/nombre, e
+-- incluye no-activas (mejor "está pero leaving" que "no existe"). Lo usan
+-- search_creator y el resolver de record_milestone como fallback con regla
+-- de match único.

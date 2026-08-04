@@ -3232,11 +3232,13 @@ async function executeTool(
         // "Sassyandreaa" (doble a) → 0 matches exactos y el hito quedó sin
         // creator_id. Reintento difuso por handle/artístico, solo si da ÚNICO.
         if ((matches ?? []).length === 0) {
-          const fz = await sb.from("creators")
-            .select("id, instagram_handle, artistic_name, name")
-            .or(`instagram_handle.ilike.%${creatorQ}%,artistic_name.ilike.%${creatorQ}%`)
-            .limit(3);
-          if ((fz.data ?? []).length === 1) matches = fz.data;
+          // v2 (04/08): el contains simple no toleraba espacios/acentos — "Carolina
+          // Romo" no matcheaba "CarolinaRomo". RPC normalizado (ambos lados), y
+          // sigue la regla de solo aceptar match ÚNICO.
+          const fz = await sb.rpc("search_creators_fuzzy", { p_q: creatorQ });
+          if ((fz.data ?? []).length === 1) {
+            matches = [fz.data![0]] as typeof matches;
+          }
         }
         if ((matches ?? []).length === 1) {
           creatorId = matches![0].id;
