@@ -1003,6 +1003,17 @@ async function esRespuestaAlBot(sb: SupabaseClient, groupId: string, texto: stri
   return minutos <= 15;
 }
 
+// Identidades WA de ÁLVARO (el jefe): lid global + jid del DM. Sus mensajes
+// invocan al agente SIEMPRE (24/7, sin gate de horario) — 04/08: preguntó 4
+// cosas en Warming a las 9:05 (antes del arranque de jornada 10:00) y el gate
+// dejó al bot sin siquiera invocarse; la política "a Álvaro nunca se lo deja
+// en visto" (03/08) exige que el criterio al menos CORRA. ⚠️ "Alvaro Mejia"
+// (114426585833505@lid) es OTRA persona — no va acá.
+const JEFE_EXTERNAL_IDS = new Set([
+  "192457652338690@lid",
+  "17866946354@s.whatsapp.net",
+]);
+
 async function resolveAgentTrigger(
   sb: SupabaseClient,
   group: { id: string; bot_enabled: boolean; bot_mode: string; department?: string | null },
@@ -1039,6 +1050,10 @@ async function resolveAgentTrigger(
     // armar una historia de ejemplo, ella contestó "Si" (2 chars) y el mensaje ni
     // llegó a invocarlo — quedó como que ofreció algo y no lo hizo.
     if (trimmed.length < 4 && !(await esRespuestaAlBot(sb, group.id, trimmed))) return null;
+
+    // El JEFE invoca siempre — el prompt decide si amerita responder (feedback
+    // al bot / instrucción → actuar; coaching a una persona → silencio).
+    if (senderExternalId && JEFE_EXTERNAL_IDS.has(senderExternalId)) return "auto";
 
     // Bots de SUPERVISIÓN (managers) se invocan 24/7: NO dependen del horario
     // laboral (los managers no tienen turnos cargados en whatsapp_user_schedules,

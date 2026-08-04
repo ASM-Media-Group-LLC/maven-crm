@@ -543,7 +543,11 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // DMs 1:1 (pseudo-grupos is_direct): el remitente está whitelisted y escribió
   // directo al bot → siempre responde, sin gate de horario (como los supervisores).
   const isDirectDm = (group as any)?.is_direct === true;
-  const alwaysFire = supervisorBot || isDirectDm;
+  // + audios del JEFE (Álvaro): invocan siempre, sin gate de horario — mismo
+  // criterio que el ingest de texto (04/08). SCRIBE_FIRST_SENDERS son
+  // exactamente sus dos identidades WA.
+  const esJefe = SCRIBE_FIRST_SENDERS.has(String(msg.sender_external_id ?? ""));
+  const alwaysFire = supervisorBot || isDirectDm || esJefe;
   if (group?.bot_enabled && group?.bot_mode !== "off") {
     if (audioMentionsBot(result.text)) {
       fireAgent(msg.id, msg.group_id, "audio_mention");
