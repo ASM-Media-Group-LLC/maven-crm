@@ -1,0 +1,11 @@
+-- Aplicado vía MCP (04/08), ronda "mejoras Marketing/Ventas + acento argentino":
+-- 1. corte_ventas_bloque(): "En la mesa: $0/mes en 2 confirmadas" cuando las
+--    confirmadas no tienen monto cargado leía como dato roto → ahora
+--    "2 confirmadas por firmar (montos sin cargar)". Solo cambia el encabezado.
+-- 2. Manuales de DB (wa_bots.manual_prompt) purgados de voseo rioplatense
+--    (Managers: mostrá/decilo ×3 · Clari: podes/tenes/decilo ·
+--    Warming: confirmá/mostrá/notá/recordá/reconocelo/sugerí/decílo/reportás/decís):
+--    el modelo imita el estilo de sus instrucciones (#1035/#1040) y salía
+--    voseo en los pitches para leads ("¿seguís manejando tu OF vos sola?").
+--    En código (mismo PR): ~50 formas voseantes neutralizadas en MOTOR/MANUAL/
+--    tools, regla ESPAÑOL NEUTRO reforzada (la propia regla decía "Tratá de tú").

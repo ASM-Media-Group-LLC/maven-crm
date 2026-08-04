@@ -379,7 +379,7 @@ export const equipoTools: AgentTool[] = [
   {
     name: "read_webpage",
     description:
-      "Lee una página web renderizada (con JavaScript) y devuelve su TEXTO limpio + título. Usala cuando alguien pega un link o pide revisar el contenido de una URL, o cuando necesitás datos de una página que no tenés como tool (dashboards, SPAs, radares con JS que el server no puede leer directo). Solo lectura, no envía nada ni interactúa. Si el lector no responde o el host no está permitido, lo DICE — nunca inventes el contenido de la página. Para el estado de cuentas del equipo usá get_radar_accounts (más estructurado); esta es para páginas web genéricas.",
+      "Lee una página web renderizada (con JavaScript) y devuelve su TEXTO limpio + título. Usala cuando alguien pega un link o pide revisar el contenido de una URL, o cuando necesitás datos de una página que no tenés como tool (dashboards, SPAs, radares con JS que el server no puede leer directo). Solo lectura, no envía nada ni interactúa. Si el lector no responde o el host no está permitido, lo DICE — nunca inventes el contenido de la página. Para el estado de cuentas del equipo usa get_radar_accounts (más estructurado); esta es para páginas web genéricas.",
     input_schema: {
       type: "object",
       properties: {
@@ -408,11 +408,11 @@ export const equipoTools: AgentTool[] = [
         });
         clearTimeout(t);
         const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || data?.ok === false) return { error: `lector_${resp.status}`, detalle: data?.error ?? null, nota: "No se pudo leer la página — decilo tal cual, no inventes el contenido." };
+        if (!resp.ok || data?.ok === false) return { error: `lector_${resp.status}`, detalle: data?.error ?? null, nota: "No se pudo leer la página — dilo tal cual, no inventes el contenido." };
         return { ok: true, url: data.final_url ?? url, titulo: data.title ?? null, texto: data.text ?? "", truncado: data.text_truncated ?? false };
       } catch (e) {
         clearTimeout(t);
-        return { error: `lector_no_responde: ${(e as Error).message}`, nota: "El lector web no respondió — decilo tal cual, no inventes." };
+        return { error: `lector_no_responde: ${(e as Error).message}`, nota: "El lector web no respondió — dilo tal cual, no inventes." };
       }
     },
   },
@@ -431,7 +431,7 @@ export const equipoTools: AgentTool[] = [
       "PROHIBIDO decir 0h, di desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (dos 'Brayan', tres " +
       "'Lizeth'): identifica siempre por nombre COMPLETO + rol de la respuesta. La tool resuelve apodos conocidos " +
       "(Brian→Brayan) y si el nombre NO existe o matchea a VARIOS te devuelve `persona_no_encontrada`/`ambiguo` con " +
-      "candidatos: en ese caso PREGUNTÁ a cuál se refieren — nunca respondas con datos de otra persona ni elijas vos " +
+      "candidatos: en ese caso PREGUNTA a cuál se refieren — nunca respondas con datos de otra persona ni elijas tú " +
       "(el 31/07 'Juan Pachas' no existía y el bot contestó con gente que nadie preguntó). " +
       "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
     input_schema: {
@@ -441,7 +441,7 @@ export const equipoTools: AgentTool[] = [
         funcion: {
           type: "string",
           description:
-            "filtrar por puesto DENTRO de Hubstaff: 'chatters', 'closers', 'cordis'… Usalo SIEMPRE que pidan un " +
+            "filtrar por puesto DENTRO de Hubstaff: 'chatters', 'closers', 'cordis'… Úsalo SIEMPRE que pidan un " +
             "grupo ('cuántos chatters hay conectados en hubstaff', 'las horas de los chatters'). Matchea contra el " +
             "PROYECTO de Hubstaff y trae todos sus proyectos: pedir 'chatters' incluye 'Chatter Supervisor' y " +
             "'Chatters Meeting'. NO uses esto para preguntas de GRUPOS DE WHATSAPP ('del grupo X, cuántos están " +
@@ -508,8 +508,8 @@ export const equipoTools: AgentTool[] = [
             ...(aliased?.alias ? { alias_aplicado: person } : {}),
             nota:
               "La persona SÍ existe en Maven pero NO trackea Hubstaff (los directivos/admins no fichan). " +
-              "No hay horas que reportar y eso NO es 'no trabajó' ni 'no existe' — decilo así. " +
-              "Para su actividad usá otras fuentes (grupos de WhatsApp, pipeline, etc.).",
+              "No hay horas que reportar y eso NO es 'no trabajó' ni 'no existe' — dilo así. " +
+              "Para su actividad usa otras fuentes (grupos de WhatsApp, pipeline, etc.).",
           };
         }
         const { data: all } = await ctx.sb.rpc("hubstaff_activity_summary", { p_from: from, p_to: to, p_person: null });

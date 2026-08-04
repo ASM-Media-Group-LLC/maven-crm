@@ -629,7 +629,7 @@ export const managersTools: AgentTool[] = [
         nota:
           "total_active = creadoras ACTIVAS con esa manager asignada; promoted_pct va sobre total_active. " +
           "⚠️ is_partial_day=true ⇒ el día está EN CURSO y la mayor parte de la promo se detecta por la tarde: " +
-          "ese % es un PISO, NO sirve para comparar managers. Para comparar usa el día CERRADO (pasa date=ayer) y decilo. " +
+          "ese % es un PISO, NO sirve para comparar managers. Para comparar usa el día CERRADO (pasa date=ayer) y dilo. " +
           "covered_count = a cuántas Promolog pudo LEER ese día (las no leídas NO son 'no promocionó', ver #818). " +
           "scannable_count = cuántas tienen handle escaneable: las que no tienen NUNCA pueden contar como que " +
           "promocionaron, así que si scannable_count < total_active el techo de esa manager es menor a 100% " +
