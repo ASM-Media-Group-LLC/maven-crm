@@ -23,6 +23,12 @@ export async function visionPromo(opts: {
     { type: "text", text: opts.text ? `Texto del post: "${opts.text.slice(0, 300)}"\n\n${opts.prompt}` : opts.prompt },
     { type: "image_url", image_url: { url: opts.dataUri } },
   ];
+  // Fallback de modelo ante 4xx (04/08, paridad con whatsapp-analyze-image):
+  // Gemini a veces rechaza la imagen entera con 400 — se reintenta UNA vez con
+  // otro modelo de visión antes de dejar el post en pending.
+  const MODELOS = [VISION_MODEL, "openai/gpt-4o-mini"];
+  let ultimoStatus = 0;
+  for (const modelo of MODELOS) {
   try {
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), 30_000);
@@ -35,7 +41,7 @@ export async function visionPromo(opts: {
         "X-Title": opts.refTitle ?? "Maven Promolog",
       },
       body: JSON.stringify({
-        model: VISION_MODEL,
+        model: modelo,
         messages: [{ role: "user", content }],
         response_format: { type: "json_object" },
         temperature: 0.1,
@@ -44,7 +50,11 @@ export async function visionPromo(opts: {
       signal: ac.signal,
     });
     clearTimeout(t);
-    if (!resp.ok) return { promoted: false, reason: `or_${resp.status}` };
+    if (!resp.ok) {
+      ultimoStatus = resp.status;
+      if (resp.status >= 400 && resp.status < 500) continue;   // probar el alterno
+      return { promoted: false, reason: `or_${resp.status}` };
+    }
     // deno-lint-ignore no-explicit-any
     const raw = ((await resp.json()) as any)?.choices?.[0]?.message?.content ?? "";
     // deno-lint-ignore no-explicit-any
@@ -55,6 +65,9 @@ export async function visionPromo(opts: {
   } catch (e) {
     return { promoted: false, reason: `vision:${(e as Error).message}` };
   }
+  }
+  // Los dos modelos rechazaron la imagen (4xx) — el llamador la deja pending.
+  return { promoted: false, reason: `or_${ultimoStatus || "4xx"}` };
 }
 
 // Baja una imagen pública (CDN de t.me, fbcdn…) y la devuelve como data URI para

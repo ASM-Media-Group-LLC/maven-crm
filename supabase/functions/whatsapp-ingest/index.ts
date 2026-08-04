@@ -1413,11 +1413,13 @@ serve(async (req) => {
       // media_url caduca rápido), después la transcripción dispara
       // el extractor.
       fireTranscribeAudio(messageId);
-    } else if (msg.msgType === "image" && msg.mediaUrl) {
-      // Imágenes: analyze-image con Gemini 2.5 vision. Idem urgencia
+    } else if ((msg.msgType === "image" || msg.msgType === "video") && msg.mediaUrl) {
+      // Imágenes: analyze-image con vision (OpenRouter). Idem urgencia
       // por caducidad del media_url. La function guarda el análisis
       // (descripción + OCR + mentions) en transcribed_text y después
       // dispara el extractor.
+      // VIDEOS (04/08): mismo edge — analiza la PORTADA (jpegThumbnail del
+      // raw); sin ffmpeg no hay frames, pero portada > "[video]" ciego.
       fireAnalyzeImage(messageId);
     } else if (msg.body && msg.body.length > 10) {
       // Texto (o caption de imagen/video que cumple el min): directo

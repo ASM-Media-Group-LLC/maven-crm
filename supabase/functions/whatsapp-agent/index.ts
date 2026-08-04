@@ -290,13 +290,6 @@ Kash es la agencia FUERTE del mercado y escribe como tal: un par de negocios que
 7. Ejemplo de TONO (referencia de energía — NO plantilla: cada mensaje se arma según SU historial y datos): "Te escribí hace unos días y no me contestaste. Respóndeme si sigues activa con tu OF — desde la última vez crecimos bastante y estamos a la vanguardia con las mejores herramientas de la industria y casos de éxito verificados. Regálame un meet y te comento estrategias personalizadas para hacer crecer tu cuenta."
 8. Esto convive con la regla de sonar HUMANO (natural, imperfecto) y con el canal preferido de cada closer (ej. María = WhatsApp). Y seguro ≠ agresivo: firme, directo y con valor — sin faltar el respeto jamás.
 
-IMÁGENES QUE NO SE PUDIERON VER:
-- Si una imagen del contexto aparece como "[análisis falló: …]", NO pudiste verla. Dilo tal cual ("no pude ver la imagen que mandaste — ¿me la reenvías o me cuentas qué muestra?") y sigue con lo que sí sabes. PROHIBIDO responder como si la hubieras visto ("recibido, con foto…" cuando el análisis falló es mentirle a la persona — pasó el 03/08 con las capturas de Lizeth).
-
-PREFERENCIAS DE MIEMBROS DEL EQUIPO (no-owner):
-- Cuando alguien del equipo te corrige CÓMO trabajar con él/ella ("yo contacto solo por WhatsApp, no IG", "pásame los números en lista"), eso se persiste con remember_fact sobre ESA persona + confirmación corta. add_persistent_rule es SOLO para el owner/Álvaro.
-- PROHIBIDO decir "guardado/lo tengo/anotado" sin haber llamado una tool de escritura en ESTA corrida — la guarda de salida te va a rebotar el mensaje.
-
 BÚSQUEDA WEB (web_search) — INVESTIGACIÓN DE INDUSTRIA:
 - Tienes búsqueda web real. Úsala cuando pidan benchmarks, "qué hace la industria", mejores prácticas o propuestas basadas en el mercado (ej. estrategias de pricing de suscripciones, tácticas de retención de otras agencias). Busca, lee y arma la propuesta — ya no digas "no tengo esa data".
 - 🔒 REGLA DURA DE PRIVACIDAD: JAMÁS pongas en una búsqueda datos internos — ni nombres/handles de creadoras, ni cifras nuestras, ni nombres del equipo, ni "Kash". Las consultas son GENÉRICAS de industria ("OnlyFans subscription pricing strategy", "OF agency retention tactics").
@@ -792,6 +785,7 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - Solo responde via reply_to_group si el mensaje cae claramente en uno de estos casos de alto valor:
   · Pregunta de horarios del equipo (a qué hora empieza X, quién trabaja hoy)
   · Anuncio de día libre / parcial / enfermedad / vacaciones → llama register_day_off Y confirma brevemente
+  · HORARIO dicho en el grupo ("mi horario es L-V 10 a 7", "trabajo de 9 a 6 y sábado hasta la 1" — típico respondiendo cuando se les preguntó) → set_member_schedule Y confirma con el horario tal como quedó
   · Pregunta directa al equipo que ya pudiste responder con datos de Maven (lead, contacto, status)
   · Reporte de jornada con métricas (contactados/respuestas/números/confirmadas/cerradas) → llama register_daily_report Y confirma con resumen 1-línea
   · AVANCE DE PIPELINE de un closer ("CONFIRMADA: @handle Modelo X $monto", "firmó", etc) → ver "RECONOCIMIENTO DE LOGROS" abajo. OJO: confirmar o firmar NO es cerrar.
@@ -801,7 +795,7 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · DECISIÓN DEL OWNER que requiere acción ("cancelar X", "rechazar Y", "asignar a Z") → ejecutar (ver abajo)
   · LINK DE INSTAGRAM en mensaje (handle visible) → llama lookup_lead_history para dar contexto del lead
   · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange/Let's Shoot/Unlok/ORA) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, loguea y quedate callado.
-  · MENSAJE O AUDIO DE ÁLVARO (el jefe): SIEMPRE se te invoca, pero RESPONDER es la EXCEPCIÓN — Álvaro casi siempre le habla AL EQUIPO, no a ti, y contestarle encima de cada mensaje es spam (lo marcó Jhon el 04/08). Habla SOLO en estos tres casos: (a) FEEDBACK sobre TI o tus textos ("muy genérico", "demasiado perfecto") → add_persistent_rule + UNA línea confirmando el ajuste; (b) te PIDE algo explícito o pregunta un DATO que solo tú tienes (números de Maven/BLU/Hubstaff) — si la pregunta la puede responder alguien del equipo, es de ellos, no tuya; (c) da una POLÍTICA que debes registrar (ej. "si se quejan de CP regalen un mes") → regístrala EN SILENCIO (regla/compromiso, sin acuse en el hilo) y refléjala recién en el próximo corte. TODO lo demás — instrucciones al equipo, coaching, avisos, preguntas que el equipo puede contestar — SILENCIO TOTAL. Ante la duda: silencio.
+  · MENSAJE O AUDIO DE ÁLVARO (el jefe): SIEMPRE se te invoca, pero RESPONDER es la EXCEPCIÓN — Álvaro casi siempre le habla AL EQUIPO, no a ti, y contestarle encima de cada mensaje es spam (lo marcó Jhon el 04/08). Habla SOLO en estos tres casos: (a) FEEDBACK sobre TI o tus textos ("muy genérico", "demasiado perfecto") → add_persistent_rule + UNA línea confirmando el ajuste; (b) te PIDE algo explícito, O pregunta algo cuya RESPUESTA CONCRETA tienes (dato de Maven/BLU/Hubstaff o algo ya reportado en el grupo — ej. "¿quedó listo lo de la estética?" y ayer Isa reportó que sí con el link del drive → aportas ESE dato citando la fuente, y el equipo complementa). Si NO tienes el dato, la pregunta es del equipo: silencio; (c) da una POLÍTICA que debes registrar (ej. "si se quejan de CP regalen un mes") → regístrala EN SILENCIO (regla/compromiso, sin acuse en el hilo) y refléjala recién en el próximo corte. TODO lo demás — instrucciones al equipo, coaching, avisos, preguntas que el equipo puede contestar — SILENCIO TOTAL. Ante la duda: silencio.
   · VENTA DE PRODUCTO CERRADA ("la venta quedó cerrada", "se quedó con X", "hizo upgrade a Y", "aceptó Piclink/CP", "activamos Z") → SIEMPRE actúa, NUNCA lo dejes pasar en silencio: log_monetization_opportunity(stage="won") por CADA producto vendido + record_milestone(kind="venta_producto", un hito por producto) + UN "✓" corto al grupo (ej. "✓ Anotada la venta: CP Elite + Piclink a @handle"). El 03/08 Juanse anunció "la venta quedó cerrada" (upgrade a CP Elite + Piclink) y el bot se quedó callado — una venta cerrada sin registrar es el error MÁS CARO del modo auto: no existe en Maven, no la ve el pulso de Álvaro y no se puede cruzar con BLU después.
   · FACTURACIÓN de un LEAD/CONFIRMADA mencionada o mostrada ('@x factura $24k', 'monetiza $5k', screenshot de ganancias de una que TODAVÍA no firmó) → set_lead_value(handle, monthly_usd) para que Maven la priorice por valor. Silencioso (✓ corto). OJO: si es una creadora YA COMPLETADA/activa cuyas ganancias se comparten para handoff a chatters, eso es otra cosa (ver "MONETIZACIÓN — CREADORA COMPLETADA"); set_lead_value es para leads/confirmadas EN pipeline.
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (termina el loop sin tool calls).
@@ -1481,6 +1475,37 @@ const TOOLS: Array<{
         date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default hoy" },
         role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "filtrar por tipo. Omitir = todos" },
       },
+    },
+  },
+  {
+    name: "set_member_schedule",
+    description:
+      "Registra o actualiza el HORARIO LABORAL de un miembro del equipo en Maven (alimenta los check-ins del supervisor y los reportes). Úsala apenas alguien DIGA su horario en el grupo ('mi horario es L-V 10am a 7pm', 'yo trabajo de 9 a 6, sábados hasta la 1') o cuando el jefe lo dicte. Confirma después con el horario TAL COMO QUEDÓ registrado. Si el horario del sábado es distinto, pásalo aparte.",
+    input_schema: {
+      type: "object",
+      properties: {
+        display_name: { type: "string", description: "nombre de la persona (como aparece en el grupo, o su nombre real)" },
+        start: { type: "string", description: "hora de inicio L-V, formato HH:MM 24h (ej. '10:00')" },
+        end: { type: "string", description: "hora de fin L-V, formato HH:MM 24h (ej. '19:00')" },
+        sat_start: { type: "string", description: "inicio del sábado si trabaja (HH:MM). Omitir si no trabaja sábados" },
+        sat_end: { type: "string", description: "fin del sábado (HH:MM)" },
+        role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "llg = busca números · closer = ventas/llamadas · content = contenido/cuentas/managers" },
+        daily_goal: { type: "number", description: "meta diaria si aplica (ej. 3 números para un llg)" },
+      },
+      required: ["display_name", "start", "end", "role_kind"],
+    },
+  },
+  {
+    name: "get_lead_outcomes",
+    description:
+      "QUÉ PASÓ con los números/leads que cargó un LLG o alguien de warming: cuántos entraron al pipeline de closers, en qué stage está cada uno (Asignada/Contactada/Confirmada/Completada/Rechazada), quién lo tiene asignado, último contacto y razón de rechazo si la hay. Úsala cuando pregunten '¿qué dijeron los closers de mis números?', '¿en qué van los leads de Daniel?' — da el RESULTADO de negocio sin exponer conversaciones de otro grupo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        member: { type: "string", description: "nombre de quien cargó los números (ej. 'Daniel')" },
+        days: { type: "number", description: "ventana en días hacia atrás (default 21)" },
+      },
+      required: ["member"],
     },
   },
   {
@@ -3069,6 +3094,60 @@ async function executeTool(
         .single();
       if (error) return { error: error.message };
       return { ok: true, registered: data, member_name: member.display_name };
+    }
+
+    case "set_member_schedule": {
+      const displayName = String(input.display_name ?? "").trim();
+      const start = String(input.start ?? "").trim();
+      const end = String(input.end ?? "").trim();
+      const roleKind = String(input.role_kind ?? "");
+      const HHMM = /^\d{1,2}:\d{2}$/;
+      if (!displayName) return { error: "missing_display_name" };
+      if (!HHMM.test(start) || !HHMM.test(end)) return { error: "horario_invalido", formato: "HH:MM 24h" };
+      if (!["llg", "closer", "content"].includes(roleKind)) return { error: "invalid_role_kind" };
+      const satStart = input.sat_start ? String(input.sat_start).trim() : null;
+      const satEnd = input.sat_end ? String(input.sat_end).trim() : null;
+      if ((satStart && !HHMM.test(satStart)) || (satEnd && !HHMM.test(satEnd))) {
+        return { error: "horario_sabado_invalido", formato: "HH:MM 24h" };
+      }
+
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName);
+      if (members.length === 0) return { error: "wpp_member_not_found", display_name: displayName };
+      const member = members[0];
+      if (!member.user_id) return { error: "member_not_linked", member: { display_name: member.display_name } };
+
+      // Reemplazo completo: borrar turnos previos y cargar L-V (+ sábado si vino).
+      await sb.from("whatsapp_user_schedules").delete().eq("user_id", member.user_id);
+      const filas: Array<Record<string, unknown>> = [];
+      for (let wd = 1; wd <= 5; wd++) {
+        filas.push({
+          user_id: member.user_id, weekday: wd, start_time: start, end_time: end,
+          role_kind: roleKind, daily_goal: input.daily_goal ?? null,
+        });
+      }
+      if (satStart && satEnd) {
+        filas.push({
+          user_id: member.user_id, weekday: 6, start_time: satStart, end_time: satEnd,
+          role_kind: roleKind, daily_goal: input.daily_goal ?? null,
+        });
+      }
+      const { error } = await sb.from("whatsapp_user_schedules").insert(filas);
+      if (error) return { error: error.message };
+      return {
+        ok: true, member: member.display_name,
+        horario: { lun_vie: `${start}-${end}`, sabado: satStart && satEnd ? `${satStart}-${satEnd}` : "no trabaja", rol: roleKind },
+      };
+    }
+
+    case "get_lead_outcomes": {
+      const nombre = String(input.member ?? "").trim();
+      if (!nombre) return { error: "missing_member" };
+      const dias = Math.min(Math.max(Number(input.days ?? 21), 1), 90);
+      const { data, error } = await sb.rpc("get_lead_outcomes_de_origen", {
+        p_tenant: ctx.tenantId, p_query: nombre, p_days: dias,
+      });
+      if (error) return { error: error.message };
+      return (data ?? { not_found: true, member: nombre }) as Record<string, unknown>;
     }
 
     case "record_milestone": {
@@ -5677,7 +5756,7 @@ async function runAgent(req: AgentRequest): Promise<{
   const TOOLS_DE_ESCRITURA = new Set([
     "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
-    "record_milestone",
+    "record_milestone", "set_member_schedule",
   ]);
   // "marcad|gestionad" se sumaron el 31/07: "las 5 quedan marcadas gestionadas en
   // Maven" pasaba limpio (esa vez era verdad, pero el hueco existía).

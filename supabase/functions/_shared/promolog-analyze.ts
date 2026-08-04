@@ -241,12 +241,31 @@ async function callOpenRouter(
   return first;
 }
 
+// Reintento con modelo alterno ante 4xx (paridad con whatsapp-analyze-image,
+// 04/08): Gemini a veces rechaza una imagen entera con 400 ("Unable to process
+// input image") y el post quedaba sin clasificar pudiendo clasificarse.
 async function callOpenRouterOnce(
   content: unknown[],
   apiKey: string,
 ): Promise<{ analysis: StoryAnalysis } | { error: string }> {
+  const MODELOS = [LLM_MODEL, "openai/gpt-4o-mini"];
+  let ultimo: { error: string } = { error: "sin_intentos" };
+  for (const modelo of MODELOS) {
+    const r = await intentoOpenRouter(content, apiKey, modelo);
+    if (!("error" in r)) return r;
+    ultimo = r;
+    if (!/openrouter_4\d\d/.test(r.error)) break;
+  }
+  return ultimo;
+}
+
+async function intentoOpenRouter(
+  content: unknown[],
+  apiKey: string,
+  modelo: string,
+): Promise<{ analysis: StoryAnalysis } | { error: string }> {
   const body = {
-    model: LLM_MODEL,
+    model: modelo,
     messages: [{ role: "user", content }],
     response_format: { type: "json_object" },
     temperature: 0.1,

@@ -301,7 +301,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     .single();
 
   if (msgErr || !msg) return { ok: false, reason: "message_not_found" };
-  if (msg.msg_type !== "image") return { ok: true, reason: "not_image" };
+  if (msg.msg_type !== "image" && msg.msg_type !== "video") return { ok: true, reason: "not_image" };
   if (msg.transcribed_text) {
     if (!msg.analyzed_at) fireExtractCommitments(messageId);
     return { ok: true, reason: "already_analyzed" };
@@ -333,10 +333,39 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   //   2. Fallback: fetch directo a la URL (sirve si la URL ya es de un
   //      media desencriptado, o si el gateway no está configurado).
   //      Para WhatsApp real esto SIEMPRE falla porque devuelve .enc.
-  let downloaded = await downloadImageViaGateway(msg.raw);
-  if ("error" in downloaded) {
-    console.warn(`gateway download failed (${downloaded.error}), trying direct media_url`);
-    downloaded = await downloadImage(msg.media_url);
+  let downloaded: { data: Uint8Array; mime: string } | { error: string };
+  const esVideo = msg.msg_type === "video";
+  if (esVideo) {
+    // VIDEOS (04/08): sin ffmpeg en el edge no se extraen frames — v1 analiza
+    // la PORTADA (jpegThumbnail que WhatsApp adjunta en el raw). Mejor un
+    // fotograma real que un "[video]" ciego (las pruebas en video de Lizeth
+    // del 03/08 pasaron sin leerse).
+    const rv = msg.raw as
+      | { data?: { message?: { videoMessage?: { jpegThumbnail?: string } } }; message?: { videoMessage?: { jpegThumbnail?: string } } }
+      | null;
+    const thumb = rv?.data?.message?.videoMessage?.jpegThumbnail ?? rv?.message?.videoMessage?.jpegThumbnail;
+    if (!thumb) {
+      await sb.from("whatsapp_messages").update({
+        transcribed_text: "[video sin análisis: sin miniatura en el mensaje]",
+        analyzed_at: new Date().toISOString(),
+      }).eq("id", msg.id);
+      return { ok: false, reason: "video_sin_thumbnail" };
+    }
+    try {
+      downloaded = { data: Uint8Array.from(atob(thumb), (c) => c.charCodeAt(0)), mime: "image/jpeg" };
+    } catch {
+      await sb.from("whatsapp_messages").update({
+        transcribed_text: "[video sin análisis: miniatura ilegible]",
+        analyzed_at: new Date().toISOString(),
+      }).eq("id", msg.id);
+      return { ok: false, reason: "video_thumbnail_invalida" };
+    }
+  } else {
+    downloaded = await downloadImageViaGateway(msg.raw);
+    if ("error" in downloaded) {
+      console.warn(`gateway download failed (${downloaded.error}), trying direct media_url`);
+      downloaded = await downloadImage(msg.media_url);
+    }
   }
   if ("error" in downloaded) {
     await logEvent(sb, {
@@ -385,7 +414,9 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: result.error };
   }
 
-  const extractedText = buildExtractedText(result.analysis);
+  // Los videos se analizan por su PORTADA: el prefijo lo deja claro para que
+  // nadie (ni el bot) crea que se vio el video completo.
+  const extractedText = (esVideo ? "[video — análisis de la portada] " : "") + buildExtractedText(result.analysis);
 
   // Guardar el texto extraído + el análisis JSON completo en analysis.
   await sb

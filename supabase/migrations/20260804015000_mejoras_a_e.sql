@@ -1,0 +1,17 @@
+-- Tanda de mejoras A-E (aprobadas por Jhon, 04/08). SQL aplicado vía MCP:
+-- · get_lead_outcomes_de_origen(p_tenant, p_query, p_days): resultados de
+--   negocio de los números/perfiles cargados por un LLG/warming (stages,
+--   closer, rechazo) SIN exponer el chat de closers. Tool get_lead_outcomes.
+--   Probado: Daniel 21d → 15 números, 378 perfiles, 12 en pipeline.
+-- En código (mismo PR):
+-- A. set_member_schedule (tool + bullet auto): el bot registra horarios
+--    cuando el equipo los dice; la pregunta inicial se siembra vía reminders.
+-- C. Videos: whatsapp-analyze-image analiza la PORTADA (jpegThumbnail del
+--    raw) con prefijo "[video — análisis de la portada]"; ingest dispara
+--    analyze también para msg_type video. Sin ffmpeg no hay frames (v1).
+-- D. Fallback de visión en promolog (paridad con grupos): visionPromo y
+--    callOpenRouterOnce reintentan con gpt-4o-mini ante 4xx del provider.
+-- E. MANUAL_VENTAS podado: fuera las secciones duplicadas en el MOTOR
+--    (imágenes falladas, preferencias de miembros).
+-- + Refinado criterio Álvaro: el bot aporta si TIENE el dato (aunque venga
+--   de un reporte del grupo), silencio si no.
