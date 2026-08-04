@@ -1,0 +1,13 @@
+-- Recordatorio PERSISTENTE de horarios (Jhon 04/08): "el bot debe asegurarse
+-- de tener mapeado el horario de cada uno; si alguno no responde, se lo sigue
+-- recordando cada tanto". Determinístico (cron '25 15,18,21 UTC' L-S = 10:25,
+-- 13:25, 16:25 Bogotá), no una promesa del modelo.
+-- (Aplicada en prod vía MCP el 04/08 — definición completa allí.)
+--
+-- recordar_horarios_pendientes(): por cada grupo operativo, miembros ACTIVOS
+-- linkeados SIN fila en whatsapp_user_schedules (excluidos Jhon, Álvaro y
+-- Juanse) → inserta un reminder (lo publica el drain). Guardas: máx 1 por
+-- grupo cada 3h30 · domingo no · sábado solo antes de las 14 · 3 variantes de
+-- texto rotando. Cuando todos tienen horario es no-op — queda activo para
+-- cubrir gente nueva. Las respuestas las registra el bot con
+-- set_member_schedule (#1133) y ahí mismo deja de recordarles.
