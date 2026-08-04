@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, neutralizarVoseo, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
 
 // whatsapp-send — manda mensajes a un grupo via el provider configurado.
 //
@@ -147,7 +147,11 @@ async function sendOne(args: {
     (txt, lid) => txt.replace(new RegExp(`@${lid}[,:]?\\s*`, "g"), ""),
     args.body,
   ).trimStart();
-  const bodyFinal = mdAWhatsApp(group.is_direct === true ? sinAutoMencion : redactPhones(sinAutoMencion));
+  // Voseo → neutro también en el borde (misma filosofía que redactPhones): un
+  // "probá"/"venís" suelto rompe el registro que pidió el equipo aunque el
+  // prompt esté limpio. Aplica a grupos Y DMs — el bot habla neutro siempre.
+  const sinVoseo = neutralizarVoseo(sinAutoMencion);
+  const bodyFinal = mdAWhatsApp(group.is_direct === true ? sinVoseo : redactPhones(sinVoseo));
 
   let result: ProviderSendResult;
   if (group.provider === "evolution") {

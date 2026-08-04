@@ -417,6 +417,48 @@ function enmascarar(s: string): string {
  * equipo puede identificar de cual numero se habla sin que el numero quede publicado.
  * Preserva URLs y menciones: llevan digitos y no son telefonos.
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// Voseo → tuteo neutro en el borde de salida. La purga de #1138 sacó el voseo de
+// las INSTRUCCIONES, pero el modelo igual escupe un "probá"/"venís" suelto de vez
+// en cuando (corte 17:00 del 04/08, tercera queja del día) — y la doctrina de la
+// casa es guarda determinística > regla de prompt. SOLO formas INEQUÍVOCAS:
+// nada de -í finales (seguí/subí/escribí = pasado 1ª persona válido) ni "dale".
+// ─────────────────────────────────────────────────────────────────────────────
+const VOSEO_A_NEUTRO: ReadonlyArray<[string, string]> = [
+  ["probá", "prueba"], ["probalo", "pruébalo"], ["mandá", "manda"], ["mandalo", "mándalo"],
+  ["mandale", "mándale"], ["decí", "di"], ["decilo", "dilo"], ["decile", "dile"], ["decime", "dime"],
+  ["tomá", "toma"], ["tomalo", "tómalo"], ["mirá", "mira"], ["miralo", "míralo"],
+  ["escuchá", "escucha"], ["andá", "anda"], ["vení", "ven"], ["poné", "pon"], ["ponelo", "ponlo"],
+  ["hacé", "haz"], ["hacelo", "hazlo"], ["hacele", "hazle"], ["sacá", "saca"], ["sacale", "sácale"],
+  ["pasá", "pasa"], ["pasale", "pásale"], ["pasalo", "pásalo"], ["pasame", "pásame"],
+  ["contá", "cuenta"], ["contale", "cuéntale"], ["contame", "cuéntame"],
+  ["avisá", "avisa"], ["avisame", "avísame"], ["avisale", "avísale"],
+  ["esperá", "espera"], ["esperame", "espérame"], ["llamá", "llama"], ["llamalo", "llámalo"],
+  ["llamame", "llámame"], ["arrancá", "arranca"], ["arrancale", "arráncale"],
+  ["fijate", "fíjate"], ["acordate", "acuérdate"], ["quedate", "quédate"], ["olvidate", "olvídate"],
+  ["sumá", "suma"], ["sumale", "súmale"], ["metele", "métele"], ["buscá", "busca"], ["buscale", "búscale"],
+  ["agarrá", "agarra"], ["cargá", "carga"], ["cargale", "cárgale"], ["tirá", "tira"], ["tirale", "tírale"],
+  ["usá", "usa"], ["usalo", "úsalo"], ["tené", "ten"], ["tenés", "tienes"], ["podés", "puedes"],
+  ["querés", "quieres"], ["sabés", "sabes"], ["hacés", "haces"], ["decís", "dices"], ["venís", "vienes"],
+  ["sos", "eres"], ["retomá", "retoma"], ["checá", "checa"], ["mostrá", "muestra"], ["marcá", "marca"],
+];
+const VOSEO_RE = new RegExp(
+  "(?<![\\p{L}@])(" + VOSEO_A_NEUTRO.map(([v]) => v).join("|") + ")(?![\\p{L}])",
+  "giu",
+);
+const VOSEO_MAP = new Map(VOSEO_A_NEUTRO);
+export function neutralizarVoseo(texto: string): string {
+  if (!texto) return texto;
+  return texto.replace(VOSEO_RE, (m) => {
+    // "SOS" (todo mayúsculas) es una sigla, no voseo.
+    if (m === m.toUpperCase() && m.length >= 3) return m;
+    const neutro = VOSEO_MAP.get(m.toLowerCase());
+    if (!neutro) return m;
+    // Respeta mayúscula inicial ("Probá" → "Prueba").
+    return m[0] === m[0].toUpperCase() ? neutro[0].toUpperCase() + neutro.slice(1) : neutro;
+  });
+}
+
 export function redactPhones(texto: string): string {
   if (!texto) return texto;
   const guardados: string[] = [];
