@@ -525,16 +525,16 @@ export const useCloserLeads = () => {
         query = query.in("stage", stageFilter);
       }
 
-      {
-        // Los tabs del embudo de modelos excluyen las agencias (línea B2B).
-        query = query.neq("lead_source", B2B_SOURCE);
-      }
-
-      // Tab "Ventas": deals de venta de plataforma a creadoras (cross-stage).
-      // Acotado a lo que NO es agencia (arriba) para no mezclar las 465 B2B con
-      // las ventas a creadoras propias.
+      // Las agencias (B2B) SÍ entran a los tabs por stage, igual que las
+      // ex-creadoras: Miguel y Jhon (04/08) tomaban agencias y "Asignaciones"
+      // no las contaba — para quien trabaja el pipeline eso lee como que el
+      // Tomar no guardó nada. Solo las TOMADAS llegan acá (las no tomadas son
+      // contactos del directorio y viven en el tab Agencias), así que no se
+      // repite la contaminación del import de las 465.
+      // Tab "Ventas": deals de venta de plataforma a creadoras propias
+      // (cross-stage) — ahí las B2B sí quedan afuera para no mezclar líneas.
       if (tab === "ventas") {
-        query = query.eq("deal_type", "venta_plataforma");
+        query = query.eq("deal_type", "venta_plataforma").neq("lead_source", B2B_SOURCE);
       }
 
       // Server-side search filter
@@ -772,10 +772,10 @@ export const useCloserLeads = () => {
 
         // Los contadores de Ex-creadores/Agencias NO salen de acá: esos tabs
         // cuentan CONTACTOS del directorio (ver el bloque (C) más abajo).
-        // Los conteos por stage y el de Ventas son del embudo de MODELOS: las
-        // agencias (B2B) no suman ahí, igual que no aparecen en esos tabs.
-        if (src === B2B_SOURCE) continue;
+        // Por STAGE las B2B sí cuentan (Asignaciones etc. — espejo del listado,
+        // 04/08); en "Ventas" no (ese tab es ventas a creadoras propias).
         counts[s] = (counts[s] || 0) + 1;
+        if (src === B2B_SOURCE) continue;
         if (row.deal_type === "venta_plataforma") counts["ventas"] = (counts["ventas"] || 0) + 1;
       }
       // (B) Pool SIN asignar partido por antigüedad (Nuevo ≤30d / Antiguos
