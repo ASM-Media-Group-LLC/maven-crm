@@ -1,0 +1,14 @@
+-- Ajustes de notas post-estreno, ronda 2 (Jhon 04/08).
+-- (Aplicado en prod vía MCP; este archivo lo versiona.)
+--
+-- 1. corte_hubstaff_bloque (modo grupo): la marca de actividad baja pasa de
+--    "(-24%)" a "(min 60)" — más clara para el equipo ("María 35% (min 60)").
+-- 2. corte_nota_formula v2.1: PENALIZACIÓN por actividad bajo el mínimo 60
+--    (hasta -1.5): "la nota no debería ser tan alta" con 36% de actividad.
+--    Verificado: Isabel 9.5→8.7 (36%) · Brayan 7.8→6.5 (22%) · Daniel 7.8→7.7
+--    (62%, sin penalización). Sin cuenta de Hubstaff = sin penalización.
+-- 3. (En el agente) ESTRUCTURA OBLIGATORIA del cierre: resumen → "*Notas del
+--    día*" con TODAS las personas de INSUMOS → objetivo de mañana. El 03/08
+--    los insumos existieron para los 3 grupos (verificado en corte_notas) pero
+--    Managers y Ventas OMITIERON la sección al redactar — solo Warming la
+--    publicó, y por eso la copia a Álvaro solo traía notas de warming.

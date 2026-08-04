@@ -768,7 +768,7 @@ Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y p
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - Quien no contó nada en el período: "sin novedades en el grupo esta tanda" — sin acusar (puede estar trabajando); si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor.
 - Al final, UNA línea recordando (con variación, no siempre igual) que pueden ir mandando todo por ti — es más rápido y no pierden tiempo.
-- ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad, con el déficit contra el mínimo de compañía (60%) tal como viene en el bloque inyectado (ej. "María 35% (-25%)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
+- ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04, formato de Jhon 04/08): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad; quien esté bajo el mínimo de compañía lleva la marca "(min 60)" tal como viene en el bloque inyectado (ej. "María 35% (min 60)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
 - CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
 - En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
 - UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
@@ -5170,8 +5170,10 @@ async function buildInitialUserMessage(args: {
       const prepObj = (prep ?? null) as { personas?: unknown[]; semana?: unknown[] | null } | null;
       if (prepObj?.personas?.length) {
         lines.push("");
-        lines.push("INSUMOS OBJETIVOS POR PERSONA (Maven + Hubstaff; nota_sugerida = fórmula fija de participación + Hubstaff + avance del rol). La nota FINAL se basa en ESTO: puedes ajustar máximo ±0.5 diciendo la razón (ej. 'destrabó las cuentas', 'cerró venta'). 'sin_metricas_tabla' = su rol no deja rastro en tablas (ej. warming de cuentas): su avance evalúalo por lo que contó en el grupo.");
+        lines.push("INSUMOS OBJETIVOS POR PERSONA (Maven + Hubstaff; nota_sugerida = fórmula fija de participación + Hubstaff + avance del rol, con penalización si la actividad está bajo el mínimo 60%). La nota FINAL se basa en ESTO: puedes ajustar máximo ±0.5 diciendo la razón (ej. 'destrabó las cuentas', 'cerró venta'). 'sin_metricas_tabla' = su rol no deja rastro en tablas: su avance evalúalo por lo que contó en el grupo.");
         lines.push(JSON.stringify(prepObj.personas));
+        lines.push("");
+        lines.push("ESTRUCTURA OBLIGATORIA DEL CIERRE — en este orden: (1) resumen del día; (2) sección '*Notas del día*' con TODAS las personas de INSUMOS, una línea cada una: 'Nombre nota — razón corta (act% o (min 60))' — si falta UNA sola persona el cierre está MAL (el 03/08 Managers y Ventas omitieron las notas y solo Warming las publicó); (3) objetivo de mañana en una línea. Las notas van SÍ o SÍ aunque ya haya habido resúmenes o cierres parciales en el chat de hoy.");
       }
       if (prepObj?.semana?.length) {
         lines.push("");
