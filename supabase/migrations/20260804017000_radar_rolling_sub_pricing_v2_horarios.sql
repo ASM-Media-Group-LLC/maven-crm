@@ -1,0 +1,16 @@
+-- Ronda post-corte-11am (Jhon 04/08). SQL aplicado vía MCP:
+-- 1. manager_promo_rolling14(p_tenant): radar con VENTANA MÓVIL de 14 días
+--    para los días 1-5 del mes ("¿por qué esperar al día 5?" → ya no se
+--    espera; misma señal, ventana que cruza el mes, etiquetada). El wrapper
+--    de get_manager_growth_feed la devuelve como radar_14d.
+-- 2. get_sub_pricing v2: p_manager ('Carolina'=Plus, 'Fabiana'=Massive vía
+--    creator_business.kash_type o assigned_manager) + lista COMPACTA — el
+--    modo "todas" de 53 filas gordas mató por presupuesto la respuesta a
+--    Fabiana (11:01).
+-- 3. whatsapp_user_schedules.role_kind acepta 'content' (migración previa) y
+--    Carolina quedó registrada a mano con su horario IRREGULAR (L 9-19 · Ma
+--    10-19 · Mi 9-19 · J 10-13 · V 9-19 · S 9-14) — la tool decía "la tengo"
+--    sin soportar per-day; ahora set_member_schedule acepta per_day[].
+-- 4. En código: patrón ack-falso += "lo/la tengo" pelado · regla MODELOS DE
+--    CADA MANAGER en el MOTOR (Plus=Carolina/Massive=Fabiana, prohibido
+--    "no sé cuáles son tus modelos").

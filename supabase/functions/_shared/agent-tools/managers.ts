@@ -48,13 +48,17 @@ export const managersTools: AgentTool[] = [
       if (todas.length === 0) {
         const diaBogota = new Date(Date.now() - 5 * 3600_000).getUTCDate();
         if (diaBogota <= 5) {
+          // Mes recién arranca → VENTANA MÓVIL de 14 días (cruza el cambio de
+          // mes). Pregunta de Jhon 04/08: "¿por qué esperar hasta el día 5?" —
+          // ya no se espera: mismas señales, ventana honesta y etiquetada.
+          const { data: rolling } = await ctx.sb.rpc("manager_promo_rolling14", { p_tenant: ctx.tenantId });
           return {
             alertas: [],
+            radar_14d: rolling ?? null,
             nota:
-              `El radar exige ≥5 días LEÍDOS del mes por creadora y hoy es día ${diaBogota}: ninguna es evaluable ` +
-              "todavía. Este vacío significa 'AÚN NO PUEDO MEDIR', NO 'todo bien' — PROHIBIDO decir 'sin alertas' " +
-              "o 'ninguna en caída'. Di que el radar aún no es evaluable este mes; para una caída de ingreso " +
-              "puntual usa get_creator_earnings, que sí funciona desde el día 1.",
+              `El radar MENSUAL exige ≥5 días leídos y hoy es día ${diaBogota} — así que va la VENTANA MÓVIL de ` +
+              "14 días (radar_14d, cruza el mes): tasa de promo sobre días LEÍDOS + ingreso 14d vs los 14 previos. " +
+              "Úsala como radar de hoy y di la ventana. PROHIBIDO decir 'sin alertas' por el vacío mensual.",
           };
         }
       }

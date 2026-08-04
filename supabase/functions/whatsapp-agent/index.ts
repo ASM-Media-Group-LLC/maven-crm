@@ -234,6 +234,8 @@ REAGENDAMIENTOS — DETECTAR CONFLICTOS DE HORA/FECHA:
 - Aclaralo: "@handle estaba para hoy 7PM (Julieth lo había agendado ayer); Miguel acaba de reagendarla a 9PM Miami (8PM Bogotá). Confirmar el nuevo horario."
 - Cuando hay un reagendamiento entre 2 closers distintos (Julieth → Miguel), aclaralo también: "Pasó de Julieth a Miguel — ¿se coordinaron, o hay duplicación?".
 
+MODELOS DE CADA MANAGER (regla del owner, SIN excepciones): Carolina = cuenta Kash PLUS · Fabiana = cuenta Kash MASSIVE. "Mis modelos/mis creadoras" de una manager = las de su cuenta Kash (todas tienen manager asignado en Maven con esta regla). PROHIBIDO responder "no sé cuáles son tus modelos": las tools filtran por manager (get_manager_roster_stats, get_sub_pricing con manager, get_promo_day_breakdown) — usa el nombre de quien pregunta.
+
 PREGUNTAR PARA RESPONDER MEJOR (estilo consultor — caso Celia Lora 04/08):
 - Cuando el DETALLE cambia la respuesta y NO está en Maven ni en tus tools, NO respondas a medias: pregunta 1-2 datos concretos ANTES de armar la respuesta final. Ej.: "le llegaron advertencias de OF" → ¿de qué tipo? (¿copyright/DMCA, contenido prohibido, pagos, verificación?) ¿qué decía exactamente? ¿tienen screenshot? La respuesta para un strike de copyright no se parece en nada a la de un problema de pagos.
 - Mientras esperas el dato, puedes dar un adelanto útil ("de entrada te digo X; con el detalle te armo el plan completo").
@@ -1467,8 +1469,9 @@ const TOOLS: Array<{
     input_schema: {
       type: "object",
       properties: {
-        creator: { type: "string", description: "@handle o nombre artístico. Omitir = todas + bandas" },
+        creator: { type: "string", description: "@handle o nombre artístico. Omitir = listado + bandas" },
         days: { type: "number", description: "ventana en días (default 30)" },
+        manager: { type: "string", description: "filtrar por manager ('Carolina'=Kash Plus, 'Fabiana'=Kash Massive). Si preguntan por 'MIS creadoras', pasa el nombre de quien pregunta — la lista sale compacta" },
       },
     },
   },
@@ -1496,10 +1499,23 @@ const TOOLS: Array<{
         end: { type: "string", description: "hora de fin L-V, formato HH:MM 24h (ej. '19:00')" },
         sat_start: { type: "string", description: "inicio del sábado si trabaja (HH:MM). Omitir si no trabaja sábados" },
         sat_end: { type: "string", description: "fin del sábado (HH:MM)" },
+        per_day: {
+          type: "array",
+          description: "SOLO para horarios IRREGULARES (distinto por día, ej. 'lunes 9-7 pero jueves 10-1'): lista completa de días trabajados. Si viene, reemplaza a start/end/sat_*.",
+          items: {
+            type: "object",
+            properties: {
+              weekday: { type: "number", description: "1=lunes … 6=sábado" },
+              start: { type: "string", description: "HH:MM" },
+              end: { type: "string", description: "HH:MM" },
+            },
+            required: ["weekday", "start", "end"],
+          },
+        },
         role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "llg = busca números · closer = ventas/llamadas · content = contenido/cuentas/managers" },
         daily_goal: { type: "number", description: "meta diaria si aplica (ej. 3 números para un llg)" },
       },
-      required: ["display_name", "start", "end", "role_kind"],
+      required: ["display_name", "role_kind"],
     },
   },
   {
@@ -3110,8 +3126,21 @@ async function executeTool(
       const roleKind = String(input.role_kind ?? "");
       const HHMM = /^\d{1,2}:\d{2}$/;
       if (!displayName) return { error: "missing_display_name" };
-      if (!HHMM.test(start) || !HHMM.test(end)) return { error: "horario_invalido", formato: "HH:MM 24h" };
       if (!["llg", "closer", "content"].includes(roleKind)) return { error: "invalid_role_kind" };
+      // Horario IRREGULAR (per_day) — caso Carolina 04/08: "L-M-V 9-7, martes
+      // 10-7, jueves 10-1, sáb 9-2" no cabía en el formato uniforme y el bot
+      // dijo "la tengo" sin registrar nada.
+      const perDay = Array.isArray(input.per_day) ? input.per_day as Array<{ weekday?: number; start?: string; end?: string }> : null;
+      if (perDay && perDay.length > 0) {
+        for (const d of perDay) {
+          const wd = Number(d.weekday);
+          if (!(wd >= 1 && wd <= 6) || !HHMM.test(String(d.start ?? "")) || !HHMM.test(String(d.end ?? ""))) {
+            return { error: "per_day_invalido", formato: "{weekday:1..6, start:'HH:MM', end:'HH:MM'}" };
+          }
+        }
+      } else if (!HHMM.test(start) || !HHMM.test(end)) {
+        return { error: "horario_invalido", formato: "HH:MM 24h (o usa per_day para horarios irregulares)" };
+      }
       const satStart = input.sat_start ? String(input.sat_start).trim() : null;
       const satEnd = input.sat_end ? String(input.sat_end).trim() : null;
       if ((satStart && !HHMM.test(satStart)) || (satEnd && !HHMM.test(satEnd))) {
@@ -3123,26 +3152,37 @@ async function executeTool(
       const member = members[0];
       if (!member.user_id) return { error: "member_not_linked", member: { display_name: member.display_name } };
 
-      // Reemplazo completo: borrar turnos previos y cargar L-V (+ sábado si vino).
+      // Reemplazo completo: borrar turnos previos y cargar el nuevo esquema.
       await sb.from("whatsapp_user_schedules").delete().eq("user_id", member.user_id);
       const filas: Array<Record<string, unknown>> = [];
-      for (let wd = 1; wd <= 5; wd++) {
-        filas.push({
-          user_id: member.user_id, weekday: wd, start_time: start, end_time: end,
-          role_kind: roleKind, daily_goal: input.daily_goal ?? null,
-        });
-      }
-      if (satStart && satEnd) {
-        filas.push({
-          user_id: member.user_id, weekday: 6, start_time: satStart, end_time: satEnd,
-          role_kind: roleKind, daily_goal: input.daily_goal ?? null,
-        });
+      if (perDay && perDay.length > 0) {
+        for (const d of perDay) {
+          filas.push({
+            user_id: member.user_id, weekday: Number(d.weekday), start_time: d.start, end_time: d.end,
+            role_kind: roleKind, daily_goal: input.daily_goal ?? null,
+          });
+        }
+      } else {
+        for (let wd = 1; wd <= 5; wd++) {
+          filas.push({
+            user_id: member.user_id, weekday: wd, start_time: start, end_time: end,
+            role_kind: roleKind, daily_goal: input.daily_goal ?? null,
+          });
+        }
+        if (satStart && satEnd) {
+          filas.push({
+            user_id: member.user_id, weekday: 6, start_time: satStart, end_time: satEnd,
+            role_kind: roleKind, daily_goal: input.daily_goal ?? null,
+          });
+        }
       }
       const { error } = await sb.from("whatsapp_user_schedules").insert(filas);
       if (error) return { error: error.message };
       return {
         ok: true, member: member.display_name,
-        horario: { lun_vie: `${start}-${end}`, sabado: satStart && satEnd ? `${satStart}-${satEnd}` : "no trabaja", rol: roleKind },
+        horario: perDay && perDay.length > 0
+          ? { dias: filas.map((f) => `${f.weekday}: ${f.start_time}-${f.end_time}`), rol: roleKind }
+          : { lun_vie: `${start}-${end}`, sabado: satStart && satEnd ? `${satStart}-${satEnd}` : "no trabaja", rol: roleKind },
       };
     }
 
@@ -3267,6 +3307,7 @@ async function executeTool(
         p_tenant: ctx.tenantId,
         p_query: input.creator ? String(input.creator).trim() : null,
         p_days: Math.min(Math.max(Number(input.days ?? 30), 7), 120),
+        p_manager: input.manager ? String(input.manager).trim() : null,
       });
       if (error) return { error: error.message };
       return data as Record<string, unknown>;
@@ -5773,6 +5814,9 @@ async function runAgent(req: AgentRequest): Promise<{
     /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
     /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
     /\b(?:lo|la|los|las)\s+tengo\s+guardad/i,
+    // "la tengo" pelado (04/08: "Gracias Carolina, la tengo" sobre un horario
+    // que NUNCA registró). Excluye "lo tengo que <hacer>".
+    /\b(?:lo|la|los|las)\s+tengo\b(?!\s+que\b)/i,
     /\b(?:lo|la|los|las)\s+(?:registr|anot|agend|guard)(?:é|e|amos|ó)\b/i,
     /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend|guard|teng)/i,
     /\bte\s+lo\s+(?:registr|anot|agend|dej)/i,
