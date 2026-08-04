@@ -5992,6 +5992,55 @@ async function runAgent(req: AgentRequest): Promise<{
     lockObtenido = got;
   }
 
+  // ── AUDIO YA CUBIERTO POR LA CORRIDA DE MENCIÓN (v2 del anti-doble-respuesta) ──
+  // Patrón del equipo: audio + "@bot" segundos después. La corrida por mention
+  // espera la transcripción (#969, tope ~24s) y el transcriptor re-dispara "auto"
+  // al terminar → dos respuestas para un pedido (Miguel 04/08 12:51). La v1
+  // saltaba el re-disparo en el transcriptor, pero eso dejó EN VISTO el caso
+  // contrario (Miguel 15:26): transcripción lenta → la mención solo alcanzó a
+  // prometer "dame unos segundos" y el re-disparo que debía cumplir la promesa
+  // nunca llegó. Acá, DESPUÉS del lock (la serialización mata la carrera: si la
+  // corrida de mención sigue trabajando, esperamos su lock y su respuesta ya está
+  // publicada cuando chequeamos), se aborta SOLO si la mención ya respondió con
+  // sustancia. Ante la duda se corre: un duplicado ocasional cuesta menos que un
+  // visto.
+  if (req.invoked_by === "auto" && req.message_id) {
+    const { data: trig } = await sb.from("whatsapp_messages")
+      .select("id, msg_type, created_at, sender_external_id")
+      .eq("id", req.message_id).maybeSingle();
+    if (trig?.msg_type === "audio" && trig.sender_external_id) {
+      const { data: mencionPosterior } = await sb.from("whatsapp_messages")
+        .select("id, created_at")
+        .eq("group_id", group.id)
+        .eq("sender_external_id", trig.sender_external_id)
+        .eq("is_from_bot", false)
+        .gt("created_at", trig.created_at)
+        .or("body.ilike.%@140716701401153%,body.ilike.%maven%")
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const mencion = (mencionPosterior ?? [])[0];
+      if (mencion) {
+        const { data: respBot } = await sb.from("whatsapp_messages")
+          .select("body")
+          .eq("group_id", group.id)
+          .eq("is_from_bot", true)
+          .gt("created_at", mencion.created_at)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const cuerpo = String((respBot ?? [])[0]?.body ?? "");
+        const esEspera = /dame unos segundos|procesa(?:ndo)? tu (?:audio|nota)|apenas tenga el texto/i.test(cuerpo);
+        if (cuerpo.length > 80 && !esEspera) {
+          await logEvent(sb, {
+            tenantId: group.tenant_id, groupId: group.id, kind: "agent_silent",
+            payload: { motivo: "audio_cubierto_por_mencion", esperado: true, invoked_by: req.invoked_by, message_id: req.message_id },
+          });
+          await releaseAgentLock(sb, group.id, lockHolder);
+          return { ok: true, iterations: 0 };
+        }
+      }
+    }
+  }
+
   // Relojes de la corrida. Sirven para saber en qué se fue el tiempo: hoy `agent_silent`
   // trae `iterations` pero ni un milisegundo, así que los 165s de la corrida de María
   // (03/08) no se pueden atribuir a lock, transcripción, modelo o tools. Sin esto, subir

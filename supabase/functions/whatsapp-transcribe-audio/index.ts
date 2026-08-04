@@ -548,30 +548,11 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // exactamente sus dos identidades WA.
   const esJefe = SCRIBE_FIRST_SENDERS.has(String(msg.sender_external_id ?? ""));
   const alwaysFire = supervisorBot || isDirectDm || esJefe;
-  // ANTI-DOBLE-RESPUESTA (04/08, Miguel): audio + "@bot ..." unos segundos después
-  // es un patrón normal del equipo. La corrida por mention ESPERA la transcripción
-  // (#969) y responde el contenido del audio — el re-disparo de acá duplicaba la
-  // respuesta (4 mensajes del bot para 2 pedidos). Si el MISMO remitente ya
-  // mencionó al bot en el grupo DESPUÉS de mandar el audio, ese camino lo cubre:
-  // no volvemos a disparar, y queda evento para diagnosticar silencios.
-  if (!isDirectDm && msg.sender_external_id && msg.created_at) {
-    const { data: mencionPosterior } = await sb
-      .from("whatsapp_messages")
-      .select("id")
-      .eq("group_id", msg.group_id)
-      .eq("sender_external_id", msg.sender_external_id)
-      .eq("is_from_bot", false)
-      .gt("created_at", msg.created_at)
-      .or("body.ilike.%@140716701401153%,body.ilike.%maven%")
-      .limit(1);
-    if ((mencionPosterior ?? []).length > 0) {
-      await sb.from("whatsapp_bot_events").insert({
-        tenant_id: msg.tenant_id, group_id: msg.group_id, kind: "audio_refire_skipped",
-        payload: { message_id: msg.id, motivo: "mencion_posterior_del_mismo_remitente" },
-      });
-      return { ok: true, reason: "mention_run_covers_audio" };
-    }
-  }
+  // (04/08) El anti-doble-respuesta audio+mención vivió acá unas horas (v1:
+  // saltar el re-disparo si había mención posterior) y dejó EN VISTO a Miguel:
+  // la corrida de la mención no siempre alcanza a ver la transcripción. La
+  // decisión se movió al AGENTE, después del lock, donde la serialización
+  // elimina la carrera — acá se dispara SIEMPRE.
   if (group?.bot_enabled && group?.bot_mode !== "off") {
     if (audioMentionsBot(result.text)) {
       fireAgent(msg.id, msg.group_id, "audio_mention");
