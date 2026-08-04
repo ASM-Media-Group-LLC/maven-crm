@@ -57,7 +57,13 @@ function pickModel(invokedBy: string | undefined, hasReportKind: boolean): strin
   return invokedBy === "auto" ? HAIKU_MODEL : SONNET_MODEL;
 }
 const MAX_ITERATIONS = 8;
-const MAX_WALL_MS = 30_000;
+// 30_000 desde el commit inicial (#208, sin justificación registrada) → 45_000 el
+// 04/08 por decisión de Jhon: con la contabilidad honesta de PR A/B los 30s reales
+// mataban pedidos de varias tools a mitad de camino (caso María 03/08: openers con
+// lookup+scrape). Ajustable por env SIN deploy; el costo extra es ruido (~centavos:
+// solo trabajan más las corridas que antes morían cortadas). Validar el jueves con
+// las métricas de agent_respondio/agent_silent (p95 ms_total, iteraciones al morir).
+const MAX_WALL_MS = Number(Deno.env.get("BOT_MAX_WALL_MS") ?? "45000");
 // Último recinto antes del 504 de la plataforma (~150s; ver telegram-scan:409 y
 // x-scan:33-43, que presupuestan a 100s dejando ~50s de aire). No es el presupuesto
 // de trabajo —ese es MAX_WALL_MS—: es la garantía de devolver algo propio en vez de
@@ -5799,10 +5805,15 @@ async function runAgent(req: AgentRequest): Promise<{
     // trabajando → las dos respondían igual, que es el duplicado que queríamos matar.
     const maxEsperaMs = budgetMs + 3_000;
     const esperaInicio = Date.now();
-    let got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
+    // TTL del lock DERIVADO del presupuesto real (+15s de colchón). Con el 60
+    // fijo de antes, una corrida de corte (100s) soltaba el candado a mitad de
+    // camino y el single-flight quedaba tapado a medias (la fuga conocida del
+    // 30/07: 4 respuestas en 41s).
+    const lockTtlSec = Math.ceil((budgetMs + 15_000) / 1000);
+    let got = await tryAcquireAgentLock(sb, group.id, lockHolder, lockTtlSec);
     while (!got && Date.now() - esperaInicio < maxEsperaMs) {
       await new Promise((r) => setTimeout(r, 1000));
-      got = await tryAcquireAgentLock(sb, group.id, lockHolder, 60);
+      got = await tryAcquireAgentLock(sb, group.id, lockHolder, lockTtlSec);
     }
     msEsperaLock = Date.now() - esperaInicio;
     lockObtenido = got;
