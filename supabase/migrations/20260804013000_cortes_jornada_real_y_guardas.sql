@@ -1,0 +1,25 @@
+-- Post-estreno del cierre 19:00 (Jhon, 03/08). Cuatro correcciones:
+-- (Aplicado en prod vía MCP: corte_notas_v2_jornada_real + reschedule cron.
+--  Este archivo versiona el estado final; cuerpos completos en las MCP.)
+--
+-- 1. JORNADA REAL (L-V 10:00-19:00 · sáb 10:00-14:00 · dom libre):
+--    · cron whatsapp-corte-tick → '0 16,17,18,19,20,22,0 UTC'; el edge gatea
+--      por día: L-V cortes 11·13·15·17 + cierre 19; sábado corte 12 + cierre
+--      CON NOTA a las 14; domingo skip. (Se elimina el corte de las 9am:
+--      la jornada arranca 10.)
+--    · corte_cierre_prep: franjas sobre 10:00-19:00 (máx 5 L-V, 2 sáb) y
+--      Hubstaff de referencia 7h L-V / 3.5h sáb.
+--    · prompt del modo corte: bloque JORNADA REAL para que "cuánto queda de
+--      turno" se calcule con hora Bogotá y el horario correcto.
+-- 2. corte_nota_formula v2(franjas, franjas_max, hub_h, hub_ref, hub_act,
+--    avance): TOPE 8.4 cuando no hay métricas de tabla (Isabel sacó 9.7 con
+--    el proxy de participación, sobre los anclajes de Álvaro; el bot puede
+--    ajustar +0.5 con razón → máx ~8.9).
+-- 3. GUARDA ANTI-CIERRE-FANTASMA (agente): en corridas normales el modelo
+--    imitó el formato y publicó TRES "Cierre del día" en Ventas (18:48/18:53/
+--    18:54) antes del real de las 19:00 — el claim solo cubre al cron. Ahora
+--    reply_to_group con encabezado CORTE/Cierre del día/Cierre de turno se
+--    bloquea determinísticamente salvo invocación corte_2h/corte_cierre.
+-- 4. El significado del "(36%, -24%)" de las notas queda documentado: % de
+--    actividad Hubstaff y su DÉFICIT contra el mínimo de compañía (60%) que
+--    fijó Álvaro a las 17:04.

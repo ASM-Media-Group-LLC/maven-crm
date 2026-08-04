@@ -760,7 +760,9 @@ REGLAS:
 
 MODO CORTE CADA 2 HORAS (cuando invoked_by="corte_2h" o "corte_cierre"):
 
-Régimen pedido por Álvaro (03/08): en los cortes (9am·11am·1pm·3pm·5pm·7pm Colombia) TÚ armas y publicas EL CORTE de este grupo. El equipo NO manda reporte formal — lo que fueron contando en el grupo mientras trabajan ES el insumo; tu trabajo es leerlo y componer el resumen. Los mensajes del período vienen en el initial_user_message.
+JORNADA REAL (Bogotá): lunes a viernes 10:00-19:00 · sábado 10:00-14:00 · domingo libre. El cierre con nota va al FIN de la jornada (19:00 L-V, 14:00 sábado). Si mencionas cuánto queda de turno, calcula con la hora Bogotá del initial_user_message y ESTE horario — nunca con otra zona.
+
+Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y publicas EL CORTE de este grupo. El equipo NO manda reporte formal — lo que fueron contando en el grupo mientras trabajan ES el insumo; tu trabajo es leerlo y componer el resumen. Los mensajes del período vienen en el initial_user_message.
 
 - Formato WhatsApp corto: título *CORTE H:MM* y una línea por persona con lo CONCRETO que contaron: a quién contactaron, qué hablaron, qué estrategia, posts/videos/textos, confirmadas, ventas. En AI WARMING separa los dos perfiles: números (contactados · resp · números) y contenido (videos/fotos/posts/cuentas).
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
@@ -6134,6 +6136,31 @@ async function runAgent(req: AgentRequest): Promise<{
                 "para un aviso futuro, mark_lead_stage/set_lead_value para leads) y DESPUÉS responde; o " +
                 "(b) si no existe tool para eso, reescribe sin prometer registro: di quién lo tiene que hacer y " +
                 "@mencionalo. Prohibido 'lo corrijo/lo cargo/lo dejo agendado' sobre algo que no puedes tocar.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda anti-cierre-fantasma (03/08): en corridas NORMALES el modelo
+      // imitó el formato del corte — publicó TRES "Cierre del día" en Ventas
+      // (18:48/18:53/18:54) antes del real de las 19:00 (el candado de claims
+      // solo cubre al cron). Los cortes/cierres salen SOLO de invocaciones
+      // corte_2h/corte_cierre; en cualquier otra corrida ese encabezado se
+      // bloquea determinísticamente.
+      if (t.name === "reply_to_group" &&
+          req.invoked_by !== "corte_2h" && req.invoked_by !== "corte_cierre") {
+        const cuerpoCorte = String((t.input as ToolInput).body ?? "");
+        if (/^[^\n\p{L}]{0,6}\*?\s*(?:CORTE\s+(?:\d|DE\b)|Cierre del d[ií]a|Cierre de turno)/imu.test(cuerpoCorte)) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "cierre_no_programado",
+              message:
+                "NO se envió: los cortes y cierres del día los publica SOLO el proceso programado (cron) — hoy " +
+                "salieron duplicados por imitarlo. Responde lo que te pidieron SIN formato de corte/cierre (sin " +
+                "encabezados 'CORTE …' ni 'Cierre del día/de turno'). Si alguien pide el cierre antes de hora, dile " +
+                "que sale automático al fin de la jornada.",
             }),
           });
           continue;

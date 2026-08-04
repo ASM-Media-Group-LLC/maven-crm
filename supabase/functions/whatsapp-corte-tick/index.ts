@@ -24,8 +24,12 @@ const GRUPOS: Array<{ id: string; nombre: string }> = [
   { id: "d12ec56f-b324-4369-b72d-7540fb930ef6", nombre: "VENTAS" },
 ];
 const DM_ALVARO = "9eb0f764-cf6e-4d8f-87e0-c7b9cdc2d17f";
-const HORAS_CORTE = new Set([9, 11, 13, 15, 17]);
-const HORA_CIERRE = 19;
+// Jornada real (Jhon 03/08): L-V 10:00-19:00 · sábado 10:00-14:00 · domingo
+// libre. Cortes cada 2h DENTRO de la jornada; el cierre con nota va al FIN.
+const HORAS_CORTE_LV = new Set([11, 13, 15, 17]);
+const HORA_CIERRE_LV = 19;
+const HORAS_CORTE_SAB = new Set([12]);
+const HORA_CIERRE_SAB = 14;
 const POLL_MAX_MS = 100_000;
 
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
@@ -58,13 +62,16 @@ serve(async (req) => {
   const force = url.searchParams.get("force") === "true";
   const { hora, dow, hhmm } = horaBogota();
 
+  const esSabado = dow === 6;
+  const horasCorte = esSabado ? HORAS_CORTE_SAB : HORAS_CORTE_LV;
+  const horaCierre = esSabado ? HORA_CIERRE_SAB : HORA_CIERRE_LV;
   if (!force) {
     if (dow === 0) return Response.json({ skip: "domingo" });
-    if (!HORAS_CORTE.has(hora) && hora !== HORA_CIERRE) {
-      return Response.json({ skip: `hora ${hora} no es de corte` });
+    if (!horasCorte.has(hora) && hora !== horaCierre) {
+      return Response.json({ skip: `hora ${hora} no es de corte (${esSabado ? "sábado 12/14" : "L-V 11·13·15·17/19"})` });
     }
   }
-  const esCierre = hora === HORA_CIERRE;
+  const esCierre = hora === horaCierre;
   const invokedBy = esCierre ? "corte_cierre" : "corte_2h";
   const sb = adminClient();
   const inicio = new Date().toISOString();
