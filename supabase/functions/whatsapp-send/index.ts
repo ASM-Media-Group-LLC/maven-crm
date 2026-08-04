@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
 
 // whatsapp-send — manda mensajes a un grupo via el provider configurado.
 //
@@ -138,7 +138,16 @@ async function sendOne(args: {
   // (respuestas del agente, recordatorios, digests, reportes), en vez de confiar en una
   // regla del prompt que el modelo puede ignorar.
   // Los DMs quedan afuera: son 1-a-1 con el dueño de la data.
-  const bodyFinal = mdAWhatsApp(group.is_direct === true ? args.body : redactPhones(args.body));
+  // El bot JAMÁS se menciona a sí mismo ni pega lids crudos como texto: el
+  // 04/08 le respondió a Carolina arrancando con "@140716701401153 dale…" (su
+  // PROPIO lid, imitando el formato de la mención de ella) — para la gente es
+  // un chorro de números. Guarda en el borde de salida, como redactPhones:
+  // strip de @<lid del bot> en cualquier posición.
+  const sinAutoMencion = BOT_LIDS.reduce(
+    (txt, lid) => txt.replace(new RegExp(`@${lid}[,:]?\\s*`, "g"), ""),
+    args.body,
+  ).trimStart();
+  const bodyFinal = mdAWhatsApp(group.is_direct === true ? sinAutoMencion : redactPhones(sinAutoMencion));
 
   let result: ProviderSendResult;
   if (group.provider === "evolution") {
