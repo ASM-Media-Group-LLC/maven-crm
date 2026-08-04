@@ -391,7 +391,10 @@ const URL_RE = /https?:\/\/\S+/gi;
 const MENCION_RE = /@\d+(?:@lid)?/g;
 // Candidato: dígitos con separadores típicos (espacio, guion, punto, paréntesis) y "+"
 // opcional. El filtrado fino se hace después, match por match, en pareceTelefono().
-const TEL_CAND_RE = /\+?\(?\d[\d\s().-]{5,}\d\)?/g;
+// El lookbehind evita comerse los dígitos de un HANDLE ("@dani2603592" quedaba
+// "@dani***3592" el 04/08): si los dígitos vienen pegados a una letra o a un @,
+// son parte de un identificador, no un teléfono suelto.
+const TEL_CAND_RE = /(?<![\w@])\+?\(?\d[\d\s().-]{5,}\d\)?/g;
 
 function pareceTelefono(s: string): boolean {
   if (s.includes(",")) return false; // "$3,443" · "1,234 followers"

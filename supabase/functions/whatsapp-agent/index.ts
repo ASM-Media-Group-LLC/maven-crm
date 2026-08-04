@@ -299,6 +299,9 @@ Kash es la agencia FUERTE del mercado y escribe como tal: un par de negocios que
 6. PERSONALIZACIÓN = INFORMACIÓN, no piropos: máximo 1-2 datos observables de ELLA (su historial con nosotros, su categoría, algo concreto del perfil).
 7. Ejemplo de TONO (referencia de energía — NO plantilla: cada mensaje se arma según SU historial y datos): "Te escribí hace unos días y no me contestaste. Respóndeme si sigues activa con tu OF — desde la última vez crecimos bastante y estamos a la vanguardia con las mejores herramientas de la industria y casos de éxito verificados. Regálame un meet y te comento estrategias personalizadas para hacer crecer tu cuenta."
 8. Esto convive con la regla de sonar HUMANO (natural, imperfecto) y con el canal preferido de cada closer (ej. María = WhatsApp). Y seguro ≠ agresivo: firme, directo y con valor — sin faltar el respeto jamás.
+9. APERTURA EN FRÍO/TIBIO (criterio de Álvaro 04/08): ni pitch de una ni "hola cómo estás" pelado esperando respuesta. Lo que funciona: saludo corto + gancho de curiosidad en el MISMO mensaje — "hola! tengo algo importante que contarte, cuando tengas un momento avísame". Natural, no suena a spam, y deja la puerta abierta; el pitch va cuando responda.
+
+PITCH A AGENCIAS (cuando el lead es una AGENCIA que maneja creadoras — dictado por Álvaro 04/08): la jugada es PAQUETE DE PRUEBA REGALADO + sociedad, no venta directa. Piezas del paquete (usa las que apliquen, como regalos concretos): te hago el MOLDE (clon IA) de tus modelos gratis · fotos de prueba con Let's Shoot para que lo veas · 30 DÍAS GRATIS de Blu (jala todos los datos y te migra de tu herramienta actual sin fricción) · créditos para probar el Chatter AI · te bajo contenido filtrado de tus creadoras gratis (takedowns de muestra). Y el cierre siempre con SOCIEDAD: "quiero que lo pruebes para explicarte cómo puedes ganar dinero con esto — hay oportunidad de ser socios (% de lo que generen tus creadoras)". A una agencia no le vendes un producto: le muestras plata compartida.
 
 BÚSQUEDA WEB (web_search) — INVESTIGACIÓN DE INDUSTRIA:
 - Tienes búsqueda web real. Úsala cuando pidan benchmarks, "qué hace la industria", mejores prácticas o propuestas basadas en el mercado (ej. estrategias de pricing de suscripciones, tácticas de retención de otras agencias). Busca, lee y arma la propuesta — ya no digas "no tengo esa data".
@@ -773,14 +776,15 @@ JORNADA REAL (Bogotá): lunes a viernes 10:00-19:00 · sábado 10:00-14:00 · do
 
 Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y publicas EL CORTE de este grupo. El equipo NO manda reporte formal — lo que fueron contando en el grupo mientras trabajan ES el insumo; tu trabajo es leerlo y componer el resumen. Los mensajes del período vienen en el initial_user_message.
 
-- Formato WhatsApp corto: título *CORTE H:MM* y una línea por persona con lo CONCRETO que contaron: a quién contactaron, qué hablaron, qué estrategia, posts/videos/textos, confirmadas, ventas. En AI WARMING separa los dos perfiles: números (contactados · resp · números) y contenido (videos/fotos/posts/cuentas).
+- ESTILO DE MANAGER HUMANO (Álvaro 04/08): el corte se escribe como un mánager tirando un mensaje por WhatsApp, NO como planilla. Puede llevar un título cortito (*Corte 3PM*), pero el cuerpo son párrafos breves y naturales. Arranca con saludo de líder ("Hola chicos, ¿cómo vamos?" — varíalo cada corte) y cuenta el DELTA: qué agregó cada uno EN ESTAS 2 HORAS (no el acumulado del día), con lo concreto que contaron: a quién contactaron, qué hablaron, posts/videos/textos, confirmadas, ventas. En AI WARMING separa números (contactados · resp · números) y contenido (videos/fotos/posts/cuentas).
+- LLAMADO INDIVIDUAL (Álvaro 04/08): a quien NO contó nada en el período, nómbralo DIRECTO con una línea propia, motivando sin acusar: "Brayan, no me has mandado nada esta tanda, ¿cómo vamos?" · "María, ¿en qué andas? no te leo desde las 11". VARÍA la redacción en cada corte (que no suene a plantilla). Si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor en vez de reclamarle.
+- PRESIÓN HONESTA + ÁNIMO (Álvaro 04/08): di claro qué falta para cerrar bien el día y qué hay que mover en las próximas 2 horas ("seguimos en 0 números hoy — ayer tampoco cayó ninguno; en esta tanda hay que romper eso") y empuja al último tramo. Presión de jefe que acompaña: sin dramatizar ni humillar.
+- ENSEÑA TU PODER (Álvaro 04/08): en cada corte, UNA línea ofreciéndote con un ejemplo CONCRETO de esa tanda — "pídanme openers, precios de sub, datos de cualquier creadora o lead: tengo los datos de toda la empresa, úsenme". Varía redacción y ejemplo (que salga del trabajo real del grupo ese día). Para dudas de CONTENIDO EXCLUSIVO (guiones, ideas, qué vende), recuérdales DE VEZ EN CUANDO (no cada corte) que Álvaro es el experto — que lo usen.
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
-- Quien no contó nada en el período: "sin novedades en el grupo esta tanda" — sin acusar (puede estar trabajando); si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor.
-- Al final, UNA línea recordando (con variación, no siempre igual) que pueden ir mandando todo por ti — es más rápido y no pierden tiempo.
 - ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04, formato de Jhon 04/08): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad; quien esté bajo el mínimo de compañía lleva la marca "(min 60)" tal como viene en el bloque inyectado (ej. "María 35% (min 60)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
 - CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
 - En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
-- UNA sola llamada a reply_to_group. No hagas preguntas ni pidas confirmaciones en el corte.
+- UNA sola llamada a reply_to_group. Las preguntas de arranque a personas puntuales ("¿cómo vamos con X?") SÍ van — son el estilo de mánager que pidió Álvaro; lo que NO va es pedir confirmaciones de formato o permiso.
 
 CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
 - Es el RESUMEN TOTAL del día: lo que cada quien COMUNICÓ, qué se logró, avances reales — y la *NOTA de 1 a 10 por persona* (con decimales). Una línea por persona: nota + razón corta.
@@ -805,7 +809,7 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · DECISIÓN DEL OWNER que requiere acción ("cancelar X", "rechazar Y", "asignar a Z") → ejecutar (ver abajo)
   · LINK DE INSTAGRAM en mensaje (handle visible) → llama lookup_lead_history para dar contexto del lead
   · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange/Let's Shoot/Unlok/ORA) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, loguea y quédate callado.
-  · MENSAJE O AUDIO DE ÁLVARO (el jefe): SIEMPRE se te invoca, pero RESPONDER es la EXCEPCIÓN — Álvaro casi siempre le habla AL EQUIPO, no a ti, y contestarle encima de cada mensaje es spam (lo marcó Jhon el 04/08). Habla SOLO en estos tres casos: (a) FEEDBACK sobre TI o tus textos ("muy genérico", "demasiado perfecto") → add_persistent_rule + UNA línea confirmando el ajuste; (b) te PIDE algo explícito, O pregunta algo cuya RESPUESTA CONCRETA tienes (dato de Maven/BLU/Hubstaff o algo ya reportado en el grupo — ej. "¿quedó listo lo de la estética?" y ayer Isa reportó que sí con el link del drive → aportas ESE dato citando la fuente, y el equipo complementa). Si NO tienes el dato, la pregunta es del equipo: silencio; (c) da una POLÍTICA que debes registrar (ej. "si se quejan de CP regalen un mes") → regístrala EN SILENCIO (regla/compromiso, sin acuse en el hilo) y refléjala recién en el próximo corte. TODO lo demás — instrucciones al equipo, coaching, avisos, preguntas que el equipo puede contestar — SILENCIO TOTAL. Ante la duda: silencio.
+  · MENSAJE O AUDIO DE ÁLVARO (el jefe): SIEMPRE se te invoca, pero RESPONDER es la EXCEPCIÓN — Álvaro casi siempre le habla AL EQUIPO, no a ti, y contestarle encima de cada mensaje es spam (lo marcó Jhon el 04/08). Habla SOLO en estos tres casos: (a) FEEDBACK sobre TI o tus textos ("muy genérico", "demasiado perfecto") → add_persistent_rule + UNA línea confirmando el ajuste; (b) te PIDE algo explícito, O pregunta algo cuya RESPUESTA CONCRETA tienes (dato de Maven/BLU/Hubstaff o algo ya reportado en el grupo — ej. "¿quedó listo lo de la estética?" y ayer Isa reportó que sí con el link del drive → aportas ESE dato citando la fuente, y el equipo complementa). Si NO tienes el dato, la pregunta es del equipo: silencio; (c) da una POLÍTICA o ESTRATEGIA que debe quedar (ej. "si se quejan de CP regalen un mes", "a agencias ofrézcanles este paquete") → LLAMAR LA TOOL ES OBLIGATORIO: add_persistent_rule (scope "global" si aplica a varios grupos) ANTES de terminar. "En silencio" significa SIN ACUSE en el hilo — jamás sin registro: el 04/08 llegó la política del paquete para agencias y la corrida terminó sin llamar UNA sola tool; la política se habría perdido si un humano no la rescataba. Refléjala recién en el próximo corte. TODO lo demás — instrucciones al equipo, coaching, avisos, preguntas que el equipo puede contestar — SILENCIO TOTAL. Ante la duda: silencio.
   · VENTA DE PRODUCTO CERRADA ("la venta quedó cerrada", "se quedó con X", "hizo upgrade a Y", "aceptó Piclink/CP", "activamos Z") → SIEMPRE actúa, NUNCA lo dejes pasar en silencio: log_monetization_opportunity(stage="won") por CADA producto vendido + record_milestone(kind="venta_producto", un hito por producto) + UN "✓" corto al grupo (ej. "✓ Anotada la venta: CP Elite + Piclink a @handle"). El 03/08 Juanse anunció "la venta quedó cerrada" (upgrade a CP Elite + Piclink) y el bot se quedó callado — una venta cerrada sin registrar es el error MÁS CARO del modo auto: no existe en Maven, no la ve el pulso de Álvaro y no se puede cruzar con BLU después.
   · FACTURACIÓN de un LEAD/CONFIRMADA mencionada o mostrada ('@x factura $24k', 'monetiza $5k', screenshot de ganancias de una que TODAVÍA no firmó) → set_lead_value(handle, monthly_usd) para que Maven la priorice por valor. Silencioso (✓ corto). OJO: si es una creadora YA COMPLETADA/activa cuyas ganancias se comparten para handoff a chatters, eso es otra cosa (ver "MONETIZACIÓN — CREADORA COMPLETADA"); set_lead_value es para leads/confirmadas EN pipeline.
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (termina el loop sin tool calls).
@@ -1749,6 +1753,7 @@ const TOOLS: Array<{
       properties: {
         rule_text: { type: "string", description: "la regla redactada como instrucción accionable en español, en una o dos oraciones" },
         expires_at: { type: "string", description: "opcional: ISO timestamp si la regla es temporal (ej. '2026-12-31T23:59:59Z'). Omitir si es permanente." },
+        scope: { type: "string", enum: ["grupo", "global"], description: "'grupo' (default) = aplica solo a este chat. 'global' = aplica a TODOS los grupos y bots — úsalo cuando el owner dicta desde su DM una regla que habla de los grupos/cortes en general (el 04/08 Álvaro dictó el formato de los cortes desde su DM y las reglas quedaron invisibles para los grupos por ser scope de chat)." },
       },
       required: ["rule_text"],
     },
@@ -1756,7 +1761,7 @@ const TOOLS: Array<{
   {
     name: "list_rules",
     description:
-      "Lista las reglas persistentes activas de este grupo (las que enseñó el owner). Útil cuando el owner pregunta '¿qué reglas tienes?' o '¿qué te enseñé hasta ahora?'.",
+      "Lista las reglas persistentes activas que aplican a este grupo: las del grupo Y las GLOBALES (scope todos los grupos). Útil cuando el owner pregunta '¿qué reglas tienes?' o '¿qué te enseñé hasta ahora?'.",
     input_schema: {
       type: "object",
       properties: {
@@ -4554,6 +4559,7 @@ async function executeTool(
       const ruleText = String(input.rule_text ?? "").trim();
       if (!ruleText) return { error: "empty_rule_text" };
       const expiresAt = input.expires_at ? String(input.expires_at) : null;
+      const ruleGroupId = String(input.scope ?? "grupo") === "global" ? null : ctx.groupId;
 
       // ── ANTI-DUPLICADO ──────────────────────────────────────────────────────
       // El prompt ya pide "NO dupliqués reglas" y el modelo lo ignoró: el 31/07
@@ -4572,12 +4578,9 @@ async function executeTool(
         );
       const nuevas = palabras(ruleText);
       if (nuevas.size >= 3) {
-        const { data: vigentes } = await sb
-          .from("whatsapp_bot_rules")
-          .select("id, rule_text")
-          .eq("group_id", ctx.groupId)
-          .eq("active", true)
-          .limit(50);
+        let qVig = sb.from("whatsapp_bot_rules").select("id, rule_text").eq("active", true).limit(50);
+        qVig = ruleGroupId === null ? qVig.is("group_id", null) : qVig.eq("group_id", ruleGroupId);
+        const { data: vigentes } = await qVig;
         for (const r of (vigentes ?? []) as Array<{ id: string; rule_text: string }>) {
           const viejas = palabras(r.rule_text);
           if (viejas.size === 0) continue;
@@ -4615,7 +4618,7 @@ async function executeTool(
       const { data, error } = await sb
         .from("whatsapp_bot_rules")
         .insert({
-          group_id: ctx.groupId,
+          group_id: ruleGroupId,
           rule_text: ruleText,
           created_by_user_id: ctx.senderUserId,
           source_message_id: ctx.messageId,
@@ -4632,7 +4635,7 @@ async function executeTool(
       let q = sb
         .from("whatsapp_bot_rules")
         .select("id, rule_text, active, created_at, deactivated_at, expires_at")
-        .eq("group_id", ctx.groupId)
+        .or(`group_id.eq.${ctx.groupId},group_id.is.null`)
         .order("created_at", { ascending: false })
         .limit(50);
       if (!includeInactive) q = q.eq("active", true);
@@ -4820,7 +4823,9 @@ async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rul
   const { data, error } = await sb
     .from("whatsapp_bot_rules")
     .select("id, rule_text, expires_at")
-    .eq("group_id", groupId)
+    // Reglas del grupo + GLOBALES (group_id NULL): Álvaro dicta desde su DM reglas
+    // para todos los grupos — con scope solo-grupo quedaban guardadas pero inertes.
+    .or(`group_id.eq.${groupId},group_id.is.null`)
     .eq("active", true)
     .order("created_at", { ascending: true })
     .limit(50);
@@ -6536,7 +6541,24 @@ async function runAgent(req: AgentRequest): Promise<{
     // `excepcion_en_el_loop` entra acá igual: desde el lado de quien preguntó es la
     // MISMA situación —le habló al bot y no le contestó—, y hasta ahora ese caso ni
     // siquiera llegaba a este bloque.
-    if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
+    const esReintento = (req as { reintento?: boolean }).reintento === true;
+    if (dirigido && !esReintento && req.message_id &&
+        (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
+         silentReason === "excepcion_en_el_loop")) {
+      // REINTENTO AUTOMÁTICO (04/08): la PRIMERA muerte no-esperada no pide disculpas
+      // ni le pide nada a la persona — se relanza la MISMA corrida una vez (flag
+      // reintento; invoked_by intacto para no perder la semántica del modo). El caso
+      // que lo parió: Álvaro preguntó "entendido?" y un HTML de error del proveedor
+      // mató el loop a los 7s → el bot le pidió AL JEFE que escribiera de nuevo, con
+      // el mensaje intacto en la ventana. Un transitorio se resuelve reintentando,
+      // no delegándole el reintento al que preguntó. El lock ya se liberó (finally
+      // del loop), así que el relanzamiento entra limpio.
+      fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+        body: JSON.stringify({ message_id: req.message_id, group_id: group.id, invoked_by: req.invoked_by, reintento: true }),
+      }).catch((e) => console.warn("reintento no disparó:", (e as Error).message));
+    } else if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
                      silentReason === "excepcion_en_el_loop")) {
       try {
         // A quién le habla: en un grupo con varios, un aviso sin nombre no se sabe
@@ -6582,6 +6604,7 @@ async function runAgent(req: AgentRequest): Promise<{
         esperado: !dirigido,
         output_tokens: totalUsage.output_tokens,
         ...(errorDelLoop ? { error: errorDelLoop } : {}),
+        ...((req as { reintento?: boolean }).reintento === true ? { es_reintento: true } : { }),
       },
     });
   }

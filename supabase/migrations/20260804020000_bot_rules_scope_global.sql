@@ -1,0 +1,12 @@
+-- Aplicado vía MCP (04/08). Reglas GLOBALES del bot: Álvaro dictó desde su DM el
+-- formato de los cortes ("tono de líder", "textos cortos", "supervisor con todos
+-- los datos") y las 4 reglas quedaron con group_id del DM — guardadas pero
+-- INVISIBLES para las corridas de los 3 grupos (loadActiveRules filtra por grupo).
+-- group_id NULL ahora significa "aplica a todos los grupos":
+--   alter table whatsapp_bot_rules alter column group_id drop not null;
+-- En código (mismo PR): loadActiveRules y list_rules leen grupo+NULL,
+-- add_persistent_rule acepta scope 'global'. Las 4 reglas del 04/08 se
+-- re-scopearon a NULL vía SQL; además se creó la regla de pausa de texteo
+-- Camila/Jeff (scope AI WARMING, vence en 7 días) que el bot había confirmado
+-- en el hilo sin persistir.
+alter table whatsapp_bot_rules alter column group_id drop not null;
