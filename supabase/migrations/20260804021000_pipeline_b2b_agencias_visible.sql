@@ -1,0 +1,13 @@
+-- Aplicado vía MCP (04/08). Miguel: "tomo una agencia y el bot ni la cuenta".
+-- Los leads B2B (lead_source='agencia') entraban MEZCLADOS en "Reclutamiento:
+-- N asignadas" de alvaro_pulse y corte_ventas_bloque — contados pero invisibles
+-- como categoría (y el rótulo mentía). Ahora:
+--   · alvaro_pulse: reclutamiento EXCLUYE agencias + línea nueva
+--     "Agencias B2B: N en trabajo (+M tomadas hoy)" (cirugía con replace()
+--     y anclas asertadas sobre pg_get_functiondef).
+--   · corte_ventas_bloque: "confirmadas por firmar" excluye agencias + cola
+--     "· N agencias B2B en trabajo" en la línea En la mesa.
+-- Verificado en vivo: 4 en trabajo (+3 hoy) — Tipsy y Agency OF Venezuela de
+-- Miguel + 2 pruebas de Jhon. La UI ya estaba bien: el "Tomar" escribe desde
+-- #1071 (fila Asignada vía RPC) y las agencias por diseño viven en el tab
+-- Agencias (excluidas del embudo de modelos), no en "Asignaciones".
