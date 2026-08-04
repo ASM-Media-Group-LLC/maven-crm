@@ -246,6 +246,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - BÚSQUEDA WEB (web_search): JAMÁS pongas en una consulta datos internos — ni nombres/handles de creadoras, ni cifras nuestras, ni nombres del equipo, ni "Kash". Consultas GENÉRICAS de industria. En la respuesta separa siempre lo NUESTRO (tools) de lo EXTERNO (web, citando el sitio).
 - IMÁGENES FALLADAS: si una imagen del contexto aparece como "[análisis falló: …]", NO la viste — dilo ("no pude ver la imagen, ¿me la reenvías?") y jamás respondas como si la hubieras visto.
 - PERSISTENCIA HONESTA: PROHIBIDO decir "anotado/guardado/registrado/lo tengo" sin haber llamado una tool de escritura en ESTA corrida. Preferencias de MIEMBROS del equipo ("yo contacto solo por WhatsApp") → remember_fact sobre esa persona; reglas permanentes → add_persistent_rule (solo owner/Álvaro).
+- PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano.
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.`;
 
 // ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
@@ -3242,6 +3243,35 @@ async function executeTool(
         }
       }
 
+      // El índice único es por DÍA exacto (handle, kind, producto, occurred_on) y un
+      // re-reporte suele venir con OTRA fecha: el 04/08 María re-reportó la venta CP
+      // del 03/08 con el typo "3/07/2026" y entró un hito nuevo fechado en julio.
+      // Para venta_producto: si ya hay un hito del mismo producto para esa creadora
+      // a ≤45 días de la fecha reportada, se completa ese (monto) y no se crea otro.
+      if (kind === "venta_producto" && handle && product) {
+        const { data: yaHito } = await sb.from("creator_milestones")
+          .select("id, title, occurred_on, amount_usd")
+          .eq("tenant_id", ctx.tenantId)
+          .ilike("creator_handle", handle)
+          .eq("kind", "venta_producto")
+          .eq("product", product)
+          .gte("occurred_on", new Date(Date.parse(occurred) - 45 * 86400_000).toISOString().slice(0, 10))
+          .lte("occurred_on", new Date(Date.parse(occurred) + 45 * 86400_000).toISOString().slice(0, 10))
+          .order("occurred_on", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (yaHito) {
+          if (amount != null && yaHito.amount_usd == null) {
+            await sb.from("creator_milestones").update({ amount_usd: amount }).eq("id", yaHito.id);
+          }
+          return {
+            ok: true, action: "hito_ya_registrado", id: yaHito.id,
+            hito_existente: { title: yaHito.title, occurred_on: yaHito.occurred_on },
+            nota: "esta venta ya tenía su hito (mismo producto, ≤45 días) — no se duplicó ni se cuenta de nuevo",
+          };
+        }
+      }
+
       const { data: fila, error } = await sb.from("creator_milestones")
         .insert({
           tenant_id: ctx.tenantId,
@@ -4457,11 +4487,15 @@ async function executeTool(
         return { ok: true, action: "updated", id: existing.id, handle, product, stage };
       }
 
-      // Una venta GANADA del mismo producto al mismo handle HOY no se duplica
-      // (03/08: la misma venta entró 3 veces entre corridas y registro manual) —
-      // se actualiza la existente (monto/nota) y se avisa.
+      // Una venta GANADA del mismo producto al mismo handle en los últimos 45 DÍAS
+      // no se duplica: se actualiza la existente (monto/nota) y se avisa. Nació como
+      // "mismo día" (03/08: la misma venta entró 3 veces en un día), pero el 04/08
+      // María re-reportó formal —con comprobante— la venta CP del día anterior y
+      // entró una fila won nueva: el re-reporte formal días después es lo normal.
+      // Una recompra REAL del mismo producto antes de 45 días no existe en la
+      // práctica (las suscripciones mensuales viven en la misma fila).
       if (stage === "won") {
-        const hoyBogWon = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+        const desdeWon = new Date(Date.now() - 45 * 86400_000).toISOString();
         const { data: yaGanada } = await sb
           .from("monetization_opportunities")
           .select("id, monthly_value_usd, notes")
@@ -4469,7 +4503,8 @@ async function executeTool(
           .eq("product", product)
           .eq("stage", "won")
           .ilike("creator_handle", handle)
-          .gte("won_at", `${hoyBogWon}T00:00:00-05:00`)
+          .gte("won_at", desdeWon)
+          .order("won_at", { ascending: false })
           .limit(1)
           .maybeSingle();
         if (yaGanada) {
@@ -4478,7 +4513,10 @@ async function executeTool(
           if (noteLine) upd.notes = yaGanada.notes ? yaGanada.notes + "\n" + noteLine : noteLine;
           const { error: updErr } = await sb.from("monetization_opportunities").update(upd).eq("id", yaGanada.id);
           if (updErr) return { error: "update_failed", detail: updErr.message };
-          return { ok: true, action: "ya_ganada_hoy_actualizada", id: yaGanada.id, handle, product, stage };
+          return {
+            ok: true, action: "ya_ganada_actualizada", id: yaGanada.id, handle, product, stage,
+            nota: "esta venta YA estaba registrada como ganada (≤45 días) — se actualizó esa fila, no se contó de nuevo",
+          };
         }
       }
 

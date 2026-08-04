@@ -195,8 +195,10 @@ export const managersTools: AgentTool[] = [
       "⚠️ 'cuántas promociones' = cuántas CREADORAS promocionaron, NO cantidad de stories. Cuenta creadoras con " +
       "promo OF detectada ese día (promoted='true'); ignora las que solo tuvieron stories sin promo y las pendientes " +
       "de scan. Úsala para '¿cuántas promocionaron hoy?', 'separa las de Carolina y Fabiana', '¿quiénes promocionaron " +
-      "el 14?'. Pasa date (YYYY-MM-DD) para otro día y manager_name para filtrar. Devuelve por manager: cuántas " +
-      "creadoras promocionaron + quiénes (con nº de stories de promo y redes). " +
+      "el 14?' y también '¿CUÁLES FALTAN por promocionar?'. Pasa date (YYYY-MM-DD) para otro día y manager_name para " +
+      "filtrar. Devuelve por manager: cuántas creadoras promocionaron + quiénes (con nº de stories de promo y redes), " +
+      "y en faltan_por_manager las que NO: separadas en leidas_sin_promo (el scan las revisó, sin promo) y sin_leer " +
+      "(el scan no llegó — de esas NO se puede decir que no promocionaron). " +
       "⚠️ MIRA SIEMPRE el bloque `cobertura` antes de responder: si scan_corrio=false / creadoras_leidas=0, el scan " +
       "de ese día TODAVÍA NO CORRIÓ — di eso, NO listes promos ni afirmes que nadie promocionó. Si la cobertura es " +
       "parcial, di explícitamente que faltan creadoras por escanear en vez de dar el número por cerrado, y nunca " +
@@ -264,9 +266,28 @@ export const managersTools: AgentTool[] = [
           .toISOString().slice(5, 16).replace("T", " ")
         : null;
 
+      // QUIÉNES FALTAN, en la misma llamada. "¿Cuáles de mis creadoras faltan?"
+      // (Fabiana, 04/08) no era respondible con solo la lista de las que SÍ —
+      // y una segunda tool para el complemento gasta presupuesto que no hay.
+      const { data: faltData } = await ctx.sb.rpc("get_promo_day_faltantes", {
+        p_tenant: ctx.tenantId, p_date: date, p_manager_name: mgr,
+      });
+      const faltan = new Map<string, { leidas_sin_promo: string[]; sin_leer: string[] }>();
+      for (const f of (faltData ?? []) as Array<{ manager_name: string | null; creadora: string; estado: string }>) {
+        const k = f.manager_name ?? "(sin manager)";
+        if (!faltan.has(k)) faltan.set(k, { leidas_sin_promo: [], sin_leer: [] });
+        faltan.get(k)![f.estado === "leida_sin_promo" ? "leidas_sin_promo" : "sin_leer"].push(f.creadora);
+      }
+      const faltan_por_manager = [...faltan.entries()].map(([manager, f]) => ({
+        manager,
+        leidas_sin_promo: f.leidas_sin_promo,
+        sin_leer: f.sin_leer,
+      }));
+
       return {
         total_creadoras_promocionaron: rows.length,
         por_manager,
+        faltan_por_manager,
         cobertura: {
           dia: diaBog,
           creadoras_leidas: leidas,
@@ -276,7 +297,9 @@ export const managersTools: AgentTool[] = [
         nota: leidas === 0
           ? "⚠️ EL SCAN DE ESE DÍA TODAVÍA NO LEYÓ A NADIE (creadoras_leidas=0). NO digas que nadie promocionó ni listes promos de 'hoy': lo correcto es decir que el scan aún no corrió y que todavía no hay datos del día."
           : "Cuenta CREADORAS con promo OF detectada (promoted=true), no cantidad de stories. Cobertura: se leyeron " +
-            `${leidas} creadoras hasta el último scan (${ultimoScan}). Si la cobertura es baja, aclara que el reporte es PARCIAL en vez de darlo por cerrado.`,
+            `${leidas} creadoras hasta el último scan (${ultimoScan}). Si la cobertura es baja, aclara que el reporte es PARCIAL en vez de darlo por cerrado. ` +
+            "En faltan_por_manager: 'leidas_sin_promo' = el scan las revisó y NO tenían promo (eso sí se dice); " +
+            "'sin_leer' = el scan AÚN no las revisó — de esas NUNCA digas que no promocionaron, di que faltan por escanear.",
       };
     },
   },
