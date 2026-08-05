@@ -255,6 +255,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - PERSISTENCIA HONESTA: PROHIBIDO decir "anotado/guardado/registrado/lo tengo" sin haber llamado una tool de escritura en ESTA corrida. Preferencias de MIEMBROS del equipo ("yo contacto solo por WhatsApp") → remember_fact sobre esa persona; reglas permanentes → add_persistent_rule (solo owner/Álvaro).
 - PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
 - LECCIONES DE ESTILO = REGLA PERSISTIDA: cuando un closer o el owner te corrige CÓMO escribes (tono, voseo, "muy genérico", "suena a robot", "demasiado amigable"), guarda la lección con add_persistent_rule con prefijo 'ESTILO: ' (generalizada, UNA línea, scope grupo) ANTES de reenviar el texto corregido — cualquier miembro vinculado puede enseñarte estilo. Si dos lecciones chocan, vale la de Álvaro/Jhon. Al armar cualquier pitch, respeta TODAS las reglas ESTILO activas del grupo.
+- "activo/a", "ya activo", "buen día, activa" al arrancar el turno = CHECK-IN de entrada (en CUALQUIER grupo, no solo warming), NUNCA una creadora activada: responde corto con saludo + su foco del día. El 05/08 a María le preguntaste "¿'activa' es de cuál creadora?" por leerlo como activación.
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.`;
 
 // ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
@@ -1971,10 +1972,32 @@ async function executeTool(
         .limit(limit);
       if (error) return { error: error.message };
 
+      let rows = data ?? [];
+      // Búsqueda AMPLIA de rescate (05/08: Brayan pidió "muéstrame el mensaje" y el
+      // bot se rindió porque la frase exacta que probó no aparecía): si la frase
+      // completa no matchea, se reintenta con la palabra más larga (la más
+      // distintiva) antes de decir "no lo encuentro".
+      if (rows.length === 0 && /\s/.test(query)) {
+        const palabra = query.split(/\s+/).filter((w) => w.length > 3)
+          .sort((a, b) => b.length - a.length)[0];
+        if (palabra) {
+          const safeW = palabra.replace(/[%_]/g, (m) => `\\${m}`);
+          const { data: amplio } = await sb
+            .from("whatsapp_messages")
+            .select("id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+            .eq("group_id", ctx.groupId)
+            .gte("sent_at", since)
+            .or(`body.ilike.%${safeW}%,transcribed_text.ilike.%${safeW}%`)
+            .order("sent_at", { ascending: false })
+            .limit(limit);
+          rows = amplio ?? [];
+        }
+      }
+
       // Enriquecer sender con full_name del profile cuando el display_name de
       // WhatsApp es ambiguo ("#21", número crudo, etc).
       const ids = new Set<string>();
-      for (const m of (data ?? [])) {
+      for (const m of rows) {
         if (m.sender_external_id) ids.add(m.sender_external_id);
       }
       const idToFullName = new Map<string, string>();
@@ -2001,7 +2024,7 @@ async function executeTool(
       }
 
       // Devolvemos un texto unificado por mensaje (el que tenga contenido).
-      const matches = (data ?? []).map((m) => {
+      const matches = rows.map((m) => {
         let text: string | null;
         if ((m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text) {
           const prefix = m.msg_type === "audio" ? "[audio]" : "[imagen]";
@@ -5555,6 +5578,25 @@ async function buildInitialUserMessage(args: {
       }
     }
 
+    // La FRANJA del encabezado va calculada, no escrita por el modelo: el corte de
+    // las 17:00 del 04/08 salió etiquetado "corte de las 5-7pm" siendo 3-5pm.
+    const hhBog = new Date(Date.now() - 5 * 3600_000).getUTCHours();
+    const franja = esCierre
+      ? `CIERRE DEL DÍA (la jornada completa, corte de las ${hhBog}:00)`
+      : `CORTE DE ${String(Math.max(0, hhBog - 2)).padStart(2, "0")}:00 A ${String(hhBog).padStart(2, "0")}:00`;
+    lines.push("");
+    lines.push(`FRANJA EXACTA DE ESTE REPORTE (Bogotá): ${franja}. Usa EXACTAMENTE esta franja en el encabezado, no la calcules tú.`);
+
+    // Jornada transcurrida/restante por persona — CALCULADA del horario registrado.
+    // El 05/08 el bot le dijo a Daniel "van 5 horas de jornada" cuando iban 3 y Daniel
+    // lo corrigió: la aritmética de tiempo nunca la estima el modelo.
+    const { data: jornadaBloque } = await sb.rpc("corte_jornada_bloque", { p_group_id: args.groupId });
+    if (jornadaBloque) {
+      lines.push("");
+      lines.push("JORNADA DE CADA UNO (calculada del horario registrado — usa ESTOS números para 'van X horas' / 'quedan X horas', NUNCA los estimes):");
+      lines.push(String(jornadaBloque));
+    }
+
     // Actividad del equipo de ESTE grupo (regla de Álvaro 17:04): en el grupo
     // NO van horas — solo % de actividad con el déficit contra el mínimo de
     // compañía (60%), ya calculado. Inyectado para no depender de tools.
@@ -5565,6 +5607,7 @@ async function buildInitialUserMessage(args: {
       lines.push(String(hubBloque));
     }
     lines.push("");
+    lines.push("Cuando cites algo que alguien dijo, ponle NOMBRE y HORA exacta tal como aparecen en la ventana de mensajes ('Brayan 11:44: …') — el 05/08 un corte le atribuyó a Isabel una pregunta que era de Brayan y nadie pudo verificar la fuente. Si no encuentras el mensaje textual, no lo cites como dicho.");
     lines.push("Compón el corte y publícalo con UNA llamada a reply_to_group. Si el período vino sin mensajes, publica el corte igual: 'sin novedades en el grupo esta tanda' — y antes consulta tools (reportes del día, pipeline, ventas de hoy) por si Maven muestra trabajo que el grupo no contó, para rescatarlo a favor del equipo.");
     return lines.join("\n");
   }

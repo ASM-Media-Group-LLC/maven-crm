@@ -213,7 +213,14 @@ async function callClaude(
     let parsed: ExtractedAnalysis | null = null;
     try {
       const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-      const obj = JSON.parse(cleaned);
+      // Endurecido 05/08: pese al response_format, el modelo a veces envuelve el JSON
+      // con una frase o corta el fence raro — 20 parse_failed de PRIMER intento en 7
+      // días (todos se auto-curaban al reintento del tick; esto baja ese ruido).
+      // Se toma el bloque entre la primera "{" y la última "}".
+      const desde = cleaned.indexOf("{");
+      const hasta = cleaned.lastIndexOf("}");
+      const candidato = desde >= 0 && hasta > desde ? cleaned.slice(desde, hasta + 1) : cleaned;
+      const obj = JSON.parse(candidato);
       parsed = {
         commitments: Array.isArray(obj.commitments) ? obj.commitments : [],
         resolutions: Array.isArray(obj.resolutions) ? obj.resolutions : [],
