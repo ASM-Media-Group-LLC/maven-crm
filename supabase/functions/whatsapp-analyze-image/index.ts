@@ -315,6 +315,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         analyzed_at: new Date().toISOString(),
       })
       .eq("id", msg.id);
+    await fireAgentPeseAlFallo(sb, msg, "no_media_url");
     return { ok: false, reason: "no_media_url" };
   }
   if (!OPENROUTER_API_KEY) {
@@ -349,6 +350,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         transcribed_text: "[video sin análisis: sin miniatura en el mensaje]",
         analyzed_at: new Date().toISOString(),
       }).eq("id", msg.id);
+      await fireAgentPeseAlFallo(sb, msg, "video_sin_thumbnail");
       return { ok: false, reason: "video_sin_thumbnail" };
     }
     try {
@@ -358,6 +360,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         transcribed_text: "[video sin análisis: miniatura ilegible]",
         analyzed_at: new Date().toISOString(),
       }).eq("id", msg.id);
+      await fireAgentPeseAlFallo(sb, msg, "video_thumbnail_invalida");
       return { ok: false, reason: "video_thumbnail_invalida" };
     }
   } else {
@@ -381,6 +384,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         analyzed_at: new Date().toISOString(),
       })
       .eq("id", msg.id);
+    await fireAgentPeseAlFallo(sb, msg, `download: ${downloaded.error}`.slice(0, 120));
     return { ok: false, reason: downloaded.error };
   }
 
@@ -411,6 +415,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
         analyzed_at: new Date().toISOString(),
       })
       .eq("id", msg.id);
+    await fireAgentPeseAlFallo(sb, msg, `llm: ${result.error}`.slice(0, 120));
     return { ok: false, reason: result.error };
   }
 
@@ -492,6 +497,46 @@ function fireAgent(messageId: string, groupId: string, reason: "image_mention" |
     },
     body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: reason }),
   }).catch((e) => console.warn("fireAgent failed:", (e as Error).message));
+}
+
+// El análisis falló, pero la PREGUNTA suele venir escrita en el caption. Antes los
+// caminos de fallo morían MUDOS: el 05/08 10:21 Daniel mandó una captura con la
+// pregunta completa en el caption (mención al bot incluida), el análisis murió en
+// json_parse y nadie le contestó — Brayan tuvo que reenviar la imagen 10 minutos
+// después y pedir explícitamente que ayudáramos. La invocación del agente no puede
+// depender de que el análisis funcione: si el caption trae mención (o el grupo está
+// en always y el caption tiene sustancia), el agente corre igual — va a ver el
+// marcador "[análisis falló…]" en el contexto y contesta por el texto, aclarando
+// que no pudo ver la imagen. Evento image_analysis_degraded para poder auditarlo.
+async function fireAgentPeseAlFallo(
+  sb: ReturnType<typeof adminClient>,
+  msg: { id: string; tenant_id: string; group_id: string; body: string | null },
+  motivo: string,
+): Promise<void> {
+  const { data: group } = await sb
+    .from("whatsapp_groups")
+    .select("bot_enabled, bot_mode")
+    .eq("id", msg.group_id)
+    .maybeSingle();
+  if (!group?.bot_enabled || group?.bot_mode === "off") return;
+
+  const caption = (msg.body ?? "").trim();
+  let reason: "image_mention" | "auto" | null = null;
+  if (hasBotMention(msg.body, "")) {
+    reason = "image_mention";
+  } else if (group.bot_mode === "always" && caption.length >= 10 && caption !== "[imagen]") {
+    const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });
+    if (inHours) reason = "auto";
+  }
+  if (!reason) return;
+
+  await logEvent(sb, {
+    tenantId: msg.tenant_id,
+    groupId: msg.group_id,
+    kind: "image_analysis_degraded",
+    payload: { message_id: msg.id, motivo, invoked_as: reason },
+  });
+  fireAgent(msg.id, msg.group_id, reason);
 }
 
 async function processBatch(batchSize: number): Promise<number> {
