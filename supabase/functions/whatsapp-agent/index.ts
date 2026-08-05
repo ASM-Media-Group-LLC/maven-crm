@@ -4,6 +4,7 @@ import {
   adminClient,
   authorizeCronOrJwt,
   cortarSeguro,
+  hasBotMention,
   limpiarSustitutosSueltos,
   logEvent,
   redactPhones,
@@ -6089,6 +6090,8 @@ async function runAgent(req: AgentRequest): Promise<{
   let ackBloqueados = 0;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
+  // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
+  let cierreForzado = false;
   // Texto del mensaje disparador, para la guarda de lecciones de estilo: si el humano
   // corrigió CÓMO escribir y el bot reenvía el pitch sin persistir la lección, se le
   // exige el add_persistent_rule primero (05/08: ocho correcciones, una guardada).
@@ -6326,6 +6329,24 @@ async function runAgent(req: AgentRequest): Promise<{
   try {
   for (; iter < MAX_ITERATIONS; iter += 1) {
     if (Date.now() - startedAt > budgetMs) { silentReason = "presupuesto_de_pared"; break; }
+    // ── CIERRE FORZADO AL BORDE DEL PRESUPUESTO ─────────────────────────────
+    // 05/08, caso Carolina: la corrida juntó 28s de tools y murió en la pared —
+    // TODO el trabajo descartado y ella 43 min en visto. Si ya hubo al menos una
+    // iteración (hay material recolectado) y queda menos de ~25% del presupuesto
+    // (piso 12s = una llamada útil con el deadline mínimo de 5s), la PRÓXIMA
+    // llamada se fuerza a entregar: tool_choice fijo en reply_to_group + orden de
+    // responder con lo que hay. Una respuesta parcial honesta > un descarte total.
+    if (!cierreForzado && iter >= 1 && !finalReply &&
+        budgetMs - (Date.now() - startedAt) < Math.max(12_000, budgetMs * 0.25)) {
+      cierreForzado = true;
+      messages.push({
+        role: "user",
+        content:
+          "⏱️ SE TE ACABA EL TIEMPO DE ESTA CORRIDA. Responde AHORA con reply_to_group usando SOLO " +
+          "lo que ya recolectaste. Si te faltó consultar algo, dilo en una línea al final " +
+          "('me faltó chequear X — pídemelo aparte y te lo traigo'). NO llames más tools de lectura.",
+      });
+    }
 
     // PROMPT CACHING (Anthropic): el system prompt (~5K tokens con
     // catálogo + reglas) y el array TOOLS (~3K tokens) son estables
@@ -6397,6 +6418,9 @@ async function runAgent(req: AgentRequest): Promise<{
         },
       ],
       messages,
+      // Cierre forzado: la última llamada no puede "elegir" seguir leyendo — se la
+      // obliga a entregar por reply_to_group con lo recolectado.
+      ...(cierreForzado ? { tool_choice: { type: "tool", name: "reply_to_group" } } : {}),
       ...(model.startsWith("claude-opus-5")
         ? { output_config: { effort: "low" } }
         : model.startsWith("claude-sonnet-5")
@@ -6771,6 +6795,8 @@ async function runAgent(req: AgentRequest): Promise<{
     ms_tools: msTools,
     lock_obtenido: lockObtenido,
     presupuesto_ms: budgetMs,
+    // Marcador para validar el cierre forzado con tráfico real (query sobre eventos).
+    cierre_forzado: cierreForzado,
     iterations: iter + 1,
     invoked_by: req.invoked_by,
     message_id: req.message_id ?? null,
@@ -6858,6 +6884,47 @@ async function runAgent(req: AgentRequest): Promise<{
         headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
         body: JSON.stringify({ message_id: req.message_id, group_id: group.id, invoked_by: req.invoked_by, reintento: true }),
       }).catch((e) => console.warn("reintento no disparó:", (e as Error).message));
+    } else if (!esReintento && !dirigido &&
+        (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
+         silentReason === "excepcion_en_el_loop")) {
+      // ── RESCATE DE MENCIÓN ABSORBIDA (05/08, caso Carolina) ────────────────
+      // Una corrida NO dirigida (night_catchup/auto) que muere pudo haber absorbido,
+      // vía single-flight, una @mención que llegó mientras corría: la persona queda
+      // en visto y NINGÚN camino la cubre — Carolina preguntó a las 09:55, el
+      // night_catchup murió en la pared a las 09:56 y nadie le respondió hasta las
+      // 10:38 (cuando otro mensaje re-invocó al bot de casualidad). Si hay una
+      // mención humana SIN respuesta posterior desde que arrancó esta corrida, se
+      // relanza el agente PARA ESE mensaje — dirigido y con flag reintento: si
+      // vuelve a morir, cae al aviso "se me cortó" del bloque de abajo.
+      try {
+        const desde = new Date(iniciadoAt - 60_000).toISOString();
+        const { data: recientes } = await sb
+          .from("whatsapp_messages")
+          .select("id, body, transcribed_text, sent_at")
+          .eq("group_id", group.id)
+          .eq("is_from_bot", false)
+          .gte("sent_at", desde)
+          .order("sent_at", { ascending: false })
+          .limit(6);
+        const rescatable = (recientes ?? []).find((m) =>
+          m.id !== req.message_id &&
+          hasBotMention(String(m.body ?? m.transcribed_text ?? ""), ""));
+        if (rescatable) {
+          const { count: respondidas } = await sb
+            .from("whatsapp_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("group_id", group.id)
+            .eq("is_from_bot", true)
+            .gt("sent_at", rescatable.sent_at);
+          if ((respondidas ?? 0) === 0) {
+            fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-agent`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+              body: JSON.stringify({ message_id: rescatable.id, group_id: group.id, invoked_by: "mention", reintento: true }),
+            }).catch((e) => console.warn("rescate de mención no disparó:", (e as Error).message));
+          }
+        }
+      } catch (_e) { /* rescate best-effort: el evento agent_silent queda igual */ }
     } else if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
                      silentReason === "excepcion_en_el_loop")) {
       try {
