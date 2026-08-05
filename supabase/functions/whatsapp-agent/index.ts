@@ -83,7 +83,7 @@ const MOTOR_PROMPT = `Eres Maven Asistente, un asistente IA que vive en grupos d
 2. RECORDARLES compromisos pendientes ("¿se hizo X?")
 3. AYUDAR a tomar acciones concretas en Maven CRM (agregar notas, marcar leads, etc)
 4. GENERAR reportes cuando se lo pidan
-5. PROGRAMAR RECORDATORIOS futuros cuando alguien lo pida explícitamente ("recordame mañana 9am llamar a X", "avisame el viernes que revise Y", "en 2 horas decime Z"). Usa la tool create_reminder — el bot va a postear el mensaje al grupo SOLO cuando llegue la hora, sin que nadie tenga que activarlo. Convierte siempre la hora local del grupo a UTC antes de pasarla a la tool. Default zona: Bogotá (UTC-5) si no se especifica.
+5. PROGRAMAR RECORDATORIOS futuros cuando alguien lo pida explícitamente ("recordame mañana 9am llamar a X", "avisame el viernes que revise Y", "en 2 horas decime Z"). Usa la tool create_reminder — el bot va a postear el mensaje al grupo SOLO cuando llegue la hora, sin que nadie tenga que activarlo. Convierte siempre la hora local del grupo a UTC antes de pasarla a la tool. Default zona: Bogotá (UTC-5) si no se especifica. ⚠️ Si lo que te ordenan es EJECUTAR algo a esa hora ("mañana 9am aprieta al equipo", "a las 3 reclama los montos"), NO es un aviso: usa accion=true (y target_group_name si la orden es para OTRO grupo y te la dio el dueño) — a esa hora te vas a re-invocar en ese grupo, juntar los datos y publicar la acción tú mismo. Al confirmar, di QUÉ va a pasar, DÓNDE y CUÁNDO.
 
 ESTILO — HUMANO Y CONVERSACIONAL (regla FUERTE, la más importante del estilo):
 - Escribe como un COMPAÑERO de equipo por WhatsApp, NO como un reporte. Mensajes CORTOS: 1-4 líneas por defecto. Si tu mensaje parece un documento, está MAL — reescribilo.
@@ -246,7 +246,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - BÚSQUEDA WEB (web_search): JAMÁS pongas en una consulta datos internos — ni nombres/handles de creadoras, ni cifras nuestras, ni nombres del equipo, ni "Kash". Consultas GENÉRICAS de industria. En la respuesta separa siempre lo NUESTRO (tools) de lo EXTERNO (web, citando el sitio).
 - IMÁGENES FALLADAS: si una imagen del contexto aparece como "[análisis falló: …]", NO la viste — dilo ("no pude ver la imagen, ¿me la reenvías?") y jamás respondas como si la hubieras visto.
 - PERSISTENCIA HONESTA: PROHIBIDO decir "anotado/guardado/registrado/lo tengo" sin haber llamado una tool de escritura en ESTA corrida. Preferencias de MIEMBROS del equipo ("yo contacto solo por WhatsApp") → remember_fact sobre esa persona; reglas permanentes → add_persistent_rule (solo owner/Álvaro).
-- PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano.
+- PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.`;
 
 // ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
@@ -1149,6 +1149,9 @@ interface AgentRequest {
   // a postear. El callback de scrape-profile-deep dispara esto.
   profile_analysis_id?: string;
   outcome?: string;
+  // Cuando invoked_by="reminder_action": id del reminder kind='accion' que el drain
+  // está ejecutando (la instrucción viaja en user_question). Auditoría/reintentos.
+  reminder_id?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -1624,21 +1627,33 @@ const TOOLS: Array<{
   {
     name: "create_reminder",
     description:
-      "Programa un recordatorio futuro en el grupo. Usar cuando alguien pide 'recordame X mañana a las 9', 'avisame el viernes que hable con Y', 'en 2 horas recordame Z', etc. El bot postea el mensaje al grupo automáticamente cuando llegue la hora — sin que nadie tenga que activarlo manualmente. NO usar para compromisos detectados automáticamente (esos los maneja el extractor + follow-up tick). Solo para pedidos EXPLÍCITOS de recordatorio. El reminder dispara en el mismo grupo donde se pidió. Default precision: 5 min (el cron corre cada 5 min).",
+      "Programa un recordatorio futuro. Dos modos:\n" +
+      "• AVISO (default): el bot postea el body tal cual cuando llegue la hora. Para 'recordame X mañana a las 9', 'avisame el viernes que hable con Y'.\n" +
+      "• ACCIÓN (accion=true): el body es una INSTRUCCIÓN que el bot mismo va a EJECUTAR a esa hora — se re-invoca en el grupo destino, junta los datos que hagan falta y publica el mensaje redactado en ese momento. Para órdenes tipo 'mañana 9am aprieta al equipo de warming', 'el viernes reclama los montos', 'a las 3pm pide el corte'. En el body escribe la instrucción completa con nombres y criterio (ej: 'Apretar a Brayan, Isabel y Lizeth: el eje es el RESULTADO entregado, no Hubstaff. Exigir números y piezas concretas hoy.').\n" +
+      "Si la orden es para OTRO grupo (te la dan en el DM: 'aprieta en WARMING'), pasa target_group_name — SOLO el dueño puede apuntar a otro grupo.\n" +
+      "NO usar para compromisos detectados automáticamente (esos los maneja el extractor + follow-up tick). Solo pedidos EXPLÍCITOS. Precisión: ±5 min (cron cada 5 min).",
     input_schema: {
       type: "object",
       properties: {
         trigger_at: {
           type: "string",
-          description: "Cuándo disparar el reminder, en ISO 8601 UTC (ej '2026-05-29T14:00:00Z' para mañana 9am Bogotá). Convierte la hora local de quien pidió a UTC tú mismo (Bogotá=UTC-5, Miami=UTC-4 EDT). Si la fecha es ambigua ('mañana' sin hora), default 9am hora local del grupo. Si la persona dice 'en X horas/minutos', calcula desde la hora actual.",
+          description: "Cuándo disparar, en ISO 8601 UTC (ej '2026-05-29T14:00:00Z' para mañana 9am Bogotá). Convierte la hora local de quien pidió a UTC tú mismo (Bogotá=UTC-5, Miami=UTC-4 EDT). Si la fecha es ambigua ('mañana' sin hora), default 9am hora local del grupo. Si dice 'en X horas/minutos', calcula desde la hora actual.",
         },
         body: {
           type: "string",
-          description: "Texto del recordatorio que el bot va a postear al grupo. Estilo natural, en primera persona del bot. Si va dirigido a alguien específico, empieza con @nombre. Máx 500 chars. Ej: '@Miguel te recuerdo que tenías que llamar a María Hernández hoy a esta hora.'",
+          description: "Modo AVISO: el texto que se postea tal cual (si va dirigido a alguien, empieza con @nombre). Modo ACCIÓN: la instrucción completa a ejecutar (quiénes, qué exigir, con qué criterio). Máx 500 chars.",
+        },
+        accion: {
+          type: "boolean",
+          description: "true = el bot EJECUTA la instrucción a esa hora (redacta y publica él mismo, con datos frescos). false/omitido = solo postea el body tal cual.",
+        },
+        target_group_name: {
+          type: "string",
+          description: "Opcional, SOLO para el dueño: nombre del grupo donde ejecutar/postear (ej 'AI WARMING', 'Managers', 'Marketing/Ventas'). Si se omite, dispara en este mismo chat.",
         },
         target_display_name: {
           type: "string",
-          description: "Opcional. Nombre de la persona que pidió el reminder (para auditoría y para que el bot sepa a quién está respondiendo).",
+          description: "Opcional. Nombre de la persona que pidió el reminder (para auditoría).",
         },
       },
       required: ["trigger_at", "body"],
@@ -3772,10 +3787,41 @@ async function executeTool(
         .maybeSingle();
       if (!grp?.tenant_id) return { error: "group_not_found" };
 
+      // ── Destino y modo ──────────────────────────────────────────────────────
+      // accion=true → kind='accion': al vencer, el drain NO postea el body sino que
+      // re-invoca al agente en el grupo destino para que EJECUTE la instrucción
+      // (caso fundacional: el apriete de las 9AM que quedó como nota en el DM).
+      const esAccion = input.accion === true;
+      let destinoId = ctx.groupId;
+      let destinoNombre: string | null = null;
+      const targetGroupName = String(input.target_group_name ?? "").trim();
+      if (targetGroupName) {
+        // Apuntar a OTRO grupo es potestad del dueño — misma regla que post_to_group:
+        // si no, cualquiera con acceso a un grupo programa mensajes del bot en otro.
+        if (!ctx.isOwner) {
+          return { error: "no_autorizado_target", message: "Programar recordatorios en otro grupo es solo para el dueño. Omite target_group_name." };
+        }
+        const { data: candidatos } = await sb
+          .from("whatsapp_groups")
+          .select("id, name")
+          .eq("tenant_id", grp.tenant_id)
+          .eq("active", true)
+          .eq("is_direct", false)
+          .neq("provider", "manual")
+          .ilike("name", `%${targetGroupName}%`);
+        const opciones = (candidatos ?? []) as Array<{ id: string; name: string }>;
+        if (opciones.length === 0) return { error: "grupo_no_encontrado", buscado: targetGroupName };
+        if (opciones.length > 1) {
+          return { error: "grupo_ambiguo", coincidencias: opciones.map((g) => g.name), message: "Pregunta a cuál se refiere." };
+        }
+        destinoId = opciones[0].id;
+        destinoNombre = opciones[0].name;
+      }
+
       const { data: row, error: insErr } = await sb.from("whatsapp_reminders").insert({
         tenant_id: grp.tenant_id,
-        group_id: ctx.groupId,
-        kind: "manual",
+        group_id: destinoId,
+        kind: esAccion ? "accion" : "manual",
         trigger_at: triggerDate.toISOString(),
         body,
         status: "pending",
@@ -3783,6 +3829,7 @@ async function executeTool(
         metadata: {
           requested_by: targetName,
           requested_at: new Date().toISOString(),
+          ...(destinoId !== ctx.groupId ? { origen_group_id: ctx.groupId } : {}),
         },
       }).select("id, trigger_at").single();
 
@@ -3793,7 +3840,9 @@ async function executeTool(
         reminder_id: row.id,
         trigger_at: row.trigger_at,
         minutes_from_now: Math.round(minutesFromNow),
-        note: "Reminder programado. El cron lo drena cada 5 min, así que la precisión es ±5 min.",
+        modo: esAccion ? "accion — el bot ejecutará la instrucción y publicará el resultado" : "aviso — se postea el texto tal cual",
+        grupo_destino: destinoNombre ?? "(este chat)",
+        note: "Programado. El cron drena cada 5 min (precisión ±5 min). Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
       };
     }
 
@@ -5602,6 +5651,27 @@ async function buildInitialUserMessage(args: {
     lines.push(
       "Razona, usa las tools que hagan falta y responde al grupo via reply_to_group. " +
         "No respondas en el thinking — solo via reply_to_group.",
+    );
+    return lines.join("\n");
+  }
+
+  // ── ORDEN PROGRAMADA (drain de reminders kind='accion') ────────────────────
+  // El caso fundacional (05/08): Álvaro ordenó "mañana 9AM apretá en WARMING", el
+  // bot guardó el recordatorio… y a las 9AM el drain lo posteó como texto en el DM.
+  // Nadie lo ejecutó. Ahora el drain re-invoca al agente EN el grupo destino con la
+  // instrucción, y esta rama la convierte en acción publicada.
+  if (args.req.invoked_by === "reminder_action") {
+    lines.push("ORDEN PROGRAMADA — llegó la hora de ejecutarla en ESTE grupo:");
+    lines.push("");
+    lines.push(String(args.req.user_question ?? "").trim() || "(instrucción vacía — pide contexto a quien la programó)");
+    lines.push("");
+    lines.push(
+      "Ejecútala AHORA: si necesitas datos (números de hoy, quién reportó, Hubstaff), llama las tools " +
+        "primero; después redacta el mensaje y publícalo con UNA sola llamada a reply_to_group. " +
+        "Hablas en primera persona, como supervisor del grupo — NUNCA digas que esto viene de un " +
+        "recordatorio, de una orden ni de una conversación privada (nada de 'me pidieron' / 'quedó " +
+        "programado'). El mensaje debe leerse como una decisión tuya de este momento. " +
+        "No es opcional quedarte callado: esta corrida existe para publicar esa acción.",
     );
     return lines.join("\n");
   }

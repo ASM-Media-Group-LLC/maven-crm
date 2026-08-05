@@ -26,6 +26,9 @@ const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven
 //   v2:           { number, text }                                          ← Evolution v2.4.x
 // Cambiar cuando se haga el upgrade del contenedor a v2.
 const EVOLUTION_API_VERSION = Deno.env.get("WHATSAPP_EVOLUTION_API_VERSION") ?? "v1";
+// Para re-invocar al agente cuando un reminder es una ORDEN (kind='accion').
+const PROJECT_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
 interface SendRequest {
   // Modo ad-hoc.
@@ -224,15 +227,88 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
 
   let sent = 0;
   let failed = 0;
+  // Las órdenes (kind='accion') bloquean el drain hasta 50s cada una mientras el
+  // agente ejecuta. Cap por tick para no acercarnos al techo de pared de la edge
+  // function; lo que no entre queda pending y sale en el próximo tick (5 min).
+  let accionesEsteTick = 0;
 
   for (const r of reminders as Array<{
     id: string;
     tenant_id: string;
     group_id: string;
+    kind: string;
     body: string | null;
     attempt_count: number;
     commitment_id: string | null;
   }>) {
+    // ── kind='accion': el recordatorio es una ORDEN, no un texto a postear ──────
+    // El caso que motivó esto (05/08): Álvaro ordenó "mañana 9AM apretá en WARMING",
+    // el bot lo guardó… y a las 9AM el drain publicó la nota tal cual EN EL DM como
+    // "Recordatorio interno". Nadie la ejecutó y el grupo recibió un saludo suave.
+    // Acá, en vez de postear el body, se re-invoca al agente EN el grupo destino con
+    // la instrucción para que la redacte y publique él mismo (mismo patrón que el
+    // corte-tick de las 2h, que funciona a diario).
+    if (r.kind === "accion") {
+      if (accionesEsteTick >= 2) continue; // queda pending para el próximo tick
+      accionesEsteTick += 1;
+
+      // Claim atómico: si otro drain concurrente la tomó, esta update no matchea.
+      // Nos llevamos el metadata actual para no pisarlo al sellar executed_at.
+      const { data: claimed } = await sb
+        .from("whatsapp_reminders")
+        .update({ status: "sent", sent_at: new Date().toISOString() })
+        .eq("id", r.id)
+        .eq("status", "pending")
+        .select("id, metadata");
+      if (!claimed || claimed.length === 0) continue;
+      const metaActual = (claimed[0] as { metadata?: Record<string, unknown> }).metadata ?? {};
+
+      let ejecutado = false;
+      let detalle = "";
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 50_000);
+        const resp = await fetch(`${PROJECT_URL}/functions/v1/whatsapp-agent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Cron-Token": CRON_TOKEN },
+          body: JSON.stringify({
+            group_id: r.group_id,
+            invoked_by: "reminder_action",
+            reminder_id: r.id,
+            user_question: r.body ?? "",
+          }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        const data = await resp.json().catch(() => ({})) as { ok?: boolean; final_reply?: string | null };
+        // Ejecutada = la corrida terminó publicando algo. Un final_reply vacío es
+        // una corrida muda: la orden NO se cumplió y hay que reintentar.
+        ejecutado = resp.ok && Boolean(data.final_reply);
+        detalle = ejecutado ? "" : `agent_sin_publicacion (http ${resp.status})`;
+      } catch (e) {
+        detalle = `agent_fetch: ${(e as Error).message}`.slice(0, 300);
+      }
+
+      if (ejecutado) {
+        await sb.from("whatsapp_reminders")
+          .update({ metadata: { ...metaActual, executed_at: new Date().toISOString() } })
+          .eq("id", r.id);
+        sent += 1;
+      } else {
+        // Devolver a pending para que el próximo tick reintente; a los 3 intentos, failed.
+        const nextAttempt = (r.attempt_count ?? 0) + 1;
+        await sb.from("whatsapp_reminders")
+          .update({
+            status: nextAttempt >= 3 ? "failed" : "pending",
+            attempt_count: nextAttempt,
+            error: detalle.slice(0, 500),
+          })
+          .eq("id", r.id);
+        failed += 1;
+      }
+      continue;
+    }
+
     if (!r.body) {
       // body NULL — tendríamos que generar contenido dinámico, pero
       // por ahora marcamos como failed para que un admin lo revise.
