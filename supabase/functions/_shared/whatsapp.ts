@@ -389,18 +389,29 @@ const URL_RE = /https?:\/\/\S+/gi;
 // protegerlas, el detector las toma por teléfono y las redacta → se rompen todos los pings
 // del bot. Se protegen igual que las URLs, antes de buscar teléfonos.
 const MENCION_RE = /@\d+(?:@lid)?/g;
-// Candidato: dígitos con separadores típicos (espacio, guion, punto, paréntesis) y "+"
-// opcional. El filtrado fino se hace después, match por match, en pareceTelefono().
-// El lookbehind evita comerse los dígitos de un HANDLE ("@dani2603592" quedaba
-// "@dani***3592" el 04/08): si los dígitos vienen pegados a una letra o a un @,
-// son parte de un identificador, no un teléfono suelto.
-const TEL_CAND_RE = /(?<![\w@])\+?\(?\d[\d\s().-]{5,}\d\)?/g;
+// Deep links que EXISTEN para llevar un teléfono: el número se enmascara ANTES de
+// proteger URLs (URL_RE guardaba el link entero y el número salía publicado — fuga
+// verificada con wa.me y api.whatsapp.com; t.me/+ es el espejo de Telegram del roadmap).
+// Tolera "+", "%2B" (el + urlencodeado) y separadores a mano ("wa.me/57-300-123-4567").
+// El link deja de ser clickeable: el número es exactamente el dato a ocultar.
+const LINK_TEL_RE = /(\b(?:wa\.me\/|t\.me\/\+|phone=)(?:%2B|\+)?)((?:[-().]*\d){7,})/gi;
+// Candidato: dígitos con separadores típicos y "+" opcional. Tres decisiones con historia:
+// · (?<![\p{L}@]): dígitos pegados a una letra o a un @ son parte de un IDENTIFICADOR
+//   ("@dani2603592" quedó "@dani***3592" cinco veces el 01-04/08). Se excluye la letra
+//   pero NO el guion bajo: "_3001234567_" es un teléfono en cursiva de WhatsApp, y el
+//   lookbehind (?<![\w@]) de antes lo dejaba FUGAR porque "_" es \w.
+// · La clase NO incluye \n: un teléfono no se parte en dos líneas, pero una COLUMNA de
+//   montos sí ("20.277\n15.202\n30.100" se puenteaba entera → "***********0100").
+// · U+2011 (guion no separable) y U+202A/C (wrappers bidi) vienen en teléfonos pegados
+//   desde iOS/fichas de contacto y partían el match dejando el número SIN enmascarar.
+// El filtrado fino se hace después, match por match y con contexto, en redactarCandidato().
+const TEL_CAND_RE = /(?<![\p{L}@])\+?\(?\d[\d \t ().‑‪‬-]{5,}\d\)?/gu;
 
 function pareceTelefono(s: string): boolean {
-  if (s.includes(",")) return false; // "$3,443" · "1,234 followers"
+  // (el viejo check de coma era código muerto: la coma no está en TEL_CAND_RE, así que
+  // ningún match puede traerla — "$3,443" se salva porque la coma CORTA el match)
   const digitos = s.replace(/\D/g, "");
   if (digitos.length < 7 || digitos.length > 15) return false;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return false; // fecha ISO
   // Series cortas separadas ("cadencia 1-3-5-8-15-29"): sin ningún bloque de 3+ dígitos.
   const bloqueMasLargo = Math.max(...(s.match(/\d+/g) ?? [""]).map((b) => b.length));
   return bloqueMasLargo >= 3;
@@ -410,6 +421,79 @@ function pareceTelefono(s: string): boolean {
 function enmascarar(s: string): string {
   const d = s.replace(/\D/g, "");
   return "*".repeat(Math.max(0, d.length - 4)) + d.slice(-4);
+}
+
+/**
+ * Decide qué hacer con UN candidato mirando su contexto inmediato: `antes` es el carácter
+ * pegado a la izquierda del match, `despues` lo que sigue pegado a la derecha.
+ *
+ * El porqué: el bot escribe la plata en formato es-CO ("$10.478", "1.234.567") y las
+ * caídas como "(-48%)". Como "(", "-", "." y el espacio son también separadores válidos
+ * de teléfono, el candidato saltaba del monto al porcentaje ("10.478 (-48" = 7 dígitos)
+ * y se enmascaraba: el 31/07 destruyó dos cifras del pedido de escalada en Managers
+ * ("$10.478 (-48%)" → "$***7848%)"). Un umbral por cantidad de dígitos no alcanza — la
+ * diferencia confiable está en lo que hay PEGADO al match. Los vetos son quirúrgicos a
+ * propósito: fuga de PII pesa más que falso positivo de plata, así que un teléfono cerca
+ * de un "$" (pero no pegado) se sigue enmascarando.
+ */
+function redactarCandidato(m: string, antes: string, despues: string): string {
+  // ── Veto 0: paréntesis envolvente ───────────────────────────────────────────
+  // "(1.234.567)" contable o "(+573001234567)" de roster: se evalúa el interior con
+  // los mismos vetos y se re-envuelve. Así el monto entre paréntesis queda vivo y el
+  // teléfono entre paréntesis se enmascara igual.
+  if (m.length > 2 && m.startsWith("(") && m.endsWith(")") && !m.slice(1, -1).includes("(")) {
+    return "(" + redactarCandidato(m.slice(1, -1), "(", ")") + ")";
+  }
+
+  // ── Veto 1: cola porcentual ─────────────────────────────────────────────────
+  // El match muere justo donde arranca un "%": "10.478 (-48" + "%". Tolera el espacio
+  // de la RAE ("-48 %"), "( -48" y el decimal con coma o punto ("-48,5%"). Se recorta
+  // la cola y se re-evalúa SOLO la cabeza: si un teléfono real quedara puenteado con
+  // un porcentaje, la cabeza se enmascara igual.
+  if (/^[\s ]?%|^[.,]\d{1,2}[\s ]?%/.test(despues)) {
+    const cola = m.match(/(?:[\s ]*\([\s ]*|[\s ])-?\d{1,4}(?:[.,]\d{1,2})?$/);
+    if (cola && cola[0].length < m.length) {
+      const cabeza = m.slice(0, m.length - cola[0].length);
+      return redactarCandidato(cabeza, antes, cola[0]) + cola[0];
+    }
+    // Sin cola recortable: decide la lógica clásica — "3001234567%" se enmascara,
+    // un porcentaje suelto no llega a los 7 dígitos y queda intacto.
+    return pareceTelefono(m) ? enmascarar(m) : m;
+  }
+
+  // ── Veto 2: fecha al inicio (ISO o latam, guion ASCII o U+2011) ─────────────
+  // "2026-07-31 20:25" matcheaba "2026-07-31 20" y se publicaba "******3120:25". Se
+  // recorta la fecha y se re-evalúa el resto, por si detrás viniera un teléfono real.
+  const fecha = m.match(/^(?:\d{4}[-‑]\d{2}[-‑]\d{2}|\d{2}[-‑]\d{2}[-‑]\d{4})(?=\D|$)/);
+  if (fecha) {
+    const resto = m.slice(fecha[0].length);
+    return fecha[0] + (resto ? redactarCandidato(resto, "-", despues) : "");
+  }
+
+  // ── Veto 3: rango de meta/ingreso ("10.000-15.000", "8.000 - 12.000") ───────
+  // Ambos lados con puntos de miles, o ambos pelados de 4-6 dígitos. Es la forma
+  // estándar de escribir metas; ningún teléfono de la base parte sus dígitos así.
+  if (/^\d{1,3}(?:\.\d{3})+[\s ]?[-‑][\s ]?\d{1,3}(?:\.\d{3})+$/.test(m)) return m;
+  if (/^\d{4,6}[\s ]?[-‑][\s ]?\d{4,6}$/.test(m)) return m;
+
+  // ── Veto 4: importe con puntos de miles ─────────────────────────────────────
+  // "1.234.567" (grupos de EXACTAMENTE 3, 7-8 dígitos) es un monto es-CO: los
+  // teléfonos con puntos reales de la base terminan en grupo de 4 ("300.123.4567") y
+  // no calzan acá. Con "$" pegado se aceptan también 9+ dígitos ("$115.702.919",
+  // nómina COP); SIN "$", un 9 dígitos con puntos puede ser un móvil español
+  // ("612.345.678") y ante la duda se enmascara — PII primero.
+  if (/^\d{1,2}(?:\.\d{3}){2}$/.test(m)) return m;
+  if (antes.endsWith("$") && /^\d{1,3}(?:\.\d{3}){2,}$/.test(m)) return m;
+
+  // ── Veto 5: "$" pegado adelante ─────────────────────────────────────────────
+  // "$1234567" es plata sin separadores. Deliberadamente estrecho: con espacio en el
+  // medio no aplica ("mandale $50 al 3001234567" enmascara el teléfono igual), y si
+  // la corrida trae separadores tampoco ("$500 3001234567" se enmascara entero antes
+  // que arriesgar la fuga del número).
+  if (antes.endsWith("$") && /^\d+$/.test(m)) return m;
+
+  // ── Sin contexto que lo vete: decide la lógica clásica ──────────────────────
+  return pareceTelefono(m) ? enmascarar(m) : m;
 }
 
 /**
@@ -468,9 +552,20 @@ export function redactPhones(texto: string): string {
     return `⟦${guardados.length - 1}⟧`;
   };
   const conPlaceholders = texto
+    // Primero el número dentro de los deep links telefónicos; recién después se
+    // protegen las URLs — al revés, el link se guarda y restaura con el número intacto.
+    .replace(LINK_TEL_RE, (_m, pre: string, num: string) => pre + enmascarar(num))
     .replace(URL_RE, guardar)
     .replace(MENCION_RE, guardar);
-  const limpio = conPlaceholders.replace(TEL_CAND_RE, (m) => (pareceTelefono(m) ? enmascarar(m) : m));
+  const limpio = conPlaceholders.replace(
+    TEL_CAND_RE,
+    (m, offset: number, full: string) =>
+      redactarCandidato(
+        m,
+        full.slice(Math.max(0, offset - 1), offset),
+        full.slice(offset + m.length, offset + m.length + 6),
+      ),
+  );
   return limpio.replace(/⟦(\d+)⟧/g, (_x, i) => guardados[Number(i)]);
 }
 
