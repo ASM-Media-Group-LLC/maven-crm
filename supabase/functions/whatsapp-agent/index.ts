@@ -1660,6 +1660,17 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_corte_notas",
+    description:
+      "Las notas 1-10 OFICIALES del día por persona — las MISMAS que salen en el cierre de las 7pm (fórmula fija: resultado del rol + participación + Hubstaff; cada persona puntúa solo en su grupo casa). Úsala SIEMPRE que pregunten '¿qué nota sacó X?', '¿cómo cerró el equipo?', '¿puntaje de hoy/de ayer?'. PROHIBIDO inventar o estimar una nota de memoria: el 04/08 el bot improvisó notas en el DM distintas de las publicadas y el owner difundió promedios que no cuadraban. Para HOY se calcula al vuelo si hace falta. Devuelve nota + insumos por persona, promedio por grupo y promedio de empresa.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default: hoy." },
+      },
+    },
+  },
+  {
     name: "get_closer_pipeline_status",
     description:
       "Devuelve el estado del pipeline de leads de un closer (o del equipo entero). Útil para responder '¿cómo va Miguel?', '¿cuántas leads tiene atrasadas Julieth?', '¿qué pipeline tiene el equipo?', '¿cuáles son las confirmadas de Julieth?', '¿cuáles leads están en Completada?'. Trae:\n- by_stage: counts por stage (Asignada, Confirmada, Completada, No interesada, Rechazada).\n- handles_by_stage: LISTA DE HANDLES de IG por stage (con fecha del cambio). Esto te permite responder 'cuáles son las 2 confirmadas de X' sin tener que preguntarle a la persona. Para Confirmada/Completada devuelve TODAS, para Asignada/No interesada devuelve top 20 recientes.\n- overdue_contacts: leads con contactos vencidos según cadencia 1-3-5-8-15-29.\n- stale_asignadas: asignadas hace >30d sin tocar.\nNO uses esta tool si solo te preguntan por UN lead específico — usa lookup_lead_history para eso.",
@@ -3846,6 +3857,53 @@ async function executeTool(
       };
     }
 
+    case "get_corte_notas": {
+      const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+      const fecha = String(input.date ?? "").trim() || hoyBog;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { error: "invalid_date", hint: "YYYY-MM-DD" };
+
+      const leer = () =>
+        sb.from("corte_notas")
+          .select("nombre, nota_sugerida, componentes, group_id")
+          .eq("fecha", fecha)
+          .order("nota_sugerida", { ascending: false });
+
+      let { data: rows } = await leer();
+      // Para HOY, si el cierre no corrió aún, se calcula al vuelo (persiste los 3 grupos).
+      if ((!rows || rows.length === 0) && fecha === hoyBog) {
+        await sb.rpc("corte_cierre_prep", { p_group_id: ctx.groupId });
+        rows = (await leer()).data;
+      }
+      if (!rows || rows.length === 0) {
+        return { fecha, equipos: {}, note: "sin notas calculadas para esa fecha (se generan en el cierre de las 19:00)" };
+      }
+
+      const { data: grps } = await sb.from("whatsapp_groups").select("id, name")
+        .in("id", [...new Set(rows.map((r) => String(r.group_id)))]);
+      const nombreGrupo = new Map((grps ?? []).map((g) => [String(g.id), String(g.name)]));
+
+      const porGrupo: Record<string, { notas: number[]; personas: Array<Record<string, unknown>> }> = {};
+      for (const r of rows) {
+        const gname = nombreGrupo.get(String(r.group_id)) ?? "?";
+        porGrupo[gname] ??= { notas: [], personas: [] };
+        porGrupo[gname].notas.push(Number(r.nota_sugerida));
+        porGrupo[gname].personas.push({ nombre: r.nombre, nota: Number(r.nota_sugerida), insumos: r.componentes });
+      }
+      const equipos = Object.fromEntries(
+        Object.entries(porGrupo).map(([g, v]) => [g, {
+          promedio: Math.round((v.notas.reduce((a, b) => a + b, 0) / v.notas.length) * 10) / 10,
+          personas: v.personas,
+        }]),
+      );
+      const todas = rows.map((r) => Number(r.nota_sugerida));
+      return {
+        fecha,
+        empresa_promedio: Math.round((todas.reduce((a, b) => a + b, 0) / todas.length) * 10) / 10,
+        equipos,
+        nota: "Estas son las notas oficiales del cierre — no las ajustes ni las mezcles con estimaciones propias.",
+      };
+    }
+
     case "get_unassigned_leads": {
       const limit = Math.min(Math.max(Math.floor(Number(input.limit ?? 10)) || 10, 1), 25);
       // Pool de "Nuevas" = closer_creators stage='Nuevo' (con número, esperando
@@ -5394,13 +5452,44 @@ async function buildInitialUserMessage(args: {
     // que el modelo llame tools.
     if (esCierre) {
       const { data: prep } = await sb.rpc("corte_cierre_prep", { p_group_id: args.groupId });
-      const prepObj = (prep ?? null) as { personas?: unknown[]; semana?: unknown[] | null } | null;
+      const prepObj = (prep ?? null) as {
+        personas?: unknown[];
+        equipo_promedio?: number | null;
+        empresa_promedio?: number | null;
+        semana?: unknown[] | null;
+      } | null;
       if (prepObj?.personas?.length) {
         lines.push("");
-        lines.push("INSUMOS OBJETIVOS POR PERSONA (Maven + Hubstaff; nota_sugerida = fórmula fija de participación + Hubstaff + avance del rol, con penalización si la actividad está bajo el mínimo 60%). La nota FINAL se basa en ESTO: puedes ajustar máximo ±0.5 diciendo la razón (ej. 'destrabó las cuentas', 'cerró venta'). 'sin_metricas_tabla' = su rol no deja rastro en tablas: su avance evalúalo por lo que contó en el grupo.");
+        lines.push(
+          "NOTAS DEL DÍA — CALCULADAS Y DEFINITIVAS (fórmula fija: el resultado del rol manda; " +
+            "participación y Hubstaff acompañan; sin resultado medible el techo es ~5). Cada persona " +
+            "aparece SOLO en su grupo casa — acá vienen las de ESTE grupo. Las publicas TAL CUAL, " +
+            "número por número: el 04/08 salieron TRES versiones distintas de la nota del mismo día " +
+            "(grupo vs grupo vs DM) y el owner difundió promedios que no cuadraban. PROHIBIDO ajustar, " +
+            "redondear o inventar una nota; si algo cualitativo no se refleja, dilo en la RAZÓN sin " +
+            "tocar el número. 'sin_metricas_tabla' = su rol no deja rastro en tablas: explica su día " +
+            "por lo que contó en el grupo, la nota sigue siendo la de acá.",
+        );
         lines.push(JSON.stringify(prepObj.personas));
         lines.push("");
-        lines.push("ESTRUCTURA OBLIGATORIA DEL CIERRE — en este orden: (1) resumen del día; (2) sección '*Notas del día*' con TODAS las personas de INSUMOS, una línea cada una: 'Nombre nota — razón corta (act% o (min 60))' — si falta UNA sola persona el cierre está MAL (el 03/08 Managers y Ventas omitieron las notas y solo Warming las publicó); (3) objetivo de mañana en una línea. Las notas van SÍ o SÍ aunque ya haya habido resúmenes o cierres parciales en el chat de hoy.");
+        lines.push(
+          `PROMEDIOS YA CALCULADOS (no los recalcules ni los redondees): este equipo ${prepObj.equipo_promedio ?? "s/d"}/10 · empresa ${prepObj.empresa_promedio ?? "s/d"}/10.`,
+        );
+        lines.push("");
+        lines.push(
+          "ESTRUCTURA OBLIGATORIA DEL CIERRE (el formato que el owner aprobó el 04/08 19:46) — en este orden:\n" +
+            "(1) ENTRADA amigable y humana, patrón: \"Chicos, hice el estudio del día como gerencia. Como " +
+            "empresa cerramos en <empresa>/10 y este equipo en <equipo>/10. No es para castigar a nadie — " +
+            "es para saber dónde estamos parados y de dónde levantamos mañana 💪\" (adapta las palabras, " +
+            "JAMÁS los números).\n" +
+            "(2) Resumen corto del día (2-4 líneas con lo importante).\n" +
+            "(3) Sección '*Notas del día*' con TODAS las personas de NOTAS DEL DÍA, una línea cada una: " +
+            "'Nombre nota — razón corta'. La razón arranca por el RESULTADO (números, piezas, ventas, " +
+            "promo, gestiones); el % de Hubstaff se menciona SOLO si está bajo 60 ('act 45%, min 60'). " +
+            "Si falta UNA sola persona el cierre está MAL.\n" +
+            "(4) Objetivo de mañana en una línea. " +
+            "Las notas van SÍ o SÍ aunque ya haya habido resúmenes parciales en el chat hoy.",
+        );
       }
       if (prepObj?.semana?.length) {
         lines.push("");

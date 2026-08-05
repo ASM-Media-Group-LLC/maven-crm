@@ -887,7 +887,17 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
   // sin cierre PROGRAMADO desde el 08/07 — el 30/07, el día de mayor producción del
   // equipo (14 videos, 14 fotos, 6 posts), no hubo ningún resumen. Corre para todos los
   // grupos con bot activo; los checks de closers siguen scopeados a department='sales'.
-  const gruposParaCierre = activos;
+  //
+  // EXCEPTO los 3 grupos del régimen de cortes 2h: su cierre de las 19:00 lo publica
+  // whatsapp-corte-tick (corte_cierre, con las notas oficiales). El 04/08 salieron DOS
+  // cierres casi idénticos con 1 minuto de diferencia en cada grupo ("Resumen de hoy"
+  // de este tick + "Cierre del día" del corte) — doble ruido y doble costo.
+  const GRUPOS_CORTE = new Set([
+    "a12d9f41-c962-4d98-b0bb-6b2d2573534c", // AI WARMING
+    "73a4414e-2546-4ca7-9289-7cbec70b0273", // Managers
+    "d12ec56f-b324-4369-b72d-7540fb930ef6", // Marketing/Ventas
+  ]);
+  const gruposParaCierre = activos.filter((g: any) => !GRUPOS_CORTE.has(g.id));
   if (activos.length === 0) return { checked: 0, sent: 0 };
 
   // Por tenant, sacar users en schedule hoy con sus profile data.
