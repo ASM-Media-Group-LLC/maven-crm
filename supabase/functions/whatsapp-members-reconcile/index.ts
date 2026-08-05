@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, BOT_LIDS } from "../_shared/whatsapp.ts";
 
 // whatsapp-members-reconcile — sincroniza whatsapp_members.active contra los
 // participantes REALES que reporta el gateway (Baileys).
@@ -26,7 +26,7 @@ serve(async (req) => {
   }
   if (!GATEWAY_URL || !GATEWAY_KEY) return Response.json({ skip: "gateway_no_configurado" });
 
-  let payload: { groups?: Array<{ jid: string; participants: string[] }>; error?: string };
+  let payload: { groups?: Array<{ jid: string; participants: string[]; structured?: Array<{ ids: string[] }> }>; error?: string };
   try {
     const r = await fetch(`${GATEWAY_URL}/groups/participants`, {
       headers: { "apikey": GATEWAY_KEY },
@@ -44,12 +44,15 @@ serve(async (req) => {
   const sb = adminClient();
   const { data: grupos } = await sb
     .from("whatsapp_groups")
-    .select("id, external_id, name")
+    .select("id, external_id, name, tenant_id")
     .eq("active", true)
     .eq("is_direct", false)
     .neq("provider", "manual");
 
   const porJid = new Map(gwGroups.map((g) => [g.jid, new Set(g.participants)]));
+  const estructuradoPorJid = new Map(gwGroups.map((g) => [g.jid, g.structured ?? null]));
+  // El propio bot no es un "miembro" del panel (LIDs + su número de línea).
+  const BOT_IDS = new Set([...BOT_LIDS.map((l) => `${l}@lid`), "573225218180@s.whatsapp.net"]);
   const resumen: Array<Record<string, unknown>> = [];
 
   for (const g of grupos ?? []) {
@@ -75,7 +78,37 @@ serve(async (req) => {
         altas += 1;
       }
     }
-    resumen.push({ grupo: g.name, miembros: (miembros ?? []).length, bajas, altas });
+    // INSERTAR participantes que el panel no conoce (05/08, caso Grace: entró
+    // al grupo pero nunca escribió → el ingest jamás le creó fila y este cron
+    // solo tocaba filas existentes → invisible e imposible de vincular).
+    // Necesita el campo `structured` del gateway (pares lid/jid POR persona);
+    // con el gateway viejo simplemente no inserta (compatible).
+    let nuevos = 0;
+    const estructurado = estructuradoPorJid.get(String(g.external_id));
+    if (estructurado) {
+      const conocidos = new Set((miembros ?? []).map((m) => String(m.external_id)));
+      for (const p of estructurado) {
+        const ids = (p.ids ?? []).map(String);
+        if (ids.length === 0) continue;
+        if (ids.some((i) => BOT_IDS.has(i))) continue;          // el bot no se lista
+        if (ids.some((i) => conocidos.has(i))) continue;        // ya tiene fila (en cualquiera de sus formas)
+        // external_id canónico = la forma @lid (la que usa el ingest para los
+        // mensajes de grupo); si no hay, el jid con número.
+        const lid = ids.find((i) => i.endsWith("@lid"));
+        const jid = ids.find((i) => i.endsWith("@s.whatsapp.net"));
+        const externalId = lid ?? jid ?? ids[0];
+        const { error: insErr } = await sb.from("whatsapp_members").insert({
+          tenant_id: g.tenant_id,
+          group_id: g.id,
+          external_id: externalId,
+          // Sin pushName hasta que hable: si hay jid, los dígitos del número
+          // al menos permiten reconocerla y vincularla desde el panel.
+          display_name: (jid ?? externalId).split("@")[0],
+        });
+        if (!insErr) { nuevos += 1; conocidos.add(externalId); }
+      }
+    }
+    resumen.push({ grupo: g.name, miembros: (miembros ?? []).length, bajas, altas, nuevos });
   }
 
   return Response.json({ ok: true, resumen });

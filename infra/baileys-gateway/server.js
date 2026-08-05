@@ -876,6 +876,13 @@ app.get('/groups/participants', async (req, res) => {
       jid: g.id,
       participants: (Array.isArray(g.participants) ? g.participants : [])
         .flatMap((p) => [p.id, p.jid, p.lid].filter(Boolean)),
+      // Emparejado POR PERSONA (05/08): el aplanado de arriba pierde qué ids
+      // (lid/jid) son de la MISMA persona, y el reconcile no podía INSERTAR
+      // participantes faltantes sin riesgo de filas gemelas (caso Grace: en el
+      // grupo pero invisible en el panel porque nunca escribió). Campo aditivo:
+      // el edge viejo lo ignora, así que el orden de deploys no importa.
+      structured: (Array.isArray(g.participants) ? g.participants : [])
+        .map((p) => ({ ids: [p.id, p.jid, p.lid].filter(Boolean) })),
     }));
     res.json({ groups });
   } catch (e) {
