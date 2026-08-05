@@ -1127,6 +1127,7 @@ ANALYZE_INSTAGRAM_LEAD:
 REGLAS DE ESTILO PARA LEAD INTELLIGENCE:
 - Sé conciso: "Daniel, larola_a ya estuvo: la rechazó Miguel el 25/5 porque quería ser cantante. Saltala." es mejor que un párrafo.
 - Si todas las tools devolvieron datos → presenta hechos, no inferencias.
+- DATO DESAFIADO = RE-VERIFICAR, NUNCA PLEGARSE. Si alguien duda o corrige un número que leíste de tabla ("¿estás seguro?", "eso está mal"), NO aceptes por cortesía: re-consulta la tool y responde con el VALOR y la FECHA exactos ("figura won ayer 18:49"). Si la tool te da la razón, sostienes con esos datos — como el 04/08 con los $50.306 de Elizabeth: el jefe dudó, re-verificaste, tenías razón y la defendiste. Si la tool muestra que el humano tiene razón, corriges citando el dato nuevo. El 05/08 hiciste lo contrario: ante "¿seguro que ninguna venta hoy?" contaste como de HOY una venta ganada AYER a las 18:49 (solo el stage se movió hoy). Un dato de tabla se corrige con otro dato de tabla, jamás con presión social. Lo cualitativo (tono, estilo, lectura de negocio) sí se acepta sin pelear.
 - Si las tools devolvieron poco/nada → reconócelo y propón pasos concretos (cargar en Maven, esperar scrape, preguntar al equipo).`;
 
 // El system prompt final = MOTOR (reutilizable) + MANUAL del depto. Mismo texto
@@ -1658,6 +1659,12 @@ const TOOLS: Array<{
       },
       required: ["trigger_at", "body"],
     },
+  },
+  {
+    name: "get_ventas_del_dia",
+    description:
+      "La vista CANÓNICA del dinero del día: qué hay en la mesa, qué se GANÓ HOY (deduplicado entre el pipeline y las oportunidades, cada venta con su HORA) y — clave — los avisos de stages movidos HOY sobre ventas ya ganadas ANTES (ej. 'pasó a Completada hoy 12:36 pero su venta figura ganada AYER 18:49 — NO es venta nueva'). Úsala SIEMPRE que pregunten '¿cuánto se vendió hoy?', '¿hubo ventas?', '¿estás seguro que no hay ventas?' — es la ÚNICA fuente para contar ventas del día. El 05/08 contaste una venta de ayer como de hoy por mirar solo el stage del pipeline: esta tool existe para que eso no se repita.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "get_corte_notas",
@@ -3854,6 +3861,15 @@ async function executeTool(
         modo: esAccion ? "accion — el bot ejecutará la instrucción y publicará el resultado" : "aviso — se postea el texto tal cual",
         grupo_destino: destinoNombre ?? "(este chat)",
         note: "Programado. El cron drena cada 5 min (precisión ±5 min). Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
+      };
+    }
+
+    case "get_ventas_del_dia": {
+      const { data, error } = await sb.rpc("corte_ventas_bloque");
+      if (error) return { error: error.message };
+      return {
+        bloque: String(data ?? ""),
+        nota: "Esta es la fuente canónica del día. Si el bloque dice que un movimiento NO es venta nueva, NO la cuentes como de hoy aunque otro tool muestre el stage movido hoy.",
       };
     }
 
