@@ -525,6 +525,14 @@ const VOSEO_A_NEUTRO: ReadonlyArray<[string, string]> = [
   ["usá", "usa"], ["usalo", "úsalo"], ["tené", "ten"], ["tenés", "tienes"], ["podés", "puedes"],
   ["querés", "quieres"], ["sabés", "sabes"], ["hacés", "haces"], ["decís", "dices"], ["venís", "vienes"],
   ["sos", "eres"], ["retomá", "retoma"], ["checá", "checa"], ["mostrá", "muestra"], ["marcá", "marca"],
+  // 05/08: "Vos ganás comisión" y "pa que vos solo pienses" se fugaron TRES veces en
+  // pitches para creadoras — el mapa cubría verbos pero no el PRONOMBRE ni estas
+  // conjugaciones. "VOS" todo-mayúsculas sigue protegido por el check de siglas.
+  ["vos", "tú"], ["ganás", "ganas"], ["seguís", "sigues"], ["cobrás", "cobras"],
+  ["facturás", "facturas"], ["entrás", "entras"], ["vendés", "vendes"], ["llevás", "llevas"],
+  ["pensás", "piensas"], ["necesitás", "necesitas"], ["trabajás", "trabajas"],
+  ["manejás", "manejas"], ["respondés", "respondes"], ["escribís", "escribes"],
+  ["subís", "subes"], ["quedás", "quedas"], ["apurate", "apúrate"], ["dejá", "deja"],
 ];
 const VOSEO_RE = new RegExp(
   "(?<![\\p{L}@])(" + VOSEO_A_NEUTRO.map(([v]) => v).join("|") + ")(?![\\p{L}])",

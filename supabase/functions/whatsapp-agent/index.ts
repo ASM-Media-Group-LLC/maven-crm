@@ -10,6 +10,12 @@ import {
   whatsappCors,
 } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
+import {
+  afirmaRegistro,
+  detectarVoseoEnPitch,
+  esCorreccionDeEstilo,
+  TIENE_PITCH_CITADO,
+} from "../_shared/agent-output-guards.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
 // El candado de línea de bandeja vive en el catálogo y se usa también acá, en las
 // tools inline, para que las dos rutas no se desincronicen.
@@ -247,6 +253,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - IMÁGENES FALLADAS: si una imagen del contexto aparece como "[análisis falló: …]", NO la viste — dilo ("no pude ver la imagen, ¿me la reenvías?") y jamás respondas como si la hubieras visto.
 - PERSISTENCIA HONESTA: PROHIBIDO decir "anotado/guardado/registrado/lo tengo" sin haber llamado una tool de escritura en ESTA corrida. Preferencias de MIEMBROS del equipo ("yo contacto solo por WhatsApp") → remember_fact sobre esa persona; reglas permanentes → add_persistent_rule (solo owner/Álvaro).
 - PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
+- LECCIONES DE ESTILO = REGLA PERSISTIDA: cuando un closer o el owner te corrige CÓMO escribes (tono, voseo, "muy genérico", "suena a robot", "demasiado amigable"), guarda la lección con add_persistent_rule con prefijo 'ESTILO: ' (generalizada, UNA línea, scope grupo) ANTES de reenviar el texto corregido — cualquier miembro vinculado puede enseñarte estilo. Si dos lecciones chocan, vale la de Álvaro/Jhon. Al armar cualquier pitch, respeta TODAS las reglas ESTILO activas del grupo.
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.`;
 
 // ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
@@ -4675,16 +4682,37 @@ async function executeTool(
     case "add_persistent_rule": {
       // Solo el owner puede crear reglas. La protección vive acá en el dispatch
       // (no en RLS) porque las edge functions usan service role y bypassan RLS.
-      if (!ctx.isOwner) {
-        return { error: "only_owner_can_add_rules" };
+      // EXCEPCIÓN quirúrgica (decisión D3, 05/08): las reglas de ESTILO de pitch
+      // ('ESTILO: …') las puede enseñar cualquier miembro VINCULADO — los closers
+      // corrigen la redacción a diario (ocho veces el 05/08) y las lecciones se
+      // evaporaban. Siempre scope GRUPO, con tope, y si dos lecciones chocan vale
+      // la de Álvaro/Jhon (poda semanal del owner).
+      const ruleText = String(input.rule_text ?? "").trim();
+      if (!ruleText) return { error: "empty_rule_text" };
+      const esEstilo = /^ESTILO\s*:/i.test(ruleText);
+      if (!ctx.isOwner && !(esEstilo && ctx.senderUserId)) {
+        return { error: "only_owner_can_add_rules", hint: "excepción: reglas 'ESTILO: …' de miembros vinculados" };
       }
       if (!ctx.senderUserId) {
         return { error: "owner_user_id_not_resolved" };
       }
-      const ruleText = String(input.rule_text ?? "").trim();
-      if (!ruleText) return { error: "empty_rule_text" };
+      if (esEstilo) {
+        const { count: nEstilo } = await sb
+          .from("whatsapp_bot_rules")
+          .select("id", { count: "exact", head: true })
+          .eq("active", true)
+          .eq("group_id", ctx.groupId)
+          .ilike("rule_text", "ESTILO:%");
+        if ((nEstilo ?? 0) >= 30) {
+          return {
+            error: "estilo_lleno",
+            message: "Ya hay 30 reglas de ESTILO activas en este grupo. Consolida (una regla que cubra varias) o desactiva una vieja con deactivate_rule antes de sumar otra.",
+          };
+        }
+      }
       const expiresAt = input.expires_at ? String(input.expires_at) : null;
-      const ruleGroupId = String(input.scope ?? "grupo") === "global" ? null : ctx.groupId;
+      // Las de estilo son SIEMPRE del grupo: un closer no define estilo global.
+      const ruleGroupId = (!esEstilo && String(input.scope ?? "grupo") === "global") ? null : ctx.groupId;
 
       // ── ANTI-DUPLICADO ──────────────────────────────────────────────────────
       // El prompt ya pide "NO dupliqués reglas" y el modelo lo ignoró: el 31/07
@@ -6026,30 +6054,11 @@ async function runAgent(req: AgentRequest): Promise<{
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
     "record_milestone", "set_member_schedule",
   ]);
-  // "marcad|gestionad" se sumaron el 31/07: "las 5 quedan marcadas gestionadas en
-  // Maven" pasaba limpio (esa vez era verdad, pero el hueco existía).
-  const PATRONES_ACK_FALSO: RegExp[] = [
-    // "guardad" se sumó el 03/08: "Ya lo tengo guardado" (a María, sin tool de
-    // escritura en la corrida) pasó limpio por no estar el participio.
-    /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
-    /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
-    /\b(?:lo|la|los|las)\s+tengo\s+guardad/i,
-    // "la tengo" pelado (04/08: "Gracias Carolina, la tengo" sobre un horario
-    // que NUNCA registró). Excluye "lo tengo que <hacer>".
-    /\b(?:lo|la|los|las)\s+tengo\b(?!\s+que\b)/i,
-    /\b(?:lo|la|los|las)\s+(?:registr|anot|agend|guard)(?:é|e|amos|ó)\b/i,
-    /\bya\s+(?:lo|la|los|las)\s+(?:registr|anot|agend|guard|teng)/i,
-    /\bte\s+lo\s+(?:registr|anot|agend|dej)/i,
-    // Participio suelto al inicio de mensaje O DE LÍNEA (flag m): "Anotado: ...",
-    // "Registrado.", "Listo, anotado", "Anotadas las 3 cuentas", "Dale.\nAnotado: ...".
-    // El 31/07 13:19 un "Anotado:" pelado pasó los 5 patrones de arriba y Álvaro
-    // creyó guardada una preferencia de formato que nunca se escribió. El imperativo
-    // ("anotá esto") NO matchea (exige la d del participio) y "listo" solo dispara
-    // si le sigue el participio ("Listo, no lo mando yo" pasa).
-    /^\s*(?:listo[,!.]?\s+)?(?:anotad|registrad|agendad|apuntad|marcad|gestionad|guardad)[oa]s?\b/im,
-    // "Tomo/tomé nota" = la misma promesa de registro con otras palabras.
-    /\btom[oé]\s+nota\b/i,
-  ];
+  // Patrones del ack falso: viven en _shared/agent-output-guards.ts con su batería de
+  // tests y la historia completa. CALIBRADOS el 05/08 contra 1.098 mensajes reales: la
+  // versión inline anterior daba ~3 falsos positivos por día ("lo tengo presente/claro/
+  // abierto", "pásame el handle y te lo dejo listo" como oferta) y cada FP quema hasta
+  // 2 reintentos de LLM.
   // Guarda anti-fuga del canal privado (31/07 15:16: el bot posteó en Managers
   // "Chicas, hablé con Álvaro y arrancamos con esto HOY" y Álvaro lo retó por
   // dejar en evidencia la conversación privada; también existe como regla
@@ -6078,6 +6087,20 @@ async function runAgent(req: AgentRequest): Promise<{
     "al privado y vuelve a enviarlo.";
   const escriturasOk = new Set<string>();
   let ackBloqueados = 0;
+  let estiloBloqueado = 0;
+  let voseoPitchBloqueado = 0;
+  // Texto del mensaje disparador, para la guarda de lecciones de estilo: si el humano
+  // corrigió CÓMO escribir y el bot reenvía el pitch sin persistir la lección, se le
+  // exige el add_persistent_rule primero (05/08: ocho correcciones, una guardada).
+  let textoDisparador = "";
+  if (req.message_id) {
+    const { data: trig } = await sb
+      .from("whatsapp_messages")
+      .select("body, transcribed_text")
+      .eq("id", req.message_id)
+      .maybeSingle();
+    textoDisparador = String(trig?.transcribed_text || trig?.body || "");
+  }
 
   // Qué tools PIDIÓ el modelo en esta corrida (nombre → veces). Se guarda en el
   // context de api_usage_log para poder recortar la lista por datos y no a ojo.
@@ -6534,7 +6557,7 @@ async function runAgent(req: AgentRequest): Promise<{
       // pero queda el evento agent_false_ack para poder auditarlo.
       if (t.name === "reply_to_group" && escriturasOk.size === 0 && ackBloqueados < 2) {
         const cuerpo = String((t.input as ToolInput).body ?? "");
-        if (PATRONES_ACK_FALSO.some((re) => re.test(cuerpo))) {
+        if (afirmaRegistro(cuerpo)) {
           ackBloqueados += 1;
           toolResults.push({
             type: "tool_result",
@@ -6573,6 +6596,57 @@ async function runAgent(req: AgentRequest): Promise<{
                 "salieron duplicados por imitarlo. Responde lo que te pidieron SIN formato de corte/cierre (sin " +
                 "encabezados 'CORTE …' ni 'Cierre del día/de turno'). Si alguien pide el cierre antes de hora, dile " +
                 "que sale automático al fin de la jornada.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda de LECCIÓN DE ESTILO (05/08: ocho correcciones de estilo en un día —
+      // argentino ×3, "muy genérico" ×2, "ghetto", "demasiado perfecto", "sé más
+      // amable" — y UNA sola persistida: el equipo re-entrena al bot a diario). Si el
+      // disparador corrigió CÓMO escribir y la respuesta trae el pitch reescrito, la
+      // lección se guarda ANTES de reenviar. Un bloqueo (a la 2ª pasa: nunca mudo).
+      if (t.name === "reply_to_group" && estiloBloqueado < 1 &&
+          textoDisparador && esCorreccionDeEstilo(textoDisparador) &&
+          !escriturasOk.has("add_persistent_rule")) {
+        const cuerpoEstilo = String((t.input as ToolInput).body ?? "");
+        if (TIENE_PITCH_CITADO(cuerpoEstilo)) {
+          estiloBloqueado += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "leccion_de_estilo_sin_guardar",
+              message:
+                "NO se envió: te acaban de corregir el ESTILO de escritura y estás reenviando el texto sin " +
+                "guardar la lección — mañana cometerías el mismo error y el equipo re-enseña a diario. " +
+                "PRIMERO llama add_persistent_rule con la lección GENERALIZADA en una línea, prefijo " +
+                "'ESTILO: ' (ej. 'ESTILO: en pitches a agencias, tono profesional de negocio — nada de " +
+                "jerga de amigos ni frases perfectas de robot'), scope grupo. DESPUÉS reenvía tu mensaje " +
+                "tal cual, con el pitch corregido.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda de voseo residual EN el pitch citado: el neutralizador de salida corrige
+      // lo mapeado en todo el mensaje; esto caza formas dentro de comillas — el texto
+      // que el closer copia y pega a una creadora. 05/08: "Vos ganás" se fugó 3 veces.
+      if (t.name === "reply_to_group" && voseoPitchBloqueado < 1) {
+        const cuerpoPitch = String((t.input as ToolInput).body ?? "");
+        const voseo = detectarVoseoEnPitch(cuerpoPitch);
+        if (voseo) {
+          voseoPitchBloqueado += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "voseo_en_pitch",
+              encontrado: voseo,
+              message:
+                `NO se envió: el texto citado (el que van a copiar y pegar a una creadora) trae "${voseo}", ` +
+                "que es voseo rioplatense — el equipo lo corrigió tres veces hoy. Reescribe SOLO el texto " +
+                "entre comillas en tuteo neutro (tú puedes/tienes/ganas) y reenvía el mensaje completo.",
             }),
           });
           continue;
