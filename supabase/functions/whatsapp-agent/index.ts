@@ -256,7 +256,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
 - LECCIONES DE ESTILO = REGLA PERSISTIDA: cuando un closer o el owner te corrige CÓMO escribes (tono, voseo, "muy genérico", "suena a robot", "demasiado amigable"), guarda la lección con add_persistent_rule con prefijo 'ESTILO: ' (generalizada, UNA línea, scope grupo) ANTES de reenviar el texto corregido — cualquier miembro vinculado puede enseñarte estilo. Si dos lecciones chocan, vale la de Álvaro/Jhon. Al armar cualquier pitch, respeta TODAS las reglas ESTILO activas del grupo.
 - "activo/a", "ya activo", "buen día, activa" al arrancar el turno = CHECK-IN de entrada (en CUALQUIER grupo, no solo warming), NUNCA una creadora activada: responde corto con saludo + su foco del día. El 05/08 a María le preguntaste "¿'activa' es de cuál creadora?" por leerlo como activación.
-- QUIÉN ES QUIÉN (jerarquía — no la confundas): Jhon Lopez = dueño (tecnología/Maven). Álvaro = jefe operativo; sus órdenes son de dueño. Juan Pachas = SOCIO de la empresa, NO empleado: participa en reuniones y cierres de venta, pero NUNCA lo midas, puntúes, aprietes ni le pongas metas como si fuera closer — el closer a medir es Miguel; los cierres de Juan suman a la empresa y se celebran, no se auditan. Grace Gelves = cabeza de Recursos Humanos y gerente: trato de management — sin notas, sin aprietes, sin metas; temas de gente, contrataciones o pagos van con ella. Ojo: hay varios "Juan" en Maven (Torres, Castellanos) — el socio es PACHAS.
+- QUIÉN ES QUIÉN (jerarquía — no la confundas): Jhon Lopez = dueño y DEVELOPER (construye Maven y a los bots; lo técnico va con él). Álvaro = jefe operativo; sus órdenes son de dueño. Juan Pachas = SOCIO de la empresa, NO empleado: participa en reuniones y cierres de venta, pero NUNCA lo midas, puntúes, aprietes ni le pongas metas como si fuera closer — el closer a medir es Miguel; los cierres de Juan suman a la empresa y se celebran, no se auditan. Grace Gelves = cabeza de Recursos Humanos y gerente de personal: trato de management — sin notas, sin aprietes, sin metas; temas de gente, contrataciones o pagos van con ella. Luis Roman = GERENTE COMERCIAL: dirige todo lo que huela a venta — closers, chatters y el lado comercial de las managers (p. ej. reuniones para vender Unlimited); mismo trato de management, sin notas ni metas personales. Las managers (Carolina/Fabiana) TAMBIÉN venden Unlimited a SUS creadoras y hacen retención cuando una se quiere ir — es parte de su rol, no invasión a ventas; su función principal sigue siendo la relación con sus creadoras y hacerlas promocionar. Ojo: hay varios "Juan" en Maven (Torres, Castellanos) — el socio es PACHAS.
 - ARENGAS Y PROACTIVOS CON FRENO (decisión del dueño 05/08): mensaje motivacional máximo UNO por día por grupo. PROHIBIDO prometer futuro de la empresa ("cuando esto explote", "vamos a ser los más grandes") — motiva con datos de HOY. Toda iniciativa proactiva tuya (wishlist, procesos, arengas) va en UN SOLO mensaje corto (≤8 líneas): el 05/08 mandaste el wishlist en dos bloques largos seguidos y Brayan tuvo que pedir "explícame rápido en 2 líneas cuál es la tarea directa".
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.
 
@@ -1681,6 +1681,39 @@ const TOOLS: Array<{
     input_schema: { type: "object", properties: {} },
   },
   {
+    name: "get_promo_registro",
+    description:
+      "Promos REGISTRADAS de una creadora en los últimos días (scan + cargas manuales), con red, día atribuido y evidencia. ÚSALA ANTES de responder cuando alguien reclame 'no registraste la promo de X': muchas veces SÍ está registrada, pero en el día anterior — una promo cuenta para el día en que se PUBLICÓ la historia (hora Bogotá), no el día en que el scan la leyó; una historia subida anoche queda en ayer aunque se escanee hoy a la mañana. Si la promo está, responde '¿te refieres a estas?' con red + día + hora de publicación, y adjunta el screenshot pasando evidencia_id a reply_to_group.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "handle o nombre artístico de la creadora" },
+        dias: { type: "number", description: "cuántos días hacia atrás mirar (default 3, máx 14)" },
+      },
+      required: ["creator"],
+    },
+  },
+  {
+    name: "get_scan_fallos",
+    description:
+      "Los fallos REALES de lectura del scan de HOY (rate-limit de IG, handle que no resuelve, error del bot), por creadora y manager. ⚠️ 0 historias NO es un fallo — es una lectura válida sin promo; 'sin leer aún' tampoco — es timing del scan. Incluye aparte las creadoras cuya causa ya fue explicada por una manager (razón conocida: no alarmar). Úsala cuando pregunten '¿qué falló en el scan?', '¿por qué X no aparece leída?', o para el bloque de scan del corte.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "set_scan_note",
+    description:
+      "MEMORIA de por qué una creadora no se puede leer en el scan. Cuando una manager (o el owner) explique la causa — 'cambió el handle', 'puso la cuenta privada', 'borró el IG', 'está sin publicar por viaje' — guárdala AQUÍ en el MISMO turno. Reemplaza la nota anterior de esa creadora. Desde entonces los reportes de scan la muestran como razón conocida en vez de alarma. NO es para notas de negocio (eso es record_milestone) ni para leads (add_note_to_lead): solo para explicar fallos de LECTURA del scan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator: { type: "string", description: "handle de IG o nombre artístico de la creadora" },
+        reason: { type: "string", description: "la razón, corta y concreta (ej: 'cambió el handle a @nuevo', 'cuenta privada desde julio')" },
+        network: { type: "string", description: "opcional: instagram | telegram | x | facebook — si la razón aplica a UNA red. Omitir = todas." },
+      },
+      required: ["creator", "reason"],
+    },
+  },
+  {
     name: "get_corte_notas",
     description:
       "Las notas 1-10 OFICIALES del día por persona — las MISMAS que salen en el cierre de las 7pm (fórmula fija: resultado del rol + participación + Hubstaff; cada persona puntúa solo en su grupo casa). Úsala SIEMPRE que pregunten '¿qué nota sacó X?', '¿cómo cerró el equipo?', '¿puntaje de hoy/de ayer?'. PROHIBIDO inventar o estimar una nota de memoria: el 04/08 el bot improvisó notas en el DM distintas de las publicadas y el owner difundió promedios que no cuadraban. Para HOY se calcula al vuelo si hace falta. Devuelve nota + insumos por persona, promedio por grupo y promedio de empresa.",
@@ -1878,6 +1911,10 @@ const TOOLS: Array<{
           type: "array",
           items: { type: "string" },
           description: "Array de LIDs/JIDs completos a notificar (ej. ['143250161664036@lid']). Debe estar alineado con los @<lid> en el body. Solo úsalo cuando realmente quieres despertar a esa persona — no en cada mensaje.",
+        },
+        evidencia_id: {
+          type: "string",
+          description: "SOLO para evidencia del scan: id de una entrada que te devolvió get_promo_registro (campo evidencia_id). El mensaje sale como IMAGEN (el screenshot de la promo) con tu body de caption. Úsalo cuando una manager duda de un registro y el screenshot zanja la discusión. Las menciones no funcionan en mensajes con imagen.",
         },
       },
       required: ["body"],
@@ -3918,6 +3955,117 @@ async function executeTool(
       };
     }
 
+    case "get_promo_registro": {
+      // Defensa con evidencia (pedido de Jhon 06/08): cuando una manager reclama
+      // "no registraste la promo de X", muchas veces SÍ está — pero atribuida al
+      // día de PUBLICACIÓN hora Bogotá (caso Carolina 06/08: Heidy/carocancino/kloe
+      // publicaron anoche 19:59-23:51 → dia=05/08, y el bot se defendió con "sin
+      // leer" en vez de mostrar el registro de ayer).
+      const qCreator = String(input.creator ?? "").trim().replace(/^@/, "");
+      if (!qCreator) return { error: "falta_creator" };
+      const dias = Math.min(Math.max(Number(input.dias) || 3, 1), 14);
+      const safeQ = qCreator.replace(/[%_,]/g, "");
+      const { data: cands } = await sb
+        .from("creators")
+        .select("id, instagram_handle, artistic_name")
+        .or(`instagram_handle.ilike.%${safeQ}%,artistic_name.ilike.%${safeQ}%`)
+        .limit(3);
+      const lista = (cands ?? []) as Array<{ id: string; instagram_handle: string | null; artistic_name: string | null }>;
+      if (lista.length === 0) return { error: "creadora_no_encontrada", buscado: qCreator };
+      if (lista.length > 1) {
+        return { error: "ambigua", coincidencias: lista.map((c) => c.artistic_name ?? c.instagram_handle), message: "Pregunta a cuál se refiere." };
+      }
+      // date viene naive en UTC (el scan guarda el timestamp real de la historia).
+      const horaBogota = (v: string | null): string | null => {
+        if (!v) return null;
+        const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? v : v + "Z");
+        if (isNaN(d.getTime())) return null;
+        return new Intl.DateTimeFormat("es-CO", {
+          timeZone: "America/Bogota", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+        }).format(d);
+      };
+      const desde = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+      const { data: entradas, error } = await sb
+        .from("promolog_entries")
+        .select("id, dia, network, date, created_at, analyzed_by_ai, evidence_url, story_media_url, story_link_url, notes")
+        .eq("creator_id", lista[0].id)
+        .eq("promoted", "true")
+        .gte("dia", desde)
+        .order("dia", { ascending: false })
+        .limit(20);
+      if (error) return { error: error.message };
+      const nombre = lista[0].artistic_name ?? lista[0].instagram_handle;
+      const promos = (entradas ?? []).map((e) => ({
+        dia: e.dia,
+        red: e.network,
+        // Hora solo en entradas del scan: ahí `date` es el timestamp real de la
+        // historia. En cargas manuales suele ser medianoche → mostrarla mentiría.
+        publicada_hora_bogota: e.analyzed_by_ai ? horaBogota(e.date as string | null) : null,
+        registrada_por: e.analyzed_by_ai ? "scan" : "carga manual",
+        link_del_post: e.story_link_url ?? null,
+        evidencia_id: (e.evidence_url || e.story_media_url) ? e.id : null,
+        nota: e.notes ? String(e.notes).replace(/\s+/g, " ").slice(0, 80) : null,
+      }));
+      return {
+        creadora: nombre,
+        rango: `últimos ${dias} días`,
+        promos,
+        ...(promos.length === 0
+          ? { sin_promos: "nada registrado en ese rango — revisa get_scan_fallos por si hay fallo de lectura o @ mal cargado" }
+          : {}),
+        como_leer_el_dia:
+          "una promo cuenta para el DÍA EN QUE SE PUBLICÓ la historia (hora Bogotá), no el día en que el scan la leyó: una historia de anoche queda en ayer aunque se escanee hoy. Para adjuntar el screenshot pasa evidencia_id a reply_to_group.",
+      };
+    }
+
+    case "get_scan_fallos": {
+      const { data, error } = await sb.rpc("promolog_fallos_bloque");
+      if (error) return { error: error.message };
+      return {
+        fallos_de_hoy: String(data ?? ""),
+        nota: "Solo fallos REALES. 0 historias = lectura válida sin promo; 'sin leer aún' = timing del scan. Si una manager explica una causa, guárdala con set_scan_note.",
+      };
+    }
+
+    case "set_scan_note": {
+      // Memoria de por qué una creadora no se lee (pedido de Jhon 06/08). La puede
+      // enseñar cualquier miembro vinculado — las managers son quienes saben la causa.
+      if (!ctx.senderUserId) {
+        return { error: "sin_usuario_vinculado", message: "Solo miembros verificados pueden guardar razones de scan." };
+      }
+      const qCreator = String(input.creator ?? "").trim().replace(/^@/, "");
+      const razon = String(input.reason ?? "").trim().slice(0, 300);
+      const redNota = input.network ? String(input.network).toLowerCase().trim() : null;
+      if (!qCreator || !razon) return { error: "faltan_creator_o_reason" };
+      const safeQ = qCreator.replace(/[%_,]/g, "");
+      const { data: cands } = await sb
+        .from("creators")
+        .select("id, instagram_handle, artistic_name")
+        .or(`instagram_handle.ilike.%${safeQ}%,artistic_name.ilike.%${safeQ}%`)
+        .limit(3);
+      const lista = (cands ?? []) as Array<{ id: string; instagram_handle: string | null; artistic_name: string | null }>;
+      if (lista.length === 0) return { error: "creadora_no_encontrada", buscado: qCreator };
+      if (lista.length > 1) {
+        return { error: "ambigua", coincidencias: lista.map((c) => c.artistic_name ?? c.instagram_handle), message: "Pregunta a cuál se refiere." };
+      }
+      // Una verdad por creadora: la nota nueva desactiva las anteriores.
+      await sb.from("promolog_scan_notes").update({ active: false })
+        .eq("creator_id", lista[0].id).eq("active", true);
+      const { error: insErr } = await sb.from("promolog_scan_notes").insert({
+        creator_id: lista[0].id,
+        network: redNota,
+        reason: razon,
+        set_by: ctx.senderUserId,
+      });
+      if (insErr) return { error: insErr.message };
+      return {
+        ok: true,
+        creadora: lista[0].artistic_name ?? lista[0].instagram_handle,
+        razon_guardada: razon,
+        nota: "Desde ahora los reportes de scan la muestran como razón conocida, no como alarma. Confírmalo en el grupo citando la razón.",
+      };
+    }
+
     case "get_corte_notas": {
       const hoyBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
       const fecha = String(input.date ?? "").trim() || hoyBog;
@@ -4983,6 +5131,36 @@ async function executeTool(
       const mentions = rawMentions
         .map((m) => String(m).trim())
         .filter((m) => m.length > 0);
+      // Evidencia del scan (opcional): evidencia_id = id de promolog_entries que
+      // devolvió get_promo_registro. NUNCA aceptamos URLs libres del modelo — el id
+      // se resuelve acá contra nuestra data. Las evidence_url guardadas son firmadas
+      // y EXPIRAN, así que se re-firma fresca; fallback al media del post (twimg).
+      let imageUrl: string | undefined;
+      const evidenciaId = input.evidencia_id ? String(input.evidencia_id).trim() : "";
+      if (evidenciaId) {
+        const { data: ev } = await sb
+          .from("promolog_entries")
+          .select("evidence_url, story_media_url, story_link_url")
+          .eq("id", evidenciaId)
+          .maybeSingle();
+        const m = ev?.evidence_url ? String(ev.evidence_url).match(/\/promolog-evidence\/([^?]+)/) : null;
+        if (m) {
+          let path = m[1];
+          try {
+            path = decodeURIComponent(path);
+          } catch { /* path ya venía plano */ }
+          const { data: signed } = await sb.storage.from("promolog-evidence").createSignedUrl(path, 3600);
+          imageUrl = signed?.signedUrl ?? undefined;
+        }
+        if (!imageUrl && ev?.story_media_url) imageUrl = String(ev.story_media_url);
+        if (!imageUrl) {
+          return {
+            error: "evidencia_no_disponible",
+            message: "Esa entrada no tiene screenshot recuperable. Reenvía SIN evidencia_id y sin prometer imagen en el texto" +
+              (ev?.story_link_url ? ` — puedes citar el link del post: ${ev.story_link_url}` : "."),
+          };
+        }
+      }
       // Llamamos a whatsapp-send para que despache.
       const url = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`;
       const resp = await fetch(url, {
@@ -4995,6 +5173,7 @@ async function executeTool(
           group_id: ctx.groupId,
           body,
           mentions: mentions.length > 0 ? mentions : undefined,
+          image_url: imageUrl,
         }),
       });
       const data = await resp.json();
@@ -5639,6 +5818,24 @@ async function buildInitialUserMessage(args: {
       }
     }
 
+    // Transparencia del scan para las MANAGERS (pedido de Jhon 06/08): fallos REALES
+    // de lectura de hoy en cada corte, con las razones ya explicadas aparte. La duda
+    // de Carolina del 06/08 11:53 ("¿por qué no registraste estas promos en el primer
+    // escaneo?") es el síntoma: el scan era una caja negra para ellas.
+    if (args.groupId === "73a4414e-2546-4ca7-9289-7cbec70b0273") {
+      const { data: fallosBloque } = await sb.rpc("promolog_fallos_bloque");
+      if (fallosBloque) {
+        lines.push("");
+        lines.push(
+          "SCAN — FALLOS REALES DE LECTURA HOY (inclúyelo en el corte tal cual viene: si dice 'sin fallos', " +
+            "UNA línea y listo. JAMÁS presentes '0 historias' o 'sin leer aún' como error del bot — lo primero " +
+            "es lectura válida sin promo y lo segundo es timing del scan. Si una manager explica la causa de un " +
+            "fallo, guárdala con set_scan_note EN ESE TURNO; las que ya traen razón conocida se mencionan sin alarma):",
+        );
+        lines.push(String(fallosBloque));
+      }
+    }
+
     // La FRANJA del encabezado va calculada, no escrita por el modelo: el corte de
     // las 17:00 del 04/08 salió etiquetado "corte de las 5-7pm" siendo 3-5pm.
     const hhBog = new Date(Date.now() - 5 * 3600_000).getUTCHours();
@@ -6157,7 +6354,7 @@ async function runAgent(req: AgentRequest): Promise<{
   const TOOLS_DE_ESCRITURA = new Set([
     "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
-    "record_milestone", "set_member_schedule", "tomar_lead",
+    "record_milestone", "set_member_schedule", "tomar_lead", "set_scan_note",
   ]);
   // Patrones del ack falso: viven en _shared/agent-output-guards.ts con su batería de
   // tests y la historia completa. CALIBRADOS el 05/08 contra 1.098 mensajes reales: la

@@ -41,6 +41,11 @@ interface SendRequest {
   // El texto en `body` debe contener "@<lid_o_phone_sin_sufijo>" en
   // los lugares donde quieras la mención.
   mentions?: string[];
+  // Imagen adjunta (opcional): el mensaje sale como imagen con `body` de caption
+  // vía /message/sendMedia del gateway. Lo usa el agente para mandar EVIDENCIA
+  // del scan (screenshot de la promo) cuando una manager disputa un registro
+  // (pedido de Jhon 06/08). El caption pasa por las mismas guardas que el texto.
+  image_url?: string;
   // Modo queue (default true si no hay group_id+body).
   drain?: boolean;
   drain_limit?: number;
@@ -94,12 +99,41 @@ async function sendViaEvolution(
   }
 }
 
+// Imagen con caption — mismo gateway, endpoint /message/sendMedia (lo implementa
+// nuestro Baileys gateway; las menciones no aplican en media, WhatsApp las ignora).
+async function sendMediaViaEvolution(
+  groupExternalId: string,
+  imageUrl: string,
+  caption: string,
+): Promise<ProviderSendResult> {
+  if (!EVOLUTION_URL || !EVOLUTION_API_KEY) {
+    return { ok: false, error: "evolution_not_configured" };
+  }
+  const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendMedia/${EVOLUTION_INSTANCE}`;
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": EVOLUTION_API_KEY },
+      body: JSON.stringify({ number: groupExternalId, mediatype: "image", url: imageUrl, caption }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      return { ok: false, error: `evolution_media ${resp.status}: ${txt.slice(0, 200)}` };
+    }
+    const data = await resp.json() as { key?: { id?: string } };
+    return { ok: true, externalId: data?.key?.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 async function sendOne(args: {
   groupId: string;
   body: string;
   tenantId: string;
   reminderId?: string;
   mentions?: string[];
+  imageUrl?: string;
 }): Promise<ProviderSendResult> {
   const sb = adminClient();
 
@@ -158,7 +192,9 @@ async function sendOne(args: {
 
   let result: ProviderSendResult;
   if (group.provider === "evolution") {
-    result = await sendViaEvolution(group.external_id, bodyFinal, args.mentions);
+    result = args.imageUrl
+      ? await sendMediaViaEvolution(group.external_id, args.imageUrl, bodyFinal)
+      : await sendViaEvolution(group.external_id, bodyFinal, args.mentions);
   } else if (group.provider === "manual") {
     // Modo manual: no mandamos al provider, solo grabamos la salida en
     // whatsapp_messages para testing y para ver lo que el bot habría
@@ -179,7 +215,8 @@ async function sendOne(args: {
         sender_external_id: "bot@maven",
         sender_display_name: "Maven Asistente",
         body: bodyFinal,
-        msg_type: "text",
+        msg_type: args.imageUrl ? "image" : "text",
+        media_url: args.imageUrl ?? null,
         is_from_bot: true,
         sent_at: new Date().toISOString(),
         analyzed_at: new Date().toISOString(),
@@ -433,6 +470,7 @@ serve(async (req) => {
         body: body.body,
         tenantId: g.tenant_id,
         mentions: body.mentions,
+        imageUrl: body.image_url,
       });
       return new Response(JSON.stringify(result), {
         status: result.ok ? 200 : 500,

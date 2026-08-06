@@ -1,0 +1,62 @@
+-- DMs de Grace y Luis con Clari + mapa de roles (pedido de Jhon 06/08).
+-- Aplicado en prod vía MCP como: dm_grace_luis_y_roles.
+--
+-- 1) IDENTIDAD — profiles.whatsapp_lid seteado para Grace Gelves
+--    (8b90f141…, 150582073532463@lid) y Luis Roman (41b35cef…, 171961967730856@lid)
+--    desde sus filas de whatsapp_members linkeadas a mano. Sin esto, un DM suyo no
+--    resolvería a su usuario Maven (whatsapp_resolve_user_by_lid) → privileged=false
+--    y Clari les negaría data de supervisión. Ambos son admin → privileged ✓.
+--
+-- 2) WHITELIST DM — wa_dm_allowlist += entradas por dígitos de LID para ambos, y
+--    (migración dm_grace_luis_numeros_reales) sus NÚMEROS REALES sacados de Maven:
+--    raw->'data'->'key'->>'participantAlt' de sus mensajes de grupo — Baileys manda
+--    el JID de teléfono junto al LID (addressingMode='lid'). Grace +17862323858,
+--    Luis +573127967885; también en profiles.phone_e164. Cubiertos los dos formatos
+--    de llegada del 1:1. El pseudo-grupo "DM · <nombre>" se auto-crea al primer
+--    mensaje whitelisteado, atado al bot department='private' (Clari), bot_mode='always'.
+--
+-- 3) MANUAL DE CLARI — sección "CON QUIÉN HABLAS (4 DMs autorizados)": Jhon
+--    (dueño/developer), Álvaro (jefe operativo), Grace (RRHH/personal — cero jerga),
+--    Luis (gerente comercial — closers, plataformas, chatters, lado comercial de
+--    managers). Además "Espaniol rioplatense" → "Español latino neutro" (la línea
+--    contradecía la purga de neutro del 04/08 y el guard del borde de salida).
+--
+-- 4) MANUAL DE MANAGERS — bullet RETENCIÓN DE MODELOS: la retención de una creadora
+--    que quiere irse es cancha de la manager (con datos + record_milestone), junto
+--    con la venta de Unlimited; su función principal sigue siendo relación + promo.
+--
+-- 5) CÓDIGO (esta rama) — MOTOR "QUIÉN ES QUIÉN" ahora incluye a Luis Roman como
+--    gerente comercial, precisa que Jhon es dueño y developer, y aclara el rol
+--    comercial secundario de las managers. Costo: va en el prefijo ESTABLE cacheado
+--    (TTL 1h) — centavos; nada dinámico por-mensaje.
+--
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ⚠️ PENDIENTE DE APLICAR (el permiso me lo bloqueó el clasificador de Claude
+-- Code, dos veces): Luis venía saliendo PUNTUADO en las notas de los cortes como
+-- closer ("Luis 1.6") — mismo absurdo que Juan/Grace. El bloque de abajo agrega su
+-- ID a la exclusión de las tres funciones de corte y borra sus notas históricas.
+-- Correrlo desde el SQL editor de Supabase (o pedirle a Claude que lo aplique con
+-- permiso). Es el MISMO patrón surgical de la migración jerarquia_socios_gerencia.
+--
+-- DO $$
+-- DECLARE fn text; def text;
+-- BEGIN
+--   FOREACH fn IN ARRAY ARRAY['corte_cierre_prep','corte_jornada_bloque','corte_hubstaff_bloque'] LOOP
+--     SELECT pg_get_functiondef(p.oid) INTO STRICT def
+--     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+--     WHERE n.nspname = 'public' AND p.proname = fn;
+--     IF position('41b35cef' in def) = 0 THEN
+--       def := replace(def,
+--         '''75bca8d9-ded5-4e86-b591-88209f6a5e6c'',''8b90f141-8546-4cfd-a358-56ff227623df''',
+--         '''75bca8d9-ded5-4e86-b591-88209f6a5e6c'',''8b90f141-8546-4cfd-a358-56ff227623df'',''41b35cef-82a8-4991-9234-3514b0064767''');
+--       IF position('41b35cef' in def) = 0 THEN
+--         RAISE EXCEPTION 'patrón de exclusión no encontrado en %', fn;
+--       END IF;
+--       EXECUTE def;
+--     END IF;
+--   END LOOP;
+-- END $$;
+--
+-- DELETE FROM corte_notas WHERE profile_id = '41b35cef-82a8-4991-9234-3514b0064767';
+-- ══════════════════════════════════════════════════════════════════════════════
+select 1;
