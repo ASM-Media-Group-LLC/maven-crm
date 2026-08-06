@@ -7394,3 +7394,5 @@ serve(async (req) => {
     );
   }
 });
+
+// deploy-nonce 2026-08-06T19:35Z: ver whatsapp-send/index.ts — redeploy forzado tras los cuelgues del CI.

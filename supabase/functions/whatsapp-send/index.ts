@@ -497,3 +497,6 @@ serve(async (req) => {
     );
   }
 });
+
+// deploy-nonce 2026-08-06T19:35Z: los deploys de la tarde murieron colgados (2 runs cancelados a 15m,
+// cero funciones subidas); este commit solo fuerza el redeploy de agent+send con el bundle ya mergeado.
