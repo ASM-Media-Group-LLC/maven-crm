@@ -14,6 +14,7 @@ import { logAnthropicUsage } from "../_shared/usage.ts";
 import {
   afirmaRegistro,
   detectarVoseoEnPitch,
+  esCausaDeFalloScan,
   esCorreccionDeEstilo,
   TIENE_PITCH_CITADO,
 } from "../_shared/agent-output-guards.ts";
@@ -6391,6 +6392,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let ackBloqueados = 0;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
+  let scanNotaBloqueado = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -6977,6 +6979,32 @@ async function runAgent(req: AgentRequest): Promise<{
           });
           continue;
         }
+      }
+      // Guarda de NOTA DE SCAN (06/08): el pedido fue que el bot RECUERDE las causas
+      // ("tal creadora no se lee por X"). En el e2e del mismo día el modelo agradeció
+      // el dato y NO llamó set_scan_note — misma clase de fallo que las lecciones de
+      // estilo: lo que importa se garantiza en el borde, no en el manual. Solo aplica
+      // a bots con set_scan_note en su allowlist explícita (hoy: Managers). Un
+      // bloqueo con orden; a la 2ª pasa (nunca mudo).
+      if (t.name === "reply_to_group" && scanNotaBloqueado < 1 &&
+          botCfg?.allow?.includes("set_scan_note") === true &&
+          textoDisparador && esCausaDeFalloScan(textoDisparador) &&
+          !escriturasOk.has("set_scan_note")) {
+        scanNotaBloqueado += 1;
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: t.id,
+          content: JSON.stringify({
+            error: "causa_de_scan_sin_guardar",
+            message:
+              "NO se envió: la manager acaba de explicar POR QUÉ una creadora no se puede leer y estás " +
+              "respondiendo sin guardarlo — el próximo reporte de scan la mostraría otra vez como alarma. " +
+              "PRIMERO llama set_scan_note (creator = como la nombró, reason = la causa en una línea). " +
+              "DESPUÉS reenvía tu mensaje confirmando la razón guardada. Si no identificas a la creadora, " +
+              "reenvía tu respuesta preguntando el handle exacto.",
+          }),
+        });
+        continue;
       }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador
       // (iniciativa propia) no apila un segundo bloque largo encima de otro reciente

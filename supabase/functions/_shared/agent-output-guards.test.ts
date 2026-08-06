@@ -6,6 +6,7 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 import {
   afirmaRegistro,
   detectarVoseoEnPitch,
+  esCausaDeFalloScan,
   esCorreccionDeEstilo,
   TIENE_PITCH_CITADO,
 } from "./agent-output-guards.ts";
@@ -96,6 +97,34 @@ Deno.test("voseo dentro del pitch citado", () => {
   );
   // Voseo FUERA de comillas no es asunto de esta guarda (lo mapea el neutralizador).
   assertEquals(detectarVoseoEnPitch('avisale vos al equipo: "mañana arrancamos a las 9 con todo"'), null);
+});
+
+Deno.test("causa de fallo de scan — explicaciones reales disparan", () => {
+  for (
+    const s of [
+      "maven ojo: moramay no se puede leer porque cambió el handle de instagram", // e2e 06/08 que el modelo ignoró
+      "tal creadora que no se pudo leer es por cambio de cuenta", // fraseo verbatim de Jhon
+      "a suunnhoney no la pueden leer porque tiene la cuenta privada",
+      "carocancino no se lee porque la banearon de IG",
+      "esas dos no se pudieron escanear ya que borraron el perfil",
+    ]
+  ) {
+    assert(esCausaDeFalloScan(s), `debió detectar causa de scan: ${s}`);
+  }
+});
+
+Deno.test("causa de fallo de scan — operación normal NO dispara", () => {
+  for (
+    const s of [
+      "¿qué falló en el scan de hoy? ¿hay creadoras que no se pudieron leer?", // pregunta, sin causa
+      "no le pude escribir porque no me responde", // escribir ≠ leer
+      "moramay subió promo hoy, revisala",
+      "cuantos vencidos he gestionado hasta ahora el dia de hoy ?",
+      "el corte no se puede publicar todavía",
+    ]
+  ) {
+    assertEquals(esCausaDeFalloScan(s), false, `no debió disparar: ${s}`);
+  }
 });
 
 Deno.test("pitch citado con sustancia", () => {

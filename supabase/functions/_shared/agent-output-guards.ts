@@ -61,3 +61,13 @@ export function detectarVoseoEnPitch(s: string): string | null {
   }
   return null;
 }
+
+// ── Causa de fallo de LECTURA del scan ──────────────────────────────────────────
+// Pedido de Jhon 06/08: "que el bot recuerde si le dicen 'tal creadora que no se
+// pudo leer es por <razón>'". En el e2e del mismo día el modelo agradeció el dato
+// y NO llamó set_scan_note — la memoria quedaba a su criterio. Este detector
+// reconoce cuando el disparador EXPLICA por qué una creadora no se lee (verbo de
+// lectura/escaneo negado + conector causal cerca) para exigir la nota en el borde.
+export const CAUSA_FALLO_SCAN_RE =
+  /\bno\s+(?:se|la|lo|las|los)\s+(?:puede[n]?\s+|pudo\s+|pudieron\s+|pudimos\s+|est[áa][n]?\s+pudiendo\s+)?(?:leer|lee[n]?|escanear|escanea[n]?)\b[\s\S]{0,60}?\b(?:porque|es\s+que|ya\s+que|es\s+por|por)\b/i;
+export const esCausaDeFalloScan = (s: string): boolean => CAUSA_FALLO_SCAN_RE.test(s);
