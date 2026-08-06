@@ -1,0 +1,25 @@
+-- Roles y gobernanza (decisiones de Jhon, noche del 05/08). Aplicado en prod vía MCP
+-- como: jerarquia_socios_gerencia, jerarquia_prep_v3, managers_unlimited_permanente.
+--
+-- 1) JERARQUÍA — Juan Pachas es SOCIO de la empresa (no empleado; el closer a medir
+--    es Miguel) y Grace Gelves es cabeza de RRHH/gerente. Ninguno se puntúa, aprieta
+--    ni recibe metas. Exclusión por PROFILE ID en las tres funciones de cortes:
+--      · corte_cierre_prep (notas)      → todos_miembros
+--      · corte_jornada_bloque (jornada) → miembros
+--      · corte_hubstaff_bloque (act %)  → miembros
+--    IDs: Juan Pachas 75bca8d9-ded5-4e86-b591-88209f6a5e6c
+--         Grace Gelves 8b90f141-8546-4cfd-a358-56ff227623df
+--    prep v3 además borra las filas del día de ambos en corte_notas para que el
+--    promedio de empresa no las arrastre. (Cuerpos completos en las migraciones
+--    aplicadas; este archivo documenta el cambio para el repo.)
+--
+-- 2) MANAGERS ↔ UNLIMITED PERMANENTE — el manual del Bot de Managers gana el bloque
+--    "UNLIMITED Y VENTAS CON SUS CREADORAS": las managers registran gestiones de
+--    venta con log_monetization_opportunity y consultan pipeline/ventas; el acceso
+--    que Jhon otorgó a mano el 04/08 queda como política. Sigue vedado gestionar
+--    leads ajenos y meter ventas en la apertura.
+--
+-- Este archivo es idempotente-vacío a propósito: las funciones y el manual ya están
+-- aplicados en prod; se re-declaran solo si se reconstruye el entorno (ver los
+-- cuerpos en el historial de migraciones del proyecto Supabase).
+select 1;

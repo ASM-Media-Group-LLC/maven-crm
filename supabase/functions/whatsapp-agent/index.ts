@@ -256,6 +256,8 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
 - LECCIONES DE ESTILO = REGLA PERSISTIDA: cuando un closer o el owner te corrige CÓMO escribes (tono, voseo, "muy genérico", "suena a robot", "demasiado amigable"), guarda la lección con add_persistent_rule con prefijo 'ESTILO: ' (generalizada, UNA línea, scope grupo) ANTES de reenviar el texto corregido — cualquier miembro vinculado puede enseñarte estilo. Si dos lecciones chocan, vale la de Álvaro/Jhon. Al armar cualquier pitch, respeta TODAS las reglas ESTILO activas del grupo.
 - "activo/a", "ya activo", "buen día, activa" al arrancar el turno = CHECK-IN de entrada (en CUALQUIER grupo, no solo warming), NUNCA una creadora activada: responde corto con saludo + su foco del día. El 05/08 a María le preguntaste "¿'activa' es de cuál creadora?" por leerlo como activación.
+- QUIÉN ES QUIÉN (jerarquía — no la confundas): Jhon Lopez = dueño (tecnología/Maven). Álvaro = jefe operativo; sus órdenes son de dueño. Juan Pachas = SOCIO de la empresa, NO empleado: participa en reuniones y cierres de venta, pero NUNCA lo midas, puntúes, aprietes ni le pongas metas como si fuera closer — el closer a medir es Miguel; los cierres de Juan suman a la empresa y se celebran, no se auditan. Grace Gelves = cabeza de Recursos Humanos y gerente: trato de management — sin notas, sin aprietes, sin metas; temas de gente, contrataciones o pagos van con ella. Ojo: hay varios "Juan" en Maven (Torres, Castellanos) — el socio es PACHAS.
+- ARENGAS Y PROACTIVOS CON FRENO (decisión del dueño 05/08): mensaje motivacional máximo UNO por día por grupo. PROHIBIDO prometer futuro de la empresa ("cuando esto explote", "vamos a ser los más grandes") — motiva con datos de HOY. Toda iniciativa proactiva tuya (wishlist, procesos, arengas) va en UN SOLO mensaje corto (≤8 líneas): el 05/08 mandaste el wishlist en dos bloques largos seguidos y Brayan tuvo que pedir "explícame rápido en 2 líneas cuál es la tarea directa".
 - PRODUCTO PEDIDO = PRODUCTO DEL PITCH: si te piden un mensaje para vender un producto (Content Protector, Let's Shoot, Piclink…), el pitch es de ESE producto — y si el lead viene de un funnel de producto, ese es el default. Si crees que conviene otro, dilo aparte y pregunta ("¿sumo también X?"); NUNCA cambies el producto en silencio.`;
 
 // ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
@@ -1695,6 +1697,18 @@ const TOOLS: Array<{
       properties: {
         display_name: { type: "string", description: "nombre del closer (opcional, si omitís devuelve total del equipo)" },
       },
+    },
+  },
+  {
+    name: "tomar_lead",
+    description:
+      "Tómate un lead del pool (stage 'Nuevo', sin asignar) A TI MISMO — el equivalente del botón 'Tomar' de la app, sin salir de WhatsApp (decisión D2, pedido de María 05/08: '¿tú me las puedes asignar?'). Úsala cuando un closer diga 'tómame/asígname @handle', 'me asigno X', 'agárrame esas dos'. La orden explícita del closer con el handle ES la confirmación. ⚠️ SOLO auto-asignación: si piden asignarle un lead a OTRA persona, eso se hace desde la app (Closers → Asignar). Tras tomarla, confirma en el grupo con el handle y quién la tomó.",
+    input_schema: {
+      type: "object",
+      properties: {
+        instagram_handle: { type: "string", description: "handle de IG del lead del pool (con o sin @)" },
+      },
+      required: ["instagram_handle"],
     },
   },
   {
@@ -3948,6 +3962,53 @@ async function executeTool(
       };
     }
 
+    case "tomar_lead": {
+      // D2 (05/08): auto-asignación self-service, espejo del botón "Tomar" del pool.
+      // SOLO para uno mismo — asignarle a OTRO sigue siendo humano (desde la app),
+      // así el pool no se reparte por chat sin que se vea.
+      if (!ctx.senderUserId) {
+        return { error: "sin_usuario_vinculado", message: "Solo miembros verificados pueden tomar leads. Verifícate desde Maven → Perfil → Verificar WhatsApp." };
+      }
+      // Tomar leads del pool es acción de CLOSERS: desde otros grupos (warming,
+      // managers) se mira el pipeline, no se reparte.
+      if (ctx.department && ctx.department !== "sales" && ctx.department !== "private") {
+        return { error: "solo_ventas", message: "Tomar leads del pool es de closers (grupo Marketing/Ventas)." };
+      }
+      const handleLead = String(input.instagram_handle ?? "").trim().replace(/^@/, "");
+      if (!handleLead) return { error: "falta_instagram_handle" };
+      const { data: lead } = await sb
+        .from("closer_creators")
+        .select("id, instagram_handle, stage, assigned_to")
+        .ilike("instagram_handle", handleLead)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!lead) return { error: "lead_no_encontrado", buscado: handleLead };
+      if (lead.assigned_to) {
+        const { data: p } = await sb.from("profiles").select("full_name").eq("id", lead.assigned_to).maybeSingle();
+        return { error: "ya_asignada", a: String(p?.full_name ?? "otro closer"), stage: lead.stage };
+      }
+      if (lead.stage !== "Nuevo") {
+        return { error: "no_esta_en_pool", stage: lead.stage, message: "Solo se toman leads en stage 'Nuevo' (el pool sin asignar)." };
+      }
+      // .is(assigned_to, null) en el UPDATE = si otro la tomó hace un segundo, no se pisa.
+      const { data: tomada, error: updErr } = await sb
+        .from("closer_creators")
+        .update({ assigned_to: ctx.senderUserId, stage: "Asignada", passed_date: new Date().toISOString() })
+        .eq("id", lead.id)
+        .is("assigned_to", null)
+        .select("id")
+        .maybeSingle();
+      if (updErr) return { error: updErr.message };
+      if (!tomada) return { error: "carrera_perdida", message: "Alguien la tomó justo antes. Elige otra del pool." };
+      return {
+        ok: true,
+        tomada: lead.instagram_handle,
+        stage: "Asignada",
+        nota: "Confirma en el grupo: '@" + String(lead.instagram_handle) + " tomada' con el nombre de quien la tomó — así el pool queda trazado.",
+      };
+    }
+
     case "get_unassigned_leads": {
       const limit = Math.min(Math.max(Math.floor(Number(input.limit ?? 10)) || 10, 1), 25);
       // Pool de "Nuevas" = closer_creators stage='Nuevo' (con número, esperando
@@ -6093,7 +6154,7 @@ async function runAgent(req: AgentRequest): Promise<{
   const TOOLS_DE_ESCRITURA = new Set([
     "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
-    "record_milestone", "set_member_schedule",
+    "record_milestone", "set_member_schedule", "tomar_lead",
   ]);
   // Patrones del ack falso: viven en _shared/agent-output-guards.ts con su batería de
   // tests y la historia completa. CALIBRADOS el 05/08 contra 1.098 mensajes reales: la
@@ -6130,6 +6191,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let ackBloqueados = 0;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
+  let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
   // Texto del mensaje disparador, para la guarda de lecciones de estilo: si el humano
@@ -6714,6 +6776,41 @@ async function runAgent(req: AgentRequest): Promise<{
             }),
           });
           continue;
+        }
+      }
+      // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador
+      // (iniciativa propia) no apila un segundo bloque largo encima de otro reciente
+      // del bot — el wishlist salió en 2 mensajes largos seguidos y Brayan pidió
+      // "explícame rápido en 2 líneas". Exentos: cortes (traen message_id ancla),
+      // reportes y órdenes programadas. Un bloqueo; a la 2ª pasa.
+      if (t.name === "reply_to_group" && proactivoBloqueado < 1 &&
+          !req.message_id && !req.report_kind && req.invoked_by !== "reminder_action") {
+        const cuerpoPro = String((t.input as ToolInput).body ?? "");
+        if (cuerpoPro.length > 300) {
+          const { data: ultimoBot } = await sb
+            .from("whatsapp_messages")
+            .select("body, sent_at")
+            .eq("group_id", group.id)
+            .eq("is_from_bot", true)
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (ultimoBot && String(ultimoBot.body ?? "").length > 300 &&
+              Date.now() - new Date(ultimoBot.sent_at as string).getTime() < 15 * 60 * 1000) {
+            proactivoBloqueado += 1;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: t.id,
+              content: JSON.stringify({
+                error: "doble_proactivo",
+                message:
+                  "NO se envió: hace minutos publicaste un mensaje largo en este grupo y este es OTRO bloque " +
+                  "largo por iniciativa propia. Regla del dueño: los proactivos van en UN solo mensaje corto " +
+                  "(≤8 líneas). Consolida lo esencial de ambos en uno breve, o no publiques si el anterior ya lo cubre.",
+              }),
+            });
+            continue;
+          }
         }
       }
       // Guarda anti-fuga del canal privado: cubre reply_to_group (solo en grupos,

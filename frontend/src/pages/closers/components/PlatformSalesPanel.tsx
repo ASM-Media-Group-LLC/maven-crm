@@ -21,7 +21,14 @@ interface PlatformSale {
   product: string | null;
   price: number;
   created_at: string;
+  // Ventas registradas por el bot (monetization_opportunities won): se muestran
+  // pero no se borran desde acá.
+  viaBot?: boolean;
 }
+
+// Para dedup entre las dos fuentes: "lets_shoot" y "Let's Shoot" son el mismo producto.
+const normalizaProducto = (s: string | null | undefined) =>
+  (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const PlatformSalesPanel = ({ creatorId }: Props) => {
   const { user } = useAuth();
@@ -45,6 +52,45 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
     },
     enabled: !!creatorId,
   });
+
+  // La misma venta puede vivir en DOS lugares: acá (cargada a mano) o en
+  // monetization_opportunities ganada (la registra el bot desde WhatsApp). María lo
+  // reportó el 04/08: su venta de Content Protector estaba ganada en Maven pero este
+  // tablero no la mostraba porque solo leía closer_platform_sales. Se traen las
+  // ganadas del bot por handle y se deduplican por producto.
+  const { data: ventasBot = [] } = useQuery({
+    queryKey: ["closer-monetization-won", creatorId],
+    queryFn: async () => {
+      const { data: lead } = await supabase
+        .from("closer_creators")
+        .select("instagram_handle")
+        .eq("id", creatorId)
+        .maybeSingle();
+      const handle = lead?.instagram_handle?.trim();
+      if (!handle) return [] as PlatformSale[];
+      const { data, error } = await supabase
+        .from("monetization_opportunities")
+        .select("id, product, monthly_value_usd, won_at")
+        .eq("stage", "won")
+        .ilike("creator_handle", handle);
+      if (error) throw error;
+      return (data ?? []).map((o) => ({
+        id: `mo-${o.id}`,
+        platform: (o.product ?? "producto").replace(/_/g, " "),
+        product: null,
+        price: Number(o.monthly_value_usd ?? 0),
+        created_at: o.won_at ?? "",
+        viaBot: true,
+      })) as PlatformSale[];
+    },
+    enabled: !!creatorId,
+  });
+
+  // Unión con dedup: si el mismo producto ya está cargado a mano, la fila del bot
+  // no se repite (evita el doble conteo del total).
+  const productosManuales = new Set(sales.map((s) => normalizaProducto(s.product ?? s.platform)));
+  const ventasBotUnicas = ventasBot.filter((v) => !productosManuales.has(normalizaProducto(v.platform)));
+  const todas = [...sales, ...ventasBotUnicas];
 
   const addSale = useMutation({
     mutationFn: async () => {
@@ -83,7 +129,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
     },
   });
 
-  const total = sales.reduce((sum, s) => sum + Number(s.price || 0), 0);
+  const total = todas.reduce((sum, s) => sum + Number(s.price || 0), 0);
 
   return (
     <div className="space-y-2">
@@ -92,17 +138,24 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
         <span className="text-xs font-semibold text-foreground">${total.toLocaleString()}</span>
       </div>
 
-      {sales.map((s) => (
+      {todas.map((s) => (
         <ListRow key={s.id} className="justify-between px-2 py-1.5">
           <div className="flex items-center gap-2">
             <span className="font-medium">{s.platform}</span>
             {s.product && <span className="text-muted-foreground">– {s.product}</span>}
+            {s.viaBot && (
+              <span className="text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground" title="Registrada por el bot desde WhatsApp (oportunidad ganada)">
+                bot
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="font-semibold">${Number(s.price).toLocaleString()}</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSale.mutate(s.id)}>
-              <Trash2 className="h-3 w-3 text-destructive" />
-            </Button>
+            {!s.viaBot && (
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSale.mutate(s.id)}>
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            )}
           </div>
         </ListRow>
       ))}
