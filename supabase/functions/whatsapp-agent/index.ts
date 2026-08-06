@@ -1454,14 +1454,14 @@ const TOOLS: Array<{
   {
     name: "post_to_group",
     description:
-      "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\nSE ENVÍA DE UNA (group_name + body): la orden explícita de la persona ('mándalo', 'publícalo', 'diles que…', 'avisales') ES la autorización — NO vuelvas a preguntar '¿lo mando?' (regla del 03/08: los borradores con pregunta al final nunca se enviaban y frustraban). Después de publicar confirma en el DM con '✓ Publicado en <grupo>:' + el texto tal cual salió, para que pueda pedirte corrección.\nSOLO pregunta antes en DOS casos: (1) la idea de publicar es TUYA (nadie te lo pidió), o (2) la instrucción no te deja claro el CONTENIDO o el GRUPO destino (audio confuso, varios grupos posibles). Si te piden cambios sobre algo ya publicado, publica la corrección.",
+      "Publica un mensaje en OTRO grupo de WhatsApp del equipo (ej. Managers, Marketing/Ventas, AI WARMING) desde este chat privado. SOLO disponible para el dueño en su DM.\n\n⚠️ FLUJO OBLIGATORIO EN DOS PASOS (decisión del dueño 05/08 — se probó el envío directo del 03/08 y prefirió volver a confirmar):\n1) Llámala SIN pending_id, con group_name y body. NO se envía: devuelve un pending_id. Muestra el grupo destino y el texto EXACTO, con la pregunta AL PRINCIPIO de tu mensaje ('¿Lo mando así a Managers? 👇' y abajo el borrador) — la pregunta al final del borrador se perdía y los textos morían sin enviarse (el bug que motivó el envío directo).\n2) Cuando diga que sí (vale un 'sí', 'dale', 'mándalo', 'va', 'ok'), llámala de nuevo con ese pending_id y confirm=true. Ahí se publica; confirma en el DM con '✓ Publicado en <grupo>'.\nSi pide cambios, vuelve al paso 1 con el texto corregido (pending_id nuevo). El borrador expira a los 30 min.",
     input_schema: {
       type: "object",
       properties: {
         group_name: { type: "string", description: "nombre del grupo destino (ej. 'Managers', 'Marketing/Ventas', 'AI WARMING')" },
         body: { type: "string", description: "texto EXACTO a publicar. Paso 1 solamente." },
-        pending_id: { type: "string", description: "LEGADO (flujo viejo de dos pasos): id de un borrador pendiente previo. Ya no hace falta — con group_name + body se publica directo." },
-        confirm: { type: "boolean", description: "LEGADO: solo acompaña a pending_id." },
+        pending_id: { type: "string", description: "id devuelto en el paso 1. Solo en el paso 2, cuando la persona ya confirmó." },
+        confirm: { type: "boolean", description: "true SOLO cuando la persona ya dijo que sí. Requiere pending_id." },
       },
     },
   },
@@ -3614,13 +3614,15 @@ async function executeTool(
         return { ok: true, publicado_en: pend.target_group_id, resultado: enviado };
       }
 
-      // ── ENVÍO DIRECTO (03/08, pedido de Jhon): la orden del dueño ES la
-      // autorización. El flujo de dos pasos ("¿lo mando así?") murió porque
-      // Álvaro nunca leía la pregunta al final del borrador: los textos quedaban
-      // en pending para siempre y nada llegaba a los grupos. El juicio de CUÁNDO
-      // preguntar (iniciativa propia / instrucción ambigua) vive en la
-      // descripción de la tool; acá se publica. La rama pending_id de arriba
-      // queda solo para drenar borradores del flujo viejo.
+      // ── PASO 1: componer el borrador y pedir confirmación (NO envía) ────────
+      // Historia completa del péndulo: el flujo de dos pasos original murió el
+      // 03/08 porque la pregunta iba al FINAL del borrador y Álvaro no la leía —
+      // los pending quedaban para siempre. Se pasó a envío directo… y el 05/08
+      // Jhon decidió volver a confirmar: publicar en un grupo del equipo es
+      // irreversible y un audio mal transcripto puede salir con errores. Los dos
+      // mitigantes del bug original ya existen: la ventana de continuación caza
+      // el "sí" pelado sin @mención (31/07) y la descripción de la tool exige la
+      // pregunta AL PRINCIPIO del mensaje, no enterrada bajo el borrador.
       const groupName = String(input.group_name ?? "").trim();
       const body = String(input.body ?? "").trim();
       if (!groupName || !body) return { error: "faltan_group_name_o_body" };
@@ -3643,34 +3645,29 @@ async function executeTool(
         return { error: "grupo_ambiguo", coincidencias: opciones.map((g) => g.name), message: "Pregunta a cuál de estos se refiere." };
       }
 
-      const enviado = await executeTool("reply_to_group", { body } as ToolInput, {
-        groupId: opciones[0].id,
-        tenantId: ctx.tenantId,
-        isOwner: ctx.isOwner,
-        senderUserId: ctx.senderUserId,
-        messageId: null,
-        department: ctx.department ?? null,
-        inboxDepartments: ctx.inboxDepartments ?? null,
-      });
-      if ((enviado as { error?: unknown }).error) {
-        return { error: "fallo_el_envio", detalle: enviado, grupo_destino: opciones[0].name };
-      }
-      // Rastro de auditoría: misma tabla del flujo viejo, directo en 'sent'
-      // (quién pidió publicar qué, dónde y cuándo).
-      await sb.from("whatsapp_pending_posts").insert({
-        tenant_id: ctx.tenantId,
-        target_group_id: opciones[0].id,
-        requested_from_group_id: ctx.groupId,
-        requested_by_user_id: ctx.senderUserId,
-        body,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-      });
+      const { data: nuevo, error: insErr } = await sb
+        .from("whatsapp_pending_posts")
+        .insert({
+          tenant_id: ctx.tenantId,
+          target_group_id: opciones[0].id,
+          requested_from_group_id: ctx.groupId,
+          requested_by_user_id: ctx.senderUserId,
+          body,
+        })
+        .select("id")
+        .single();
+      if (insErr) return { error: insErr.message };
       return {
-        ok: true,
-        publicado_en: opciones[0].name,
-        texto_publicado: body,
-        instruccion: "Ya está PUBLICADO en el grupo. Confirma en el DM con '✓ Publicado en " + opciones[0].name + ":' + el texto tal cual — sin preguntar nada.",
+        paso: "confirmacion_pendiente",
+        enviado: false,
+        pending_id: nuevo?.id,
+        grupo_destino: opciones[0].name,
+        texto_a_publicar: body,
+        instruccion:
+          "NO se envió todavía. Responde en el DM con la pregunta PRIMERO ('¿Lo mando así a " +
+          opciones[0].name + "? 👇') y el texto EXACTO abajo. Cuando diga que sí (sirve 'sí', " +
+          "'dale', 'mándalo', 'va'), llama post_to_group con este pending_id y confirm=true. " +
+          "Si pide cambios, paso 1 de nuevo con el texto corregido.",
       };
     }
 
