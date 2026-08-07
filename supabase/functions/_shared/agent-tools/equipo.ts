@@ -433,6 +433,8 @@ export const equipoTools: AgentTool[] = [
       "(Brian→Brayan) y si el nombre NO existe o matchea a VARIOS te devuelve `persona_no_encontrada`/`ambiguo` con " +
       "candidatos: en ese caso PREGUNTA a cuál se refieren — nunca respondas con datos de otra persona ni elijas tú " +
       "(el 31/07 'Juan Pachas' no existía y el bot contestó con gente que nadie preguntó). " +
+      "La respuesta de equipo separa `direccion_fuera_de_medicion` (dueño/socios/gerencia: se informan, no se " +
+      "rankean) y trae `sin_fichar_en_rango` (roster que no trackeó nada — el piso real en preguntas de empresa). " +
       "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
     input_schema: {
       type: "object",
@@ -542,6 +544,20 @@ export const equipoTools: AgentTool[] = [
         };
       }
 
+      // Dueño/socios/gerencia: sus horas son DATO visible, pero jamás van rankeados
+      // como empleados (jerarquía de Jhon 05-07/08 — el 07/08 el bot le listó al
+      // DUEÑO a Grace como "productividad más baja de la empresa"). Ambos perfiles
+      // de Álvaro incluidos (hay dos en profiles).
+      const DIRECCION_EXENTA = new Set([
+        "c5b124cb-f272-458d-aa8e-1b11de0ff4d6", // Jhon Lopez (dueño/developer)
+        "fcdfdfcb-c0ab-4c82-b6d9-d50d37ab086e", // Alvaro Rene (jefe operativo)
+        "528453bd-f1e1-43d3-85c1-01c5fa5bbcfb", // Alvaro Mejía (perfil alterno)
+        "75bca8d9-ded5-4e86-b591-88209f6a5e6c", // Juan Pachas (socio)
+        "8b90f141-8546-4cfd-a358-56ff227623df", // Grace Gelves (RRHH/gerente)
+        "41b35cef-82a8-4991-9234-3514b0064767", // Luis Roman (gerente comercial)
+      ]);
+      const esDireccion = (r: Record<string, unknown>) => DIRECCION_EXENTA.has(String(r.profile_id ?? ""));
+
       // Función de cada persona (proyecto de Hubstaff > rol de Maven). Ver resolverFunciones.
       const funciones = await resolverFunciones(ctx.sb, rows as Array<Record<string, unknown>>, from, to);
       const fnDe = (r: Record<string, unknown>): Funcion =>
@@ -592,11 +608,24 @@ export const equipoTools: AgentTool[] = [
         };
       };
 
+      // Partición: dirección aparte del equipo medible. Sus filas no desaparecen —
+      // van en su propia llave para que el modelo no pueda mezclarlas en un ranking.
+      const base = pedido ? filtradas : rows;
+      const equipoMedible = base.filter((r) => !esDireccion(r as Record<string, unknown>));
+      const direccion = base.filter((r) => esDireccion(r as Record<string, unknown>));
+
       const result: Record<string, unknown> = {
         rango: { desde: from, hasta: to },
-        personas: (pedido ? filtradas : rows).length,
+        personas: equipoMedible.length,
         ...(pedido ? { filtrado_por: pedido, personas_totales_del_rango: rows.length } : {}),
-        equipo: (pedido ? filtradas : rows).slice(0, 60).map((r) => mapear(r as Record<string, unknown>)),
+        equipo: equipoMedible.slice(0, 60).map((r) => mapear(r as Record<string, unknown>)),
+        ...(direccion.length ? {
+          direccion_fuera_de_medicion: direccion.map((r) => mapear(r as Record<string, unknown>)),
+          nota_direccion:
+            "Estas personas son dueño/socios/gerencia: sus horas se pueden INFORMAR como dato si lo piden, " +
+            "pero JAMÁS entran en rankings de productividad ni se presentan como 'los más flojos' — su trabajo " +
+            "(reuniones, gestión, código) no registra como mouse/teclado. No los mezcles con el equipo.",
+        } : {}),
         // Los sin clasificar se DETALLAN solo cuando hay filtro: ahí son los que
         // quedaron fuera y hay que nombrarlos. Sin filtro no se omiten nada (están en
         // `equipo`), así que alcanza con el conteo — listarlos otra vez sería ruido.
@@ -613,6 +642,35 @@ export const equipoTools: AgentTool[] = [
             "podés mencionarlo como pista DICIENDO que sale de Maven y no de Hubstaff — nunca como si fuera el dato de Hubstaff.",
         } : { sin_funcion_registrada: sinClasificar.length }) : {}),
       };
+
+      // ── QUIÉNES NO FICHARON NADA EN EL RANGO ──────────────────────────────
+      // La RPC parte de hubstaff_daily_data: quien no trackeó ni un segundo no
+      // tiene filas y era INVISIBLE al ranking (07/08: Grace preguntó "la
+      // productividad más baja de la empresa" y los 17 con cero horas ni
+      // aparecieron — para RRHH son justamente los más bajos). Diff contra el
+      // roster de hubstaff_members; la dirección exenta no se lista (no ficha
+      // por diseño).
+      if (!person) {
+        const { data: rosterAll } = await ctx.sb
+          .from("hubstaff_members")
+          .select("hubstaff_user_id, name, profile_id, is_active");
+        const ficharon = new Set(rows.map((r) => String((r as Record<string, unknown>).hubstaff_user_id ?? "")));
+        const sinFichar = ((rosterAll ?? []) as Array<Record<string, unknown>>).filter((m) =>
+          m.is_active !== false &&
+          !ficharon.has(String(m.hubstaff_user_id ?? "")) &&
+          !DIRECCION_EXENTA.has(String(m.profile_id ?? ""))
+        );
+        if (sinFichar.length) {
+          result.sin_fichar_en_rango = sinFichar.slice(0, 30).map((m) => ({
+            nombre: m.name,
+            en_maven: m.profile_id != null,
+          }));
+          result.nota_sin_fichar =
+            `${sinFichar.length} persona(s) del roster activo de Hubstaff NO ficharon ni un minuto en el rango. ` +
+            "En preguntas de productividad/asistencia de 'toda la empresa' van MENCIONADOS (son el piso real del " +
+            "ranking) — aclarando que puede haber vacaciones/licencias/desvinculaciones en curso, eso Hubstaff no lo sabe.";
+        }
+      }
 
       // Desglose por día cuando se pide UNA persona y matcheó exactamente una.
       if (person && rows.length === 1) {
