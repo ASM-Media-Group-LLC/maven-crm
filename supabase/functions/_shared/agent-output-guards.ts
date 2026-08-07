@@ -83,3 +83,37 @@ export const DISPUTA_REGISTRO_RES: RegExp[] = [
   /\bpromos?\b[\s\S]{0,50}\bno\s+(?:has?\s+|hab[ií]as?\s+|me\s+|te\s+|le[s]?\s+|las?\s+|los?\s+|se\s+)*(?:registr\w+|aparec\w+|marc\w+|figur\w+|detect\w+|sali[oó])\b/i,
 ];
 export const esDisputaDeRegistro = (s: string): boolean => DISPUTA_REGISTRO_RES.some((re) => re.test(s));
+
+// ── Promesa de COMPORTAMIENTO sin persistir ─────────────────────────────────────
+// 07/08: Álvaro dio ~8 correcciones entre Ventas y Managers y el bot respondió
+// "Entendido", "Dos cosas que quedan aplicadas", "Ajusto:", "Cambio de estrategia"
+// — y guardó CERO reglas (última regla del día: 10:52, antes del feedback). Al día
+// siguiente no recuerda nada: contentillo puro.
+// La guarda de ack falso no lo cazaba porque solo mira promesas de DATO
+// ("anotado/registrado/guardado"), no de CONDUCTA. Verificado: las 5 frases
+// reales de ese día pasaban limpias.
+// Un "Entendido" pelado NO alcanza para disparar (es acuse normal): hace falta
+// un compromiso de conducta futura.
+export const PROMESA_CONDUCTA_RE =
+  /\b(?:qued[ao]n?\s+(?:aplicad|ajustad|como\s+(?:norma|regla))|de\s+ahora\s+en\s+adelante|a\s+partir\s+de\s+(?:ahora|hoy)|voy\s+a\s+(?:llevar|empezar|dejar\s+de|cambiar|corregir|aplicar|exigir|pedir\s+siempre)|no\s+(?:lo\s+)?voy\s+a\s+(?:dejar\s+pasar|volver\s+a)|ya\s+no\s+voy\s+a|cambio\s+de\s+(?:estrategia|enfoque|criterio|foco)|lo\s+(?:ajusto|aplico|corrijo)\b|\bajusto\s*[:,]|lo\s+tomo\s+como\s+(?:norma|regla))/im;
+export const esPromesaDeComportamiento = (s: string): boolean => PROMESA_CONDUCTA_RE.test(s);
+
+// ── Repetición: el bot re-mandando lo mismo ─────────────────────────────────────
+// 07/08 en Ventas: entre 15:11 y 15:13 mandó CUATRO mensajes casi idénticos
+// ("Entendido Álvaro 👆 PADRÓN DE AGENCIAS — peguen acá…") sin aportar un dato
+// nuevo. Álvaro tuvo que sacarle los números a la fuerza. La guarda
+// anti-doble-proactivo no aplica: esos mensajes SÍ responden a un disparador.
+// Jaccard sobre palabras significativas (≥4 letras) — barato y suficiente para
+// detectar "es el mismo mensaje con otras palabras de relleno".
+export function similitudTexto(a: string, b: string): number {
+  const norm = (s: string) =>
+    new Set(
+      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length >= 4),
+    );
+  const A = norm(a), B = norm(b);
+  if (A.size === 0 || B.size === 0) return 0;
+  let inter = 0;
+  for (const w of A) if (B.has(w)) inter++;
+  return inter / (A.size + B.size - inter);
+}

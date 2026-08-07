@@ -17,6 +17,8 @@ import {
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
+  esPromesaDeComportamiento,
+  similitudTexto,
   TIENE_PITCH_CITADO,
 } from "../_shared/agent-output-guards.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
@@ -1144,6 +1146,8 @@ REGLAS DE ESTILO PARA LEAD INTELLIGENCE:
 - Sé conciso: "Daniel, larola_a ya estuvo: la rechazó Miguel el 25/5 porque quería ser cantante. Saltala." es mejor que un párrafo.
 - Si todas las tools devolvieron datos → presenta hechos, no inferencias.
 - DATO DESAFIADO = RE-VERIFICAR, NUNCA PLEGARSE. Si alguien duda o corrige un número que leíste de tabla ("¿estás seguro?", "eso está mal"), NO aceptes por cortesía: re-consulta la tool y responde con el VALOR y la FECHA exactos ("figura won ayer 18:49"). Si la tool te da la razón, sostienes con esos datos — como el 04/08 con los $50.306 de Elizabeth: el jefe dudó, re-verificaste, tenías razón y la defendiste. Si la tool muestra que el humano tiene razón, corriges citando el dato nuevo. El 05/08 hiciste lo contrario: ante "¿seguro que ninguna venta hoy?" contaste como de HOY una venta ganada AYER a las 18:49 (solo el stage se movió hoy). Un dato de tabla se corrige con otro dato de tabla, jamás con presión social. Lo cualitativo (tono, estilo, lectura de negocio) sí se acepta sin pelear.
+- CONTAR ANTES DE PEDIR. Cuando te piden un análisis, un padrón o un diagnóstico ("¿cuántas agencias tocamos?", "arma el listado", "hay que analizar los textos"), tu PRIMERA respuesta lleva los NÚMEROS que ya puedes sacar solo — contactos por persona, intentos, fechas, resultados — y recién después pides lo que de verdad falta, nombrando a quién y qué. Pedirle al equipo que te pegue información que tú puedes contar es devolver la tarea. El 07/08 en Ventas pediste cuatro veces "peguen los textos acá" sin dar un solo número; Álvaro tuvo que exigirlo ("no nos han dicho ni los números... en estadística no tiene sentido") y recién ahí contaste 24 agencias / 0 reuniones. Ese conteo era el PRIMER mensaje, no el quinto.
+- FEEDBACK DEL JEFE = REGLA GUARDADA, NO "ENTENDIDO". Cuando Álvaro o Jhon corrigen cómo debes trabajar (qué exigir, a quién no apretar, con qué criterio decidir, qué revisar antes de actuar), eso es una norma permanente: guárdala con add_persistent_rule EN ESE MISMO TURNO y recién después confirma, citando en una línea qué quedó guardado. Un "Entendido 🙌" sin regla es contentillo: mañana arrancas en blanco y te lo van a reclamar. Si te corrigen varias cosas seguidas, guarda cada una por separado.
 - Si las tools devolvieron poco/nada → reconócelo y propón pasos concretos (cargar en Maven, esperar scrape, preguntar al equipo).`;
 
 // El system prompt final = MOTOR (reutilizable) + MANUAL del depto. Mismo texto
@@ -6453,6 +6457,8 @@ async function runAgent(req: AgentRequest): Promise<{
   let voseoPitchBloqueado = 0;
   let scanNotaBloqueado = 0;
   let disputaBloqueada = 0;
+  let conductaBloqueada = 0;
+  let repetidoBloqueado = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -7091,6 +7097,72 @@ async function runAgent(req: AgentRequest): Promise<{
           }),
         });
         continue;
+      }
+      // Guarda de PROMESA DE COMPORTAMIENTO (07/08): Álvaro dio ~8 correcciones
+      // entre Ventas y Managers y el bot contestó "Entendido", "quedan aplicadas",
+      // "Ajusto:", "cambio de estrategia" — guardando CERO reglas. Al día siguiente
+      // no recuerda nada: contentillo. La guarda de ack-falso no lo cazaba porque
+      // solo mira promesas de DATO, no de CONDUCTA.
+      // Solo se arma si quien habla PUEDE crear reglas (owner): bloquear cuando
+      // add_persistent_rule igual lo rechazaría sería un callejón sin salida.
+      if (t.name === "reply_to_group" && conductaBloqueada < 1 &&
+          senderCtx.isOwner && !escriturasOk.has("add_persistent_rule")) {
+        const cuerpoConducta = String((t.input as ToolInput).body ?? "");
+        if (esPromesaDeComportamiento(cuerpoConducta)) {
+          conductaBloqueada += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "promesa_de_conducta_sin_guardar",
+              message:
+                "NO se envió: le estás prometiendo al jefe un CAMBIO DE CONDUCTA y no lo guardaste — mañana " +
+                "arrancarías sin memoria de esto y él lo va a notar (el 07/08 fueron 8 correcciones y 0 reglas). " +
+                "PRIMERO llama add_persistent_rule con la instrucción en UNA línea, redactada como norma " +
+                "permanente y accionable (no 'Álvaro pidió X' sino 'X se hace así'). DESPUÉS reenvía tu mensaje. " +
+                "Si lo tuyo era un acuse puntual y no un compromiso permanente, reescríbelo sin prometer conducta futura.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda ANTI-REPETICIÓN (07/08): en Ventas el bot mandó CUATRO mensajes casi
+      // calcados en dos minutos ("peguen los textos acá") sin aportar un dato nuevo,
+      // hasta que Álvaro le sacó los números a la fuerza. La guarda anti-doble-
+      // proactivo no cubre esto: esos mensajes SÍ respondían a un disparador.
+      if (t.name === "reply_to_group" && repetidoBloqueado < 1) {
+        const cuerpoRep = String((t.input as ToolInput).body ?? "");
+        if (cuerpoRep.length > 120) {
+          const { data: recientes } = await sb
+            .from("whatsapp_messages")
+            .select("body")
+            .eq("group_id", group.id)
+            .eq("is_from_bot", true)
+            .gte("sent_at", new Date(Date.now() - 10 * 60_000).toISOString())
+            .order("sent_at", { ascending: false })
+            .limit(3);
+          const sim = ((recientes ?? []) as Array<{ body: string | null }>)
+            .map((m) => similitudTexto(cuerpoRep, String(m.body ?? "")))
+            .find((s) => s >= 0.55);
+          if (sim != null) {
+            repetidoBloqueado += 1;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: t.id,
+              content: JSON.stringify({
+                error: "mensaje_repetido",
+                similitud: Math.round(sim * 100) / 100,
+                message:
+                  "NO se envió: es casi el mismo mensaje que ya mandaste a este grupo hace menos de 10 minutos. " +
+                  "Repetir el pedido no lo hace avanzar — el equipo ya lo leyó. Si lo que falta es información " +
+                  "que TÚ puedes sacar (conteos, historial, actividad), sácala con tus tools y responde con los " +
+                  "NÚMEROS. Si de verdad depende de que alguien conteste, no lo repitas: espera o menciona a la " +
+                  "persona puntual con lo que falta.",
+              }),
+            });
+            continue;
+          }
+        }
       }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador
       // (iniciativa propia) no apila un segundo bloque largo encima de otro reciente

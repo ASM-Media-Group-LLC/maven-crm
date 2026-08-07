@@ -9,6 +9,8 @@ import {
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
+  esPromesaDeComportamiento,
+  similitudTexto,
   TIENE_PITCH_CITADO,
 } from "./agent-output-guards.ts";
 
@@ -154,6 +156,48 @@ Deno.test("disputa de registro — operación normal NO dispara", () => {
   ) {
     assertEquals(esDisputaDeRegistro(s), false, `no debió disparar: ${s}`);
   }
+});
+
+Deno.test("promesa de comportamiento — las frases reales del 07/08 disparan", () => {
+  for (
+    const s of [
+      "Entendido Álvaro 🙌 Dos cosas que quedan aplicadas: 1. No le voy a bajar nota a Carolina...",
+      "Entendido Álvaro 🙌 Ajusto: la nota no sube ni baja por estar sola, pero el reporte sigue obligatorio",
+      "Entendido Álvaro 👍 Cambio de estrategia: antes de mandar texto a una agencia hay que saber si ya la tocamos",
+      "Voy a llevar registro de horarios de todo el equipo para evitar que coincidan descansos",
+      "De ahora en adelante el reporte del día es obligatorio siempre",
+      "Listo, no lo voy a dejar pasar más",
+    ]
+  ) {
+    assert(esPromesaDeComportamiento(s), `debió detectar promesa de conducta: ${s}`);
+  }
+});
+
+Deno.test("promesa de comportamiento — acuses normales NO disparan", () => {
+  for (
+    const s of [
+      "Entendido Miguel 👍",                       // acuse pelado: no es compromiso
+      "dale María, eso suena bien",
+      "Gracias Álvaro, tomado 🙌",                 // cortesía sin conducta futura
+      "Copiado Daniel — van 20 contactos hoy, cuadra con lo que veo en Maven.",
+      "✓ Firmó orianafitness_ — Juan participó del cierre. En inducción ahora.",
+      "Perfecto, Grace. Cualquier otra cosa me dices 👍",
+    ]
+  ) {
+    assertEquals(esPromesaDeComportamiento(s), false, `no debió disparar: ${s}`);
+  }
+});
+
+Deno.test("similitud — caza el loop de mensajes calcados del 07/08", () => {
+  const a = "Entendido Álvaro 👆 PADRÓN DE AGENCIAS — TODOS pasen AHORA: Agencia, Contacto, Fecha, " +
+    "Texto exacto mandado, Respuesta. Miguel, María, Brayan, Lizeth — peguen todo acá, texto crudo, sin audio.";
+  const b = "Entendido Álvaro 👆 PADRÓN DE AGENCIAS — COMPILANDO AHORA. Antes de tocar una agencia hay que " +
+    "saber si ya la contactamos, con qué texto, qué respondió. Miguel, María, Brayan, Lizeth — peguen AHORA acá texto crudo sin audio.";
+  assert(similitudTexto(a, b) >= 0.5, `debieron parecerse: ${similitudTexto(a, b)}`);
+  // Dos mensajes distintos del mismo día NO deben parecerse.
+  const c = "María, ese msj está bien armado — corto, dos frentes claros y termina con pregunta abierta.";
+  assert(similitudTexto(a, c) < 0.2, `no debieron parecerse: ${similitudTexto(a, c)}`);
+  assertEquals(similitudTexto("", "hola mundo"), 0);
 });
 
 Deno.test("pitch citado con sustancia", () => {

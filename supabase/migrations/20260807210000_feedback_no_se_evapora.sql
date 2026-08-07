@@ -1,0 +1,60 @@
+-- El feedback del jefe se evaporaba: contentillo comprobado (07/08).
+-- Aplicado en prod vía MCP como: alvaro_lid_global.
+--
+-- ══════════════════════════════════════════════════════════════════════════════
+-- EL HALLAZGO
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Álvaro dio ~8 correcciones entre Marketing/Ventas y Managers entre las 13:53 y
+-- las 15:20. El bot contestó "Entendido" 5 veces, además de "Dos cosas que quedan
+-- aplicadas", "Ajusto:" y "Cambio de estrategia".
+--   Reglas persistidas en esa ventana: CERO.
+--   Última regla del día: 10:52 — ANTES de todo el feedback.
+-- Es decir: al día siguiente el bot arranca sin memoria de nada de eso.
+--
+-- POR QUÉ NINGUNA GUARDA LO CAZÓ: la de ack falso (afirmaRegistro) solo mira
+-- promesas de DATO ("anotado", "registrado", "guardado"); "entendido / queda
+-- aplicado / ajusto / cambio de estrategia" son promesas de CONDUCTA y pasaban
+-- limpias. Verificado ejecutando la guarda contra las 5 frases reales del día:
+-- las 5 pasaban.
+--
+-- ══════════════════════════════════════════════════════════════════════════════
+-- LO QUE SE AGREGÓ (código, esta rama)
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 1) GUARDA "promesa de conducta sin guardar" — si el bot promete cambio de
+--    conducta a alguien con permiso de crear reglas y no llamó add_persistent_rule
+--    en esa corrida, se bloquea UNA vez con la orden de guardarla primero.
+--    Gate deliberado en `senderCtx.isOwner`: bloquear cuando add_persistent_rule
+--    igual lo rechazaría (only_owner_can_add_rules) sería un callejón sin salida.
+--
+-- 2) GUARDA "mensaje repetido" — en Ventas mandó CUATRO mensajes casi calcados en
+--    dos minutos ("peguen los textos acá") sin aportar un dato nuevo. Jaccard sobre
+--    palabras de ≥4 letras contra sus propios mensajes de los últimos 10 min;
+--    ≥0.55 → bloqueo con la orden de responder con NÚMEROS o esperar.
+--    La guarda anti-doble-proactivo no cubría esto: esos mensajes SÍ respondían a
+--    un disparador.
+--
+-- 3) MOTOR — dos reglas nuevas: "CONTAR ANTES DE PEDIR" (el conteo va en el PRIMER
+--    mensaje, no en el quinto) y "FEEDBACK DEL JEFE = REGLA GUARDADA".
+--
+-- ══════════════════════════════════════════════════════════════════════════════
+-- IDENTIDAD DE ÁLVARO: DOS LIDs, Y UNA TRAMPA LATENTE
+-- ══════════════════════════════════════════════════════════════════════════════
+-- El bot solo puede persistir reglas si quien habla resuelve a un profile con
+-- is_owner=true. Álvaro escribe desde DOS cuentas de WhatsApp:
+--   · 192457652338690@lid ("Alvaro S")     → 528453bd "Alvaro Mejía"  is_owner ✅
+--   · 114426585833505@lid ("Alvaro Mejia") → en Ventas apunta a
+--     fcdfdfcb "Alvaro Rene"  is_owner ❌  (PERFIL DUPLICADO de la misma persona)
+-- Hoy escribió con el primero, así que el permiso NO fue el bloqueo — pero si
+-- escribe desde el otro dispositivo en Ventas, su feedback es IMPOSIBLE de
+-- guardar y el bot igual respondería "entendido".
+-- La constraint unique(group_id,user_id) impide linkear sus dos LIDs al mismo
+-- profile dentro de un grupo, así que el arreglo aplicado es el fallback GLOBAL:
+UPDATE profiles SET whatsapp_lid = '192457652338690@lid'
+WHERE id = '528453bd-f1e1-43d3-85c1-01c5fa5bbcfb' AND whatsapp_lid IS NULL;
+--
+-- ⚠️ PENDIENTE PARA JHON (decisión suya, no la tomo yo):
+--   (a) Unificar los perfiles duplicados de Álvaro (528453bd "Alvaro Mejía" con
+--       is_owner, vs fcdfdfcb "Alvaro Rene" que es el linkeado a Hubstaff).
+--   (b) profiles.is_owner de JHON está en FALSE → su propio feedback en los grupos
+--       tampoco se puede guardar como regla. Hoy el único owner efectivo es Álvaro.
+select 1;
