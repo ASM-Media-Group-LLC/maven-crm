@@ -235,6 +235,76 @@ async function fetchEmployeeReportsDaily(token, days) {
   });
 }
 
+// ── SOPHIE (la AI de BLU; interno "persona-pro"): ventas/mensajes AI por modelo ──
+// Contrato sacado del bundle de la app de escritorio (07/08): mismo WS, request
+// {type:"persona-pro-stats-rollup", modelIds:"all", from, to} → {data:{models:[...]}}.
+// Pedimos POR DÍA (un rollup por día sobre un socket) para diarizar "cuánto vendió
+// Sophie ayer" — igual que employee-reports diario.
+async function fetchSophieDailyWS(token, days) {
+  const { default: WS } = await import("ws");
+  return await new Promise((resolve, reject) => {
+    const ws = new WS(BLU_WS_URL);
+    const results = [];
+    let idx = 0, authed = false, resolved = false, freshToken = null;
+    const timeoutMs = Math.max(90000, days.length * 8000);
+    const to = setTimeout(() => done(resolve, { results, freshToken, partial: true }), timeoutMs);   // parcial > nada
+    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
+    function queryNext() {
+      if (idx >= days.length) return done(resolve, { results, freshToken });
+      ws.send(JSON.stringify({
+        type: "persona-pro-stats-rollup", modelIds: "all",
+        from: `${days[idx]}T00:00:00.000Z`, to: `${days[idx]}T23:59:59.999Z`,
+      }));
+    }
+    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
+    ws.on("message", (data) => {
+      let m; try { m = JSON.parse(data.toString()); } catch { return; }
+      const t = typeof m.type === "string" ? m.type : "";
+      if (t === "ping") { try { ws.send(JSON.stringify({ type: "pong" })); } catch {} return; }
+      if (/auth:error|unauthorized|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
+        return done(reject, Object.assign(new Error("WS auth rechazado (sophie): " + t), { expired: true }));
+      }
+      if (t === "auth:ok") { authed = true; if (m.token) freshToken = m.token; queryNext(); return; }
+      if (t === "connected" || t === "pong") return;
+      if (!authed) return;
+      if (t === "persona-pro-stats-rollup") {
+        if (m.error) console.error(`[blu-bridge] sophie rollup ${days[idx]}: ${String(m.error).slice(0, 120)}`);
+        else results.push({ date: days[idx], models: Array.isArray(m?.data?.models) ? m.data.models : [] });
+        idx++;
+        return queryNext();
+      }
+    });
+    ws.on("error", (e) => done(reject, new Error("WS error (sophie): " + e.message)));
+    ws.on("close", () => { if (!resolved) done(resolve, { results, freshToken, partial: true }); });
+  });
+}
+
+// {date, models[]} → filas sophie_daily_stats. Mapeo DEFENSIVO (el shape exacto del
+// rollup se confirma con la primera corrida real) + raw jsonb para re-parsear sin
+// re-pedir a BLU si algún campo viene con otro nombre. Solo días con actividad.
+function transformSophieDaily(results, account) {
+  const rows = [];
+  for (const { date, models } of (results || [])) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    for (const md of (models || [])) {
+      const id = md?.modelId ?? md?.id;
+      if (id == null) continue;
+      const tot = md.totals || md;
+      const sales = Number(tot.aiSales ?? tot.salesValue ?? tot.sales ?? 0) || 0;
+      const msgs = Number(tot.aiMessages ?? tot.messages ?? 0) || 0;
+      if (sales <= 0 && msgs <= 0) continue;
+      rows.push({
+        date, account, blu_model_id: id,
+        model_name: md.modelName ?? md.displayName ?? null,
+        username: md.username ?? md.handle ?? null,
+        ai_sales: sales, ai_messages: msgs,
+        raw: md, updated_at: new Date().toISOString(),
+      });
+    }
+  }
+  return rows;
+}
+
 // {date, employees[]} por día → filas {blu_employee_id, date, total_sales, ...}. Solo con actividad.
 function transformChatterDaily(results) {
   const rows = [];
@@ -547,6 +617,25 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
   }
 
   } // fin chatters/chatter-daily (solo plus)
+
+  // ── SOPHIE (AI de BLU) — en AMBAS cuentas (los modelos con Sophie viven en cada una).
+  // Diario: 7 días atrás en corridas normales, hoy+ayer en QUICK. Aislado: si falla,
+  // no afecta nada más. Upsert directo (PK date+account+blu_model_id).
+  try {
+    const sophieDays = quickDays != null ? daysBack(1) : daysBack(7);
+    const { results: sr, freshToken: sft, partial } = await fetchSophieDailyWS(token, sophieDays);
+    if (sft && sft !== token) { await saveToken(acct.id, sft); token = sft; }
+    const sRows = transformSophieDaily(sr, acct.account);
+    for (const batch of chunk(sRows, 500)) {
+      const { error } = await sb().from("sophie_daily_stats")
+        .upsert(batch, { onConflict: "date,account,blu_model_id" });
+      if (error) throw new Error("sophie upsert: " + error.message);
+    }
+    console.log(`[blu-bridge:${acct.account}] sophie: ${sRows.length} filas en ${sr.length}/${sophieDays.length} días${partial ? " (parcial)" : ""}.`);
+  } catch (e) {
+    if (e.expired) throw e;
+    console.error(`[blu-bridge:${acct.account}] sophie falló (no afecta el resto): ${e.message}`);
+  }
 
   return { rows: totalRows, fanRows };
 }

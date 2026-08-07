@@ -1488,6 +1488,18 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "get_sophie_sales",
+    description:
+      "Ventas de SOPHIE — la AI de BLU que chatea en lugar de los chatters humanos ('persona-pro'). Devuelve, por rango de días: total vendido por la AI, desglose por día y por cuenta (Plus/Massive), y top de modelos donde Sophie más vendió, con mensajes AI enviados. Úsala para '¿cuánto vendió Sophie ayer/esta semana?' o para comparar venta AI vs chatters humanos (los humanos salen de get_chatter_productivity/chatter_daily_sales). Si viene vacía di la razón que trae la respuesta — no inventes ceros.",
+    input_schema: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "últimos N días (default 7, máx 60)" },
+        account: { type: "string", enum: ["plus", "massive", "both"], description: "cuenta agencia (default both)" },
+      },
+    },
+  },
+  {
     name: "get_sub_pricing",
     description:
       "PRECIO DE SUSCRIPCIÓN (efectivo) por creadora, derivado de BLU: plata de subs NUEVAS ÷ fans nuevos en la ventana (default 30 días). Úsala para '¿a cuánto está la sub de X?', '¿su cuenta es gratis o paga?' y para decisiones de pricing ($3 vs $5): sin creator devuelve TODAS las creadoras + BANDAS de precio (gratis / <$4 / $4-6 / >$6) con ingreso promedio por banda. OJO al responder: es el promedio REAL cobrado (descuentos y trials incluidos), NO el precio de lista del panel de OF — acláralo siempre. Las VISITAS al perfil no existen en ninguna fuente nuestra (solo en el panel de OF de cada cuenta).",
@@ -3724,6 +3736,52 @@ async function executeTool(
           opciones[0].name + "? 👇') y el texto EXACTO abajo. Cuando diga que sí (sirve 'sí', " +
           "'dale', 'mándalo', 'va'), llama post_to_group con este pending_id y confirm=true. " +
           "Si pide cambios, paso 1 de nuevo con el texto corregido.",
+      };
+    }
+
+    case "get_sophie_sales": {
+      const dias = Math.min(Math.max(Number(input.days) || 7, 1), 60);
+      const cuenta = String(input.account ?? "both").toLowerCase();
+      const desde = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+      let q = sb.from("sophie_daily_stats")
+        .select("date, account, blu_model_id, model_name, username, ai_sales, ai_messages, updated_at")
+        .gte("date", desde);
+      if (cuenta === "plus" || cuenta === "massive") q = q.eq("account", cuenta);
+      const { data, error } = await q.order("date", { ascending: true }).limit(2000);
+      if (error) return { error: error.message };
+      const filas = (data ?? []) as Array<{ date: string; account: string; blu_model_id: number; model_name: string | null; username: string | null; ai_sales: number; ai_messages: number; updated_at: string }>;
+      if (filas.length === 0) {
+        return {
+          rango: `últimos ${dias} días`,
+          ventas_ai: 0,
+          nota: "Sin filas de Sophie en ese rango. Puede ser que la AI no vendió, o que el blu-bridge todavía no corrió con el soporte de Sophie (se agregó 07/08 y requiere redeploy en Dokploy) — dilo así, sin afirmar que vendió $0.",
+        };
+      }
+      const suma = (arr: typeof filas) => Math.round(arr.reduce((s, r) => s + Number(r.ai_sales || 0), 0) * 100) / 100;
+      const porDia = new Map<string, { sales: number; msgs: number }>();
+      const porModelo = new Map<string, { sales: number; msgs: number }>();
+      for (const r of filas) {
+        const d = porDia.get(r.date) ?? { sales: 0, msgs: 0 };
+        d.sales += Number(r.ai_sales || 0); d.msgs += Number(r.ai_messages || 0);
+        porDia.set(r.date, d);
+        const nombre = r.model_name ?? r.username ?? `modelo ${r.blu_model_id}`;
+        const m = porModelo.get(nombre) ?? { sales: 0, msgs: 0 };
+        m.sales += Number(r.ai_sales || 0); m.msgs += Number(r.ai_messages || 0);
+        porModelo.set(nombre, m);
+      }
+      return {
+        rango: `últimos ${dias} días`,
+        total_ventas_ai: suma(filas),
+        total_mensajes_ai: filas.reduce((s, r) => s + Number(r.ai_messages || 0), 0),
+        por_cuenta: {
+          plus: suma(filas.filter((r) => r.account === "plus")),
+          massive: suma(filas.filter((r) => r.account === "massive")),
+        },
+        por_dia: [...porDia.entries()].map(([date, v]) => ({ date, ventas: Math.round(v.sales * 100) / 100, mensajes: v.msgs })),
+        top_modelos: [...porModelo.entries()]
+          .sort((a, b) => b[1].sales - a[1].sales).slice(0, 5)
+          .map(([nombre, v]) => ({ modelo: nombre, ventas: Math.round(v.sales * 100) / 100, mensajes: v.msgs })),
+        actualizado: filas.reduce((mx, r) => (r.updated_at > mx ? r.updated_at : mx), filas[0].updated_at),
       };
     }
 
