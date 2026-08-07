@@ -37,24 +37,22 @@
 --    mensaje, no en el quinto) y "FEEDBACK DEL JEFE = REGLA GUARDADA".
 --
 -- ══════════════════════════════════════════════════════════════════════════════
--- IDENTIDAD DE ÁLVARO: DOS LIDs, Y UNA TRAMPA LATENTE
+-- IDENTIDAD DEL JEFE (fallback global)
 -- ══════════════════════════════════════════════════════════════════════════════
 -- El bot solo puede persistir reglas si quien habla resuelve a un profile con
--- is_owner=true. Álvaro escribe desde DOS cuentas de WhatsApp:
---   · 192457652338690@lid ("Alvaro S")     → 528453bd "Alvaro Mejía"  is_owner ✅
---   · 114426585833505@lid ("Alvaro Mejia") → en Ventas apunta a
---     fcdfdfcb "Alvaro Rene"  is_owner ❌  (PERFIL DUPLICADO de la misma persona)
--- Hoy escribió con el primero, así que el permiso NO fue el bloqueo — pero si
--- escribe desde el otro dispositivo en Ventas, su feedback es IMPOSIBLE de
--- guardar y el bot igual respondería "entendido".
--- La constraint unique(group_id,user_id) impide linkear sus dos LIDs al mismo
--- profile dentro de un grupo, así que el arreglo aplicado es el fallback GLOBAL:
+-- is_owner=true. Se fija el LID de Álvaro en su profile para que CUALQUIER grupo
+-- (incluidos los nuevos) lo reconozca sin depender de la fila por-grupo.
+-- Verificado por participantAlt: 192457652338690@lid = +17866946354 = el mismo
+-- número con el que el bot habla en su DM.
 UPDATE profiles SET whatsapp_lid = '192457652338690@lid'
 WHERE id = '528453bd-f1e1-43d3-85c1-01c5fa5bbcfb' AND whatsapp_lid IS NULL;
 --
--- ⚠️ PENDIENTE PARA JHON (decisión suya, no la tomo yo):
---   (a) Unificar los perfiles duplicados de Álvaro (528453bd "Alvaro Mejía" con
---       is_owner, vs fcdfdfcb "Alvaro Rene" que es el linkeado a Hubstaff).
---   (b) profiles.is_owner de JHON está en FALSE → su propio feedback en los grupos
---       tampoco se puede guardar como regla. Hoy el único owner efectivo es Álvaro.
+-- ⚠️ CORRECCIÓN (ver 20260807220000_alvaro_homonimo.sql): en la primera pasada
+-- afirmé que Álvaro escribía desde DOS LIDs. ERA FALSO — Jhon lo desmintió y
+-- tenía razón: son DOS PERSONAS DISTINTAS con el mismo nombre de pila. El detalle
+-- y el agujero de seguridad que eso destapó están en esa migración.
+--
+-- ⚠️ PENDIENTE PARA JHON: profiles.is_owner de JHON está en FALSE → su propio
+-- feedback en los grupos tampoco se puede guardar como regla. Hoy el único owner
+-- efectivo del sistema es Álvaro.
 select 1;
