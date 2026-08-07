@@ -69,34 +69,46 @@ export default function MessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevMessagesLengthRef = useRef(0);
-  const isInitialLoadRef = useRef(true);
+  const currentConvRef = useRef<string | null>(null);
+  // Mientras esté "pegado al fondo", cualquier crecimiento de alto (imágenes que terminan
+  // de cargar, reacciones, mensaje nuevo) vuelve a bajar al último mensaje. Se apaga cuando
+  // el usuario scrollea hacia arriba y se reactiva cuando vuelve al fondo.
+  const pinToBottomRef = useRef(true);
 
+  // Al abrir/cambiar de conversación → al fondo. Con la MISMA conversación, si llega un
+  // mensaje nuevo y estabas abajo, seguí el fondo.
   useEffect(() => {
-    if (!scrollRef.current) return;
     const el = scrollRef.current;
-    
-    if (isInitialLoadRef.current) {
-      el.scrollTop = el.scrollHeight;
-      isInitialLoadRef.current = false;
-      prevMessagesLengthRef.current = messages.length;
-      return;
-    }
+    if (!el || messages.length === 0) return;
+    const conv = messages[0]?.conversation_id ?? null;
 
-    const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    
-    if (messages.length > prevMessagesLengthRef.current && wasNearBottom) {
-      requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight;
-      });
+    if (conv !== currentConvRef.current) {
+      currentConvRef.current = conv;
+      pinToBottomRef.current = true;
+      el.scrollTop = el.scrollHeight;
+    } else if (messages.length > prevMessagesLengthRef.current && pinToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
     }
     prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
-  const conversationKey = messages.length > 0 ? messages[0]?.conversation_id : null;
-  useEffect(() => {
-    isInitialLoadRef.current = true;
-    prevMessagesLengthRef.current = 0;
-  }, [conversationKey]);
+  // ResizeObserver: mientras esté pegado al fondo, mantener el scroll abajo cuando el
+  // contenido crece de alto DESPUÉS del render inicial. Las imágenes que cargan async eran
+  // la causa de quedar ~140px arriba del último mensaje al abrir la conversación:
+  // scrollTop=scrollHeight corría antes de que la imagen tuviera alto, y no se recalculaba.
+  const roRef = useRef<ResizeObserver | null>(null);
+  const contentRef = useCallback((node: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (node) {
+      const ro = new ResizeObserver(() => {
+        const el = scrollRef.current;
+        if (el && pinToBottomRef.current) el.scrollTop = el.scrollHeight;
+      });
+      ro.observe(node);
+      roRef.current = ro;
+    }
+  }, []);
 
   useEffect(() => {
     if (highlightedMsgId && msgRefs.current[highlightedMsgId]) {
@@ -116,9 +128,13 @@ export default function MessageList({
   }, [messages, loadingMore]);
 
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current || !hasMore || loadingMore || !onLoadMore) return;
-    if (scrollRef.current.scrollTop < 80) {
-      prevScrollHeightRef.current = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    // ¿el usuario está pegado al fondo? Define si seguimos autoscrolleando.
+    pinToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    // Cargar mensajes más viejos al llegar arriba.
+    if (hasMore && !loadingMore && onLoadMore && el.scrollTop < 80) {
+      prevScrollHeightRef.current = el.scrollHeight;
       wasLoadingMoreRef.current = true;
       onLoadMore();
     }
@@ -156,7 +172,7 @@ export default function MessageList({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div className="w-full py-4 px-3 md:px-6 space-y-1">
+      <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (
           <div className="flex justify-center py-3">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
