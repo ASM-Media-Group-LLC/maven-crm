@@ -258,7 +258,16 @@ async function processDirectMessage(
     return { kind: "dm_ignored_non_text" };
   }
 
-  const code = extractCode(msg.body);
+  // ⚠️ UN DM DE VERIFICACIÓN ES *LITERALMENTE* EL CÓDIGO — no una frase que lo
+  // contenga. El alfabeto de códigos (ACDEFGHJKLMNPQRTUVWXY3479) hace que
+  // palabras españolas comunes de 6 letras calcen: "cuenta", "manera", "verdad",
+  // "agenda". Sin este gate, cualquier mensaje con una de ellas se consumía como
+  // intento de código y MORÍA acá sin llegar al agente.
+  // INCIDENTE 07/08: Grace pidió "dime a qué hora ingresaron hoy estas personas,
+  // teniendo en cuenta que deben ingresar a las 8 AM" + la lista — el "cuenta"
+  // disparó el falso código y el bot quedó MUDO con su jefa de RRHH.
+  const cuerpo = msg.body.trim();
+  const code = cuerpo.length <= 40 ? extractCode(cuerpo) : null;
   if (!code) {
     return { kind: "dm_received_no_code" };
   }
@@ -277,6 +286,8 @@ async function processDirectMessage(
     return { kind: "dm_claim_rpc_error" };
   }
   if (!userId) {
+    // El código no matcheó: entonces NO era un código. Segunda capa de la misma
+    // lección — este camino ya no muere mudo, cae al agente como cualquier DM.
     return { kind: "dm_code_invalid_or_expired" };
   }
 
@@ -1344,8 +1355,11 @@ serve(async (req) => {
     // Bot privado (Clari 1:1): si el DM NO fue una verificación (mensaje normal) y el
     // remitente está en la whitelist, ruteamos al agente de IA vía pseudo-grupo. Los
     // números fuera de la whitelist siguen sin respuesta (auth-only, como antes).
+    // `dm_code_invalid_or_expired` TAMBIÉN rutea: un texto que solo se PARECÍA a
+    // un código es un mensaje normal, y quedarse mudo es el peor resultado
+    // posible en el DM de un directivo (incidente Grace 07/08).
     let agentKind: string | null = null;
-    if (result.kind === "dm_received_no_code") {
+    if (result.kind === "dm_received_no_code" || result.kind === "dm_code_invalid_or_expired") {
       agentKind = await maybeRouteDmToAgent(sb, msg).catch((e) => {
         console.warn("maybeRouteDmToAgent:", (e as Error).message);
         return "dm_agent_exception";

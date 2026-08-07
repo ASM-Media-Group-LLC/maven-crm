@@ -37,12 +37,17 @@ export const qaTools: AgentTool[] = [
       "efectivo firmado), costo (salario base), margen y ROI (×). Detecta 'online pero improductivo' (mucha " +
       "actividad, poca venta) y 'no rentable' (la agencia recibe menos de lo que cuesta el chatter, ROI<1). " +
       "Pasa only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
-      "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo.",
+      "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo. " +
+      "VENTA DÍA POR DÍA: sí la tienes — pasa `person` y devuelve `venta_por_dia` (fecha, monto, mensajes vendidos, " +
+      "fans chateados) de los últimos `days`. Úsalo para '¿cuánto vendió X ayer / en la madrugada / el día 3?'. " +
+      "Si ese bloque viene vacío NO afirmes $0: la respuesta trae la razón (sin ventas registradas vs sin sincronizar).",
     input_schema: {
       type: "object",
       properties: {
         only_flagged: { type: "boolean", description: "true → solo los 'no rentables' u 'online improductivos'" },
         limit: { type: "number", description: "máximo de chatters a devolver (default 20)" },
+        person: { type: "string", description: "nombre (o parte) de un chatter → agrega su venta DÍA POR DÍA" },
+        days: { type: "number", description: "ventana del desglose diario (default 14, máx 90). Solo aplica con `person`." },
       },
       additionalProperties: false,
     },
@@ -63,8 +68,57 @@ export const qaTools: AgentTool[] = [
       rows.sort((a, b) => (Number(a.roi_x) || 0) - (Number(b.roi_x) || 0));
       if (args.only_flagged !== true) rows.reverse();
       const num = (v: unknown) => (v == null ? null : Number(v));
+
+      // VENTA DÍA POR DÍA (chatter_daily_sales, que alimenta el bridge con
+      // employee-reports día a día). El 07/08 el bot le dijo a Grace que "la
+      // productividad de chatters me llega solo como acumulado del MES" y que el
+      // desglose diario vivía en el panel de BLU — falso, esta tabla existe.
+      let diario: Record<string, unknown> | null = null;
+      const persona = typeof args.person === "string" ? args.person.trim() : "";
+      if (persona) {
+        const dias = Math.min(Math.max(Number(args.days) || 14, 1), 90);
+        const desde = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+        const safe = persona.replace(/[%_,]/g, "");
+        const { data: dd, error: dErr } = await ctx.sb
+          .from("chatter_daily_sales")
+          .select("name, date, total_sales, sold_messages, fans_chatted")
+          .ilike("name", `%${safe}%`)
+          .gte("date", desde)
+          .order("date", { ascending: false })
+          .limit(200);
+        if (dErr) {
+          diario = { error: dErr.message };
+        } else {
+          const filas = (dd ?? []) as Array<Record<string, unknown>>;
+          const { data: ult } = await ctx.sb
+            .from("chatter_daily_sales").select("date")
+            .order("date", { ascending: false }).limit(1).maybeSingle();
+          diario = {
+            persona_buscada: persona,
+            rango: `últimos ${dias} días (desde ${desde})`,
+            dias_con_venta: filas.length,
+            total_periodo: Math.round(filas.reduce((s, r) => s + (Number(r.total_sales) || 0), 0) * 100) / 100,
+            venta_por_dia: filas.map((r) => ({
+              dia: r.date, chatter: r.name,
+              venta: Number(r.total_sales) || 0,
+              mensajes_vendidos: r.sold_messages, fans_chateados: r.fans_chatted,
+            })),
+            ultimo_dia_sincronizado: ult?.date ?? null,
+            ...(filas.length === 0
+              ? {
+                nota:
+                  "Sin filas en ese rango. La tabla SOLO guarda días con actividad, así que puede ser que no " +
+                  "vendió — pero compara con `ultimo_dia_sincronizado`: si es anterior al rango pedido, el puente " +
+                  "de BLU no trajo esos días y NO puedes afirmar $0.",
+              }
+              : {}),
+          };
+        }
+      }
+
       return {
         total: rows.length,
+        ...(diario ? { desglose_diario: diario } : {}),
         no_rentables: rows.filter((r) => r.no_rentable === true).length,
         online_improductivos: rows.filter((r) => r.online_improductivo === true).length,
         tasa_agencia_efectiva_pct: num(rows.find((r) => r.agency_rate_used != null)?.agency_rate_used),

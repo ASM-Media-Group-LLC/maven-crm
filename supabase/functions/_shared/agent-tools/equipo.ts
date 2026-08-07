@@ -435,6 +435,9 @@ export const equipoTools: AgentTool[] = [
       "(el 31/07 'Juan Pachas' no existía y el bot contestó con gente que nadie preguntó). " +
       "La respuesta de equipo separa `direccion_fuera_de_medicion` (dueño/socios/gerencia: se informan, no se " +
       "rankean) y trae `sin_fichar_en_rango` (roster que no trackeó nada — el piso real en preguntas de empresa). " +
+      "HORA DE INGRESO: sí la tienes. En el ranking cada persona trae `entrada_hoy`/`ultimo_ping_hoy`, y pidiendo " +
+      "UNA persona el bloque `por_dia` trae `entrada` y `ultimo_ping` de CADA día — úsalo para '¿a qué hora entró/" +
+      "salió?', '¿llegó tarde?', control de turnos y cumplimiento de horario. " +
       "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
     input_schema: {
       type: "object",
@@ -672,22 +675,72 @@ export const equipoTools: AgentTool[] = [
         }
       }
 
+      // HORA DE ENTRADA/SALIDA por día (RRHH). El agregado diario solo trae el
+      // TOTAL, y por eso el bot le dijo a Grace que "no tenía la hora de ingreso"
+      // (07/08) — pero hubstaff_activities guarda franjas de 10 min, así que
+      // entrada = primer ping y salida = último. Se pide UNA vez y sirve a los dos
+      // caminos: por_dia (persona puntual) y entrada_hoy (ranking de equipo).
+      const entradas = new Map<string, Map<string, Record<string, unknown>>>();
+      try {
+        const { data: ee } = await ctx.sb.rpc("hubstaff_entry_exit", {
+          p_from: from, p_to: to, p_person: person,
+        });
+        for (const r of ((ee ?? []) as Array<Record<string, unknown>>)) {
+          const porDia = entradas.get(String(r.name)) ?? new Map();
+          porDia.set(String(r.dia), r);
+          entradas.set(String(r.name), porDia);
+        }
+      } catch { /* best-effort: sin horas de entrada la respuesta sigue siendo útil */ }
+
+      // Ranking de equipo: a cada fila se le pega la ENTRADA DE HOY. Es lo que
+      // permite responder "¿a qué hora ingresaron hoy estas personas?" de varias
+      // a la vez (la pregunta real de Grace) sin una llamada por persona.
+      if (Array.isArray(result.equipo)) {
+        for (const fila of result.equipo as Array<Record<string, unknown>>) {
+          const ee = entradas.get(String(fila.nombre))?.get(hoyBog);
+          if (ee) { fila.entrada_hoy = ee.entrada; fila.ultimo_ping_hoy = ee.ultimo_ping; }
+        }
+        result.nota_horario =
+          "`entrada_hoy` es el PRIMER ping de Hubstaff del día (hora Bogotá); si falta, esa persona no fichó hoy. " +
+          "Para el detalle día por día de una persona, pide esa persona con `person`.";
+      }
+
       // Desglose por día cuando se pide UNA persona y matcheó exactamente una.
       if (person && rows.length === 1) {
         const uid = String(rows[0].hubstaff_user_id);
+        const nombreExacto = String(rows[0].name);
         const { data: daily } = await ctx.sb
           .from("hubstaff_daily_data")
           .select("date, tracked_seconds, overall_activity, project_name")
           .eq("hubstaff_user_id", uid)
           .gte("date", from).lte("date", to)
           .order("date", { ascending: true });
-        result.por_dia = ((daily ?? []) as Array<Record<string, unknown>>).map((d) => ({
-          dia: d.date,
-          horas: Math.round((Number(d.tracked_seconds) / 3600) * 100) / 100,
-          actividad_pct: d.overall_activity,
-          proyecto: d.project_name,
-          ...(d.date === hoyBog ? { parcial: "agregado de HOY, puede venir hasta 6h atrasado — usa hoy_en_vivo" } : {}),
-        }));
+        const suyas = entradas.get(nombreExacto) ?? new Map();
+        result.por_dia = ((daily ?? []) as Array<Record<string, unknown>>).map((d) => {
+          const ee = suyas.get(String(d.date));
+          return {
+            dia: d.date,
+            horas: Math.round((Number(d.tracked_seconds) / 3600) * 100) / 100,
+            actividad_pct: d.overall_activity,
+            proyecto: d.project_name,
+            ...(ee ? { entrada: ee.entrada, ultimo_ping: ee.ultimo_ping } : {}),
+            ...(d.date === hoyBog ? { parcial: "agregado de HOY, puede venir hasta 6h atrasado — usa hoy_en_vivo" } : {}),
+          };
+        });
+        // Días con actividad que el agregado todavía no escribió (lag de 6h):
+        // sin esto, un día reciente aparecía sin entrada aunque la persona fichó.
+        const yaListados = new Set(((daily ?? []) as Array<Record<string, unknown>>).map((d) => String(d.date)));
+        const faltantes = [...suyas.entries()].filter(([dia]) => !yaListados.has(dia));
+        if (faltantes.length) {
+          (result.por_dia as Array<unknown>).push(...faltantes.map(([dia, ee]) => ({
+            dia, horas: ee.horas, actividad_pct: ee.actividad_pct,
+            entrada: ee.entrada, ultimo_ping: ee.ultimo_ping,
+            nota: "del feed en vivo (el agregado diario aún no lo escribió)",
+          })));
+        }
+        result.nota_horario =
+          "`entrada` es el PRIMER ping de Hubstaff del día y `ultimo_ping` el último (franjas de 10 min, hora Bogotá). " +
+          "Es la hora real de arranque del tracker, no un fichaje declarado: si alguien trabajó sin tracker no aparece.";
       }
 
       // ── DÍA EN CURSO desde hubstaff_activities (capa en vivo) ────────────
