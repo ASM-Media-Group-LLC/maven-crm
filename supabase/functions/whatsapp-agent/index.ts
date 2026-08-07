@@ -16,6 +16,7 @@ import {
   detectarVoseoEnPitch,
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
+  esDisputaDeRegistro,
   TIENE_PITCH_CITADO,
 } from "../_shared/agent-output-guards.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
@@ -6393,6 +6394,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
   let scanNotaBloqueado = 0;
+  let disputaBloqueada = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -7002,6 +7004,32 @@ async function runAgent(req: AgentRequest): Promise<{
               "PRIMERO llama set_scan_note (creator = como la nombró, reason = la causa en una línea). " +
               "DESPUÉS reenvía tu mensaje confirmando la razón guardada. Si no identificas a la creadora, " +
               "reenvía tu respuesta preguntando el handle exacto.",
+          }),
+        });
+        continue;
+      }
+      // Guarda de DISPUTA DE REGISTRO (07/08): ante "¿por qué no registraste la promo
+      // de X?" el modelo respondió DOS veces (e2e 06-07/08) con reportes de cobertura
+      // sin consultar get_promo_registro — donde vive la respuesta real (la promo
+      // suele ESTAR, atribuida al día de publicación hora Bogotá, caso Carolina) y la
+      // evidencia. Un bloqueo con orden; a la 2ª pasa. Solo bots con la tool en
+      // allowlist explícita (hoy: Managers).
+      if (t.name === "reply_to_group" && disputaBloqueada < 1 &&
+          botCfg?.allow?.includes("get_promo_registro") === true &&
+          textoDisparador && esDisputaDeRegistro(textoDisparador) &&
+          !msPorTool.has("get_promo_registro")) {
+        disputaBloqueada += 1;
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: t.id,
+          content: JSON.stringify({
+            error: "disputa_sin_consultar_registro",
+            message:
+              "NO se envió: te están disputando un REGISTRO de promo y respondes sin consultar la fuente " +
+              "canónica. PRIMERO llama get_promo_registro con esa creadora (mira días anteriores: una " +
+              "historia de anoche cuenta para AYER, hora Bogotá). Si la promo APARECE, responde '¿te " +
+              "refieres a estas?' con red + día + hora de publicación y ADJUNTA el screenshot pasando " +
+              "evidencia_id a reply_to_group. Si NO aparece, revisa get_scan_fallos antes de explicar.",
           }),
         });
         continue;

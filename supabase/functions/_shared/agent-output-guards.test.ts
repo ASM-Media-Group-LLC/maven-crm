@@ -8,6 +8,7 @@ import {
   detectarVoseoEnPitch,
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
+  esDisputaDeRegistro,
   TIENE_PITCH_CITADO,
 } from "./agent-output-guards.ts";
 
@@ -124,6 +125,34 @@ Deno.test("causa de fallo de scan — operación normal NO dispara", () => {
     ]
   ) {
     assertEquals(esCausaDeFalloScan(s), false, `no debió disparar: ${s}`);
+  }
+});
+
+Deno.test("disputa de registro — reclamos reales disparan", () => {
+  for (
+    const s of [
+      "Por qué no habías registrado estas promos en el primer escaneo?", // Carolina 06/08 11:53
+      "maven por qué no registraste la promo de heidy? ella sí subió historia", // e2e 07/08
+      "la promo de dayora no aparece en el reporte",
+      "a suunnhoney no le marcaste la promo de ayer",
+      "las promos de anoche no se detectaron",
+    ]
+  ) {
+    assert(esDisputaDeRegistro(s), `debió detectar disputa: ${s}`);
+  }
+});
+
+Deno.test("disputa de registro — operación normal NO dispara", () => {
+  for (
+    const s of [
+      "registra la promo de heidy porfa", // orden, no disputa
+      "cuántas promos registraste hoy?",
+      "moramay no se puede leer porque cambió el handle", // eso es causa de scan, otra guarda
+      "¿ya salió el reporte de promos?",
+      "heidy subió promo en X, revisala",
+    ]
+  ) {
+    assertEquals(esDisputaDeRegistro(s), false, `no debió disparar: ${s}`);
   }
 });
 

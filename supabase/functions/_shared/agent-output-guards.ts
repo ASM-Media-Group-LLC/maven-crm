@@ -71,3 +71,15 @@ export function detectarVoseoEnPitch(s: string): string | null {
 export const CAUSA_FALLO_SCAN_RE =
   /\bno\s+(?:se|la|lo|las|los)\s+(?:puede[n]?\s+|pudo\s+|pudieron\s+|pudimos\s+|est[áa][n]?\s+pudiendo\s+)?(?:leer|lee[n]?|escanear|escanea[n]?)\b[\s\S]{0,60}?\b(?:porque|es\s+que|ya\s+que|es\s+por|por)\b/i;
 export const esCausaDeFalloScan = (s: string): boolean => CAUSA_FALLO_SCAN_RE.test(s);
+
+// ── Disputa de REGISTRO de promo ────────────────────────────────────────────────
+// 06-07/08: ante "¿por qué no registraste la promo de X?" el modelo respondió dos
+// veces con tools legacy (reporte de cobertura) sin consultar get_promo_registro —
+// que es donde vive la respuesta real (la promo suele ESTAR, atribuida al día de
+// publicación hora Bogotá) y la evidencia (screenshot). Detector: negación + verbo
+// de registro/aparición + "promo" cerca, en cualquier orden.
+export const DISPUTA_REGISTRO_RES: RegExp[] = [
+  /\bno\s+(?:has?\s+|hab[ií]as?\s+|me\s+|te\s+|le[s]?\s+|las?\s+|los?\s+|se\s+)*(?:registr\w+|aparec\w+|marc\w+|figur\w+|detect\w+)\b[\s\S]{0,50}\bpromos?\b/i,
+  /\bpromos?\b[\s\S]{0,50}\bno\s+(?:has?\s+|hab[ií]as?\s+|me\s+|te\s+|le[s]?\s+|las?\s+|los?\s+|se\s+)*(?:registr\w+|aparec\w+|marc\w+|figur\w+|detect\w+|sali[oó])\b/i,
+];
+export const esDisputaDeRegistro = (s: string): boolean => DISPUTA_REGISTRO_RES.some((re) => re.test(s));
