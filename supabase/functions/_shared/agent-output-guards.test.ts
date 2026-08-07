@@ -5,6 +5,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   afirmaRegistro,
+  desescaparSaltosLiterales,
   detectarVoseoEnPitch,
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
@@ -203,4 +204,22 @@ Deno.test("similitud — caza el loop de mensajes calcados del 07/08", () => {
 Deno.test("pitch citado con sustancia", () => {
   assert(TIENE_PITCH_CITADO('Va: "hola lucy! te escribo de kash, somos agencia de creadoras y tu perfil tiene con qué crecer bien"'));
   assertEquals(TIENE_PITCH_CITADO('le dije "ok" y seguimos'), false);
+});
+
+// ── desescaparSaltosLiterales (Cheryl 07/08 16:06: muro de 608 chars con \\n visibles) ──
+Deno.test("desescapa \\n y \\t literales del modelo", () => {
+  assertEquals(
+    desescaparSaltosLiterales("Grace, de Cheryl:\\n\\n- venta $120\\n- 7h30\\t82%"),
+    "Grace, de Cheryl:\n\n- venta $120\n- 7h30\t82%",
+  );
+});
+
+Deno.test("no toca mensajes normales (con saltos reales o sin escapes)", () => {
+  const normal = "Hola Grace 👋\nAquí va el reporte de hoy.";
+  assertEquals(desescaparSaltosLiterales(normal), normal);
+  assertEquals(desescaparSaltosLiterales(""), "");
+});
+
+Deno.test("mixto: conserva los saltos reales y convierte los literales", () => {
+  assertEquals(desescaparSaltosLiterales("línea real\ny luego\\nliteral"), "línea real\ny luego\nliteral");
 });

@@ -553,11 +553,15 @@ export const equipoTools: AgentTool[] = [
       // de Álvaro incluidos (hay dos en profiles).
       const DIRECCION_EXENTA = new Set([
         "c5b124cb-f272-458d-aa8e-1b11de0ff4d6", // Jhon Lopez (dueño/developer)
-        "fcdfdfcb-c0ab-4c82-b6d9-d50d37ab086e", // Alvaro Rene (jefe operativo)
-        "528453bd-f1e1-43d3-85c1-01c5fa5bbcfb", // Alvaro Mejía (perfil alterno)
+        "528453bd-f1e1-43d3-85c1-01c5fa5bbcfb", // Álvaro Stephan Mejía (jefe operativo, is_owner)
+        "fcdfdfcb-c0ab-4c82-b6d9-d50d37ab086e", // Álvaro Mejía (padre — pagos y líneas telefónicas)
         "75bca8d9-ded5-4e86-b591-88209f6a5e6c", // Juan Pachas (socio)
         "8b90f141-8546-4cfd-a358-56ff227623df", // Grace Gelves (RRHH/gerente)
-        "41b35cef-82a8-4991-9234-3514b0064767", // Luis Roman (gerente comercial)
+        "41b35cef-82a8-4991-9234-3514b0064767", // Luis Carlos Ortega Roman (gerente comercial)
+        // Michel: pedido explícito de Grace (07/08 15:20) — sin él acá, la exclusión
+        // vivía solo como texto dentro de los reminders programados y cualquier
+        // pregunta suelta ("¿quién va más bajo?") lo volvía a listar.
+        "3661183d-2c79-4a6b-86be-515f9ee441c2", // Michel Alejandro Zárate (dirección/tech)
       ]);
       const esDireccion = (r: Record<string, unknown>) => DIRECCION_EXENTA.has(String(r.profile_id ?? ""));
 

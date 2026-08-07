@@ -38,6 +38,8 @@ export const qaTools: AgentTool[] = [
       "actividad, poca venta) y 'no rentable' (la agencia recibe menos de lo que cuesta el chatter, ROI<1). " +
       "Pasa only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
       "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo. " +
+      "Los números son SOLO del MES EN CURSO (campo `periodo`); cada chatter trae `venta_al` = último día con venta " +
+      "sincronizada — si `venta_desactualizada` es true, la venta de ese chatter está incompleta y DEBES decirlo con la fecha. " +
       "VENTA DÍA POR DÍA: sí la tienes — pasa `person` y devuelve `venta_por_dia` (fecha, monto, mensajes vendidos, " +
       "fans chateados) de los últimos `days`. Úsalo para '¿cuánto vendió X ayer / en la madrugada / el día 3?'. " +
       "Si ese bloque viene vacío NO afirmes $0: la respuesta trae la razón (sin ventas registradas vs sin sincronizar).",
@@ -55,14 +57,37 @@ export const qaTools: AgentTool[] = [
     scope: "read",
     handler: async (args, ctx) => {
       const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 100);
-      // v_chatter_hubstaff_effort: cruce Hubstaff×BLU, mes en curso. No tiene tenant_id (datos de chatters,
-      // single-tenant). El cliente service-role bypassa la RLS de las tablas base (incl. el costo).
+      // v_chatter_hubstaff_effort emite UNA FILA POR CHATTER POR MES (4 meses de
+      // historia = 55 filas para 15 personas). Sin filtrar `period`, el 07/08 el
+      // bot narró los meses de Erick como "3 asignaciones" y le dio a Grace ventas
+      // de JUNIO como "del mes": TODOS los agregados de abajo (total, margen del
+      // equipo, no_rentables, ranking) contaban filas-mes como personas. El filtro
+      // al mes en curso (Bogotá) arregla las cuatro cosas de una.
+      const primerDiaMes = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 8) + "01";
       const { data, error } = await ctx.sb
         .from("v_chatter_hubstaff_effort")
-        .select("name, total_hours, avg_activity_pct, sales, sales_per_hour, avg_response_min, " +
-          "online_improductivo, cost_usd, agency_revenue_usd, margin_usd, roi_x, no_rentable, agency_rate_used");
+        .select("blu_employee_id, name, period, total_hours, avg_activity_pct, sales, sales_per_hour, avg_response_min, " +
+          "online_improductivo, cost_usd, agency_revenue_usd, margin_usd, roi_x, no_rentable, agency_rate_used")
+        .eq("period", primerDiaMes);
       if (error) throw new Error(`get_chatter_productivity: ${error.message}`);
       let rows = (data ?? []) as Array<Record<string, unknown>>;
+      // Frescura de la VENTA por chatter: último día con fila en chatter_daily_sales.
+      // El puente de BLU llega con lag y cobertura irregular (Erick: última venta
+      // sincronizada 05/07) — sin esta fecha, un $0 de agosto se lee como "no vendió"
+      // cuando en realidad es "no sincronizado desde X".
+      const ventaAl = new Map<string, string>();
+      {
+        const { data: vs } = await ctx.sb
+          .from("chatter_daily_sales")
+          .select("blu_employee_id, date")
+          .order("date", { ascending: false })
+          .limit(5000);
+        for (const v of (vs ?? []) as Array<{ blu_employee_id: string; date: string }>) {
+          const k = String(v.blu_employee_id);
+          if (!ventaAl.has(k)) ventaAl.set(k, String(v.date));
+        }
+      }
+      const hace3d = new Date(Date.now() - 3 * 86400_000).toISOString().slice(0, 10);
       if (args.only_flagged === true) rows = rows.filter((r) => r.no_rentable === true || r.online_improductivo === true);
       // Peor ROI primero cuando se filtran problemas; si no, mejor ROI primero.
       rows.sort((a, b) => (Number(a.roi_x) || 0) - (Number(b.roi_x) || 0));
@@ -116,15 +141,23 @@ export const qaTools: AgentTool[] = [
         }
       }
 
+      const truncado = rows.length > limit;
       return {
-        total: rows.length,
+        periodo: primerDiaMes.slice(0, 7),
+        total_chatters_mes: rows.length,
+        ...(truncado ? { ojo_truncado: `mostrando ${limit} de ${rows.length} — al hablar de totales usa ${rows.length}, no el recorte` } : {}),
         ...(diario ? { desglose_diario: diario } : {}),
         no_rentables: rows.filter((r) => r.no_rentable === true).length,
         online_improductivos: rows.filter((r) => r.online_improductivo === true).length,
         tasa_agencia_efectiva_pct: num(rows.find((r) => r.agency_rate_used != null)?.agency_rate_used),
         margen_total_equipo_usd: rows.reduce((s, r) => s + (num(r.margin_usd) ?? 0), 0),
+        nota_frescura: "venta_al = último día con venta sincronizada de ese chatter. Si venta_desactualizada=true, " +
+          "su venta del mes está incompleta (puente BLU atrasado): dilo con la fecha y NO leas ese número como el real.",
         chatters: rows.slice(0, limit).map((r) => ({
           chatter: r.name,
+          periodo: String(r.period ?? "").slice(0, 7),
+          venta_al: ventaAl.get(String(r.blu_employee_id)) ?? null,
+          venta_desactualizada: (ventaAl.get(String(r.blu_employee_id)) ?? "") < hace3d,
           horas: r.total_hours,
           actividad_pct: r.avg_activity_pct,
           venta_bruta: r.sales,

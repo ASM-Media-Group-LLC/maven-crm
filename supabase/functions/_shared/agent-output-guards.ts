@@ -117,3 +117,14 @@ export function similitudTexto(a: string, b: string): number {
   for (const w of A) if (B.has(w)) inter++;
   return inter / (A.size + B.size - inter);
 }
+
+// ── Saltos de línea ESCAPADOS que llegan como texto ─────────────────────────────
+// El 07/08 16:06 la respuesta sobre Cheryl le llegó a Grace como un muro de 608
+// caracteres con los "\\n" a la vista: el modelo escapó los saltos en el body del
+// tool call (desliz de escapado, único caso en 3 días — NO es regresión del
+// pipeline). Cura determinística en el borde: un "\\n" o "\\t" LITERAL en un
+// mensaje de WhatsApp nunca es contenido querido — se convierte al carácter real.
+export function desescaparSaltosLiterales(s: string): string {
+  if (!s || (!s.includes("\\n") && !s.includes("\\t"))) return s;
+  return s.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+}

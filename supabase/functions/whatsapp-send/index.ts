@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, neutralizarVoseo, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
+import { desescaparSaltosLiterales } from "../_shared/agent-output-guards.ts";
 
 // whatsapp-send — manda mensajes a un grupo via el provider configurado.
 //
@@ -184,10 +185,15 @@ async function sendOne(args: {
     (txt, lid) => txt.replace(new RegExp(`@${lid}[,:]?\\s*`, "g"), ""),
     args.body,
   ).trimStart();
+  // "\\n" literales → saltos reales (guardas de salida; caso Cheryl 07/08): si el
+  // modelo escapa los saltos en el body, el mensaje llega como muro de texto con
+  // los "\\n" a la vista. Va ANTES del resto para que las demás guardas vean el
+  // texto ya normalizado.
+  const sinEscapes = desescaparSaltosLiterales(sinAutoMencion);
   // Voseo → neutro también en el borde (misma filosofía que redactPhones): un
   // "probá"/"venís" suelto rompe el registro que pidió el equipo aunque el
   // prompt esté limpio. Aplica a grupos Y DMs — el bot habla neutro siempre.
-  const sinVoseo = neutralizarVoseo(sinAutoMencion);
+  const sinVoseo = neutralizarVoseo(sinEscapes);
   const bodyFinal = mdAWhatsApp(group.is_direct === true ? sinVoseo : redactPhones(sinVoseo));
 
   let result: ProviderSendResult;
