@@ -2082,8 +2082,8 @@ async function executeTool(
       // Devolvemos un texto unificado por mensaje (el que tenga contenido).
       const matches = rows.map((m) => {
         let text: string | null;
-        if ((m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text) {
-          const prefix = m.msg_type === "audio" ? "[audio]" : "[imagen]";
+        if ((m.msg_type === "audio" || m.msg_type === "image" || m.msg_type === "document") && m.transcribed_text) {
+          const prefix = m.msg_type === "audio" ? "[audio]" : m.msg_type === "document" ? "[documento]" : "[imagen]";
           text = `${prefix} ${m.transcribed_text}`;
         } else {
           text = m.body;
@@ -5664,8 +5664,8 @@ async function buildInitialUserMessage(args: {
       return (displayName ?? "").trim() || "(desconocido)";
     };
     const effectiveText = (m: { body: string | null; transcribed_text: string | null; msg_type: string }) => {
-      if ((m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text) {
-        const prefix = m.msg_type === "audio" ? "[audio]" : "[imagen]";
+      if ((m.msg_type === "audio" || m.msg_type === "image" || m.msg_type === "document") && m.transcribed_text) {
+        const prefix = m.msg_type === "audio" ? "[audio]" : m.msg_type === "document" ? "[documento]" : "[imagen]";
         return `${prefix} ${m.transcribed_text}`;
       }
       return m.body;
@@ -5750,8 +5750,8 @@ async function buildInitialUserMessage(args: {
     for (const m of tanda ?? []) {
       const sender = (m.sender_external_id ? extToNombre.get(m.sender_external_id) : null) ??
         ((m.sender_display_name ?? "").trim() || "(desconocido)");
-      const texto = (m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text
-        ? `[${m.msg_type === "audio" ? "audio" : "imagen"}] ${m.transcribed_text}`
+      const texto = (m.msg_type === "audio" || m.msg_type === "image" || m.msg_type === "document") && m.transcribed_text
+        ? `[${m.msg_type === "audio" ? "audio" : m.msg_type === "document" ? "documento" : "imagen"}] ${m.transcribed_text}`
         : m.body;
       if (texto) lines.push(`[${m.sent_at}] ${sender}: ${texto}`);
     }
@@ -5988,8 +5988,8 @@ async function buildInitialUserMessage(args: {
       transcribed_text: string | null;
       msg_type: string;
     }) => {
-      if ((m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text) {
-        const prefix = m.msg_type === "audio" ? "[audio]" : "[imagen]";
+      if ((m.msg_type === "audio" || m.msg_type === "image" || m.msg_type === "document") && m.transcribed_text) {
+        const prefix = m.msg_type === "audio" ? "[audio]" : m.msg_type === "document" ? "[documento]" : "[imagen]";
         return `${prefix} ${m.transcribed_text}`;
       }
       return m.body;

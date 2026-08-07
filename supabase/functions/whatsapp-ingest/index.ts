@@ -247,6 +247,13 @@ async function processDirectMessage(
   if (msg.msgType === "audio") {
     return { kind: "dm_received_no_code" };
   }
+  // Documentos en DM (07/08): Álvaro mandó un PPTX y un texto largo (WhatsApp
+  // convierte textos largos pegados en adjunto .txt) y morían acá como
+  // dm_ignored_non_text. Siguen al ruteo: whatsapp-extract-document los convierte
+  // en texto (patrón audio→transcripción) y dispara al agente.
+  if (msg.msgType === "document") {
+    return { kind: "dm_received_no_code" };
+  }
   if (msg.msgType !== "text" || !msg.body) {
     return { kind: "dm_ignored_non_text" };
   }
@@ -1099,6 +1106,21 @@ function fireAgent(messageId: string, groupId: string, reason: "mention" | "auto
   });
 }
 
+// Dispara whatsapp-extract-document para un DOCUMENTO (PDF/PPTX/DOCX/TXT) de DM.
+// El extractor baja el archivo vía gateway, saca el texto, lo guarda en
+// transcribed_text y AL TERMINAR dispara el agente él mismo (patrón audio).
+function fireExtractDocument(messageId: string): void {
+  const url = `${PROJECT_URL}/functions/v1/whatsapp-extract-document`;
+  const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cron-Token": token },
+    body: JSON.stringify({ message_id: messageId }),
+  }).catch((e) => {
+    console.warn("fireExtractDocument failed:", (e as Error).message);
+  });
+}
+
 // Dispara whatsapp-transcribe-audio para un mensaje de audio. El transcriptor
 // baja el audio (vía gateway), lo pasa por Whisper, guarda transcribed_text y
 // AL TERMINAR dispara el agente él mismo (mismo pipeline que los audios de
@@ -1125,12 +1147,13 @@ function fireTranscribe(messageId: string): void {
 // Devuelve un "kind" para logear. NO responde a números fuera de la whitelist.
 async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Promise<string> {
   const isAudio = msg.msgType === "audio";
-  if (msg.msgType !== "text" && !isAudio) return "dm_agent_skip_non_text";
+  const isDocument = msg.msgType === "document";
+  if (msg.msgType !== "text" && !isAudio && !isDocument) return "dm_agent_skip_non_text";
   const digits = (msg.senderExternalId || "").replace(/@.*/, "").replace(/\D/g, "");
   if (!digits) return "dm_agent_no_digits";
-  // Para texto exigimos algo sustantivo. El audio se valida DESPUÉS de
-  // transcribir (en whatsapp-transcribe-audio), así que no lo cortamos acá.
-  if (!isAudio && (msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
+  // Para texto exigimos algo sustantivo. El audio y los documentos se validan
+  // DESPUÉS (transcripción/extracción), así que no los cortamos acá.
+  if (!isAudio && !isDocument && (msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
 
   const { data: allow } = await sb
     .from("wa_dm_allowlist")
@@ -1184,15 +1207,19 @@ async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Pr
   const { id: messageId, inserted } = await insertMessage(sb, { id: groupId, tenant_id: TENANT_ID }, memberId, msg);
   if (inserted) {
     // Audio: primero transcribimos; el transcriptor dispara el agente al
-    // terminar (is_direct → sin gate de horario). Texto: al agente directo.
+    // terminar (is_direct → sin gate de horario). Documento: primero se extrae
+    // el texto (whatsapp-extract-document) y ESE pipeline dispara al agente.
+    // Texto: al agente directo.
     if (isAudio) {
       fireTranscribe(messageId);
+    } else if (isDocument) {
+      fireExtractDocument(messageId);
     } else {
       fireAgent(messageId, groupId, "mention");
     }
   }
   return inserted
-    ? (isAudio ? "dm_agent_audio_queued" : "dm_agent_fired")
+    ? (isAudio ? "dm_agent_audio_queued" : isDocument ? "dm_agent_document_queued" : "dm_agent_fired")
     : "dm_agent_duplicate";
 }
 

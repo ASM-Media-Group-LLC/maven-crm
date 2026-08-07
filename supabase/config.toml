@@ -110,6 +110,9 @@ verify_jwt = false  # cron (seguimientos); check interno de X-Cron-Token
 [functions.whatsapp-extract-commitments]
 verify_jwt = false  # cron; check interno de X-Cron-Token
 
+[functions.whatsapp-extract-document]
+verify_jwt = false  # extrae texto de PDF/PPTX/DOCX de DMs; auth propia (X-Cron-Token)
+
 [functions.whatsapp-transcribe-audio]
 verify_jwt = false  # transcribe audios de grupo (Whisper); auth propia
 
