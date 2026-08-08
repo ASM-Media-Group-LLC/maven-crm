@@ -12,13 +12,16 @@ import {
 } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import {
+  afirmaCeroProduccion,
   afirmaRegistro,
+  caracterizaPersona,
   detectarVoseoEnPitch,
   esCausaDeFalloScan,
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
   esPromesaDeComportamiento,
   similitudTexto,
+  tieneRespaldoDeJuicio,
   TIENE_PITCH_CITADO,
 } from "../_shared/agent-output-guards.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
@@ -1186,11 +1189,18 @@ const TOOLS: Array<{
   {
     name: "search_messages",
     description:
-      "Busca mensajes en el historial del grupo actual por texto. Devuelve hasta 20 matches con timestamp, sender y body. Úsalo para responder '¿qué dijo X sobre Y?' o '¿cuándo se habló de Z?'.",
+      "Busca mensajes en el historial del grupo por texto. Devuelve hasta 20 matches con timestamp, sender y body. Úsalo para responder '¿qué dijo X sobre Y?' o '¿cuándo se habló de Z?'. " +
+      "Con `group` busca en OTRO grupo del equipo a lo largo de VARIOS días — es la única forma de responder '¿qué instrucciones recibió fulano estas dos semanas?' o '¿quién le asigna trabajo?' " +
+      "(get_group_activity solo trae UN día). Buscar en otro grupo es solo para el dueño desde su chat privado.",
     input_schema: {
       type: "object",
       properties: {
         query: { type: "string", description: "texto a buscar (case insensitive)" },
+        group: {
+          type: "string",
+          description:
+            "nombre (o parte) de OTRO grupo: 'Managers', 'Ventas', 'WARMING'. Omitir = grupo actual. Solo el dueño puede cruzar de grupo.",
+        },
         since_days: { type: "number", description: "limitar a últimos N días (default 30)" },
         limit: { type: "number", description: "máx resultados (default 20, max 50)" },
       },
@@ -1519,11 +1529,14 @@ const TOOLS: Array<{
   {
     name: "get_daily_reports",
     description:
-      "Los reportes de jornada que el equipo YA registró hoy (o en la fecha que pidas): números/contactados de captación (llg), cierres de closers, y CONTENIDO del equipo de warming (videos, fotos, cuentas, posts). Úsalo cuando pregunten '¿qué hizo hoy el equipo?', '¿fulano ya reportó?', '¿cuánto produjo warming?' — o cuando te digan 'chequea, acaba de mandar el reporte'. Devuelve una fila por persona con lo que quedó registrado.",
+      "Los reportes de jornada que el equipo registró: números/contactados de captación (llg), cierres de closers, y CONTENIDO del equipo de warming (videos, fotos, cuentas, posts). Úsalo cuando pregunten '¿qué hizo hoy el equipo?', '¿fulano ya reportó?', '¿cuánto produjo warming?'. " +
+      "Con `days` devuelve el ACUMULADO por persona de los últimos N días — es la ÚNICA fuente de videos/fotos/posts/cuentas producidos: eso NO vive en Maven. " +
+      "Es obligatorio consultarla antes de decir que alguien no produjo nada.",
     input_schema: {
       type: "object",
       properties: {
-        date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default hoy" },
+        date: { type: "string", description: "fecha YYYY-MM-DD (Bogotá). Default hoy. Ignorado si mandas `days`" },
+        days: { type: "number", description: "acumulado de los últimos N días por persona (máx 90). Úsalo para '¿cuánto produjo X este mes?'" },
         role_kind: { type: "string", enum: ["llg", "closer", "content"], description: "filtrar por tipo. Omitir = todos" },
       },
     },
@@ -2030,6 +2043,29 @@ async function executeTool(
       const sinceDays = Number(input.since_days ?? 30);
       const limit = Math.min(Number(input.limit ?? 20), 50);
       const since = new Date(Date.now() - sinceDays * 24 * 3600 * 1000).toISOString();
+
+      // Buscar en OTRO grupo. 08/08: Álvaro pidió desde su DM "qué instrucciones
+      // recibe cada uno y quién le asigna trabajo, ejemplos de las últimas dos
+      // semanas" — imposible: esta tool estaba clavada al grupo actual (su propio
+      // DM) y get_group_activity solo trae UN día con tope de 100 mensajes.
+      // Mismo gate que get_group_activity: cruzar grupos es solo del dueño, porque
+      // los bots de Ventas/Warming tienen allowlist null y heredarían la tool sola.
+      let targetGroupId = ctx.groupId;
+      let targetGroupName: string | null = null;
+      const pedidoGrupo = String(input.group ?? "").trim();
+      if (pedidoGrupo) {
+        if (!ctx.isOwner) {
+          return { error: "no_autorizado", message: "Buscar en otros grupos es solo para el dueño." };
+        }
+        const { data: gs } = await sb.from("whatsapp_groups")
+          .select("id, name").eq("tenant_id", ctx.tenantId).eq("active", true)
+          .eq("is_direct", false).neq("provider", "manual").ilike("name", `%${pedidoGrupo}%`);
+        const grupos = (gs ?? []) as Array<{ id: string; name: string }>;
+        if (grupos.length === 0) return { error: "grupo_no_encontrado", buscado: pedidoGrupo };
+        if (grupos.length > 1) return { error: "grupo_ambiguo", coincidencias: grupos.map((g) => g.name) };
+        targetGroupId = grupos[0].id;
+        targetGroupName = grupos[0].name;
+      }
       // Buscamos en body Y en transcribed_text — un texto puede aparecer
       // en cualquiera de los dos según si el mensaje era texto o audio.
       // Postgres OR sobre dos ILIKE con escaping correcto del wildcard.
@@ -2037,7 +2073,7 @@ async function executeTool(
       const { data, error } = await sb
         .from("whatsapp_messages")
         .select("id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
-        .eq("group_id", ctx.groupId)
+        .eq("group_id", targetGroupId)
         .gte("sent_at", since)
         .or(`body.ilike.%${safe}%,transcribed_text.ilike.%${safe}%`)
         .order("sent_at", { ascending: false })
@@ -2057,7 +2093,7 @@ async function executeTool(
           const { data: amplio } = await sb
             .from("whatsapp_messages")
             .select("id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
-            .eq("group_id", ctx.groupId)
+            .eq("group_id", targetGroupId)
             .gte("sent_at", since)
             .or(`body.ilike.%${safeW}%,transcribed_text.ilike.%${safeW}%`)
             .order("sent_at", { ascending: false })
@@ -2077,7 +2113,7 @@ async function executeTool(
         const { data: members } = await sb
           .from("whatsapp_members")
           .select("external_id, user_id")
-          .eq("group_id", ctx.groupId)
+          .eq("group_id", targetGroupId)
           .in("external_id", Array.from(ids));
         const userIds = (members ?? [])
           .map((mm) => mm.user_id)
@@ -2118,7 +2154,12 @@ async function executeTool(
           text,
         };
       });
-      return { matches };
+      // Al cruzar de grupo el nombre viaja en la respuesta: sin él el modelo no
+      // puede atribuir ("esto se dijo en AI WARMING, no acá") y termina contando
+      // como propio lo que leyó en otro lado.
+      return targetGroupName
+        ? { grupo: targetGroupName, ventana_dias: sinceDays, matches }
+        : { matches };
     }
 
     case "search_maven_leads": {
@@ -3822,11 +3863,75 @@ async function executeTool(
 
     case "get_daily_reports": {
       const hoyBog = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+      const COLS =
+        "user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos, raw_text, profiles:user_id(full_name)";
+      const nombreDe = (r: Record<string, unknown>) =>
+        (r.profiles as { full_name?: string } | null)?.full_name ?? null;
+
+      // ── ACUMULADO POR PERSONA (rango) ──────────────────────────────────────
+      // 08/08: Álvaro pidió "volumen de producción de 30 días: DMs, números,
+      // videos, fotos, publicaciones, cuentas". Esta tool solo aceptaba UNA
+      // fecha, así que el bot contestó con lo que hay en Maven (leads) y dijo
+      // "Isabel — 0 registros" cuando Isabel tenía 27 videos registrados acá.
+      // Videos/fotos/posts/cuentas NO existen en ninguna otra tabla.
+      // No se scopea por grupo, igual que la consulta de un día: los tres bots que
+      // heredan esta tool (Warming, Ventas, Clari) ya podían leer cualquier fecha
+      // suelta, y los cortes de cada 2h ya cruzan esta misma data entre grupos. Es
+      // producción interna del equipo, no PII. Managers no la tiene en su allowlist.
+      if (input.days != null) {
+        const dias = Math.min(Math.max(Number(input.days) || 30, 1), 90);
+        const desde = new Date(Date.now() - 5 * 3600 * 1000 - dias * 86400000).toISOString().slice(0, 10);
+        let qr = sb.from("whatsapp_daily_reports").select(COLS).gte("report_date", desde);
+        if (input.role_kind) qr = qr.eq("role_kind", String(input.role_kind));
+        const { data: dr, error: eRango } = await qr;
+        if (eRango) return { error: eRango.message };
+        const filas = (dr ?? []) as Array<Record<string, unknown>>;
+
+        const acc = new Map<string, Record<string, number | string | null>>();
+        const n = (v: unknown) => Number(v) || 0;
+        for (const r of filas) {
+          const persona = nombreDe(r) ?? "(sin profile)";
+          const a = acc.get(persona) ?? {
+            persona, tipo: (r.role_kind as string) ?? null, dias_reportados: 0,
+            numeros: 0, contactados: 0, respuestas: 0, confirmadas: 0, cerradas: 0,
+            videos: 0, fotos: 0, cuentas: 0, posts: 0, primer_reporte: null, ultimo_reporte: null,
+          };
+          a.dias_reportados = n(a.dias_reportados) + 1;
+          a.numeros = n(a.numeros) + n(r.numeros_obtenidos);
+          a.contactados = n(a.contactados) + n(r.contactados);
+          a.respuestas = n(a.respuestas) + n(r.respuestas);
+          a.confirmadas = n(a.confirmadas) + n(r.confirmadas);
+          a.cerradas = n(a.cerradas) + n(r.cerradas);
+          a.videos = n(a.videos) + n(r.videos_creados);
+          a.fotos = n(a.fotos) + n(r.fotos_creadas);
+          a.cuentas = n(a.cuentas) + n(r.cuentas_creadas);
+          a.posts = n(a.posts) + n(r.posts_subidos);
+          const f = String(r.report_date);
+          if (!a.primer_reporte || f < String(a.primer_reporte)) a.primer_reporte = f;
+          if (!a.ultimo_reporte || f > String(a.ultimo_reporte)) a.ultimo_reporte = f;
+          acc.set(persona, a);
+        }
+        const personas = Array.from(acc.values())
+          .sort((x, y) => n(y.dias_reportados) - n(x.dias_reportados));
+        return {
+          rango: `últimos ${dias} días (desde ${desde})`,
+          dias_del_rango: dias,
+          personas,
+          // El reporte es AUTO-REPORTADO y opcional: la cobertura es rala (en la
+          // ventana real de agosto va de 11 días a 2 según la persona). Sin este
+          // aviso el modelo lee el total como si fuera de los N días completos —
+          // el antipatrón de la casa de tomar una muestra por el universo.
+          nota: personas.length === 0
+            ? "Nadie registró reportes en ese rango."
+            : "`dias_reportados` es cuántos días esa persona REPORTÓ, no cuántos trabajó. " +
+              "Cítalo siempre junto al total. Un 0 acá significa 'no lo reportó', NUNCA " +
+              "'no produjo': quien no aparece en la lista simplemente no registró reportes.",
+        };
+      }
+
+      // ── UN DÍA ─────────────────────────────────────────────────────────────
       const fecha = String(input.date ?? hoyBog);
-      let q = sb
-        .from("whatsapp_daily_reports")
-        .select("user_id, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos, raw_text, profiles:user_id(full_name)")
-        .eq("report_date", fecha);
+      let q = sb.from("whatsapp_daily_reports").select(COLS).eq("report_date", fecha);
       if (input.role_kind) q = q.eq("role_kind", String(input.role_kind));
       const { data, error } = await q;
       if (error) return { error: error.message };
@@ -3835,7 +3940,7 @@ async function executeTool(
       return {
         fecha,
         reportes: rows.map((r) => ({
-          persona: (r.profiles as { full_name?: string } | null)?.full_name ?? null,
+          persona: nombreDe(r),
           tipo: r.role_kind,
           numeros: r.numeros_obtenidos, contactados: r.contactados, respuestas: r.respuestas,
           confirmadas: r.confirmadas, cerradas: r.cerradas,
@@ -6459,6 +6564,8 @@ async function runAgent(req: AgentRequest): Promise<{
   let disputaBloqueada = 0;
   let conductaBloqueada = 0;
   let repetidoBloqueado = 0;
+  let ceroProduccionBloqueado = 0;
+  let juicioBloqueado = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -7162,6 +7269,58 @@ async function runAgent(req: AgentRequest): Promise<{
             });
             continue;
           }
+        }
+      }
+      // Guarda CERO PRODUCCIÓN (08/08): Álvaro pidió el volumen de producción de 30
+      // días para rediseñar puestos ("PERSONA → NUEVO PUESTO → QUÉ LE QUITAMOS") y el
+      // bot contestó "Isabel — 0 registros en Maven", "Brayan — 0 registros" mirando
+      // solo leads. Isabel tenía 27 videos y Lizeth 16 videos + 73 fotos + 11 posts
+      // en whatsapp_daily_reports, que es la ÚNICA tabla donde vive el contenido.
+      // Decir que alguien no produjo, leyendo una fuente que no registra lo que esa
+      // persona produce, es la muestra tomada por el universo — con un puesto en juego.
+      if (t.name === "reply_to_group" && ceroProduccionBloqueado < 1 &&
+          !msPorTool.has("get_daily_reports")) {
+        const cuerpoCero = String((t.input as ToolInput).body ?? "");
+        if (afirmaCeroProduccion(cuerpoCero)) {
+          ceroProduccionBloqueado += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "cero_produccion_sin_verificar",
+              message:
+                "NO se envió: estás afirmando que alguien no produjo (o produjo 0) sin haber consultado " +
+                "get_daily_reports, que es la ÚNICA fuente de videos, fotos, posts y cuentas — eso NO está " +
+                "en Maven. El 08/08 se le dijo al jefe que Isabel tenía 0 registros cuando tenía 27 videos " +
+                "reportados. Llama get_daily_reports (con `days` si el pedido es de un período) y recién " +
+                "entonces responde. Si tras consultarlo sigue sin haber filas, di 'no reportó', NO 'no produjo'.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda JUICIO SOBRE PERSONAS (08/08): en el mismo hilo el bot calificó a
+      // cuatro personas ("Reactivos: Brayan e Isabel", "Lizeth necesita que le digan
+      // qué hacer", "poca pieza propia") con la misma seguridad con la que daba horas
+      // de Hubstaff. No se prohíbe opinar — dirección necesita la lectura — pero
+      // tiene que decir sobre cuánto tiempo opina, o marcarlo como impresión.
+      if (t.name === "reply_to_group" && juicioBloqueado < 1) {
+        const cuerpoJuicio = String((t.input as ToolInput).body ?? "");
+        if (caracterizaPersona(cuerpoJuicio) && !tieneRespaldoDeJuicio(cuerpoJuicio)) {
+          juicioBloqueado += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "juicio_sobre_persona_sin_ventana",
+              message:
+                "NO se envió: estás calificando la forma de trabajar de una persona sin decir sobre qué " +
+                "período ni con qué evidencia. Quien te lee toma decisiones de puesto con eso. Reescríbelo " +
+                "con la ventana explícita y el hecho que lo sostiene ('en los últimos 7 días pidió " +
+                "instrucciones 3 veces'), o márcalo como lo que es ('impresión del chat, no medido').",
+            }),
+          });
+          continue;
         }
       }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador

@@ -13,6 +13,9 @@ import {
   esPromesaDeComportamiento,
   similitudTexto,
   TIENE_PITCH_CITADO,
+  afirmaCeroProduccion,
+  caracterizaPersona,
+  tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
 
 Deno.test("ack falso — los casos reales siguen bloqueados", () => {
@@ -222,4 +225,63 @@ Deno.test("no toca mensajes normales (con saltos reales o sin escapes)", () => {
 
 Deno.test("mixto: conserva los saltos reales y convierte los literales", () => {
   assertEquals(desescaparSaltosLiterales("línea real\ny luego\\nliteral"), "línea real\ny luego\nliteral");
+});
+
+// ── Cero producción sin verificar (Álvaro 08/08, rediseño de puestos) ───────────
+Deno.test("cero producción — los casos reales del 08/08 se bloquean", () => {
+  for (
+    const s of [
+      "• Isabel — 0 registros en Maven (todo video de cliente).",
+      "• Brayan — 0 registros en Maven (coordinación).",
+      "Lizeth — 10 números (sin cargar perfiles). 0 números pese a tener meta de 3.",
+      "Isabel y Brayan: sin output de negocio esta semana.",
+      "Brayan no produjo nada en el período.",
+      "Cero entregables de su parte.",
+    ]
+  ) assert(afirmaCeroProduccion(s), `debió bloquear: ${s}`);
+});
+
+Deno.test("cero producción — no bloquea reportes normales con números reales", () => {
+  for (
+    const s of [
+      "Daniel — 560 perfiles cargados · 22 números · 19 leads al pipeline.",
+      "Isabel — 27 videos reportados en 7 días de reporte.",
+      "Carolina: 7/29 promocionaron hoy · 9 contactadas.",
+      "Hoy no ha fichado nada en Hubstaff (feed al corte de 09:50).",
+      "Vanessa — sin fichar hoy, ayer sí entró 08:00.",
+    ]
+  ) assertEquals(afirmaCeroProduccion(s), false, `no debió bloquear: ${s}`);
+});
+
+// ── Juicio sobre personas sin ventana (mismo hilo del 08/08) ────────────────────
+Deno.test("juicio sobre persona — caza las caracterizaciones reales", () => {
+  for (
+    const s of [
+      "Reactivos: Brayan (apaga fuegos: créditos, links, apelaciones) e Isabel (ejecuta lo que le pidas).",
+      "Lizeth necesita que le digan qué hacer.",
+      "Brayan: coordinación, poca pieza propia.",
+      "El cuello de botella es Brayan.",
+      "No es autónomo, hay que estarle encima.",
+    ]
+  ) assert(caracterizaPersona(s), `debió detectarse: ${s}`);
+});
+
+Deno.test("juicio con ventana o hedge explícito pasa limpio", () => {
+  // El mismo juicio, sostenido: pasa. La guarda pide respaldo, no silencio.
+  assert(tieneRespaldoDeJuicio("Lizeth necesita que le digan qué hacer — ayer preguntó dos veces qué cuenta tocar."));
+  assert(tieneRespaldoDeJuicio("Reactivo en los últimos 7 días: Brayan."));
+  assert(tieneRespaldoDeJuicio("Es impresión del chat, no lo tengo medido: Isabel ejecuta lo que le pidas."));
+  assert(tieneRespaldoDeJuicio("Del 02/08 al 07/08 fue el cuello de botella."));
+  // Sin ninguna de las tres cosas, no hay respaldo.
+  assertEquals(tieneRespaldoDeJuicio("Reactivos: Brayan e Isabel."), false);
+});
+
+Deno.test("juicio — un reporte de datos sin adjetivos no dispara", () => {
+  for (
+    const s of [
+      "Daniel Duque — 77h en 25 días (3h/día prom.) · 53% act.",
+      "Brayan Esneider — 194h en 24 días (8h/día) · 19% act.",
+      "Carolina: 4h50 · 56% act.",
+    ]
+  ) assertEquals(caracterizaPersona(s), false, `no debió detectarse: ${s}`);
 });

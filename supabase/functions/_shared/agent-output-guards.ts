@@ -128,3 +128,37 @@ export function desescaparSaltosLiterales(s: string): string {
   if (!s || (!s.includes("\\n") && !s.includes("\\t"))) return s;
   return s.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
 }
+
+// ── "Fulano no produjo nada" sin haber mirado los reportes ──────────────────────
+// 08/08: Álvaro pidió el volumen de producción de 30 días para decidir puestos y
+// despidos. El bot contestó "Isabel — 0 registros en Maven" y "Brayan — 0 registros"
+// mirando SOLO leads de Maven. En whatsapp_daily_reports, Isabel tenía 27 videos y
+// Lizeth 16 videos + 73 fotos + 11 posts: videos/fotos/posts/cuentas no viven en
+// ninguna otra tabla. Declarar cero producción desde una fuente que no la registra
+// es el antipatrón de la casa (la muestra tomada por el universo), pero aplicado a
+// una PERSONA y con su puesto en juego.
+export const CERO_PRODUCCION_RE =
+  /\b(?:0|cero)\s+(?:registros?|n[úu]meros?|videos?|fotos?|posts?|publicaciones|piezas?|entregables?|leads?|cuentas?|contactad[oa]s?)\b|\bsin\s+(?:output|producci[óo]n|registros?|entregables?|piezas?)\b|\bno\s+(?:produjo|produce|registr[óo]|entreg[óo]|aport[óo])\s+(?:nada\b|ning)/i;
+export const afirmaCeroProduccion = (s: string): boolean => CERO_PRODUCCION_RE.test(s);
+
+// ── Caracterizar a una persona sin ventana ni evidencia ─────────────────────────
+// Mismo día, mismo hilo: "Reactivos: Brayan e Isabel", "Lizeth necesita que le
+// digan qué hacer", "poca pieza propia" — juicios de disposición entregados con la
+// misma seguridad que una medición, a un jefe que dijo textual para qué los quería
+// ("PERSONA → NUEVO PUESTO → QUÉ LE QUITAMOS"). No se prohíbe opinar: se exige
+// decir sobre cuántos días se opina, o marcarlo como impresión.
+export const CARACTERIZA_PERSONA_RE =
+  /\b(?:reactiv[oa]s?\b|apaga(?:ndo)?\s+fuegos?|cuello\s+de\s+botella|necesita\s+que\s+le\s+(?:digan|diga|indiquen|est[ée]n)|hay\s+que\s+estar(?:le)?\s+encima|no\s+(?:rinde|da\s+el\s+ancho|vale\s+la\s+pena)|ejecuta\s+lo\s+que\s+le\s+pid|poca\s+(?:pieza|iniciativa|autonom[íi]a)|sin\s+iniciativa|no\s+es\s+aut[óo]nom|hay\s+que\s+reemplazar)/i;
+export const caracterizaPersona = (s: string): boolean => CARACTERIZA_PERSONA_RE.test(s);
+
+// Respaldo aceptable: una ventana temporal explícita (fechas, "N días", "esta
+// semana") o un marcador honesto de que es inferencia. Con cualquiera de los dos
+// la caracterización pasa — el objetivo es que el lector sepa sobre qué se opina.
+export const RESPALDO_TEMPORAL_RE =
+  /\b\d{1,2}\s*[/-]\s*\d{1,2}\b|\b\d{1,2}\s+de\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)/i;
+export const RESPALDO_VENTANA_RE =
+  /\b(?:[úu]ltim[oa]s?\s+\d+|\d+\s+d[íi]as?|\d+\s+semanas?|esta\s+semana|este\s+mes|[úu]ltimo\s+mes|hoy|ayer|anteayer)\b/i;
+export const RESPALDO_HEDGE_RE =
+  /\b(?:estimad[oa]|impresi[óo]n|inferid[oa]|infiero|aproximad[oa]|no\s+(?:lo\s+)?tengo\s+medid|seg[úu]n\s+(?:lo\s+registrado|los\s+reportes|el\s+chat)|sin\s+dato\s+duro|a\s+ojo)\b/i;
+export const tieneRespaldoDeJuicio = (s: string): boolean =>
+  RESPALDO_TEMPORAL_RE.test(s) || RESPALDO_VENTANA_RE.test(s) || RESPALDO_HEDGE_RE.test(s);
