@@ -5550,7 +5550,9 @@ async function resolveSenderContext(args: {
   const sb = adminClient();
   const { data: msg } = await sb
     .from("whatsapp_messages")
-    .select("sender_external_id")
+    // `raw` viaja para poder resolver por TELÉFONO cuando el LID es desconocido
+    // (ver fallback 3): Baileys manda el número real en key.participantAlt.
+    .select("sender_external_id, raw")
     .eq("id", args.messageId)
     .maybeSingle();
   if (!msg?.sender_external_id) {
@@ -5590,8 +5592,53 @@ async function resolveSenderContext(args: {
         .maybeSingle();
       if (anyMember?.user_id) resolvedUserId = anyMember.user_id;
     }
+    // 3) POR TELÉFONO — el que salva los cambios de número.
+    // Caso Daniel Duque (12/08): cambió de línea, cargó el número nuevo en Maven y
+    // verificó por DM… y el bot dejó de reconocerlo igual. Su LID nuevo entró como
+    // miembro sin user_id, y el fallback (1) tampoco lo agarró porque
+    // claim_whatsapp_verification_code guarda en profiles.whatsapp_lid lo que le pasa
+    // el DM — y en un DM el adapter resuelve el remitente al TELÉFONO a propósito
+    // (para no duplicar contactos en la bandeja). Resultado: un '@s.whatsapp.net'
+    // guardado en una columna que se compara contra LIDs de grupo. Nunca matchea.
+    // Los cinco perfiles verificados por DM tienen ese defecto.
+    //
+    // El teléfono es el único identificador que la persona SÍ actualiza en Maven, y
+    // viaja en cada mensaje de grupo. Con esto, cambiar de número vuelve a ser lo que
+    // el equipo espera: se corrige en Maven y el bot lo toma solo en el próximo
+    // mensaje, sin que nadie tenga que tocar la base.
+    if (!resolvedUserId) {
+      const alt = (msg.raw as Record<string, unknown> | null)
+        ?.["data"] as Record<string, unknown> | undefined;
+      const key = alt?.["key"] as Record<string, unknown> | undefined;
+      const crudo = String(key?.["participantAlt"] ?? "");
+      const digitos = crudo.split("@")[0].replace(/\D/g, "");
+      // Match EXACTO sobre E.164. Nada de "últimos N dígitos": acá se decide la
+      // identidad y con ella los permisos — un match parcial es una adivinanza con
+      // consecuencias (la lección de los dos Álvaro Mejía).
+      if (digitos.length >= 10) {
+        const { data: porTel } = await sb
+          .from("profiles")
+          .select("id")
+          .eq("phone_e164", `+${digitos}`)
+          .limit(2);
+        const filas = (porTel ?? []) as Array<{ id: string }>;
+        // Si dos perfiles comparten teléfono, NO se elige: se prefiere no reconocer
+        // antes que atribuirle a la persona equivocada.
+        if (filas.length === 1) resolvedUserId = filas[0].id;
+      }
+    }
     // Backfill de la fila de este grupo para acelerar futuras resoluciones.
     if (resolvedUserId) {
+      // ⚠️ unique(group_id, user_id): un perfil solo puede estar en UNA fila por
+      // grupo. Si la persona cambió de número, su LID VIEJO sigue ocupando ese lugar
+      // y este update fallaría en silencio — el bot la reconocería por el fallback
+      // en cada mensaje, para siempre, sin nunca terminar de migrarla.
+      // Se libera primero el LID anterior: quien manda es el que está escribiendo.
+      await sb.from("whatsapp_members")
+        .update({ user_id: null })
+        .eq("group_id", args.groupId)
+        .eq("user_id", resolvedUserId)
+        .neq("external_id", ext);
       await sb.from("whatsapp_members")
         .update({ user_id: resolvedUserId })
         .eq("group_id", args.groupId)
