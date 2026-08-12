@@ -3809,13 +3809,18 @@ async function executeTool(
       const dias = Math.min(Math.max(Number(input.days) || 7, 1), 60);
       const cuenta = String(input.account ?? "both").toLowerCase();
       const desde = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+      // net_sales/purchases/offers/fans_contacted: confirmados el 12/08 con el shape
+      // real de BLU. Sin ellos la tool solo puede decir CUÁNTO vendió la IA, y la
+      // pregunta de dirección es si VENDE o solo mensajea — eso sale de ofertas
+      // contra compras. Exponerlos acá evita repetir el patrón de la semana: el dato
+      // en la tabla y la tool sin pedirlo.
       let q = sb.from("sophie_daily_stats")
-        .select("date, account, blu_model_id, model_name, username, ai_sales, ai_messages, updated_at")
+        .select("date, account, blu_model_id, model_name, username, ai_sales, ai_messages, net_sales, purchases, offers, fans_contacted, updated_at")
         .gte("date", desde);
       if (cuenta === "plus" || cuenta === "massive") q = q.eq("account", cuenta);
       const { data, error } = await q.order("date", { ascending: true }).limit(2000);
       if (error) return { error: error.message };
-      const filas = (data ?? []) as Array<{ date: string; account: string; blu_model_id: number; model_name: string | null; username: string | null; ai_sales: number; ai_messages: number; updated_at: string }>;
+      const filas = (data ?? []) as Array<{ date: string; account: string; blu_model_id: number; model_name: string | null; username: string | null; ai_sales: number; ai_messages: number; net_sales: number | null; purchases: number | null; offers: number | null; fans_contacted: number | null; updated_at: string }>;
       if (filas.length === 0) {
         return {
           rango: `últimos ${dias} días`,
@@ -3835,10 +3840,24 @@ async function executeTool(
         m.sales += Number(r.ai_sales || 0); m.msgs += Number(r.ai_messages || 0);
         porModelo.set(nombre, m);
       }
+      const sumCampo = (k: "net_sales" | "purchases" | "offers" | "fans_contacted") =>
+        filas.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+      const ofertas = sumCampo("offers"), compras = sumCampo("purchases");
       return {
         rango: `últimos ${dias} días`,
         total_ventas_ai: suma(filas),
         total_mensajes_ai: filas.reduce((s, r) => s + Number(r.ai_messages || 0), 0),
+        // "¿la IA vende o solo mensajea?" se responde con esto, no con el bruto.
+        venta_neta_ai: Math.round(sumCampo("net_sales") * 100) / 100,
+        ofertas_lanzadas: ofertas,
+        compras_cerradas: compras,
+        conversion_pct: ofertas > 0 ? Math.round((compras / ofertas) * 1000) / 10 : null,
+        fans_contactados: sumCampo("fans_contacted"),
+        nota_lectura:
+          "total_ventas_ai es BRUTO (BLU: totalSales) y venta_neta_ai es NETO (netSales) — no los mezcles " +
+          "ni los sumes. La conversión sale de ofertas→compras. ⚠️ Esto es SOLO lo que BLU le atribuye a " +
+          "Sophie: los chatters humanos venden mayormente en Infloww, que Maven todavía no lee, así que NO " +
+          "compares este total contra la venta de los humanos como si fueran el mismo universo.",
         por_cuenta: {
           plus: suma(filas.filter((r) => r.account === "plus")),
           massive: suma(filas.filter((r) => r.account === "massive")),

@@ -320,15 +320,37 @@ function transformSophieDaily(results, account) {
       // blu_model_id es BIGINT: un id no numérico haría fallar el upsert entero.
       // Se cuenta aparte para poder decirlo en el log en vez de tumbar la corrida.
       if (!Number.isFinite(Number(id))) { diag.id_no_numerico++; continue; }
+      // ── SHAPE REAL DE BLU, confirmado con la corrida del 12/08 ────────────────
+      // Las métricas vienen PLANAS en el objeto del modelo (no hay `totals`):
+      //   {modelId, username, modelName, aiEnabled, totalSales, netSales,
+      //    purchases, offers, totalMessages, activeChats, fansContacted,
+      //    lastActivityAt, avatarUrl}
+      // `tot` se deja por si algún día lo anidan, pero hoy cae siempre en `md`.
       const tot = md.totals || md.stats || md.metrics || md;
-      const sales = Number(tot.aiSales ?? tot.salesValue ?? tot.sales ?? tot.totalSales ?? tot.revenue ?? 0) || 0;
-      const msgs = Number(tot.aiMessages ?? tot.messages ?? tot.messagesSent ?? tot.sentMessages ?? 0) || 0;
+      const num = (...alias) => {
+        for (const a of alias) { const v = Number(tot[a]); if (Number.isFinite(v)) return v; }
+        return 0;
+      };
+      const sales = num("totalSales", "aiSales", "salesValue", "sales", "revenue");
+      // ⚠️ El campo de mensajes es `totalMessages`. Buscar solo aiMessages/messages/
+      // messagesSent/sentMessages metió las 93 primeras filas con ai_messages=0
+      // aunque el dato venía (danyancatgaming: 1.201 mensajes en un día).
+      const msgs = num("totalMessages", "aiMessages", "messages", "messagesSent", "sentMessages");
       if (sales <= 0 && msgs <= 0) { diag.descartados_sin_actividad++; continue; }
       rows.push({
         date, account, blu_model_id: Number(id),
         model_name: md.modelName ?? md.displayName ?? md.name ?? null,
         username: md.username ?? md.handle ?? null,
         ai_sales: sales, ai_messages: msgs,
+        // Señal que se estaba tirando y es la que responde "¿la IA VENDE o solo
+        // mensajea?": offers→purchases da la conversión real (13,6% en los 8 días
+        // medidos), y net vs bruto evita comparar peras con manzanas.
+        net_sales: Number.isFinite(Number(tot.netSales)) ? Number(tot.netSales) : null,
+        purchases: Number.isFinite(Number(tot.purchases)) ? Number(tot.purchases) : null,
+        offers: Number.isFinite(Number(tot.offers)) ? Number(tot.offers) : null,
+        fans_contacted: Number.isFinite(Number(tot.fansContacted)) ? Number(tot.fansContacted) : null,
+        active_chats: Number.isFinite(Number(tot.activeChats)) ? Number(tot.activeChats) : null,
+        ai_enabled: typeof md.aiEnabled === "boolean" ? md.aiEnabled : null,
         raw: md, updated_at: new Date().toISOString(),
       });
     }
