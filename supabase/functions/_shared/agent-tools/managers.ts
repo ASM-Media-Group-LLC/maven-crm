@@ -99,14 +99,33 @@ export const managersTools: AgentTool[] = [
       // preferir la activa si hay varias
       const c = cands.find((x) => x.status === "active") ?? cands[0];
 
+      let managerNombre: string | null = null;
+      if (c.assigned_manager_profile_id) {
+        const { data: mgr } = await ctx.sb
+          .from("profiles").select("full_name").eq("id", c.assigned_manager_profile_id).maybeSingle();
+        managerNombre = (mgr as { full_name?: string } | null)?.full_name ?? null;
+      }
+
+      // AUDITORÍA 10-12/08: dos "no tengo" que eran huecos de este select, no del modelo.
+      //   · 10/08 13:22, Juan Pachas antes de una reunión: "¿puedes separar estos
+      //     números entre suscripción y mensajería?" → "no tengo el desglose".
+      //     subscription_gross y message_gross están poblados TODOS los días (796
+      //     filas solo en agosto); Carolina terminó sacándolo a mano.
+      //   · Álvaro pidió churn/LTV — la serie de active_fans/new_fans está acá día a
+      //     día, pero abajo solo se devolvía `latestFans`, un snapshot. Con la serie
+      //     sale directo: fans nuevos del período vs variación de la base.
       const { data: rows, error: eErr } = await ctx.sb
         .from("creator_daily_earnings")
-        .select("date,total_gross,active_fans,new_fans")
+        .select("date,total_gross,subscription_gross,message_gross,tips_gross,active_fans,new_fans")
         .eq("creator_id", c.id)
         .gte("date", new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10))
         .order("date", { ascending: false });
       if (eErr) throw new Error(`get_creator_earnings earnings: ${eErr.message}`);
-      const es = (rows ?? []) as Array<{ date: string; total_gross: number; active_fans: number | null; new_fans: number | null }>;
+      const es = (rows ?? []) as Array<{
+        date: string; total_gross: number; subscription_gross: number | null;
+        message_gross: number | null; tips_gross: number | null;
+        active_fans: number | null; new_fans: number | null;
+      }>;
 
       const today = new Date();
       const dayN = (n: number) => new Date(today.getTime() - n * 864e5).toISOString().slice(0, 10);
@@ -138,7 +157,18 @@ export const managersTools: AgentTool[] = [
 
       return {
         found: true,
-        creator: { name: c.artistic_name || c.name, instagram_handle: c.instagram_handle, status: c.status },
+        // `manager` va en la ficha porque el bot llegó a PREGUNTARLE AL GRUPO de quién
+        // era una creadora teniendo el dato acá: assigned_manager_profile_id ya se
+        // consultaba arriba y nunca salía en la respuesta.
+        creator: {
+          name: c.artistic_name || c.name,
+          instagram_handle: c.instagram_handle,
+          status: c.status,
+          manager: managerNombre,
+          ...(c.assigned_manager_profile_id ? {} : {
+            nota_manager: "Sin manager asignada: queda FUERA de los conteos por línea (Plus/Massive).",
+          }),
+        },
         ...(posibleCorte ? {
           posible_corte_de_lectura: true,
           dias_en_cero: rachaCero,
@@ -155,7 +185,48 @@ export const managersTools: AgentTool[] = [
         trend_pct: gPrev7 > 0 ? Math.round(((g7 - gPrev7) / gPrev7) * 100) : null,
         active_fans: latestFans?.active_fans ?? null,
         new_fans_last: latestFans?.new_fans ?? null,
-        daily_last14: es.filter((r) => r.date >= dayN(14)).map((r) => ({ date: r.date, gross: Math.round(Number(r.total_gross) || 0) })),
+        // DESGLOSE POR TIPO DE INGRESO (30d). Lo que el bot le negó a Juan Pachas.
+        desglose_30d: (() => {
+          const suma = (k: "subscription_gross" | "message_gross" | "tips_gross") =>
+            Math.round(es.reduce((a, r) => a + (Number(r[k]) || 0), 0));
+          const sub = suma("subscription_gross"), msg = suma("message_gross"), tips = suma("tips_gross");
+          const tot = Math.round(g30);
+          const pct = (v: number) => (tot > 0 ? Math.round((v / tot) * 100) : null);
+          return {
+            suscripcion_usd: sub, suscripcion_pct: pct(sub),
+            mensajeria_usd: msg, mensajeria_pct: pct(msg),
+            propinas_usd: tips, propinas_pct: pct(tips),
+            otros_usd: Math.max(0, tot - sub - msg - tips),
+          };
+        })(),
+        // SERIE DE FANS para churn/LTV: sin esto solo había un snapshot y la
+        // pregunta "¿fidelizamos o solo entran nuevos?" quedaba sin responder.
+        // Los fans nuevos se SUMAN; la base activa se compara punta a punta.
+        fans_serie_30d: (() => {
+          const conFans = es.filter((r) => r.active_fans != null).sort((a, b) => a.date.localeCompare(b.date));
+          if (conFans.length < 2) return { suficiente: false, nota: "menos de 2 días con lectura de fans" };
+          const ini = conFans[0], fin = conFans[conFans.length - 1];
+          const nuevos = es.reduce((a, r) => a + (Number(r.new_fans) || 0), 0);
+          const deltaBase = Number(fin.active_fans) - Number(ini.active_fans);
+          return {
+            suficiente: true,
+            desde: ini.date, hasta: fin.date,
+            base_inicial: ini.active_fans, base_final: fin.active_fans,
+            variacion_base: deltaBase,
+            fans_nuevos_periodo: nuevos,
+            // Entraron `nuevos` y la base se movió `deltaBase` → se fueron la diferencia.
+            fans_perdidos_estimado: Math.max(0, nuevos - deltaBase),
+            nota:
+              "`fans_perdidos_estimado` = nuevos − variación de la base. Es una ESTIMACIÓN aritmética, " +
+              "no un churn medido por BLU: cítala como tal y con las fechas del tramo.",
+          };
+        })(),
+        daily_last14: es.filter((r) => r.date >= dayN(14)).map((r) => ({
+          date: r.date,
+          gross: Math.round(Number(r.total_gross) || 0),
+          suscripcion: Math.round(Number(r.subscription_gross) || 0),
+          mensajeria: Math.round(Number(r.message_gross) || 0),
+        })),
       };
     },
   },

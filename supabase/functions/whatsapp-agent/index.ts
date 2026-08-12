@@ -2957,7 +2957,14 @@ async function executeTool(
           // lead_source/deal_type/source_contact_id: de qué BASE viene el lead y con
           // qué contacto está atado. Sin esto el bot no podía decir de dónde salió
           // (respondía como si todo fuera de la base maven).
-          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, last_contact_date, created_at, notes, lead_source, deal_type, source_contact_id")
+          // source_account: DESDE QUÉ CUENTA DE IG se consiguió el lead. La columna
+          // existe hace rato y NO estaba expuesta a ninguna tool — `grep -rn
+          // source_account supabase/functions` devolvía CERO líneas. Por eso el bot le
+          // pedía a Daniel una y otra vez "de qué cuenta salió este número" aunque
+          // Daniel ya lo hubiera cargado: no era desmemoria del modelo, era un dato
+          // que nunca le llegaba. Y es justo el eje con el que Álvaro quiere decidir
+          // en qué cuentas concentrar el outreach.
+          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, last_contact_date, created_at, notes, lead_source, deal_type, source_contact_id, source_account")
           .ilike("instagram_handle", ilike)
           .order("created_at", { ascending: false })
           .limit(5),

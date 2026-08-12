@@ -225,9 +225,25 @@ async function buildDailyQuality(sb: any): Promise<string> {
 
   // Denominador: sin esto un podio de 3 sobre 5 lecturas válidas se lee como si
   // fuera el top de todo el roster.
-  const leidas = new Set(rows.map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean)).size;
+  //
+  // ⚠️ "lectura válida" NO es "aparece en la tabla". El scan escribe fila igual
+  // cuando NO pudo leer, con promoted='pending' (error_reason no_ig_id,
+  // unconfirmed_empty, throttled…). Contarlas infla el denominador y hace ver al
+  // equipo peor de lo que es: el 12/08 había 44 creadoras con lectura definitiva
+  // y 13 sin leer, y el pie decía "sobre 57". Es el antipatrón de la casa —
+  // "no poder leer" convertido en "no promocionó" (#818) — colado en el ratio.
+  const definitiva = (p: string | null) => ["true", "false", "yes", "no", "partial"].includes((p || "").toLowerCase());
+  const idsLeidas = new Set(
+    rows.filter((e: { promoted: string | null }) => definitiva(e.promoted))
+      .map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean),
+  );
+  const idsTodas = new Set(rows.map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean));
+  const leidas = idsLeidas.size;
+  const sinLeer = idsTodas.size - leidas;
   const pie = leidas > 0
-    ? `_${conPuntaje.length} con promo sobre ${leidas} creadoras con lectura válida hoy · % = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`
+    ? `_${conPuntaje.length} con promo sobre ${leidas} creadoras con lectura válida hoy` +
+      (sinLeer > 0 ? ` · ${sinLeer} sin lectura (no cuentan)` : "") +
+      ` · % = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`
     : `_% = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`;
   return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n${pie}`;
 }

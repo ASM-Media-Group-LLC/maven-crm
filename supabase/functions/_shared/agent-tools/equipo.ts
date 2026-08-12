@@ -625,7 +625,13 @@ export const equipoTools: AgentTool[] = [
         rango: { desde: from, hasta: to },
         personas: equipoMedible.length,
         ...(pedido ? { filtrado_por: pedido, personas_totales_del_rango: rows.length } : {}),
-        equipo: equipoMedible.slice(0, 60).map((r) => mapear(r as Record<string, unknown>)),
+        // ⚠️ SIN TOPE. El roster de Hubstaff son 65 personas y el cap estaba en 60:
+        // se caían 5 por corrida y, como las filas vienen ordenadas por tiempo
+        // fichado descendente, SIEMPRE las de menos horas — el 10/08, gente con 0
+        // segundos. Justo las que hay que reportar. Y la respuesta no traía ni total
+        // ni marca de truncado, así que el modelo no tenía forma de saber que le
+        // faltaba gente: contestaba sobre 60 creyendo que eran todos.
+        equipo: equipoMedible.map((r) => mapear(r as Record<string, unknown>)),
         ...(direccion.length ? {
           direccion_fuera_de_medicion: direccion.map((r) => mapear(r as Record<string, unknown>)),
           nota_direccion:
@@ -637,7 +643,7 @@ export const equipoTools: AgentTool[] = [
         // quedaron fuera y hay que nombrarlos. Sin filtro no se omiten nada (están en
         // `equipo`), así que alcanza con el conteo — listarlos otra vez sería ruido.
         ...(sinClasificar.length ? (pedido ? {
-          sin_clasificar: sinClasificar.slice(0, 30).map((r) => ({
+          sin_clasificar: sinClasificar.map((r) => ({
             nombre: (r as Record<string, unknown>).name,
             en_maven: (r as Record<string, unknown>).mapped_to_maven,
             horas: (r as Record<string, unknown>).total_hours,
@@ -668,7 +674,10 @@ export const equipoTools: AgentTool[] = [
           !DIRECCION_EXENTA.has(String(m.profile_id ?? ""))
         );
         if (sinFichar.length) {
-          result.sin_fichar_en_rango = sinFichar.slice(0, 30).map((m) => ({
+          // ⚠️ SIN TOPE, y es el más peligroso de los cuatro que había: este bloque
+          // responde "quién no fichó hoy" — la pregunta literal de RRHH. El cap de 30
+          // sobre 36 ceros (10/08) borraba a seis personas de la lista de ausentes.
+          result.sin_fichar_en_rango = sinFichar.map((m) => ({
             nombre: m.name,
             en_maven: m.profile_id != null,
           }));
@@ -784,6 +793,16 @@ export const equipoTools: AgentTool[] = [
         // Con match único, al feed en vivo va el nombre EXACTO del match (no lo
         // que se dijo): la RPC live también hace ilike y podría re-ambiguar.
         const personLive = person && rows.length === 1 ? String(rows[0].name) : person;
+        // hubstaff_user_id → profile_id, para poder aplicar DIRECCION_EXENTA sobre el
+        // feed en vivo (la RPC no expone profile_id).
+        const pidPorHubstaffUser = new Map<string, string>();
+        {
+          const { data: hm } = await ctx.sb
+            .from("hubstaff_members").select("hubstaff_user_id, profile_id");
+          for (const m of (hm ?? []) as Array<Record<string, unknown>>) {
+            if (m.profile_id) pidPorHubstaffUser.set(String(m.hubstaff_user_id), String(m.profile_id));
+          }
+        }
         const { data: live, error: liveErr } = await ctx.sb.rpc("hubstaff_live_today", { p_person: personLive });
         if (liveErr) {
           result.hoy_en_vivo = { error: `hubstaff_live_today: ${liveErr.message}` };
@@ -808,7 +827,11 @@ export const equipoTools: AgentTool[] = [
             feed_edad_min: feedAgeMin,
             feed_stale: feedStale,
             refresh_on_demand: refresh,
-            personas: liveRows.slice(0, 60).map((r) => ({
+            // SIN TOPE: el roster son 65 y el cap estaba en 60. liveRows viene
+            // ordenado por segundos descendente, así que las 5 que se caían eran
+            // siempre las de menos tiempo fichado — exactamente las que se preguntan.
+            personas_totales: liveRows.length,
+            personas: liveRows.map((r) => ({
               nombre: r.name,
               nombre_en_maven: r.full_name_maven ?? null,
               rol: r.hubstaff_role,
@@ -823,6 +846,40 @@ export const equipoTools: AgentTool[] = [
                 ? "ficho_hoy"
                 : (feedStale ? "sin_dato_feed_stale" : "sin_fichar_hoy"),
             })),
+            // BUCKET 0-25% CALCULADO POR LA TOOL, no compuesto por el modelo.
+            // 10/08 10:20, único reporte que le llegó a Grace: listó DOS personas en
+            // la banda y cerró con "el resto del equipo conectado está por encima del
+            // 25%". Falso — quedaban dentro Lizeth Jerez (10%), María Suárez (15%) y
+            // Manuela Zapata (22%), ninguna exenta. La regla que sale de acá: si un
+            // número o una lista va a salir en un mensaje, tiene que venir de un campo
+            // del payload, no de que el modelo filtre a ojo una lista de 60 personas.
+            bucket_actividad_0_25: (() => {
+              // ⚠️ hubstaff_live_today NO devuelve profile_id (solo hubstaff_user_id),
+              // así que la exención de dirección se resuelve contra el mapa de
+              // hubstaff_members cargado arriba. Filtrar por `r.profile_id` acá sería
+              // comparar contra undefined: no excluiría a NADIE y metería a Grace —
+              // la destinataria del reporte — en su propia lista de baja actividad.
+              const enBanda = liveRows.filter((r) =>
+                Number(r.seconds_today) > 0 &&
+                r.activity_pct != null && Number(r.activity_pct) <= 25 &&
+                !DIRECCION_EXENTA.has(pidPorHubstaffUser.get(String(r.hubstaff_user_id ?? "")) ?? "")
+              );
+              return {
+                total_en_bucket: enBanda.length,
+                criterio: "fichó hoy (>0s) Y actividad del día ≤25% · dirección excluida por UUID",
+                personas: enBanda.map((r) => ({
+                  nombre: r.full_name_maven ?? r.name,
+                  actividad_pct: r.activity_pct,
+                  horas_hoy_fmt: horasHM(Number(r.seconds_today)),
+                  arranco: horaBogota(r.first_ping ? String(r.first_ping) : null),
+                  ultimo_ping: horaBogota(r.last_ping ? String(r.last_ping) : null),
+                })),
+                nota:
+                  "Esta lista es COMPLETA para el criterio de arriba: transcribila tal cual. NO la re-filtres ni " +
+                  "cierres con 'el resto está por encima del 25%' salvo que uses este total — el 10/08 esa frase " +
+                  "convirtió una lista incompleta en un universo cerrado y dejó fuera a tres personas en banda.",
+              };
+            })(),
             nota: feedStale
               ? `⚠️ EL FEED EN VIVO ESTÁ VIEJO: último ping ${horaBogota(feedLast || null) ?? "desconocido"} (hace ${feedAgeMin ?? "?"} min; umbral ${HUBSTAFF_FEED_STALE_MIN}). ` +
                 "El puente de Hubstaff está caído o atrasado. PROHIBIDO afirmar '0h' o 'no arrancó' de NADIE: " +
