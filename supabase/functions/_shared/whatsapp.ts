@@ -631,3 +631,48 @@ export function limpiarSustitutosSueltos(s: string): string {
     "",
   );
 }
+
+// ── Recurrencia de recordatorios ─────────────────────────────────────────────
+// AUDITORÍA 10-12/08: la serie de reportes de Grace murió el lunes 10:20 y nadie
+// se enteró (49h de silencio). No fue una caída: attempt_count=0, error=null, la
+// corrida cerró sana. Murió porque NADIE RE-AGENDA — create_reminder es one-shot y
+// el único eslabón capaz de crear la siguiente ocurrencia era el modelo. Las 6
+// filas se crearon todas el 07/08 en cinco minutos: la serie nació con fecha de
+// defunción.
+//
+// Bogotá es UTC-5 FIJO (sin horario de verano), así que sumar días enteros en UTC
+// preserva la hora local sin conversiones. Si algún día hubiera DST, esto hay que
+// rehacerlo con una librería de zonas.
+export type Recurrencia = "daily" | "weekdays" | "weekends" | "weekly";
+
+const DIA_MS = 86_400_000;
+// Día de la semana en Bogotá (0=dom … 6=sáb) de un instante UTC.
+const dowBogota = (d: Date): number => new Date(d.getTime() - 5 * 3600_000).getUTCDay();
+
+/**
+ * Próxima ocurrencia ESTRICTAMENTE posterior a `desde`, respetando la hora local
+ * del disparo original. Devuelve null si la recurrencia no se reconoce — mejor una
+ * serie que se termina visiblemente que una que salta a una hora inventada.
+ */
+export function proximaOcurrencia(triggerAt: string | Date, recurrence: string | null): Date | null {
+  if (!recurrence) return null;
+  const base = triggerAt instanceof Date ? triggerAt : new Date(triggerAt);
+  if (isNaN(base.getTime())) return null;
+  const modo = recurrence.trim().toLowerCase() as Recurrencia;
+  if (!["daily", "weekdays", "weekends", "weekly"].includes(modo)) return null;
+
+  if (modo === "weekly") return new Date(base.getTime() + 7 * DIA_MS);
+
+  // Avanza de a un día hasta caer en un día admitido. Tope de 8 vueltas: con
+  // cualquiera de los modos se encuentra en ≤3, y el tope evita un bucle infinito
+  // si alguien agrega un modo sin días válidos.
+  for (let i = 1; i <= 8; i++) {
+    const cand = new Date(base.getTime() + i * DIA_MS);
+    const dow = dowBogota(cand);
+    const esFinde = dow === 0 || dow === 6;
+    if (modo === "daily") return cand;
+    if (modo === "weekdays" && !esFinde) return cand;
+    if (modo === "weekends" && esFinde) return cand;
+  }
+  return null;
+}

@@ -1699,6 +1699,17 @@ const TOOLS: Array<{
           type: "string",
           description: "Opcional, SOLO para el dueño: nombre del grupo donde ejecutar/postear (ej 'AI WARMING', 'Managers', 'Marketing/Ventas'). Si se omite, dispara en este mismo chat.",
         },
+        recurrence: {
+          type: "string",
+          enum: ["daily", "weekdays", "weekends", "weekly"],
+          description:
+            "Opcional: convierte esto en una SERIE que se re-agenda sola. daily = todos los días · weekdays = " +
+            "lunes a viernes · weekends = sábado y domingo · weekly = mismo día cada semana. " +
+            "ÚSALO SIEMPRE que te pidan una cadencia ('todos los días a las 10', 'cada mañana L-V', 'los fines de " +
+            "semana'). Si en cambio creas filas sueltas, la serie se muere cuando se acaba la última y NADIE se " +
+            "entera: el 10/08 el canal de RRHH quedó 49 horas mudo por eso. Para varias horas del mismo día, crea " +
+            "una serie POR HORA (10:20 weekdays + 13:20 weekdays + 16:20 weekdays), no una fila por día.",
+        },
         target_display_name: {
           type: "string",
           description: "Opcional. Nombre de la persona que pidió el reminder (para auditoría).",
@@ -4096,6 +4107,13 @@ async function executeTool(
         destinoNombre = opciones[0].name;
       }
 
+      const RECURRENCIAS = ["daily", "weekdays", "weekends", "weekly"];
+      const recurrenciaRaw = String(input.recurrence ?? "").trim().toLowerCase();
+      const recurrencia = RECURRENCIAS.includes(recurrenciaRaw) ? recurrenciaRaw : null;
+      if (recurrenciaRaw && !recurrencia) {
+        return { error: "recurrencia_invalida", validas: RECURRENCIAS };
+      }
+
       const { data: row, error: insErr } = await sb.from("whatsapp_reminders").insert({
         tenant_id: grp.tenant_id,
         group_id: destinoId,
@@ -4103,6 +4121,7 @@ async function executeTool(
         trigger_at: triggerDate.toISOString(),
         body,
         status: "pending",
+        recurrence: recurrencia,
         created_by: ctx.senderUserId ?? null,
         metadata: {
           requested_by: targetName,
@@ -4112,6 +4131,11 @@ async function executeTool(
       }).select("id, trigger_at").single();
 
       if (insErr) return { error: insErr.message };
+      // La serie se identifica con el id de su primera ocurrencia. El drain usa esto
+      // para insertar la siguiente y para poder cancelar la serie entera si cambia
+      // el horario (el 07/08 quedó un huérfano del horario viejo disparando un
+      // sábado 9:20 que Grace había pedido explícitamente no recibir).
+      if (recurrencia) await sb.from("whatsapp_reminders").update({ series_id: row.id }).eq("id", row.id);
 
       return {
         ok: true,
@@ -4120,7 +4144,21 @@ async function executeTool(
         minutes_from_now: Math.round(minutesFromNow),
         modo: esAccion ? "accion — el bot ejecutará la instrucción y publicará el resultado" : "aviso — se postea el texto tal cual",
         grupo_destino: destinoNombre ?? "(este chat)",
-        note: "Programado. El cron drena cada 5 min (precisión ±5 min). Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
+        ...(recurrencia
+          ? {
+            recurrencia,
+            series_id: row.id,
+            note:
+              `Serie creada (${recurrencia}): se re-agenda sola, no hace falta volver a crearla. La próxima ` +
+              "ocurrencia la inserta el drain ANTES de ejecutar cada una, así que un fallo no corta la serie. " +
+              "Confírmale a la persona la cadencia y la hora.",
+          }
+          : {
+            note:
+              "Programado (UNA sola vez). El cron drena cada 5 min (precisión ±5 min). Si te pidieron una " +
+              "CADENCIA ('todos los días', 'cada mañana'), esto NO alcanza — cancelá y creá con `recurrence`. " +
+              "Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
+          }),
       };
     }
 

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, neutralizarVoseo, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, BOT_LIDS, logEvent, neutralizarVoseo, proximaOcurrencia, redactPhones, whatsappCors } from "../_shared/whatsapp.ts";
 import { desescaparSaltosLiterales } from "../_shared/agent-output-guards.ts";
 
 // whatsapp-send — manda mensajes a un grupo via el provider configurado.
@@ -256,8 +256,76 @@ async function sendOne(args: {
   return result;
 }
 
+// ── Barrido de borradores que nadie confirmó ──────────────────────────────────
+// El bot redacta, pregunta "¿lo mando así?" y si nadie contesta el borrador muere
+// en silencio: no vence, no se rescata, no se reporta. Al 12/08 había 29 en
+// 'pending' (la nota del 07/08 decía 7 — creció 4x en cinco días). Entre ellos la
+// tarea de churn que Álvaro dictó el 10/08 21:13 con "Plazo: jueves 13, 12:00":
+// Carolina y Fabiana nunca supieron que se la pidieron.
+//
+// A los 30 min se le recuerda UNA vez a quien lo pidió, en el chat donde lo pidió.
+// A las 24h se marca expired: un borrador viejo ya no sirve — el contexto cambió y
+// mandarlo tarde es peor que no mandarlo.
+async function barrerBorradores(sb: ReturnType<typeof adminClient>): Promise<{ avisados: number; vencidos: number }> {
+  const ahora = new Date();
+  let avisados = 0, vencidos = 0;
+
+  // 1) Vencer los que pasaron su expires_at.
+  const { data: caducos } = await sb
+    .from("whatsapp_pending_posts")
+    .select("id, tenant_id, requested_from_group_id, body")
+    .eq("status", "pending")
+    .lt("expires_at", ahora.toISOString())
+    .limit(20);
+  for (const p of (caducos ?? []) as Array<Record<string, unknown>>) {
+    await sb.from("whatsapp_pending_posts").update({ status: "expired" }).eq("id", p.id).eq("status", "pending");
+    await logEvent(sb, {
+      tenantId: String(p.tenant_id), groupId: String(p.requested_from_group_id ?? ""),
+      kind: "pending_post_expirado",
+      payload: { pending_post_id: p.id, preview: String(p.body ?? "").slice(0, 160) },
+    });
+    vencidos += 1;
+  }
+
+  // 2) Avisar UNA vez a los que llevan >30 min esperando confirmación.
+  const hace30 = new Date(ahora.getTime() - 30 * 60_000).toISOString();
+  const { data: colgados } = await sb
+    .from("whatsapp_pending_posts")
+    .select("id, tenant_id, requested_from_group_id, target_group_id, body, created_at")
+    .eq("status", "pending")
+    .is("nudged_at", null)
+    .lt("created_at", hace30)
+    .limit(5);
+  for (const p of (colgados ?? []) as Array<Record<string, unknown>>) {
+    const origen = String(p.requested_from_group_id ?? "");
+    if (!origen) continue; // sin chat de origen no hay a quién avisarle
+    const { data: destino } = await sb
+      .from("whatsapp_groups").select("name").eq("id", String(p.target_group_id ?? "")).maybeSingle();
+    const mins = Math.round((ahora.getTime() - Date.parse(String(p.created_at))) / 60_000);
+    const cuerpo =
+      `📝 Te quedó un mensaje sin confirmar hace ${mins >= 120 ? `${Math.round(mins / 60)}h` : `${mins} min`}` +
+      `${destino?.name ? ` para *${destino.name}*` : ""}:\n\n` +
+      `_${String(p.body ?? "").slice(0, 220)}${String(p.body ?? "").length > 220 ? "…" : ""}_\n\n` +
+      `¿Lo mando, lo ajusto o lo descarto? Si no me dices nada, en 24h lo doy de baja.`;
+    const res = await sendOne({ groupId: origen, body: cuerpo, tenantId: String(p.tenant_id) });
+    // nudged_at se sella SIEMPRE, mande o no: si el envío falla, insistir cada 5
+    // minutos convertiría el rescate en spam.
+    await sb.from("whatsapp_pending_posts").update({ nudged_at: ahora.toISOString() }).eq("id", p.id);
+    if (res.ok) avisados += 1;
+  }
+
+  return { avisados, vencidos };
+}
+
 async function drainQueue(limit: number): Promise<{ sent: number; failed: number }> {
   const sb = adminClient();
+
+  // Best-effort: que un problema con los borradores no frene los recordatorios.
+  try {
+    await barrerBorradores(sb);
+  } catch (e) {
+    console.warn("barrerBorradores:", (e as Error).message);
+  }
 
   const { data: reminders, error } = await sb
     .rpc("whatsapp_pending_reminders", { p_limit: limit });
@@ -267,6 +335,61 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
     return { sent: 0, failed: 0 };
   }
   if (!reminders || reminders.length === 0) return { sent: 0, failed: 0 };
+
+  // ── RE-AGENDADO DE SERIES, ANTES DE EJECUTAR NADA ───────────────────────────
+  // El canal de Grace murió el 10/08 a las 10:20 con 49h de silencio y nadie se
+  // enteró. No fue una caída: attempt_count=0, error=null, la corrida cerró en 24s
+  // de 45s. Murió porque NADIE RE-AGENDABA — create_reminder es one-shot y el único
+  // eslabón capaz de crear la siguiente ocurrencia era el modelo.
+  //
+  // Va ANTES del bucle a propósito: si la ejecución falla, se cuelga o la edge
+  // function se queda sin pared, la siguiente ocurrencia YA está en la base. Una
+  // serie no se puede perder por un mal día del que la ejecuta.
+  // whatsapp_pending_reminders no devuelve estas columnas, así que se piden aparte.
+  {
+    const ids = (reminders as Array<{ id: string }>).map((r) => r.id);
+    const { data: series } = await sb
+      .from("whatsapp_reminders")
+      .select("id, tenant_id, group_id, kind, body, trigger_at, recurrence, series_id, commitment_id, created_by")
+      .in("id", ids)
+      .not("recurrence", "is", null);
+    for (const s of (series ?? []) as Array<Record<string, unknown>>) {
+      const siguiente = proximaOcurrencia(String(s.trigger_at), String(s.recurrence));
+      if (!siguiente) {
+        await logEvent(sb, {
+          tenantId: String(s.tenant_id), groupId: String(s.group_id), kind: "error",
+          payload: { stage: "recurrencia", reminder_id: s.id, recurrence: s.recurrence,
+                     detalle: "recurrencia no reconocida — la serie termina acá" },
+        });
+        continue;
+      }
+      const serieId = (s.series_id as string | null) ?? (s.id as string);
+      // Idempotente: si otro tick ya insertó esta ocurrencia, no se duplica.
+      const { data: yaExiste } = await sb
+        .from("whatsapp_reminders").select("id")
+        .eq("series_id", serieId).eq("trigger_at", siguiente.toISOString())
+        .limit(1);
+      if (yaExiste && yaExiste.length) continue;
+      const { error: insErr } = await sb.from("whatsapp_reminders").insert({
+        tenant_id: s.tenant_id, group_id: s.group_id, kind: s.kind, body: s.body,
+        trigger_at: siguiente.toISOString(), status: "pending",
+        recurrence: s.recurrence, series_id: serieId,
+        commitment_id: s.commitment_id ?? null, created_by: s.created_by ?? null,
+      });
+      if (insErr) {
+        // Que la serie se muera en silencio es el bug que estamos arreglando: si el
+        // insert falla, queda evento para que el watchdog y el owner lo vean.
+        await logEvent(sb, {
+          tenantId: String(s.tenant_id), groupId: String(s.group_id), kind: "error",
+          payload: { stage: "recurrencia", reminder_id: s.id, error: insErr.message,
+                     detalle: "NO se pudo agendar la siguiente ocurrencia — la serie queda cortada" },
+        });
+      }
+      // La fila actual queda sellada con su series_id para poder cancelar la serie
+      // entera cuando alguien cambie el horario.
+      if (!s.series_id) await sb.from("whatsapp_reminders").update({ series_id: serieId }).eq("id", s.id);
+    }
+  }
 
   let sent = 0;
   let failed = 0;
