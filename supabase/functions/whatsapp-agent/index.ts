@@ -20,6 +20,7 @@ import {
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
   esPromesaDeComportamiento,
+  esRetractacion,
   similitudTexto,
   tieneRespaldoDeJuicio,
   TIENE_PITCH_CITADO,
@@ -1839,7 +1840,7 @@ const TOOLS: Array<{
   {
     name: "get_monetization_opportunities",
     description:
-      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Úsala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtra won y mira last_touch_at); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó acá.",
+      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Úsala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at), cuándo se GANÓ (won_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtra won y mira **won_at**, NUNCA last_touch_at: éste se mueve con cualquier toque, incluida la limpieza de duplicados y las correcciones de un closer, y convierte housekeeping en ventas nuevas); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó acá.",
     input_schema: {
       type: "object",
       properties: {
@@ -6566,6 +6567,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let repetidoBloqueado = 0;
   let ceroProduccionBloqueado = 0;
   let juicioBloqueado = 0;
+  let retractacionBloqueada = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -7321,6 +7323,51 @@ async function runAgent(req: AgentRequest): Promise<{
             }),
           });
           continue;
+        }
+      }
+      // Guarda de RETRACTACIÓN (auditoría 10-12/08): el bot sabe pedir perdón en el
+      // chat y no sabe deshacer en la base. Cuatro casos en tres días — valevalois
+      // ("mi error" a los 62s, la venta fantasma se republicó 4 veces igual), Velvet
+      // for Women (stage='lost' escrito 6s ANTES de preguntar si la bajaba),
+      // gabbiel_of ("lo saco del registro" y la republicó ganada a las 19:00) y
+      // andreasoto. Es el patrón que más plata movió de toda la auditoría.
+      // ⚠️ La retractación cae en OTRA corrida que la escritura, así que no sirve
+      // mirar escriturasOk: hay que preguntarle a la tabla por lo que el bot tocó
+      // hace un rato. El detector es generoso a propósito — lo que gatea de verdad
+      // es que exista una fila reciente; si no la hay, esto no bloquea nada.
+      if (t.name === "reply_to_group" && retractacionBloqueada < 1) {
+        const cuerpoRetro = String((t.input as ToolInput).body ?? "");
+        if (esRetractacion(cuerpoRetro)) {
+          const desdeRetro = new Date(Date.now() - 20 * 60_000).toISOString();
+          const { data: recientes } = await sb
+            .from("monetization_opportunities")
+            .select("id, creator_handle, product, stage, won_at, updated_at")
+            .eq("tenant_id", group.tenant_id)
+            .gte("updated_at", desdeRetro)
+            .in("stage", ["won", "lost"])
+            .limit(5);
+          const filas = (recientes ?? []) as Array<Record<string, unknown>>;
+          if (filas.length > 0) {
+            retractacionBloqueada += 1;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: t.id,
+              content: JSON.stringify({
+                error: "retractacion_sin_revertir",
+                filas_que_tocaste: filas.map((f) => ({
+                  handle: f.creator_handle, producto: f.product, estado: f.stage,
+                })),
+                message:
+                  "NO se envió: te estás retractando en el chat, pero la fila que escribiste sigue como la dejaste " +
+                  "— y el corte de las próximas horas la va a volver a publicar como venta (o como perdida). El " +
+                  "10/08 pasó exactamente eso: dijiste 'mi error' por valevalois y la venta fantasma se republicó " +
+                  "cuatro veces en el DM del jefe. PRIMERO corregí el estado con log_monetization_opportunity " +
+                  "(devolvela a la etapa que tenía, o marcala como descartada si nunca fue una venta) y DESPUÉS " +
+                  "mandá tu mensaje. Pedir perdón sin deshacer no arregla nada: el número sigue mal.",
+              }),
+            });
+            continue;
+          }
         }
       }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador

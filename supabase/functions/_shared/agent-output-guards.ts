@@ -162,3 +162,25 @@ export const RESPALDO_HEDGE_RE =
   /\b(?:estimad[oa]|impresi[óo]n|inferid[oa]|infiero|aproximad[oa]|no\s+(?:lo\s+)?tengo\s+medid|seg[úu]n\s+(?:lo\s+registrado|los\s+reportes|el\s+chat)|sin\s+dato\s+duro|a\s+ojo)\b/i;
 export const tieneRespaldoDeJuicio = (s: string): boolean =>
   RESPALDO_TEMPORAL_RE.test(s) || RESPALDO_VENTANA_RE.test(s) || RESPALDO_HEDGE_RE.test(s);
+
+// ── Retractación: el bot se disculpa en el chat y la fila queda escrita ──────────
+// AUDITORÍA 10-12/08 — el patrón que más daño hizo, cuatro casos en dos frentes:
+//   · valevalois: publicó "Buen cierre Miguel — activó Content Protector" a los 9
+//     segundos de una captura SIN TEXTO. Miguel lo desmintió a los 62 segundos, el
+//     bot dijo "mi error" — y la fila quedó stage='won'. Se republicó CUATRO veces
+//     en el DM del dueño y entró en la nota del día de Miguel.
+//   · Velvet for Women: escribió stage='lost' seis segundos ANTES de preguntar
+//     "¿la bajamos de cartera?". Álvaro nunca contestó. Agencia B2B con llamada
+//     agendada, enterrada como perdida.
+//   · gabbiel_of/piclink: "lo saco del registro" y a las 19:00 la republicó ganada.
+//   · andreasoto: "es otro lead" — ese otro lead no existe.
+//
+// El bot sabe pedir perdón y NO sabe deshacer: no hay camino de vuelta a la base.
+// ⚠️ La retractación casi nunca ocurre en la misma corrida que la escritura (en
+// valevalois pasaron 72 segundos y son dos corridas distintas), así que mirar las
+// escrituras de ESTA corrida no alcanza — hay que preguntarle a la tabla.
+// El detector puede ser generoso porque el gate caro es la consulta: si no hay
+// filas recientes escritas por el bot, no bloquea nada.
+export const RETRACTACION_RE =
+  /\b(?:mi\s+error|me\s+equivoqu[ée]|fue\s+un\s+error|tien[eé]s\s+raz[óo]n|ten[ée]s\s+raz[óo]n|corregid[oa]\b|lo\s+corrijo|lo\s+saco\s+del\s+registro|lo\s+doy\s+de\s+baja|no\s+(?:era|es)\s+(?:una\s+)?venta|no\s+cuenta\s+como\s+venta|mal\s+(?:contad|atribuid|registrad|marcad)[oa]|me\s+adelant[ée]|retiro\s+lo\s+dicho|descarta\s+lo\s+que\s+dije)/i;
+export const esRetractacion = (s: string): boolean => RETRACTACION_RE.test(s);

@@ -15,6 +15,7 @@ import {
   TIENE_PITCH_CITADO,
   afirmaCeroProduccion,
   caracterizaPersona,
+  esRetractacion,
   tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
 
@@ -284,4 +285,30 @@ Deno.test("juicio — un reporte de datos sin adjetivos no dispara", () => {
       "Carolina: 4h50 · 56% act.",
     ]
   ) assertEquals(caracterizaPersona(s), false, `no debió detectarse: ${s}`);
+});
+
+// ── Retractación (los 4 casos reales de la auditoría 10-12/08) ──────────────────
+Deno.test("retractación — las frases reales con las que el bot se desdijo", () => {
+  for (
+    const s of [
+      "Miguel, mi error — no lo tomo como cierre.",                       // valevalois 10/08 11:26
+      "Corregido, van 2 agencias, no 3.",                                 // Velvet 10/08 17:05
+      "En Maven no encuentro esa oportunidad, así que lo saco del registro.", // gabbiel_of 10/08 17:02
+      "Tienes razón, me equivoqué con el handle.",                        // andreasoto 11/08
+      "Perdón, me adelanté — todavía no está cerrada.",
+      "Eso lo tenía mal atribuido, va con Miguel.",
+    ]
+  ) assert(esRetractacion(s), `debió detectarse: ${s}`);
+});
+
+Deno.test("retractación — operación normal NO dispara", () => {
+  for (
+    const s of [
+      "Miguel, ya quedó registrado el cierre de Alejandra.",
+      "Confirmado: la venta de Let's Shoot entró hoy 15:53.",
+      "Carolina, tienes 9 creadoras con 3+ días sin contacto.",
+      "Ojo que ese lead ya estaba asignado a María desde el 05/08.",
+      "Revisá el link que te pasó Brayan, no abre.",
+    ]
+  ) assertEquals(esRetractacion(s), false, `no debió disparar: ${s}`);
 });

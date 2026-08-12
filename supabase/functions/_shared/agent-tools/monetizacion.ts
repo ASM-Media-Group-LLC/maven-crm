@@ -17,7 +17,11 @@ export const monetizacionTools: AgentTool[] = [
     description:
       "Oportunidades de venta de productos (Piclink, Content Protector, Blu, Exchange, etc.) de Maven, priorizadas " +
       "por etapa y urgencia de seguimiento. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para " +
-      "VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas se cerraron?' → mira last_touch_at); 'all' trae todas. " +
+      "VENTAS CERRADAS pasa stage='won'; 'all' trae todas. " +
+      "⚠️ CUÁNDO se ganó una venta es `won_at`, NUNCA `last_touch_at` ni `updated_at`: esos dos se mueven con " +
+      "cualquier toque, incluido el housekeeping (cerrar un duplicado viejo del import, o cerrar una fila porque " +
+      "un closer avisó que la creadora YA tenía el servicio). Contar por ellos convierte una limpieza — o la " +
+      "corrección de un humano — en una venta nueva del día. " +
       "Nota: Maven solo tiene lo que registró el bot o lo cargado acá — si un closer dice que las puso en un Google " +
       "Sheet u otro lado, no van a aparecer.",
     input_schema: {
@@ -36,7 +40,11 @@ export const monetizacionTools: AgentTool[] = [
       const stages = !s || s === "open" ? OPEN : s === "all" ? ALL : ALL.includes(s) ? [s] : OPEN;
       const { data, error } = await ctx.sb
         .from("monetization_opportunities")
-        .select("creator_handle, product, stage, monthly_value_usd, next_followup_at, last_touch_at")
+        // won_at va en el select porque es la ÚNICA columna que dice cuándo se ganó
+        // de verdad. Sin ella el modelo no tiene con qué contestar "¿cuántas se
+        // cerraron hoy?" salvo last_touch_at, que es exactamente el error que
+        // inflaba el conteo del mes (auditoría 10-12/08: 24 publicados vs 18 reales).
+        .select("creator_handle, product, stage, monthly_value_usd, next_followup_at, last_touch_at, won_at")
         .eq("tenant_id", ctx.tenantId)
         .in("stage", stages)
         .order("next_followup_at", { ascending: true })
