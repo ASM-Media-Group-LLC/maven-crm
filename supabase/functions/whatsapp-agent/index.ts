@@ -22,6 +22,7 @@ import {
   esPromesaDeComportamiento,
   esRetractacion,
   extraerParesNombreLid,
+  metaContraFact,
   similitudTexto,
   tieneRespaldoDeJuicio,
   TIENE_PITCH_CITADO,
@@ -6611,6 +6612,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let disputaBloqueada = 0;
   let conductaBloqueada = 0;
   let repetidoBloqueado = 0;
+  let metaBloqueada = 0;
   let ceroProduccionBloqueado = 0;
   let juicioBloqueado = 0;
   let retractacionBloqueada = 0;
@@ -7477,6 +7479,35 @@ async function runAgent(req: AgentRequest): Promise<{
             });
             continue;
           }
+        }
+      }
+      // Guarda META vs PERSON_FACT (auditoría 10-12/08). El fact de Lizeth estaba
+      // escrito, bien redactado ("NO hace outreach ni textea modelos, por lo que no
+      // reporta números"), activo, en el grupo correcto y CARGADO en el prompt por
+      // loadPersonFacts — y 22 horas después, por este mismo camino (`mention`), el
+      // bot le puso "Meta hoy son 3 números también". Un hecho en el contexto es una
+      // sugerencia; lo que tiene que cumplirse va acá. El fix #1166 arregló la
+      // escritura y el problema se mudó a la lectura.
+      if (t.name === "reply_to_group" && metaBloqueada < 1 && personFacts.length > 0) {
+        const cuerpoMeta = String((t.input as ToolInput).body ?? "");
+        const choques = metaContraFact(cuerpoMeta, personFacts);
+        if (choques.length > 0) {
+          metaBloqueada += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "meta_contra_hecho_guardado",
+              choques,
+              message:
+                "NO se envió: le estás poniendo meta de NÚMEROS a alguien que ya te dijo que eso no le " +
+                "corresponde, y vos mismo lo anotaste. Repetir el pedido después de haber dicho 'anotado' es " +
+                "peor que no anotar nada — la persona ve que no sirvió de nada avisarte. Sacá a esa persona de " +
+                "la meta de números y pedile lo que SÍ hace. Si el hecho ya no vale porque cambió el trabajo, " +
+                "primero desactivalo con forget_fact y explicá el cambio; no lo pises en silencio.",
+            }),
+          });
+          continue;
         }
       }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador

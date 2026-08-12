@@ -68,6 +68,53 @@ export const managersTools: AgentTool[] = [
       if (mgr) rows = rows.filter((r) => String(r.manager_name ?? "").toLowerCase().includes(mgr));
       const q = String(args?.quadrant ?? "").trim().toLowerCase();
       if (q) rows = rows.filter((r) => String(r.quadrant ?? "") === q);
+
+      // ── CORTE DE LECTURA DE BLU ───────────────────────────────────────────
+      // get_creator_earnings ya detecta esto (bloque "¿CORTE DE LECTURA?"), pero el
+      // RPC del radar NO — y es el que alimenta los cortes de cada 2h.
+      // Verificado hoy 12/08: Elizabethloaiza sale con income_trend_pct=-100,
+      // quadrant='calidad' y el diagnóstico "Promociona bien (9/12 días leídos) pero
+      // sus ingresos caen 100% → revisar CALIDAD/estrategia"… con su última fila de
+      // BLU el 04/08, hace OCHO días, porque retiró los accesos y mandó carta de
+      // terminación (el propio bot lo sabía desde el 03/08). Es de las que MÁS
+      // promociona. marcyjiimnz igual, 7 días sin lectura y -54%.
+      // Sin esto, la manager recibe cada dos horas la orden de "revisar la calidad"
+      // de alguien que no tiene nada que revisar. Es el antipatrón #818 — "no poder
+      // leer" convertido en "no rindió" — aplicado a plata en vez de a promo.
+      const ids = rows.map((r) => String(r.creator_id)).filter(Boolean);
+      if (ids.length) {
+        const desde = new Date(Date.now() - 12 * 864e5).toISOString().slice(0, 10);
+        const { data: ult } = await ctx.sb
+          .from("creator_daily_earnings").select("creator_id, date")
+          .in("creator_id", ids).gte("date", desde);
+        const ultimoPorCreator = new Map<string, string>();
+        for (const e of (ult ?? []) as Array<{ creator_id: string; date: string }>) {
+          const prev = ultimoPorCreator.get(e.creator_id);
+          if (!prev || e.date > prev) ultimoPorCreator.set(e.creator_id, e.date);
+        }
+        const hoy = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+        const diasAtras = (d: string) => Math.round((Date.parse(hoy) - Date.parse(d)) / 864e5);
+        rows = rows.map((r) => {
+          const last = ultimoPorCreator.get(String(r.creator_id));
+          const dias = last ? diasAtras(last) : 99;
+          if (dias < 2) return r; // BLU liquida con ~1-2 días de lag: eso es normal
+          return {
+            ...r,
+            sin_datos_desde: last ?? "sin lectura en 12 días",
+            dias_sin_lectura: dias,
+            // Se ANULA la tendencia en vez de dejarla: un -100% junto a un caveat es
+            // un -100% que igual se publica. Lo que no se puede medir no se reporta.
+            income_trend_pct: null,
+            income_trend_pct_no_confiable: r.income_trend_pct,
+            quadrant: "sin_lectura",
+            diagnosis:
+              `⚠️ SIN LECTURA DE BLU desde el ${last ?? "hace más de 12 días"} (${dias} días). ` +
+              "La caída que calculaba el radar es falta de dato, NO caída de ingreso: PROHIBIDO reportarla como " +
+              "baja de facturación ni pedirle a la manager que 'revise la calidad'. Lo accionable es verificar " +
+              "si la creadora quitó los accesos o se fue, y avisarlo.",
+          };
+        });
+      }
       return rows;
     },
   },

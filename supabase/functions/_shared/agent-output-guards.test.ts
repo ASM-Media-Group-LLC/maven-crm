@@ -17,6 +17,7 @@ import {
   caracterizaPersona,
   esRetractacion,
   extraerParesNombreLid,
+  metaContraFact,
   tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
 
@@ -362,4 +363,39 @@ Deno.test("pares Nombre↔LID — no confunde texto normal con una mención", ()
   assertEquals(extraerParesNombreLid("Miguel @milibmiles1 ya es creadora activa").length, 0);
   // Un número corto no es un LID.
   assertEquals(extraerParesNombreLid("Brayan @123 hola").length, 0);
+});
+
+// ── Meta de números contra un person_fact que exime (Lizeth, 11-12/08) ──────────
+Deno.test("meta vs fact — el caso real: fact escrito, cargado, e ignorado igual", () => {
+  const facts = [{
+    name: "Lizeth Jerez",
+    fact: "Lizeth trabaja en subir/organizar contenido y curar estéticamente las cuentas; " +
+      "NO hace outreach ni textea modelos, por lo que no reporta números/contactados/respuestas.",
+  }];
+  // 12/08 10:01, 22 horas después de anotar el hecho.
+  const choques = metaContraFact("Buen día Lizeth 💪 arrancas activa. Meta hoy son 3 números también — apóyate en un handle.", facts);
+  assertEquals(choques.length, 1);
+  assertEquals(choques[0].persona, "Lizeth Jerez");
+  // 12/08 09:01, la versión plural del mismo error.
+  assertEquals(metaContraFact("Daniel, Liss y Lizeth. Meta: 3 números c/u", facts).length, 1);
+});
+
+Deno.test("meta vs fact — no bloquea a quien SÍ hace outreach", () => {
+  const facts = [{ name: "Lizeth Jerez", fact: "NO hace outreach ni textea modelos." }];
+  // Daniel no tiene fact: su meta pasa limpia.
+  assertEquals(metaContraFact("Buen día Daniel 💪 arrancas en 0. Meta hoy son 3 números.", facts).length, 0);
+  // Un fact descriptivo SIN negación explícita no exime de nada.
+  const descriptivo = [{ name: "Brayan Esneider", fact: "Brayan organiza y cruza data con Claude y saca KPIs." }];
+  assertEquals(metaContraFact("Brayan, meta hoy 3 números.", descriptivo).length, 0);
+});
+
+Deno.test("meta vs fact — un mensaje que no asigna meta nunca dispara", () => {
+  const facts = [{ name: "Lizeth Jerez", fact: "NO hace outreach ni textea modelos." }];
+  for (
+    const s of [
+      "Lizeth subió 11 fotos hoy, buen ritmo 💪",
+      "Lizeth, ¿cómo vas con el Drive?",
+      "Ayer salieron 3 números del equipo.", // dato, no meta
+    ]
+  ) assertEquals(metaContraFact(s, facts).length, 0, `no debió disparar: ${s}`);
 });

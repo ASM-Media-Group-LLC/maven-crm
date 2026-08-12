@@ -211,3 +211,48 @@ export function extraerParesNombreLid(s: string): Array<{ nombre: string; lid: s
 export const RETRACTACION_RE =
   /\b(?:mi\s+error|me\s+equivoqu[ée]|fue\s+un\s+error|tien[eé]s\s+raz[óo]n|ten[ée]s\s+raz[óo]n|corregid[oa]\b|lo\s+corrijo|lo\s+saco\s+del\s+registro|lo\s+doy\s+de\s+baja|no\s+(?:era|es)\s+(?:una\s+)?venta|no\s+cuenta\s+como\s+venta|mal\s+(?:contad|atribuid|registrad|marcad)[oa]|me\s+adelant[ée]|retiro\s+lo\s+dicho|descarta\s+lo\s+que\s+dije)/i;
 export const esRetractacion = (s: string): boolean => RETRACTACION_RE.test(s);
+// ── Meta de números a quien tiene un fact que dice que no le corresponde ────────
+// AUDITORÍA 10-12/08, y es el caso más instructivo de todos:
+//   11/08 11:35 Lizeth avisa que no textea. El bot dice "anotado" y ESCRIBE la fila.
+//   El fact quedó bien redactado y accionable: "NO hace outreach ni textea modelos,
+//   por lo que no reporta números/contactados/respuestas". Activo, en el grupo
+//   correcto, y loadPersonFacts LO CARGA en el prompt.
+//   22 horas después, 12/08 10:01 — por el camino `mention`, el que SÍ carga facts:
+//   "Buen día Lizeth 💪 arrancas activa. Meta hoy son 3 números también".
+//
+// O sea: escrito ✓, cargado ✓, en contexto ✓ — y el modelo lo ignoró igual. Es
+// exactamente la doctrina de la casa: un hecho en el prompt es una sugerencia; lo
+// que tiene que cumplirse va como chequeo determinístico en el borde. El fix #1166
+// funcionó y el problema se movió un casillero: de la escritura a la LECTURA.
+export const META_NUMEROS_RE =
+  /\bmetas?\b[^\n]{0,40}?\d+\s*n[úu]meros?|\b\d+\s*n[úu]meros?\b[^\n]{0,25}?\b(?:hoy|c\/u|cada\s+uno|por\s+cabeza|diarios?)\b/i;
+export const asignaMetaDeNumeros = (s: string): boolean => META_NUMEROS_RE.test(s);
+
+// Un fact que EXIME de outreach. Deliberadamente estrecho: solo negaciones
+// explícitas, no cualquier descripción de tareas.
+export const FACT_SIN_OUTREACH_RE =
+  /\bno\s+(?:hace|realiza|va\s+a\s+hacer)\s+outreach\b|\bno\s+textea\b|\bno\s+reporta\s+n[úu]meros\b|\bno\s+le\s+corresponden?\s+n[úu]meros\b|\bsin\s+meta\s+de\s+n[úu]meros\b/i;
+export const factEximeDeNumeros = (s: string): boolean => FACT_SIN_OUTREACH_RE.test(s);
+
+/**
+ * Personas a las que el mensaje les está poniendo meta de números teniendo un fact
+ * activo que las exime. Compara por PRIMER NOMBRE, que es como el bot las nombra en
+ * el chat. Devuelve [] si el mensaje no asigna meta.
+ */
+export function metaContraFact(
+  cuerpo: string,
+  facts: Array<{ name: string; fact: string }>,
+): Array<{ persona: string; fact: string }> {
+  if (!asignaMetaDeNumeros(cuerpo)) return [];
+  const norm = (v: string) => v.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+  const texto = norm(cuerpo);
+  const out: Array<{ persona: string; fact: string }> = [];
+  for (const f of facts) {
+    if (!factEximeDeNumeros(f.fact)) continue;
+    const primer = norm(f.name).split(/\s+/)[0];
+    if (primer.length >= 3 && new RegExp(`\\b${primer}\\b`).test(texto)) {
+      out.push({ persona: f.name, fact: f.fact });
+    }
+  }
+  return out;
+}
