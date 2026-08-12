@@ -16,6 +16,7 @@ import {
   afirmaCeroProduccion,
   caracterizaPersona,
   esRetractacion,
+  extraerParesNombreLid,
   tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
 
@@ -311,4 +312,54 @@ Deno.test("retractación — operación normal NO dispara", () => {
       "Revisá el link que te pasó Brayan, no abre.",
     ]
   ) assertEquals(esRetractacion(s), false, `no debió disparar: ${s}`);
+});
+
+// ── Ack falso: los dos fraseos que se escapaban (auditoría 10-12/08) ────────────
+Deno.test("ack falso — 'quedaron cargadas en Maven' y 'tenlo por hecho'", () => {
+  // 10/08 18:42 Marketing/Ventas. melossomconsulting sigue en stage 'Nuevo' con
+  // last_contact_date NULL y sin tocar desde el 01/08: el ack era falso y pasó
+  // porque "quedaron" no lo cubría \bqueda\b y "cargad" no estaba en los verbos.
+  assert(afirmaRegistro(
+    "Dale María, tenlo por hecho — ya quedaron cargadas en Maven como gestión por WhatsApp de hoy " +
+    "(melossomconsulting, honeyfans.agency y el resto de la tanda).",
+  ));
+  assert(afirmaRegistro("Listo, quedaron cargadas las 10 agencias."));
+  assert(afirmaRegistro("Tenlo por hecho."));
+});
+
+Deno.test("ack falso — los negativos de la calibración siguen libres tras ampliar", () => {
+  for (
+    const s of [
+      "Las fotos quedaron muy bien, Isa.",           // "quedaron" sin verbo de registro
+      "Esas dos cuentas quedaron restringidas ayer.", // estado del mundo, no persistencia
+      "Ya cargó ella el formulario en la app.",       // lo hizo un humano, no el bot
+    ]
+  ) assertEquals(afirmaRegistro(s), false, `no debió bloquear: ${s}`);
+});
+
+// ── Promesa de conducta: la variante que se fugó el 10/08 ───────────────────────
+Deno.test("promesa de conducta — 'de aquí en adelante' y 'te aviso siempre'", () => {
+  assert(esPromesaDeComportamiento("De aquí en adelante te marco los que no tienen monto."));
+  assert(esPromesaDeComportamiento("Te aviso siempre que una agencia quede sin dueño."));
+  // El negativo: un acuse puntual no es compromiso permanente.
+  assertEquals(esPromesaDeComportamiento("Entendido, lo reviso ahora."), false);
+});
+
+// ── Identidad: nombre pegado al LID de otra persona ─────────────────────────────
+Deno.test("pares Nombre↔LID — extrae los casos reales del 11/08", () => {
+  // Corte 11/08 15:00: a Brayan le pusieron el LID del dueño.
+  const p1 = extraerParesNombreLid("· Brayan @192457652338690: sin evidencia en el chat esta franja. Actividad 13%");
+  assertEquals(p1, [{ nombre: "Brayan", lid: "192457652338690" }]);
+  // Con dos puntos, guion largo y coma.
+  assertEquals(extraerParesNombreLid("Carolina — @114426585833505 revisá esto")[0]?.nombre, "Carolina");
+  assertEquals(extraerParesNombreLid("Juan, @75561234567890 te toca")[0]?.lid, "75561234567890");
+});
+
+Deno.test("pares Nombre↔LID — no confunde texto normal con una mención", () => {
+  // Una mención sin nombre delante no es asunto de esta guarda.
+  assertEquals(extraerParesNombreLid("@192457652338690 ¿lo bajamos de cartera?").length, 0);
+  // Handles de Instagram no son LIDs (no son solo dígitos).
+  assertEquals(extraerParesNombreLid("Miguel @milibmiles1 ya es creadora activa").length, 0);
+  // Un número corto no es un LID.
+  assertEquals(extraerParesNombreLid("Brayan @123 hola").length, 0);
 });

@@ -21,6 +21,7 @@ import {
   esDisputaDeRegistro,
   esPromesaDeComportamiento,
   esRetractacion,
+  extraerParesNombreLid,
   similitudTexto,
   tieneRespaldoDeJuicio,
   TIENE_PITCH_CITADO,
@@ -6568,6 +6569,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let ceroProduccionBloqueado = 0;
   let juicioBloqueado = 0;
   let retractacionBloqueada = 0;
+  let identidadBloqueada = 0;
   let proactivoBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
@@ -7212,10 +7214,17 @@ async function runAgent(req: AgentRequest): Promise<{
       // "Ajusto:", "cambio de estrategia" — guardando CERO reglas. Al día siguiente
       // no recuerda nada: contentillo. La guarda de ack-falso no lo cazaba porque
       // solo mira promesas de DATO, no de CONDUCTA.
-      // Solo se arma si quien habla PUEDE crear reglas (owner): bloquear cuando
-      // add_persistent_rule igual lo rechazaría sería un callejón sin salida.
+      // AMPLIADO tras la auditoría 10-12/08: antes esto solo se armaba para el owner,
+      // con el argumento de que bloquear a un no-owner sería un callejón sin salida
+      // porque add_persistent_rule lo rechazaría. Consecuencia real: TODO lo que Grace
+      // (RRHH, no owner) le enseñaba al bot vivía lo que durara la ventana de contexto
+      // y se evaporaba. El callejón no existe — `remember_fact` NO exige owner, solo un
+      // profile linkeado, y su propia descripción cubre este caso ("excepciones
+      // operativas estables que corrigen una métrica tuya"). Así que ahora se arma para
+      // cualquiera identificado, y cualquiera de las dos escrituras lo satisface.
+      const persistioLeccion = escriturasOk.has("add_persistent_rule") || escriturasOk.has("remember_fact");
       if (t.name === "reply_to_group" && conductaBloqueada < 1 &&
-          senderCtx.isOwner && !escriturasOk.has("add_persistent_rule")) {
+          senderCtx.senderUserId && !persistioLeccion) {
         const cuerpoConducta = String((t.input as ToolInput).body ?? "");
         if (esPromesaDeComportamiento(cuerpoConducta)) {
           conductaBloqueada += 1;
@@ -7224,12 +7233,18 @@ async function runAgent(req: AgentRequest): Promise<{
             tool_use_id: t.id,
             content: JSON.stringify({
               error: "promesa_de_conducta_sin_guardar",
-              message:
-                "NO se envió: le estás prometiendo al jefe un CAMBIO DE CONDUCTA y no lo guardaste — mañana " +
-                "arrancarías sin memoria de esto y él lo va a notar (el 07/08 fueron 8 correcciones y 0 reglas). " +
-                "PRIMERO llama add_persistent_rule con la instrucción en UNA línea, redactada como norma " +
-                "permanente y accionable (no 'Álvaro pidió X' sino 'X se hace así'). DESPUÉS reenvía tu mensaje. " +
-                "Si lo tuyo era un acuse puntual y no un compromiso permanente, reescríbelo sin prometer conducta futura.",
+              message: senderCtx.isOwner
+                ? "NO se envió: le estás prometiendo al jefe un CAMBIO DE CONDUCTA y no lo guardaste — mañana " +
+                  "arrancarías sin memoria de esto y él lo va a notar (el 07/08 fueron 8 correcciones y 0 reglas). " +
+                  "PRIMERO llama add_persistent_rule con la instrucción en UNA línea, redactada como norma " +
+                  "permanente y accionable (no 'Álvaro pidió X' sino 'X se hace así'). DESPUÉS reenvía tu mensaje. " +
+                  "Si lo tuyo era un acuse puntual y no un compromiso permanente, reescríbelo sin prometer conducta futura."
+                : "NO se envió: estás prometiendo un CAMBIO DE CONDUCTA y no lo guardaste, así que se te olvida en " +
+                  "cuanto se corra la ventana de contexto — y quien te lo pidió va a ver que volviste a hacer lo " +
+                  "mismo. Quien te habla no es el dueño, así que NO uses add_persistent_rule (te lo va a rechazar): " +
+                  "llama remember_fact con el hecho en una línea y en 3ª persona, con `about` si es sobre otra " +
+                  "persona. DESPUÉS reenvía tu mensaje. Si era un acuse puntual y no un compromiso permanente, " +
+                  "reescríbelo sin prometer conducta futura.",
             }),
           });
           continue;
@@ -7370,6 +7385,55 @@ async function runAgent(req: AgentRequest): Promise<{
           }
         }
       }
+      // Guarda de IDENTIDAD Nombre↔LID (auditoría 10-12/08): el corte del 11/08 15:00
+      // etiquetó "Brayan @192457652338690" — ese LID es el del DUEÑO. Y tres veces se
+      // mencionó al PADRE de Álvaro (@114426585833505, que escribió cero mensajes en la
+      // ventana) para decisiones del hijo. #1167 cerró el link LID→profile; lo que
+      // sigue fallando es resolver POR NOMBRE, que con homónimos es adivinar.
+      // Se verifica sobre el texto YA compuesto, que es donde el error se vuelve visible.
+      if (t.name === "reply_to_group" && identidadBloqueada < 1) {
+        const cuerpoId = String((t.input as ToolInput).body ?? "");
+        const pares = extraerParesNombreLid(cuerpoId);
+        if (pares.length > 0) {
+          const norm = (v: string) =>
+            v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+          const { data: miembros } = await sb
+            .from("whatsapp_members")
+            .select("external_id, profiles:user_id(full_name)")
+            .eq("group_id", group.id)
+            .in("external_id", pares.map((p) => `${p.lid}@lid`));
+          const nombreDeLid = new Map<string, string>();
+          for (const m of (miembros ?? []) as Array<Record<string, unknown>>) {
+            const fn = (m.profiles as { full_name?: string } | null)?.full_name;
+            if (fn) nombreDeLid.set(String(m.external_id).replace("@lid", ""), fn);
+          }
+          const cruzados = pares.filter((p) => {
+            const real = nombreDeLid.get(p.lid);
+            if (!real) return false; // LID desconocido en este grupo: no es asunto de esta guarda
+            return !norm(real).split(/\s+/).some((parte) => parte === norm(p.nombre));
+          });
+          if (cruzados.length > 0) {
+            identidadBloqueada += 1;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: t.id,
+              content: JSON.stringify({
+                error: "nombre_no_coincide_con_lid",
+                cruzados: cruzados.map((c) => ({
+                  escribiste: `${c.nombre} @${c.lid}`,
+                  ese_lid_es_de: nombreDeLid.get(c.lid),
+                })),
+                message:
+                  "NO se envió: estás mencionando a una persona con el LID de OTRA. En este equipo hay homónimos " +
+                  "(dos Álvaro Mejía padre e hijo, dos Brayan, tres Lizeth, tres Juan), así que etiquetar por " +
+                  "nombre es adivinar — el 11/08 le pusiste a Brayan el LID del dueño. Usa get_group_members para " +
+                  "sacar el LID correcto de esa persona en ESTE grupo, o nómbrala sin @mención.",
+              }),
+            });
+            continue;
+          }
+        }
+      }
       // Guarda anti-doble-proactivo (D1, 05/08): una corrida SIN mensaje disparador
       // (iniciativa propia) no apila un segundo bloque largo encima de otro reciente
       // del bot — el wishlist salió en 2 mensajes largos seguidos y Brayan pidió
@@ -7462,8 +7526,15 @@ async function runAgent(req: AgentRequest): Promise<{
       }
       if (t.name === "reply_to_group") {
         finalReply = String((t.input as ToolInput).body ?? "");
-        if (ackBloqueados > 0 && escriturasOk.size === 0) {
-          // Se publicó igual tras 2 bloqueos: dejamos rastro para auditar.
+        // ⚠️ El evento se emite SOLO si el texto que finalmente sale sigue afirmando
+        // persistencia. Antes bastaba con `ackBloqueados > 0`, y eso registraba como
+        // fallo el caso EXITOSO: el modelo reescribía sin el ack falso y el evento se
+        // insertaba igual. En la auditoría del 10-12/08 los 7 `agent_false_ack` de la
+        // ventana se leyeron como "la guarda no frena nada" — al correr los patrones
+        // contra los 7 cuerpos publicados, NINGUNO matcheaba: la guarda había hecho su
+        // trabajo 7 de 7. Telemetría que miente sobre sí misma cuesta más que no tenerla:
+        // mandó una auditoría entera a buscar un bug que no existía.
+        if (ackBloqueados > 0 && escriturasOk.size === 0 && afirmaRegistro(finalReply)) {
           await sb.from("whatsapp_bot_events").insert({
             group_id: group.id,
             tenant_id: group.tenant_id,
@@ -7473,6 +7544,15 @@ async function runAgent(req: AgentRequest): Promise<{
               intentos_bloqueados: ackBloqueados,
               body_preview: finalReply.slice(0, 300),
             },
+          });
+        } else if (ackBloqueados > 0 && escriturasOk.size === 0) {
+          // La guarda funcionó: el modelo corrigió. Se registra aparte para poder
+          // medir su eficacia sin ensuciar la señal de fallo.
+          await sb.from("whatsapp_bot_events").insert({
+            group_id: group.id,
+            tenant_id: group.tenant_id,
+            kind: "agent_ack_corregido",
+            payload: { intentos_bloqueados: ackBloqueados, body_preview: finalReply.slice(0, 300) },
           });
         }
       }

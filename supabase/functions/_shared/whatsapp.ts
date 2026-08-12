@@ -533,6 +533,28 @@ const VOSEO_A_NEUTRO: ReadonlyArray<[string, string]> = [
   ["pensás", "piensas"], ["necesitás", "necesitas"], ["trabajás", "trabajas"],
   ["manejás", "manejas"], ["respondés", "respondes"], ["escribís", "escribes"],
   ["subís", "subes"], ["quedás", "quedas"], ["apurate", "apúrate"], ["dejá", "deja"],
+  // AUDITORÍA 10-12/08: 23 de 115 mensajes de Marketing/Ventas salieron con voseo (20%).
+  // El caso que muestra el agujero: "Miguel, coordiná con Michelle antes de las 5PM:
+  // revisá cómo está funcionando el CP, y pasá el reporte acá" — el mapa corrigió
+  // "pasá" y dejó "coordiná" y "revisá" EN LA MISMA ORACIÓN. Un mapa incompleto es
+  // peor que ninguno: el mensaje sale medio corregido y parece descuido, no dialecto.
+  // Las formas de los nudges hardcodeados del cron van acá también (avanzás, asignás,
+  // arrancales), aunque la plantilla se corrige aparte: si mañana alguien escribe otra
+  // plantilla en voseo, el borde la tapa igual.
+  ["coordiná", "coordina"], ["revisá", "revisa"], ["revisalo", "revísalo"],
+  ["chequeá", "chequea"], ["confirmá", "confirma"], ["cerrá", "cierra"], ["cerrás", "cierras"],
+  ["anotá", "anota"], ["anotalo", "anótalo"], ["armá", "arma"], ["armale", "ármale"],
+  ["preguntá", "pregunta"], ["preguntale", "pregúntale"], ["respondé", "responde"],
+  ["respondele", "respóndele"], ["avanzá", "avanza"], ["avanzás", "avanzas"],
+  ["asigná", "asigna"], ["asignás", "asignas"], ["arrancales", "arráncales"],
+  ["perdés", "pierdes"], ["metés", "metes"], ["enfocate", "enfócate"], ["sumate", "súmate"],
+  ["dejame", "déjame"], ["dejalo", "déjalo"], ["ponete", "ponte"], ["jugá", "juega"],
+  // Formas en -me que faltaban al lado de sus hermanas -le/-lo ya mapeadas.
+  // "mandame" lo encontró el test nuevo: estaban mandale y mandalo, no mandame.
+  ["mandame", "mándame"], ["tirame", "tírame"], ["buscame", "búscame"], ["armame", "ármame"],
+  ["mostrame", "muéstrame"], ["contestame", "contéstame"], ["confirmame", "confírmame"],
+  // "che" no es un verbo pero es la marca rioplatense más obvia que existe.
+  ["che", "oye"],
 ];
 const VOSEO_RE = new RegExp(
   "(?<![\\p{L}@])(" + VOSEO_A_NEUTRO.map(([v]) => v).join("|") + ")(?![\\p{L}])",

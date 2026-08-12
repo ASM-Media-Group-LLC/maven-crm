@@ -14,8 +14,16 @@
 // no un ack) — y cada FP quema hasta 2 reintentos de LLM y empuja a una tercera
 // redacción más floja.
 export const PATRONES_ACK_FALSO: RegExp[] = [
-  /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
-  /\b(?:qued[óo]|quedan|queda)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad)/i,
+  /(?:✓|✅)[^\n]{0,80}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad|cargad)/i,
+  // AUDITORÍA 10-12/08: "Dale María, tenlo por hecho — ya quedaron CARGADAS en Maven
+  // como gestión por WhatsApp de hoy (melossomconsulting, honeyfans.agency…)".
+  // melossomconsulting sigue en stage 'Nuevo' con last_contact_date NULL y sin tocar
+  // desde el 01/08. Se escapaba por dos agujeros a la vez: "quedaron" no lo cubría
+  // `\bqueda\b` (el boundary corta antes de "-ron"), y "cargad" no estaba entre los
+  // verbos. Es el fraseo natural para una carga masiva, justo lo más caro de fingir.
+  /\b(?:qued[óo]|quedan|queda|quedaron|quedaban)\b[^\n]{0,40}\b(?:registrad|anotad|agendad|marcad|gestionad|guardad|cargad)/i,
+  // "tenlo/dalo por hecho" = hecho consumado sobre algo que el bot no tocó.
+  /\b(?:tenl[oa]|dal[oa]|dalo)\s+por\s+hecho\b/i,
   /\b(?:lo|la|los|las)\s+tengo\s+guardad/i,
   // "la tengo" SOLO si la frase termina ahí ([.,:!] o fin de línea): se queda el caso
   // real ("Gracias Carolina, la tengo.") y se sueltan "lo tengo presente/claro/
@@ -94,8 +102,11 @@ export const esDisputaDeRegistro = (s: string): boolean => DISPUTA_REGISTRO_RES.
 // reales de ese día pasaban limpias.
 // Un "Entendido" pelado NO alcanza para disparar (es acuse normal): hace falta
 // un compromiso de conducta futura.
+// 10/08: se fugó "de aquí en adelante" — la variante que el mapa no tenía (estaba
+// "de ahora en adelante"), y "te aviso siempre", que es la forma en que el bot le
+// promete una cadencia a alguien sin dejar fila.
 export const PROMESA_CONDUCTA_RE =
-  /\b(?:qued[ao]n?\s+(?:aplicad|ajustad|como\s+(?:norma|regla))|de\s+ahora\s+en\s+adelante|a\s+partir\s+de\s+(?:ahora|hoy)|voy\s+a\s+(?:llevar|empezar|dejar\s+de|cambiar|corregir|aplicar|exigir|pedir\s+siempre)|no\s+(?:lo\s+)?voy\s+a\s+(?:dejar\s+pasar|volver\s+a)|ya\s+no\s+voy\s+a|cambio\s+de\s+(?:estrategia|enfoque|criterio|foco)|lo\s+(?:ajusto|aplico|corrijo)\b|\bajusto\s*[:,]|lo\s+tomo\s+como\s+(?:norma|regla))/im;
+  /\b(?:qued[ao]n?\s+(?:aplicad|ajustad|como\s+(?:norma|regla))|de\s+(?:ahora|aqu[íi]|hoy)\s+en\s+(?:adelante|m[áa]s)|a\s+partir\s+de\s+(?:ahora|hoy)|voy\s+a\s+(?:llevar|empezar|dejar\s+de|cambiar|corregir|aplicar|exigir|pedir\s+siempre)|no\s+(?:lo\s+)?voy\s+a\s+(?:dejar\s+pasar|volver\s+a)|ya\s+no\s+voy\s+a|cambio\s+de\s+(?:estrategia|enfoque|criterio|foco)|lo\s+(?:ajusto|aplico|corrijo)\b|\bajusto\s*[:,]|lo\s+tomo\s+como\s+(?:norma|regla)|te\s+(?:aviso|avisar[ée]|paso|pasar[ée]|mando|mandar[ée])\s+siempre)/im;
 export const esPromesaDeComportamiento = (s: string): boolean => PROMESA_CONDUCTA_RE.test(s);
 
 // ── Repetición: el bot re-mandando lo mismo ─────────────────────────────────────
@@ -181,6 +192,22 @@ export const tieneRespaldoDeJuicio = (s: string): boolean =>
 // escrituras de ESTA corrida no alcanza — hay que preguntarle a la tabla.
 // El detector puede ser generoso porque el gate caro es la consulta: si no hay
 // filas recientes escritas por el bot, no bloquea nada.
+// ── Nombre pegado a un LID que no es el suyo ────────────────────────────────────
+// AUDITORÍA 10-12/08: el corte del 11/08 15:00 dijo "Brayan @192457652338690: sin
+// evidencia en el chat esta franja" — ese LID es el del DUEÑO. Y tres veces se
+// etiquetó a @114426585833505 (el PADRE de Álvaro, is_owner=false, que escribió 0
+// mensajes en la ventana) para temas del hijo. #1167 arregló el link LID→profile;
+// la resolución POR NOMBRE sigue cayendo en el homónimo.
+// Devuelve los pares <Nombre, LID> del texto ya compuesto para que el borde los
+// verifique contra whatsapp_members: es una lectura barata y caza las tres.
+export function extraerParesNombreLid(s: string): Array<{ nombre: string; lid: string }> {
+  const pares: Array<{ nombre: string; lid: string }> = [];
+  // "Brayan @192457652338690" / "Brayan: @192..." / "Brayan — @192..."
+  const re = /\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,})\b[\s:—,-]{1,3}@(\d{8,})\b/g;
+  for (const m of s.matchAll(re)) pares.push({ nombre: m[1], lid: m[2] });
+  return pares;
+}
+
 export const RETRACTACION_RE =
   /\b(?:mi\s+error|me\s+equivoqu[ée]|fue\s+un\s+error|tien[eé]s\s+raz[óo]n|ten[ée]s\s+raz[óo]n|corregid[oa]\b|lo\s+corrijo|lo\s+saco\s+del\s+registro|lo\s+doy\s+de\s+baja|no\s+(?:era|es)\s+(?:una\s+)?venta|no\s+cuenta\s+como\s+venta|mal\s+(?:contad|atribuid|registrad|marcad)[oa]|me\s+adelant[ée]|retiro\s+lo\s+dicho|descarta\s+lo\s+que\s+dije)/i;
 export const esRetractacion = (s: string): boolean => RETRACTACION_RE.test(s);
