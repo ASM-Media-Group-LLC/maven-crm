@@ -282,27 +282,58 @@ async function fetchSophieDailyWS(token, days) {
 // {date, models[]} → filas sophie_daily_stats. Mapeo DEFENSIVO (el shape exacto del
 // rollup se confirma con la primera corrida real) + raw jsonb para re-parsear sin
 // re-pedir a BLU si algún campo viene con otro nombre. Solo días con actividad.
+//
+// ⚠️ 12/08: la primera corrida real devolvió "sophie: 0 filas en 8/8 días" — o sea
+// que el WS conectó, autenticó y CONTESTÓ los ocho días sin un solo error… y salieron
+// cero filas. Ese log confundía tres causas distintas en un mismo "0":
+//   (a) BLU no manda modelos → Sophie de verdad no registró nada
+//   (b) los manda pero todos con 0 ventas y 0 mensajes → el filtro los descarta
+//   (c) los manda pero el campo del id se llama distinto → se saltean todos
+// Y el `raw` jsonb, que existe justamente para re-parsear sin volver a pedirle a BLU,
+// solo se guarda en filas INSERTADAS: con cero filas no quedaba ni rastro de lo que
+// llegó. Estábamos ciegos, no rotos.
+// Ahora la función devuelve además un diagnóstico con una MUESTRA del primer modelo
+// visto, para que el próximo log diga cuál de las tres es sin otro ciclo de deploy.
 function transformSophieDaily(results, account) {
   const rows = [];
+  const diag = {
+    dias_con_respuesta: 0, dias_con_modelos: 0, modelos_vistos: 0,
+    descartados_sin_id: 0, descartados_sin_actividad: 0, id_no_numerico: 0,
+    claves_del_modelo: null, muestra: null,
+  };
   for (const { date, models } of (results || [])) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    for (const md of (models || [])) {
-      const id = md?.modelId ?? md?.id;
-      if (id == null) continue;
-      const tot = md.totals || md;
-      const sales = Number(tot.aiSales ?? tot.salesValue ?? tot.sales ?? 0) || 0;
-      const msgs = Number(tot.aiMessages ?? tot.messages ?? 0) || 0;
-      if (sales <= 0 && msgs <= 0) continue;
+    diag.dias_con_respuesta++;
+    const lista = Array.isArray(models) ? models : [];
+    if (lista.length) diag.dias_con_modelos++;
+    // Muestra del PRIMER modelo que aparezca en toda la corrida: es lo único que
+    // permite ver el shape real sin volver a pedirle nada a BLU.
+    if (!diag.muestra && lista.length) {
+      diag.claves_del_modelo = Object.keys(lista[0] ?? {}).join(",");
+      try { diag.muestra = JSON.stringify(lista[0]).slice(0, 400); } catch { /* circular */ }
+    }
+    for (const md of lista) {
+      diag.modelos_vistos++;
+      // Se amplían los alias: si BLU nombra distinto, no se pierde la fila entera.
+      const id = md?.modelId ?? md?.id ?? md?.model_id ?? md?.personaId ?? md?.persona_id;
+      if (id == null) { diag.descartados_sin_id++; continue; }
+      // blu_model_id es BIGINT: un id no numérico haría fallar el upsert entero.
+      // Se cuenta aparte para poder decirlo en el log en vez de tumbar la corrida.
+      if (!Number.isFinite(Number(id))) { diag.id_no_numerico++; continue; }
+      const tot = md.totals || md.stats || md.metrics || md;
+      const sales = Number(tot.aiSales ?? tot.salesValue ?? tot.sales ?? tot.totalSales ?? tot.revenue ?? 0) || 0;
+      const msgs = Number(tot.aiMessages ?? tot.messages ?? tot.messagesSent ?? tot.sentMessages ?? 0) || 0;
+      if (sales <= 0 && msgs <= 0) { diag.descartados_sin_actividad++; continue; }
       rows.push({
-        date, account, blu_model_id: id,
-        model_name: md.modelName ?? md.displayName ?? null,
+        date, account, blu_model_id: Number(id),
+        model_name: md.modelName ?? md.displayName ?? md.name ?? null,
         username: md.username ?? md.handle ?? null,
         ai_sales: sales, ai_messages: msgs,
         raw: md, updated_at: new Date().toISOString(),
       });
     }
   }
-  return rows;
+  return { rows, diag };
 }
 
 // {date, employees[]} por día → filas {blu_employee_id, date, total_sales, ...}. Solo con actividad.
@@ -625,13 +656,27 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
     const sophieDays = quickDays != null ? daysBack(1) : daysBack(7);
     const { results: sr, freshToken: sft, partial } = await fetchSophieDailyWS(token, sophieDays);
     if (sft && sft !== token) { await saveToken(acct.id, sft); token = sft; }
-    const sRows = transformSophieDaily(sr, acct.account);
+    const { rows: sRows, diag } = transformSophieDaily(sr, acct.account);
     for (const batch of chunk(sRows, 500)) {
       const { error } = await sb().from("sophie_daily_stats")
         .upsert(batch, { onConflict: "date,account,blu_model_id" });
       if (error) throw new Error("sophie upsert: " + error.message);
     }
     console.log(`[blu-bridge:${acct.account}] sophie: ${sRows.length} filas en ${sr.length}/${sophieDays.length} días${partial ? " (parcial)" : ""}.`);
+    // CERO FILAS NO ES UNA RESPUESTA: sin esto, "0 filas" tapaba por igual "Sophie no
+    // vendió", "el filtro se los comió" y "el campo se llama distinto". El diagnóstico
+    // solo se imprime cuando hace falta, así que no ensucia las corridas sanas.
+    if (sRows.length === 0) {
+      console.warn(
+        `[blu-bridge:${acct.account}] sophie SIN FILAS — ` +
+        `días con respuesta: ${diag.dias_con_respuesta}, con modelos: ${diag.dias_con_modelos}, ` +
+        `modelos vistos: ${diag.modelos_vistos} (descartados: ${diag.descartados_sin_id} sin id, ` +
+        `${diag.id_no_numerico} con id no numérico, ${diag.descartados_sin_actividad} sin actividad). ` +
+        (diag.modelos_vistos === 0
+          ? "BLU no devolvió ningún modelo: o Sophie no operó en esos días, o el rollup necesita otro parámetro."
+          : `claves del modelo: [${diag.claves_del_modelo}] · muestra: ${diag.muestra}`),
+      );
+    }
   } catch (e) {
     if (e.expired) throw e;
     console.error(`[blu-bridge:${acct.account}] sophie falló (no afecta el resto): ${e.message}`);
