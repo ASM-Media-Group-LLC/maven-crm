@@ -7698,11 +7698,26 @@ async function runAgent(req: AgentRequest): Promise<{
           });
         }
       }
-      toolResults.push({
-        type: "tool_result",
-        tool_use_id: t.id,
-        content: JSON.stringify(result).slice(0, 8000),
-      });
+      // Cap del resultado POR TOOL, y si hay que cortar se corta CON AVISO.
+      // 12/08: get_hubstaff_activity con el roster completo (65 personas × varios
+      // bloques) superaba el cap plano de 8000 y el JSON se cortaba mudo a mitad de
+      // objeto — el reporte de las 16:20 a Grace perdió justo hoy_en_vivo y el
+      // modelo "reconstruyó" horas desde el ranking viejo: 0h31 para gente que
+      // llevaba 4 horas. Un corte sin marca invita a inventar la cola.
+      {
+        const CAP_POR_TOOL: Record<string, number> = { get_hubstaff_activity: 26000 };
+        const cap = CAP_POR_TOOL[String(t.name)] ?? 8000;
+        const resJson = JSON.stringify(result);
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: t.id,
+          content: resJson.length > cap
+            ? resJson.slice(0, cap) +
+              ` …[RESULTADO CORTADO: medía ${resJson.length} chars y el JSON quedó incompleto. ` +
+              "NO inventes ni reconstruyas lo que falta — dilo explícito o repite la consulta con filtros más chicos.]"
+            : resJson,
+        });
+      }
     }
 
     messages.push({ role: "user", content: toolResults });

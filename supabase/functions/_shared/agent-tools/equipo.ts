@@ -565,6 +565,91 @@ export const equipoTools: AgentTool[] = [
       ]);
       const esDireccion = (r: Record<string, unknown>) => DIRECCION_EXENTA.has(String(r.profile_id ?? ""));
 
+      // ── LAS HORAS DE HOY, DEL FEED VIVO — no del agregado que atrasa ────────────
+      // 12/08 14:19, Grace: "dame el ingreso de todos hasta el corte de 2PM y su
+      // productividad". El bot respondió "Yoselin — 7:40 am · 2h41" … 7:40 + 2h41 =
+      // 10:21. TODA la lista calzaba con un corte fantasma de ~10:20-10:30: las
+      // horas salían de hubstaff_daily_data (que atrasa hasta 6h) mientras la
+      // entrada/último ping venían de hubstaff_activities (frescas) — dos fuentes
+      // MEZCLADAS EN LA MISMA FILA, sin marca. A María Suárez le reportó 0h31
+      // cuando el feed vivo ya tenía 3h22. Grace pidió el corte de las 2pm y
+      // recibió el de las 10:20 rotulado "corte 2:00 pm".
+      // El feed vivo TENÍA los números correctos en ese momento (verificado fila
+      // por fila): el bug era de qué fuente lee el ranking, no de datos.
+      //
+      // Acá: si el rango incluye HOY, la porción de hoy se REEMPLAZA por el vivo
+      // (se resta lo que el daily ya contó de hoy y se suma el vivo). Y quien ya
+      // fichó hoy pero aún no existe en el agregado (entró después del corte del
+      // daily) se AGREGA — antes era invisible para el ranking.
+      const incluyeHoy = to >= hoyBog;
+      const esHoySolo = from === hoyBog && to === hoyBog;
+      if (incluyeHoy) {
+        try {
+          const [liveRes, dailyRes, memRes] = await Promise.all([
+            ctx.sb.rpc("hubstaff_live_today", { p_person: null }),
+            ctx.sb.from("hubstaff_daily_data")
+              .select("hubstaff_user_id, tracked_seconds").eq("date", hoyBog),
+            ctx.sb.from("hubstaff_members").select("hubstaff_user_id, profile_id"),
+          ]);
+          const vivo = new Map<string, { secs: number; act: number | null; name: string; role: string | null; maven: boolean }>();
+          for (const r of (liveRes.data ?? []) as Array<Record<string, unknown>>) {
+            vivo.set(String(r.hubstaff_user_id), {
+              secs: Number(r.seconds_today) || 0,
+              act: r.activity_pct == null ? null : Math.round(Number(r.activity_pct)),
+              name: String(r.name ?? ""),
+              role: (r.hubstaff_role as string) ?? null,
+              maven: Boolean(r.mapped_to_maven),
+            });
+          }
+          // El daily parte el día en filas por proyecto: se suma por persona.
+          const dailyHoy = new Map<string, number>();
+          for (const r of (dailyRes.data ?? []) as Array<Record<string, unknown>>) {
+            const k = String(r.hubstaff_user_id);
+            dailyHoy.set(k, (dailyHoy.get(k) ?? 0) + (Number(r.tracked_seconds) || 0));
+          }
+          const pidPorUid = new Map<string, string>();
+          for (const m of (memRes.data ?? []) as Array<Record<string, unknown>>) {
+            if (m.profile_id) pidPorUid.set(String(m.hubstaff_user_id), String(m.profile_id));
+          }
+
+          const vistos = new Set<string>();
+          for (const r of rows as Array<Record<string, unknown>>) {
+            const uid = String(r.hubstaff_user_id ?? "");
+            vistos.add(uid);
+            const lv = vivo.get(uid);
+            if (!lv) continue;
+            const totalSecs = Math.max(
+              0,
+              (Number(r.total_hours) || 0) * 3600 - (dailyHoy.get(uid) ?? 0) + lv.secs,
+            );
+            r.total_hours = Math.round((totalSecs / 3600) * 100) / 100;
+            r.horas_hoy_fmt = horasHM(lv.secs);
+            // En un rango de UN día (=hoy) el % del daily es tan viejo como sus
+            // horas: se reemplaza entero. En rangos largos el promedio es
+            // mayormente histórico y se deja.
+            if (esHoySolo && lv.act != null) r.avg_activity_pct = lv.act;
+          }
+          for (const [uid, lv] of vivo) {
+            if (vistos.has(uid) || lv.secs <= 0) continue;
+            (rows as Array<Record<string, unknown>>).push({
+              hubstaff_user_id: uid,
+              name: lv.name,
+              hubstaff_role: lv.role,
+              mapped_to_maven: lv.maven,
+              profile_id: pidPorUid.get(uid) ?? null,
+              total_hours: Math.round((lv.secs / 3600) * 100) / 100,
+              avg_activity_pct: lv.act,
+              days_worked: 1,
+              last_day: hoyBog,
+              solo_en_vivo: true, // aún sin fila en el agregado diario
+            });
+          }
+        } catch {
+          // Si el vivo falla se queda el agregado: mejor viejo que nada — y el
+          // bloque hoy_en_vivo de abajo tiene su propio aviso de frescura.
+        }
+      }
+
       // Función de cada persona (proyecto de Hubstaff > rol de Maven). Ver resolverFunciones.
       const funciones = await resolverFunciones(ctx.sb, rows as Array<Record<string, unknown>>, from, to);
       const fnDe = (r: Record<string, unknown>): Funcion =>
@@ -612,6 +697,10 @@ export const equipoTools: AgentTool[] = [
           actividad_pct: r.avg_activity_pct,
           dias: r.days_worked,
           ultimo_dia: r.last_day,
+          // Solo cuando el rango incluye hoy: las horas de HOY ya en formato citable,
+          // recién salidas del feed vivo. Citar ESTO para "cuánto lleva hoy".
+          ...(r.horas_hoy_fmt ? { horas_hoy_fmt: r.horas_hoy_fmt } : {}),
+          ...(r.solo_en_vivo ? { solo_en_vivo: true } : {}),
         };
       };
 
@@ -620,9 +709,24 @@ export const equipoTools: AgentTool[] = [
       const base = pedido ? filtradas : rows;
       const equipoMedible = base.filter((r) => !esDireccion(r as Record<string, unknown>));
       const direccion = base.filter((r) => esDireccion(r as Record<string, unknown>));
+      // El ajuste en vivo cambió horas (y agregó filas): re-ordenar para que el
+      // ranking siga siendo un ranking y los agregados-tarde no queden al final.
+      if (incluyeHoy) {
+        equipoMedible.sort((a, b) =>
+          (Number((b as Record<string, unknown>).total_hours) || 0) -
+          (Number((a as Record<string, unknown>).total_hours) || 0)
+        );
+      }
 
       const result: Record<string, unknown> = {
         rango: { desde: from, hasta: to },
+        ...(incluyeHoy ? {
+          frescura_de_hoy:
+            "Las horas de HOY en este ranking salen del feed EN VIVO (franjas de 10 min, lag 2-5 min) — " +
+            "NO del agregado diario que atrasa horas. `horas_hoy_fmt` es lo citable para 'cuánto lleva hoy'. " +
+            (esHoySolo ? "El % de actividad también es del vivo." :
+              "El % de actividad es el promedio del rango (mayormente histórico)."),
+        } : {}),
         personas: equipoMedible.length,
         ...(pedido ? { filtrado_por: pedido, personas_totales_del_rango: rows.length } : {}),
         // ⚠️ SIN TOPE. El roster de Hubstaff son 65 personas y el cap estaba en 60:
@@ -890,6 +994,15 @@ export const equipoTools: AgentTool[] = [
                 "Nombres repetidos (hay tres 'Brayan'): identifica por nombre completo + nombre_en_maven, no adivines.",
           };
         }
+      }
+      // hoy_en_vivo y el bucket van PRIMERO en el objeto: el loop del agente corta
+      // resultados largos por caracteres, y el 12/08 a las 16:20 el corte se comió
+      // JUSTO estos bloques — el modelo reconstruyó "0h31" desde el ranking viejo
+      // para gente que llevaba 4 horas. Si algo se corta, que sea la cola del
+      // ranking histórico, nunca el bloque fresco.
+      if (result.hoy_en_vivo) {
+        const { rango, frescura_de_hoy, hoy_en_vivo, ...resto } = result;
+        return { rango, ...(frescura_de_hoy ? { frescura_de_hoy } : {}), hoy_en_vivo, ...resto };
       }
       return result;
     },
