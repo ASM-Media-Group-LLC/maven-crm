@@ -288,6 +288,11 @@ async function barrerBorradores(sb: ReturnType<typeof adminClient>): Promise<{ a
   }
 
   // 2) Avisar UNA vez a los que llevan >30 min esperando confirmación.
+  // ⚠️ Solo los que TODAVÍA no vencieron: el 12/08 13:30 el barrido le avisó a
+  // Álvaro por borradores de 28-40 horas que ya estaban pasados de TTL — el pase
+  // de vencimiento (limitado a 20 por tick) no había alcanzado a procesarlos y el
+  // aviso decía "en 24h lo doy de baja" sobre algo que venció 5 minutos después.
+  // Un zombie pasado de TTL es del pase de vencimiento, nunca del de avisos.
   const hace30 = new Date(ahora.getTime() - 30 * 60_000).toISOString();
   const { data: colgados } = await sb
     .from("whatsapp_pending_posts")
@@ -295,23 +300,54 @@ async function barrerBorradores(sb: ReturnType<typeof adminClient>): Promise<{ a
     .eq("status", "pending")
     .is("nudged_at", null)
     .lt("created_at", hace30)
-    .limit(5);
+    .gt("expires_at", ahora.toISOString())
+    .order("created_at", { ascending: true })
+    .limit(10);
+
+  // AGRUPADOS por chat de origen: la iteración de un borrador (5 revisiones en 43
+  // min el 12/08) generaba UNA fila por versión y a las 15:50 salieron CUATRO
+  // avisos seguidos por el mismo mensaje. El supersede en post_to_group ya evita
+  // esa multiplicidad hacia adelante; esto cubre el resto — si igual hay varios
+  // borradores esperando, va UN solo mensaje con la lista, no una ráfaga.
+  const porOrigen = new Map<string, Array<Record<string, unknown>>>();
   for (const p of (colgados ?? []) as Array<Record<string, unknown>>) {
     const origen = String(p.requested_from_group_id ?? "");
     if (!origen) continue; // sin chat de origen no hay a quién avisarle
-    const { data: destino } = await sb
-      .from("whatsapp_groups").select("name").eq("id", String(p.target_group_id ?? "")).maybeSingle();
-    const mins = Math.round((ahora.getTime() - Date.parse(String(p.created_at))) / 60_000);
-    const cuerpo =
-      `📝 Te quedó un mensaje sin confirmar hace ${mins >= 120 ? `${Math.round(mins / 60)}h` : `${mins} min`}` +
-      `${destino?.name ? ` para *${destino.name}*` : ""}:\n\n` +
-      `_${String(p.body ?? "").slice(0, 220)}${String(p.body ?? "").length > 220 ? "…" : ""}_\n\n` +
-      `¿Lo mando, lo ajusto o lo descarto? Si no me dices nada, en 24h lo doy de baja.`;
-    const res = await sendOne({ groupId: origen, body: cuerpo, tenantId: String(p.tenant_id) });
-    // nudged_at se sella SIEMPRE, mande o no: si el envío falla, insistir cada 5
-    // minutos convertiría el rescate en spam.
-    await sb.from("whatsapp_pending_posts").update({ nudged_at: ahora.toISOString() }).eq("id", p.id);
-    if (res.ok) avisados += 1;
+    if (!porOrigen.has(origen)) porOrigen.set(origen, []);
+    porOrigen.get(origen)!.push(p);
+  }
+  if (porOrigen.size > 0) {
+    // Nombres de los grupos destino, resueltos de una sola vez.
+    const destinos = [...new Set(
+      (colgados ?? []).map((p) => String((p as Record<string, unknown>).target_group_id ?? "")).filter(Boolean),
+    )];
+    const nombreDestino = new Map<string, string>();
+    if (destinos.length) {
+      const { data: gs } = await sb.from("whatsapp_groups").select("id, name").in("id", destinos);
+      for (const g of (gs ?? []) as Array<{ id: string; name: string }>) nombreDestino.set(g.id, g.name);
+    }
+    const edad = (creado: unknown) => {
+      const mins = Math.round((ahora.getTime() - Date.parse(String(creado))) / 60_000);
+      return mins >= 120 ? `${Math.round(mins / 60)}h` : `${mins} min`;
+    };
+    for (const [origen, pendientes] of porOrigen) {
+      const items = pendientes.map((p) => {
+        const dest = nombreDestino.get(String(p.target_group_id ?? ""));
+        const preview = String(p.body ?? "").slice(0, 180);
+        return `📝 hace ${edad(p.created_at)}${dest ? ` para *${dest}*` : ""}:\n_${preview}${String(p.body ?? "").length > 180 ? "…" : ""}_`;
+      });
+      const cuerpo = pendientes.length === 1
+        ? `${items[0]}\n\n¿Lo mando, lo ajusto o lo descarto? Si no me dices nada, en 24h lo doy de baja.`
+        : `Tienes *${pendientes.length} mensajes sin confirmar*:\n\n${items.join("\n\n")}\n\n` +
+          `Dime cuál mando, cuál ajusto o cuál descarto. Lo que no confirmes se da de baja solo a las 24h.`;
+      const res = await sendOne({ groupId: origen, body: cuerpo, tenantId: String(pendientes[0].tenant_id) });
+      // nudged_at se sella SIEMPRE, mande o no: si el envío falla, insistir cada 5
+      // minutos convertiría el rescate en spam.
+      await sb.from("whatsapp_pending_posts")
+        .update({ nudged_at: ahora.toISOString() })
+        .in("id", pendientes.map((p) => String(p.id)));
+      if (res.ok) avisados += pendientes.length;
+    }
   }
 
   return { avisados, vencidos };

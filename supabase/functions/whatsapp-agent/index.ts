@@ -1972,6 +1972,21 @@ const TOOLS: Array<{
 // ----------------------------------------------------------------------------
 type ToolInput = Record<string, unknown>;
 
+// Timestamp → "DD/MM HH:MM" hora Bogotá (UTC-5 fijo, sin DST).
+// 12/08: el corte de las 11:00 citó "Daniel — activo 15:01" DENTRO del corte
+// 09:00-11:00. Eran las 10:01: el transcript que lee el modelo renderizaba
+// `[${m.sent_at}]` — el ISO UTC crudo — y el modelo copia la hora tal cual la ve,
+// por más que el prompt diga "NUNCA muestres UTC" (regla de prosa vs dato al
+// alcance de la mano: gana el dato). La cura es darle el dato YA local.
+const tsBogota = (iso: unknown): string => {
+  const v = String(iso ?? "");
+  const t = Date.parse(v);
+  if (isNaN(t)) return v.slice(0, 16);
+  const d = new Date(t - 5 * 3600_000);
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")} ` +
+    `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+};
+
 // Extrae el handle de IG dado un input que puede ser:
 //   - "catalinaofficer"
 //   - "@catalinaofficer"
@@ -3292,27 +3307,51 @@ async function executeTool(
       const member = members[0];
       if (!member.user_id) return { error: "member_not_linked", member: { display_name: member.display_name } };
 
-      // Construir payload
+      // ── ACUMULAR, NO PISAR (12/08) ──────────────────────────────────────────
+      // Con el régimen de cortes cada 2h la gente reporta VARIAS tandas al día, y
+      // el upsert plano sobrescribía la fila entera: Lizeth reportó 7 piezas al
+      // mediodía, 3 reels a las 17:26, y el ledger quedó en 3 — su día real era
+      // ~10. Peor: los campos que la tanda nueva no traía se volvían NULL.
+      // Esta tabla alimenta la nota diaria, los cortes y la producción de 30 días
+      // con la que se deciden puestos (el caso "Isabel — 0 registros" fue acá).
+      // Los contadores SUMAN dentro del día; el raw_text se anexa con hora.
+      const CONTADORES = [
+        "contactados", "respuestas", "numeros_obtenidos", "confirmadas", "rechazadas",
+        "canceladas", "cerradas", "seguimientos", "videos_creados", "fotos_creadas",
+        "cuentas_creadas", "posts_subidos",
+      ] as const;
+
+      const { data: previo } = await sb
+        .from("whatsapp_daily_reports")
+        .select("id, links, raw_text, " + CONTADORES.join(", "))
+        .eq("user_id", member.user_id)
+        .eq("report_date", reportDate)
+        .maybeSingle();
+      const prevRow = (previo ?? null) as Record<string, unknown> | null;
+
       const payload: Record<string, unknown> = {
         user_id: member.user_id,
         report_date: reportDate,
         role_kind: roleKind,
-        contactados: input.contactados ?? null,
-        respuestas: input.respuestas ?? null,
-        numeros_obtenidos: input.numeros_obtenidos ?? null,
-        confirmadas: input.confirmadas ?? null,
-        rechazadas: input.rechazadas ?? null,
-        canceladas: input.canceladas ?? null,
-        cerradas: input.cerradas ?? null,
-        seguimientos: input.seguimientos ?? null,
-        videos_creados: input.videos_creados ?? null,
-        fotos_creadas: input.fotos_creadas ?? null,
-        cuentas_creadas: input.cuentas_creadas ?? null,
-        posts_subidos: input.posts_subidos ?? null,
-        links: input.links ?? [],
-        raw_text: input.raw_text ? String(input.raw_text).slice(0, 5000) : null,
         group_id: ctx.groupId,
       };
+      for (const k of CONTADORES) {
+        const nuevoVal = input[k];
+        const previoVal = prevRow?.[k];
+        // null + null = null (no inventar ceros); con cualquiera de los dos, suma.
+        payload[k] = nuevoVal == null && previoVal == null
+          ? null
+          : (Number(previoVal) || 0) + (Number(nuevoVal) || 0);
+      }
+      const horaBog = new Date(Date.now() - 5 * 3600_000).toISOString().slice(11, 16);
+      const rawNuevo = input.raw_text ? String(input.raw_text).slice(0, 3000) : null;
+      const rawPrevio = prevRow?.raw_text ? String(prevRow.raw_text) : null;
+      payload.raw_text = rawNuevo && rawPrevio
+        ? `${rawPrevio}\n—— tanda ${horaBog} ——\n${rawNuevo}`.slice(0, 5000)
+        : (rawNuevo ?? rawPrevio);
+      const linksPrevios = Array.isArray(prevRow?.links) ? prevRow.links as unknown[] : [];
+      const linksNuevos = Array.isArray(input.links) ? input.links as unknown[] : [];
+      payload.links = [...linksPrevios, ...linksNuevos];
 
       const { data, error } = await sb
         .from("whatsapp_daily_reports")
@@ -3320,7 +3359,19 @@ async function executeTool(
         .select("id, user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos")
         .single();
       if (error) return { error: error.message };
-      return { ok: true, registered: data, member_name: member.display_name };
+      return {
+        ok: true,
+        registered: data,
+        member_name: member.display_name,
+        ...(prevRow
+          ? {
+            acumulado: true,
+            nota:
+              "Los números de arriba son el ACUMULADO del día (esta tanda se sumó a lo ya registrado). " +
+              "Al reportar pasa SOLO lo nuevo de la tanda, nunca el total del día — si repites el total, se duplica.",
+          }
+          : {}),
+      };
     }
 
     case "set_member_schedule": {
@@ -3617,7 +3668,7 @@ async function executeTool(
         grupo: g.name,
         fecha: dia,
         mensajes: ((msgs.data ?? []) as Array<Record<string, unknown>>).map((m) => ({
-          hora: String(m.sent_at).slice(11, 16),
+          hora: tsBogota(m.sent_at), // hora Bogotá — .slice(11,16) sobre el ISO era UTC
           quien: m.is_from_bot ? "BOT" : m.sender_display_name,
           texto: String(m.transcribed_text ?? m.body ?? "").slice(0, 400),
         })),
@@ -3675,7 +3726,7 @@ async function executeTool(
       const filas = ((msgs ?? []) as Array<Record<string, unknown>>)
         .filter((m) => String(m.body ?? "").trim().length > 0)
         .map((m) => ({
-          hora: String(m.sent_at).slice(11, 16),
+          hora: tsBogota(m.sent_at), // hora Bogotá — .slice(11,16) sobre el ISO era UTC
           con: convById.get(String(m.conversation_id)) ?? "?",
           direccion: m.direction === "out" ? "equipo→creadora" : "creadora→equipo",
           texto: String(m.body ?? "").slice(0, 400),
@@ -3745,7 +3796,27 @@ async function executeTool(
         await sb.from("whatsapp_pending_posts")
           .update({ status: "sent", sent_at: new Date().toISOString() })
           .eq("id", pend.id);
-        return { ok: true, publicado_en: pend.target_group_id, resultado: enviado };
+        // SUPERSEDE AL PUBLICAR (12/08): al confirmar el mensaje de Brayan, el bot
+        // dijo "los 4 borradores viejos quedan descartados" — y los 4 (más una 5ª
+        // copia de la re-confirmación) siguieron `pending` en la base. A las 16:30
+        // el barrido le avisó a Álvaro por un mensaje YA publicado a las 15:53.
+        // La guarda de ack falso no lo cazó porque post_to_group es una escritura
+        // exitosa y eso la desarma. El arreglo no es endurecer la guarda: es que
+        // el sistema HAGA lo que el bot dice — publicar mata a los hermanos.
+        const { data: huerfanos } = await sb.from("whatsapp_pending_posts")
+          .update({ status: "superseded" })
+          .eq("tenant_id", ctx.tenantId)
+          .eq("target_group_id", pend.target_group_id)
+          .eq("requested_from_group_id", ctx.groupId)
+          .eq("status", "pending")
+          .neq("id", pend.id)
+          .select("id");
+        return {
+          ok: true,
+          publicado_en: pend.target_group_id,
+          resultado: enviado,
+          borradores_descartados: (huerfanos ?? []).length,
+        };
       }
 
       // ── PASO 1: componer el borrador y pedir confirmación (NO envía) ────────
@@ -3779,6 +3850,19 @@ async function executeTool(
         return { error: "grupo_ambiguo", coincidencias: opciones.map((g) => g.name), message: "Pregunta a cuál de estos se refiere." };
       }
 
+      // SUPERSEDE AL REDACTAR (12/08): la iteración del mensaje de Brayan (5 audios
+      // de Álvaro en 43 min) creó CINCO filas pending — una por revisión — y a las
+      // 15:50 el barrido le mandó CUATRO avisos seguidos por el mismo mensaje en
+      // versiones distintas. Una revisión nueva para el mismo origen→destino
+      // REEMPLAZA a la anterior: solo la última espera confirmación.
+      const { data: reemplazados } = await sb.from("whatsapp_pending_posts")
+        .update({ status: "superseded" })
+        .eq("tenant_id", ctx.tenantId)
+        .eq("target_group_id", opciones[0].id)
+        .eq("requested_from_group_id", ctx.groupId)
+        .eq("status", "pending")
+        .select("id");
+
       const { data: nuevo, error: insErr } = await sb
         .from("whatsapp_pending_posts")
         .insert({
@@ -3796,6 +3880,14 @@ async function executeTool(
         enviado: false,
         pending_id: nuevo?.id,
         grupo_destino: opciones[0].name,
+        ...(reemplazados && reemplazados.length
+          ? {
+            borradores_anteriores_reemplazados: reemplazados.length,
+            nota_reemplazo:
+              "El/los borradores anteriores para este mismo grupo quedaron reemplazados por esta versión — " +
+              "solo esta espera confirmación. No hace falta descartarlos ni avisar de ellos.",
+          }
+          : {}),
         texto_a_publicar: body,
         instruccion:
           "NO se envió todavía. Responde en el DM con la pregunta PRIMERO ('¿Lo mando así a " +
@@ -5958,7 +6050,7 @@ async function buildInitialUserMessage(args: {
     for (const m of nocturnos ?? []) {
       const sender = firstName(m.sender_external_id, m.sender_display_name);
       const text = effectiveText(m);
-      if (text) lines.push(`[${m.sent_at}] ${sender}: ${text}`);
+      if (text) lines.push(`[${tsBogota(m.sent_at)}] ${sender}: ${text}`);
     }
     lines.push("");
     lines.push("INSTRUCCIONES — sigue la sección 'APERTURA DEL DÍA' del system prompt:");
@@ -6034,7 +6126,7 @@ async function buildInitialUserMessage(args: {
       const texto = (m.msg_type === "audio" || m.msg_type === "image" || m.msg_type === "document") && m.transcribed_text
         ? `[${m.msg_type === "audio" ? "audio" : m.msg_type === "document" ? "documento" : "imagen"}] ${m.transcribed_text}`
         : m.body;
-      if (texto) lines.push(`[${m.sent_at}] ${sender}: ${texto}`);
+      if (texto) lines.push(`[${tsBogota(m.sent_at)}] ${sender}: ${texto}`);
     }
     // CIERRE: insumos objetivos por persona (participación en franjas, Hubstaff,
     // avance real del ROL) + nota sugerida con fórmula fija, calculados y
