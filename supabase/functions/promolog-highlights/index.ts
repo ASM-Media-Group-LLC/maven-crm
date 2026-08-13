@@ -252,45 +252,31 @@ async function buildDailyQuality(sb: any): Promise<string> {
 // comparación con ayer (pedido del dueño 2026-07-23 — ayer-completo vs hoy-parcial
 // daba ↓ falsos que confundían).
 // ── ¿Qué significa "hoy" en las filas de BLU? ─────────────────────────────────
-// 12/08 23:00: el reporte dijo "Danik $2,850 hoy" y el panel cerró el día en
-// $2,422. La fila "12/08" cubría ~[11/08 19:00 → 12/08 19:00] Colombia: el puente
-// bucketeaba en el día del PROVEEDOR (UTC), así que el top de las 23:00 traía la
-// noche anterior adentro y le faltaba la noche prime del propio día. El puente
-// ahora verifica si BLU acepta ventanas alineadas a Colombia y deja su veredicto
-// en blu_bridge_state — acá se lee para etiquetar el número como lo que ES, en
-// vez de afirmar "hoy" sobre una ventana que no es el día calendario.
-async function ventanaBucket(sb: any): Promise<{ esColombia: boolean; aviso: string }> {
-  try {
-    const { data } = await sb.from("blu_bridge_state").select("value").eq("key", "bucket_earnings").maybeSingle();
-    if (data?.value?.mode === "bogota") return { esColombia: true, aviso: "" };
-  } catch { /* sin estado → asumir proveedor, que es el histórico */ }
-  return {
-    esColombia: false,
-    aviso: " ⚠️ La ventana del \"día\" es la del proveedor (~7pm→7pm Colombia): incluye la noche de AYER y no la de hoy — no la compares con el cierre del panel.",
-  };
-}
-
+// RESUELTO (13/08, PR #1183): BLU trabaja en día de COLOMBIA y sus rangos son
+// INCLUSIVOS — el bridge pedía [D, D+1] y cada fila traía el día siguiente
+// adentro (danik 12/08: fila $5,800 vs panel $2,422; fila(12)−fila(13) daba el
+// cierre del panel al dólar). Con el bridge corregido y el histórico reescrito,
+// la fila del día ES el día del panel. El "+118% overnight" y el "lag de ~2
+// días" eran ese bug, no liquidación; el ajuste real de BLU existe pero es
+// menor (el resync de 90d del bridge lo absorbe). Decisión de Jhon: la cocina
+// no va al grupo — el mensaje queda simple.
 async function buildDailyIncome(sb: any): Promise<string> {
   const fresh = await requestFreshBlu(sb, "daily_income");
   const today = bogToday();
   const names = await activeNames(sb);
   const hoy = await incomeTop(sb, today, today, names);
   const hhmm = bogNow().toISOString().slice(11, 16);
-  const bucket = await ventanaBucket(sb);
   const top5 = hoy.top.slice(0, 5);
-  const head = bucket.esColombia
-    ? `💰 *Top ingresos de hoy ${fmtDia(today)} (día Colombia) — hasta las ${hhmm}*`
-    : `💰 *Top ingresos — ventana BLU del ${fmtDia(today)}, corte ${hhmm}*`;
+  const head = `💰 *Top ingresos de hoy ${fmtDia(today)} — hasta las ${hhmm}*`;
   if (!top5.length) return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte) || "s/d"}).`;
   const lines = top5.map(([cid, v], i) => `${medals[i]} *${names.get(cid)}* — ${money(v)}`);
-  // "Recién sincronizada" se leía como "cifra cerrada del día", y no lo es: BLU liquida
-  // con lag, así que el total de hoy siempre viene PARCIAL (el 30/07 cerró en $15,8k
-  // contra $27,6k del 29 y $29,4k del 28 — no fue un mal día, faltaba ingesta; y el
-  // 12/08 la fila creció +118% de la noche a la mañana). El sync nuestro sí corrió;
-  // lo que falta es upstream. Que el mensaje lo diga.
+  // "Recién sincronizada" se leía como "cifra cerrada del día", y no lo es del todo:
+  // a las 23:00 falta la última hora y BLU puede ajustar (reembolsos). Que el
+  // mensaje lo diga sin dramatizar — el "va a SUBIR" de antes era el bug del día
+  // inclusivo (#1183), no liquidación.
   const nota = fresh === "fresh"
-    ? `_Sync BLU al día (corte ${fmtCorte(hoy.corte)}). ⚠️ Parcial: BLU liquida con ~2 días de lag, el total va a SUBIR.${bucket.aviso}_`
-    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo. ⚠️ Parcial: el total va a subir.${bucket.aviso}_`;
+    ? `_Sync BLU al día (corte ${fmtCorte(hoy.corte)}). La cifra es al corte: puede moverse con ajustes de BLU._`
+    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo; la cifra puede estar atrasada._`;
   return `${head}\n\n${lines.join("\n")}\n\n${nota}`;
 }
 
