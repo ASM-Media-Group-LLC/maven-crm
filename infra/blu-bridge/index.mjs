@@ -67,12 +67,46 @@ const addDay = (d) => ymd(new Date(new Date(d + "T00:00:00.000Z").getTime() + DA
 const daysBack = (n) => { const out = []; for (let i = n; i >= 0; i--) out.push(ymd(new Date(Date.now() - i * DAY))); return out; };
 const chunk = (arr, size) => { const out = []; for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size)); return out; };
 
+// ── BUCKET DEL DÍA (13/08) ────────────────────────────────────────────────────
+// Las claves de día se generaban con toISOString() (UTC) y a BLU se le mandaban
+// fechas peladas → la fila "12/08" cubría ~[11/08 19:00 → 12/08 19:00] Bogotá.
+// Consecuencia visible: el reporte de las 23:00 dijo "Danik $2,850 hoy" cuando el
+// panel cerró el día en $2,422 — el bot tenía la noche del 11 adentro y le faltaba
+// la noche prime del 12. Y a las 9 AM el roster entero ya "vendía" un tercio del
+// día: era la noche anterior, no madrugadores.
+//
+// El fix: ventanas ISO alineadas a Colombia (T05:00Z → T05:00Z del día siguiente).
+// PERO BLU ya demostró en employee-reports que puede tratar rangos como días
+// enteros INCLUSIVOS (~2× la venta real si te descuidás), así que el modo 'bogota'
+// solo se activa después de que chequearSemanticaBucket() verifique contra un día
+// asentado que BLU de verdad respeta la parte horaria — y la transición reescribe
+// TODO el histórico de la cuenta en esa misma corrida. Nunca buckets mezclados.
+// El veredicto queda en blu_bridge_state para que los reportes etiqueten honesto.
+const DAY_OFFSET_H = Math.min(23, Math.max(0, Number(process.env.BLU_DAY_OFFSET_HOURS ?? 5)));
+const dayStartISO = (day) => `${day}T${String(DAY_OFFSET_H).padStart(2, "0")}:00:00.000Z`;
+const diasDesdeHistoryStart = () =>
+  Math.max(1, Math.ceil((Date.now() - Date.parse(BLU_HISTORY_START + "T00:00:00Z")) / DAY));
+const bucketProbeHecha = {};   // por cuenta (id) → no re-sondear en cada corrida liviana
+
+async function loadBucketState() {
+  const { data } = await sb().from("blu_bridge_state").select("value").eq("key", "bucket_earnings").maybeSingle();
+  const v = data?.value ?? {};
+  return { mode: v.mode === "bogota" ? "bogota" : "utc", rewritten: v.rewritten ?? {}, ...v };
+}
+async function saveBucketState(value) {
+  const { error } = await sb().from("blu_bridge_state")
+    .upsert({ key: "bucket_earnings", value, updated_at: new Date().toISOString() });
+  if (error) console.error("[blu-bridge] saveBucketState:", error.message);
+}
+
 // Marca de tiempo del último resync PESADO (90 días). Las corridas livianas intermedias solo
 // refrescan el mes en curso; cada RESYNC_EVERY_HOURS se hace uno pesado para corregir reembolsos.
 const lastFullResyncMs = {};   // por cuenta (id → ms del último resync pesado)
 
 // ── WS: auth (captura el token fresco del auth:ok) + pedir reportes día a día ──
-async function fetchEarningsWS(token, days) {
+// modo 'bogota' = ventana [T05:00Z, T05:00Z+1d) → el día calendario de Colombia.
+// modo 'utc' (histórico) = fechas peladas, bucket del proveedor.
+async function fetchEarningsWS(token, days, modo = "utc") {
   const { default: WS } = await import("ws");
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
@@ -83,7 +117,9 @@ async function fetchEarningsWS(token, days) {
     function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
     function queryNext() {
       if (idx >= days.length) return done(resolve, { results, freshToken });
-      ws.send(JSON.stringify({ type: "agency:analytics:creator-reports", startDate: days[idx], endDate: addDay(days[idx]), groupBy: "day", earningsType: "gross" }));
+      const start = modo === "bogota" ? dayStartISO(days[idx]) : days[idx];
+      const end = modo === "bogota" ? dayStartISO(addDay(days[idx])) : addDay(days[idx]);
+      ws.send(JSON.stringify({ type: "agency:analytics:creator-reports", startDate: start, endDate: end, groupBy: "day", earningsType: "gross" }));
     }
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
     ws.on("message", (data) => {
@@ -104,6 +140,48 @@ async function fetchEarningsWS(token, days) {
     ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
     ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (¿auth?)")); });
   });
+}
+
+// ── Chequeo de semántica del bucket ─────────────────────────────────────────
+// Pide el MISMO día asentado (hoy−3) con fechas peladas y con ventana horaria, y
+// compara los totales del roster. Tres resultados posibles:
+//   · difieren razonablemente → BLU respeta la hora → modo 'bogota' habilitado
+//   · idénticos → BLU ignora la hora → seguimos en 'utc' (activarlo sería mentir:
+//     las etiquetas dirían Colombia y el bucket seguiría siendo del proveedor)
+//   · con hora ≈ 2× → rango inclusivo de 2 días (el bug de employee-reports) →
+//     JAMÁS activar: duplicaría toda la facturación
+async function chequearSemanticaBucket(token) {
+  const dia = ymd(new Date(Date.now() - 3 * DAY));
+  const sumar = (res) => {
+    let t = 0;
+    for (const { payload } of res.results) {
+      for (const c of (payload.creators || [])) {
+        t += Number(c.metrics?.total?.grossAmount ?? c.metrics?.total?.amount ?? 0) || 0;
+      }
+    }
+    return Math.round(t * 100) / 100;
+  };
+  const pelado = await fetchEarningsWS(token, [dia], "utc");
+  let tok = pelado.freshToken || token;
+  const conHora = await fetchEarningsWS(tok, [dia], "bogota");
+  tok = conHora.freshToken || tok;
+  const t1 = sumar(pelado), t3 = sumar(conHora);
+  let mode, motivo;
+  if (t1 <= 0 && t3 <= 0) {
+    mode = "utc"; motivo = `día de prueba ${dia} sin datos — no se pudo verificar, queda el bucket del proveedor`;
+  } else if (Math.abs(t3 - t1) <= Math.max(1, t1 * 0.005)) {
+    mode = "utc"; motivo = `BLU IGNORA la parte horaria (${dia}: $${t1} pelado vs $${t3} con hora) — el bucket sigue siendo el día del proveedor y los reportes lo van a decir`;
+  } else if (t3 >= t1 * 1.6) {
+    mode = "utc"; motivo = `SOSPECHA DE RANGO INCLUSIVO (${dia}: $${t1} pelado vs $${t3} con hora ≈ 2 días) — NO se activa la ventana Colombia`;
+  } else if (t3 <= 0) {
+    // Un día con plata que devuelve $0 al pedirlo con hora no es "respeta la
+    // ventana": es un formato que BLU no entendió. Activar con esto reescribiría
+    // el histórico entero con ceros.
+    mode = "utc"; motivo = `la ventana con hora devolvió $0 contra un día de $${t1} — formato no soportado, NO se activa`;
+  } else {
+    mode = "bogota"; motivo = `BLU respeta la ventana horaria (${dia}: $${t1} día proveedor vs $${t3} día Colombia)`;
+  }
+  return { mode, motivo, dia, t1, t3, freshToken: tok };
 }
 
 // ── WS: fan-reports. auth → agency:models:list → fan-reports:model POR MODELO.
@@ -240,7 +318,7 @@ async function fetchEmployeeReportsDaily(token, days) {
 // {type:"persona-pro-stats-rollup", modelIds:"all", from, to} → {data:{models:[...]}}.
 // Pedimos POR DÍA (un rollup por día sobre un socket) para diarizar "cuánto vendió
 // Sophie ayer" — igual que employee-reports diario.
-async function fetchSophieDailyWS(token, days) {
+async function fetchSophieDailyWS(token, days, modo = "utc") {
   const { default: WS } = await import("ws");
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
@@ -251,9 +329,14 @@ async function fetchSophieDailyWS(token, days) {
     function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
     function queryNext() {
       if (idx >= days.length) return done(resolve, { results, freshToken });
+      // Mismo bucket que los ingresos: si el modo Colombia está activo, el día de
+      // Sophie también es [05:00Z → 05:00Z), no el día UTC. Dos tablas con dos
+      // definiciones de "día" es cómo se comparan peras con manzanas sin saberlo.
+      const from = modo === "bogota" ? dayStartISO(days[idx]) : `${days[idx]}T00:00:00.000Z`;
+      const to = new Date(Date.parse(from) + DAY - 1).toISOString();
       ws.send(JSON.stringify({
         type: "persona-pro-stats-rollup", modelIds: "all",
-        from: `${days[idx]}T00:00:00.000Z`, to: `${days[idx]}T23:59:59.999Z`,
+        from, to,
       }));
     }
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
@@ -520,21 +603,58 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
   // TERCER nivel (quickDays): sync ON-DEMAND ultra-liviano — solo hoy+ayer, disparado por
   // la cola blu_sync_requests (reportes que necesitan data fresca YA). No toca el
   // bookkeeping del resync pesado.
+  // ── BUCKET: en qué día cae cada dólar ───────────────────────────────────────
+  // El modo efectivo de ESTA cuenta es 'bogota' solo si el veredicto global es
+  // bogota Y esta cuenta ya reescribió su histórico con ese bucket. Las corridas
+  // QUICK nunca cambian de modo (usan el vigente): la transición solo ocurre en
+  // corridas completas, que pueden pagar la reescritura — así jamás conviven dos
+  // buckets en la tabla.
+  const bucketSt = await loadBucketState();
+  let bucketMode = (bucketSt.mode === "bogota" && bucketSt.rewritten?.[acct.account]) ? "bogota" : "utc";
+  let reescrituraTotal = false;
+  if (quickDays == null && DAY_OFFSET_H > 0 && bucketMode !== "bogota") {
+    if (bucketSt.mode === "bogota") {
+      // El veredicto global ya está emitido (lo sacó la otra cuenta, o una corrida
+      // anterior cuya reescritura quedó incompleta): a esta cuenta solo le falta
+      // reescribir. Sin re-sondear — el veredicto es de la API, no de la cuenta.
+      reescrituraTotal = true;
+      bucketMode = "bogota";
+      console.log(`[blu-bridge:${acct.account}] bucket Colombia ya verificado — falta reescribir esta cuenta: histórico completo (${diasDesdeHistoryStart()} días) en esta corrida.`);
+    } else if (!bucketProbeHecha[acct.id]) {
+      bucketProbeHecha[acct.id] = true;   // una vez por proceso: si BLU ignora la hora, re-sondear cada corrida es gastar
+      try {
+        const v = await chequearSemanticaBucket(token);
+        if (v.freshToken && v.freshToken !== token) { await saveToken(acct.id, v.freshToken); token = v.freshToken; }
+        console.log(`[blu-bridge:${acct.account}] chequeo de bucket: ${v.motivo}`);
+        if (v.mode === "bogota") {
+          reescrituraTotal = true;
+          bucketMode = "bogota";
+          console.log(`[blu-bridge:${acct.account}] TRANSICIÓN DE BUCKET → día Colombia: se reescribe el histórico completo (${diasDesdeHistoryStart()} días) en esta corrida.`);
+        }
+        await saveBucketState({ ...bucketSt, mode: v.mode, motivo: v.motivo, dia_verificado: v.dia, total_proveedor: v.t1, total_colombia: v.t3 });
+      } catch (e) {
+        console.error(`[blu-bridge:${acct.account}] chequeo de bucket falló (${e.message}) — sigo en modo '${bucketMode}'.`);
+      }
+    }
+  }
+
   const baseDays = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);   // mes en curso
   const doFull = quickDays == null && (firstRun || (Date.now() - (lastFullResyncMs[acct.id] || 0) >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000));
   if (doFull) lastFullResyncMs[acct.id] = Date.now();
   const rolling = doFull ? Math.max(baseDays, Number(RESYNC_DAYS) || 0) : baseDays;
   const backfill = firstRun && quickDays == null ? Number(BACKFILL_DAYS) || 0 : 0;
-  const allDays = quickDays != null ? daysBack(quickDays) : daysBack(Math.max(rolling, backfill));
+  const allDays = quickDays != null
+    ? daysBack(quickDays)
+    : daysBack(reescrituraTotal ? diasDesdeHistoryStart() : Math.max(rolling, backfill));
   const chunks = chunk(allDays, 30);
   console.log(`[blu-bridge:${acct.account}] conectando WS ${BLU_WS_URL}… ${quickDays != null ? "QUICK on-demand" : doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
 
-  let totalRows = 0, sawCreators = false;
+  let totalRows = 0, sawCreators = false, chunksFallidos = 0;
   const bluNamesSeen = new Set(); // nombres BLU vistos en ESTA cuenta → marcar kash_type (Massive/Plus)
   for (let ci = 0; ci < chunks.length; ci++) {
     const c = chunks[ci];
     try {
-      const { results, freshToken } = await fetchEarningsWS(token, c);
+      const { results, freshToken } = await fetchEarningsWS(token, c, bucketMode);
       if (freshToken && freshToken !== token) { await saveToken(acct.id, freshToken); token = freshToken; }
       if (!sawCreators && results[0]) { console.log(`[blu-bridge] ≈${results[0].payload?.creators?.length ?? 0} creadoras/día.`); sawCreators = true; }
       const rows = transform(results);
@@ -544,10 +664,25 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
       console.log(`[blu-bridge] chunk ${ci + 1}/${chunks.length} (${c[c.length - 1]}..${c[0]}): ${rows.length} filas.`);
     } catch (e) {
       if (e.expired) throw e;   // token vencido → abortar todo (re-seed)
+      chunksFallidos++;
       console.error(`[blu-bridge] chunk ${ci + 1}/${chunks.length} falló (sigo con los demás): ${e.message}`);
     }
   }
-  console.log(`[blu-bridge] OK: ${totalRows} filas de ingresos ingestadas.`);
+  console.log(`[blu-bridge] OK: ${totalRows} filas de ingresos ingestadas (bucket: ${bucketMode === "bogota" ? "día Colombia" : "día del proveedor"}).`);
+
+  // La cuenta se marca migrada SOLO si la reescritura salió completa: con un chunk
+  // caído quedarían días viejos en bucket UTC conviviendo con días nuevos en bucket
+  // Colombia — exactamente lo que este diseño promete que no puede pasar. Si algo
+  // falló, el marcador no se escribe y la próxima corrida completa lo reintenta.
+  if (reescrituraTotal) {
+    if (chunksFallidos === 0) {
+      const st = await loadBucketState();
+      await saveBucketState({ ...st, mode: "bogota", rewritten: { ...(st.rewritten ?? {}), [acct.account]: new Date().toISOString() } });
+      console.log(`[blu-bridge:${acct.account}] histórico reescrito completo con bucket Colombia ✓ — de acá en adelante "12/08" significa el 12/08 de Colombia.`);
+    } else {
+      console.error(`[blu-bridge:${acct.account}] reescritura INCOMPLETA (${chunksFallidos} chunk(s) caídos) — la cuenta NO se marca migrada; se reintenta en la próxima corrida completa.`);
+    }
+  }
 
   // Marca la AGENCIA (kash_type) de las creadoras de ESTA cuenta: las que trajeron data
   // de la cuenta Massive → "Massive"; de la principal → "Plus". Llena sola la columna
@@ -675,8 +810,10 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
   // Diario: 7 días atrás en corridas normales, hoy+ayer en QUICK. Aislado: si falla,
   // no afecta nada más. Upsert directo (PK date+account+blu_model_id).
   try {
-    const sophieDays = quickDays != null ? daysBack(1) : daysBack(7);
-    const { results: sr, freshToken: sft, partial } = await fetchSophieDailyWS(token, sophieDays);
+    // En la transición de bucket, Sophie también se reescribe (su historia es corta:
+    // empezó el 05/08 — 15 días la cubren con margen).
+    const sophieDays = quickDays != null ? daysBack(1) : daysBack(reescrituraTotal ? 15 : 7);
+    const { results: sr, freshToken: sft, partial } = await fetchSophieDailyWS(token, sophieDays, bucketMode);
     if (sft && sft !== token) { await saveToken(acct.id, sft); token = sft; }
     const { rows: sRows, diag } = transformSophieDaily(sr, acct.account);
     for (const batch of chunk(sRows, 500)) {
