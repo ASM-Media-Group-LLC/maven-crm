@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ListRowButton } from "@/components/ui/list-row";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
+import PromoScoreLeaderboard from "./PromoScoreLeaderboard";
 import { categoryTone } from "@/components/dashboard/categoryTones";
 import { type PromologEntry } from "./PromologEntryCard";
 import { displayPlatform } from "./promoScore";
@@ -433,6 +434,11 @@ const PromologDashboardView = ({
           }
         />
       </div>
+
+      {/* ═══ Score de promo v2 — ranking oficial (RPC promo_creator_period_scores,
+           misma fuente que los reportes de WhatsApp). Los podios de abajo miden
+           volumen bruto del rango filtrado; esto mide cumplimiento del plan. ═══ */}
+      <PromoScoreLeaderboard />
 
       {/* ═══ Row 2: Dos podios Top 3 paralelos ═════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

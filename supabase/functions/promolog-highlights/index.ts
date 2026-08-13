@@ -1,13 +1,18 @@
 // promolog-highlights — reportes automáticos de destacados al grupo de Managers.
 //
-//   mode="daily_quality"  (cron 7pm Col)    → top 3 modelos con mejor % de calidad de promo HOY
+//   mode="daily_quality"  (cron 7pm Col)    → top 3 del SCORE de promo v2, ventana 7 días
 //   mode="daily_income"   (cron 11pm Col)   → top 5 modelos por ingreso de HOY (vs ayer, ↑/↓)
-//   mode="weekly"         (cron sáb 2pm Col)→ top 3 calidad de la semana + top 5 ingresos de la semana
+//   mode="weekly"         (cron sáb 2pm Col)→ top 3 score de la semana + top 5 ingresos de la semana
 //
-// La "calidad" es EXACTAMENTE la barrita de Promolog (frontend promoScore.ts):
-//   score_día = Σ (peso_red × calidad_de_la_mejor_promo_en_esa_red)
-//   pesos fijos: IG 60% · X 13,3% · Telegram 13,3% · Facebook 13,3%.
-// Port fiel de qualityForEntry/computeDayScore — si cambia el modelo allá, cambiar acá.
+// SCORE v2 (2026-08-13): el ranking viene del RPC `promo_creator_period_scores`
+// (fuente ÚNICA de verdad — misma que el leaderboard de la UI, ya no hay port):
+//   score 0-100 = Frecuencia 40 (promo-días / días LEÍDOS en las redes objetivo de
+//   la creadora) + Calidad 30 (CTA estructurado: link 1.0 · funnel 0.85 · mención 0.6)
+//   + Consistencia 20 (racha máxima sin promo) + Diversificación 10 (promo fuera del plan).
+//   Días no leídos NO castigan; cobertura <60% → marcada "parcial". El lift ($) es
+//   señal aparte: ingreso del día siguiente a promo vs sin promo (BLU liquidado).
+// El day-score viejo (promoScore.ts, IG 60% fijo) queda SOLO como visual de detalle
+// del día en la UI — capaba a las creadoras que no viven en IG (caso Martina Smith).
 //
 // Ingresos: creator_daily_earnings (BLU, sync ~3×/día: ~8am/11am/5pm Col). Cada mensaje
 // de ingresos incluye el CORTE (max imported_at) para no vender data vieja como fresca.
@@ -18,6 +23,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MANAGERS_GROUP_JID = "120363408785575383@g.us"; // grupo "Managers" (igual que manager-tick)
+const TENANT_ID = Deno.env.get("PROMOLOG_TENANT_ID") ?? "30869615-f579-4981-8a1f-dbebc61eae2d";
 const BOG_OFFSET_MS = 5 * 3600 * 1000; // Bogotá = UTC-5 fijo (sin DST)
 
 const cors = {
@@ -39,95 +45,36 @@ function bogMonday(): string {
   const delta = dow === 0 ? -6 : 1 - dow;
   return dayKey(new Date(n.getTime() + delta * 86400 * 1000));
 }
-// Un día Bogotá (YYYY-MM-DD) empieza a las 05:00Z.
-const bogDayStartUtc = (key: string) => `${key}T05:00:00Z`;
 const fmtDia = (key: string) => `${key.slice(8, 10)}/${key.slice(5, 7)}`;
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
-// ── Port fiel de promoScore.ts (calidad) ─────────────────────────────────────
-const NETWORK_WEIGHTS: Record<string, number> = { instagram: 0.6, x: 0.4 / 3, telegram: 0.4 / 3, facebook: 0.4 / 3 };
-const NET_LABEL: Record<string, string> = { instagram: "IG", x: "X", telegram: "TG", facebook: "FB" };
-const canonicalNetwork = (n?: string | null) => { const v = (n || "").toLowerCase().trim(); return v === "twitter" ? "x" : v; };
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-const MANAGED = new Set(["onlyfans", "unlok", "piclink", "linktree"]);
-const KNOWN_UNMANAGED = new Set(["fansly"]);
-
-type Row = {
-  creator_id: string; date: string; network: string | null; promoted: string | null;
-  analyzed_by_ai: boolean | null; ai_reasoning: string | null; platform: string | null;
-  has_buy_link: boolean | null; buy_link_type: string | null; ai_confidence: number | string | null;
-  notes: string | null; needs_review: boolean | null;
+// ── Score v2: RPC promo_creator_period_scores (fuente única) ──────────────────
+type ScoreRow = {
+  creator_id: string; name: string; instagram_handle: string | null; manager_name: string | null;
+  target_networks: string[]; window_days: number; covered_days: number; coverage_pct: number | string | null;
+  promo_days: number; freq_pts: number | string; quality_pts: number | string;
+  consistency_pts: number | string; diversification_pts: number | string;
+  score: number; is_partial: boolean; promo_networks: string | null;
+  manual_share: number | string | null; lift_pct: number | string | null;
+  lift_n_promo: number; lift_n_quiet: number;
 };
 
-function isManagedPromo(e: Row): boolean {
-  const p = (e.platform || "").toLowerCase();
-  const b = (e.buy_link_type || "").toLowerCase();
-  const r = (e.ai_reasoning || "").toLowerCase();
-  if (MANAGED.has(p) || MANAGED.has(b)) return true;
-  if (/unlok/.test(r)) return true;
-  if (p === "otra" || KNOWN_UNMANAGED.has(p) || KNOWN_UNMANAGED.has(b)) return false;
-  if (b === "other") return false;
-  return true;
+async function periodScores(sb: any, fromKey: string, toKey: string): Promise<ScoreRow[]> {
+  const { data, error } = await sb.rpc("promo_creator_period_scores", {
+    p_tenant: TENANT_ID, p_from: fromKey, p_to: toKey,
+  });
+  if (error) throw new Error(`promo_creator_period_scores: ${error.message}`);
+  return (data ?? []) as ScoreRow[];
 }
 
-function qualityForEntry(e: Row): number {
-  const promotedStr = (e.promoted || "").toLowerCase();
-  const isPromoted = ["true", "yes", "partial"].includes(promotedStr);
-  if (!isPromoted) return 0;
-  if (!isManagedPromo(e) && e.needs_review !== true) return 0;
-  const net = canonicalNetwork(e.network);
-  const notes = (e.notes || "").toLowerCase();
-  const hasLink = e.has_buy_link === true || !!e.buy_link_type || /(onlyfans|enlace|\blink\b|fans)/.test(notes);
-  let q: number;
-  if (e.analyzed_by_ai !== true) {
-    q = 0.75 + (hasLink ? 0.25 : 0);
-  } else if (net === "instagram") {
-    const conf = e.ai_confidence != null ? clamp01(Number(e.ai_confidence)) : 0.6;
-    q = 0.45 + (e.has_buy_link ? 0.35 : 0) + 0.2 * conf;
-  } else {
-    const r = (e.ai_reasoning || "").toLowerCase();
-    if (/(onlyfans|of_handle|link_agg)/.test(r)) q = 1.0;
-    else if (r.includes("vision-of")) q = 0.85;
-    else if (r.includes("plataforma")) q = 0.75;
-    else if (r.includes("promo")) q = 0.6;
-    else q = 0.5;
-  }
-  if (promotedStr === "partial") q *= 0.5;
-  return clamp01(q);
-}
-
-// Score de UN día para UN creador (0-1) + qué redes promocionó.
-function dayScore(rows: Row[]): { score: number; nets: string[] } {
-  const byNet = new Map<string, number>();
-  const promotedNets = new Set<string>();
-  for (const e of rows) {
-    const net = canonicalNetwork(e.network);
-    if (!(net in NETWORK_WEIGHTS)) continue;
-    const q = qualityForEntry(e);
-    if (q > 0) promotedNets.add(net);
-    byNet.set(net, Math.max(byNet.get(net) ?? 0, q));
-  }
-  let score = 0;
-  for (const [net, q] of byNet) score += NETWORK_WEIGHTS[net] * q;
-  const order = ["instagram", "x", "telegram", "facebook"];
-  return { score: clamp01(score), nets: order.filter((n) => promotedNets.has(n)).map((n) => NET_LABEL[n]) };
-}
-
-// ── Data ──────────────────────────────────────────────────────────────────────
-async function fetchEntries(sb: any, fromKey: string): Promise<Row[]> {
-  // Paginado (cap 1000 de PostgREST): una semana de entries puede superar 1000 filas.
-  const out: Row[] = [];
-  for (let page = 0; page < 10; page++) {
-    const { data, error } = await sb.from("promolog_entries")
-      .select("creator_id, date, network, promoted, analyzed_by_ai, ai_reasoning, platform, has_buy_link, buy_link_type, ai_confidence, notes, needs_review")
-      .gte("date", bogDayStartUtc(fromKey))
-      .order("date", { ascending: true })
-      .range(page * 1000, page * 1000 + 999);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
+// Línea de podio: score + desglose compacto + lift si hay señal + marca parcial.
+function scoreLine(r: ScoreRow): string {
+  const parts = `frec ${Math.round(Number(r.freq_pts))} · cta ${Math.round(Number(r.quality_pts))} · const ${Math.round(Number(r.consistency_pts))}` +
+    (Number(r.diversification_pts) > 0 ? ` · redes ${Math.round(Number(r.diversification_pts))}` : "");
+  const lift = r.lift_pct != null ? ` · $ ${Number(r.lift_pct) >= 0 ? "+" : ""}${Math.round(Number(r.lift_pct))}% con promo (${r.lift_n_promo}v${r.lift_n_quiet}d)` : "";
+  const manual = Number(r.manual_share ?? 0) >= 50 ? ` · ✍️ ${Math.round(Number(r.manual_share))}% manual` : "";
+  const partial = r.is_partial ? " ⚠️ poca lectura" : "";
+  return `*${r.name}* — ${r.score}/100  (${parts})${lift}${manual}${partial}`;
 }
 
 async function activeNames(sb: any): Promise<Map<string, string>> {
@@ -137,31 +84,7 @@ async function activeNames(sb: any): Promise<Map<string, string>> {
   return m;
 }
 
-// Agrupa entries por creador y por día Bogotá; promedia el day-score de los días con registro.
-function scoreByCreator(rows: Row[], names: Map<string, string>): Array<{ name: string; score: number; nets: string[] }> {
-  const byCreatorDay = new Map<string, Map<string, Row[]>>();
-  for (const r of rows) {
-    if (!names.has(r.creator_id)) continue; // solo activas
-    const dk = dayKey(new Date(new Date(r.date).getTime() - BOG_OFFSET_MS));
-    let days = byCreatorDay.get(r.creator_id);
-    if (!days) { days = new Map(); byCreatorDay.set(r.creator_id, days); }
-    const arr = days.get(dk); if (arr) arr.push(r); else days.set(dk, [r]);
-  }
-  const out: Array<{ name: string; score: number; nets: string[] }> = [];
-  for (const [cid, days] of byCreatorDay) {
-    let sum = 0, n = 0; const nets = new Set<string>();
-    for (const rows2 of days.values()) {
-      const s = dayScore(rows2);
-      sum += s.score; n++;
-      s.nets.forEach((x) => nets.add(x));
-    }
-    if (n > 0) out.push({ name: names.get(cid)!, score: sum / n, nets: [...nets] });
-  }
-  return out.sort((a, b) => b.score - a.score);
-}
-
 const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
-const pct = (s: number) => `${Math.round(s * 100)}%`;
 
 async function incomeTop(sb: any, fromKey: string, toKey: string, names: Map<string, string>) {
   const { data, error } = await sb.from("creator_daily_earnings")
@@ -203,49 +126,40 @@ async function requestFreshBlu(sb: any, why: string): Promise<"fresh" | "timeout
 }
 
 // ── Mensajes ──────────────────────────────────────────────────────────────────
-async function buildDailyQuality(sb: any): Promise<string> {
-  const today = bogToday();
-  const names = await activeNames(sb);
-  const rows = await fetchEntries(sb, today);
-  const conPuntaje = scoreByCreator(rows, names).filter((r) => r.score > 0);
-  if (!conPuntaje.length) return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\nTodavía no hay promos con calidad registrada hoy.`;
-
-  // Podio por PUNTAJES DISTINTOS, no por posición. La barra de calidad satura (una
-  // sola story de IG ya vale 60), así que repartir 🥇🥈🥉 entre puntajes idénticos
-  // inventa un orden que no existe: el 30/07 salieron Danikmichelltv, Moramay y
-  // Jacqueenriquez5 con 60% EXACTO las tres, presentadas como 1º, 2º y 3º.
-  const nets = (r: { nets: string[] }) => r.nets.join(" · ") || "—";
+// Top del SCORE v2 en una ventana [fromKey, toKey]. Compartido por el 7pm (7 días
+// móviles) y el semanal (lunes→hoy). Podio por PUNTAJES DISTINTOS: repartir 🥇🥈🥉
+// entre scores idénticos inventa un orden que no existe (lección del day-score).
+function scorePodium(rows: ScoreRow[]): { lines: string[]; pie: string } {
+  const conDatos = rows.filter((r) => r.covered_days > 0);
+  // Las de POCA lectura (is_partial) no compiten por medallas: con poca evidencia el
+  // score sale INFLADO (1 día leído con promo = 90). Se cuentan aparte en el pie.
+  const conPuntaje = conDatos.filter((r) => r.score > 0 && !r.is_partial);
   const puntajes = [...new Set(conPuntaje.map((r) => r.score))].slice(0, 3);
   const lines = puntajes.map((sc, i) => {
     const grupo = conPuntaje.filter((r) => r.score === sc);
     return grupo.length === 1
-      ? `${medals[i]} *${grupo[0].name}* — ${pct(sc)}  (${nets(grupo[0])})`
-      : `${medals[i]} *Empate — ${pct(sc)}*: ${grupo.map((r) => `${r.name} (${nets(r)})`).join(" · ")}`;
+      ? `${medals[i]} ${scoreLine(grupo[0])}`
+      : `${medals[i]} *Empate — ${sc}/100*: ${grupo.map((r) => r.name + (r.is_partial ? " ⚠️" : "")).join(" · ")}`;
   });
+  // Denominador honesto: el score solo existe donde el scan LEYÓ. Las no leídas no
+  // cuentan — jamás convertir "no poder leer" en "no promocionó" (#818).
+  const sinLectura = rows.length - conDatos.length;
+  const parciales = conDatos.filter((r) => r.is_partial && r.score > 0).length;
+  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · CTA 30 · constancia 20 · multi-red 10 = promo en 2+ redes). ` +
+    `${conPuntaje.length} con promo de ${conDatos.length} con lectura` +
+    (parciales > 0 ? ` · ${parciales} con poca lectura (no compiten)` : "") +
+    (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
+    `. "$ con promo" = ingreso del día siguiente a un día con promo vs sin promo (BLU liquidado, NvM días)._`;
+  return { lines, pie };
+}
 
-  // Denominador: sin esto un podio de 3 sobre 5 lecturas válidas se lee como si
-  // fuera el top de todo el roster.
-  //
-  // ⚠️ "lectura válida" NO es "aparece en la tabla". El scan escribe fila igual
-  // cuando NO pudo leer, con promoted='pending' (error_reason no_ig_id,
-  // unconfirmed_empty, throttled…). Contarlas infla el denominador y hace ver al
-  // equipo peor de lo que es: el 12/08 había 44 creadoras con lectura definitiva
-  // y 13 sin leer, y el pie decía "sobre 57". Es el antipatrón de la casa —
-  // "no poder leer" convertido en "no promocionó" (#818) — colado en el ratio.
-  const definitiva = (p: string | null) => ["true", "false", "yes", "no", "partial"].includes((p || "").toLowerCase());
-  const idsLeidas = new Set(
-    rows.filter((e: { promoted: string | null }) => definitiva(e.promoted))
-      .map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean),
-  );
-  const idsTodas = new Set(rows.map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean));
-  const leidas = idsLeidas.size;
-  const sinLeer = idsTodas.size - leidas;
-  const pie = leidas > 0
-    ? `_${conPuntaje.length} con promo sobre ${leidas} creadoras con lectura válida hoy` +
-      (sinLeer > 0 ? ` · ${sinLeer} sin lectura (no cuentan)` : "") +
-      ` · % = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`
-    : `_% = barra de calidad de Promolog (IG 60 · X/TG/FB 13,3 c/u)_`;
-  return `🏆 *Top calidad de promo — hoy ${fmtDia(today)}*\n\n${lines.join("\n")}\n\n${pie}`;
+async function buildDailyQuality(sb: any): Promise<string> {
+  const today = bogToday(), from = bogShift(-6);
+  const scores = await periodScores(sb, from, today);
+  const { lines, pie } = scorePodium(scores);
+  const head = `🏆 *Score de promo — últimos 7 días (${fmtDia(from)} → ${fmtDia(today)})*`;
+  if (!lines.length) return `${head}\n\nSin promos con score en la ventana.`;
+  return `${head}\n\n${lines.join("\n")}\n\n${pie}`;
 }
 
 // "Hasta ahora": sync fresco de BLU + total del día al momento del reporte, SIN
@@ -284,25 +198,23 @@ async function buildWeekly(sb: any): Promise<string> {
   const fresh = await requestFreshBlu(sb, "weekly");
   const monday = bogMonday(), today = bogToday();
   const names = await activeNames(sb);
-  const rows = await fetchEntries(sb, monday);
-  const q3 = scoreByCreator(rows, names).filter((r) => r.score > 0).slice(0, 3);
+  const scores = await periodScores(sb, monday, today);
+  const { lines: qLines, pie: qPie } = scorePodium(scores);
   const inc = await incomeTop(sb, monday, today, names);
   const i5 = inc.top.slice(0, 5);
-  const qLines = q3.length
-    ? q3.map((r, i) => `${medals[i]} *${r.name}* — ${pct(r.score)} promedio  (${r.nets.join(" · ")})`)
-    : ["Sin promos con calidad esta semana."];
   const iLines = i5.length
     ? i5.map(([cid, v], i) => `${medals[i]} *${names.get(cid)}* — ${money(v)}`)
     : ["Sin ingresos registrados esta semana."];
   return [
-    `📅 *Resumen semanal (lun ${fmtDia(monday)} → sáb ${fmtDia(today)})*`,
+    `📅 *Resumen semanal (lun ${fmtDia(monday)} → ${fmtDia(today)})*`,
     ``,
-    `🏆 *Top calidad de promo de la semana*`,
-    ...qLines,
+    `🏆 *Top score de promo de la semana*`,
+    ...(qLines.length ? qLines : ["Sin promos con score esta semana."]),
     ``,
     `💰 *Top ingresos de la semana*`,
     ...iLines,
     ``,
+    qPie,
     fresh === "fresh"
       ? `_Data BLU recién sincronizada (${fmtCorte(inc.corte)})_`
       : `_Corte BLU: ${fmtCorte(inc.corte)} — no se pudo refrescar a tiempo_`,
