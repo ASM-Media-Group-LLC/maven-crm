@@ -1492,13 +1492,14 @@ const TOOLS: Array<{
   {
     name: "get_blu_sales",
     description:
-      "INGRESOS BLU de las modelos (lo que facturan en OnlyFans), NO las ventas de los closers. ⚠️ Son DOS cuentas agencia con accesos distintos: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). Si te preguntan por 'ventas' sin aclarar, PREGUNTA primero si hablan de los closers o de BLU; si eligen BLU y no dicen cuál cuenta, pregunta Plus o Massive (o 'both' si te dicen todo). Devuelve total, split por cuenta, cuántas creadoras facturaron, top 5 y cuándo fue la última importación. Con refresh=true dispara una sincronización on-demand contra BLU para traer data fresca (tarda ~40s: avisa que la pediste y vuelve a consultar en un minuto).",
+      "INGRESOS BLU de las modelos (lo que facturan en OnlyFans), NO las ventas de los closers. ⚠️ Son DOS cuentas agencia con accesos distintos: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). Si te preguntan por 'ventas' sin aclarar, PREGUNTA primero si hablan de los closers o de BLU; si eligen BLU y no dicen cuál cuenta, pregunta Plus o Massive (o 'both' si te dicen todo). Devuelve total, split por cuenta, cuántas creadoras facturaron, top 5 y cuándo fue la última importación. Con detalle=true trae además el LISTADO COMPLETO por modelo — úsalo SIEMPRE que pidan 'todas las modelos', 'por modelo', un listado o un archivo, y ENTREGA el listado entero en la respuesta (no puedes generar archivos: dilo en una línea y pega el listado en texto; el top 5 NO es el listado). Con refresh=true dispara una sincronización on-demand contra BLU para traer data fresca (tarda ~40s: avisa que la pediste y vuelve a consultar en un minuto).",
     input_schema: {
       type: "object",
       properties: {
         kash: { type: "string", enum: ["plus", "massive", "both"], description: "qué cuenta agencia: plus (Carolina), massive (Fabiana) o both" },
         from: { type: "string", description: "fecha desde YYYY-MM-DD (Bogotá). Default: primer día del mes" },
         to: { type: "string", description: "fecha hasta YYYY-MM-DD (Bogotá). Default: hoy" },
+        detalle: { type: "boolean", description: "true = incluir el listado COMPLETO por modelo (una fila por creadora con su monto, cuentas de la misma ficha sumadas). Para pedidos de 'todas las modelos'/listado/archivo." },
         refresh: { type: "boolean", description: "true = pedir sync fresco a BLU antes de responder (solo si piden data 'de ahora'/'actualizada'). Tarda ~40s." },
       },
       required: ["kash"],
@@ -3986,8 +3987,12 @@ async function executeTool(
               nota: "Sync a BLU encolado (~40s). Los datos de abajo son los ANTERIORES al refresh: avísale a la persona que en un minuto le puedes dar los frescos." };
       }
 
+      // detalle=true → el RPC suma 'listado' (TODAS las creadoras del rango). Nació el
+      // 09/08: Álvaro pidió "el archivo de ventas de julio de todas las modelos" y la
+      // tool solo sabía dar total + top 5 — el listado por modelo no existía.
       const { data, error } = await sb.rpc("get_blu_sales_summary", {
         p_tenant: ctx.tenantId, p_kash: kash, p_from: from, p_to: to,
+        p_detalle: input.detalle === true,
       });
       if (error) return { error: error.message };
       return { ...(data as Record<string, unknown>), refresh: refreshInfo };
