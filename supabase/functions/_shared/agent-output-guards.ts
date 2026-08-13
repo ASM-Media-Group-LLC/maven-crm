@@ -249,8 +249,21 @@ export function metaContraFact(
   const out: Array<{ persona: string; fact: string }> = [];
   for (const f of facts) {
     if (!factEximeDeNumeros(f.fact)) continue;
-    const primer = norm(f.name).split(/\s+/)[0];
-    if (primer.length >= 3 && new RegExp(`\\b${primer}\\b`).test(texto)) {
+    // TAMBIÉN el apodo de WhatsApp. 13/08: el fact de Lizeth estaba activo y la
+    // guarda desplegada — y el bot le puso meta de números DOS VECES en la mañana
+    // (09:01 "Daniel y Liss arrancan outreach — meta 3 números" y 09:49 "meta de
+    // hoy son 3 números c/u (Daniel, Casta, Liss)"). La guarda comparaba solo el
+    // primer nombre de Maven ("lizeth") y el bot la nombra como en el chat:
+    // "Liss". loadPersonFacts ya embebe el apodo en el nombre — se aprovecha.
+    const candidatos = new Set<string>();
+    const primer = norm(f.name).split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+    if (primer.length >= 3) candidatos.add(primer);
+    const apodo = f.name.match(/aparece como\s+"([^"]+)"/i)?.[1];
+    if (apodo) {
+      const a = norm(apodo).split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+      if (a.length >= 3) candidatos.add(a);
+    }
+    if ([...candidatos].some((n) => new RegExp(`\\b${n}\\b`).test(texto))) {
       out.push({ persona: f.name, fact: f.fact });
     }
   }

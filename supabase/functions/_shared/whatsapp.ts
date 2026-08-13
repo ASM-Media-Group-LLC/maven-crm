@@ -676,3 +676,70 @@ export function proximaOcurrencia(triggerAt: string | Date, recurrence: string |
   }
   return null;
 }
+
+// ── Quick commands (@maven presentate/help/audita/cierre del día) ──────────────
+// Vivía dentro de whatsapp-ingest (intesteable: importar ese módulo ejecuta
+// serve()). Se movió acá tras el incidente del 13/08 09:49:
+//
+//   Brayan posteó su plan de agencias (@mencionando al bot) que terminaba en
+//   "…y cierre a demo de 15 min". El patrón viejo /\bcierre(…)?\b/ tenía el
+//   calificador OPCIONAL — cualquier "cierre" suelto disparaba el modo EOD.
+//   El agente, invocado como "generá el reporte de fin de turno" a las 9:49 AM,
+//   respondió "no es hora de cierre de jornada" — un delirio frente al plan que
+//   Brayan había presentado. Y como el camino de quick command RETORNA temprano,
+//   el mensaje real de Brayan nunca llegó al agente: plan sólido, cero acuse.
+//
+// Dos capas de arreglo:
+//   1. "cierre" exige su calificador (del día/jornada/turno). Sin excepciones.
+//   2. UN COMANDO TIENE QUE PARECER UN COMANDO: si el texto (sin la @mención)
+//      pasa de 80 caracteres, es una conversación — jamás un quick command.
+//      Esto mata la clase entera del bug para los cuatro comandos: un plan que
+//      diga "auditoría" o "sincroniza" en el medio tampoco secuestra nada.
+export type QuickCommand = "presentate" | "help" | "audit" | "eod" | null;
+
+export function detectQuickCommand(body: string | null): QuickCommand {
+  if (!body) return null;
+  // La @mención cruda (@<lid numérico>) no cuenta como largo del comando.
+  const limpio = body.replace(/@\d{8,}/g, " ").replace(/\s+/g, " ").trim();
+  if (limpio.length > 80) return null;
+
+  const presentate = [
+    /\bpres[eé]ntate\b/i,
+    /\bqui[eé]n\s+sos\b/i,
+    /\bqu[eé]\s+sos\b/i,
+    /\bqu[eé]\s+hac[eé]s\b/i,
+    /\bqu[eé]\s+sab[eé]s\s+hacer\b/i,
+    /\bqu[eé]\s+pod[eé]s\s+hacer\b/i,
+    /\bpara\s+qu[eé]\s+serv[ií]s\b/i,
+  ];
+  if (presentate.some((p) => p.test(limpio))) return "presentate";
+
+  const help = [
+    /^\s*[@/]?maven\s+\/?(help|ayuda|comandos)\b/i,
+    /^\s*\/(help|ayuda|comandos)\b/i,
+    /\bqu[eé]\s+comandos\b/i,
+  ];
+  if (help.some((p) => p.test(limpio))) return "help";
+
+  const audit = [
+    /\baudita(?:r|ndo)?\b/i,
+    /\bauditor[ií]a\b/i,
+    /\bsync\s+(?:el\s+)?historial\b/i,
+    /\bsincroniza\b/i,
+    /\bescanea(?:r)?\s+(?:el\s+)?historial\b/i,
+    /\brevisa\s+(?:el\s+)?historial\b/i,
+  ];
+  if (audit.some((p) => p.test(limpio))) return "audit";
+
+  const eod = [
+    // El calificador es OBLIGATORIO: "cierre a demo", "cierre de ventas", "el
+    // cierre con la agencia" son negocio, no un pedido de reporte.
+    /\bcierre\s+(?:del?\s+)?(?:d[ií]a|jornada|turno)\b/i,
+    /\bresumen\s+(?:del|de)\s+(?:d[ií]a|hoy|jornada|turno)\b/i,
+    /\bc[oó]mo\s+va\s+(?:el\s+)?(?:d[ií]a|equipo|jornada|turno)\b/i,
+    /\beod\b/i,
+  ];
+  if (eod.some((p) => p.test(limpio))) return "eod";
+
+  return null;
+}

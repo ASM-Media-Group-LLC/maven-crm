@@ -399,3 +399,21 @@ Deno.test("meta vs fact — un mensaje que no asigna meta nunca dispara", () => 
     ]
   ) assertEquals(metaContraFact(s, facts).length, 0, `no debió disparar: ${s}`);
 });
+
+// ── metaContraFact: el apodo de WhatsApp también cuenta (Liss, 13/08) ───────────
+Deno.test("meta vs fact — el apodo de WhatsApp no evade la guarda", () => {
+  // El fact como lo arma loadPersonFacts: nombre de Maven + apodo embebido.
+  const facts = [{
+    name: 'Lizeth Jerez (en WhatsApp aparece como "Liss")',
+    fact: "NO hace outreach ni textea modelos, por lo que no reporta números/contactados/respuestas.",
+  }];
+  // Los dos mensajes REALES del 13/08 que pasaron la guarda vieja:
+  const m1 = "Foco de hoy jueves: Daniel y Liss arrancan outreach de captación — meta 3 números obtenidos cada uno.";
+  const m2 = "Si quieren, les hago un check de arranque: meta de hoy son 3 números c/u (Daniel, Casta, Liss).";
+  assertEquals(metaContraFact(m1, facts).length, 1);
+  assertEquals(metaContraFact(m2, facts).length, 1);
+  // Por nombre completo sigue funcionando igual que antes.
+  assertEquals(metaContraFact("Lizeth, meta hoy 3 números.", facts).length, 1);
+  // Y sin meta, el apodo suelto no dispara nada.
+  assertEquals(metaContraFact("Liss subió 7 piezas hoy, buen ritmo 💪", facts).length, 0);
+});

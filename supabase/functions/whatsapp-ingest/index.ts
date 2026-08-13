@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   type IncomingMessage,
+  detectQuickCommand,
   parseEvolutionApiMessage,
   parseGenericMessage,
   adminClient,
@@ -713,48 +714,9 @@ function fireAnalyzeImage(messageId: string): void {
 //
 // La presentación usa un flow especial (multi-mensaje + stats vivas). El
 // resto son templates fijos.
-type QuickCommand = "presentate" | "help" | "audit" | "eod" | null;
-
-function detectQuickCommand(body: string | null): QuickCommand {
-  if (!body) return null;
-  const presentate = [
-    /\bpres[eé]ntate\b/i,
-    /\bqui[eé]n\s+sos\b/i,
-    /\bqu[eé]\s+sos\b/i,
-    /\bqu[eé]\s+hac[eé]s\b/i,
-    /\bqu[eé]\s+sab[eé]s\s+hacer\b/i,
-    /\bqu[eé]\s+pod[eé]s\s+hacer\b/i,
-    /\bpara\s+qu[eé]\s+serv[ií]s\b/i,
-  ];
-  if (presentate.some((p) => p.test(body))) return "presentate";
-
-  const help = [
-    /^\s*[@/]?maven\s+\/?(help|ayuda|comandos)\b/i,
-    /^\s*\/(help|ayuda|comandos)\b/i,
-    /\bqu[eé]\s+comandos\b/i,
-  ];
-  if (help.some((p) => p.test(body))) return "help";
-
-  const audit = [
-    /\baudita(?:r|ndo)?\b/i,
-    /\bauditor[ií]a\b/i,
-    /\bsync\s+(?:el\s+)?historial\b/i,
-    /\bsincroniza\b/i,
-    /\bescanea(?:r)?\s+(?:el\s+)?historial\b/i,
-    /\brevisa\s+(?:el\s+)?historial\b/i,
-  ];
-  if (audit.some((p) => p.test(body))) return "audit";
-
-  const eod = [
-    /\bcierre(?:\s+(?:del|de)\s+(?:d[ií]a|jornada|turno))?\b/i,
-    /\bresumen\s+(?:del|de)\s+(?:d[ií]a|hoy|jornada|turno)\b/i,
-    /\bc[oó]mo\s+va\s+(?:el\s+)?(?:d[ií]a|equipo|jornada|turno)\b/i,
-    /\beod\b/i,
-  ];
-  if (eod.some((p) => p.test(body))) return "eod";
-
-  return null;
-}
+// detectQuickCommand vive en _shared/whatsapp.ts: importar ESTE archivo ejecuta
+// serve(), así que acá adentro es intesteable — y la doctrina de la casa es que
+// los regex de las guardas se testean (el 13/08 uno de estos secuestró un plan).
 
 async function sendToGroup(groupId: string, body: string): Promise<void> {
   const url = `${PROJECT_URL}/functions/v1/whatsapp-send`;
