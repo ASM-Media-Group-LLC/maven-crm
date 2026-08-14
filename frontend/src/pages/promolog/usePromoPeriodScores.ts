@@ -20,7 +20,6 @@ export interface PromoPeriodScore {
   freq_pts: number;
   quality_pts: number;
   consistency_pts: number;
-  diversification_pts: number;
   score: number;
   is_partial: boolean;
   promo_networks: string | null;
@@ -54,7 +53,6 @@ export function usePromoPeriodScores(windowDays = 7) {
         freq_pts: Number(r.freq_pts ?? 0),
         quality_pts: Number(r.quality_pts ?? 0),
         consistency_pts: Number(r.consistency_pts ?? 0),
-        diversification_pts: Number(r.diversification_pts ?? 0),
         manual_share: r.manual_share != null ? Number(r.manual_share) : null,
         lift_pct: r.lift_pct != null ? Number(r.lift_pct) : null,
       })) as PromoPeriodScore[];

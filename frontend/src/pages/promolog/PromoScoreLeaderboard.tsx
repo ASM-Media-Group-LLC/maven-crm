@@ -31,8 +31,7 @@ function Row({ r, rank }: { r: PromoPeriodScore; rank: number }) {
         </div>
         <div className="text-[11px] text-muted-foreground truncate">
           {(r.target_networks || []).map((n) => NET_LABEL[n] ?? n).join("·") || "—"}
-          {" · "}frec {Math.round(r.freq_pts)} · cta {Math.round(r.quality_pts)} · const {Math.round(r.consistency_pts)}
-          {r.diversification_pts > 0 ? ` · redes ${Math.round(r.diversification_pts)}` : ""}
+          {" · "}frec {Math.round(r.freq_pts)} · calidad {Math.round(r.quality_pts)} · const {Math.round(r.consistency_pts)}
           {r.lift_pct != null && (
             <span className={r.lift_pct >= 0 ? "text-emerald-600" : "text-red-500"} title={`Ingreso del día siguiente a un día con promo vs sin promo, sobre ${r.lift_n_promo}v${r.lift_n_quiet} días liquidados`}>
               {" "}· ${r.lift_pct >= 0 ? "+" : ""}{Math.round(r.lift_pct)}% con promo
@@ -65,7 +64,7 @@ export default function PromoScoreLeaderboard() {
           <div>
             <h3 className="text-sm font-semibold">Score de promo — últimos 7 días</h3>
             <p className="text-[11px] text-muted-foreground">
-              0-100 sobre días leídos en las redes objetivo de cada una · frecuencia 40 · CTA 30 · constancia 20 · multi-red 10 (promo en 2+ redes)
+              0-100 sobre días leídos · frecuencia 40 · calidad 40 (= promedio de las barritas del día; 100% diario exige promo buena en 2+ redes) · constancia 20
             </p>
           </div>
           <span title="El score mide el cumplimiento del plan de promo de CADA creadora (sus redes objetivo). Los días que el scan no pudo leer NO castigan. '$ con promo' compara el ingreso del día siguiente a un día con promo vs sin promo (BLU liquidado) — es señal aparte, no entra al score.">

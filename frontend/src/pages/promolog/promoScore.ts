@@ -1,7 +1,10 @@
 // Score de CALIDAD de promo por DÍA (v2, 2026-08-13 — pedido de Jhon: la barrita del
 // día usa la MISMA escala que el score de periodo del Dashboard).
 //
-//   score del día = calidad de la MEJOR promo válida del día (0-1), sin pesos por red.
+//   score del día = 0.7 × mejor promo válida + 0.3 × la 2ª red (0-1).
+//   Una sola red perfecta = 70%; para el 100% diario hay que promocionar BIEN en más
+//   de una red (decisión de Jhon 13/08). El MES promedia estas mismas barritas
+//   (calidad 40 del RPC) → el % diario suma literalmente al global.
 //
 // El modelo v1 (Σ peso_red × calidad, IG 60% fijo) capaba a las creadoras que no viven
 // en IG (Martina Smith: X+TG con link directo → tope 27%) — retirado como ranking en el
@@ -89,7 +92,7 @@ export interface NetworkScore {
 }
 
 export interface DayScore {
-  score: number; // 0-1 = calidad de la MEJOR promo válida del día
+  score: number; // 0-1 = 0.7×mejor promo válida + 0.3×2ª red
   networks: NetworkScore[]; // SIEMPRE las 4 redes con bot (slots fijos)
 }
 
@@ -126,8 +129,9 @@ export function qualityForEntry(e: ScoreInput): number {
 
 /**
  * Score del día (0-1) + desglose por red, desde TODAS las entries de un creador+día.
- * v2: el score es la MEJOR promo válida del día — sin pesos por red (el v1 de IG 60%
- * capaba a quien no vive en IG). Los slots por red quedan para el tooltip/detalle.
+ * v2.1: 0.7 × mejor promo válida + 0.3 × la 2ª red — una red sola no llega a 100%.
+ * (El v1 de IG 60% fijo capaba a quien no vive en IG; retirado en #1185/#1186.)
+ * MISMA fórmula que day_quality en el RPC promo_creator_period_scores — sincronizar.
  */
 export function computeDayScore(inputs: ScoreInput[]): DayScore {
   const byNet = new Map<string, { quality: number; promoted: boolean; scanned: boolean }>();
@@ -146,6 +150,7 @@ export function computeDayScore(inputs: ScoreInput[]): DayScore {
     const info = byNet.get(net) ?? { quality: 0, promoted: false, scanned: false };
     return { network: net, quality: info.quality, promoted: info.promoted, scanned: info.scanned };
   });
-  const score = networks.reduce((s, n) => Math.max(s, n.quality), 0);
+  const qs = networks.map((n) => n.quality).filter((q) => q > 0).sort((a, b) => b - a);
+  const score = 0.7 * (qs[0] ?? 0) + 0.3 * (qs[1] ?? 0);
   return { score: clamp01(score), networks };
 }

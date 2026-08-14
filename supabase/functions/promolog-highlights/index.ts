@@ -1,14 +1,14 @@
 // promolog-highlights — reportes automáticos de destacados al grupo de Managers.
 //
-//   mode="daily_quality"  (cron 7pm Col)    → top 3 del SCORE de promo v2, ventana 7 días
+//   mode="daily_quality"  (cron 7pm Col)    → mejores promos de HOY (barrita del día 70/30)
 //   mode="daily_income"   (cron 11pm Col)   → top 5 modelos por ingreso de HOY (vs ayer, ↑/↓)
 //   mode="weekly"         (cron sáb 2pm Col)→ top 3 score de la semana + top 5 ingresos de la semana
 //
 // SCORE v2 (2026-08-13): el ranking viene del RPC `promo_creator_period_scores`
 // (fuente ÚNICA de verdad — misma que el leaderboard de la UI, ya no hay port):
-//   score 0-100 = Frecuencia 40 (promo-días / días LEÍDOS en las redes objetivo de
-//   la creadora) + Calidad 30 (CTA estructurado: link 1.0 · funnel 0.85 · mención 0.6)
-//   + Consistencia 20 (racha máxima sin promo) + Diversificación 10 (promo fuera del plan).
+//   score 0-100 = Frecuencia 40 (promo-días / días LEÍDOS en las redes objetivo) +
+//   Calidad 40 (PROMEDIO de las barritas diarias: 0.7×mejor promo + 0.3×2ª red) +
+//   Consistencia 20 (racha máxima sin promo). Día y mes = la misma fórmula.
 //   Días no leídos NO castigan; cobertura <60% → marcada "parcial". El lift ($) es
 //   señal aparte: ingreso del día siguiente a promo vs sin promo (BLU liquidado).
 // El day-score viejo (promoScore.ts, IG 60% fijo) queda SOLO como visual de detalle
@@ -53,7 +53,7 @@ type ScoreRow = {
   creator_id: string; name: string; instagram_handle: string | null; manager_name: string | null;
   target_networks: string[]; window_days: number; covered_days: number; coverage_pct: number | string | null;
   promo_days: number; freq_pts: number | string; quality_pts: number | string;
-  consistency_pts: number | string; diversification_pts: number | string;
+  consistency_pts: number | string;
   score: number; is_partial: boolean; promo_networks: string | null;
   manual_share: number | string | null; lift_pct: number | string | null;
   lift_n_promo: number; lift_n_quiet: number;
@@ -69,8 +69,7 @@ async function periodScores(sb: any, fromKey: string, toKey: string): Promise<Sc
 
 // Línea de podio: score + desglose compacto + lift si hay señal + marca parcial.
 function scoreLine(r: ScoreRow): string {
-  const parts = `frec ${Math.round(Number(r.freq_pts))} · cta ${Math.round(Number(r.quality_pts))} · const ${Math.round(Number(r.consistency_pts))}` +
-    (Number(r.diversification_pts) > 0 ? ` · redes ${Math.round(Number(r.diversification_pts))}` : "");
+  const parts = `frec ${Math.round(Number(r.freq_pts))} · calidad ${Math.round(Number(r.quality_pts))} · const ${Math.round(Number(r.consistency_pts))}`;
   const lift = r.lift_pct != null ? ` · $ ${Number(r.lift_pct) >= 0 ? "+" : ""}${Math.round(Number(r.lift_pct))}% con promo (${r.lift_n_promo}v${r.lift_n_quiet}d)` : "";
   const manual = Number(r.manual_share ?? 0) >= 50 ? ` · ✍️ ${Math.round(Number(r.manual_share))}% manual` : "";
   const partial = r.is_partial ? " ⚠️ poca lectura" : "";
@@ -145,7 +144,7 @@ function scorePodium(rows: ScoreRow[]): { lines: string[]; pie: string } {
   // cuentan — jamás convertir "no poder leer" en "no promocionó" (#818).
   const sinLectura = rows.length - conDatos.length;
   const parciales = conDatos.filter((r) => r.is_partial && r.score > 0).length;
-  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · CTA 30 · constancia 20 · multi-red 10 = promo en 2+ redes). ` +
+  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · calidad 40 = promedio de las barritas diarias, 100% del día exige promo buena en 2+ redes · constancia 20). ` +
     `${conPuntaje.length} con promo de ${conDatos.length} con lectura` +
     (parciales > 0 ? ` · ${parciales} con poca lectura (no compiten)` : "") +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
@@ -154,11 +153,34 @@ function scorePodium(rows: ScoreRow[]): { lines: string[]; pie: string } {
 }
 
 async function buildDailyQuality(sb: any): Promise<string> {
-  const today = bogToday(), from = bogShift(-6);
-  const scores = await periodScores(sb, from, today);
-  const { lines, pie } = scorePodium(scores);
-  const head = `🏆 *Score de promo — últimos 7 días (${fmtDia(from)} → ${fmtDia(today)})*`;
-  if (!lines.length) return `${head}\n\nSin promos con score en la ventana.`;
+  // DEL DÍA (pedido de Jhon 13/08): el podio de las 7pm rankea las barritas de HOY.
+  // Con from=to=hoy, quality_pts/40 del RPC ES la barrita del día (0.7×mejor promo +
+  // 0.3×2ª red) → una sola red no llega a 100% y el ranking vuelve a discriminar.
+  const today = bogToday();
+  const scores = await periodScores(sb, today, today);
+  const leidas = scores.filter((r) => r.covered_days > 0);
+  const conPromo = leidas
+    .map((r) => ({ ...r, dayPct: Math.round((Number(r.quality_pts) / 40) * 100) }))
+    .filter((r) => r.dayPct > 0);
+  const head = `🏆 *Mejores promos de hoy ${fmtDia(today)}*`;
+  if (!conPromo.length) return `${head}\n\nTodavía no hay promos con calidad registrada hoy.`;
+  // Podio por PUNTAJES DISTINTOS (empates agrupados, no orden inventado).
+  const pcts = [...new Set(conPromo.map((r) => r.dayPct))].sort((a, b) => b - a).slice(0, 3);
+  const lines = pcts.map((pc, i) => {
+    const grupo = conPromo.filter((r) => r.dayPct === pc);
+    const det = (r: typeof grupo[0]) => {
+      const manual = Number(r.manual_share ?? 0) >= 50 ? " ✍️" : "";
+      return `${r.name}${manual} (${r.promo_networks ?? "—"})`;
+    };
+    return grupo.length === 1
+      ? `${medals[i]} *${grupo[0].name}* — ${pc}%  (${grupo[0].promo_networks ?? "—"})${Number(grupo[0].manual_share ?? 0) >= 50 ? " ✍️ manual" : ""}`
+      : `${medals[i]} *Empate — ${pc}%*: ${grupo.map(det).join(" · ")}`;
+  });
+  const sinLectura = scores.length - leidas.length;
+  const pie = `_% = barrita del día (70% la mejor promo + 30% la 2ª red — el 100% exige promo buena en 2+ redes). ` +
+    `${conPromo.length} con promo de ${leidas.length} leídas hoy` +
+    (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
+    `. El acumulado del mes está en Maven → Promolog → Dashboard._`;
   return `${head}\n\n${lines.join("\n")}\n\n${pie}`;
 }
 
