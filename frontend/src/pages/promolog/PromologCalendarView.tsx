@@ -180,6 +180,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
             has_buy_link: e.has_buy_link === true,
             buy_link_type: e.buy_link_type,
             ai_confidence: e.ai_confidence != null ? Number(e.ai_confidence) : null,
+            ai_appeal: e.ai_appeal != null ? Number(e.ai_appeal) : null,
             notes: e.notes,
             needs_review: e.needs_review === true,
           })),

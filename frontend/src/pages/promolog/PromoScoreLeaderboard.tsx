@@ -64,7 +64,7 @@ export default function PromoScoreLeaderboard() {
           <div>
             <h3 className="text-sm font-semibold">Score de promo — últimos 7 días</h3>
             <p className="text-[11px] text-muted-foreground">
-              0-100 sobre días leídos · frecuencia 40 · calidad 40 (= promedio de las barritas del día: mejor promo + 2ª red + volumen) · constancia 20
+              0-100 sobre días leídos · frecuencia 40 · calidad 40 (= promedio de las barritas del día: mejor promo × creatividad IA + 2ª red + volumen) · constancia 20
             </p>
           </div>
           <span title="El score mide el cumplimiento del plan de promo de CADA creadora (sus redes objetivo). Los días que el scan no pudo leer NO castigan. '$ con promo' compara el ingreso del día siguiente a un día con promo vs sin promo (BLU liquidado) — es señal aparte, no entra al score.">

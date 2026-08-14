@@ -39,6 +39,7 @@ export interface ScoreInput {
   has_buy_link?: boolean;
   buy_link_type?: string | null;
   ai_confidence?: number | null;
+  ai_appeal?: number | null; // nota de la visión: la story como pieza de venta (0-1)
   notes?: string | null;
   needs_review?: boolean; // la IA la marcó para revisión manual (link/plataforma ambiguos)
 }
@@ -125,6 +126,10 @@ export function qualityForEntry(e: ScoreInput): number {
     q = 0.3; // promocionó pero la señal es difusa (watermark, CTA genérico)
   }
   if (e.partial) q *= 0.5;
+  // Factor de CREATIVIDAD (v2.3, espejo del RPC): la visión califica la story como
+  // pieza de venta (¿aparece ella? ¿sugerente? ¿CTA visible? ¿invita a interactuar?).
+  // 0.70-1.00; sin nota (X/TG/FB, manual, historial) → neutro 0.925.
+  q *= e.ai_appeal != null ? 0.7 + 0.3 * clamp01(e.ai_appeal) : 0.925;
   return clamp01(q);
 }
 

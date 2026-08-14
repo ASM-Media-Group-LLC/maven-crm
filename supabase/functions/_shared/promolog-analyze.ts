@@ -39,6 +39,7 @@ export interface StoryAnalysis {
   platform_mentioned: string;
   confidence: number;
   reasoning: string;
+  appeal: number | null; // 0-1: calidad de la story COMO PIEZA DE VENTA (solo si promoted=true)
 }
 
 export interface CreatorCtx {
@@ -76,8 +77,18 @@ Devolvé SOLO JSON con esta forma:
   "buy_link_type": "onlyfans" | "piclink" | "linktree" | "fansly" | "other" | null,
   "platform_mentioned": "onlyfans" | "piclink" | "fansly" | "linktree" | "ninguna",  // solo si se nombra o se ve; si no, "ninguna"
   "confidence": 0.0 a 1.0,
+  "appeal": 0.0 a 1.0 | null,                     // SOLO si promoted=true: nota de la story COMO PIEZA DE VENTA (rúbrica APPEAL abajo); si promoted=false → null
   "reasoning": "una oración corta en español: QUÉ señal de promoción viste (link/sticker/frase CTA) o, si no promociona, por qué no"
 }
+
+RÚBRICA APPEAL (qué tan buena es la promo como pieza de venta — solo si promoted=true):
+Arrancá de 0.5 y ajustá:
++ hasta +0.20 si la creadora APARECE en la foto/video (contenido real de ella; capturas/memes/solo-texto no suman)
++ hasta +0.15 si la imagen es atractiva/sugerente (lencería, pose, producción — lo que vende)
++ hasta +0.10 si el CTA/link es VISIBLE y prominente (sticker grande, texto claro; un link diminuto/escondido no suma)
++ hasta +0.05 si invita a INTERACTUAR (pregunta, encuesta, "escribime", countdown, oferta con urgencia)
+− hasta −0.25 si es una foto random/reciclada sin ella, un pantallazo, o el link está escondido/apenas legible
+⚠️ Usá TODA la escala en pasos de 0.05 — NO devuelvas 0.7 por defecto: una promo mediocre con link es 0.35-0.5, una killer (ella, sexy, CTA grande, invita a escribirle) es 0.85-1.0.
 
 GUÍA:
 - Necesitás una señal CONCRETA para marcar promoted=true: un link/sticker/URL, una mención de su plataforma de pago, o una frase de llamado a la acción. Sin eso → "none".
@@ -219,6 +230,7 @@ function parseModelJson(text: string): any | null {
       buy_link_type: grab(/"buy_link_type"\s*:\s*"([^"]*)"/i),
       platform_mentioned: grab(/"platform_mentioned"\s*:\s*"([^"]*)"/i) ?? "ninguna",
       confidence: Number(grab(/"confidence"\s*:\s*([0-9.]+)/i) ?? "0.75"),
+      appeal: (() => { const a = grab(/"appeal"\s*:\s*([0-9.]+)/i); return a != null ? Number(a) : null; })(),
       reasoning: (grab(/"reasoning"\s*:\s*"([^"]*)"/i) ?? "veredicto recuperado de respuesta parcial de la IA").slice(0, 500),
     };
   }
@@ -304,6 +316,8 @@ async function intentoOpenRouter(
         platform_mentioned: String(parsed.platform_mentioned ?? "ninguna").toLowerCase(),
         confidence: Math.max(0, Math.min(1, Number(parsed.confidence ?? 0))),
         reasoning: String(parsed.reasoning ?? "").slice(0, 500),
+        appeal: parsed.appeal != null && !Number.isNaN(Number(parsed.appeal))
+          ? Math.max(0, Math.min(1, Number(parsed.appeal))) : null,
       },
     };
   } catch (e) {
@@ -435,6 +449,7 @@ async function insertAnalyzedEntry(
     notes, evidence_url: args.evidence_url, dispatch_run_id: args.dispatch_run_id,
     apify_run_id: args.apify_run_id, analyzed_by_ai: true, ai_model: LLM_MODEL,
     ai_confidence: args.analysis.confidence, ai_reasoning: args.analysis.reasoning,
+    ai_appeal: args.analysis.promoted ? (args.analysis.appeal ?? null) : null,
     story_index: args.story_index, story_count: args.story_count, story_media_url: args.media_url,
     story_link_url: args.story_link_url ?? null, scraped_at: args.scraped_at,
     source_handle: args.source_handle ?? null, needs_review: args.needs_review ?? false,

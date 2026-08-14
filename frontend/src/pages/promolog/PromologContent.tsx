@@ -416,6 +416,7 @@ const PromologContent = () => {
           has_buy_link: e.has_buy_link,
           buy_link_type: e.buy_link_type,
           ai_confidence: e.ai_confidence,
+          ai_appeal: (e as any).ai_appeal != null ? Number((e as any).ai_appeal) : null,
           notes: e.notes,
           needs_review: e.needs_review,
         })),

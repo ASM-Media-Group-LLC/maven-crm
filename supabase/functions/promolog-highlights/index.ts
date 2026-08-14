@@ -177,7 +177,7 @@ async function buildDailyQuality(sb: any): Promise<string> {
       : `${medals[i]} *Empate — ${pc}%*: ${grupo.map(det).join(" · ")}`;
   });
   const sinLectura = scores.length - leidas.length;
-  const pie = `_% = barrita del día (60% la mejor promo + 25% la 2ª red + 15% el volumen — el 100% exige promo buena en 2+ redes y varias promos). ` +
+  const pie = `_% = barrita del día (60% la mejor promo × su creatividad + 25% la 2ª red + 15% el volumen). La creatividad la califica la IA por story: ella en cámara, sugerente, CTA visible, invitación a interactuar. ` +
     `${conPromo.length} con promo de ${leidas.length} leídas hoy` +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
     `. El acumulado del mes está en Maven → Promolog → Dashboard._`;
