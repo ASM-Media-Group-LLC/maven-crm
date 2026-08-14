@@ -144,7 +144,7 @@ function scorePodium(rows: ScoreRow[]): { lines: string[]; pie: string } {
   // cuentan — jamás convertir "no poder leer" en "no promocionó" (#818).
   const sinLectura = rows.length - conDatos.length;
   const parciales = conDatos.filter((r) => r.is_partial && r.score > 0).length;
-  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · calidad 40 = promedio de las barritas diarias, 100% del día exige promo buena en 2+ redes · constancia 20). ` +
+  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · calidad 40 = promedio de las barritas diarias · constancia 20). ` +
     `${conPuntaje.length} con promo de ${conDatos.length} con lectura` +
     (parciales > 0 ? ` · ${parciales} con poca lectura (no compiten)` : "") +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
@@ -177,7 +177,7 @@ async function buildDailyQuality(sb: any): Promise<string> {
       : `${medals[i]} *Empate — ${pc}%*: ${grupo.map(det).join(" · ")}`;
   });
   const sinLectura = scores.length - leidas.length;
-  const pie = `_% = barrita del día (70% la mejor promo + 30% la 2ª red — el 100% exige promo buena en 2+ redes). ` +
+  const pie = `_% = barrita del día (60% la mejor promo + 25% la 2ª red + 15% el volumen — el 100% exige promo buena en 2+ redes y varias promos). ` +
     `${conPromo.length} con promo de ${leidas.length} leídas hoy` +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
     `. El acumulado del mes está en Maven → Promolog → Dashboard._`;

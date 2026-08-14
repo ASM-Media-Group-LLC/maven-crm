@@ -1,10 +1,11 @@
 // Score de CALIDAD de promo por DÍA (v2, 2026-08-13 — pedido de Jhon: la barrita del
 // día usa la MISMA escala que el score de periodo del Dashboard).
 //
-//   score del día = 0.7 × mejor promo válida + 0.3 × la 2ª red (0-1).
-//   Una sola red perfecta = 70%; para el 100% diario hay que promocionar BIEN en más
-//   de una red (decisión de Jhon 13/08). El MES promedia estas mismas barritas
-//   (calidad 40 del RPC) → el % diario suma literalmente al global.
+//   score del día = 0.60 × mejor promo válida + 0.25 × la 2ª red + 0.15 × volumen
+//   (promos válidas del día, tope 4). Una historia con link = 64%; 3 historias = 71%;
+//   con 2ª red ≈ 83%; 2 redes con link y 4+ promos = 100% (decisión de Jhon 13-14/08:
+//   el 100% exige más de una red, y el volumen separa los empates). El MES promedia
+//   estas mismas barritas (calidad 40 del RPC) → el % diario suma literalmente al global.
 //
 // El modelo v1 (Σ peso_red × calidad, IG 60% fijo) capaba a las creadoras que no viven
 // en IG (Martina Smith: X+TG con link directo → tope 27%) — retirado como ranking en el
@@ -92,7 +93,7 @@ export interface NetworkScore {
 }
 
 export interface DayScore {
-  score: number; // 0-1 = 0.7×mejor promo válida + 0.3×2ª red
+  score: number; // 0-1 = 0.60×mejor promo + 0.25×2ª red + 0.15×volumen (tope 4)
   networks: NetworkScore[]; // SIEMPRE las 4 redes con bot (slots fijos)
 }
 
@@ -129,9 +130,10 @@ export function qualityForEntry(e: ScoreInput): number {
 
 /**
  * Score del día (0-1) + desglose por red, desde TODAS las entries de un creador+día.
- * v2.1: 0.7 × mejor promo válida + 0.3 × la 2ª red — una red sola no llega a 100%.
- * (El v1 de IG 60% fijo capaba a quien no vive en IG; retirado en #1185/#1186.)
- * MISMA fórmula que day_quality en el RPC promo_creator_period_scores — sincronizar.
+ * v2.2: 0.60×mejor promo + 0.25×2ª red + 0.15×volumen (promos válidas, tope 4).
+ * Una red sola no llega a 100%; el volumen separa los empates. (El v1 de IG 60% fijo
+ * capaba a quien no vive en IG; retirado en #1185/#1186.)
+ * MISMA fórmula que day_quality/vol_day en el RPC promo_creator_period_scores — sincronizar.
  */
 export function computeDayScore(inputs: ScoreInput[]): DayScore {
   const byNet = new Map<string, { quality: number; promoted: boolean; scanned: boolean }>();
@@ -151,6 +153,8 @@ export function computeDayScore(inputs: ScoreInput[]): DayScore {
     return { network: net, quality: info.quality, promoted: info.promoted, scanned: info.scanned };
   });
   const qs = networks.map((n) => n.quality).filter((q) => q > 0).sort((a, b) => b - a);
-  const score = 0.7 * (qs[0] ?? 0) + 0.3 * (qs[1] ?? 0);
+  // Volumen: cuántas promos VÁLIDAS hubo en el día (1 entry = 1 historia/post), tope 4.
+  const nPromos = inputs.filter((e) => e.promoted && qualityForEntry(e) > 0).length;
+  const score = 0.6 * (qs[0] ?? 0) + 0.25 * (qs[1] ?? 0) + (qs.length ? 0.15 * (Math.min(nPromos, 4) / 4) : 0);
   return { score: clamp01(score), networks };
 }
