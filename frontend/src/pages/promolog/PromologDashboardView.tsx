@@ -154,9 +154,9 @@ const PromologDashboardView = ({
   const indirectas = promosCount - directas;
   const directPct = promosCount > 0 ? Math.round((directas / promosCount) * 100) : 0;
 
-  // Calidad promedio: media del dayScore (peso×calidad, IG 60% + multi-red) de los
-  // creadora-días que SÍ sumaron (dayScore>0). "Cuando promocionan, qué tan buena es
-  // la promo" — reutiliza el computeDayScore que ya viene en cada entry deduplicada.
+  // Calidad promedio: media del dayScore v2 (calidad de la MEJOR promo del día, misma
+  // escala que el score de periodo) de los creadora-días que SÍ sumaron (dayScore>0).
+  // "Cuando promocionan, qué tan buena es la promo" — reutiliza el computeDayScore.
   const qualityAvg = useMemo(() => {
     const withScore = filteredEntries.filter(e => (e.dayScore ?? 0) > 0);
     if (!withScore.length) return 0;
@@ -510,7 +510,7 @@ const PromologDashboardView = ({
 
       {/* ═══ Row 3.5: Calidad promedio + Tipo de promo ════════════ */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      {/* (a) Calidad de promo — media del dayScore (peso×calidad) */}
+      {/* (a) Calidad de promo — media del dayScore v2 (mejor promo del día) */}
       <Card>
         <CardContent className="p-4">
           <div className="mb-2 flex items-center gap-2">

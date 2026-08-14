@@ -1,27 +1,21 @@
-// Score de CALIDAD de promo por día y por red (Fase 1).
+// Score de CALIDAD de promo por DÍA (v2, 2026-08-13 — pedido de Jhon: la barrita del
+// día usa la MISMA escala que el score de periodo del Dashboard).
 //
-// Modelo acordado con el dueño (2026-06-11):
-//   score = Σ (peso_red × calidad_de_la_mejor_promo_en_esa_red)
-//   pesos FIJOS entre las 4 redes con bot: IG 60% · X 13,3% · Telegram 13,3% · Facebook 13,3%.
-//   Pesos fijos = si la creadora NO está en una red, nunca llega a 100% (empuja multi-red).
+//   score del día = calidad de la MEJOR promo válida del día (0-1), sin pesos por red.
 //
-// Calidad v1: heurística sobre lo que YA guardamos (sin re-correr IA).
-//   - Instagram (visión Gemini): usa has_buy_link + ai_confidence (señales numéricas ricas).
-//   - X / Telegram / Facebook (heurística de texto): solo tokens en ai_reasoning
-//     (onlyfans / of_handle / link_agg / vision-of / plataforma / promo).
-// Queda enchufable: en Fase 2 reemplazamos qualityForEntry por un puntaje fino de IA
-// sin tocar computeDayScore ni la barra.
+// El modelo v1 (Σ peso_red × calidad, IG 60% fijo) capaba a las creadoras que no viven
+// en IG (Martina Smith: X+TG con link directo → tope 27%) — retirado como ranking en el
+// PR #1185 y de esta barra acá. La frecuencia/constancia/multi-red se miden a nivel
+// PERIODO en el RPC `promo_creator_period_scores` (leaderboard del Dashboard y reportes
+// de WhatsApp); esta barra responde solo "¿qué tan buena fue la promo de HOY?".
+//
+// ⚠️ ESCALA DE CALIDAD DUPLICADA A PROPÓSITO: la fuente canónica es el RPC
+// `promo_creator_period_scores` (migración 20260813170000). Si se cambia la escala
+// allá (link 1.0 · funnel 0.85 · mención 0.6 · difusa 0.3 · manual 0.75/1.0 ·
+// partial ×0.5 · no-gestionada 0), cambiarla ACÁ también.
 
 export const BOT_NETWORKS = ["instagram", "x", "telegram", "facebook"] as const;
 export type BotNetwork = (typeof BOT_NETWORKS)[number];
-
-// Pesos fijos. El 40% restante (fuera de IG) se reparte en partes iguales.
-export const NETWORK_WEIGHTS: Record<BotNetwork, number> = {
-  instagram: 0.6,
-  x: 0.4 / 3,
-  telegram: 0.4 / 3,
-  facebook: 0.4 / 3,
-};
 
 /** Normaliza el nombre de red (twitter → x, lower-case). */
 export function canonicalNetwork(n?: string | null): string {
@@ -89,60 +83,57 @@ export function displayPlatform(e: {
 
 export interface NetworkScore {
   network: BotNetwork;
-  weight: number;
   quality: number; // 0-1 (calidad de la mejor promo de esa red ese día)
   promoted: boolean; // promocionó en esa red ese día
   scanned: boolean; // el bot dejó registro de esa red ese día (aunque sea "sin promo")
-  contribution: number; // weight × quality (lo que aporta al score)
 }
 
 export interface DayScore {
-  score: number; // 0-1
+  score: number; // 0-1 = calidad de la MEJOR promo válida del día
   networks: NetworkScore[]; // SIEMPRE las 4 redes con bot (slots fijos)
 }
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
-/** Calidad 0-1 de UNA entry promocionada. 0 si no promocionó. */
+/** Calidad 0-1 de UNA entry promocionada (escala v2 = la del RPC). 0 si no promocionó. */
 export function qualityForEntry(e: ScoreInput): number {
   if (!e.promoted) return 0;
-  // Promocionó pero a una plataforma que NO manejamos (Fansly/Piclink/…) → no suma.
+  // Promocionó pero a una plataforma que NO manejamos (Fansly/…) → no suma.
   // EXCEPCIÓN: si está marcada "revisar manual", la asumimos promo válida (OF) y SÍ le
   // damos calidad hasta que un humano la revise. Si en la revisión la marcan No,
   // promoted pasa a false y la calidad vuelve a 0 automáticamente.
   if (!isManagedPromo(e) && !e.needs_review) return 0;
-  const net = canonicalNetwork(e.network);
-  const notes = (e.notes || "").toLowerCase();
-  const hasLink = e.has_buy_link === true || !!e.buy_link_type || /(onlyfans|enlace|\blink\b|fans)/.test(notes);
+  const b = (e.buy_link_type || "").toLowerCase();
+  const p = (e.platform || "").toLowerCase();
+  const r = (e.ai_reasoning || "").toLowerCase();
   let q: number;
 
   if (!e.analyzed_by_ai) {
-    // Manual / verificada por un humano (chatter): es una promo REAL confirmada → base
-    // alta. No tenemos puntaje fino de calidad → un link la sube. Fase 2 (IA) la afina.
-    q = 0.75 + (hasLink ? 0.25 : 0);
-  } else if (net === "instagram") {
-    // IG bot (visión): link explícito a OF pesa fuerte + confianza de la visión.
-    const conf = e.ai_confidence != null ? clamp01(e.ai_confidence) : 0.6;
-    q = 0.45 + (e.has_buy_link ? 0.35 : 0) + 0.2 * conf;
+    // Manual / verificada por un humano: promo real confirmada. Con link = máxima.
+    q = e.has_buy_link === true || !!e.buy_link_type ? 1.0 : 0.75;
+  } else if (e.has_buy_link === true || ["onlyfans", "unlok", "of"].includes(b) || /(of_link|link_agg)/.test(r)) {
+    q = 1.0; // link directo a plataforma gestionada
+  } else if (["piclink", "linktree"].includes(b) || ["piclink", "linktree"].includes(p)) {
+    q = 0.85; // funnel propio hacia el OF de la ficha
+  } else if (/(onlyfans|of_handle|vision-of)/.test(r)) {
+    q = 0.6; // mención/handle de OF sin link
   } else {
-    // X / Telegram / Facebook bot: solo tokens cortos en ai_reasoning.
-    const r = (e.ai_reasoning || "").toLowerCase();
-    if (/(onlyfans|of_handle|link_agg)/.test(r)) q = 1.0; // link/handle de OF explícito
-    else if (r.includes("vision-of")) q = 0.85; // la visión confirmó promo de OF en la imagen
-    else if (r.includes("plataforma")) q = 0.75; // menciona la plataforma
-    else if (r.includes("promo")) q = 0.6; // CTA / promo indirecta
-    else q = 0.5; // promocionó pero señal difusa
+    q = 0.3; // promocionó pero la señal es difusa (watermark, CTA genérico)
   }
   if (e.partial) q *= 0.5;
   return clamp01(q);
 }
 
-/** Score del día (0-1) + desglose por red, desde TODAS las entries de un creador+día. */
+/**
+ * Score del día (0-1) + desglose por red, desde TODAS las entries de un creador+día.
+ * v2: el score es la MEJOR promo válida del día — sin pesos por red (el v1 de IG 60%
+ * capaba a quien no vive en IG). Los slots por red quedan para el tooltip/detalle.
+ */
 export function computeDayScore(inputs: ScoreInput[]): DayScore {
   const byNet = new Map<string, { quality: number; promoted: boolean; scanned: boolean }>();
   for (const e of inputs) {
     const net = canonicalNetwork(e.network);
-    if (!(net in NETWORK_WEIGHTS)) continue; // solo las 4 redes con bot pesan
+    if (!(BOT_NETWORKS as readonly string[]).includes(net)) continue; // solo las 4 redes con bot
     const cur = byNet.get(net) ?? { quality: 0, promoted: false, scanned: false };
     cur.scanned = true;
     if (e.promoted) {
@@ -152,17 +143,9 @@ export function computeDayScore(inputs: ScoreInput[]): DayScore {
     byNet.set(net, cur);
   }
   const networks: NetworkScore[] = BOT_NETWORKS.map((net) => {
-    const weight = NETWORK_WEIGHTS[net];
     const info = byNet.get(net) ?? { quality: 0, promoted: false, scanned: false };
-    return {
-      network: net,
-      weight,
-      quality: info.quality,
-      promoted: info.promoted,
-      scanned: info.scanned,
-      contribution: weight * info.quality,
-    };
+    return { network: net, quality: info.quality, promoted: info.promoted, scanned: info.scanned };
   });
-  const score = networks.reduce((s, n) => s + n.contribution, 0);
+  const score = networks.reduce((s, n) => Math.max(s, n.quality), 0);
   return { score: clamp01(score), networks };
 }

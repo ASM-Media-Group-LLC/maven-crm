@@ -1,10 +1,10 @@
-// Barra de CALIDAD de promo (Fase 1) — vista de usuario.
+// Barra de CALIDAD de promo del DÍA — vista de usuario.
 //
-// A nivel usuario es UNA sola barra continua llena hasta el score del día (0-100%),
-// con el % al lado. El score sale del modelo interno (Σ peso_red × calidad, IG 60% +
-// X/TG/FB ~13,3% c/u) — ese desglose por red es INTERNO: vive en el tooltip y en el
-// popup de detalle, NO en la barra (antes se dibujaba un segmento por red y se veía
-// fragmentada/inconsistente, con bloques "flotando" cuando una red promocionaba y otra no).
+// UNA sola barra continua llena hasta el score del día (0-100%), con el % al lado.
+// v2 (2026-08-13): el score = calidad de la MEJOR promo válida del día, con la MISMA
+// escala que el score de periodo del Dashboard (link 1.0 · funnel 0.85 · mención 0.6 ·
+// difusa 0.3) — se retiró el Σ peso_red con IG 60% fijo, que capaba a las creadoras
+// que no viven en IG. El desglose por red vive en el tooltip.
 
 import { cn } from "@/lib/utils";
 import type { NetworkScore } from "./promoScore";

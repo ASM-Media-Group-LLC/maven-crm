@@ -404,7 +404,7 @@ const PromologContent = () => {
       const promotedNetworks = Array.from(new Set(
         group.filter(e => e.result === "Sí").map(e => (e.network || "").toLowerCase()).filter(Boolean),
       ));
-      // Score de calidad del día (peso×calidad por red) desde TODO el grupo del día.
+      // Score de calidad del día (v2: mejor promo válida) desde TODO el grupo del día.
       const { score: dayScore, networks: networkScores } = computeDayScore(
         group.map((e) => ({
           network: e.network,

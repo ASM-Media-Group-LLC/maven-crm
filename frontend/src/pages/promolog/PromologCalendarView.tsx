@@ -163,7 +163,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     return map;
   }, [monthEntries, userTz]);
 
-  // Score de calidad por día (peso×calidad por red) desde las entries crudas del bucket.
+  // Score de calidad por día (v2: mejor promo válida del día) desde las entries crudas del bucket.
   const dayScores = useMemo(() => {
     const m = new Map<string, DayScore>();
     for (const [key, bucket] of dayMap.entries()) {
@@ -172,7 +172,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
         computeDayScore(
           bucket.raw.map((e: any) => ({
             network: (e.network || "").toLowerCase(),
-            promoted: e.promoted === "true",
+            promoted: e.promoted === "true" || e.promoted === "yes" || e.promoted === "partial",
             partial: e.promoted === "partial",
             analyzed_by_ai: e.analyzed_by_ai === true,
             ai_reasoning: e.ai_reasoning,
