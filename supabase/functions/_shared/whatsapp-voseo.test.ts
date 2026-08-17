@@ -66,3 +66,18 @@ Deno.test("no toca handles ni menciones", () => {
   assert(!neutralizarVoseo(s).includes("@tú"));
   assert(!neutralizarVoseo(s).includes("@oye"));
 });
+
+Deno.test("voseo — los que se fugaron el 17/08 (auditoría sáb/lun)", () => {
+  // Las tres frases REALES que salieron al aire ese lunes:
+  assertEquals(
+    neutralizarVoseo("aún no veo números cargados hoy — la meta son 3. Priorizá unlok_official (203K, score 75)."),
+    "aún no veo números cargados hoy — la meta son 3. Prioriza unlok_official (203K, score 75).",
+  );
+  assertEquals(neutralizarVoseo("Seguile la corriente a eso"), "Síguele la corriente a eso");
+  assertEquals(
+    neutralizarVoseo("Miguel, la lead está en tu vencidos… tocala hoy y avanza."),
+    "Miguel, la lead está en tu vencidos… tócala hoy y avanza.",
+  );
+  // Hermanas de las fugadas, para no repetir "pasá corregido, coordiná intacto":
+  assertEquals(neutralizarVoseo("tocá base con María y seguime contando"), "toca base con María y sígueme contando");
+});

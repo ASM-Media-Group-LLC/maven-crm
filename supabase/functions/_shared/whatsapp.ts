@@ -553,6 +553,13 @@ const VOSEO_A_NEUTRO: ReadonlyArray<[string, string]> = [
   // "mandame" lo encontró el test nuevo: estaban mandale y mandalo, no mandame.
   ["mandame", "mándame"], ["tirame", "tírame"], ["buscame", "búscame"], ["armame", "ármame"],
   ["mostrame", "muéstrame"], ["contestame", "contéstame"], ["confirmame", "confírmame"],
+  // AUDITORÍA sáb 15 / lun 17 (17/08): "Priorizá unlok_official…", "Seguile la
+  // corriente" y "tocala hoy" salieron al aire — imperativos voseantes que el
+  // mapa no cubría. Van con sus hermanas (-lo/-le/-me) para no repetir el caso
+  // "pasá corregido, coordiná intacto" en la misma oración.
+  ["priorizá", "prioriza"], ["priorizalo", "priorízalo"],
+  ["seguile", "síguele"], ["seguilo", "síguelo"], ["seguime", "sígueme"],
+  ["tocá", "toca"], ["tocala", "tócala"], ["tocalo", "tócalo"], ["tocale", "tócale"],
   // "che" no es un verbo pero es la marca rioplatense más obvia que existe.
   ["che", "oye"],
 ];
