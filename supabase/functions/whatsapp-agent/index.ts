@@ -3618,8 +3618,12 @@ async function executeTool(
     }
 
     case "get_creator_top_fans": {
-      // Nombres de fans = PII de terceros → solo privilegiados (owner/admin/supervisor).
-      if (ctx.privileged === false) {
+      // Nombres de fans = PII de terceros → privilegiados (owner/admin/supervisor)
+      // y, desde el 17/08 (decisión de Jhon, a pedido de Fabiana), los bots de
+      // MANAGERS: las ballenas de sus modelos son herramienta de trabajo diaria
+      // (estrategia por modelo — quién gasta, en qué, cuándo vence su sub). Los
+      // demás bots de grupo (ventas/warming) siguen afuera.
+      if (ctx.privileged === false && ctx.department !== "manager") {
         return { error: "no_autorizado", message: "El detalle de fans/compradores es de supervisión." };
       }
       const creator = String(input.creator ?? "").trim();
