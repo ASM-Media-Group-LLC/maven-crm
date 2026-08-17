@@ -808,6 +808,7 @@ Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y p
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04, formato de Jhon 04/08): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad; quien esté bajo el mínimo de compañía lleva la marca "(min 60)" tal como viene en el bloque inyectado (ej. "María 35% (min 60)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
 - CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
+- NOTAS DE DÍAS ANTERIORES = SOLO PERSISTIDAS (17/08): si vas a citar la nota, el cierre o "cómo cerró" un día anterior de alguien — en un corte, en la apertura o respondiendo una mención — el dato sale de get_corte_notas({date:"YYYY-MM-DD"}) o del bloque NOTAS PERSISTIDAS inyectado, NUNCA de la memoria del hilo. El 17/08 el bot regañó a Brayan por un "viernes flojo (1.4)" que era la nota del SÁBADO (el viernes cerró 2.7) y, cuando Casta lo corrigió, desestimó la corrección sin verificar. Si alguien te corrige una nota o una fecha, VERIFICA con la tool antes de sostener tu versión: la fecha de la tabla manda, no tu recuerdo.
 - En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
 - UNA sola llamada a reply_to_group. Las preguntas de arranque a personas puntuales ("¿cómo vamos con X?") SÍ van — son el estilo de mánager que pidió Álvaro; lo que NO va es pedir confirmaciones de formato o permiso.
 
@@ -6108,6 +6109,33 @@ async function buildInitialUserMessage(args: {
       const sender = firstName(m.sender_external_id, m.sender_display_name);
       const text = effectiveText(m);
       if (text) lines.push(`[${tsBogota(m.sent_at)}] ${sender}: ${text}`);
+    }
+    // NOTAS PERSISTIDAS de los últimos días: la verdad para cualquier recap.
+    // 17/08: la apertura del lunes le atribuyó a Brayan un "viernes flojo (1.4)"
+    // — la nota del viernes fue 2.7 y el 1.4 era del SÁBADO; Casta lo corrigió y
+    // el bot desestimó la corrección. Y el 15/08 el recap dijo "Isa con 7 videos"
+    // leyendo un corte intermedio del hilo en vez del cierre real (9). El recap
+    // se armaba desde la memoria conversacional y cruzaba días: los cierres
+    // persistidos (corte_notas) son la única fuente para días pasados.
+    const desdeNotas = new Date(Date.now() - 5 * 3600_000 - 4 * 86400_000).toISOString().slice(0, 10);
+    const { data: notasPrevias } = await sb
+      .from("corte_notas")
+      .select("fecha, nombre, nota_sugerida")
+      .eq("group_id", args.groupId)
+      .gte("fecha", desdeNotas)
+      .order("fecha", { ascending: true })
+      .order("nombre", { ascending: true });
+    if (notasPrevias && notasPrevias.length > 0) {
+      lines.push("");
+      lines.push(
+        "NOTAS PERSISTIDAS de los últimos días (fecha → persona: nota — la fecha manda). Si citas " +
+          "la nota, el resultado o 'cómo cerró' un día ANTERIOR de alguien, sale SOLO de este bloque " +
+          "— no de los mensajes de arriba ni de memoria. Si un dato de un día pasado no está acá, " +
+          "no lo cites. Y ojo con qué día fue cada fecha: viernes ≠ sábado.",
+      );
+      for (const n of notasPrevias as Array<{ fecha: string; nombre: string; nota_sugerida: number }>) {
+        lines.push(`· ${n.fecha} → ${n.nombre}: ${Number(n.nota_sugerida)}`);
+      }
     }
     lines.push("");
     lines.push("INSTRUCCIONES — sigue la sección 'APERTURA DEL DÍA' del system prompt:");
