@@ -14,6 +14,7 @@ import { logAnthropicUsage } from "../_shared/usage.ts";
 import {
   afirmaCeroProduccion,
   afirmaRegistro,
+  marcarAckSinPersistencia,
   caracterizaPersona,
   detectarVoseoEnPitch,
   esCausaDeFalloScan,
@@ -6769,6 +6770,7 @@ async function runAgent(req: AgentRequest): Promise<{
     "al privado y vuelve a enviarlo.";
   const escriturasOk = new Set<string>();
   let ackBloqueados = 0;
+  let ackSanitizados = 0;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
   let scanNotaBloqueado = 0;
@@ -7291,6 +7293,18 @@ async function runAgent(req: AgentRequest): Promise<{
           continue;
         }
       }
+      // A la 3ª insistencia el mensaje sale (nunca mudo) pero YA NO MIENTE: la
+      // corrección va ADELANTE, determinística. 15/08 12:23: "Anotado en Maven:
+      // tipsyagency como oportunidad BLU interesada" salió intacto a la 3ª — la
+      // guarda veía (agent_false_ack) pero no frenaba, y Miguel quedó creyendo
+      // que la lead estaba registrada cuando no existía en ningún lado.
+      if (t.name === "reply_to_group" && escriturasOk.size === 0 && ackBloqueados >= 2) {
+        const cuerpo = String((t.input as ToolInput).body ?? "");
+        if (afirmaRegistro(cuerpo)) {
+          (t.input as ToolInput).body = marcarAckSinPersistencia(cuerpo);
+          ackSanitizados += 1;
+        }
+      }
       // Guarda anti-cierre-fantasma (03/08): en corridas NORMALES el modelo
       // imitó el formato del corte — publicó TRES "Cierre del día" en Ventas
       // (18:48/18:53/18:54) antes del real de las 19:00 (el candado de claims
@@ -7781,6 +7795,9 @@ async function runAgent(req: AgentRequest): Promise<{
             payload: {
               motivo: "afirmo_persistencia_sin_tool_de_escritura",
               intentos_bloqueados: ackBloqueados,
+              // true = el mensaje salió con la corrección "NO quedó registrado"
+              // adelante (la mentira ya no llega limpia al grupo).
+              sanitizado: ackSanitizados > 0,
               body_preview: finalReply.slice(0, 300),
             },
           });

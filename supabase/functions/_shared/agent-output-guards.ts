@@ -269,3 +269,18 @@ export function metaContraFact(
   }
   return out;
 }
+
+// ── Ack falso, 3ª insistencia: se publica pero con la duda ADELANTE ─────────────
+// La guarda de "anotado fantasma" devuelve el control 2 veces; a la 3ª el mensaje
+// sale igual (nunca mudo). El 15/08 12:23 salió así "Anotado en Maven: tipsyagency
+// como oportunidad BLU interesada" — ESA corrida no escribió nada (agent_false_ack,
+// 2 bloqueos). El aviso habla SOLO de lo que esta corrida sabe de sí misma: en el
+// caso tipsy una corrida vecina del mismo minuto SÍ había insertado la fila, así
+// que afirmar "NO quedó registrado" sería mentir al revés. Verificable ≠ adivinable:
+// el lector queda avisado de que el registro no tiene respaldo en ESTE turno.
+export function marcarAckSinPersistencia(cuerpo: string): string {
+  return (
+    "⚠️ Ojo: en esta corrida no ejecuté NINGUNA escritura en Maven — si abajo digo que " +
+    "algo quedó registrado/anotado, verifíquenlo antes de confiar.\n\n" + cuerpo
+  );
+}

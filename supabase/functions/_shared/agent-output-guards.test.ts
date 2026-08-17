@@ -17,6 +17,7 @@ import {
   caracterizaPersona,
   esRetractacion,
   extraerParesNombreLid,
+  marcarAckSinPersistencia,
   metaContraFact,
   tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
@@ -416,4 +417,15 @@ Deno.test("meta vs fact — el apodo de WhatsApp no evade la guarda", () => {
   assertEquals(metaContraFact("Lizeth, meta hoy 3 números.", facts).length, 1);
   // Y sin meta, el apodo suelto no dispara nada.
   assertEquals(metaContraFact("Liss subió 7 piezas hoy, buen ritmo 💪", facts).length, 0);
+});
+
+// ── marcarAckSinPersistencia: la 3ª insistencia sale corregida, no mentirosa ────
+Deno.test("ack falso 3ª insistencia — el aviso va adelante y la telemetría sigue viendo el ack", () => {
+  const original = "Anotado en Maven: https://instagram.com/tipsyagency como oportunidad BLU interesada (Miguel).";
+  const salida = marcarAckSinPersistencia(original);
+  assert(salida.startsWith("⚠️ Ojo: en esta corrida no ejecuté NINGUNA escritura en Maven"));
+  assert(salida.includes(original), "el contenido original no se pierde");
+  // El evento agent_false_ack se emite re-corriendo afirmaRegistro sobre el texto
+  // final: el aviso NO debe romper esa detección.
+  assert(afirmaRegistro(salida), "afirmaRegistro debe seguir matcheando el cuerpo");
 });
