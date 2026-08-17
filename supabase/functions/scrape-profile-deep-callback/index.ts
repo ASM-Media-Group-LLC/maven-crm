@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
   // ── Validar job ─────────────────────────────────────────────────────────
   const { data: job, error: jErr } = await (sb as any)
     .from("profile_analyses")
-    .select("id, apify_run_id, status, instagram_handle, source_group_id, source_message_id, requested_by_display_name, context, tenant_id, created_at")
+    .select("id, apify_run_id, status, instagram_handle, source_group_id, source_message_id, requested_by_display_name, context, perspective, tenant_id, created_at")
     .eq("id", jobId)
     .maybeSingle();
 
@@ -246,7 +246,11 @@ Deno.serve(async (req: Request) => {
   const signals = aggregateSignals(storiesAnalysis, profile);
 
   // ── Generar estrategia ─────────────────────────────────────────────────
-  const strategy = generateStrategy(profile, storiesAnalysis, signals, job.context);
+  // La perspectiva la fijó el bot que pidió el scrape (por departamento): el
+  // MISMO análisis se lee distinto según de qué lado del mostrador estás.
+  const strategy = job.perspective === "manager_growth"
+    ? generateGrowthStrategy(profile, storiesAnalysis, signals, job.context, stories.length)
+    : generateStrategy(profile, storiesAnalysis, signals, job.context);
 
   // ── Update row ──────────────────────────────────────────────────────────
   const duration = Math.round((Date.now() - t0) / 1000);
@@ -543,6 +547,111 @@ function generateStrategy(profile: any, stories: any[], signals: any, context: s
   }
 
   return lines.join("\n");
+}
+
+// ── Variante MANAGER (17/08, pedido de Fabiana vía Jhon) ──────────────────────
+// El mismo scrape leído desde el otro lado del mostrador: acá la modelo ES de la
+// casa y quien pregunta es su MANAGER. Nada de pitches de producto a un lead —
+// lo que sirve es CÓMO está usando sus historias/bio para vender y qué corregir.
+// El plan de plata (canal débil, lift, precio de sub, ballenas) lo cruza el bot
+// con sus tools de BLU/promolog; esto aporta la lectura EN VIVO del contenido.
+function generateGrowthStrategy(profile: any, stories: any[], signals: any, context: string | null, rawStoriesCount = 0): string {
+  const lines: string[] = [];
+  const handle = profile?.handle ?? "—";
+  const followers = profile?.followers_count;
+  const fStr = followers ? formatNum(followers) : "—";
+  lines.push(`📈 @${handle}${profile?.is_verified ? " ✓" : ""} — lectura de crecimiento (modelo de la casa)`);
+  lines.push("");
+
+  const bioBits: string[] = [];
+  if (followers) bioBits.push(`**${fStr} followers**`);
+  if (profile?.posts_count) bioBits.push(`${formatNum(profile.posts_count)} posts`);
+  if (profile?.is_private) bioBits.push("⚠️ cuenta privada (mata el alcance de la promo)");
+  if (profile?.external_url) bioBits.push(`bio link: ${profile.external_url}`);
+  if (bioBits.length > 0) lines.push(`**Perfil**: ${bioBits.join(" · ")}`);
+  if (profile?.biography) {
+    lines.push(`Bio: "${String(profile.biography).slice(0, 140).replace(/\n+/g, " ")}"`);
+  }
+  lines.push("");
+
+  const total = signals.stories_analyzed ?? 0;
+  if (total === 0 && rawStoriesCount > 0) {
+    // 0 analizadas ≠ 0 subidas: si Apify trajo stories y Vision no pudo leerlas
+    // (blip técnico), decir "no subió" sería inventar inactividad (review 17/08).
+    lines.push(`**Stories**: tenía ${rawStoriesCount} stories hoy pero la lectura visual falló (blip técnico) — NO leer esto como inactividad; reintentar más tarde.`);
+  } else if (total === 0) {
+    lines.push("**Stories**: sin stories para leer hoy — sin historias no hay promo que medir.");
+  } else {
+    lines.push(`**Stories (${total} últimas)**: ${signals.direct_count} promo directa · ${signals.indirect_count} indirecta · ${total - signals.promoted_count} sin promo`);
+    if (signals.tracker_kinds_in_stories.length > 0) {
+      lines.push(`· trackers en stories: ${signals.tracker_kinds_in_stories.join(", ")}`);
+    }
+  }
+  lines.push("");
+
+  lines.push("**Palancas sugeridas** (cruzar con sus números de BLU antes de bajarlas):");
+  const moves = buildGrowthMoves(signals, profile, rawStoriesCount);
+  moves.forEach((m, i) => lines.push(`${i + 1}. ${m}`));
+
+  if (context) {
+    lines.push("");
+    lines.push(`_Contexto del pedido: "${context}"_`);
+  }
+  return lines.join("\n");
+}
+
+function buildGrowthMoves(signals: any, profile: any, rawStoriesCount = 0): string[] {
+  const moves: string[] = [];
+  const total = signals.stories_analyzed ?? 0;
+  const directas = signals.direct_count ?? 0;
+  const indirectas = signals.indirect_count ?? 0;
+  const conPromo = signals.promoted_count ?? 0;
+  const sinPromo = total - conPromo;
+
+  // Cadencia y mezcla de promo — el corazón de la lectura.
+  if (total === 0 && rawStoriesCount > 0) {
+    moves.push("La lectura visual de hoy falló (había stories pero no se pudieron analizar): reintentar más tarde — mientras, trabajar el plan con los números de BLU.");
+  } else if (total === 0) {
+    moves.push("Cadencia primero: acordar un mínimo diario de historias — hoy la cuenta no está vendiendo nada por IG.");
+  } else if (conPromo === 0) {
+    moves.push("Sube contenido pero SIN promo: meter 1-2 CTAs suaves por día (indirecta primero) — hoy el funnel no existe.");
+  } else if (directas > 0 && indirectas === 0 && directas >= Math.max(1, Math.floor(total / 2))) {
+    moves.push("Todo promo directa: quema a la audiencia — balancear con contenido de persona/promo indirecta (regla ~2 de valor por 1 de venta).");
+  } else if (sinPromo > 0 && conPromo > 0) {
+    moves.push("La mezcla promo/contenido se ve razonable — el foco pasa a la CALIDAD del CTA: que cada promo lleve gancho y link claros.");
+  }
+
+  // El link de bio es el punto de conversión de toda la promo.
+  // ⚠️ Con 0 stories válidas, aggregateSignals devuelve un objeto SIN
+  // bio_url/bio_tracker aunque el perfil tenga link (review 17/08: se llegó a
+  // afirmar "SIN link en bio" contradiciendo el propio bloque Perfil del mismo
+  // mensaje). La verdad del link vive en profile.external_url — se clasifica
+  // desde ahí cuando las signals vienen degeneradas.
+  const bioUrl = String(signals.bio_url ?? profile?.external_url ?? "");
+  const bioTracker = signals.bio_tracker ?? (
+    /onlyfans\.com/i.test(bioUrl) ? "onlyfans_direct"
+      : /linktr\.ee|linktree/i.test(bioUrl) ? "linktree"
+      : /beacons\./i.test(bioUrl) ? "beacons"
+      : /piclink/i.test(bioUrl) ? "piclink"
+      : null);
+  if (bioTracker === "onlyfans_direct") {
+    moves.push("🚨 Bio con onlyfans.com directo = riesgo de ban de IG: mover YA el link a Piclink (interno de la casa).");
+  } else if (bioTracker === "linktree" || bioTracker === "beacons") {
+    moves.push(`Bio con ${bioTracker}: migrar a Piclink (interno) — mismo link, menos riesgo de ban y con analytics para medir la promo.`);
+  } else if (!bioUrl) {
+    moves.push("SIN link en bio: la promo de historias no tiene a dónde convertir — resolver esto antes que cualquier otra palanca.");
+  }
+
+  if (profile?.is_private) {
+    moves.push("Cuenta privada: decidir si es estrategia (funnel a DM) o descuido — en privado las historias no captan tráfico nuevo.");
+  }
+  if (signals.paywall_strength === "strong") {
+    moves.push("Paywall fuerte en su contenido: bien para el valor percibido — cuidar que quede suficiente material 'gratis' que enganche.");
+  }
+
+  // Siempre cerrar atando a los números: la lectura visual propone, BLU decide.
+  moves.push("Cerrar el plan con sus números: canal débil, lift de promo y ballenas (get_creator_earnings_range + growth feed + top fans) mandan sobre cualquier lectura visual.");
+  return moves;
 }
 
 function buildRecommendation(signals: any, profile: any): string[] {

@@ -92,6 +92,7 @@ Deno.serve(async (req: Request) => {
     source_message_id?: string | null;
     source_group_id?: string | null;
     context?: string | null;
+    perspective?: string | null; // 'manager_growth' | 'closer_sale' (null = closer_sale legacy)
     force?: boolean;            // si true, saltea cache de 24h
   } = {};
   try {
@@ -107,14 +108,23 @@ Deno.serve(async (req: Request) => {
   if (!handle || handle.length < 2) return json({ error: "Invalid handle" }, 400);
 
   // ── Cache: ¿hay análisis reciente complete? ─────────────────────────────
+  // El cache matchea también la PERSPECTIVA (17/08): la estrategia cacheada es
+  // texto ya horneado — si un closer analizó a la modelo ayer (pitch de venta) y
+  // hoy pregunta su manager (palancas de crecimiento), servirle el cache sería
+  // darle el flavor equivocado. NULL histórico = closer_sale.
+  const perspectivaPedida = body.perspective === "manager_growth" ? "manager_growth" : "closer_sale";
   if (!body.force) {
     const since = new Date(Date.now() - CACHE_HOURS * 3600_000).toISOString();
-    const { data: cached } = await (sb as any)
+    let cacheQ = (sb as any)
       .from("profile_analyses")
       .select("id, status, created_at, profile, stories_analysis, signals, strategy, stories_count")
       .eq("instagram_handle", handle)
       .eq("status", "complete")
-      .gte("created_at", since)
+      .gte("created_at", since);
+    cacheQ = perspectivaPedida === "manager_growth"
+      ? cacheQ.eq("perspective", "manager_growth")
+      : cacheQ.or("perspective.is.null,perspective.eq.closer_sale");
+    const { data: cached } = await cacheQ
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -137,12 +147,19 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── ¿Hay un job en curso para este handle? evitar duplicar ──────────────
-  const { data: inFlight } = await (sb as any)
+  // Mismo criterio que el cache: solo cuenta como "en curso" un job de la MISMA
+  // perspectiva — el callback postea al grupo del job original, así que colgarse
+  // de un job ajeno dejaría a este grupo sin respuesta (y con otro flavor).
+  let inFlightQ = (sb as any)
     .from("profile_analyses")
     .select("id, status, created_at")
     .eq("instagram_handle", handle)
     .in("status", ["queued", "running"])
-    .gte("created_at", new Date(Date.now() - 5 * 60_000).toISOString())  // últimos 5 min
+    .gte("created_at", new Date(Date.now() - 5 * 60_000).toISOString());  // últimos 5 min
+  inFlightQ = perspectivaPedida === "manager_growth"
+    ? inFlightQ.eq("perspective", "manager_growth")
+    : inFlightQ.or("perspective.is.null,perspective.eq.closer_sale");
+  const { data: inFlight } = await inFlightQ
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -166,6 +183,9 @@ Deno.serve(async (req: Request) => {
       source_message_id: body.source_message_id ?? null,
       source_group_id: body.source_group_id ?? null,
       context: body.context ?? null,
+      // 'manager_growth' = palancas de crecimiento para una modelo de la casa;
+      // 'closer_sale' = pitch de venta a un lead (los NULL históricos = closer).
+      perspective: perspectivaPedida,
       instagram_handle: handle,
       status: "queued",
     })

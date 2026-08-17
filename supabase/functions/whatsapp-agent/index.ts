@@ -1383,7 +1383,7 @@ const TOOLS: Array<{
   {
     name: "analyze_profile_deep",
     description:
-      "Análisis DEEP de un perfil de Instagram (Apify + Gemini Vision) que devuelve estrategia de venta personalizada. Tarda 30-90 segundos en completar. Usar SOLO cuando el closer/owner pide explícitamente estrategia o análisis profundo (frases tipo 'analizame a @X', 'qué le ofrezco a @X', 'estrategia para @X', 'cómo abordo a @X'). NO usar para lookups simples — para eso usa analyze_instagram_lead (cache, instantáneo). Scrapea stories en vivo + bio + posts y produce: profile (followers/bio/link), análisis story-by-story con Gemini Vision (promo directa/indirecta/none, trackers, paywall strength, audience vibe, signs de agencia), signals agregados, y estrategia textual con recomendación de producto (Blu/Piclink/CP/Kash) + pitch específico. Costo ~$0.06 por análisis. El bot debe responder al closer 'dame ~1 min, scrapeando' inmediatamente, y la estrategia llega después en un segundo mensaje cuando el callback completa.",
+      "Análisis DEEP de un perfil de Instagram (Apify + Gemini Vision) que devuelve estrategia personalizada. Tarda 30-90 segundos en completar. Usar SOLO cuando piden explícitamente estrategia o análisis profundo (frases tipo 'analizame a @X', 'qué le ofrezco a @X', 'estrategia para @X', 'cómo abordo a @X'). NO usar para lookups simples — para eso usa analyze_instagram_lead (cache, instantáneo). Scrapea stories en vivo + bio + posts y produce: profile (followers/bio/link), análisis story-by-story con Vision (promo directa/indirecta/none, trackers, paywall strength, audience vibe, signs de agencia) y signals agregados. La estrategia final depende de quién eres: en bots de CLOSERS vuelve como pitch de venta con recomendación de producto (Blu/Piclink/CP/Kash); en el bot de MANAGERS vuelve como lectura de CRECIMIENTO de la modelo (palancas sobre sus historias/bio, para cruzar con sus números de BLU). Costo ~$0.06 por análisis. Responde 'dame ~1 min, scrapeando' inmediatamente — el resultado llega después en un segundo mensaje cuando el callback completa.",
     input_schema: {
       type: "object",
       properties: {
@@ -3262,6 +3262,10 @@ async function executeTool(
             source_message_id: ctx.messageId ?? null,
             source_group_id: ctx.groupId ?? null,
             context,
+            // La perspectiva la decide el DEPARTAMENTO del bot, no el modelo
+            // (17/08, pedido de Fabiana): mismo scrape, otra lectura — managers
+            // reciben palancas de crecimiento, closers el pitch de venta.
+            perspective: ctx.department === "manager" ? "manager_growth" : "closer_sale",
           }),
         });
         const data = await resp.json();
@@ -5901,7 +5905,7 @@ async function buildInitialUserMessage(args: {
     const sb = adminClient();
     const { data: pa } = await sb
       .from("profile_analyses")
-      .select("id, instagram_handle, status, error, profile, stories_analysis, signals, strategy, stories_count, requested_by_display_name, context, duration_seconds")
+      .select("id, instagram_handle, status, error, profile, stories_analysis, signals, strategy, stories_count, requested_by_display_name, context, perspective, duration_seconds")
       .eq("id", args.req.profile_analysis_id)
       .maybeSingle();
 
@@ -5917,8 +5921,36 @@ async function buildInitialUserMessage(args: {
       if (pa.requested_by_display_name) {
         lines.push(`Menciona a ${pa.requested_by_display_name} (quien lo pidió).`);
       }
-      lines.push("Sugiere: 'puede ser cuenta privada, sin stories del día, o un blip de Apify. Prueba analyze_instagram_lead para el cache normal.'");
+      if ((pa as { perspective?: string | null }).perspective === "manager_growth") {
+        // Modelo DE LA CASA: jamás sugerir analyze_instagram_lead — esa tool
+        // escribe en scouter_leads y contaminaría el pipeline de captación con
+        // cuentas propias (lo cazó el review adversarial del 17/08).
+        lines.push("Sugiere: 'puede ser cuenta privada, sin stories del día, o un blip del scraper — se puede reintentar más tarde. Mientras, la estrategia arranca igual con sus números de BLU (ingresos por canal, ballenas, promo).'");
+      } else {
+        lines.push("Sugiere: 'puede ser cuenta privada, sin stories del día, o un blip de Apify. Prueba analyze_instagram_lead para el cache normal.'");
+      }
       lines.push("Tu output va por reply_to_group — corto, profesional, no técnico.");
+      return lines.join("\n");
+    }
+
+    // PERSPECTIVA MANAGER (17/08, review adversarial: la perspectiva moría en
+    // este último salto — el prompt de abajo está hardcodeado en clave closer y
+    // el flavor de crecimiento nunca llegaba al grupo). Acá la modelo ES de la
+    // casa y quien pregunta es su manager: el texto pre-armado
+    // (generateGrowthStrategy) SÍ se entrega — es lectura operativa con
+    // palancas, no un pitch que deba sonar humano. Nada de openers, productos
+    // ni "closers" en este flavor.
+    if ((pa as { perspective?: string | null }).perspective === "manager_growth") {
+      lines.push(`Tarea: entregar al grupo la LECTURA DE CRECIMIENTO de @${pa.instagram_handle} (modelo de la casa).`);
+      if (pa.requested_by_display_name) {
+        lines.push(`La pidió: ${pa.requested_by_display_name} — nómbrala al entregar.`);
+      }
+      lines.push("");
+      lines.push("LECTURA PRE-ARMADA — entrégala esencialmente tal cual (formato WhatsApp; puedes ajustar el saludo, PROHIBIDO inventar datos que no estén acá):");
+      lines.push(String(pa.strategy ?? "(sin lectura generada)"));
+      lines.push("");
+      lines.push("Al final, ofrece el paso siguiente del playbook: cruzar esta lectura con sus números (get_creator_earnings_range, get_creator_top_fans, growth feed) para bajar el plan de 7 días. PROHIBIDO: openers de DM, recomendación de productos para 'abordarla', o mencionar closers — es una modelo de la casa, no un lead.");
+      lines.push("Tu output final va por reply_to_group — UN solo mensaje.");
       return lines.join("\n");
     }
 
