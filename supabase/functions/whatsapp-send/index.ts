@@ -196,11 +196,33 @@ async function sendOne(args: {
   const sinVoseo = neutralizarVoseo(sinEscapes);
   const bodyFinal = mdAWhatsApp(group.is_direct === true ? sinVoseo : redactPhones(sinVoseo));
 
+  // ── MENCIONES: todo @<dígitos> del body viaja en `mentions` ─────────────────
+  // Sin el JID en `mentions`, WhatsApp muestra el LID crudo: el 17/08 Álvaro
+  // salió como "@192457652338690" en Ventas DOS veces — una reply del agente que
+  // no pasó mention_lids y un recordatorio cuyo resolver estaba muerto en
+  // silencio (embebía `profiles:user_id(...)` y whatsapp_members.user_id apunta
+  // a auth.users, NO a profiles → PostgREST no puede embeber esa relación y el
+  // error se tragaba). Va acá, en el único punto por el que salen TODOS los
+  // mensajes, con la consulta directa a members — sin embeds.
+  let mentionsFinal = args.mentions ?? [];
+  const lidsEnBody = [...bodyFinal.matchAll(/@(\d{6,})/g)].map((m) => m[1]);
+  const faltantes = lidsEnBody.filter((d) => !mentionsFinal.some((j) => j.startsWith(d)));
+  if (faltantes.length > 0 && group.is_direct !== true) {
+    const { data: mem, error: memErr } = await sb
+      .from("whatsapp_members")
+      .select("external_id")
+      .eq("group_id", group.id)
+      .in("external_id", faltantes.map((d) => `${d}@lid`));
+    if (memErr) console.warn("[whatsapp-send] resolver de menciones falló:", memErr.message);
+    const hallados = ((mem ?? []) as Array<{ external_id: string }>).map((r) => r.external_id);
+    if (hallados.length > 0) mentionsFinal = [...mentionsFinal, ...hallados];
+  }
+
   let result: ProviderSendResult;
   if (group.provider === "evolution") {
     result = args.imageUrl
       ? await sendMediaViaEvolution(group.external_id, args.imageUrl, bodyFinal)
-      : await sendViaEvolution(group.external_id, bodyFinal, args.mentions);
+      : await sendViaEvolution(group.external_id, bodyFinal, mentionsFinal.length > 0 ? mentionsFinal : undefined);
   } else if (group.provider === "manual") {
     // Modo manual: no mandamos al provider, solo grabamos la salida en
     // whatsapp_messages para testing y para ver lo que el bot habría
@@ -522,38 +544,17 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
       continue;
     }
 
-    // Los recordatorios se guardan como TEXTO PLANO, y el agente suele escribir el
-    // destinatario como "@<lid>" (copiado de la tabla de miembros). Como el drain
-    // mandaba el body tal cual, SIN el array `mentions`, WhatsApp no podía resolver
-    // el LID y el equipo veía "@249125350154247, recordatorio: ..." — números crudos.
-    // (Caso real 29/07 con María.) Acá resolvemos cada @<dígitos> a su NOMBRE y de paso
-    // pasamos los LIDs en `mentions` para que además le llegue el ping.
-    let outBody = r.body;
-    let mentions: string[] | undefined;
-    const lids = [...String(r.body).matchAll(/@(\d{6,})/g)].map((m) => m[1]);
-    if (lids.length > 0) {
-      const { data: mem } = await sb
-        .from("whatsapp_members")
-        .select("external_id, display_name, profiles:user_id(full_name)")
-        .eq("group_id", r.group_id)
-        .in("external_id", lids.map((d) => `${d}@lid`));
-      const found: string[] = [];
-      for (const d of lids) {
-        const row = (mem ?? []).find((x: any) => x.external_id === `${d}@lid`) as any;
-        if (!row) continue;
-        const nombre = String(row.profiles?.full_name ?? row.display_name ?? "").split(" ")[0];
-        if (nombre) outBody = outBody.split(`@${d}`).join(nombre);
-        found.push(`${d}@lid`);
-      }
-      if (found.length > 0) mentions = found;
-    }
-
+    // Los @<lid> del body ya NO se resuelven acá: el resolver de este drain nació
+    // muerto (embebía `profiles:user_id(...)` y whatsapp_members.user_id apunta a
+    // auth.users, no a profiles — PostgREST no puede embeber esa relación y el
+    // error se tragaba, caso Álvaro 17/08). La resolución vive ahora en sendOne,
+    // el borde por el que salen TODOS los mensajes: el @<lid> queda en el body y
+    // sale como mención real (nombre + ping).
     const result = await sendOne({
       groupId: r.group_id,
-      body: outBody,
+      body: r.body,
       tenantId: r.tenant_id,
       reminderId: r.id,
-      mentions,
     });
 
     if (result.ok) {
