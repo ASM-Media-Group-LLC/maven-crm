@@ -808,6 +808,7 @@ Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y p
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04, formato de Jhon 04/08): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad; quien esté bajo el mínimo de compañía lleva la marca "(min 60)" tal como viene en el bloque inyectado (ej. "María 35% (min 60)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
 - CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
+- NOTAS DE DÍAS ANTERIORES = SOLO PERSISTIDAS (17/08): si vas a citar la nota, el cierre o "cómo cerró" un día anterior de alguien — en un corte, en la apertura o respondiendo una mención — el dato sale de get_corte_notas({date:"YYYY-MM-DD"}) o del bloque NOTAS PERSISTIDAS inyectado, NUNCA de la memoria del hilo. El 17/08 el bot regañó a Brayan por un "viernes flojo (1.4)" que era la nota del SÁBADO (el viernes cerró 2.7) y, cuando Casta lo corrigió, desestimó la corrección sin verificar. Si alguien te corrige una nota o una fecha, VERIFICA con la tool antes de sostener tu versión: la fecha de la tabla manda, no tu recuerdo.
 - En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
 - UNA sola llamada a reply_to_group. Las preguntas de arranque a personas puntuales ("¿cómo vamos con X?") SÍ van — son el estilo de mánager que pidió Álvaro; lo que NO va es pedir confirmaciones de formato o permiso.
 
@@ -2064,7 +2065,7 @@ async function resolveMembersByName(
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; inboxDepartments?: string[] | null; privileged?: boolean; canSeePhones?: boolean; deadlineAt?: number },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null; department?: string | null; inboxDepartments?: string[] | null; privileged?: boolean; canSeePhones?: boolean; deadlineAt?: number; invokedBy?: string | null },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -5459,6 +5460,57 @@ async function executeTool(
     case "reply_to_group": {
       const body = String(input.body ?? "").trim();
       if (!body) return { error: "empty_body" };
+      // ── SUPERSESIÓN (17/08 09:24, AI WARMING) ─────────────────────────────
+      // Casta mandó un "@" solo y 6 segundos después su reporte completo; la
+      // corrida del "@" regañó en público ("van 3 veces que te menciono…")
+      // cuando el reporte YA estaba visible, y 7 segundos después la corrida
+      // del reporte lo felicitó — dos mensajes contradictorios en 7s. Si la
+      // MISMA persona mandó otro mensaje dirigido al bot DESPUÉS del que
+      // disparó esta corrida (hay agent_invoked de ese mensaje), esta
+      // respuesta nació vieja: se suprime y responde la corrida nueva, que ve
+      // los dos mensajes en su contexto.
+      if (ctx.invokedBy === "mention" && ctx.messageId) {
+        const { data: trig } = await sb
+          .from("whatsapp_messages")
+          .select("sent_at, sender_external_id")
+          .eq("id", ctx.messageId)
+          .maybeSingle();
+        if (trig?.sender_external_id) {
+          const { data: nuevos } = await sb
+            .from("whatsapp_messages")
+            .select("id")
+            .eq("group_id", ctx.groupId)
+            .eq("sender_external_id", trig.sender_external_id)
+            .eq("is_from_bot", false)
+            .gt("sent_at", trig.sent_at)
+            .limit(5);
+          const ids = ((nuevos ?? []) as Array<{ id: string }>).map((r) => r.id).filter((x) => x !== ctx.messageId);
+          if (ids.length > 0) {
+            const { data: evs } = await sb
+              .from("whatsapp_bot_events")
+              .select("id")
+              .eq("group_id", ctx.groupId)
+              .eq("kind", "agent_invoked")
+              .in("payload->req->>message_id", ids)
+              .limit(1);
+            if (evs && evs.length > 0) {
+              await sb.from("whatsapp_bot_events").insert({
+                group_id: ctx.groupId,
+                tenant_id: ctx.tenantId,
+                kind: "agent_superseded",
+                payload: { message_id: ctx.messageId, body_preview: body.slice(0, 200) },
+              });
+              return {
+                error: "superseded",
+                message:
+                  "NO se envió: la misma persona mandó un mensaje MÁS NUEVO dirigido a ti después del que " +
+                  "estás respondiendo, y la corrida de ese mensaje ya está en curso — ella responde con el " +
+                  "contexto completo (incluido esto). Termina SIN reintentar el envío y sin llamar más tools.",
+              };
+            }
+          }
+        }
+      }
       // Menciones opcionales: array de LIDs/JIDs. El gateway las pasa
       // a Baileys como `mentions` para que WhatsApp ping a esos users.
       const rawMentions = Array.isArray(input.mention_lids) ? input.mention_lids : [];
@@ -6058,6 +6110,33 @@ async function buildInitialUserMessage(args: {
       const text = effectiveText(m);
       if (text) lines.push(`[${tsBogota(m.sent_at)}] ${sender}: ${text}`);
     }
+    // NOTAS PERSISTIDAS de los últimos días: la verdad para cualquier recap.
+    // 17/08: la apertura del lunes le atribuyó a Brayan un "viernes flojo (1.4)"
+    // — la nota del viernes fue 2.7 y el 1.4 era del SÁBADO; Casta lo corrigió y
+    // el bot desestimó la corrección. Y el 15/08 el recap dijo "Isa con 7 videos"
+    // leyendo un corte intermedio del hilo en vez del cierre real (9). El recap
+    // se armaba desde la memoria conversacional y cruzaba días: los cierres
+    // persistidos (corte_notas) son la única fuente para días pasados.
+    const desdeNotas = new Date(Date.now() - 5 * 3600_000 - 4 * 86400_000).toISOString().slice(0, 10);
+    const { data: notasPrevias } = await sb
+      .from("corte_notas")
+      .select("fecha, nombre, nota_sugerida")
+      .eq("group_id", args.groupId)
+      .gte("fecha", desdeNotas)
+      .order("fecha", { ascending: true })
+      .order("nombre", { ascending: true });
+    if (notasPrevias && notasPrevias.length > 0) {
+      lines.push("");
+      lines.push(
+        "NOTAS PERSISTIDAS de los últimos días (fecha → persona: nota — la fecha manda). Si citas " +
+          "la nota, el resultado o 'cómo cerró' un día ANTERIOR de alguien, sale SOLO de este bloque " +
+          "— no de los mensajes de arriba ni de memoria. Si un dato de un día pasado no está acá, " +
+          "no lo cites. Y ojo con qué día fue cada fecha: viernes ≠ sábado.",
+      );
+      for (const n of notasPrevias as Array<{ fecha: string; nombre: string; nota_sugerida: number }>) {
+        lines.push(`· ${n.fecha} → ${n.nombre}: ${Number(n.nota_sugerida)}`);
+      }
+    }
     lines.push("");
     lines.push("INSTRUCCIONES — sigue la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identifica y ejecuta acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
@@ -6594,6 +6673,33 @@ async function runAgent(req: AgentRequest): Promise<{
     }
   }
 
+  // ── DEDUPE determinístico por mensaje (17/08) ──────────────────────────────
+  // El audio de Luis en Managers se transcribió e invocó DOS veces con payload
+  // idéntico (11:13:17 y 11:14:33); la segunda corrida quedó muda solo porque el
+  // modelo no llamó tools — dedupe por suerte no es dedupe. Las invocaciones que
+  // nacen de un mensaje por el camino del transcriptor reclaman (grupo, mensaje)
+  // UNA vez; la que pierde el claim no corre (evento agent_skipped_duplicate,
+  // sin agent_invoked — así el diagnóstico "sin agent_invoked = problema de
+  // ingest" sigue valiendo).
+  if (req.message_id && (req.invoked_by === "auto" || req.invoked_by === "audio_mention")) {
+    const { data: claim } = await sb
+      .from("whatsapp_agent_claims")
+      .upsert(
+        { group_id: group.id, claim_key: `msg:${req.message_id}:${req.invoked_by}` },
+        { onConflict: "group_id,claim_key", ignoreDuplicates: true },
+      )
+      .select("claim_key");
+    if (!claim || claim.length === 0) {
+      await logEvent(sb, {
+        tenantId: group.tenant_id,
+        groupId: group.id,
+        kind: "agent_skipped_duplicate",
+        payload: { message_id: req.message_id, invoked_by: req.invoked_by },
+      });
+      return { ok: true, iterations: 0 };
+    }
+  }
+
   await logEvent(sb, {
     tenantId: group.tenant_id,
     groupId: group.id,
@@ -6771,6 +6877,9 @@ async function runAgent(req: AgentRequest): Promise<{
   const escriturasOk = new Set<string>();
   let ackBloqueados = 0;
   let ackSanitizados = 0;
+  // true = una respuesta se suprimió por supersesión (hay una corrida más nueva
+  // del mismo remitente en curso): el empujón anti-mudo NO debe revivirla.
+  let respuestaSuprimida = false;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
   let scanNotaBloqueado = 0;
@@ -7237,7 +7346,7 @@ async function runAgent(req: AgentRequest): Promise<{
         req.invoked_by === "image_mention" || group.is_direct === true;
       const textoModelo = (data.content ?? [])
         .filter((b) => b.type === "text").map((b) => (b as { text?: string }).text ?? "").join("\n").trim();
-      if (addressed && !nudgedToReply && textoModelo.length > 0) {
+      if (addressed && !nudgedToReply && !respuestaSuprimida && textoModelo.length > 0) {
         nudgedToReply = true;
         messages.push({ role: "assistant", content: data.content });
         messages.push({ role: "user", content: [{ type: "text", text:
@@ -7247,7 +7356,7 @@ async function runAgent(req: AgentRequest): Promise<{
           "NO corresponde responder, termina sin llamar ninguna tool." }] });
         continue;
       }
-      silentReason = "el_modelo_no_llamo_ninguna_tool";
+      silentReason = respuestaSuprimida ? "respuesta_supersedida" : "el_modelo_no_llamo_ninguna_tool";
       messages.push({ role: "assistant", content: data.content });
       break;
     }
@@ -7762,6 +7871,7 @@ async function runAgent(req: AgentRequest): Promise<{
           inboxDepartments: botCfg?.inboxDepartments ?? null,
           privileged,
           canSeePhones,
+          invokedBy: req.invoked_by ?? null,
           // 2s de reserva: que la tool devuelva ANTES del corte del loop, para que
           // el resultado (aunque sea parcial/error) entre al contexto del modelo.
           deadlineAt: startedAt + budgetMs - 2_000,
@@ -7777,7 +7887,13 @@ async function runAgent(req: AgentRequest): Promise<{
       ) {
         escriturasOk.add(String(t.name));
       }
-      if (t.name === "reply_to_group") {
+      if (t.name === "reply_to_group" && result && typeof result === "object" && (result as Record<string, unknown>).error === "superseded") {
+        respuestaSuprimida = true;
+      }
+      // finalReply SOLO si el envío no falló: antes se seteaba incluso con error
+      // (evidencia_no_disponible, superseded…) y el reintento que el propio mensaje
+      // de error le pedía al modelo moría en la guarda "ya respondiste una vez".
+      if (t.name === "reply_to_group" && !(result && typeof result === "object" && (result as Record<string, unknown>).error)) {
         finalReply = String((t.input as ToolInput).body ?? "");
         // ⚠️ El evento se emite SOLO si el texto que finalmente sale sigue afirmando
         // persistencia. Antes bastaba con `ackBloqueados > 0`, y eso registraba como
