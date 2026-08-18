@@ -519,12 +519,19 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
           .eq("id", r.id);
         sent += 1;
       } else {
-        // Devolver a pending para que el próximo tick reintente; a los 3 intentos, failed.
+        // Devolver a pending para que un tick POSTERIOR reintente; a los 3 intentos, failed.
+        // ⚠️ BACKOFF (18/08): sin empujar trigger_at los 3 intentos caían en ticks
+        // consecutivos (10-20-30 min) — o sea, los tres DENTRO de la misma caída del
+        // proveedor. Pasó tal cual: una acción de rescate murió 3 veces seguidas en
+        // una sobrecarga de ~1h y se dio por failed sin haber tenido una chance real.
+        // 1er reintento a los ~10 min (transitorio corto), el 2º a los ~30.
         const nextAttempt = (r.attempt_count ?? 0) + 1;
+        const esperaMin = nextAttempt === 1 ? 10 : 30;
         await sb.from("whatsapp_reminders")
           .update({
             status: nextAttempt >= 3 ? "failed" : "pending",
             attempt_count: nextAttempt,
+            trigger_at: new Date(Date.now() + esperaMin * 60_000).toISOString(),
             error: detalle.slice(0, 500),
           })
           .eq("id", r.id);

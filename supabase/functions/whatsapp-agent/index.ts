@@ -8179,17 +8179,73 @@ async function runAgent(req: AgentRequest): Promise<{
           }
           if (nombre) quien = `${nombre}, `;
         }
-        await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
-          body: JSON.stringify({
-            group_id: group.id,
-            // Texto único para timeout y excepción: "me quedé sin tiempo" sería FALSO
-            // ante una excepción, y quien pregunta no necesita saber cuál de las dos fue
-            // — necesita saber que falló y qué hacer.
-            body: `${quien}se me cortó armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
-          }),
-        });
+
+        // ── AUTO-RESCATE LEJOS DEL BLIP (18/08) ───────────────────────────────
+        // Acá terminaba todo: el reintento inmediato ya había fallado, se pedía
+        // disculpas y NADIE retomaba el mensaje. El 18/08 Álvaro pidió lo mismo
+        // cuatro veces durante una sobrecarga de ~1h del proveedor y se quedó sin
+        // respuesta las cuatro — el pedido (llamarle la atención a una manager)
+        // solo se cumplió a mano. Un tercer intento pegado no sirve: hay que
+        // volver CUANDO la caída ya pasó. Se agenda un recordatorio-acción a los
+        // 15 min; el drain lo ejecuta con el agente y, si para entonces ya hubo
+        // respuesta, la instrucción le manda callarse (nada de responder dos veces).
+        let reprogramado = false;
+        if (req.message_id) {
+          const { count: yaAgendado } = await sb
+            .from("whatsapp_reminders")
+            .select("id", { count: "exact", head: true })
+            .eq("group_id", group.id)
+            .eq("status", "pending")
+            .like("body", `%${req.message_id}%`);
+          if ((yaAgendado ?? 0) === 0) {
+            const { error: errRescate } = await sb.from("whatsapp_reminders").insert({
+              tenant_id: group.tenant_id,
+              group_id: group.id,
+              kind: "accion",
+              trigger_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+              body:
+                `RESCATE AUTOMÁTICO — el mensaje ${req.message_id}` +
+                (quien ? ` de ${quien.replace(/, $/, "")}` : "") +
+                ` quedó SIN respuesta: la corrida se cayó dos veces seguidas por un fallo del proveedor. ` +
+                `Búscalo en el contexto reciente del chat y respóndelo ahora, como si acabara de llegar ` +
+                `(si pedía una acción, ejecútala). ⚠️ Si ya le respondiste DESPUÉS de ese mensaje, o la ` +
+                `persona ya lo resolvió por otro lado, termina SIN publicar nada — no repitas.`,
+              status: "pending",
+            });
+            reprogramado = !errRescate;
+          } else {
+            reprogramado = true; // ya hay un rescate en cola para este mensaje
+          }
+        }
+
+        // ── DISCULPA, UNA SOLA VEZ ────────────────────────────────────────────
+        // El 18/08 salieron TRES "se me cortó" idénticas en 20 minutos: cada
+        // reintento que moría mandaba la suya. Repetir la misma disculpa no
+        // informa, desespera. Si ya se avisó hace poco en este chat, se calla —
+        // el evento agent_silent queda igual para la auditoría.
+        const { count: disculpasRecientes } = await sb
+          .from("whatsapp_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("group_id", group.id)
+          .eq("is_from_bot", true)
+          .gte("sent_at", new Date(Date.now() - 30 * 60_000).toISOString())
+          .like("body", "%se me cortó armando la respuesta%");
+        if ((disculpasRecientes ?? 0) === 0) {
+          await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+            body: JSON.stringify({
+              group_id: group.id,
+              // Texto único para timeout y excepción: "me quedé sin tiempo" sería FALSO
+              // ante una excepción, y quien pregunta no necesita saber cuál de las dos fue
+              // — necesita saber que falló y qué sigue. Con rescate agendado NO se le
+              // pide que reescriba: el bot vuelve solo.
+              body: reprogramado
+                ? `${quien}se me cortó armando la respuesta 🙏 No hace falta que reescribas: lo retomo en unos minutos y te respondo.`
+                : `${quien}se me cortó armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
+            }),
+          });
+        }
       } catch (_e) { /* si tampoco se puede avisar, al menos queda el evento */ }
     }
 
