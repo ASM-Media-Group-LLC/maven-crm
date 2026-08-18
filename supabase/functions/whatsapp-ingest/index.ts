@@ -1124,9 +1124,14 @@ async function maybeRouteDmToAgent(sb: SupabaseClient, msg: IncomingMessage): Pr
   if (msg.msgType !== "text" && !isAudio && !isDocument) return "dm_agent_skip_non_text";
   const digits = (msg.senderExternalId || "").replace(/@.*/, "").replace(/\D/g, "");
   if (!digits) return "dm_agent_no_digits";
-  // Para texto exigimos algo sustantivo. El audio y los documentos se validan
-  // DESPUÉS (transcripción/extracción), así que no los cortamos acá.
-  if (!isAudio && !isDocument && (msg.body ?? "").trim().length < 4) return "dm_agent_too_short";
+  // Para texto solo se corta lo VACÍO. El gate anterior (<4 chars) dropeaba las
+  // CONFIRMACIONES: el 18/08 el bot le preguntó al dueño "¿Lo mando, lo ajusto o
+  // lo descarto?" y su "si" (2 chars) murió acá como dm_agent_too_short — la
+  // acción confirmada nunca se ejecutó y Álvaro quedó en visto por segunda vez
+  // en la misma mañana. En un DM whitelisteado de 5 personas, "si", "no" y "ok"
+  // son órdenes, no ruido. El audio y los documentos se validan DESPUÉS
+  // (transcripción/extracción), así que tampoco se cortan acá.
+  if (!isAudio && !isDocument && (msg.body ?? "").trim().length === 0) return "dm_agent_too_short";
 
   const { data: allow } = await sb
     .from("wa_dm_allowlist")
