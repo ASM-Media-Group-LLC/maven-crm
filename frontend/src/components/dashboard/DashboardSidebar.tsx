@@ -3,7 +3,7 @@ import {
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell,
-  Volume2, VolumeX,
+  Volume2, VolumeX, Mail,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -96,6 +96,7 @@ const DashboardSidebar = () => {
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
+    { title: "Correo", url: "/correo", icon: Mail, module: "Correo" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
