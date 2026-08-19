@@ -395,6 +395,8 @@ CASOS COMUNES:
    → Tú (el bot) NO mandas audios nunca — no aplica a tú.
    → Respuesta apropiada: "Entendido [Nombre], equipo: si necesitan hablarle a [Nombre] específicamente, mejor por texto. Para coordinación interna entre ustedes pueden seguir usando audio." NO digas "✓ Anotado, de ahora en más respuestas en texto" porque eso ya lo haces siempre.
    → ⚠️ TÚ SÍ ESCUCHAS LOS AUDIOS: las notas de voz se transcriben solas y las lees como texto (en el contexto aparecen como "[audio] <transcripción>"). PROHIBIDO decir "no puedo escuchar audios" o pedir que te lo pasen a texto — sí puedes. Si ves un "[audio]" SIN transcripción todavía (recién llegó, se procesa en ~20s), NO afirmes que no lo oyes: di "dame unos segundos que proceso tu audio 🙏" y espera; el sistema te reinvoca con el texto.
+   → ⚠️ Y TÚ SÍ VES LAS IMÁGENES Y LOS DOCUMENTOS, exactamente igual: se procesan solos (descripción + TODO el texto en pantalla) y te llegan al contexto como "[imagen] <contenido>" y "[documento] <contenido>". Capturas de pantalla, flyers, parrillas, PDFs, tablas: todo eso lo lees. PROHIBIDO decir "no puedo ver imágenes", "no puedo recibir PDF" o "capturas tampoco las puedo analizar" — el 18/08 Carolina preguntó si podías analizar capturas de un PDF, dijiste que no, y el día ANTERIOR habías leído sin problema la parrilla que mandó Luis como imagen. Con "[imagen]" o "[documento]" SIN contenido todavía, misma respuesta que con el audio: "dame unos segundos que lo proceso 🙏", nunca "no puedo".
+   → El ÚNICO límite real: si el archivo llegó con "NO SE PUDO LEER", dilo en una línea y pedí el formato que sí entra (PDF). No inventes un límite que no tienes: decir "no puedo" cuando sí puedes le hace perder tiempo al equipo y te quita trabajo que es tuyo.
 
 2. "Decile a X que haga Y" / "@X explicale eso":
    → El autor está delegando a X. NO eres tú quien debe hacer Y.
@@ -1719,6 +1721,37 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "list_reminders",
+    description:
+      "TUS recordatorios y series programadas en este chat: qué se va a disparar, cuándo, si es aviso o acción, y si es una SERIE recurrente (daily/weekdays/weekends/weekly). " +
+      "Úsala SIEMPRE que te pregunten por la cadencia de algo que tú mandas ('¿cada cuánto me llega esto?', 'mándamelo cada 4 horas', '¿qué tienes agendado?', 'deja de mandarme esto') — y ANTES de crear una serie nueva, para no dejar dos corriendo en paralelo. " +
+      "⚠️ Estos reportes automáticos son TUYOS, no un cron ajeno: el 18/08 Grace pidió cambiar la frecuencia de su reporte y el bot le dijo que 'el cron lo cambia Jhon' (falso) y no revisó ni creó nada — le ofreció como novedad exactamente la cadencia que ya tenía. Con esta tool eso se responde mirando, no adivinando. " +
+      "Devuelve el id de cada uno, que es lo que necesita cancel_reminder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        incluir_enviados: {
+          type: "boolean",
+          description: "true = incluye también los ya enviados/fallidos de los últimos 7 días (para auditar qué salió). Default: solo lo pendiente.",
+        },
+      },
+    },
+  },
+  {
+    name: "cancel_reminder",
+    description:
+      "Cancela un recordatorio o una SERIE de este chat, por id (sale de list_reminders). Úsalo cuando pidan parar algo que mandas ('no me mandes más esto', 'ya no hace falta') o cuando REEMPLACES una serie por otra con distinta cadencia — en ese caso: crea la nueva con create_reminder y cancela la vieja EN LA MISMA CORRIDA, o quedan las dos y llegan duplicados. " +
+      "Cancelar una serie mata también sus próximas repeticiones. Solo alcanza recordatorios de ESTE chat: los de otros grupos no se tocan desde acá.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reminder_id: { type: "string", description: "id del recordatorio a cancelar (de list_reminders)" },
+        motivo: { type: "string", description: "Opcional: por qué se cancela (queda en la auditoría)." },
+      },
+      required: ["reminder_id"],
+    },
+  },
+  {
     name: "get_ventas_del_dia",
     description:
       "La vista CANÓNICA del dinero del día: qué hay en la mesa, qué se GANÓ HOY (deduplicado entre el pipeline y las oportunidades, cada venta con su HORA) y — clave — los avisos de stages movidos HOY sobre ventas ya ganadas ANTES (ej. 'pasó a Completada hoy 12:36 pero su venta figura ganada AYER 18:49 — NO es venta nueva'). Úsala SIEMPRE que pregunten '¿cuánto se vendió hoy?', '¿hubo ventas?', '¿estás seguro que no hay ventas?' — es la ÚNICA fuente para contar ventas del día. El 05/08 contaste una venta de ayer como de hoy por mirar solo el stage del pipeline: esta tool existe para que eso no se repita.",
@@ -2230,12 +2263,65 @@ async function executeTool(
           }
         }
       }
+      // ── ¿ESTÁ EN EL PIPELINE DE CLOSERS, Y DE QUIÉN ES? ─────────────────────
+      // Esta tool lee SOLO leadgen_entries. Devolver esas filas peladas hacía que
+      // se leyeran como leads del pipeline y ASIGNABLES, que son otra cosa.
+      // El 18/08 Miguel pidió 5 agencias para asignarse; el bot buscó acá, le pasó
+      // cinco que NO existían en Closers junto con instrucciones de asignación que
+      // no funcionan, y lo tuvo 30 minutos trabado hasta que Miguel lo corrigió con
+      // cuatro audios. Después "corrigió" con otras cinco... que YA estaban
+      // asignadas a él. Las dos veces la tool había respondido bien: lo que
+      // faltaba era decir a qué universo pertenece cada fila.
+      const enPipeline = new Map<string, { stage: string | null; assigned_to: string | null }>();
+      if (handles.length > 0) {
+        const { data: ccs } = await sb
+          .from("closer_creators")
+          .select("instagram_handle, stage, assigned_to")
+          .eq("tenant_id", ctx.tenantId)
+          .in("instagram_handle", handles);
+        for (const c of (ccs ?? []) as Array<{ instagram_handle: string | null; stage: string | null; assigned_to: string | null }>) {
+          const h = (c.instagram_handle ?? "").toLowerCase();
+          if (h && !enPipeline.has(h)) enPipeline.set(h, { stage: c.stage, assigned_to: c.assigned_to });
+        }
+      }
+      // Nombre del closer dueño, para no devolver un uuid que el modelo no puede leer.
+      const nombrePorUser = new Map<string, string>();
+      const dueños = [...new Set([...enPipeline.values()].map((v) => v.assigned_to).filter(Boolean))] as string[];
+      if (dueños.length > 0) {
+        const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", dueños);
+        for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+          if (p.full_name) nombrePorUser.set(p.id, String(p.full_name));
+        }
+      }
+
       const leadsConNumero = leads.map((l) => {
         const h = (l.model_handle ?? "").toLowerCase();
         const masked = telPorHandle.get(h) ?? null;
-        return { ...l, numero: { cargado: !!masked, telefono_enmascarado: masked } };
+        const cc = enPipeline.get(h);
+        return {
+          ...l,
+          numero: { cargado: !!masked, telefono_enmascarado: masked },
+          en_pipeline_closers: cc
+            ? {
+              existe: true,
+              stage: cc.stage,
+              asignada_a: cc.assigned_to ? (nombrePorUser.get(cc.assigned_to) ?? "otro closer") : null,
+              asignable: !cc.assigned_to,
+            }
+            : { existe: false, stage: null, asignada_a: null, asignable: false },
+        };
       });
-      return { leads: leadsConNumero };
+      return {
+        leads: leadsConNumero,
+        universo: "leadgen_entries (LeadGen) — NO es el pipeline de Closers",
+        como_leerlo:
+          "⚠️ `en_pipeline_closers.existe=false` significa que esa lead NO está en el pipeline de Closers: " +
+          "un closer NO se la puede asignar ni trabajar desde ahí, y PROHIBIDO ofrecérsela como si pudiera " +
+          "(hay que cargarla primero). `existe=true` con `asignada_a` NO es 'libre': ya tiene dueño — si te " +
+          "pidieron leads SIN asignar, esas no cuentan y decirlo al revés le hace perder la tanda al closer. " +
+          "Solo `asignable=true` es realmente tomable. Para pedir leads libres del pool, la tool correcta es " +
+          "get_unassigned_leads, no esta.",
+      };
     }
 
     case "get_lead_details": {
@@ -3156,11 +3242,54 @@ async function executeTool(
         entrada_leadgen_el: (leadgen[0]?.created_at as string | undefined) ?? null,
       };
 
+      // ── "NO LO ENCONTRÉ" NO ES "NO EXISTE" ──────────────────────────────────
+      // El 18/08 el bot le dijo a Miguel que Lea Sophy "no está en Maven todavía
+      // (lead nueva)". Estaba cargada, asignada a ÉL y con quality A: había
+      // buscado un handle equivocado — lo admitió después ("mi error fue de
+      // handle"). Decirle a un closer que una lead no existe es de las
+      // afirmaciones más caras que puede hacer: lo invita a cargarla de nuevo y a
+      // duplicar el pipeline. Mismo antipatrón que #818 (no poder leer ≠ no
+      // promocionó). Si no hubo coincidencias, se buscan handles PARECIDOS antes
+      // de dejar que el modelo saque conclusiones.
+      let sinCoincidencias: Record<string, unknown> | null = null;
+      if (leadgen.length === 0 && cc.length === 0 && creators.length === 0 && scouter.length === 0) {
+        const raiz = handle.slice(0, Math.max(4, Math.min(7, handle.length - 2)));
+        const parecidos = new Set<string>();
+        if (raiz.length >= 4) {
+          const { data: pcc } = await sb.from("closer_creators")
+            .select("instagram_handle").eq("tenant_id", ctx.tenantId)
+            .ilike("instagram_handle", `%${raiz}%`).limit(6);
+          for (const r of (pcc ?? []) as Array<{ instagram_handle: string | null }>) {
+            if (r.instagram_handle) parecidos.add(String(r.instagram_handle));
+          }
+          const { data: plg } = await sb.from("leadgen_entries")
+            .select("model_handle").eq("tenant_id", ctx.tenantId)
+            .ilike("model_handle", `%${raiz}%`).limit(6);
+          for (const r of (plg ?? []) as Array<{ model_handle: string | null }>) {
+            if (r.model_handle) parecidos.add(String(r.model_handle));
+          }
+        }
+        const lista = [...parecidos].slice(0, 8);
+        sinCoincidencias = {
+          buscado: handle,
+          handles_parecidos: lista,
+          como_responder: lista.length > 0
+            ? "⚠️ NO encontré ESE handle, pero SÍ existen los parecidos de arriba. PROHIBIDO decir 'no está en " +
+              "Maven' o 'es lead nueva': lo más probable es que el handle esté mal escrito. Preguntá cuál de " +
+              "esos es, o volvé a llamar la tool con el correcto."
+            : "⚠️ No hubo coincidencias NI handles parecidos. Aun así, PROHIBIDO afirmar 'no existe' o 'es lead " +
+              "nueva' como un hecho: lo único que sabés es que con ESE handle no aparece. Decilo así — 'con el " +
+              "handle <X> no me figura, ¿lo tenés escrito distinto?' — y dejá que el closer confirme antes de " +
+              "que nadie la cargue de nuevo (cargarla dos veces ensucia el pipeline).",
+        };
+      }
+
       return {
         handle,
         overall_status: overall,
         // Primero el veredicto (si lo hay): es la síntesis que NO se re-interpreta.
         ...(veredicto ? { veredicto, creadora_activa: creadoraActiva } : {}),
+        ...(sinCoincidencias ? { sin_coincidencias: sinCoincidencias } : {}),
         procedencia,
         numero: telResumen,
         leadgen_entries: leadgen,
@@ -4285,6 +4414,95 @@ async function executeTool(
               "CADENCIA ('todos los días', 'cada mañana'), esto NO alcanza — cancelá y creá con `recurrence`. " +
               "Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
           }),
+      };
+    }
+
+    // ── VER Y APAGAR LO PROPIO ────────────────────────────────────────────────
+    // El agente podía CREAR recordatorios pero no verlos ni cancelarlos: sus
+    // propias series eran un punto ciego. Por eso el 18/08, cuando Grace pidió
+    // cambiar la frecuencia de su reporte, contestó que "el cron lo cambia Jhon"
+    // —falso, era su propia serie—, no revisó nada y le ofreció como novedad la
+    // cadencia que ya tenía. Sin lectura no hay forma de no inventar.
+    case "list_reminders": {
+      const incluirEnviados = input.incluir_enviados === true;
+      const estados = incluirEnviados
+        ? ["pending", "sent", "failed", "cancelled"]
+        : ["pending"];
+      const desde = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      let q = sb
+        .from("whatsapp_reminders")
+        .select("id, kind, body, trigger_at, status, recurrence, series_id, attempt_count")
+        .eq("group_id", ctx.groupId)
+        .in("status", estados)
+        .order("trigger_at", { ascending: true })
+        .limit(50);
+      // Los ya cerrados solo de la última semana: el histórico completo no ayuda
+      // y empuja el resultado fuera de lo legible.
+      if (incluirEnviados) q = q.gte("trigger_at", desde);
+      const { data: rems, error: errRems } = await q;
+      if (errRems) return { error: "list_reminders_failed", message: errRems.message };
+
+      const filas = (rems ?? []) as Array<Record<string, unknown>>;
+      const enBogota = (iso: unknown) =>
+        iso ? new Date(new Date(String(iso)).getTime() - 5 * 3600_000).toISOString().slice(0, 16).replace("T", " ") : null;
+
+      return {
+        total: filas.length,
+        recordatorios: filas.map((r) => ({
+          id: r.id,
+          cuando_bogota: enBogota(r.trigger_at),
+          modo: r.kind === "accion" ? "ACCIÓN (el bot ejecuta y redacta)" : "aviso (postea el texto tal cual)",
+          serie: r.recurrence ?? null,
+          estado: r.status,
+          intentos: r.attempt_count ?? 0,
+          texto: String(r.body ?? "").slice(0, 220),
+        })),
+        nota: filas.length === 0
+          ? "No hay nada agendado en este chat. Si te piden cambiar la frecuencia de algo que igual estás mandando, puede venir de otro lado (pulso de Álvaro, digests): dilo así, sin inventar."
+          : "`serie` con valor = se re-agenda sola; null = dispara UNA vez. Las horas están en Bogotá. " +
+            "Para cambiar una cadencia: crea la nueva con create_reminder Y cancela la vieja con cancel_reminder EN ESTA MISMA CORRIDA, o quedan las dos.",
+      };
+    }
+
+    case "cancel_reminder": {
+      const remId = String(input.reminder_id ?? "").trim();
+      if (!remId) return { error: "missing_reminder_id" };
+
+      // Scope por grupo: desde este chat solo se apaga lo de este chat. Sin esto,
+      // cualquiera con acceso a un grupo podría matar los reportes de otro.
+      const { data: rem } = await sb
+        .from("whatsapp_reminders")
+        .select("id, group_id, status, body, recurrence")
+        .eq("id", remId)
+        .maybeSingle();
+      if (!rem) return { error: "no_encontrado", message: "No existe un recordatorio con ese id." };
+      if (rem.group_id !== ctx.groupId) {
+        return {
+          error: "otro_grupo",
+          message: "Ese recordatorio es de otro chat y desde acá no se toca. Pídelo en el grupo donde vive.",
+        };
+      }
+      if (rem.status !== "pending") {
+        return { ok: true, ya_estaba: rem.status, nota: `Ese recordatorio ya estaba en '${rem.status}', no había nada que cancelar.` };
+      }
+
+      const { error: errCancel } = await sb
+        .from("whatsapp_reminders")
+        .update({
+          status: "cancelled",
+          error: `cancelado por el agente${input.motivo ? `: ${String(input.motivo).slice(0, 200)}` : ""}`,
+        })
+        .eq("id", remId)
+        .eq("status", "pending");
+      if (errCancel) return { error: "cancel_failed", message: errCancel.message };
+
+      return {
+        ok: true,
+        cancelado: remId,
+        era_serie: rem.recurrence ?? null,
+        nota: rem.recurrence
+          ? `Serie cancelada (${rem.recurrence}): tampoco vuelven las próximas repeticiones. Confírmaselo a la persona diciendo QUÉ dejará de llegar.`
+          : "Cancelado. Confírmaselo a la persona diciendo qué dejará de llegar.",
       };
     }
 
@@ -7030,7 +7248,7 @@ async function runAgent(req: AgentRequest): Promise<{
   // el modelo obedezca. Si afirma persistencia y en la corrida no hubo escritura ok,
   // se le devuelve el control con una instrucción concreta en vez de publicar la mentira.
   const TOOLS_DE_ESCRITURA = new Set([
-    "register_daily_report", "register_day_off", "create_reminder", "set_lead_value",
+    "register_daily_report", "register_day_off", "create_reminder", "cancel_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
     "record_milestone", "set_member_schedule", "tomar_lead", "set_scan_note",
   ]);
