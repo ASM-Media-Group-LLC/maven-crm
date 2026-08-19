@@ -6758,6 +6758,39 @@ async function runAgent(req: AgentRequest): Promise<{
     messageId: req.message_id ?? null,
   });
 
+  // ── IDENTIDAD DE UNA ORDEN DIFERIDA ────────────────────────────────────────
+  // Una corrida de recordatorio NO tiene mensaje disparador, así que
+  // resolveSenderContext devuelve isOwner=false / senderUserId=null: para el
+  // agente, la orden no la pidió nadie. Eso volvía IMPOSIBLE ejecutar por esta
+  // vía cualquier orden del dueño que requiera ser dueño.
+  // Caso real 18/08: Álvaro ordenó por DM publicar un llamado de atención en
+  // Managers, la corrida murió con un 529 y el rescate quedó como reminder
+  // kind='accion'. Al ejecutarse, post_to_group lo rechazó con "publicar en
+  // otros grupos es solo para el dueño" — al DUEÑO, en su propio DM —, el
+  // reminder terminó 'failed' tras 3 intentos y el bot le escribió a Álvaro
+  // que no había podido. Un humano tuvo que completarlo a mano.
+  // La orden se ejecuta con la autoridad de QUIEN LA DIO (created_by), ni más
+  // ni menos: no amplía permisos, porque apuntar a otro grupo YA está gateado a
+  // isOwner en create_reminder — la autorización real ocurrió al crearla. Con
+  // created_by NULL (series cargadas por SQL) queda sin identidad, como hasta hoy.
+  if (req.invoked_by === "reminder_action" && req.reminder_id && !senderCtx.senderUserId) {
+    const { data: rem } = await sb
+      .from("whatsapp_reminders")
+      .select("created_by")
+      .eq("id", req.reminder_id)
+      .maybeSingle();
+    const autorId = (rem as { created_by: string | null } | null)?.created_by ?? null;
+    if (autorId) {
+      const { data: perfil } = await sb
+        .from("profiles")
+        .select("is_owner")
+        .eq("id", autorId)
+        .maybeSingle();
+      senderCtx.senderUserId = autorId;
+      senderCtx.isOwner = (perfil as { is_owner: boolean | null } | null)?.is_owner === true;
+    }
+  }
+
   // ── GATE de acceso: el bot SOLO asiste a usuarios reconocidos de Maven ─────
   // Seguridad (pedido 2026-07-28): si el remitente NO está linkeado a un usuario
   // Maven (senderUserId null, ya con fallback global por LID) y el bot está siendo
