@@ -270,6 +270,26 @@ export function metaContraFact(
   return out;
 }
 
+// ── Negación FALSA de leer adjuntos ─────────────────────────────────────────────
+// El bot SÍ recibe imágenes y documentos: whatsapp-analyze-image / -extract-document
+// corren Vision+OCR y le entregan el contenido en el contexto como "[imagen] <texto>"
+// / "[documento] <texto>", igual que un audio transcrito. Aun así, a veces NIEGA la
+// capacidad — el 18/08 a Carolina, dos veces: "no puedo ver imágenes/PDF que suban al
+// grupo, así que capturas tampoco las puedo analizar" y "Lo del PDF no lo puedo recibir
+// por acá". El MOTOR ya lo prohíbe (#1205) pero es prosa; esto lo caza en el borde.
+// CLAVE de diseño: distingue "no PUEDO" (capacidad, presente → FALSO, se caza) de
+// "no PUDE leer este archivo" (un intento puntual que falló, pasado → legítimo, NO se
+// caza) — por eso la lista de verbos es puedo/puedes/logro/consigo/sé, nunca pude/pudo.
+// Además se exime el marcador de sistema "NO SE PUDO LEER" (formato no soportado real).
+export const NIEGA_ADJUNTOS_VERBO_NOMBRE =
+  /\bno\s+(?:lo\s+|la\s+|las\s+|los\s+|te\s+|me\s+)?(?:puedo|puedes|logro|consigo|s[eé])\s+(?:\w+\s+){0,2}?(?:ver|leer|abrir|recibir|procesar|analizar|interpretar)\b[^.\n]{0,20}?(?:im[aá]genes?|fotos?|capturas?|pantallazos?|pdf|documentos?|archivos?|adjuntos?)/iu;
+export const NIEGA_ADJUNTOS_NOMBRE_VERBO =
+  /(?:im[aá]genes?|fotos?|capturas?|pantallazos?|pdf|documentos?|archivos?|adjuntos?)\b[^.\n]{0,25}?\b(?:no|tampoco)\b[^.\n]{0,18}?\b(?:puedo|puedes|logro|consigo)\b[^.\n]{0,14}?(?:ver|leer|abrir|recibir|analizar|procesar|interpretar)/iu;
+export function niegaLeerAdjuntos(s: string): boolean {
+  if (/no\s+se\s+pud[oe]\s+leer/iu.test(s)) return false; // marcador legítimo de formato no soportado
+  return NIEGA_ADJUNTOS_VERBO_NOMBRE.test(s) || NIEGA_ADJUNTOS_NOMBRE_VERBO.test(s);
+}
+
 // ── Ack falso, 3ª insistencia: se publica pero con la duda ADELANTE ─────────────
 // La guarda de "anotado fantasma" devuelve el control 2 veces; a la 3ª el mensaje
 // sale igual (nunca mudo). El 15/08 12:23 salió así "Anotado en Maven: tipsyagency

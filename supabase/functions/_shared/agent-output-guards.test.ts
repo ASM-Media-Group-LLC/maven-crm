@@ -19,6 +19,7 @@ import {
   extraerParesNombreLid,
   marcarAckSinPersistencia,
   metaContraFact,
+  niegaLeerAdjuntos,
   tieneRespaldoDeJuicio,
 } from "./agent-output-guards.ts";
 
@@ -460,4 +461,35 @@ Deno.test("ack falso — no duplica el aviso si el modelo ya escribió el suyo",
   const limpio = marcarAckSinPersistencia("Corte 17:00. Todo en orden.");
   assertEquals(limpio.match(/escritura en Maven/gi)?.length, 1);
   assert(limpio.includes("Corte 17:00. Todo en orden."));
+});
+
+// ── niegaLeerAdjuntos: el bot NIEGA en falso que puede leer imágenes/PDF ────────
+Deno.test("niega adjuntos — las frases REALES del 18/08 a Carolina disparan", () => {
+  const reales = [
+    "Carolina, no puedo ver imágenes/PDF que suban al grupo, así que capturas tampoco las puedo analizar. Mejor pega el texto.",
+    "Carolina, buenísimo el trabajo. Lo del PDF no lo puedo recibir por acá — mejor pega el texto de los 10 puntos.",
+    "no puedo ver imágenes acá",
+    "las capturas no las puedo leer, mandá el texto",
+    "no logro abrir el documento que subiste",
+    "no puedo procesar archivos adjuntos en el grupo",
+  ];
+  for (const r of reales) assert(niegaLeerAdjuntos(r), `debería disparar: ${r}`);
+});
+
+Deno.test("niega adjuntos — NO dispara en negativos legítimos", () => {
+  const negativos = [
+    // marcador de sistema de formato no soportado — el bot SÍ puede reportarlo
+    "El archivo llegó con NO SE PUDO LEER — mándamelo en PDF y lo reviso.",
+    "no se pudo leer el documento, probá con un PDF",
+    // intento PUNTUAL que falló (pasado), no negación de capacidad
+    "no pude leer ese PDF, parece que llegó cortado",
+    "no pude abrir el archivo que mandaste, ¿lo reenviás?",
+    // operación normal, sin negar nada
+    "Carolina, buen reporte 🙌 la guía de Reddit para Mili quedó completa.",
+    "te leo la imagen: dice sub $3 y promo diaria",
+    "dame unos segundos que proceso la imagen 🙏",
+    // menciona PDF pero no niega capacidad
+    "pasame el PDF y te armo el resumen",
+  ];
+  for (const n of negativos) assert(!niegaLeerAdjuntos(n), `NO debería disparar: ${n}`);
 });

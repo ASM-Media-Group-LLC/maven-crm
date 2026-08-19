@@ -21,6 +21,7 @@ import {
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
   esPromesaDeComportamiento,
+  niegaLeerAdjuntos,
   esRetractacion,
   extraerParesNombreLid,
   metaContraFact,
@@ -7291,6 +7292,7 @@ async function runAgent(req: AgentRequest): Promise<{
   let respuestaSuprimida = false;
   let estiloBloqueado = 0;
   let voseoPitchBloqueado = 0;
+  let negacionAdjuntosBloqueada = 0;
   let scanNotaBloqueado = 0;
   let disputaBloqueada = 0;
   let conductaBloqueada = 0;
@@ -7833,6 +7835,35 @@ async function runAgent(req: AgentRequest): Promise<{
         if (afirmaRegistro(cuerpo)) {
           (t.input as ToolInput).body = marcarAckSinPersistencia(cuerpo);
           ackSanitizados += 1;
+        }
+      }
+      // Guarda de NEGACIÓN FALSA de adjuntos (18/08): el bot SÍ lee imágenes y
+      // documentos (Vision+OCR los deja en el contexto como "[imagen]/[documento]
+      // <texto>"), pero le dijo a Carolina dos veces que "no puede ver imágenes/PDF".
+      // El MOTOR ya lo prohíbe (#1205) pero es prosa; acá se caza en el borde. Un
+      // solo bloqueo (a la 2ª sale igual: nunca mudo). NO caza "no se pudo leer"
+      // (formato no soportado real) ni "no pude leer este archivo" (intento puntual).
+      if (t.name === "reply_to_group" && negacionAdjuntosBloqueada < 1) {
+        const cuerpoAdj = String((t.input as ToolInput).body ?? "");
+        if (niegaLeerAdjuntos(cuerpoAdj)) {
+          negacionAdjuntosBloqueada += 1;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "niega_leer_adjuntos",
+              message:
+                "NO se envió: dijiste que no puedes ver/leer imágenes o documentos, y eso es FALSO. Las imágenes, " +
+                "capturas, PDF y documentos se procesan con Vision+OCR y te llegan al contexto como " +
+                "\"[imagen] <contenido>\" o \"[documento] <contenido>\", igual que un audio transcrito. Reescribe: " +
+                "(a) si el contenido del adjunto YA está en el contexto, respóndelo directo; (b) si ves " +
+                "\"[imagen]/[documento]\" SIN contenido todavía (recién llegó), di \"dame unos segundos que lo " +
+                "proceso\" y nada más; (c) el ÚNICO caso donde de verdad no puedes es si el mensaje trae la marca " +
+                "\"NO SE PUDO LEER\" (formato no soportado) — ahí sí decilo y pedí que lo manden en PDF. Nunca " +
+                "afirmes como regla general que no ves imágenes o PDF.",
+            }),
+          });
+          continue;
         }
       }
       // Guarda anti-cierre-fantasma (03/08): en corridas NORMALES el modelo
