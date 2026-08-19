@@ -1,6 +1,6 @@
 // blu-bridge — micro en Dokploy. Cada corrida (cada ~12h, < 24h de vida del token):
 //   1) Toma el JWT de sesión: de la tabla blu_session (refrescado) o de BLU_JWT (seed inicial).
-//   2) Conecta WS a BLU (wss://of.unlok.me/), manda auth:token. El server responde auth:ok
+//   2) Conecta WS a BLU (wss://of.blu.luxe/), manda auth:token. El server responde auth:ok
 //      con un TOKEN FRESCO → lo guardamos en blu_session para la próxima corrida.
 //      → AUTO-REFRESH: mientras las corridas no se espacien más de ~24h, el token nunca vence.
 //   3) Pide agency:analytics:creator-reports UN DÍA A LA VEZ (gross), mapea metrics.*.grossAmount,
@@ -15,7 +15,7 @@ import { createClient } from "@supabase/supabase-js";
 const {
   BLU_JWT,
   BLU_JWT_MASSIVE,   // seed de la 2ª cuenta-agencia (Kash Massive); si falta, Massive NO se corre
-  BLU_WS_URL = "wss://of.unlok.me/",
+  BLU_WS_URL = "wss://of.blu.luxe/",
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",

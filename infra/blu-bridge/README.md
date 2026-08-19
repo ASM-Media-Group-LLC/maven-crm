@@ -23,7 +23,7 @@ GET REST de ingresos con `Authorization: Bearer <JWT>` → transformar → `impo
 
 ## Confirmar el endpoint (una vez, con PROBE)
 Con `BLU_JWT` ya seteado, poné `BLU_PROBE=1` y deployá una vez: el micro tantea host+endpoints
-candidatos (`/api/earnings`, `/api/creator-earnings/daily`, `/api/v1/earnings`, … en `of.unlok.me`
+candidatos (`/api/earnings`, `/api/creator-earnings/daily`, `/api/v1/earnings`, … en `of.blu.luxe`
 y `app.blu.luxe`) con tu JWT, y loguea **status + forma del JSON** de cada uno. Con eso:
 - fijás `BLU_API_BASE` + `BLU_EARNINGS_PATH`,
 - ajustás `transform()` a la forma real,
