@@ -429,3 +429,35 @@ Deno.test("ack falso 3ª insistencia — el aviso va adelante y la telemetría s
   // final: el aviso NO debe romper esa detección.
   assert(afirmaRegistro(salida), "afirmaRegistro debe seguir matcheando el cuerpo");
 });
+
+// ── El aviso va UNA vez, aunque el modelo ya haya escrito el suyo ───────────────
+// Incidente real 18/08 17:00 (grupo Managers): el corte salió con la advertencia
+// duplicada — la de esta guarda arriba y, dos líneas después, la que el modelo
+// improvisó imitando cortes sanitizados anteriores.
+Deno.test("ack falso — no duplica el aviso si el modelo ya escribió el suyo", () => {
+  const conAvisoDelModelo =
+    "⚠️ Ojo: en esta corrida no ejecuté ninguna escritura en Maven — si algo abajo suena a \"quedó registrado\", verifíquenlo antes de confiar.\n\n" +
+    "Corte 15:00–17:00, chicos ¿cómo van?\n\nAnotado en Maven: theA como oportunidad.";
+  const salida = marcarAckSinPersistencia(conAvisoDelModelo);
+  // Exactamente UNA aparición del aviso, y es la canónica.
+  assertEquals(salida.match(/no ejecut[ée] (?:NINGUNA|ninguna) escritura/gi)?.length, 1);
+  assert(salida.startsWith("⚠️ Ojo: en esta corrida no ejecuté NINGUNA escritura en Maven"));
+  assert(salida.includes("Corte 15:00–17:00"), "el contenido real no se pierde");
+  assert(!salida.includes('si algo abajo suena a "quedó registrado"'), "la variante del modelo se va");
+
+  // Variantes que también improvisa el modelo.
+  for (const v of [
+    "No hice ninguna escritura en Maven en esta corrida.\n\nCuerpo real.",
+    "Aclaro: no ejecuté escrituras en Maven.\n\nCuerpo real.",
+    "no realicé ninguna escritura en Maven hoy\n\nCuerpo real.",
+  ]) {
+    const s = marcarAckSinPersistencia(v);
+    assertEquals(s.match(/escrituras? en Maven/gi)?.length, 1, `variante no deduplicada: ${v}`);
+    assert(s.includes("Cuerpo real."), "no se come el cuerpo");
+  }
+
+  // Y un cuerpo SIN aviso previo sigue recibiendo el suyo, intacto.
+  const limpio = marcarAckSinPersistencia("Corte 17:00. Todo en orden.");
+  assertEquals(limpio.match(/escritura en Maven/gi)?.length, 1);
+  assert(limpio.includes("Corte 17:00. Todo en orden."));
+});

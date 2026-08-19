@@ -278,9 +278,25 @@ export function metaContraFact(
 // caso tipsy una corrida vecina del mismo minuto SÍ había insertado la fila, así
 // que afirmar "NO quedó registrado" sería mentir al revés. Verificable ≠ adivinable:
 // el lector queda avisado de que el registro no tiene respaldo en ESTE turno.
+// El aviso va UNA sola vez y con ESTA redacción. El 18/08 17:00 el corte de
+// Managers salió con la advertencia DUPLICADA (una en mayúscula "NINGUNA" de acá
+// y otra abajo, en minúscula, que el modelo escribió solo): venía imitando su
+// propia salida sanitizada de cortes anteriores — el mismo patrón de #1138, donde
+// el modelo copiaba el estilo de sus instrucciones. Fabiana y Carolina abrieron su
+// corte con dos avisos seguidos de "no confíen en esto". Por eso primero se BORRA
+// cualquier variante que traiga el cuerpo y recién después se antepone la canónica:
+// así el texto no depende de que el modelo se acuerde de no escribirla.
+const AVISO_SIN_PERSISTENCIA =
+  "⚠️ Ojo: en esta corrida no ejecuté NINGUNA escritura en Maven — si abajo digo que " +
+  "algo quedó registrado/anotado, verifíquenlo antes de confiar.";
+
+// Cubre la redacción propia y las que improvisa el modelo ("no ejecuté ninguna
+// escritura", "no hice ninguna escritura", "no ejecuté escrituras"). Se come el
+// párrafo entero (hasta el doble salto) porque el aviso siempre viene suelto.
+const RE_AVISO_SIN_PERSISTENCIA =
+  /^[^\n]*?no\s+(?:ejecut[ée]|hice|realic[ée])\s+(?:ningun[ao]s?\s+)?escrituras?\s+en\s+maven[^\n]*(?:\n{1,2}|$)/gimu;
+
 export function marcarAckSinPersistencia(cuerpo: string): string {
-  return (
-    "⚠️ Ojo: en esta corrida no ejecuté NINGUNA escritura en Maven — si abajo digo que " +
-    "algo quedó registrado/anotado, verifíquenlo antes de confiar.\n\n" + cuerpo
-  );
+  const limpio = cuerpo.replace(RE_AVISO_SIN_PERSISTENCIA, "").trimStart();
+  return `${AVISO_SIN_PERSISTENCIA}\n\n${limpio}`;
 }
