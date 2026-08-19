@@ -42,6 +42,11 @@ const TaskSharePage = lazy(() => import("./pages/tareas/TaskSharePage"));
 const ProjectSharePage = lazy(() => import("./pages/tareas/ProjectSharePage"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
+// Correo (Zoho detrás). El módulo "Correo" todavía no está en
+// UNIVERSAL_MODULES, así que hoy solo lo alcanzan los admin — a propósito,
+// mientras la bandeja se construye.
+const CorreoPage = lazy(() => import("./pages/correo/CorreoPage"));
+const CorreoConectarPage = lazy(() => import("./pages/correo/CorreoConectarPage"));
 const InboxPage = lazy(() => import("./pages/inbox/InboxPage"));
 const InboxChannelsPage = lazy(() => import("./pages/inbox/ChannelsPage"));
 const InboxBotsPage = lazy(() => import("./pages/inbox/BotsPage"));
@@ -321,6 +326,13 @@ const App = () => (
                 <Route path="/tareas" element={<PermissionRoute module="Tareas"><Tareas /></PermissionRoute>} />
                 <Route path="/tareas/:projectId" element={<PermissionRoute module="Tareas"><TareaProject /></PermissionRoute>} />
                 <Route path="/roadmap" element={<Roadmap />} />
+                <Route path="/correo" element={<PermissionRoute module="Correo"><CorreoPage /></PermissionRoute>} />
+                {/* Retorno del OAuth de Zoho. SIN PermissionRoute: la URL está
+                    registrada en Zoho y tiene que resolver aunque el módulo
+                    todavía no esté habilitado para el rol. Va protegida igual
+                    por ProtectedRoute (hay que estar logueado) y por el state
+                    firmado que valida el backend. */}
+                <Route path="/correo/conectar" element={<CorreoConectarPage />} />
                 <Route path="/messenger" element={<PermissionRoute module="Messenger"><Messenger /></PermissionRoute>} />
                 <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
