@@ -5818,6 +5818,121 @@ async function resolveSenderContext(args: {
   };
 }
 
+// ¿Alguien está ESPERANDO esta respuesta? Una definición sola, usada por los dos
+// caminos de muerte (el del loop y el del proveedor): si divergen, uno de los dos
+// deja a alguien en visto sin que nadie se entere.
+function esCorridaDirigida(
+  invokedBy: string | null | undefined,
+  esDm: boolean | null | undefined,
+  isOwner: boolean,
+): boolean {
+  return invokedBy === "mention" || invokedBy === "audio_mention" ||
+    invokedBy === "image_mention" || esDm === true ||
+    isOwner || invokedBy === "profile_analysis_complete";
+}
+
+// ----------------------------------------------------------------------------
+// avisarCaidaYRescatar — lo que hay que hacer cuando una corrida DIRIGIDA muere
+// sin publicar nada: avisar UNA vez y agendar un rescate para volver cuando la
+// caída ya pasó.
+//
+// ⚠️ POR QUÉ ES UNA FUNCIÓN Y NO UN BLOQUE: hay DOS muertes distintas y las dos
+// necesitan exactamente esto. La del loop (presupuesto/excepción) ya lo tenía
+// desde #1199; la del PROVEEDOR (429/529/5xx) retornaba antes de llegar, así que
+// se quedaba sin disculpa Y sin rescate. El 18/08 Álvaro le pidió al bot que
+// llamara la atención a una manager, Anthropic devolvió 529, y quedó **22
+// minutos sin una sola línea** — tuvo que insistir con un "?" y el pedido se
+// terminó cumpliendo a mano. Justo el caso que #1199 creía haber cerrado.
+// ----------------------------------------------------------------------------
+async function avisarCaidaYRescatar(
+  sb: SupabaseClient,
+  group: { id: string; tenant_id: string },
+  messageId: string | null,
+): Promise<void> {
+  try {
+    // A quién le habla: en un grupo con varios, un aviso sin nombre no se sabe
+    // para quién es. Se prefiere el full_name del profile sobre el display name
+    // de WhatsApp ("Msv" es María).
+    let quien = "";
+    if (messageId) {
+      const { data: m } = await sb.from("whatsapp_messages")
+        .select("sender_display_name, member_id").eq("id", messageId).maybeSingle();
+      let nombre = (m?.sender_display_name ?? "").trim();
+      if (m?.member_id) {
+        const { data: mem } = await sb.from("whatsapp_members")
+          .select("user_id").eq("id", m.member_id).maybeSingle();
+        if (mem?.user_id) {
+          const { data: prof } = await sb.from("profiles")
+            .select("full_name").eq("id", mem.user_id).maybeSingle();
+          if (prof?.full_name) nombre = String(prof.full_name).split(" ")[0];
+        }
+      }
+      if (nombre) quien = `${nombre}, `;
+    }
+
+    // ── AUTO-RESCATE LEJOS DEL BLIP (18/08) ───────────────────────────────
+    // Un tercer intento pegado no sirve: hay que volver CUANDO la caída ya pasó.
+    // Recordatorio-acción a los 15 min; el drain lo ejecuta con el agente y, si
+    // para entonces ya hubo respuesta, la instrucción le manda callarse.
+    let reprogramado = false;
+    if (messageId) {
+      const { count: yaAgendado } = await sb
+        .from("whatsapp_reminders")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", group.id)
+        .eq("status", "pending")
+        .like("body", `%${messageId}%`);
+      if ((yaAgendado ?? 0) === 0) {
+        const { error: errRescate } = await sb.from("whatsapp_reminders").insert({
+          tenant_id: group.tenant_id,
+          group_id: group.id,
+          kind: "accion",
+          trigger_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+          body:
+            `RESCATE AUTOMÁTICO — el mensaje ${messageId}` +
+            (quien ? ` de ${quien.replace(/, $/, "")}` : "") +
+            ` quedó SIN respuesta: la corrida se cayó por un fallo del proveedor o se quedó sin tiempo. ` +
+            `Búscalo en el contexto reciente del chat y respóndelo ahora, como si acabara de llegar ` +
+            `(si pedía una acción, ejecútala). ⚠️ Si ya le respondiste DESPUÉS de ese mensaje, o la ` +
+            `persona ya lo resolvió por otro lado, termina SIN publicar nada — no repitas.`,
+          status: "pending",
+        });
+        reprogramado = !errRescate;
+      } else {
+        reprogramado = true; // ya hay un rescate en cola para este mensaje
+      }
+    }
+
+    // ── DISCULPA, UNA SOLA VEZ ────────────────────────────────────────────
+    // El 18/08 salieron TRES "se me cortó" idénticas en 20 minutos: cada
+    // reintento que moría mandaba la suya. Repetir la misma disculpa no
+    // informa, desespera. Si ya se avisó hace poco en este chat, se calla —
+    // el evento agent_silent / agent_llm_error queda igual para la auditoría.
+    const { count: disculpasRecientes } = await sb
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("group_id", group.id)
+      .eq("is_from_bot", true)
+      .gte("sent_at", new Date(Date.now() - 30 * 60_000).toISOString())
+      .like("body", "%se me cortó armando la respuesta%");
+    if ((disculpasRecientes ?? 0) === 0) {
+      await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+        body: JSON.stringify({
+          group_id: group.id,
+          // Texto único para timeout, excepción y caída del proveedor: quien
+          // pregunta no necesita saber cuál de las tres fue — necesita saber que
+          // falló y qué sigue. Con rescate agendado NO se le pide que reescriba.
+          body: reprogramado
+            ? `${quien}se me cortó armando la respuesta 🙏 No hace falta que reescribas: lo retomo en unos minutos y te respondo.`
+            : `${quien}se me cortó armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
+        }),
+      });
+    }
+  } catch (_e) { /* si tampoco se puede avisar, al menos queda el evento */ }
+}
+
 // ----------------------------------------------------------------------------
 // getSenderScope — scoping por ROL (candado 2). Reusa los MISMOS predicados que
 // las RLS de Maven (con _user_id explícito, ya que el bot corre con service_role):
@@ -7392,6 +7507,18 @@ async function runAgent(req: AgentRequest): Promise<{
           error: txt.slice(0, 400),
         },
       }).catch(() => {});
+
+      // ⚠️ ACÁ SE MORÍA EN SILENCIO. Este `return` salta TODO lo de abajo —
+      // incluidos el aviso y el auto-rescate de #1199, que viven al final de la
+      // corrida. O sea que la protección existía para las muertes del loop pero
+      // NO para la del proveedor, que es la más común cuando Anthropic se
+      // sobrecarga. El 18/08 Álvaro ordenó llamarle la atención a una manager,
+      // llegó un 529, y se quedó 22 MINUTOS sin una línea: sin disculpa, sin
+      // rescate, y con la orden sin cumplir hasta que un humano la hizo a mano.
+      // Si alguien está esperando, se le avisa y se agenda la vuelta.
+      if (esCorridaDirigida(req.invoked_by, group.is_direct, senderCtx.isOwner)) {
+        await avisarCaidaYRescatar(sb, group, req.message_id ?? null);
+      }
       return { ok: false, error: `anthropic ${resp?.status ?? "?"}: ${txt.slice(0, 200)}`, iterations: iter };
     }
 
@@ -8124,9 +8251,7 @@ async function runAgent(req: AgentRequest): Promise<{
     //  · profile_analysis_complete. Ese flujo existe SOLO para entregar una respuesta
     //    ya prometida al grupo ("dame ~1 min, ya vuelvo"), así que callarse ahí es
     //    siempre un incumplimiento.
-    const dirigido = req.invoked_by === "mention" || req.invoked_by === "audio_mention" ||
-      req.invoked_by === "image_mention" || group.is_direct === true ||
-      senderCtx.isOwner || req.invoked_by === "profile_analysis_complete";
+    const dirigido = esCorridaDirigida(req.invoked_by, group.is_direct, senderCtx.isOwner);
 
     // ⚠️ DEJAR EN VISTO POR TIMEOUT. `presupuesto_de_pared` y `loop_agotado` NO son
     // el bot decidiendo callarse: es que estaba trabajando y se le acabó el tiempo.
@@ -8199,94 +8324,7 @@ async function runAgent(req: AgentRequest): Promise<{
       } catch (_e) { /* rescate best-effort: el evento agent_silent queda igual */ }
     } else if (dirigido && (silentReason === "presupuesto_de_pared" || silentReason === "loop_agotado" ||
                      silentReason === "excepcion_en_el_loop")) {
-      try {
-        // A quién le habla: en un grupo con varios, un aviso sin nombre no se sabe
-        // para quién es. Se prefiere el full_name del profile sobre el display name
-        // de WhatsApp ("Msv" es María).
-        let quien = "";
-        if (req.message_id) {
-          const { data: m } = await sb.from("whatsapp_messages")
-            .select("sender_display_name, member_id").eq("id", req.message_id).maybeSingle();
-          let nombre = (m?.sender_display_name ?? "").trim();
-          if (m?.member_id) {
-            const { data: mem } = await sb.from("whatsapp_members")
-              .select("user_id").eq("id", m.member_id).maybeSingle();
-            if (mem?.user_id) {
-              const { data: prof } = await sb.from("profiles")
-                .select("full_name").eq("id", mem.user_id).maybeSingle();
-              if (prof?.full_name) nombre = String(prof.full_name).split(" ")[0];
-            }
-          }
-          if (nombre) quien = `${nombre}, `;
-        }
-
-        // ── AUTO-RESCATE LEJOS DEL BLIP (18/08) ───────────────────────────────
-        // Acá terminaba todo: el reintento inmediato ya había fallado, se pedía
-        // disculpas y NADIE retomaba el mensaje. El 18/08 Álvaro pidió lo mismo
-        // cuatro veces durante una sobrecarga de ~1h del proveedor y se quedó sin
-        // respuesta las cuatro — el pedido (llamarle la atención a una manager)
-        // solo se cumplió a mano. Un tercer intento pegado no sirve: hay que
-        // volver CUANDO la caída ya pasó. Se agenda un recordatorio-acción a los
-        // 15 min; el drain lo ejecuta con el agente y, si para entonces ya hubo
-        // respuesta, la instrucción le manda callarse (nada de responder dos veces).
-        let reprogramado = false;
-        if (req.message_id) {
-          const { count: yaAgendado } = await sb
-            .from("whatsapp_reminders")
-            .select("id", { count: "exact", head: true })
-            .eq("group_id", group.id)
-            .eq("status", "pending")
-            .like("body", `%${req.message_id}%`);
-          if ((yaAgendado ?? 0) === 0) {
-            const { error: errRescate } = await sb.from("whatsapp_reminders").insert({
-              tenant_id: group.tenant_id,
-              group_id: group.id,
-              kind: "accion",
-              trigger_at: new Date(Date.now() + 15 * 60_000).toISOString(),
-              body:
-                `RESCATE AUTOMÁTICO — el mensaje ${req.message_id}` +
-                (quien ? ` de ${quien.replace(/, $/, "")}` : "") +
-                ` quedó SIN respuesta: la corrida se cayó dos veces seguidas por un fallo del proveedor. ` +
-                `Búscalo en el contexto reciente del chat y respóndelo ahora, como si acabara de llegar ` +
-                `(si pedía una acción, ejecútala). ⚠️ Si ya le respondiste DESPUÉS de ese mensaje, o la ` +
-                `persona ya lo resolvió por otro lado, termina SIN publicar nada — no repitas.`,
-              status: "pending",
-            });
-            reprogramado = !errRescate;
-          } else {
-            reprogramado = true; // ya hay un rescate en cola para este mensaje
-          }
-        }
-
-        // ── DISCULPA, UNA SOLA VEZ ────────────────────────────────────────────
-        // El 18/08 salieron TRES "se me cortó" idénticas en 20 minutos: cada
-        // reintento que moría mandaba la suya. Repetir la misma disculpa no
-        // informa, desespera. Si ya se avisó hace poco en este chat, se calla —
-        // el evento agent_silent queda igual para la auditoría.
-        const { count: disculpasRecientes } = await sb
-          .from("whatsapp_messages")
-          .select("id", { count: "exact", head: true })
-          .eq("group_id", group.id)
-          .eq("is_from_bot", true)
-          .gte("sent_at", new Date(Date.now() - 30 * 60_000).toISOString())
-          .like("body", "%se me cortó armando la respuesta%");
-        if ((disculpasRecientes ?? 0) === 0) {
-          await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
-            body: JSON.stringify({
-              group_id: group.id,
-              // Texto único para timeout y excepción: "me quedé sin tiempo" sería FALSO
-              // ante una excepción, y quien pregunta no necesita saber cuál de las dos fue
-              // — necesita saber que falló y qué sigue. Con rescate agendado NO se le
-              // pide que reescriba: el bot vuelve solo.
-              body: reprogramado
-                ? `${quien}se me cortó armando la respuesta 🙏 No hace falta que reescribas: lo retomo en unos minutos y te respondo.`
-                : `${quien}se me cortó armando la respuesta y no alcancé a mandártela 🙏 Escríbeme de nuevo y la retomo — si el pedido es largo, mándalo en dos partes.`,
-            }),
-          });
-        }
-      } catch (_e) { /* si tampoco se puede avisar, al menos queda el evento */ }
+      await avisarCaidaYRescatar(sb, group, req.message_id ?? null);
     }
 
     await logEvent(sb, {
