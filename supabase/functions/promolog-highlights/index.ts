@@ -204,7 +204,25 @@ async function buildDailyIncome(sb: any): Promise<string> {
   const hhmm = bogNow().toISOString().slice(11, 16);
   const top5 = hoy.top.slice(0, 5);
   const head = `💰 *Top ingresos de hoy ${fmtDia(today)} — hasta las ${hhmm}*`;
-  if (!top5.length) return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte) || "s/d"}).`;
+  // ⚠️ VACÍO NO ES CERO. Antes esto decía siempre "Sin ingresos registrados
+  // todavía", que Fabiana y Carolina leen como "nadie facturó hoy". El 18/08 a las
+  // 23:00 salió ese texto con el puente de BLU CIEGO hacía 54 horas (los dos JWT
+  // vencidos el 18/08 02:45, y el sync marcándose "done" igual). Reportar falta de
+  // dato como si fuera un resultado es el antipatrón #818 — "no pude leer"
+  // convertido en "no pasó" — y acá encima tapa una caída de infraestructura.
+  if (!top5.length) {
+    // ¿Hay ALGUNA fila del día? Sin corte no hubo lectura; con corte pero sin top,
+    // sí se leyó y de verdad no hay ingresos.
+    const hayLectura = Boolean(hoy.corte);
+    if (!hayLectura || fresh !== "fresh") {
+      const { data: ult } = await sb.from("creator_daily_earnings")
+        .select("date").order("date", { ascending: false }).limit(1).maybeSingle();
+      const ultimoDia = ult?.date ? fmtDia(String(ult.date)) : "sin registro";
+      return `${head}\n\n⚠️ No pude leer BLU, así que HOY NO TENGO DATO — esto no quiere decir que no se haya facturado. ` +
+        `El último día con datos es ${ultimoDia}. Avísenle a Jhon que el puente de BLU necesita renovar la sesión.`;
+    }
+    return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte)}).`;
+  }
   const lines = top5.map(([cid, v], i) => `${medals[i]} *${names.get(cid)}* — ${money(v)}`);
   // "Recién sincronizada" se leía como "cifra cerrada del día", y no lo es del todo:
   // a las 23:00 falta la última hora y BLU puede ajustar (reembolsos). Que el

@@ -52,7 +52,19 @@ function jwtExpMs(token) {
 async function getToken(id, seed) {
   try {
     const { data } = await sb().from("blu_session").select("token").eq("id", id).maybeSingle();
-    if (data?.token) return data.token;
+    const guardado = data?.token;
+    if (guardado) {
+      const exp = jwtExpMs(guardado);
+      if (!exp || Date.now() < exp) return guardado;
+      // ⚠️ UN TOKEN GUARDADO VENCIDO NO PUEDE TAPAR UN SEED FRESCO (19/08).
+      // Antes se devolvía la fila SIEMPRE y runOnce tiraba "token vencido" sin
+      // mirar el seed. Consecuencia: renovar BLU_JWT en Dokploy —el arreglo
+      // natural cuando el puente se cae— NO alcanzaba, porque blu_session seguía
+      // sirviendo el token viejo; había que además borrar la fila a mano, cosa
+      // que no está escrita en ningún lado. El auto-refresh vuelve a andar solo
+      // en cuanto una corrida se autentica: el seed es la puerta de rescate.
+      console.error(`[blu-bridge] token guardado (id=${id}) VENCIDO → uso el seed de Dokploy.`);
+    }
   } catch (e) { console.error(`[blu-bridge] getToken(id=${id}) falló, uso seed:`, e.message); }
   return seed;
 }
@@ -783,6 +795,26 @@ function warnIfExpired(acct, e) {
   if (e.expired) console.error(`[blu-bridge:${acct?.account ?? "?"}] ⚠ Renová el JWT (${acct?.account === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}) desde BLU y re-seedeá el secreto en Dokploy.`);
 }
 
+// Deja la salud del puente en un lugar CONSULTABLE (blu_bridge_state), no solo en
+// los logs del contenedor. Sin esto, "el puente está ciego" solo se descubre cuando
+// alguien nota que un reporte salió vacío — el 18/08 tardó 54 horas.
+async function registrarSaludBlu(fallos, totalCuentas) {
+  try {
+    await sb().from("blu_bridge_state").upsert({
+      key: "salud_sync",
+      value: {
+        ok: fallos.length === 0,
+        cuentas_totales: totalCuentas,
+        cuentas_fallidas: fallos.length,
+        detalle: fallos,
+        ultimo_intento: new Date().toISOString(),
+        ...(fallos.length === 0 ? { ultimo_exito: new Date().toISOString() } : {}),
+      },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "key" });
+  } catch (e) { console.error("[blu-bridge] no pude registrar salud:", e.message); }
+}
+
 // Cuentas a correr: plus SIEMPRE (seed BLU_JWT). Massive SOLO si hay seed BLU_JWT_MASSIVE
 // → hasta que el owner lo setee en Dokploy, no se toca nada de Massive.
 function buildAccounts() {
@@ -797,10 +829,16 @@ async function runAllAccounts(firstRun) {
   if (busy) { console.log("[blu-bridge] corrida programada saltada (hay un sync en curso)."); return; }
   busy = true;
   try {
-    for (const acct of buildAccounts()) {
+    const fallos = [];
+    const cuentas = buildAccounts();
+    for (const acct of cuentas) {
       try { await runOnce(acct, firstRun); }
-      catch (e) { warnIfExpired(acct, e); }
+      catch (e) {
+        warnIfExpired(acct, e);
+        fallos.push(`${acct.account}: ${e.expired ? "JWT vencido" : String(e.message || e).slice(0, 60)}`);
+      }
     }
+    await registrarSaludBlu(fallos, cuentas.length);
   } finally { busy = false; }
 }
 
@@ -826,12 +864,29 @@ async function pollSyncRequests() {
   console.log(`[blu-bridge] sync on-demand #${req.id} → QUICK (hoy+ayer)…`);
   try {
     await sb().from("blu_sync_requests").update({ status: "running", started_at: new Date().toISOString() }).eq("id", req.id);
-    for (const acct of buildAccounts()) {
+    // ⚠️ ACÁ SE MARCABA 'done' PASE LO QUE PASE (19/08). Cada cuenta corre dentro de
+    // un catch que solo escribe en consola, así que con los dos JWT vencidos el
+    // pedido se cerraba "done" en UN SEGUNDO sin haber importado nada. El 18/08 a
+    // las 23:00 el ranking de Managers salió "Sin ingresos registrados todavía" con
+    // 54h sin sincronizar, y nadie se enteró: el aviso vivía en los logs de Dokploy,
+    // donde no mira nadie. Un pedido que falló tiene que DECIR que falló.
+    const fallos = [];
+    const cuentas = buildAccounts();
+    for (const acct of cuentas) {
       try { await runOnce(acct, false, 1); }   // quickDays=1 → hoy + ayer
-      catch (e) { warnIfExpired(acct, e); }
+      catch (e) {
+        warnIfExpired(acct, e);
+        fallos.push(`${acct.account}: ${e.expired ? "JWT vencido" : String(e.message || e).slice(0, 60)}`);
+      }
     }
-    await sb().from("blu_sync_requests").update({ status: "done", finished_at: new Date().toISOString() }).eq("id", req.id);
-    console.log(`[blu-bridge] sync on-demand #${req.id} done.`);
+    const todasFallaron = fallos.length === cuentas.length;
+    await sb().from("blu_sync_requests").update({
+      status: todasFallaron ? "error" : "done",
+      finished_at: new Date().toISOString(),
+      note: fallos.length ? fallos.join(" | ").slice(0, 200) : null,
+    }).eq("id", req.id);
+    await registrarSaludBlu(fallos, cuentas.length);
+    console.log(`[blu-bridge] sync on-demand #${req.id} ${todasFallaron ? "ERROR (ninguna cuenta sincronizó)" : "done"}.`);
   } catch (e) {
     await sb().from("blu_sync_requests").update({ status: "error", finished_at: new Date().toISOString(), note: String(e.message || e).slice(0, 200) }).eq("id", req.id)
       .then(() => {}, () => {});
