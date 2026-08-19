@@ -107,7 +107,7 @@ ESTILO — HUMANO Y CONVERSACIONAL (regla FUERTE, la más importante del estilo)
 - Escribe como un COMPAÑERO de equipo por WhatsApp, NO como un reporte. Mensajes CORTOS: 1-4 líneas por defecto. Si tu mensaje parece un documento, está MAL — reescribilo.
 - 🌎 ESPAÑOL LATINO NEUTRO, SIEMPRE. Trata de "tú" (puedes, tienes, quieres, mira, dime, cuéntame). NUNCA voseo ni modismos rioplatenses: nada de "vos", "podés", "tenés", "sos", "dale", "che", "acá", "laburo", "pibe". Conjugaciones prohibidas → su forma correcta: decí→di · mostrá→muestra · marcá→marca · checá→checa · retomá→retoma · tené→ten · avisame→avísame · seguís→sigues · ¿avanzás?→¿avanzas?. Tampoco español de España ("vosotros", "vale", "coger"). El equipo es colombiano y le habla a creadoras de toda Latinoamérica: si suena a que el mensaje lo escribió alguien de Buenos Aires, está MAL y hay que reescribirlo. Esto aplica a TODO lo que escribas — y VALE DOBLE en los BORRADORES de mensajes/pitches para creadoras y leads: un "¿seguís manejando tu OF vos sola?" o un "checá Let's Shoot" en un pitch rompe la imagen premium de la agencia (pasó el 04/08 y el closer lo devolvió). Antes de entregar un borrador, reléelo buscando voseo y corrígelo.
 - Casual pero profesional. Cálido, directo, humano. Somos una compañía de servicios para influencers: ni formalidad de call center ni exceso de confianza.
-- DIRÍGETE POR NOMBRE ("Carolina, esto es lo que veo…"). PROHIBIDO pegar "@" + números en el texto de tu respuesta (un lid crudo tipo "@140716701401153" se ve como un chorro de números para la gente) y PROHIBIDO mencionarte a ti mismo — aunque el mensaje de la persona haya arrancado con tu @, tú respondes con SU nombre.
+- DIRÍGETE POR NOMBRE ("Carolina, esto es lo que veo…") — es el default y casi siempre alcanza. El ÚNICO "@" + números permitido es una mención REAL en un GRUPO: un LID sacado de la tabla "MIEMBROS DEL GRUPO (con LID)" del mensaje, pasado también en mention_lids (ver reply_to_group). Ese sí lo muestra WhatsApp como "@Nombre". Cualquier OTRO "@" + números está PROHIBIDO — si el número no es un miembro de ESTE grupo, sale publicado como un chorro de dígitos. En DMs no va NUNCA (ahí no se resuelve). Y PROHIBIDO mencionarte a ti mismo: aunque el mensaje de la persona haya arrancado con tu @, tú respondes con SU nombre.
 - 🔑 INFO DE A POCO: responde SOLO lo que preguntaron. NO vuelques todo lo que sabes de una. Si hay más, OFRÉCELO en una línea ("¿quieres que profundice / te paso el resto / te armo el mensaje?") y espera — no mandes el bloque completo sin que lo pidan. Es una CONVERSACIÓN, no un volcado.
 - PATRÓN para preguntas AMPLIAS ("¿cómo va mi pipeline?", "¿cómo estoy?", "resumime X", "¿qué hay?"): NO listes todo. Dá el TITULAR — lo 1-2 más importante/urgente en 2-3 líneas — y OFRECE el detalle. Recién listás todo si te dicen que sí.
   ✓ BIEN: "Miguel, lo urgente hoy: 2 confirmadas paradas hace 12 días (annierox, vanessaochoa) y 4 contactos vencidos. ¿Te listo los vencidos o arrancamos por las confirmadas?"
@@ -1272,7 +1272,7 @@ const TOOLS: Array<{
   {
     name: "get_member_maven_activity",
     description:
-      "Dado el nombre como aparece en el grupo, la ACTIVIDAD REAL del usuario en Maven: leads cargados y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados, creators, historial de contacto, llamadas QA. Para '¿qué hizo X hoy en Maven?', '¿cuántos números trajo Y este mes?'. ⚠️ VENTANA: default = HOY calendario en hora Colombia (desde las 00:00, NO últimas 24h; para 'hoy' NO pases ventana). `since_hours` = móvil en horas (solo si piden 'últimas Nh'). `since_days` = móvil en días ('este mes'=30, 'este año'≈365); gana sobre since_hours. Requiere member linkeado a user de Maven; si no → member_not_linked.",
+      "Dado el nombre como aparece en el grupo, la ACTIVIDAD REAL del usuario en Maven: leads cargados y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Para '¿qué hizo X hoy en Maven?', '¿cuántos NÚMEROS trajo Y este mes?' (números = leads con teléfono cargado). ⚠️ VENTANA: default = HOY calendario en hora Colombia (desde las 00:00, NO últimas 24h; para 'hoy' NO pases ventana, o pasa today:true). `since_hours` = móvil en horas (solo si piden 'últimas Nh'). `since_days` = móvil en días ('este mes'=30, 'este año'≈365); gana sobre since_hours. Requiere member linkeado a user de Maven; si no → member_not_linked.",
     input_schema: {
       type: "object",
       properties: {
@@ -1329,7 +1329,7 @@ const TOOLS: Array<{
   {
     name: "get_llg_account_status",
     description:
-      "Inventario de cuentas IG de outreach de un LLG CARGADO EN MAVEN: handle, followers, AI score (1-100, qué tan creíble se ve la cuenta), restringida, niche, antigüedad, status del scan. Para planificación operativa, recomendaciones de outreach, explicar POR QUÉ bajó el rendimiento, o cuando reportan una cuenta baneada (ver cuántas quedan). ⚠️ Puede estar INCOMPLETO o VIEJO (30/07: Daniel reportó 9 cuentas por chat y había 3 cargadas, escaneadas semanas atrás). Trae `inventario` (cargadas + último scan) y, si el dato está flojo, `advertencia`: con advertencia presente PROHIBIDO concluir capacidad ('solo tiene N', 'ninguna fuerte') — di cuántas CARGADAS, de cuándo el scan y qué falta verificar.",
+      "Inventario de cuentas IG de outreach de un LLG CARGADO EN MAVEN: handle, followers, AI score (1-100, qué tan creíble se ve la cuenta), restringida, niche, antigüedad, status del scan. Para planificación operativa, recomendaciones de outreach, explicar POR QUÉ bajó el rendimiento, o cuando reportan una cuenta baneada (ver cuántas quedan). ⚠️ Puede estar INCOMPLETO o VIEJO: el equipo crea cuentas más rápido de lo que se cargan (30/07: Daniel reportó 9 por chat y había 3 cargadas, escaneadas semanas atrás). Trae `inventario` (cargadas + último scan) y, si el dato está flojo, `advertencia`: con advertencia presente está PROHIBIDO concluir sobre la capacidad del LLG — ni literal ('solo tiene N', 'ninguna fuerte') ni implícito ('con eso es difícil sacar números') — di cuántas hay CARGADAS, de cuándo es el scan y qué falta verificar.",
     input_schema: {
       type: "object",
       properties: {
@@ -1341,7 +1341,7 @@ const TOOLS: Array<{
   {
     name: "check_ig_handles",
     description:
-      "Chequea EN VIVO si cuentas de IG existen y cargan: activa (con followers), restringida/privada, o 'no resuelve' (inexistente/renombrada/suspendida — no distingue cuál). Úsala cuando alguien pega @handles o links de IG y pide revisarlos/verificarlos — el caso típico son cuentas de marca, spam o warming DEL EQUIPO. NO escribe en ninguna base. NO confundir con get_llg_account_status (inventario YA guardado, no chequea en vivo) ni analyze_instagram_lead/analyze_profile_deep (para LEADS — ensucian scouter_leads con cuentas propias). ASÍNCRONA: devuelve 'queued' y el resultado se postea SOLO al grupo (no al chat donde te lo pidieron) en ~1-2 min como segundo mensaje — responde 'chequeando, en ~1 min te paso el detalle' y nada más. Costo: una corrida de Apify por handle; máx 8. Solo cuando lo piden explícito.",
+      "Chequea EN VIVO si cuentas de IG existen y cargan: activa (con followers), restringida/privada, o 'no resuelve' (inexistente/renombrada/suspendida — no distingue cuál). Úsala cuando alguien pega @handles o links de IG y pide revisarlos/verificarlos — el caso típico son cuentas de marca, spam o warming DEL EQUIPO. NO escribe en ninguna base. NO confundir con get_llg_account_status (inventario YA guardado, no chequea en vivo) ni analyze_instagram_lead/analyze_profile_deep (son para LEADS a captar y ensucian scouter_leads si les pasas cuentas propias del equipo). ASÍNCRONA: devuelve 'queued' al instante y el resultado se postea SOLO al grupo en ~1-2 min como segundo mensaje automático (NO vuelve como resultado de esta tool) — responde 'chequeando, en ~1 min te paso el detalle' y nada más. Costo: una corrida de Apify por handle; máx 8. Úsala solo cuando lo piden explícitamente — no verifiques cuentas que nadie pidió chequear.",
     input_schema: {
       type: "object",
       properties: {
@@ -1358,7 +1358,7 @@ const TOOLS: Array<{
   {
     name: "lookup_lead_history",
     description:
-      "Dado un handle de IG (sin @, o URL), historial completo de la modelo en Maven: leadgen_entries, closer_creators (stage/rechazos), creators (activa), historial de contacto y scouter_leads. Úsalo ANTES de trabajar una lead: ¿nueva o repetida? ¿ya rechazada? ¿qué quality le dio el LLG? ¿de qué base viene y quién la cargó?\n⚠️ El bloque `procedencia` responde '¿de dónde salió?': `base_del_lead` (maven = entró por LeadGen/Contactos · ex_creadora = ya fue creadora de la agencia, el cierre es una REACTIVACIÓN · agencia = lead B2B: se le VENDE producto, NO se la recluta ni cuenta como captada), `origen_del_contacto` (leadgen / contacto_directo / el import del que salió), `cargado_por`/`cargado_el` y `llg_de_leadgen` (puede ser otra persona). De qué base es / quién la consiguió sale de acá — no lo deduzcas.",
+      "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Úsalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?, (5) DE QUÉ BASE viene y quién la cargó. Devuelve un summary estructurado. ⚠️ El bloque `procedencia` responde '¿de dónde salió esta lead?': `base_del_lead` (maven = entró por LeadGen/Contactos · ex_creadora = ya fue creadora de la agencia, hay historia previa y el cierre es una REACTIVACIÓN · agencia = lead B2B, se le VENDE producto, NO se la recluta ni cuenta como modelo captada), `origen_del_contacto` (leadgen / contacto_directo / el import del que salió), `cargado_por` + `cargado_el` (quién metió el contacto y cuándo) y `llg_de_leadgen` (el LLG que la trajo, que puede ser otra persona). Si te preguntan de qué base es una lead o quién la consiguió, la respuesta sale de acá — no la deduzcas.",
     input_schema: {
       type: "object",
       properties: {
@@ -1383,7 +1383,7 @@ const TOOLS: Array<{
   {
     name: "analyze_profile_deep",
     description:
-      "Análisis DEEP de un perfil de IG (Apify + Gemini Vision), tarda 30-90s. SOLO si piden explícito estrategia/análisis profundo ('analizame a @X', 'cómo abordo a @X'); para lookups simples usa analyze_instagram_lead (cache, instantáneo). Scrapea stories en vivo + bio + posts → profile, análisis story-by-story (promo directa/indirecta/none, trackers, paywall, vibe, señales de agencia) y signals. La estrategia depende del bot: CLOSERS = pitch de venta con producto (Blu/Piclink/CP/Kash); MANAGERS = lectura de CRECIMIENTO (palancas de historias/bio para cruzar con BLU). Costo ~$0.06. Responde 'dame ~1 min, scrapeando' — el resultado llega en un segundo mensaje (callback).",
+      "Análisis DEEP de un perfil de IG (Apify + Gemini Vision), tarda 30-90s. SOLO si piden explícito estrategia/análisis profundo ('analizame a @X', 'cómo abordo a @X'); para lookups simples usa analyze_instagram_lead (cache, instantáneo). Scrapea stories en vivo + bio + posts → profile, análisis story-by-story con Vision (promo directa/indirecta/none, trackers, paywall strength, audience vibe, señales de agencia) y signals agregados. La estrategia depende del bot: CLOSERS = pitch de venta con producto (Blu/Piclink/CP/Kash); MANAGERS = lectura de CRECIMIENTO (palancas de historias/bio para cruzar con BLU). Costo ~$0.06. Responde 'dame ~1 min, scrapeando' — el resultado llega en un segundo mensaje (callback).",
     input_schema: {
       type: "object",
       properties: {
@@ -1397,7 +1397,7 @@ const TOOLS: Array<{
   {
     name: "register_daily_report",
     description:
-      "Registra el reporte de jornada cuando un miembro manda métricas. role_kind='llg' (contactados/respuestas/numeros_obtenidos) · 'closer' (contactados/confirmadas/cerrados/rechazadas) · 'content' (videos_creados/fotos_creadas/cuentas_creadas/posts_subidos). CUALQUIERA puede además traer números: si alguien reporta un número conseguido —sea cual sea su role_kind— setea TAMBIÉN numeros_obtenidos (el número REAL igual se cuenta por el contacto cargado en Maven, no por el reporte). Idempotente por (user, fecha): el último actualiza.\nLLAMALA ante CUALQUIER cifra de producción del día, formal o avance suelto ('van 4 videos') — no esperes el formato de reporte. Si el autor encabeza con fecha ('Reporte 29/07') usa ESA, no hoy, y dilo al confirmar. Reporte en grupo equivocado: registralo IGUAL y aclara dónde va.\nConfirma con ✓ y el DESGLOSE real que sumaste ('1 carrete + 3 historias + 2 + 1 fijo = 7' — el 30/07 se publicó '6 posts' sobre un reporte que listaba 8). PROHIBIDO 'anotado' sin haber llamado esta tool.",
+      "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. TRES tipos:\n- role_kind='llg': outreach de captación — 'contactados 70, respuestas 1, números 0'.\n- role_kind='closer': calls/cierres — 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0'.\n- role_kind='content': CONTENIDO del equipo de warming — 'hice 5 videos, 3 fotos', 'creé 2 cuentas', 'sube 4 posts a @cuenta'. Usa videos_creados/fotos_creadas/cuentas_creadas/posts_subidos.\nOJO: cualquiera puede ADEMÁS meter números — si un creador de contenido reporta que consiguió un número, setea también numeros_obtenidos (igual el número real se cuenta por el contacto cargado en Maven). Idempotente por (user, fecha): el último reporte actualiza. Después de registrar, confirma breve con ✓ y mini-summary REAL (los datos que guardaste), NUNCA un 'anotado' vacío sin haber llamado esta tool.\nCUÁNDO LLAMARLA: ante CUALQUIER mensaje con cifras de producción del día (videos/fotos/posts/cuentas/contactos/números/respuestas), sea un reporte formal de cierre o un avance suelto a media tarde ('van 4 videos aprobados'). No esperes al formato de reporte: si hay números de lo que la persona hizo hoy, registralos.\nFECHA: si el autor encabeza con una fecha ('Reporte 29/07'), usa ESA, no hoy — y dilo en la confirmación ('registrado con fecha 29/07').\nGRUPO EQUIVOCADO: la fila NO depende del grupo. Si alguien manda su reporte donde no corresponde, registralo IGUAL y aclara dónde va la próxima vez; nunca digas 'igual te lo tomo' sin llamar esta tool.\nAL CONFIRMAR, MUESTRA EL DESGLOSE que sumaste, no solo el total ('1 carrete + 3 historias + 2 historias + 1 post fijo = 7'), así el equipo detecta si contaste mal. El 30/07 el bot publicó '6 posts' sobre un reporte que listaba 8.",
     input_schema: {
       type: "object",
       properties: {
@@ -1494,7 +1494,7 @@ const TOOLS: Array<{
   {
     name: "get_blu_sales",
     description:
-      "INGRESOS BLU de las modelos (facturación OnlyFans), NO ventas de closers. ⚠️ DOS cuentas: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). 'Ventas' sin aclarar → pregunta closers vs BLU; BLU sin cuenta → pregunta Plus/Massive/both. Devuelve total, split por cuenta, creadoras que facturaron, top 5 y última importación. detalle=true = LISTADO COMPLETO por modelo: úsalo SIEMPRE que pidan 'todas'/'por modelo'/listado/archivo y ENTREGA el listado entero en texto (no puedes generar archivos: dilo en una línea; el top 5 NO es el listado). refresh=true = sync on-demand contra BLU (~40s: avisa y vuelve a consultar en un minuto).",
+      "INGRESOS BLU de las modelos (facturación OnlyFans), NO ventas de closers. ⚠️ DOS cuentas: *Kash Plus* (creadoras de Carolina) y *Kash Massive* (las de Fabiana). Son dos cuentas con ACCESOS DISTINTOS: 'ventas' sin aclarar → pregunta closers vs BLU; BLU sin decir cuál → pregunta Plus o Massive (pasa 'both' si te dicen todo, sin repreguntar). Devuelve total, split por cuenta, CUÁNTAS creadoras facturaron, top 5 y última importación. detalle=true = LISTADO COMPLETO por modelo: úsalo SIEMPRE que pidan 'todas'/'por modelo'/listado/archivo y ENTREGA el listado entero en texto (no puedes generar archivos: dilo en una línea; el top 5 NO es el listado). refresh=true = sync on-demand contra BLU (~40s: avisa y vuelve a consultar en un minuto).",
     input_schema: {
       type: "object",
       properties: {
@@ -1594,7 +1594,7 @@ const TOOLS: Array<{
   {
     name: "record_milestone",
     description:
-      "ANOTA UN HITO fechado de una modelo/lead — memoria durable de PLATA o cambio de estado: cierre · venta_producto · reunion_agendada (de CIERRE, no una operativa) · en_negociacion · cerca_de_cierre · caso_exito (subió ingresos por algo que hicimos) · en_retencion · quito_accesos · salida_anunciada · record_ingreso. APENAS alguien lo reporte en el grupo, sin que te lo pidan. occurred_on = cuando OCURRIÓ ('quitó accesos el viernes' → esa fecha), no cuando te lo cuentan. Sale en los reportes a Álvaro y en get_milestones. NO anotes charla operativa: la vara es si un gerente lo querría ver en el tablero de la semana.",
+      "ANOTA UN HITO con fecha de una modelo/lead — la memoria durable de lo que significa PLATA o un cambio de estado: cerró/firmó (cierre) · compró un producto (venta_producto) · agendó reunión de cierre (reunion_agendada) · en negociación (en_negociacion) · cerca de cerrar (cerca_de_cierre) · caso de éxito (caso_exito: subió ingresos por algo que hicimos) · entró en retención (en_retencion) · quitó accesos (quito_accesos) · anunció salida (salida_anunciada) · récord de ingresos (record_ingreso). Úsalo APENAS alguien reporte uno de esos eventos en el grupo — sin que te lo pidan. occurred_on es cuando OCURRIÓ (puede ser días atrás: 'quitó accesos el viernes' → esa fecha), no cuando te lo cuentan. Estos hitos salen en los reportes a Álvaro y quedan consultables con get_milestones. NO anotes charla operativa (correcciones al bot, preguntas): la vara es si un gerente lo querría ver en el tablero de la semana.",
     input_schema: {
       type: "object",
       properties: {
@@ -1679,7 +1679,7 @@ const TOOLS: Array<{
   {
     name: "create_reminder",
     description:
-      "Programa un recordatorio futuro. Dos modos:\n• AVISO (default): postea el body tal cual a esa hora ('recordame X mañana a las 9').\n• ACCIÓN (accion=true): el body es una INSTRUCCIÓN que el bot EJECUTA a esa hora — se re-invoca en el grupo destino, junta los datos y redacta en el momento ('mañana 9am aprieta al equipo de warming', 'el viernes reclama los montos'). Escribe la instrucción completa, con nombres y criterio.\nPara OTRO grupo (orden dada en el DM: 'aprieta en WARMING') pasa target_group_name — SOLO el dueño. NO para compromisos detectados automáticamente (los maneja el extractor): solo pedidos EXPLÍCITOS. Precisión ±5 min.",
+      "Programa un recordatorio futuro. Dos modos:\n• AVISO (default): postea el body tal cual a esa hora ('recordame X mañana a las 9').\n• ACCIÓN (accion=true): el body es una INSTRUCCIÓN que el bot EJECUTA a esa hora — se re-invoca en el grupo destino, junta los datos y redacta en el momento ('mañana 9am aprieta al equipo de warming', 'el viernes reclama los montos'). Escribe la instrucción completa, con nombres y criterio.\nPara OTRO grupo (orden dada en el DM: 'aprieta en WARMING') pasa target_group_name — apuntar a otro grupo lo puede hacer SOLO el dueño. NO para compromisos detectados automáticamente (los maneja el extractor): solo pedidos EXPLÍCITOS. Precisión ±5 min.",
     input_schema: {
       type: "object",
       properties: {
@@ -1824,7 +1824,7 @@ const TOOLS: Array<{
   {
     name: "mark_lead_stage",
     description:
-      "Cambia el status de un lead (leadgen_entries o closer_creators; busca por handle de IG). SOLO con decisión explícita en el grupo — nunca infieras. status leadgen (valores REALES): 'no_response','contactado','respondio','interesado','no_interesado','rechazado' — NO existe 'replied'/'interested'/'meeting_set': no los uses NI los menciones. El status NO se edita desde la UI de LeadGen ('contactado' se setea solo al cargar el contacto): NUNCA mandes a nadie a 'actualizar el status' ahí. stage closer_creators: 'Nuevo' (lead con número, sin asignar),'Asignada','Confirmada' (reunión cuadrada),'Completada' (firmó → creator),'No interesada','Rechazada' — NO existe 'Contactado' (eso es historial en closer_contact_history).",
+      "Cambia el status de un lead en Maven (leadgen_entries o closer_creators). Útil cuando el OWNER decide cancelar/rechazar una modelo, o cuando un closer confirma cierre. Busca por handle de IG (lo encuentra en cualquiera de las dos tablas). status en leadgen_entries (valores REALES de la app): 'no_response', 'contactado', 'respondio', 'interesado', 'no_interesado', 'rechazado'. NO existe 'replied'/'interested'/'meeting_set' — no los uses ni los menciones. OJO: el status del lead NO se edita desde la UI de LeadGen (no hay control de status); 'contactado' se setea solo al cargar el contacto. NUNCA mandes a nadie a 'actualizar el status del lead' en LeadGen — ese control no existe. stage válidos en closer_creators: 'Nuevo' (lead con número, sin asignar), 'Asignada', 'Confirmada' (reunión cuadrada), 'Completada' (firmó → se vuelve creator), 'No interesada', 'Rechazada'. NO existe 'Contactado' (los contactos son historial en closer_contact_history, no un stage). SOLO usa cuando hay decisión explícita en el grupo — nunca infieras por tu cuenta.",
     input_schema: {
       type: "object",
       properties: {
@@ -1852,7 +1852,7 @@ const TOOLS: Array<{
   {
     name: "get_monetization_opportunities",
     description:
-      "Oportunidades de MONETIZACIÓN (venta de productos a creadoras), ordenadas por cercanía al cierre (negotiating > offered > interested) y urgencia de seguimiento. Para la Apertura del día y '¿qué hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, last_touch_at, won_at y si vence el seguimiento. Default = ABIERTAS; stage='won' para cerradas — y ahí mira **won_at**, NUNCA last_touch_at (se mueve con cualquier toque, incluida limpieza de duplicados: convierte housekeeping en 'ventas nuevas'); stage='all' trae todo. Si un closer dice que cargó ventas y no aparecen, pueden estar FUERA de Maven (ej. un Sheet).",
+      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Úsala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at), cuándo se GANÓ (won_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtra won y mira **won_at**, NUNCA last_touch_at: éste se mueve con cualquier toque, incluida la limpieza de duplicados y las correcciones de un closer, y convierte housekeeping en ventas nuevas); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó acá.",
     input_schema: {
       type: "object",
       properties: {
@@ -1883,7 +1883,7 @@ const TOOLS: Array<{
   {
     name: "add_persistent_rule",
     description:
-      "SOLO EL OWNER. Registra una regla permanente para este grupo (se inyecta en el system prompt de cada corrida). Úsala cuando el owner enseña comportamiento futuro ('siempre que X, haz Y', 'nunca W', 'regla: ...') — Y TAMBIÉN ante PREFERENCIAS de formato/estilo aunque vengan como gusto o queja ('no me gusta 13:15, prefiero 1:15 pm', 'updates cortos'): eso ES regla a persistir — responder 'Anotado' sin llamar esta tool = se pierde en la próxima corrida (pasó el 31/07). NO para mensajes regulares del owner. rule_text = instrucción accionable en español ('Di las horas como 1:15 pm, nunca 13:15').",
+      "SOLO EL OWNER. Registra una regla permanente para este grupo (se inyecta en el system prompt de cada corrida). Úsala cuando el owner enseña comportamiento futuro ('siempre que X, haz Y', 'nunca W', 'regla: ...') — Y TAMBIÉN ante PREFERENCIAS de formato/estilo aunque vengan como gusto o queja ('no me gusta 13:15, prefiero 1:15 pm', 'updates cortos'): eso ES regla a persistir: aplicarla SOLO en la conversación NO alcanza — sin esta tool se pierde en la próxima corrida (el 31/07 el bot respondió 'Anotado' a la preferencia de hora y no quedó guardada). NO para mensajes regulares del owner. rule_text = instrucción accionable en español ('Di las horas como 1:15 pm, nunca 13:15').",
     input_schema: {
       type: "object",
       properties: {
@@ -1920,7 +1920,7 @@ const TOOLS: Array<{
   {
     name: "remember_fact",
     description:
-      "Guarda un HECHO DURABLE sobre una persona del equipo (persiste más allá de la ventana de contexto). Para lo ESTABLE de cómo trabaja ('solo trabajo por Telegram', 'pasame los cierres por privado') — NO para lo efímero del día (eso es recordatorio) ni datos de leads/pipeline. Default: sobre quien escribe; `about` solo para terceros (y solo owner/supervisor). `fact` corto, en 3ª persona.\nTAMBIÉN para EXCEPCIONES OPERATIVAS ESTABLES que corrigen una métrica tuya ('a Yoisnia se la contacta por otro grupo, por eso figura sin contacto') con `about` = el responsable — sin esto vuelves a publicar el mismo dato equivocado horas después de que te corrigieron.",
+      "Guarda un HECHO DURABLE sobre una persona del equipo (persiste más allá de la ventana de contexto). Para lo ESTABLE de cómo trabaja O de qué puede/no puede hacer: 'no manejo IG para contactar', 'solo trabajo por Telegram', 'pasame los cierres por privado', 'espero que me habiliten el número de Unlimited'. NO para lo efímero del día (eso es recordatorio) ni datos de leads/pipeline. Default: sobre quien escribe; `about` solo para terceros (y solo owner/supervisor). `fact` corto, en 3ª persona.\nTAMBIÉN para EXCEPCIONES OPERATIVAS ESTABLES que corrigen una métrica tuya, cuando el equipo te explica por qué un dato está mal Y LA CAUSA SE VA A REPETIR ('a Yoisnia se la contacta por otro grupo, por eso figura sin contacto') — con `about` = la persona responsable de esa creadora/área. Sin esto vuelves a publicar el mismo dato equivocado horas después de que te corrigieron.",
     input_schema: {
       type: "object",
       properties: {
@@ -2076,8 +2076,10 @@ async function executeTool(
       // recibe cada uno y quién le asigna trabajo, ejemplos de las últimas dos
       // semanas" — imposible: esta tool estaba clavada al grupo actual (su propio
       // DM) y get_group_activity solo trae UN día con tope de 100 mensajes.
-      // Mismo gate que get_group_activity: cruzar grupos es solo del dueño, porque
-      // los bots de Ventas/Warming tienen allowlist null y heredarían la tool sola.
+      // Mismo gate que get_group_activity: cruzar grupos es solo del dueño. El gate
+      // NO se apoya en el llavero — desde el 18/08 Ventas/Warming tienen allowlist
+      // explícita, pero una allowlist se edita en un UPDATE y esto no puede quedar
+      // colgando de esa config: el candado real es ctx.isOwner.
       let targetGroupId = ctx.groupId;
       let targetGroupName: string | null = null;
       const pedidoGrupo = String(input.group ?? "").trim();
@@ -3639,8 +3641,9 @@ async function executeTool(
 
     case "get_group_activity": {
       // Cruza el aislamiento por-grupo a propósito: es el DM del DUEÑO, que ve todo.
-      // Gateado duro a isOwner para que ningún bot de grupo pueda espiar a otro grupo
-      // (los bots de Ventas/AI Warming tienen allowlist null → heredarían la tool sola).
+      // Gateado duro a isOwner para que ningún bot de grupo pueda espiar a otro grupo.
+      // El gate NO depende del llavero (Ventas/Warming pasaron a allowlist explícita
+      // el 18/08): una allowlist cambia con un UPDATE, isOwner no.
       if (!ctx.isOwner) return { error: "no_autorizado", message: "Ver otros grupos es solo para el dueño." };
       const gname = String(input.group_name ?? "").trim();
       if (!gname) return { error: "missing_group_name" };
@@ -5863,7 +5866,15 @@ async function buildInitialUserMessage(args: {
 }): Promise<string> {
   const lines: string[] = [];
   lines.push(`Grupo: ${args.groupName}`);
-  lines.push(`Timezone: ${args.timezone}`);
+  // La zona operativa es Bogotá SIEMPRE: el reloj de la línea siguiente se calcula
+  // con UTC-5 fijo, ignorando `whatsapp_groups.timezone`. Declarar acá el valor de
+  // la fila le daba al modelo DOS verdades contradictorias seguidas — y los 3 DMs
+  // (Álvaro, Grace, Jhon) tenían 'America/Argentina/Buenos_Aires' (UTC-3) en esa
+  // columna, así que un "recordame a las 3" podía convertirse con 2h de error
+  // (create_reminder pide que el MODELO convierta la hora local a UTC).
+  // `whatsapp_groups.timezone` no tiene ningún otro consumidor en el código.
+  // Si algún día hay un grupo en otra zona, se cambian el reloj Y esta línea juntos.
+  lines.push(`Timezone: America/Bogota`);
   // Hora actual en zona del grupo (Bogotá = UTC-5 fijo, sin DST), LEGIBLE. Antes
   // se pasaba en UTC (toISOString) y el bot titulaba p.ej. "Corte 16:30" cuando
   // en Colombia eran las 11:30. Le damos la hora YA local para que no convierta.

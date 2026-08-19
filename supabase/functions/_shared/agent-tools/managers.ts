@@ -7,16 +7,22 @@ export const managersTools: AgentTool[] = [
   {
     name: "get_manager_growth_feed",
     description:
-      "Radar de crecimiento por creadora ACTIVA con manager: promoción (Promolog, mes a la fecha) × ingreso " +
-      "(BLU vs mismo día del mes pasado). Devuelve SOLO las accionables con cuadrante: 'critico' (no promociona + " +
-      "cae) · 'calidad' (promociona e igual cae → revisar CÓMO) · 'riesgo' (promo baja, ingreso ok). Incluye " +
-      "manager, días de promo, ingresos, % tendencia y diagnóstico; filtra con manager_name (ej. 'Fabiana'). " +
-      "⚠️ Mide SOLO promo × ingreso — NUNCA infieras 'sin contacto' de que promociona poco: contacto = " +
-      "get_manager_contact_activity (hoy) o get_manager_silent_creators (días sin contacto). " +
-      "⚠️ NO es el roster (solo alertas): totales y % por manager = get_manager_roster_stats. " +
-      "⚠️ 'promo_networks' trae días de promo por red ('x:15d, telegram:11d') e 'ig_has_data': si es false NO hay " +
-      "dato utilizable de IG este mes → PROHIBIDO mandarla a revisar 'sus historias de IG' o culpar a IG por la " +
-      "caída: nombra las redes reales y pide revisar la calidad AHÍ (típico: tráfico por X/Telegram con link a OF).",
+      "Radar de crecimiento por creadora ACTIVA con manager: cruza promoción (Promolog mes a la fecha) × ingreso " +
+      "(BLU, mes a la fecha vs mismo día del mes pasado) y devuelve solo las accionables con su cuadrante — 'critico' (no promociona + " +
+      "ingreso cae), 'calidad' (promociona pero igual cae → revisar CÓMO promociona), 'riesgo' (promo baja, " +
+      "ingreso aún ok). Incluye manager responsable, días de promo, ingreso del mes/mes pasado, % de tendencia y un " +
+      "diagnóstico. Filtra por manager con 'manager_name' (ej. 'Fabiana'). Es la fuente para saber quién no crece. " +
+      "⚠️ Mide SOLO promoción (Promolog) e ingreso (BLU) — NO sabe nada de contacto/mensajes. NUNCA infieras " +
+      "'sin contacto' ni 'días sin que le escriban' a partir de que una creadora promociona poco: son cosas " +
+      "distintas. Para contacto usa get_manager_contact_activity (cuántas contactó hoy) o " +
+      "get_manager_silent_creators (quiénes llevan días sin contacto). " +
+      "⚠️ Devuelve SOLO las creadoras EN ALERTA — NO es el roster: para totales y % por manager usa " +
+      "get_manager_roster_stats. " +
+      "⚠️ RED DE PROMO: cada fila trae 'promo_networks' (días de promo por red este mes, ej 'x:15d, telegram:11d') " +
+      "e 'ig_has_data'. Si ig_has_data=false NO hay dato utilizable de Instagram este mes (historias sin leer o sin " +
+      "IG) → está PROHIBIDO decirle que revise 'el formato/oferta de sus historias de IG' o culpar a IG por la " +
+      "caída: nombra las redes reales de promo_networks y pide revisar la calidad AHÍ. Caso típico: creadoras cuyo " +
+      "tráfico va por X/Telegram con link directo a OF.",
     input_schema: {
       type: "object",
       properties: {
@@ -304,10 +310,12 @@ export const managersTools: AgentTool[] = [
     name: "get_promo_day_breakdown",
     description:
       "Cuántas CREADORAS promocionaron en un día (default HOY, Bogotá), por manager. 'Cuántas promociones' = " +
-      "creadoras con promo OF detectada (promoted='true'), NO cantidad de stories. Para '¿cuántas promocionaron " +
-      "hoy?', '¿quiénes faltan?'; date (YYYY-MM-DD) y manager_name filtran. Devuelve por manager: quiénes " +
-      "promocionaron (stories de promo + redes) y faltan_por_manager separado en leidas_sin_promo (revisadas, sin " +
-      "promo) vs sin_leer (el scan no llegó — de esas NO se puede decir que no promocionaron). " +
+      "cuántas CREADORAS promocionaron, NO cantidad de stories: cuenta las que tienen promo OF detectada ese día " +
+      "(promoted='true') e IGNORA tanto las que solo tuvieron stories sin promo como las PENDIENTES DE SCAN. " +
+      "Para '¿cuántas promocionaron hoy?', '¿quiénes faltan?'; date (YYYY-MM-DD) y manager_name filtran. Devuelve " +
+      "por manager: cuántas promocionaron + quiénes (stories de promo + redes), y faltan_por_manager separado en " +
+      "leidas_sin_promo (revisadas, sin promo) vs sin_leer (el scan no llegó — de esas NO se puede decir que no " +
+      "promocionaron). " +
       "⚠️ MIRA SIEMPRE `cobertura` antes de responder: scan_corrio=false / creadoras_leidas=0 → el scan NO corrió: " +
       "di eso, NO listes promos ni afirmes que nadie promocionó. Cobertura parcial → di que faltan por escanear en " +
       "vez de dar el número por cerrado; nunca 'sigue escaneando' si ultimo_scan es viejo.",
@@ -623,8 +631,9 @@ export const managersTools: AgentTool[] = [
       "Creadoras que una manager NO contacta hace días, por la línea de WhatsApp de Managers. LA fuente para " +
       "'¿a quién no ha contactado Carolina/Fabiana?', '¿quiénes llevan 3+ días?'. Complementa " +
       "get_manager_contact_activity (cuántas contactó HOY). Por manager: cuántas + lista (nombre, IG, días sin " +
-      "contacto, último); 'sin registro' = ningún saliente visible (NO prueba abandono: pudo ser otra línea o antes " +
-      "del 16/07). Matching por últimos 10 dígitos (sirve México 521/52); atribución por manager asignada " +
+      "contacto, último); dias_sin_contacto='sin registro' = ningún saliente POR LA LÍNEA DE MANAGERS en el " +
+      "historial visible (NO prueba abandono: pudo ser otra línea o antes del 16/07). Matching por TELÉFONO, " +
+      "robusto (últimos 10 dígitos, sirve México 521/52); atribución por manager asignada " +
       "(Plus=Carolina, Massive=Fabiana). silent_days cambia el umbral (default 3); manager_name filtra. " +
       "⚠️ NUNCA respondas esto de memoria ni lo deduzcas del growth feed (promo ≠ contacto): llama ESTA tool. " +
       "CAVEAT: solo ve las líneas 'manager'.",
@@ -699,9 +708,9 @@ export const managersTools: AgentTool[] = [
       "calculados. LA tool para '¿en % cómo va cada manager?', '¿cuántas creadoras tiene Carolina/Fabiana?'. " +
       "⚠️ NUNCA pidas al equipo el total ni digas que no lo tienes: SIEMPRE está acá (activas por manager asignada, " +
       "Plus=Carolina, Massive=Fabiana). Tampoco lo deduzcas del growth feed (ese SOLO trae las EN ALERTA). " +
-      "'date' (YYYY-MM-DD) para otro día; default hoy. Campos: total_active, promoted_count/pct, contacted_count/pct " +
-      "y covered_count = cuántas leyó Promolog ese día — si covered < total, aclaralo al dar el %: las no leídas no " +
-      "son 'no promocionó' (#818). La fila manager_name=null = activas SIN manager: mencionala si es >0.",
+      "'date' (YYYY-MM-DD) para otro día; default hoy. Campos: total_active (el denominador), promoted_count/" +
+      "promoted_pct, contacted_count/contacted_pct y covered_count = a cuántas Promolog logró LEER ese día — si " +
+      "covered_count < total_active, aclaralo al dar el %: las no leídas no son 'no promocionó' (#818). La fila manager_name=null = activas SIN manager: mencionala si es >0.",
     input_schema: {
       type: "object",
       properties: {
