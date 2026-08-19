@@ -419,26 +419,21 @@ export const equipoTools: AgentTool[] = [
   {
     name: "get_hubstaff_activity",
     description:
-      "Datos de Hubstaff (tiempo trabajado + % de actividad) de CUALQUIER persona del equipo registrada en Maven, " +
-      "por rango de fechas. SIN `person` devuelve un ranking de TODO el equipo (horas, % actividad, días trabajados) " +
-      "del rango, ordenado por horas; CON `person` devuelve esa persona + su desglose por día. Default: últimos 7 días. " +
-      "Útil para '¿cuántas horas hizo X esta semana?', '¿quién trabajó menos?', 'horas del equipo este mes', " +
-      "'¿quién está con baja actividad?'. Nota: no incluye screenshots (no se sincronizan). " +
-      "⚠️ PARA HOY: usa EXCLUSIVAMENTE el bloque `hoy_en_vivo` de la respuesta (feed de a 10 min, refrescado cada " +
-      "2-5 min); el agregado diario de HOY puede venir hasta 6h atrasado y hacía reportar '0h' de gente trabajando. " +
-      "Cada persona de hoy trae `estado`: 'ficho_hoy' (horas reales al último ping), 'sin_fichar_hoy' (el feed está " +
-      "vivo y NO tiene ni un minuto — solo esto es 'no arrancó'), o 'sin_dato_feed_stale' (el tracker no reporta: " +
-      "PROHIBIDO decir 0h, di desde qué hora no hay datos). Hay NOMBRES REPETIDOS en el equipo (dos 'Brayan', tres " +
-      "'Lizeth'): identifica siempre por nombre COMPLETO + rol de la respuesta. La tool resuelve apodos conocidos " +
-      "(Brian→Brayan) y si el nombre NO existe o matchea a VARIOS te devuelve `persona_no_encontrada`/`ambiguo` con " +
-      "candidatos: en ese caso PREGUNTA a cuál se refieren — nunca respondas con datos de otra persona ni elijas tú " +
-      "(el 31/07 'Juan Pachas' no existía y el bot contestó con gente que nadie preguntó). " +
-      "La respuesta de equipo separa `direccion_fuera_de_medicion` (dueño/socios/gerencia: se informan, no se " +
-      "rankean) y trae `sin_fichar_en_rango` (roster que no trackeó nada — el piso real en preguntas de empresa). " +
-      "HORA DE INGRESO: sí la tienes. En el ranking cada persona trae `entrada_hoy`/`ultimo_ping_hoy`, y pidiendo " +
-      "UNA persona el bloque `por_dia` trae `entrada` y `ultimo_ping` de CADA día — úsalo para '¿a qué hora entró/" +
-      "salió?', '¿llegó tarde?', control de turnos y cumplimiento de horario. " +
-      "La tool puede tardar ~12s extra cuando pide refresh en vivo al bridge.",
+      "Hubstaff (tiempo trabajado + % actividad) de cualquier persona registrada en Maven, por rango. " +
+      "SIN `person` = ranking del equipo entero (horas, %, días); CON `person` = esa persona + desglose por día. " +
+      "Default 7 días. No incluye screenshots. " +
+      "⚠️ PARA HOY usa EXCLUSIVAMENTE el bloque `hoy_en_vivo` (feed refrescado cada 2-5 min): el agregado diario de " +
+      "HOY atrasa hasta 6h y hacía reportar '0h' de gente trabajando. `estado` por persona: 'ficho_hoy' (horas al " +
+      "último ping) · 'sin_fichar_hoy' (feed vivo y sin un minuto — SOLO esto es 'no arrancó') · 'sin_dato_feed_stale' " +
+      "(tracker mudo: PROHIBIDO decir 0h, di desde qué hora no hay datos). " +
+      "HOMÓNIMOS reales (dos 'Brayan', tres 'Lizeth'): identifica por nombre COMPLETO + rol. Resuelve apodos " +
+      "(Brian→Brayan); si no existe o es ambiguo devuelve `persona_no_encontrada`/`ambiguo` con candidatos: PREGUNTA " +
+      "— nunca respondas con datos de otra persona ni elijas tú (31/07: 'Juan Pachas' NO existía en Hubstaff y el " +
+      "bot contestó con gente que nadie preguntó). El equipo separa `direccion_fuera_de_medicion` (dueño/socios/" +
+      "gerencia: se informan, no se rankean) y `sin_fichar_en_rango` (roster que no trackeó nada — el piso real en " +
+      "preguntas de empresa). " +
+      "HORA DE INGRESO: `entrada_hoy`/`ultimo_ping_hoy` en el ranking; por persona, `por_dia` trae `entrada` y " +
+      "`ultimo_ping` de cada día — para '¿a qué hora entró/salió?', tardanzas y turnos. Puede tardar ~12s con refresh en vivo.",
     input_schema: {
       type: "object",
       properties: {

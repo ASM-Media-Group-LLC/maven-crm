@@ -32,17 +32,14 @@ export const qaTools: AgentTool[] = [
   {
     name: "get_chatter_productivity",
     description:
-      "Productividad y RENTABILIDAD de chatters cruzando Hubstaff (horas + % actividad) con la venta de BLU " +
-      "del mes en curso. Devuelve por chatter: ventas, $/hora, ingreso de la agencia (venta × 80% neto OF × % " +
-      "efectivo firmado), costo (salario base), margen y ROI (×). Detecta 'online pero improductivo' (mucha " +
-      "actividad, poca venta) y 'no rentable' (la agencia recibe menos de lo que cuesta el chatter, ROI<1). " +
-      "Pasa only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
-      "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo. " +
-      "Los números son SOLO del MES EN CURSO (campo `periodo`); cada chatter trae `venta_al` = último día con venta " +
-      "sincronizada — si `venta_desactualizada` es true, la venta de ese chatter está incompleta y DEBES decirlo con la fecha. " +
-      "VENTA DÍA POR DÍA: sí la tienes — pasa `person` y devuelve `venta_por_dia` (fecha, monto, mensajes vendidos, " +
-      "fans chateados) de los últimos `days`. Úsalo para '¿cuánto vendió X ayer / en la madrugada / el día 3?'. " +
-      "Si ese bloque viene vacío NO afirmes $0: la respuesta trae la razón (sin ventas registradas vs sin sincronizar).",
+      "Productividad y RENTABILIDAD de chatters: Hubstaff (horas + % actividad) × venta BLU. TODOS los números " +
+      "son SOLO del MES EN CURSO (campo `periodo`). Por chatter: ventas, $/hora, ingreso agencia (venta × 80% " +
+      "neto OF × % firmado), costo (salario base), margen y ROI. Detecta 'online pero improductivo' y 'no rentable' (ROI<1); only_flagged=true lista SOLO los " +
+      "que hay que revisar. Para '¿quién está conectado pero no vende?', '¿quién no es rentable?'. " +
+      "`venta_al` = último día con venta sincronizada — si `venta_desactualizada` es true, la venta está incompleta " +
+      "y DEBES decirlo con la fecha. VENTA POR DÍA: pasa `person` → `venta_por_dia` (fecha, monto, mensajes, fans) " +
+      "de los últimos `days`, para '¿cuánto vendió X ayer / el día 3?'. Si viene vacío NO afirmes $0: la respuesta " +
+      "trae la razón (sin ventas vs sin sincronizar).",
     input_schema: {
       type: "object",
       properties: {
