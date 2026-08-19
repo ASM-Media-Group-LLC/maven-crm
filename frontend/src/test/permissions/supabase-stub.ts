@@ -11,11 +11,22 @@ interface ErrorShape {
   message: string;
 }
 
+// Capacidades RLS por rol (tabla `role_groups`). Es la fuente de verdad que lee
+// `is_in_role_group()` en la DB y `useRoleTier` en el front.
+export interface RoleGroupRow {
+  role_name: string;
+  is_admin: boolean;
+  is_manager_or_above: boolean;
+  is_supervisor_or_above: boolean;
+  is_member: boolean;
+}
+
 // Representacion interna del store en memoria
 interface StoreState {
   user_roles: Array<{ user_id: string; role: AppRole | null }>;
   roles_config: Array<{ id: string; name: string; is_active: boolean }>;
   role_permissions: Array<PermissionRow & { role_id: string }>;
+  role_groups: RoleGroupRow[];
   errors: Map<string, ErrorShape>;
 }
 
@@ -23,6 +34,7 @@ interface StoreState {
 //   user_roles:      .select("role").eq("user_id", id).maybeSingle()
 //   roles_config:    .select("id").eq("name", role).eq("is_active", true).maybeSingle()
 //   role_permissions:.select("module, submodule, can_access, data_scope").eq("role_id", id)
+//   role_groups:     .select("is_admin, ...").eq("role_name", role).maybeSingle()
 class QueryBuilder {
   private filters: Array<[string, unknown]> = [];
 
@@ -84,6 +96,7 @@ export interface SupabaseStub {
   setUserRole(userId: string, role: AppRole | null): void;
   setRolesConfig(roleName: string, configId: string, isActive?: boolean): void;
   setRolePermissions(configId: string, perms: PermissionRow[]): void;
+  setRoleGroup(roleName: string, flags: Partial<Omit<RoleGroupRow, "role_name">>): void;
   setError(table: string, error: ErrorShape): void;
   reset(): void;
 }
@@ -103,6 +116,7 @@ export function createSupabaseStub(): SupabaseStub {
     user_roles: [],
     roles_config: [],
     role_permissions: [],
+    role_groups: [],
     errors: new Map(),
   };
 
@@ -139,6 +153,18 @@ export function createSupabaseStub(): SupabaseStub {
       });
     },
 
+    setRoleGroup(roleName: string, flags: Partial<Omit<RoleGroupRow, "role_name">>): void {
+      store.role_groups = store.role_groups.filter((g) => g.role_name !== roleName);
+      store.role_groups.push({
+        role_name: roleName,
+        is_admin: false,
+        is_manager_or_above: false,
+        is_supervisor_or_above: false,
+        is_member: true,
+        ...flags,
+      });
+    },
+
     setError(table: string, error: ErrorShape): void {
       store.errors.set(table, error);
     },
@@ -147,6 +173,7 @@ export function createSupabaseStub(): SupabaseStub {
       store.user_roles = [];
       store.roles_config = [];
       store.role_permissions = [];
+      store.role_groups = [];
       store.errors.clear();
     },
   };

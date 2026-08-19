@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession } from "@/hooks/useCoworkSession";
+import { useRoleTier } from "@/hooks/useRoleTier";
 import { supabase } from "@/integrations/supabase/client";
 import CoworkCreateDialog from "./CoworkCreateDialog";
 import CoworkLobby from "./CoworkLobby";
@@ -23,6 +24,13 @@ export default function CoworkPage() {
   const [loadingSessions, setLoadingSessions] = useState(true);
 
   const cowork = useCoworkSession(sessionId);
+
+  // Crear una sesión es acción de coordinación: los roles de nivel "miembro" solo
+  // entran por el enlace que les pasa su coordinador. El backend rechaza igual la
+  // acción (cowork-session/createSession) — esto es para no mostrar un botón que
+  // termina en error.
+  const { isSupervisorOrAbove, isLoading: tierLoading } = useRoleTier();
+  const canCreateSessions = isSupervisorOrAbove;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
@@ -142,28 +150,40 @@ export default function CoworkPage() {
             Sala Cowork
           </h1>
           <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
-            {mySessions.length > 0
-              ? "Volvé a una de tus salas activas o crea una nueva sesión."
-              : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."}
+            {canCreateSessions
+              ? mySessions.length > 0
+                ? "Volvé a una de tus salas activas o crea una nueva sesión."
+                : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
+              : mySessions.length > 0
+                ? "Vuelve a una de tus salas activas."
+                : "Abre el enlace que te compartió tu coordinador para entrar a tu sala."}
           </p>
-          <Button
-            onClick={() => setShowCreate(true)}
-            size="lg"
-            className="gap-2 rounded-full px-8 mt-2 shadow-md"
-          >
-            <Plus className="h-5 w-5" /> Crear sesión
-          </Button>
+          {!tierLoading && (canCreateSessions ? (
+            <Button
+              onClick={() => setShowCreate(true)}
+              size="lg"
+              className="gap-2 rounded-full px-8 mt-2 shadow-md"
+            >
+              <Plus className="h-5 w-5" /> Crear sesión
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground/80 text-center max-w-sm mt-1">
+              Solo los coordinadores pueden crear sesiones de Cowork.
+            </p>
+          ))}
         </div>
 
-        <CoworkCreateDialog
-          open={showCreate}
-          onOpenChange={setShowCreate}
-          onCreate={async (name, roomNames, description) => {
-            const result = await cowork.createSession(name, roomNames, description);
-            setSearchParams({ session: result.sessionId });
-            setShowCreate(false);
-          }}
-        />
+        {canCreateSessions && (
+          <CoworkCreateDialog
+            open={showCreate}
+            onOpenChange={setShowCreate}
+            onCreate={async (name, roomNames, description) => {
+              const result = await cowork.createSession(name, roomNames, description);
+              setSearchParams({ session: result.sessionId });
+              setShowCreate(false);
+            }}
+          />
+        )}
       </div>
     );
   }

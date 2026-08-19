@@ -90,6 +90,21 @@ serve(async (req) => {
     // CREATE COWORK SESSION
     // ═══════════════════════════════════════════════════════════════
     if (action === "createSession") {
+      // Crear una sesión es una acción de COORDINACIÓN: solo supervisor o
+      // superior. Un rol de nivel "miembro" entra únicamente por el enlace que
+      // le pasa su coordinador (?session=…&room=…). Guarda dura acá porque el
+      // front solo esconde el botón, y esta función corre con service_role
+      // (bypassa RLS) — sin este check cualquiera con sesión válida podría
+      // llamar la acción a mano.
+      const { data: canCreate, error: tierErr } = await admin.rpc("is_in_role_group", {
+        _user_id: userId,
+        _group: "supervisor_or_above",
+      });
+      if (tierErr) return err(tierErr.message, 500);
+      if (!canCreate) {
+        return err("Tu rol no permite crear sesiones de Cowork. Pide el enlace de la sala a tu coordinador.", 403);
+      }
+
       const { name, description, roomNames } = body; // roomNames: string[]
       if (!name || !roomNames?.length) return err("name and roomNames required");
       if (roomNames.length > 10) return err("Máximo 10 salas por sesión");
