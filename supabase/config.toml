@@ -243,3 +243,6 @@ verify_jwt = true
 verify_jwt = true
 [functions.promolog-highlights]
 verify_jwt = false  # crons de destacados (7pm calidad / 11pm ingresos / sáb 2pm semanal); check interno de X-Cron-Token
+
+[functions.zoho-provision]
+verify_jwt = false  # auth propia: Bearer del admin + chequeo de rol adentro
