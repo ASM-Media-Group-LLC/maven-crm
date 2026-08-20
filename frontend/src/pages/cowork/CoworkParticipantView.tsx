@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -34,8 +36,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
 
+  // Pantalla "no tengo sala": código para entrar y la última sala para reanudar.
+  const [roomCode, setRoomCode] = useState("");
+  const [joiningByCode, setJoiningByCode] = useState(false);
+  const [lastRoomId, setLastRoomId] = useState<string | null>(null);
+  const [resuming, setResuming] = useState(false);
+
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
+
+  // Sin asignación activa, buscamos la última sala en la que estuvo para ofrecerle
+  // reanudar. Sin esto la única salida sería el código, y quien salió de su propia
+  // sala tendría que pedirlo de nuevo al coordinador.
+  useEffect(() => {
+    const sid = cowork.session?.id;
+    if (!sid || myAssignment) return;
+    let alive = true;
+    cowork.getMyLastRoomId(sid)
+      .then((rid) => { if (alive) setLastRoomId(rid); })
+      .catch(() => { /* noop */ });
+    return () => { alive = false; };
+  }, [cowork.session?.id, myAssignment, cowork.getMyLastRoomId]);
 
   const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
   // Compartir pantalla ya es DIRECTO (el token de sala lo permite para todos) —
@@ -170,12 +191,90 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [cowork.joinOneOnOne, oneOnOneRequestId]);
 
   if (!myAssignment) {
+    // ANTES: un spinner con "Esperando asignación de sala por el coordinador…".
+    // Era una espera IMPOSIBLE: `assignToRoom` se eliminó al pasar a self-join por
+    // URL, así que ningún coordinador podía asignar nada y el participante quedaba
+    // trabado para siempre (pasaba al volver sin `?room=`, al entrar por el lobby,
+    // o al salir de la sala). Ahora la pantalla ofrece las dos salidas reales:
+    // reanudar la última sala, o canjear el código que dio el coordinador.
+    const resumeLastRoom = async () => {
+      if (!lastRoomId || !cowork.session?.id) return;
+      setResuming(true);
+      try {
+        await cowork.joinSession(cowork.session.id, "participant", undefined, lastRoomId);
+        cowork.refetch();
+      } catch (e: any) {
+        toast.error(e.message || "No se pudo volver a tu sala");
+      } finally {
+        setResuming(false);
+      }
+    };
+
+    const enterWithCode = async () => {
+      const code = normalizeRoomCode(roomCode);
+      if (!isCompleteRoomCode(code)) return;
+      setJoiningByCode(true);
+      try {
+        await cowork.joinByCode(code);
+        setRoomCode("");
+        cowork.refetch();
+      } catch (e: any) {
+        toast.error(e.message || "No se pudo entrar con ese código");
+      } finally {
+        setJoiningByCode(false);
+      }
+    };
+
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4 p-4">
-        <div className="flex flex-col items-center gap-3 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
-          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
-          <p className="text-muted-foreground text-sm text-center">Esperando asignación de sala por el coordinador...</p>
-          <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
+        <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
+          <div className="flex items-center justify-center h-14 w-14 rounded-full bg-primary/10">
+            <DoorOpen className="h-7 w-7 text-primary" />
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-foreground font-semibold text-center">Todavía no estás en una sala</p>
+            <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
+          </div>
+
+          {lastRoomId && (
+            <Button onClick={resumeLastRoom} disabled={resuming} className="w-full rounded-full gap-2">
+              {resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <DoorOpen className="h-4 w-4" />}
+              Volver a mi sala
+            </Button>
+          )}
+
+          <div className="w-full flex flex-col gap-2">
+            <span className="text-xs text-muted-foreground text-center">
+              {lastRoomId ? "O entra con el código de otra sala" : "Entra con el código que te dio tu coordinador"}
+            </span>
+            <div className="flex gap-2">
+              <Input
+                value={roomCode}
+                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+                onKeyDown={(e) => e.key === "Enter" && enterWithCode()}
+                placeholder="ABC234"
+                maxLength={ROOM_CODE_LENGTH}
+                className="rounded-full text-center font-mono tracking-[0.25em] uppercase"
+              />
+              <Button
+                onClick={enterWithCode}
+                disabled={!isCompleteRoomCode(roomCode) || joiningByCode}
+                className="rounded-full gap-1 shrink-0"
+              >
+                {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Entrar
+              </Button>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-muted-foreground"
+            onClick={() => navigate("/cowork", { replace: true })}
+          >
+            Volver a Cowork
+          </Button>
         </div>
       </div>
     );

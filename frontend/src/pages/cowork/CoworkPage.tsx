@@ -8,7 +8,9 @@ import CoworkLobby from "./CoworkLobby";
 import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
-import { Plus, Users2, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
+import { Plus, Users2, ArrowRight, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CoworkPage() {
@@ -20,8 +22,10 @@ export default function CoworkPage() {
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
-  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string }>>([]);
+  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null }>>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [roomCode, setRoomCode] = useState("");
+  const [joiningByCode, setJoiningByCode] = useState(false);
 
   const cowork = useCoworkSession(sessionId);
 
@@ -57,6 +61,23 @@ export default function CoworkPage() {
       toast.success("Sesión finalizada");
     } catch {
       toast.error("No se pudo finalizar la sesión");
+    }
+  };
+
+  // Entrar canjeando el código de sala que dio el coordinador. Es la vía de acceso
+  // cuando el link largo no sobrevivió (o cuando el participante ya no tiene sala).
+  const handleJoinByCode = async () => {
+    const code = normalizeRoomCode(roomCode);
+    if (!isCompleteRoomCode(code)) return;
+    setJoiningByCode(true);
+    try {
+      const res = await cowork.joinByCode(code);
+      setRoomCode("");
+      setSearchParams({ session: res.sessionId, room: res.roomId });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo entrar con ese código");
+    } finally {
+      setJoiningByCode(false);
     }
   };
 
@@ -133,7 +154,13 @@ export default function CoworkPage() {
                 <Button
                   size="sm"
                   className="rounded-full gap-1 shrink-0"
-                  onClick={() => setSearchParams({ session: s.id })}
+                  onClick={() => setSearchParams(
+                    // Sin el `room` el participante vuelve SIN asignación y queda
+                    // esperando una asignación que ya nadie puede hacer.
+                    s.lastRoomId && s.role !== "host"
+                      ? { session: s.id, room: s.lastRoomId }
+                      : { session: s.id }
+                  )}
                 >
                   Volver <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -171,6 +198,33 @@ export default function CoworkPage() {
               Solo los coordinadores pueden crear sesiones de Cowork.
             </p>
           ))}
+
+          {/* Entrar por código: la puerta que sobrevive al copy/paste de WhatsApp,
+              a la PWA y a que el link largo se pierda. Visible para TODOS — para el
+              nivel miembro es SU vía de acceso. */}
+          <div className="w-full max-w-xs flex flex-col gap-2 mt-3 pt-4 border-t border-border/40">
+            <span className="text-xs text-muted-foreground text-center">
+              Entrar con el código de tu sala
+            </span>
+            <div className="flex gap-2">
+              <Input
+                value={roomCode}
+                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+                onKeyDown={(e) => e.key === "Enter" && handleJoinByCode()}
+                placeholder="ABC234"
+                maxLength={ROOM_CODE_LENGTH}
+                className="rounded-full text-center font-mono tracking-[0.25em] uppercase"
+              />
+              <Button
+                onClick={handleJoinByCode}
+                disabled={!isCompleteRoomCode(roomCode) || joiningByCode}
+                className="rounded-full gap-1 shrink-0"
+              >
+                {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Entrar
+              </Button>
+            </div>
+          </div>
         </div>
 
         {canCreateSessions && (

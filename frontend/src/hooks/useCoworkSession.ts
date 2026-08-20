@@ -9,6 +9,9 @@ export interface CoworkRoom {
   livekit_room_name: string;
   sort_order: number;
   preview_mode?: "video" | "avatars";
+  // Código corto que el coordinador comparte para entrar a ESTA sala. Solo lo
+  // ve quien puede leer la fila (el host); el participante lo recibe por fuera.
+  join_code?: string;
 }
 
 export interface CoworkMembership {
@@ -180,6 +183,25 @@ export function useCoworkSession(sessionId: string | null) {
     invokeCowork("updateRoom", { roomId, ...patch }), []);
   const closeRoom = useCallback(async (roomId: string) => invokeCowork("closeRoom", { roomId }), []);
 
+  // Canjea un código de sala. Devuelve { sessionId, roomId, ... } para navegar.
+  const joinByCode = useCallback(async (code: string) => invokeCowork("joinByCode", { code }), []);
+
+  // Última sala en la que estuvo el usuario en una sesión, ACTIVA O NO. Sirve para
+  // reanudar: el participante que volvió sin `?room=` (o al que se le desactivó la
+  // asignación al salir) puede retomar su sala en vez de quedarse esperando a nadie.
+  // RLS permite leer las propias asignaciones ("Participants see own assignment"),
+  // aunque el nombre de la sala no sea legible sin asignación activa.
+  const getMyLastRoomId = useCallback(async (sid: string): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase.from("cowork_room_assignments")
+      .select("room_id, assigned_at")
+      .eq("session_id", sid).eq("user_id", user.id)
+      .order("assigned_at", { ascending: false })
+      .limit(1).maybeSingle();
+    return (data as { room_id: string } | null)?.room_id ?? null;
+  }, []);
+
   const getHostCode = useCallback(async () => {
     if (!sessionId) throw new Error("No session");
     return invokeCowork("getHostCode", { sessionId });
@@ -233,7 +255,7 @@ export function useCoworkSession(sessionId: string | null) {
   // Puro cliente: el RLS `is_cowork_member` permite leer las propias membresías y sus
   // sesiones. El conteo de miembros es exacto (los miembros ven toda la membresía de su
   // sesión); NO devolvemos conteo de salas porque un participante solo ve su sala por RLS.
-  const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string }>> => {
+  const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null }>> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
     const { data: mems } = await supabase.from("cowork_memberships").select("session_id, role").eq("user_id", user.id);
@@ -249,8 +271,20 @@ export function useCoworkSession(sessionId: string | null) {
     const { data: allMems } = await supabase.from("cowork_memberships").select("session_id").in("session_id", sessIds);
     const memCount = new Map<string, number>();
     (allMems as Array<{ session_id: string }> | null)?.forEach((m) => memCount.set(m.session_id, (memCount.get(m.session_id) || 0) + 1));
+
+    // Última sala del usuario por sesión (activa o no) para que "Volver" retome la
+    // sala en vez de dejarlo sin asignación esperando a nadie. Ordenado ASC y
+    // sobreescribiendo, así queda la más reciente por sesión.
+    const { data: myAssigns } = await supabase.from("cowork_room_assignments")
+      .select("session_id, room_id, assigned_at")
+      .eq("user_id", user.id).in("session_id", sessIds)
+      .order("assigned_at", { ascending: true });
+    const lastRoom = new Map<string, string>();
+    (myAssigns as Array<{ session_id: string; room_id: string }> | null)?.forEach((a) => lastRoom.set(a.session_id, a.room_id));
+
     return (sess as Array<{ id: string; name: string; description: string | null; created_at: string }>).map((s) => ({
       ...s, role: roleBy.get(s.id) || "participant", members: memCount.get(s.id) || 1,
+      lastRoomId: lastRoom.get(s.id) ?? null,
     }));
   }, []);
 
@@ -260,7 +294,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
-    createSession, joinSession, addRoom, updateRoom, closeRoom,
+    createSession, joinSession, joinByCode, getMyLastRoomId, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
     listMyActiveSessions, endSessionById,
