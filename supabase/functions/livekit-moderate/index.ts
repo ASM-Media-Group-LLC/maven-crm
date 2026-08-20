@@ -45,12 +45,18 @@ async function signHS256(payload: string, secret: string): Promise<string> {
 
 // Token de ADMINISTRACIÓN de sala: no es para unirse, es para que la API twirp
 // acepte las órdenes. Vive 60 segundos — solo tiene que durar esta petición.
-async function createAdminToken(apiKey: string, apiSecret: string, room: string): Promise<string> {
+//
+// OJO con los grants: `roomAdmin` habilita ListParticipants, MutePublishedTrack,
+// UpdateParticipant y RemoveParticipant, pero DeleteRoom exige `roomCreate` y
+// devuelve 401 sin él. Se pide solo cuando hace falta (menor privilegio).
+async function createAdminToken(
+  apiKey: string, apiSecret: string, room: string, canDeleteRoom = false,
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "HS256", typ: "JWT" };
   const payload = {
     iss: apiKey, sub: "maven-moderation", iat: now, nbf: now, exp: now + 60,
-    video: { roomAdmin: true, room },
+    video: canDeleteRoom ? { roomAdmin: true, roomCreate: true, room } : { roomAdmin: true, room },
   };
   const hB64 = base64UrlEncode(strToBytes(JSON.stringify(header)));
   const pB64 = base64UrlEncode(strToBytes(JSON.stringify(payload)));
@@ -66,7 +72,7 @@ function httpBase(livekitUrl: string): string {
 async function twirp(
   livekitUrl: string, apiKey: string, apiSecret: string, room: string, method: string, body: unknown,
 ): Promise<{ ok: boolean; status: number; data: any }> {
-  const token = await createAdminToken(apiKey, apiSecret, room);
+  const token = await createAdminToken(apiKey, apiSecret, room, method === "DeleteRoom");
   const res = await fetch(`${httpBase(livekitUrl)}/twirp/livekit.RoomService/${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -244,7 +250,12 @@ serve(async (req) => {
       }
 
       const res = await twirp(lkUrl, lkKey, lkSecret, room, "DeleteRoom", { room });
-      if (!res.ok) return err(`LiveKit DeleteRoom ${res.status}`, 502);
+      // Una sala de LiveKit no existe hasta que alguien entra: si la reunión está
+      // vacía, DeleteRoom devuelve 404 y "terminar" tiene que funcionar igual.
+      // Cualquier otro error sí es un problema.
+      if (!res.ok && res.status !== 404) {
+        return err(`LiveKit DeleteRoom ${res.status}`, 502);
+      }
 
       // Una reunión de Meet además se marca terminada: su código deja de servir.
       if (room.startsWith("meet_")) {
@@ -252,7 +263,7 @@ serve(async (req) => {
           .update({ status: "ended", ended_at: new Date().toISOString() })
           .eq("livekit_room_name", room).eq("status", "active");
       }
-      return json({ ok: true });
+      return json({ ok: true, livekitRoomExisted: res.ok });
     }
 
     // ═══ CO-ANFITRIONES (solo Meet, solo el creador) ═══
