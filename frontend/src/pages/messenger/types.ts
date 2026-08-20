@@ -66,12 +66,6 @@ export interface ConversationWithDetails extends ChatConversation {
   displayName: string;
 }
 
-export interface VideoRoom {
-  id: string;
-  name: string;
-  createdBy: string;
-  createdAt: Date;
-  participants: UserProfile[];
-  isActive: boolean;
-  shareLink: string;
-}
+// VideoRoom se eliminó: las reuniones ahora son filas de `meet_rooms` (ver
+// hooks/useMeetRooms). El tipo describía salas que vivían en memoria y se
+// perdían al recargar.

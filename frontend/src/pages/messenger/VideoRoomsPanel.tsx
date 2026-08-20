@@ -1,103 +1,95 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Video, Plus, Copy, Link2, Users, X, Users2 } from "lucide-react";
+import { Video, Plus, Link2, X, Users2, KeyRound, Copy, PhoneOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { VideoRoom } from "./types";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { useMeetRooms, MeetRoom } from "@/hooks/useMeetRooms";
+import { parseJoinInput } from "@/lib/meetJoinInput";
 
 interface VideoRoomsPanelProps {
-  rooms: VideoRoom[];
-  onCreateRoom: (name: string) => void;
-  onJoinRoom: (room: VideoRoom) => void;
   onClose: () => void;
 }
 
-export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
-  const [joinLink, setJoinLink] = useState("");
+// Atajo a las reuniones desde Messenger: estás chateando y querés llamar.
+//
+// ANTES este panel tenía su propio mecanismo de salas viviendo en el `useState`
+// de MessengerPage: se perdían al recargar, no existían para nadie más, y la
+// lista renderizaba avatares de una lista siempre vacía con un badge "EN VIVO"
+// que no podía encenderse nunca (isActive quedaba en false para siempre). Peor:
+// su link era /call/<sala>, que a un invitado sin cuenta lo deja en el login.
+//
+// Ahora es la MISMA cosa que /meet: reuniones de verdad, con código y sala de
+// espera para externos. Este panel es solo la puerta corta.
+export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
   const navigate = useNavigate();
+  const { myRooms, loading, createRoom, joinByCode, resolveByLivekitRoom, endRoom } = useMeetRooms();
+  const [joinInput, setJoinInput] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [joining, setJoining] = useState(false);
 
-  const handleCreate = () => {
-    const autoName = `Sala ${new Date().toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
-    onCreateRoom(autoName);
+  const openCall = (room: MeetRoom) => {
+    const params = new URLSearchParams();
+    if (room.isHost) params.set("admin", "1");
+    params.set("name", room.name);
+    const url = `/call/${encodeURIComponent(room.livekit_room_name)}?${params.toString()}`;
+    const target = `call-${room.livekit_room_name}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+    window.open(url, target, "noopener");
   };
 
-  const extractRoomId = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "";
+  // El link que se comparte es /entrar/<código>: sirve con cuenta (entra directo)
+  // y sin cuenta (pide entrada y espera que alguien la acepte).
+  const shareLink = (room: MeetRoom) => `${window.location.origin}/entrar/${room.code}`;
 
-    const directCode = trimmed.replace(/^\/+|\/+$/g, "");
-    if (!/^https?:\/\//i.test(trimmed) && !directCode.includes("/") && !directCode.includes("?")) {
-      return directCode;
-    }
-
+  const handleCreate = async () => {
+    setCreating(true);
     try {
-      const parsed = new URL(trimmed);
-      const roomFromQuery = parsed.searchParams.get("room");
-      if (roomFromQuery) return decodeURIComponent(roomFromQuery).trim();
-
-      const segments = parsed.pathname.split("/").filter(Boolean);
-      const callIndex = segments.findIndex((segment) => segment.toLowerCase() === "call");
-      if (callIndex !== -1 && segments[callIndex + 1]) {
-        return decodeURIComponent(segments[callIndex + 1]).trim();
-      }
-    } catch {
-      // Not an absolute URL, continue with regex fallback
+      const room = await createRoom();
+      openCall(room);
+      await navigator.clipboard.writeText(shareLink(room)).catch(() => { /* sin portapapeles */ });
+      toast.success(`Reunión creada · código ${room.code}`, { description: "Link copiado." });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo crear la reunión");
+    } finally {
+      setCreating(false);
     }
-
-    const roomParamMatch = trimmed.match(/[?&]room=([^&#]+)/i);
-    if (roomParamMatch?.[1]) {
-      return decodeURIComponent(roomParamMatch[1]).trim();
-    }
-
-    const callPathMatch = trimmed.match(/\/call\/([^/?#]+)/i);
-    if (callPathMatch?.[1]) {
-      return decodeURIComponent(callPathMatch[1]).trim();
-    }
-
-    return directCode;
   };
 
-  const handleJoinByLink = () => {
-    const roomId = extractRoomId(joinLink);
-    if (!roomId) return;
-
-    const room = rooms.find((r) => r.id === roomId);
-    if (room) {
-      onJoinRoom(room);
-    } else {
-      onJoinRoom({
-        id: roomId,
-        name: roomId,
-        createdBy: "link",
-        createdAt: new Date(),
-        participants: [],
-        isActive: true,
-        shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}?name=${encodeURIComponent(roomId)}`,
-      });
-      toast.success("Uniéndote por enlace...");
+  const handleJoin = async () => {
+    const parsed = parseJoinInput(joinInput);
+    if (!parsed.code && !parsed.livekitRoom) return;
+    setJoining(true);
+    try {
+      const room = parsed.livekitRoom
+        ? await resolveByLivekitRoom(parsed.livekitRoom)
+        : await joinByCode(parsed.code!);
+      setJoinInput("");
+      openCall(room);
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo entrar a la reunión");
+    } finally {
+      setJoining(false);
     }
-
-    setJoinLink("");
   };
 
-  const copyLink = (link: string) => {
-    navigator.clipboard.writeText(link);
-    toast.success("Enlace copiado al portapapeles");
+  const handleEnd = async (room: MeetRoom) => {
+    if (!window.confirm(`¿Terminar "${room.name}"? El link y el código dejan de funcionar.`)) return;
+    try {
+      await endRoom(room.id);
+      toast.success("Reunión terminada");
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo terminar la reunión");
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/50">
-      <div className="shrink-0 flex items-center justify-between p-4 bg-primary/[0.03]">
+    <div className="flex flex-col h-full bg-card border-r border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Video Rooms</h2>
+          <h2 className="text-lg font-semibold text-foreground">Reuniones</h2>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-4 w-4" />
@@ -105,13 +97,16 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       </div>
 
       <div className="shrink-0 p-4 space-y-3">
-        {/* Quick actions */}
         <div className="grid grid-cols-3 gap-2">
-          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1 rounded-2xl">
-            <Plus className="h-5 w-5" />
-            <span className="text-xs">Nueva sala</span>
+          <Button onClick={handleCreate} disabled={creating} className="h-auto py-3 flex-col gap-1 rounded-2xl">
+            {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+            <span className="text-xs">Nueva</span>
           </Button>
-          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1 rounded-2xl">
+          <Button
+            variant="outline"
+            onClick={() => document.getElementById("join-link-input")?.focus()}
+            className="h-auto py-3 flex-col gap-1 rounded-2xl"
+          >
             <Link2 className="h-5 w-5" />
             <span className="text-xs">Unirse</span>
           </Button>
@@ -121,69 +116,97 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
           </Button>
         </div>
 
-        {/* Join by link */}
         <div className="flex gap-2">
           <Input
             id="join-link-input"
-            placeholder="Pegar enlace de la sala..."
+            placeholder="Código o enlace de la reunión..."
             className="h-9 bg-primary/5 border-0 text-xs rounded-full"
-            value={joinLink}
-            onChange={e => setJoinLink(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleJoinByLink()}
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleJoin()}
           />
-          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()} className="rounded-full">
-            Unirse
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleJoin}
+            disabled={!joinInput.trim() || joining}
+            className="rounded-full"
+            title="Entrar con el código o el link"
+          >
+            {joining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Entrar"}
           </Button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => navigate("/meet")}
+          className="text-[11px] text-muted-foreground hover:text-primary transition-colors w-full text-center"
+        >
+          Ver todas en Meet
+        </button>
       </div>
 
       <ScrollArea className="flex-1 px-4 pb-4">
+        {!loading && myRooms.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center px-2 py-6">
+            No tienes reuniones abiertas. Crea una y comparte el link o el código.
+          </p>
+        )}
         <div className="space-y-3">
-          {rooms.map(room => (
-            <Card key={room.id} className={cn("transition-colors border-0 rounded-3xl", room.isActive ? "bg-primary/8" : "bg-primary/[0.03]")}>
+          {myRooms.map((room) => (
+            <Card key={room.id} className="border-0 rounded-3xl bg-primary/[0.04]">
               <CardContent className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "h-8 w-8 rounded-lg flex items-center justify-center",
-                      room.isActive ? "bg-primary/20" : "bg-muted"
-                    )}>
-                      <Video className={cn("h-4 w-4", room.isActive ? "text-primary" : "text-muted-foreground")} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{room.name}</p>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <Users className="h-3 w-3" /> {room.participants.length}
-                        {room.isActive && (
-                          <Badge className="h-4 px-1.5 text-[9px] bg-success/20 text-success border-0">
-                            EN VIVO
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary/15 shrink-0">
+                    <Video className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{room.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(room.code);
+                        toast.success(`Código copiado: ${room.code}`);
+                      }}
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                      title="Copiar código"
+                    >
+                      <KeyRound className="h-2.5 w-2.5" />
+                      <span className="font-mono tracking-[0.15em]">{room.code}</span>
+                      <Copy className="h-2.5 w-2.5 opacity-60" />
+                    </button>
                   </div>
                 </div>
 
-                {/* Participants avatars */}
-                <div className="flex items-center gap-1">
-                  {room.participants.slice(0, 4).map(p => (
-                    <Avatar key={p.id} className="h-6 w-6 border-2 border-card -ml-1 first:ml-0">
-                      <AvatarFallback className="text-[9px] bg-muted">
-                        {(p.full_name || "?").split(" ").map(w => w[0]).join("").slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                  {room.participants.length > 4 && (
-                    <span className="text-[10px] text-muted-foreground ml-1">+{room.participants.length - 4}</span>
-                  )}
-                </div>
-
                 <div className="flex gap-2">
-                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => onJoinRoom(room)}>
-                    {room.isActive ? "Unirse ahora" : "Iniciar"}
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 text-xs"
+                    title={`Entrar a ${room.name}`}
+                    onClick={() => openCall(room)}
+                  >
+                    Entrar
                   </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyLink(room.shareLink)}>
-                    <Copy className="h-3 w-3" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    title="Copiar link de invitación"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareLink(room));
+                      toast.success("Link copiado — sirve con o sin cuenta en Maven");
+                    }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                    title="Terminar reunión"
+                    onClick={() => handleEnd(room)}
+                  >
+                    <PhoneOff className="h-3 w-3" />
                   </Button>
                 </div>
               </CardContent>
@@ -191,7 +214,6 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
           ))}
         </div>
       </ScrollArea>
-
     </div>
   );
 }

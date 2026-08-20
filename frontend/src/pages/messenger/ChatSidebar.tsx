@@ -178,7 +178,7 @@ export default function ChatSidebar({
             <StatusPicker />
           </div>
           <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onOpenVideoRooms} title="Video Rooms">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onOpenVideoRooms} title="Reuniones">
               <Video className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onNewChat} title="Nuevo chat">

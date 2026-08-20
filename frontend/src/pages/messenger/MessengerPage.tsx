@@ -7,7 +7,7 @@ import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
 
 import IncomingCallModal from "./components/IncomingCallModal";
-import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
+import { ConversationWithDetails, ChatMessage } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
@@ -44,7 +44,6 @@ export default function MessengerPage() {
   const { isAdmin: isSystemAdmin } = useUserRole();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const activeChatIdRef = useRef<string | null>(null);
-  const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -105,27 +104,6 @@ export default function MessengerPage() {
     setNewGroupOpen(false);
   };
 
-  const handleCreateRoom = (name: string) => {
-    const myRooms = videoRooms.filter(r => r.createdBy === "me");
-    if (myRooms.length >= 10) {
-      toast.error("Has alcanzado el máximo de 10 salas. Elimina una existente para crear otra.");
-      return;
-    }
-    const roomId = `room-${Date.now()}`;
-    const newRoom: VideoRoom = {
-      id: roomId, name, createdBy: "me", createdAt: new Date(),
-      participants: [], isActive: false,
-      shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}?name=${encodeURIComponent(name)}`,
-    };
-    setVideoRooms(prev => [newRoom, ...prev]);
-    toast.success(`Sala "${name}" creada`);
-  };
-
-  const handleJoinRoom = (room: VideoRoom) => {
-    openCallInNewTab(room.id, room.createdBy === "me", room.name);
-    setShowVideoRooms(false);
-  };
-
   const handleStartVideoCall = async (conv: ConversationWithDetails) => {
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
@@ -167,12 +145,7 @@ export default function MessengerPage() {
         activeChatId ? "hidden sm:flex sm:flex-col" : "flex flex-col"
       )}>
         {showVideoRooms ? (
-          <VideoRoomsPanel
-            rooms={videoRooms}
-            onCreateRoom={handleCreateRoom}
-            onJoinRoom={handleJoinRoom}
-            onClose={() => setShowVideoRooms(false)}
-          />
+          <VideoRoomsPanel onClose={() => setShowVideoRooms(false)} />
         ) : (
             <ChatSidebar
               conversations={conversations}
