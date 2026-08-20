@@ -22,7 +22,8 @@ export interface ZohoResult<T = unknown> {
 }
 
 export interface ZohoAccount {
-  zuid?: string;
+  /** Zoho lo devuelve como NÚMERO, no como string. */
+  zuid?: string | number;
   accountId?: string;
   primaryEmailAddress?: string;
   displayName?: string;
@@ -221,5 +222,26 @@ export function deleteMailbox(accountId: string): Promise<ZohoResult> {
   return zohoFetch(`/accounts`, {
     method: "DELETE",
     body: JSON.stringify({ accountId }),
+  });
+}
+
+/** Resetea la contraseña de una casilla como admin de la organización.
+ *
+ *  OJO: la ruta lleva **zuid**, NO accountId. Son identificadores distintos
+ *  y Zoho los devuelve juntos en /accounts, así que es fácil pasar el
+ *  equivocado y comerse un error opaco.
+ *
+ *  Es la pieza de recuperación: si la clave de cifrado se pierde o la
+ *  conexión de alguien se rompe, Maven genera una contraseña nueva y la
+ *  vuelve a guardar cifrada, sin intervención de la persona. */
+export function resetMailboxPassword(
+  zuid: string | number,
+  newPassword: string,
+): Promise<ZohoResult> {
+  return zohoFetch(`/accounts/${zuid}`, {
+    method: "PUT",
+    // El `zuid` va en la ruta Y en el cuerpo. Mandarlo solo en la ruta
+    // devuelve "zuid is null" — Zoho lo lee del body, no del path.
+    body: JSON.stringify({ zuid, mode: "resetPassword", password: newPassword }),
   });
 }

@@ -8,10 +8,15 @@
 // `authenticated` — solo service_role lo lee, que es lo que hacemos acá.
 //
 // Acciones:
-//   folders — carpetas de la casilla del usuario
+//   folders      — carpetas vía API REST (necesita conexión OAuth)
+//   imap_folders — carpetas vía IMAP con la credencial cifrada. Este es el
+//       camino DEFINITIVO: no requiere que la persona autorice nada, así que
+//       nunca ve la pantalla de Zoho. El de arriba queda como plan B.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
+import { ImapClient } from "../_shared/imap.ts";
+import { unseal } from "../_shared/mail-crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,35 +60,37 @@ Deno.serve(async (req) => {
     const { action } = body as { action?: string };
     if (!action) return json({ error: "action is required" }, 400);
 
-    // Conexión activa del usuario. Sin esto no hay nada que leer.
-    const { data: conn, error: connErr } = await admin
-      .from("mail_connections")
-      .select("id, email_address, zoho_account_id, refresh_token")
-      .eq("user_id", user.id)
-      .is("revoked_at", null)
-      .maybeSingle();
-
-    if (connErr) {
-      console.error("[mail-fetch] lectura de conexión falló:", connErr.message);
-      return json({ error: "no se pudo leer tu conexión de correo" }, 500);
-    }
-    if (!conn) return json({ error: "no_connection" }, 409);
-    if (!conn.zoho_account_id) {
-      return json({ error: "la conexión no tiene casilla asociada — reconectá" }, 409);
-    }
-
-    const tok = await refreshUserToken(conn.refresh_token as string);
-    if (!tok.ok || !tok.data) {
-      // Dejamos rastro para que el panel muestre la conexión en rojo en
-      // vez de fallar en silencio cada vez que alguien abra el correo.
-      await admin
-        .from("mail_connections")
-        .update({ last_error: tok.error ?? "refresh falló" })
-        .eq("id", conn.id);
-      return json({ error: `no se pudo renovar el acceso: ${tok.error}` }, 502);
-    }
-
+    // OJO: la búsqueda de la conexión OAuth va DENTRO de `folders`, no
+    // antes del dispatch: `imap_folders` no necesita conexión OAuth, y
+    // tenerla afuera lo bloqueaba pidiendo algo que no usa.
     if (action === "folders") {
+      const { data: conn, error: connErr } = await admin
+        .from("mail_connections")
+        .select("id, email_address, zoho_account_id, refresh_token")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+
+      if (connErr) {
+        console.error("[mail-fetch] lectura de conexión falló:", connErr.message);
+        return json({ error: "no se pudo leer tu conexión de correo" }, 500);
+      }
+      if (!conn) return json({ error: "no_connection" }, 409);
+      if (!conn.zoho_account_id) {
+        return json({ error: "la conexión no tiene casilla asociada — reconectá" }, 409);
+      }
+
+      const tok = await refreshUserToken(conn.refresh_token as string);
+      if (!tok.ok || !tok.data) {
+        // Dejamos rastro para que el panel muestre la conexión en rojo en
+        // vez de fallar en silencio cada vez que alguien abra el correo.
+        await admin
+          .from("mail_connections")
+          .update({ last_error: tok.error ?? "refresh falló" })
+          .eq("id", conn.id);
+        return json({ error: `no se pudo renovar el acceso: ${tok.error}` }, 502);
+      }
+
       const res = await listFolders(tok.data, conn.zoho_account_id as string);
       if (!res.ok) {
         await admin
@@ -110,6 +117,84 @@ Deno.serve(async (req) => {
           total: f.messageCount ?? 0,
         })),
       });
+    }
+
+    // === IMAP_FOLDERS ===
+    // Camino sin clics: descifra la credencial que Maven administra y se
+    // conecta por IMAP. La persona no autoriza nada ni ve nada de Zoho.
+    if (action === "imap_folders") {
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+
+      if (credErr) {
+        console.error("[mail-fetch] lectura de credencial falló:", credErr.message);
+        return json({ error: "no se pudo leer tu credencial de correo" }, 500);
+      }
+      if (!cred) return json({ error: "no_credential" }, 409);
+
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) {
+        // Clave de cifrado equivocada o ausente. NO es recuperable acá:
+        // hay que re-provisionar la credencial (ensure_credential).
+        await admin.from("mail_credentials")
+          .update({ last_error: "no se pudo descifrar la credencial" })
+          .eq("id", cred.id);
+        return json({
+          error: "no se pudo descifrar la credencial — hay que re-provisionarla",
+        }, 500);
+      }
+
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(
+          cred.imap_host as string,
+          cred.imap_port as number,
+        );
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) {
+          await admin.from("mail_credentials")
+            .update({ last_error: `IMAP login: ${auth.error ?? "rechazado"}` })
+            .eq("id", cred.id);
+          return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        }
+
+        const list = await client.listFolders();
+        if (!list.ok) return json({ error: `IMAP LIST: ${list.error}` }, 502);
+
+        const inbox = await client.selectFolder("INBOX");
+
+        await admin.from("mail_credentials")
+          .update({ last_used_at: new Date().toISOString(), last_error: null })
+          .eq("id", cred.id);
+
+        return json({
+          ok: true,
+          via: "imap",
+          email_address: cred.email_address,
+          folders: list.folders,
+          inbox: inbox.ok ? { total: inbox.exists, recientes: inbox.recent } : null,
+        });
+      } catch (e) {
+        const msg = (e as Error).message ?? "error de IMAP";
+        await admin.from("mail_credentials")
+          .update({ last_error: msg }).eq("id", cred.id);
+        return json({ error: msg }, 502);
+      } finally {
+        // Siempre cerrar: un socket abierto en una edge function que muere
+        // deja la conexión colgada del lado del servidor de correo.
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
     }
 
     return json({ error: `Acción desconocida: ${action}` }, 400);

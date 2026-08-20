@@ -9,8 +9,13 @@
 //
 // Acciones:
 //   status  — ¿están los secrets? ¿responde la API? (smoke test)
-//   create  — crea una casilla suelta (para el piloto: maven@unlok.me)
+//   create  — crea una casilla suelta
 //   disable — suspende una casilla
+//   ensure_credential — resetea la contraseña de una casilla y la guarda
+//       cifrada, para que Maven pueda conectarse por IMAP sin que la
+//       persona haga nada. Es también la RECUPERACIÓN: si la clave de
+//       cifrado se pierde, o la conexión de alguien se rompe, correr esto
+//       la deja andando de nuevo. Idempotente: se puede repetir siempre.
 //
 // Todo requiere rol admin.
 
@@ -19,8 +24,10 @@ import {
   createMailbox,
   disableMailbox,
   listAccounts,
+  resetMailboxPassword,
   zohoConfigured,
 } from "../_shared/zoho.ts";
+import { cryptoConfigured, seal } from "../_shared/mail-crypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,12 +114,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, email, first_name, last_name, account_id } = body as {
+    const { action, email, first_name, last_name, account_id, user_id } = body as {
       action?: string;
       email?: string;
       first_name?: string;
       last_name?: string;
       account_id?: string;
+      /** Usuario de Maven al que pertenece la casilla (para ensure_credential). */
+      user_id?: string;
     };
 
     if (!action) return json({ error: "action is required" }, 400);
@@ -135,7 +144,13 @@ Deno.serve(async (req) => {
         error: res.error,
         status: res.status,
         account_count: res.data?.length ?? null,
-        sample: (res.data ?? []).slice(0, 5).map((a) => a.primaryEmailAddress),
+        // zuid y accountId son identificadores, no secretos, y sin ellos
+        // no se puede diagnosticar ni llamar al resto de las acciones.
+        sample: (res.data ?? []).slice(0, 10).map((a) => ({
+          email: a.primaryEmailAddress,
+          zuid: a.zuid,
+          accountId: a.accountId,
+        })),
       });
     }
 
@@ -162,6 +177,55 @@ Deno.serve(async (req) => {
       if (res.skipped) return json({ error: "Zoho no configurado todavía" }, 409);
       if (!res.ok) return json({ error: res.error, status: res.status }, 502);
       return json({ ok: true });
+    }
+
+    // === ENSURE_CREDENTIAL ===
+    // Resetea la contraseña de la casilla y la guarda cifrada contra el
+    // usuario de Maven indicado. La persona no participa ni se entera.
+    if (action === "ensure_credential") {
+      if (!email || !user_id) {
+        return json({ error: "email y user_id son requeridos" }, 400);
+      }
+      if (!cryptoConfigured()) {
+        return json({ error: "falta el secret MAIL_CRED_KEY" }, 409);
+      }
+
+      // Necesitamos el zuid, y solo se obtiene listando la organización.
+      const accounts = await listAccounts();
+      if (!accounts.ok) return json({ error: accounts.error, status: accounts.status }, 502);
+      const acct = (accounts.data ?? []).find(
+        (a) => (a.primaryEmailAddress ?? "").toLowerCase() === email.toLowerCase(),
+      );
+      if (!acct?.zuid) {
+        return json({ error: `no existe casilla para ${email} en la organización` }, 404);
+      }
+
+      const password = generatePassword();
+      const reset = await resetMailboxPassword(acct.zuid, password);
+      if (!reset.ok) return json({ error: reset.error, status: reset.status }, 502);
+
+      const sealed = await seal(password);
+      if (!sealed) return json({ error: "no se pudo cifrar la credencial" }, 500);
+
+      const { error: upErr } = await adminClient
+        .from("mail_credentials")
+        .upsert({
+          user_id,
+          email_address: email,
+          secret_cipher: sealed.cipher,
+          secret_nonce: sealed.nonce,
+          key_version: sealed.keyVersion,
+          last_error: null,
+          revoked_at: null,
+        }, { onConflict: "user_id,email_address" });
+
+      if (upErr) {
+        console.error("[zoho-provision] upsert de credencial falló:", upErr.message);
+        return json({ error: "no se pudo guardar la credencial" }, 500);
+      }
+
+      // La contraseña NO se devuelve: nadie la necesita, es de máquina.
+      return json({ ok: true, email_address: email, zuid: acct.zuid });
     }
 
     return json({ error: `Acción desconocida: ${action}` }, 400);
