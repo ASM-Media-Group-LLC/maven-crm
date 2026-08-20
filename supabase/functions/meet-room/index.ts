@@ -132,6 +132,40 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // DECIDE GUEST — admitir o rechazar a un invitado sin cuenta
+    //
+    // Como en Google: a alguien de fuera de la organización solo lo admite
+    // alguien de adentro. Acá "de adentro" = tener cuenta en Maven, que es lo
+    // que este endpoint ya exige. El invitado NO recibe token al golpear: lo
+    // canjea después contra la edge pública, y solo si esto lo admitió.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "decideGuest") {
+      const requestId = String(body.requestId ?? "");
+      const admit = body.admit === true;
+      if (!requestId) return err("requestId required");
+
+      const { data: request } = await admin.from("meet_guest_requests")
+        .select("id, status, meet_room_id").eq("id", requestId).maybeSingle();
+      if (!request) return err("Solicitud no encontrada", 404);
+      if (request.status !== "pending") return err("Esa solicitud ya fue resuelta", 409);
+
+      const { data: room } = await admin.from("meet_rooms")
+        .select("id, status").eq("id", request.meet_room_id).maybeSingle();
+      if (!room || room.status !== "active") return err("Esa reunión ya terminó", 410);
+
+      const { error: upErr } = await admin.from("meet_guest_requests")
+        .update({
+          status: admit ? "admitted" : "denied",
+          decided_at: new Date().toISOString(),
+          decided_by: userId,
+        })
+        .eq("id", requestId);
+      if (upErr) return err(upErr.message, 500);
+
+      return json({ ok: true, status: admit ? "admitted" : "denied" });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // END — solo el anfitrión
     // ═══════════════════════════════════════════════════════════════
     if (action === "end") {

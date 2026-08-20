@@ -43,6 +43,7 @@ const ProjectSharePage = lazy(() => import("./pages/tareas/ProjectSharePage"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
+const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 // Correo (Zoho detrás). El módulo "Correo" todavía no está en
 // UNIVERSAL_MODULES, así que hoy solo lo alcanzan los admin — a propósito,
 // mientras la bandeja se construye.
@@ -258,6 +259,9 @@ const App = () => (
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
               {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
               <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
+              {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
+                  alguien de adentro lo admita. Pública a propósito. */}
+              <Route path="/entrar/:code" element={<MeetGuestPage />} />
               <Route path="/shared/agenda/:token" element={<SharedAgendaPage />} />
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
               <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
+import MeetGuestGate from "./meet/MeetGuestGate";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
 
@@ -155,6 +156,9 @@ export default function VideoCallPage() {
         initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
         initialBackgroundEffect={joinOpts.backgroundEffect}
       />
+      {/* Sala de espera: si es una reunión de Meet, quien está adentro (con cuenta)
+          ve a los invitados sin cuenta que piden entrar y los admite. */}
+      {roomName.startsWith("meet_") && <MeetGuestGate livekitRoom={roomName} />}
     </div>
   );
 }

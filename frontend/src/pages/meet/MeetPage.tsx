@@ -8,6 +8,14 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { isCompleteRoomCode } from "@/lib/coworkRoomCode";
 import { parseJoinInput } from "@/lib/meetJoinInput";
 
+// El link que se COMPARTE es /entrar/<código>, no /call/<sala>: esa página manda
+// a la llamada a quien tiene cuenta en Maven y le pide entrada a quien no la
+// tiene (sala de espera). Un link a /call/ directo dejaría al invitado externo
+// mirando la pantalla de login.
+function shareLink(room: MeetRoom) {
+  return `${window.location.origin}/entrar/${room.code}`;
+}
+
 // La llamada vive en /call/:roomName (VideoCallPage + livekit-token), igual que
 // cualquier otra videollamada de Maven. Se abre en pestaña aparte para que quien
 // está en la reunión pueda seguir usando el CRM sin cortar el audio.
@@ -38,7 +46,7 @@ export default function MeetPage() {
       const room = await createRoom();
       openCall(room);
       await navigator.clipboard
-        .writeText(`${window.location.origin}/call/${room.livekit_room_name}`)
+        .writeText(shareLink(room))
         .catch(() => { /* sin permiso de portapapeles: el link igual está en la lista */ });
       toast.success(`Reunión creada · código ${room.code}`, {
         description: "Link copiado. Compartilo con quien quieras que entre.",
@@ -68,8 +76,8 @@ export default function MeetPage() {
   };
 
   const copyLink = (room: MeetRoom) => {
-    navigator.clipboard.writeText(`${window.location.origin}/call/${room.livekit_room_name}`);
-    toast.success("Link copiado");
+    navigator.clipboard.writeText(shareLink(room));
+    toast.success("Link copiado — sirve con o sin cuenta en Maven");
   };
 
   const copyCode = (room: MeetRoom) => {

@@ -27,6 +27,11 @@ verify_jwt = false
 [functions.meet-room]
 verify_jwt = false
 
+# Puerta pública para invitados sin cuenta (sala de espera de Meet).
+# verify_jwt=false es DELIBERADO: la valida la función misma con rate limit por IP.
+[functions.meet-guest]
+verify_jwt = false
+
 [functions.scouter-generate-tasks]
 verify_jwt = false
 # schedule = "0 6 * * *"  # Not supported by CLI config parser; set via Dashboard
