@@ -4,6 +4,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
+ * Saca el mensaje ÚTIL de un error de edge function.
+ *
+ * `supabase.functions.invoke` devuelve un error genérico ("non-2xx status
+ * code") y deja la Response en `error.context`. Nuestras funciones ponen
+ * el motivo en el body como `{ error: "..." }`, así que sin leer el
+ * context se pierde exactamente la información que hace falta.
+ */
+async function describeFunctionError(error: unknown): Promise<string> {
+  const ctx = (error as { context?: unknown }).context;
+  if (ctx instanceof Response) {
+    try {
+      const body = await ctx.clone().json();
+      if (body?.error) return String(body.error);
+      const txt = await ctx.clone().text();
+      if (txt) return txt.slice(0, 400);
+    } catch {
+      // body no-JSON o ya consumido: caemos al mensaje genérico
+    }
+  }
+  return (error as Error)?.message ?? "error desconocido";
+}
+
+/**
  * Estado de la conexión de correo del usuario contra Zoho.
  *
  * Lee `v_my_mail_connection`, NO la tabla: el `refresh_token` está fuera
@@ -44,7 +67,7 @@ export function useMailConnection() {
     const { data, error } = await supabase.functions.invoke("mail-connect", {
       body: { action: "start" },
     });
-    if (error) throw error;
+    if (error) throw new Error(await describeFunctionError(error));
     const payload = data as { auth_url?: string; state?: string; error?: string };
     if (payload.error || !payload.auth_url || !payload.state) {
       throw new Error(payload.error ?? "no se pudo iniciar la conexión");
@@ -68,7 +91,11 @@ export function useMailConnection() {
       const { data, error } = await supabase.functions.invoke("mail-connect", {
         body: { action: "callback", code, state },
       });
-      if (error) throw error;
+      // OJO: ante un non-2xx, supabase-js NO pone el cuerpo en `error` —
+      // deja "Edge Function returned a non-2xx status code", que no dice
+      // nada. El motivo real viene en el body, accesible por
+      // `error.context` (la Response). Sin esto el diagnóstico es a ciegas.
+      if (error) throw new Error(await describeFunctionError(error));
       const payload = data as { ok?: boolean; email_address?: string; error?: string };
       if (!payload.ok) throw new Error(payload.error ?? "no se pudo completar la conexión");
       sessionStorage.removeItem("mail_oauth_state");
@@ -82,7 +109,7 @@ export function useMailConnection() {
       const { error } = await supabase.functions.invoke("mail-connect", {
         body: { action: "disconnect" },
       });
-      if (error) throw error;
+      if (error) throw new Error(await describeFunctionError(error));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-connection"] }),
   });
