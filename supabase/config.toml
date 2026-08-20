@@ -260,3 +260,6 @@ verify_jwt = false  # auth propia: Bearer del admin + chequeo de rol adentro
 
 [functions.mail-connect]
 verify_jwt = false  # auth propia: Bearer del usuario + state firmado (HMAC) en el callback
+
+[functions.mail-fetch]
+verify_jwt = false  # auth propia: Bearer del usuario + resuelve su conexión adentro

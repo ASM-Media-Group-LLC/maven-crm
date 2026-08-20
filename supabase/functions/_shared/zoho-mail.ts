@@ -209,3 +209,67 @@ export async function getMyAccounts(accessToken: string): Promise<OAuthResult<Zo
   }
   return { ok: true, data: (parsed.data ?? []) as ZohoMailAccount[] };
 }
+
+export interface ZohoFolder {
+  folderId?: string;
+  folderName?: string;
+  path?: string;
+  /** INBOX | SENT | DRAFTS | TRASH | SPAM | TEMPLATES | USER_DEFINED */
+  folderType?: string;
+  unreadCount?: number;
+  messageCount?: number;
+}
+
+/** Respuesta de error de Zoho, con el detalle en `data`, no en `status`. */
+function zohoError(raw: string, httpStatus: number): OAuthResult<never> {
+  let parsed: {
+    data?: { errorCode?: string; moreInfo?: string };
+    status?: { code?: number; description?: string };
+  };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, status: httpStatus, error: `respuesta no-JSON: ${raw.slice(0, 200)}` };
+  }
+  const parts = [
+    parsed.data?.errorCode,
+    parsed.data?.moreInfo,
+    parsed.status?.description,
+  ].filter(Boolean);
+  return {
+    ok: false,
+    status: parsed.status?.code ?? httpStatus,
+    error: parts.length ? parts.join(" — ") : raw.slice(0, 300),
+  };
+}
+
+/** Carpetas de una casilla. Es la llamada más liviana de la API de
+ *  mensajes, así que sirve de smoke test del acceso al correo. */
+export async function listFolders(
+  accessToken: string,
+  accountId: string,
+): Promise<OAuthResult<ZohoFolder[]>> {
+  const env = readOAuthEnv();
+  if (!env) return { ok: false, skipped: true, error: "OAuth de Zoho no configurado" };
+
+  let resp: Response;
+  try {
+    resp = await fetch(`https://mail.zoho.${env.dc}/api/accounts/${accountId}/folders`, {
+      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+    });
+  } catch (e) {
+    return { ok: false, error: `folders falló: ${(e as Error).message}` };
+  }
+
+  const raw = await resp.text();
+  let parsed: { data?: ZohoFolder[] & { errorCode?: string } };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, status: resp.status, error: `respuesta no-JSON: ${raw.slice(0, 200)}` };
+  }
+  const d = parsed.data as unknown as { errorCode?: string } | undefined;
+  if (!resp.ok || d?.errorCode) return zohoError(raw, resp.status);
+
+  return { ok: true, data: (parsed.data ?? []) as ZohoFolder[] };
+}
