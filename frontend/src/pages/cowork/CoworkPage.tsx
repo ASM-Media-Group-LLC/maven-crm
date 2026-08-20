@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession } from "@/hooks/useCoworkSession";
 import { useRoleTier } from "@/hooks/useRoleTier";
+import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import CoworkCreateDialog from "./CoworkCreateDialog";
 import CoworkLobby from "./CoworkLobby";
@@ -30,11 +31,17 @@ export default function CoworkPage() {
   const cowork = useCoworkSession(sessionId);
 
   // Crear una sesión es acción de coordinación: los roles de nivel "miembro" solo
-  // entran por el enlace que les pasa su coordinador. El backend rechaza igual la
-  // acción (cowork-session/createSession) — esto es para no mostrar un botón que
-  // termina en error.
+  // entran por el enlace o el código que les pasa su coordinador. El backend
+  // rechaza igual la acción (cowork-session/createSession, vía la misma regla en
+  // can_use_module_function) — esto es para no mostrar un botón que termina en
+  // error.
+  //
+  // Misma precedencia que la DB: la fila explícita del modal de permisos manda;
+  // sin fila, decide el nivel de acceso del rol.
   const { isSupervisorOrAbove, isLoading: tierLoading } = useRoleTier();
-  const canCreateSessions = isSupervisorOrAbove;
+  const { explicitPermission, isLoading: permsLoading } = usePermissions();
+  const canCreateSessions = explicitPermission("Cowork", "Crear sesión") ?? isSupervisorOrAbove;
+  const permissionLoading = tierLoading || permsLoading;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
@@ -185,7 +192,7 @@ export default function CoworkPage() {
                 ? "Vuelve a una de tus salas activas."
                 : "Abre el enlace que te compartió tu coordinador para entrar a tu sala."}
           </p>
-          {!tierLoading && (canCreateSessions ? (
+          {!permissionLoading && (canCreateSessions ? (
             <Button
               onClick={() => setShowCreate(true)}
               size="lg"

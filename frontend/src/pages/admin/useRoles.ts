@@ -125,7 +125,10 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Messenger: chat interno. (El borrado de conversación es por dueño/admin del grupo,
   // no por permiso — por eso ya no se declara un submódulo que no gateaba nada.)
   def("Menú", "Messenger"),
-  def("Menú", "Cowork"),
+  // Cowork: "Crear sesión" es acción de coordinación. Sin fila explícita el gate
+  // cae al nivel de acceso (supervisor+); marcarla acá permite dársela a un rol
+  // de nivel miembro, o quitársela a un supervisor, sin tocar código.
+  def("Menú", "Cowork", [], ["Crear sesión"]),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.

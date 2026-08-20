@@ -90,17 +90,22 @@ serve(async (req) => {
     // CREATE COWORK SESSION
     // ═══════════════════════════════════════════════════════════════
     if (action === "createSession") {
-      // Crear una sesión es una acción de COORDINACIÓN: solo supervisor o
-      // superior. Un rol de nivel "miembro" entra únicamente por el enlace que
-      // le pasa su coordinador (?session=…&room=…). Guarda dura acá porque el
-      // front solo esconde el botón, y esta función corre con service_role
-      // (bypassa RLS) — sin este check cualquiera con sesión válida podría
-      // llamar la acción a mano.
-      const { data: canCreate, error: tierErr } = await admin.rpc("is_in_role_group", {
+      // Crear una sesión es una acción de COORDINACIÓN. La regla vive en la DB
+      // (can_use_module_function) para que el front y esta función no se
+      // desincronicen: si el rol tiene fila explícita para Cowork → "Crear
+      // sesión" en el modal de permisos, esa fila manda; si no la tiene, cae al
+      // nivel de acceso supervisor+. Así un admin puede habilitar a un rol de
+      // nivel miembro desde Administración → Roles sin tocar código.
+      // Guarda dura acá porque el front solo esconde el botón, y esta función
+      // corre con service_role (bypassa RLS): sin este check cualquiera con
+      // sesión válida podría llamar la acción a mano.
+      const { data: canCreate, error: permErr } = await admin.rpc("can_use_module_function", {
         _user_id: userId,
-        _group: "supervisor_or_above",
+        _module: "Cowork",
+        _submodule: "Crear sesión",
+        _fallback_group: "supervisor_or_above",
       });
-      if (tierErr) return err(tierErr.message, 500);
+      if (permErr) return err(permErr.message, 500);
       if (!canCreate) {
         return err("Tu rol no permite crear sesiones de Cowork. Pide el enlace de la sala a tu coordinador.", 403);
       }

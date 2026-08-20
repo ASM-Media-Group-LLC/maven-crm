@@ -83,6 +83,26 @@ export const usePermissions = () => {
     return false;
   };
 
+  // Permiso EXPLÍCITO de una acción: true/false si el rol tiene fila para ella,
+  // `null` si no tiene ninguna. Distinguir "no hay fila" de "está en false" es lo
+  // que permite que una acción caiga a su default (p. ej. el nivel de acceso del
+  // rol) sin pisar lo que un admin configuró a mano.
+  //
+  // `canAccess` NO sirve para esto: cuando no encuentra fila específica cae al
+  // permiso del módulo, y para los módulos universales (Dashboard, Messenger,
+  // Cowork) eso es `true` para todo el mundo — o sea, cualquier acción quedaría
+  // habilitada por defecto.
+  //
+  // Espeja `can_use_module_function()` en la DB, que es la que realmente decide
+  // del lado del servidor.
+  const explicitPermission = (module: string, submodule: string): boolean | null => {
+    if (isAdmin) return true;
+    const row = permissions.find(
+      (p) => p.module === module && p.submodule === submodule,
+    );
+    return row ? row.can_access : null;
+  };
+
   const dataScope = (module: string): "all" | "subordinates" | "self" => {
     if (isAdmin) return "all";
 
@@ -94,6 +114,7 @@ export const usePermissions = () => {
 
   return {
     canAccess,
+    explicitPermission,
     dataScope,
     isLoading: roleLoading || permsLoading,
     permissions,
