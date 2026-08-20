@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
-  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell,
+  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
   Volume2, VolumeX, Mail,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -99,6 +99,7 @@ const DashboardSidebar = () => {
     { title: "Correo", url: "/correo", icon: Mail, module: "Correo" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
+    { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },

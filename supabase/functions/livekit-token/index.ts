@@ -142,6 +142,20 @@ serve(async (req) => {
 
         verifiedAdmin = (callData && callData.length > 0);
       }
+
+      // Meet: quien creó la reunión es su anfitrión (mutear, echar, terminar),
+      // como en Google Meet. Se verifica contra la tabla, no contra lo que diga
+      // el cliente en `isAdmin`.
+      if (!verifiedAdmin && roomName.startsWith("meet_")) {
+        const { data: meetRoom } = await adminClient
+          .from("meet_rooms")
+          .select("created_by")
+          .eq("livekit_room_name", roomName)
+          .eq("created_by", userId)
+          .limit(1);
+
+        verifiedAdmin = !!(meetRoom && meetRoom.length > 0);
+      }
     }
 
     const livekitUrl = Deno.env.get("LIVEKIT_URL")!;

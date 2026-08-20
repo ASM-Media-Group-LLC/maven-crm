@@ -129,6 +129,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // cae al nivel de acceso (supervisor+); marcarla acá permite dársela a un rol
   // de nivel miembro, o quitársela a un supervisor, sin tocar código.
   def("Menú", "Cowork", [], ["Crear sesión"]),
+  // Meet: reuniones ad-hoc. Crear la puede cualquiera por default (a diferencia de
+  // Cowork), pero queda acá para poder quitárselo a un rol desde la UI.
+  def("Menú", "Meet", [], ["Crear reunión", "Terminar reunión"]),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.
