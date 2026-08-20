@@ -70,7 +70,7 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId).eq("status", "active");
       if (activeCount !== null && activeCount >= 10) {
-        return err("Tenés 10 reuniones abiertas. Terminá alguna para crear otra.");
+        return err("Tienes 10 reuniones abiertas. Termina alguna para crear otra.");
       }
 
       const rawName = String(body.name ?? "").trim();

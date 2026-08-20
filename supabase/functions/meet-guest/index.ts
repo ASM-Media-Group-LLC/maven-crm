@@ -112,7 +112,7 @@ serve(async (req) => {
       const code = normalizeCode(body.code);
       const rawName = String(body.name ?? "").trim().replace(/\s+/g, " ");
       if (code.length !== 6) return err("Código inválido");
-      if (rawName.length < 2) return err("Poné tu nombre para pedir entrar");
+      if (rawName.length < 2) return err("Escribe tu nombre para pedir entrar");
       const guestName = rawName.slice(0, 40);
 
       const ipHash = await hashIp(clientIp(req), ipSalt);
@@ -124,7 +124,7 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("ip_hash", ipHash).gte("created_at", since);
       if (recentAttempts !== null && recentAttempts >= MAX_ATTEMPTS_PER_10MIN) {
-        return err("Demasiados intentos. Esperá unos minutos.", 429);
+        return err("Demasiados intentos. Espera unos minutos.", 429);
       }
 
       const { data: room } = await admin.from("meet_rooms")
@@ -144,7 +144,7 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("meet_room_id", room.id).eq("ip_hash", ipHash).eq("status", "denied");
       if (denials !== null && denials >= MAX_DENIALS_PER_ROOM) {
-        return err("Tu solicitud fue rechazada. Contactá a quien te invitó.", 403);
+        return err("Tu solicitud fue rechazada. Contacta a quien te invitó.", 403);
       }
 
       const guestToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
