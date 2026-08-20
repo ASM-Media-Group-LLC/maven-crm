@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
  * el motivo en el body como `{ error: "..." }`, así que sin leer el
  * context se pierde exactamente la información que hace falta.
  */
-async function describeFunctionError(error: unknown): Promise<string> {
+export async function describeFunctionError(error: unknown): Promise<string> {
   const ctx = (error as { context?: unknown }).context;
   if (ctx instanceof Response) {
     try {
