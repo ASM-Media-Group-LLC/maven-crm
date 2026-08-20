@@ -1064,36 +1064,12 @@ export function useLiveKit() {
                 )
               );
             }, 15000);
-          } else if (msg.type === "moderation") {
-            const action = msg.payload?.action;
-            const target = msg.payload?.target;
-
-            if (target !== room.localParticipant.identity) return;
-
-            if (action === "mute") {
-              // Any participant can mute others
-              room.localParticipant.setMicrophoneEnabled(false);
-              setIsMicOn(false);
-              refreshParticipants();
-            } else if (action === "remove") {
-              // Only admins can remove — validate sender
-              const senderParticipant = participant ? room.remoteParticipants.get(participant.identity) || (participant.identity === room.localParticipant.identity ? room.localParticipant : null) : null;
-              let metadataAdmin = false;
-              try {
-                const meta = JSON.parse(senderParticipant?.metadata || "{}");
-                metadataAdmin = !!meta.isAdmin;
-              } catch {}
-              const senderPermissions = senderParticipant?.permissions;
-              const isSenderAdmin = (senderPermissions?.canPublish && senderPermissions?.canSubscribe) || metadataAdmin;
-
-              if (!isSenderAdmin) {
-                console.warn("[LiveKit] Ignoring remove command from non-admin:", participant?.identity);
-                return;
-              }
-              setError("Has sido removido de la llamada por un moderador");
-              room.disconnect(true);
-            }
           }
+          // El tipo "moderation" del canal de datos se ELIMINÓ: mutear y expulsar
+          // los ejecuta ahora el servidor (edge livekit-moderate). Obedecer una
+          // orden que llegaba por datos era opcional para el cliente, y el
+          // chequeo de "sos admin" que corría acá daba verdadero para cualquier
+          // participante (comparaba canPublish && canSubscribe).
         } catch {}
       });
 
@@ -1451,25 +1427,57 @@ export function useLiveKit() {
   }, []);
 
   // ── Moderation ────────────────────────────────────────────────
-  const muteParticipant = useCallback(async (identity: string) => {
+  // ── Moderación ────────────────────────────────────────────────────────
+  // ANTES esto publicaba un mensaje por el canal de datos y esperaba que el
+  // cliente de la víctima se muteara o se desconectara solo: honor system. Quien
+  // no quería obedecer, no obedecía. Ahora la orden la ejecuta el servidor de
+  // LiveKit y la autorización la decide la base (can_moderate_livekit_room).
+  const moderate = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     const room = roomRef.current;
-    if (!room) return;
-    const msg: DataMessage = { type: "moderation", payload: { action: "mute", target: identity } };
-    room.localParticipant.publishData(
-      new TextEncoder().encode(JSON.stringify(msg)),
-      { reliable: true }
+    if (!room?.name) throw new Error("No estás en una llamada");
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/livekit-moderate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action, room: room.name, ...payload }),
+      }
     );
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "No se pudo aplicar la acción");
+    return json;
   }, []);
 
+  const muteParticipant = useCallback(async (identity: string) => {
+    await moderate("muteParticipant", { identity });
+  }, [moderate]);
+
   const removeParticipant = useCallback(async (identity: string) => {
-    const room = roomRef.current;
-    if (!room) return;
-    const msg: DataMessage = { type: "moderation", payload: { action: "remove", target: identity } };
-    room.localParticipant.publishData(
-      new TextEncoder().encode(JSON.stringify(msg)),
-      { reliable: true }
-    );
-  }, []);
+    await moderate("removeParticipant", { identity });
+  }, [moderate]);
+
+  const muteAllParticipants = useCallback(async () => {
+    const res = await moderate("muteAll");
+    return (res?.muted ?? 0) as number;
+  }, [moderate]);
+
+  // El "solo ver" de Google: le saca (o le devuelve) la capacidad de publicar.
+  const setParticipantCanPublish = useCallback(async (identity: string, canPublish: boolean) => {
+    await moderate("setCanPublish", { identity, canPublish });
+  }, [moderate]);
+
+  const endRoomForAll = useCallback(async () => {
+    await moderate("endRoom");
+  }, [moderate]);
+
+  const setCohost = useCallback(async (identity: string, isCohost: boolean) => {
+    await moderate("setCohost", { identity, isCohost });
+  }, [moderate]);
 
   const getRoom = useCallback(() => roomRef.current, []);
 
@@ -1680,6 +1688,10 @@ export function useLiveKit() {
     sendChatMessage,
     muteParticipant,
     removeParticipant,
+    muteAllParticipants,
+    setParticipantCanPublish,
+    endRoomForAll,
+    setCohost,
     getRoom,
     setBackgroundEffect,
     clearUnreadChat,

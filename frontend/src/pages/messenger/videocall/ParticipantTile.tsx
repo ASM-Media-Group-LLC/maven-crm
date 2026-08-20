@@ -342,7 +342,9 @@ const ParticipantTile = memo(function ParticipantTile({
                   {isPinned ? "Desanclar" : "Anclar en pantalla"}
                 </DropdownMenuItem>
               )}
-              {!participant.isLocal && onMuteParticipant && !participant.isMuted && (
+              {/* Silenciar es acción de anfitrión: el servidor rechaza al resto,
+                  así que ofrecerlo a todos era prometer algo que no pasa. */}
+              {isAdmin && !participant.isLocal && onMuteParticipant && !participant.isMuted && (
                 <DropdownMenuItem onClick={() => onMuteParticipant(participant.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
                   <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
                 </DropdownMenuItem>

@@ -50,6 +50,49 @@ describe("CallParticipantsSidebar", () => {
     expect(buttons.length).toBeGreaterThanOrEqual(3);
   });
 
+  // ── Controles de anfitrión ────────────────────────────────────────────
+  // La moderación pasó de honor system (un mensaje por el canal de datos que el
+  // cliente de la víctima podía ignorar) a órdenes server-side. Estos casos
+  // fijan lo que la UI puede ofrecer y a quién.
+
+  it("no ofrece los controles de anfitrión a quien no lo es", () => {
+    render(
+      <CallParticipantsSidebar
+        {...defaultProps}
+        isAdmin={false}
+        onMuteAll={vi.fn()}
+        onEndForAll={vi.fn()}
+      />
+    );
+    expect(screen.queryByText("Silenciar a todos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Terminar para todos")).not.toBeInTheDocument();
+  });
+
+  it("ofrece silenciar a todos y terminar para todos al anfitrión", () => {
+    render(
+      <CallParticipantsSidebar
+        {...defaultProps}
+        isAdmin={true}
+        onMuteAll={vi.fn()}
+        onEndForAll={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Silenciar a todos")).toBeInTheDocument();
+    expect(screen.getByText("Terminar para todos")).toBeInTheDocument();
+  });
+
+  it("silenciar a todos dispara la acción", () => {
+    const onMuteAll = vi.fn();
+    render(<CallParticipantsSidebar {...defaultProps} isAdmin={true} onMuteAll={onMuteAll} />);
+    fireEvent.click(screen.getByText("Silenciar a todos"));
+    expect(onMuteAll).toHaveBeenCalled();
+  });
+
+  it("sin las acciones cableadas no muestra la sección (una llamada 1:1 no modera)", () => {
+    render(<CallParticipantsSidebar {...defaultProps} isAdmin={true} />);
+    expect(screen.queryByText("Controles de anfitrión")).not.toBeInTheDocument();
+  });
+
   it("sorts hand-raised participants first (after local)", () => {
     const { container } = render(<CallParticipantsSidebar {...defaultProps} />);
     const names = container.querySelectorAll("span.truncate");

@@ -144,6 +144,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada"); }, [lk, onLeave, suppressLeaveToast]);
 
+  // Una acción de moderación puede volver con 403 del servidor (no sos
+  // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
+  // honor system anterior no había respuesta posible — el mensaje salía al aire
+  // y nadie sabía si había pasado algo.
+  const runModeration = useCallback(async (fn: () => Promise<unknown>, okMessage: string) => {
+    try {
+      await fn();
+      toast.success(okMessage);
+    } catch (e: any) {
+      toast.error(e?.message || "No se pudo aplicar la acción");
+    }
+  }, []);
+
+  const handleModeration = useCallback(
+    (fn: (identity: string) => Promise<void>, okMessage: string) => (identity: string) => {
+      void runModeration(() => fn(identity), okMessage);
+    },
+    [runModeration],
+  );
+
   const handleAudioInputChange = useCallback((id: string) => { setAudioInputId(id); lk.switchAudioInput?.(id); }, [lk]);
   const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);
   const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk]);
@@ -284,7 +304,36 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         </div>
 
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
-        {participantsOpen && <CallParticipantsSidebar participants={lk.participants} isAdmin={isAdmin} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onClose={() => setParticipantsOpen(false)} />}
+        {participantsOpen && (
+          <CallParticipantsSidebar
+            participants={lk.participants}
+            isAdmin={isAdmin}
+            onMuteParticipant={handleModeration(lk.muteParticipant, "Silenciado")}
+            onRemoveParticipant={handleModeration(lk.removeParticipant, "Sacado de la llamada")}
+            onSetCanPublish={(identity, canPublish) =>
+              runModeration(
+                () => lk.setParticipantCanPublish(identity, canPublish),
+                canPublish ? "Puede volver a hablar" : "Queda solo como oyente",
+              )}
+            onSetCohost={(identity, isCohost) =>
+              runModeration(
+                () => lk.setCohost(identity, isCohost),
+                isCohost ? "Ahora es co-anfitrión" : "Ya no es co-anfitrión",
+              )}
+            onMuteAll={() => runModeration(
+              async () => {
+                const muted = await lk.muteAllParticipants();
+                return muted;
+              },
+              "Todos silenciados",
+            )}
+            onEndForAll={async () => {
+              if (!window.confirm("¿Terminar la llamada para todos los participantes?")) return;
+              await runModeration(lk.endRoomForAll, "Llamada terminada para todos");
+            }}
+            onClose={() => setParticipantsOpen(false)}
+          />
+        )}
       </div>
 
       {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}

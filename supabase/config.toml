@@ -27,6 +27,9 @@ verify_jwt = false
 [functions.meet-room]
 verify_jwt = false
 
+[functions.livekit-moderate]
+verify_jwt = false
+
 # Puerta pública para invitados sin cuenta (sala de espera de Meet).
 # verify_jwt=false es DELIBERADO: la valida la función misma con rate limit por IP.
 [functions.meet-guest]
