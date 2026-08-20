@@ -9,7 +9,7 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
-  Pin, PinOff, PhoneOff, PictureInPicture2,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -716,6 +716,25 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <Share2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+
+                      {/* Código de la sala: la alternativa al link que sobrevive a
+                          WhatsApp y se puede dictar por voz. El participante lo pega
+                          en "Entrar con el código de tu sala". */}
+                      {room.join_code && (
+                        <button
+                          type="button"
+                          title="Copiar código de esta sala"
+                          className="flex items-center justify-center gap-1.5 w-full text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                          onClick={() => {
+                            navigator.clipboard.writeText(room.join_code!);
+                            toast.success(`Código de ${room.name}: ${room.join_code}`);
+                          }}
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          <span className="font-mono tracking-[0.2em]">{room.join_code}</span>
+                          <Copy className="h-2.5 w-2.5 opacity-60" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

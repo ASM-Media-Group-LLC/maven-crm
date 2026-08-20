@@ -231,7 +231,57 @@ serve(async (req) => {
       return json({ membership, alreadyJoined: false });
     }
 
-    // (assignToRoom removed — participants self-join via URL ?room=X)
+    // ═══════════════════════════════════════════════════════════════
+    // JOIN BY ROOM CODE
+    // Canjea el código corto de una sala (cowork_rooms.join_code) por
+    // membresía + asignación. Es la puerta de entrada del participante cuando
+    // el link largo no sobrevivió al camino (WhatsApp, PWA, copy/paste): el
+    // coordinador dicta 6 caracteres y el chatter entra a LA sala que le toca.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "joinByCode") {
+      // Normalizamos lo que la gente realmente pega: minúsculas, espacios, guiones.
+      const code = String(body.code ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length !== 6) return err("El código debe tener 6 caracteres");
+
+      const { data: room } = await admin.from("cowork_rooms")
+        .select("id, session_id, name").eq("join_code", code).maybeSingle();
+      if (!room) return err("Código inválido. Pedile el código a tu coordinador.", 404);
+
+      const { data: session } = await admin.from("cowork_sessions")
+        .select("id, name, status").eq("id", room.session_id).maybeSingle();
+      if (!session || session.status !== "active") return err("Esa sesión ya finalizó", 410);
+
+      const { data: existing } = await admin.from("cowork_memberships")
+        .select("id, role").eq("session_id", room.session_id).eq("user_id", userId).maybeSingle();
+
+      if (!existing) {
+        const { error: memErr } = await admin.from("cowork_memberships").insert({
+          session_id: room.session_id, user_id: userId, role: "participant",
+        });
+        if (memErr) return err(memErr.message, 500);
+      }
+
+      // Un host que canjea un código NO se degrada a participante: los hosts
+      // viven en el Hub y entran a las salas desde el dashboard.
+      const isHost = existing?.role === "host";
+      if (!isHost) {
+        // El índice único parcial de asignaciones activas exige desactivar la
+        // anterior antes de insertar la nueva.
+        await admin.from("cowork_room_assignments").update({ is_active: false })
+          .eq("session_id", room.session_id).eq("user_id", userId).eq("is_active", true);
+        const { error: asgErr } = await admin.from("cowork_room_assignments").insert({
+          session_id: room.session_id, user_id: userId, room_id: room.id, assigned_by: userId,
+        });
+        if (asgErr) return err(asgErr.message, 500);
+      }
+
+      return json({
+        sessionId: room.session_id, sessionName: session.name,
+        roomId: room.id, roomName: room.name, isHost,
+      });
+    }
+
+    // (assignToRoom removed — participants self-join via URL ?room=X or a room code)
 
     // ═══════════════════════════════════════════════════════════════
     // LEAVE ROOM (deactivate caller's active assignment)
