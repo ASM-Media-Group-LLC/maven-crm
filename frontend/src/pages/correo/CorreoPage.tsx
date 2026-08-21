@@ -286,7 +286,11 @@ export default function CorreoPage() {
         >
           {/* Carpetas como píldoras cuando no está la columna lateral —
               mismo patrón que los filtros de Messenger. */}
-          <div className="scrollbar-hide flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2 lg:hidden">
+          {/* SIN scrollbar-hide a propósito: con la barra oculta, quien usa
+              mouse no tiene forma de desplazarse entre las carpetas (el
+              gesto táctil no existe y la rueda scrollea vertical). La
+              barra finita es el asa. */}
+          <div className="flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2 pb-1.5 lg:hidden">
             {(carpetas.data ?? [{ folder: carpeta, unread: 0 }]).map(({ folder: f }) => {
               const Icono = iconoCarpeta(f);
               const activa = f === carpeta;
@@ -308,7 +312,12 @@ export default function CorreoPage() {
             })}
           </div>
 
-          <ScrollArea className="flex-1">
+          {/* [&_[data-radix-scroll-area-viewport]>div]: Radix envuelve el
+              contenido en un div display:table; min-width:100% que crece más
+              que el viewport y SE COME EL BORDE DERECHO (acá, las horas de
+              la lista — mismo bug que ya mordió a Messenger). Forzarlo a
+              block lo clampa y deja funcionar a truncate/min-w-0. */}
+          <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
             <div className="space-y-0.5 p-2">
               {lista.isLoading &&
                 [...Array(6)].map((_, i) => (
@@ -373,7 +382,7 @@ export default function CorreoPage() {
               detalle={(mensaje.error as Error).message}
             />
           ) : mensaje.data ? (
-            <ScrollArea className="h-full">
+            <ScrollArea className="h-full [&_[data-radix-scroll-area-viewport]>div]:!block">
               <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
                 <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
                   {mensaje.data.subject}
