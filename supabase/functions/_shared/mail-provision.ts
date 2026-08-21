@@ -52,6 +52,25 @@ export function generateMailboxPassword(): string {
   return chars.join("");
 }
 
+/** Dominio de las casillas del equipo. */
+export const DOMINIO_CASILLA = Deno.env.get("MAIL_TEAM_DOMAIN") || "maven-ai.me";
+
+/** `José Pérez` -> `jose.perez`. Sin tildes ni eñes: una dirección con
+ *  caracteres acentuados funciona mal en medio mundo. El frontend tiene una
+ *  copia de esta lógica SOLO para previsualizar; la autoridad es esta. */
+export function direccionSugerida(nombre: string, apellido: string): string | null {
+  const limpiar = (s: string) =>
+    s.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "")
+      .trim();
+  const n = limpiar(nombre);
+  const a = limpiar(apellido);
+  if (!n && !a) return null;
+  return [n, a].filter(Boolean).join(".");
+}
+
 export interface ProvisionInput {
   /** Cliente con service_role: escribe `mail_credentials`, que está fuera
    *  del alcance de cualquier usuario. */

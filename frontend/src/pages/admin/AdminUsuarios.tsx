@@ -12,7 +12,7 @@ import EditUserModal from "./EditUserModal";
 import DeleteUserDialog from "./DeleteUserDialog";
 import RolesContent from "./RolesContent";
 import ResetPasswordModal from "./ResetPasswordModal";
-import AddUserModal from "./AddUserModal";
+import AddUserModal, { type CredencialesCreadas } from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Loader2 } from "lucide-react";
@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 const AdminUsuarios = () => {
+  const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
   const { canAccess } = usePermissions();
   const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
@@ -259,36 +260,32 @@ const AdminUsuarios = () => {
 
               <AddUserModal
                 open={addUserOpen}
-                onOpenChange={setAddUserOpen}
+                onOpenChange={(o) => {
+                  setAddUserOpen(o);
+                  if (!o) setCredenciales(null);
+                }}
+                credenciales={credenciales}
                 onConfirm={(data) => {
                   adminAction.mutate(
                     { action: "create_user", ...data },
                     {
                       onSuccess: (res) => {
-                        setAddUserOpen(false);
-                        // La casilla se crea con mejor esfuerzo: si falla,
-                        // el usuario igual queda creado. Hay que DECIRLO —
-                        // un "creado exitosamente" a secas esconde que esa
-                        // persona se va a quedar sin correo.
+                        // El modal NO se cierra: pasa a la vista de entrega
+                        // con el correo generado y la contraseña temporal,
+                        // que es lo que el admin le pasa a la persona. La
+                        // casilla es mejor-esfuerzo y su estado se muestra
+                        // ahí mismo.
                         const r = res as {
-                          email_sent_to?: string;
+                          email?: string;
+                          temp_password?: string;
                           mailbox?: { ok: boolean; error?: string | null } | null;
                         } | undefined;
-                        const casilla = r?.mailbox;
-                        if (casilla && !casilla.ok) {
-                          toast({
-                            title: "Usuario creado, pero sin casilla de correo",
-                            description: `${casilla.error ?? "no se pudo crear"} — se puede reintentar sin romper nada.`,
-                            variant: "destructive",
-                          });
-                        } else {
-                          toast({
-                            title: "Usuario creado exitosamente",
-                            description: r?.email_sent_to
-                              ? `Contraseña temporal enviada a ${r.email_sent_to}`
-                              : undefined,
-                          });
-                        }
+                        setCredenciales({
+                          email: r?.email ?? "",
+                          temp_password: r?.temp_password ?? "",
+                          mailbox_ok: r?.mailbox?.ok ?? false,
+                          mailbox_error: r?.mailbox?.error ?? null,
+                        });
                       },
                     }
                   );

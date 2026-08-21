@@ -4,35 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, AtSign, LifeBuoy, Mail, User, Loader2 } from "lucide-react";
+import { AtSign, Check, Copy, KeyRound, Loader2, Mail, User, UserCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-/** Dominio de las casillas del equipo. Solo se usa para SUGERIR la
- *  dirección; el admin puede escribir la que quiera. */
+/**
+ * Alta de usuario: NOMBRE, APELLIDO y ROL. Nada más.
+ *
+ * El correo de acceso NO se pide: se genera del nombre
+ * (juan.perez@maven-ai.me; si está ocupado, juan.perez1@...) y es a la vez
+ * la casilla de correo — identidad = casilla. La contraseña temporal
+ * aparece acá al terminar, para que el admin se la entregue en mano: la
+ * recuperación también es por admin (reset y entrega), así que no hay
+ * correo personal que pedir.
+ *
+ * Decisión de producto de Jhon (21/08/2026), reemplaza al formulario de
+ * cinco campos.
+ */
+
+/** Dominio de las casillas. Copia SOLO para previsualizar: la dirección
+ *  final la decide el backend (que además resuelve colisiones). */
 const DOMINIO_CASILLA = "maven-ai.me";
 
-export interface NuevoUsuario {
-  email: string;
-  first_name: string;
-  last_name: string;
-  role?: string;
-  /** Correo personal, fuera de Maven. Ver la nota del campo. */
-  recovery_email?: string;
-  /** Casilla de trabajo a crear. Si va vacía, no se provisiona nada. */
-  mailbox_email?: string;
-}
-
-interface AddUserModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: (data: NuevoUsuario) => void;
-  isLoading: boolean;
-}
-
-/** `José Pérez` → `jose.perez`. Sin tildes ni eñes: una dirección de
- *  correo con caracteres acentuados funciona mal en medio mundo. */
-function sugerirCasilla(nombre: string, apellido: string): string {
+function sugerirDireccion(nombre: string, apellido: string): string | null {
   const limpiar = (s: string) =>
     s.normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -41,51 +35,54 @@ function sugerirCasilla(nombre: string, apellido: string): string {
       .trim();
   const n = limpiar(nombre);
   const a = limpiar(apellido);
-  if (!n && !a) return "";
+  if (!n && !a) return null;
   return `${[n, a].filter(Boolean).join(".")}@${DOMINIO_CASILLA}`;
 }
 
-const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export interface NuevoUsuario {
+  first_name: string;
+  last_name: string;
+  role?: string;
+}
 
-const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading }: AddUserModalProps) => {
-  const [email, setEmail] = useState("");
+/** Lo que el backend devuelve y el admin tiene que ENTREGAR. */
+export interface CredencialesCreadas {
+  email: string;
+  temp_password: string;
+  mailbox_ok: boolean;
+  mailbox_error?: string | null;
+}
+
+interface AddUserModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (data: NuevoUsuario) => void;
+  isLoading: boolean;
+  /** Al llegar, el modal pasa a la vista de entrega de credenciales. */
+  credenciales?: CredencialesCreadas | null;
+}
+
+const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }: AddUserModalProps) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
-  const [recoveryEmail, setRecoveryEmail] = useState("");
-  const [mailbox, setMailbox] = useState("");
-  // Mientras el admin no toque la casilla a mano, la seguimos sugiriendo
-  // a partir del nombre. En cuanto la edita, dejamos de pisársela.
-  const [casillaEditada, setCasillaEditada] = useState(false);
+  const [copiado, setCopiado] = useState<"correo" | "clave" | null>(null);
 
-  const limpiar = () => {
-    setEmail("");
-    setFirstName("");
-    setLastName("");
-    setRole("employee");
-    setRecoveryEmail("");
-    setMailbox("");
-    setCasillaEditada(false);
-  };
-
-  // Resetea el form cada vez que el modal se abre. Antes solo se
-  // limpiaba cuando el usuario cerraba el diálogo (Esc / click fuera /
-  // Cancelar) — pero cuando el padre lo cierra programáticamente al
-  // guardar (`setAddUserOpen(false)` en el onSuccess), el callback
-  // onOpenChange del Dialog no dispara, entonces los campos quedaban
-  // pegados con los datos del último usuario creado y la próxima
-  // apertura mostraba el form sucio.
+  // Resetea el form cada vez que el modal se abre (el cierre programático
+  // del padre no dispara onOpenChange, y el form quedaba sucio).
   useEffect(() => {
-    if (open) limpiar();
+    if (open) {
+      setFirstName("");
+      setLastName("");
+      setRole("employee");
+      setCopiado(null);
+    }
   }, [open]);
 
   const sugerida = useMemo(
-    () => sugerirCasilla(firstName, lastName),
+    () => sugerirDireccion(firstName, lastName),
     [firstName, lastName],
   );
-  useEffect(() => {
-    if (!casillaEditada) setMailbox(sugerida);
-  }, [sugerida, casillaEditada]);
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles-config-select"],
@@ -100,185 +97,186 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading }: AddUserModal
     },
   });
 
-  // Si la dirección de login ES la casilla interna, la contraseña temporal
-  // viajaría a un buzón que solo se lee desde adentro de Maven: la persona
-  // necesitaría entrar para poder entrar.
-  const seEncierra =
-    !recoveryEmail.trim() &&
-    ES_CORREO.test(email.trim()) &&
-    email.trim().toLowerCase().endsWith(`@${DOMINIO_CASILLA}`);
-
-  const recoveryInvalido =
-    !!recoveryEmail.trim() && !ES_CORREO.test(recoveryEmail.trim());
-
-  const completo =
-    !!email.trim() && !!firstName.trim() && !!lastName.trim() && !recoveryInvalido;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!completo) return;
-    onConfirm({
-      email: email.trim(),
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      role,
-      recovery_email: recoveryEmail.trim() || undefined,
-      mailbox_email: mailbox.trim() || undefined,
-    });
+    if (!firstName.trim() || !lastName.trim()) return;
+    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), role });
   };
 
-  const handleOpenChange = (o: boolean) => {
-    if (!o) limpiar();
-    onOpenChange(o);
+  const copiar = async (texto: string, cual: "correo" | "clave") => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(cual);
+      setTimeout(() => setCopiado(null), 1500);
+    } catch {
+      // Sin permiso de portapapeles: el texto queda visible para copiarlo a mano.
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Agregar Usuario</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            <div className="space-y-2">
-              <Label htmlFor="email">Correo para entrar a Maven</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="correo@ejemplo.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
-                  required
-                  maxLength={255}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Nombre</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="firstName"
-                  placeholder="Nombre"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="pl-9"
-                  required
-                  maxLength={50}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Apellido</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="lastName"
-                  placeholder="Apellido"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="pl-9"
-                  required
-                  maxLength={50}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="recoveryEmail">Correo personal</Label>
-              <div className="relative">
-                <LifeBuoy className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="recoveryEmail"
-                  type="email"
-                  placeholder="personal@gmail.com"
-                  value={recoveryEmail}
-                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                  className="pl-9"
-                  maxLength={255}
-                  autoComplete="off"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ahí le llegan la contraseña temporal y los links para recuperar
-                la cuenta. Es la única forma de destrabar a alguien que se
-                olvidó la contraseña.
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        {credenciales ? (
+          /* ── Vista de ENTREGA: esto es lo que el admin le pasa a la persona ── */
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-emerald-500" />
+                Usuario creado
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Entregale estos datos a la persona. La contraseña
+                <strong> no se muestra de nuevo</strong>: si se pierde, se le
+                hace un reset desde acá mismo.
               </p>
-              {recoveryInvalido && (
-                <p className="text-xs text-destructive">No parece una dirección válida.</p>
+
+              <Credencial
+                etiqueta="Correo de acceso"
+                valor={credenciales.email}
+                icono={Mail}
+                copiado={copiado === "correo"}
+                onCopiar={() => copiar(credenciales.email, "correo")}
+              />
+              <Credencial
+                etiqueta="Contraseña temporal"
+                valor={credenciales.temp_password}
+                icono={KeyRound}
+                mono
+                copiado={copiado === "clave"}
+                onCopiar={() => copiar(credenciales.temp_password, "clave")}
+              />
+
+              {credenciales.mailbox_ok ? (
+                <p className="text-xs text-muted-foreground">
+                  La casilla de correo quedó creada y aparece en la pestaña
+                  Correo al entrar.
+                </p>
+              ) : (
+                <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
+                  El acceso a Maven quedó bien, pero la casilla de correo no
+                  se pudo crear{credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : ""}.
+                  Se puede reintentar después sin romper nada.
+                </p>
               )}
             </div>
-
-            {seEncierra && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs text-muted-foreground">
-                  Sin correo personal, esta persona va a quedar encerrada afuera
-                  si olvida su contraseña: el link de recuperación le llegaría a
-                  una casilla que solo se lee entrando a Maven.
-                </p>
+            <DialogFooter>
+              <Button onClick={() => onOpenChange(false)}>Listo</Button>
+            </DialogFooter>
+          </>
+        ) : (
+          /* ── Vista de ALTA: nombre, apellido y rol ── */
+          <>
+            <DialogHeader>
+              <DialogTitle>Agregar Usuario</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">Nombre</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="firstName"
+                    placeholder="Nombre"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="pl-9"
+                    required
+                    maxLength={50}
+                  />
+                </div>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="mailbox">Casilla de trabajo</Label>
-              <div className="relative">
-                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="mailbox"
-                  type="email"
-                  placeholder={`nombre.apellido@${DOMINIO_CASILLA}`}
-                  value={mailbox}
-                  onChange={(e) => {
-                    setCasillaEditada(true);
-                    setMailbox(e.target.value);
-                  }}
-                  className="pl-9"
-                  maxLength={255}
-                  autoComplete="off"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Apellido</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="lastName"
+                    placeholder="Apellido"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="pl-9"
+                    required
+                    maxLength={50}
+                  />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Se crea sola y aparece en la pestaña Correo. Dejala vacía si
-                esta persona no necesita casilla.
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Rol</Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.name}>
-                      {r.name.charAt(0).toUpperCase() + r.name.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              {sugerida && (
+                <div className="flex items-start gap-2 rounded-lg bg-primary/5 px-3 py-2.5">
+                  <AtSign className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
+                  <p className="text-xs text-muted-foreground">
+                    Va a entrar con <strong className="text-foreground">{sugerida}</strong>,
+                    que es también su casilla de correo. Si ese nombre ya está
+                    ocupado, se le agrega un número solo.
+                  </p>
+                </div>
+              )}
 
-          <DialogFooter className="mt-4 gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isLoading}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading || !completo}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Agregar
-            </Button>
-          </DialogFooter>
-        </form>
+              <div className="space-y-2">
+                <Label htmlFor="role">Rol</Label>
+                <Select value={role} onValueChange={setRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.id} value={r.name}>
+                        {r.name.charAt(0).toUpperCase() + r.name.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading || !firstName.trim() || !lastName.trim()}>
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Agregar
+                </Button>
+              </DialogFooter>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
 };
+
+function Credencial({
+  etiqueta,
+  valor,
+  icono: Icono,
+  mono,
+  copiado,
+  onCopiar,
+}: {
+  etiqueta: string;
+  valor: string;
+  icono: React.ComponentType<{ className?: string }>;
+  mono?: boolean;
+  copiado: boolean;
+  onCopiar: () => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{etiqueta}</p>
+      <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+        <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className={mono ? "flex-1 font-mono text-sm tracking-wider" : "flex-1 truncate text-sm"}>
+          {valor}
+        </span>
+        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onCopiar}>
+          {copiado ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default AddUserModal;

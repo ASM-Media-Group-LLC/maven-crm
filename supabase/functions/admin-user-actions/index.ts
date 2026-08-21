@@ -1,5 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { provisionMailbox, type ProvisionResult } from "../_shared/mail-provision.ts";
+import {
+  DOMINIO_CASILLA,
+  direccionSugerida,
+  provisionMailbox,
+  type ProvisionResult,
+} from "../_shared/mail-provision.ts";
+import { listAccounts, zohoConfigured } from "../_shared/zoho.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,8 +130,8 @@ Deno.serve(async (req) => {
 
     // === CREATE USER ===
     if (action === "create_user") {
-      if (!email || !first_name || !last_name) {
-        return new Response(JSON.stringify({ error: "email, first_name, and last_name are required" }), {
+      if (!first_name || !last_name) {
+        return new Response(JSON.stringify({ error: "first_name y last_name son requeridos" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -137,14 +143,77 @@ Deno.serve(async (req) => {
       // (sin símbolos) que reset_password — fácil de copy-paste.
       const tempPassword = generateTempPassword();
 
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { full_name: fullName },
-      });
+      // === Identidad = casilla ===
+      // Cuando el alta no trae `email`, el correo de acceso SE GENERA del
+      // nombre: juan.perez@<dominio>, y si está ocupado, juan.perez1@...
+      // Decisión de producto de Jhon (21/08): el admin solo carga nombre,
+      // apellido y rol; la contraseña temporal se entrega en mano.
+      let loginEmail = (email as string | undefined)?.trim().toLowerCase() || null;
+      let newUser: { user?: { id?: string } } | null = null;
 
-      if (createError) {
+      if (loginEmail) {
+        const { data, error: createError } = await adminClient.auth.admin.createUser({
+          email: loginEmail,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { full_name: fullName },
+        });
+        if (createError) return respuestaDeAltaFallida(createError);
+        newUser = data;
+      } else {
+        const base = direccionSugerida(first_name, last_name);
+        if (!base) {
+          return new Response(
+            JSON.stringify({ error: "No se pudo derivar un correo de ese nombre." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        // Direcciones ya ocupadas EN EL PROVEEDOR. Importa por un caso
+        // concreto: si un "Juan Pérez" se fue y entra otro, el email de
+        // Maven puede estar libre pero el buzón viejo seguir existiendo —
+        // adjudicárselo le mostraría al nuevo el correo del anterior. Ante
+        // colisión en cualquiera de los dos lados, se prueba el siguiente
+        // número.
+        const ocupadasEnProveedor = new Set<string>();
+        if (zohoConfigured()) {
+          const cuentas = await listAccounts();
+          for (const a of cuentas.data ?? []) {
+            if (a.primaryEmailAddress) ocupadasEnProveedor.add(a.primaryEmailAddress.toLowerCase());
+          }
+        }
+
+        let ultimoError: { message?: string } | null = null;
+        for (let n = 0; n < 50 && !newUser; n++) {
+          const candidato = `${base}${n === 0 ? "" : n}@${DOMINIO_CASILLA}`;
+          if (ocupadasEnProveedor.has(candidato)) continue;
+          const { data, error: createError } = await adminClient.auth.admin.createUser({
+            email: candidato,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: { full_name: fullName },
+          });
+          if (!createError) {
+            newUser = data;
+            loginEmail = candidato;
+            break;
+          }
+          // Ocupado en Maven: probamos el siguiente número. Cualquier otro
+          // error corta — repetirlo 50 veces no lo va a arreglar.
+          if (!/already (been )?registered|already exists|duplicate/i.test(createError.message ?? "")) {
+            return respuestaDeAltaFallida(createError);
+          }
+          ultimoError = createError;
+        }
+        if (!newUser || !loginEmail) {
+          return respuestaDeAltaFallida(
+            ultimoError ?? { message: "no quedó ningún candidato libre para ese nombre" },
+          );
+        }
+      }
+
+      // deno-lint-ignore no-inner-declarations
+      function respuestaDeAltaFallida(createError: { message?: string }) {
         // Mapeamos los errores comunes a español para que el modal del
         // admin muestre algo accionable. createUser de Supabase Auth
         // devuelve mensajes como "A user with this email address has
@@ -230,12 +299,19 @@ Deno.serve(async (req) => {
       // que es idempotente. Lo que NO puede pasar es que un admin no
       // pueda dar de alta a nadie porque un servicio de terceros falla.
       let mailboxResult: ProvisionResult | null = null;
-      if (mailbox_email && newUser?.user?.id) {
+      // La casilla por defecto ES el correo de acceso: identidad = casilla.
+      // `mailbox_email` explícito se respeta (compatibilidad con el flujo
+      // viejo por API); solo si viene vacío Y el login se generó del
+      // nombre, la casilla es esa misma dirección.
+      const casillaFinal =
+        (mailbox_email as string | undefined)?.trim().toLowerCase() ||
+        (!email ? loginEmail : null);
+      if (casillaFinal && newUser?.user?.id) {
         try {
           mailboxResult = await provisionMailbox({
             adminClient,
             userId: newUser.user.id,
-            email: String(mailbox_email).trim().toLowerCase(),
+            email: casillaFinal,
             firstName: first_name,
             lastName: last_name,
           });
@@ -246,7 +322,7 @@ Deno.serve(async (req) => {
           const msg = (e as Error).message ?? "error inesperado";
           console.error("[create_user] provisión de casilla explotó:", msg);
           mailboxResult = {
-            ok: false, email_address: String(mailbox_email), outcome: null, error: msg,
+            ok: false, email_address: casillaFinal, outcome: null, error: msg,
           };
         }
       }
@@ -260,13 +336,23 @@ Deno.serve(async (req) => {
       // poco frecuente, esa latencia es aceptable.
       const welcomeTo = recoveryStored
         ? String(recovery_email).trim().toLowerCase()
-        : email;
+        : loginEmail!;
+
+      // Si el destino es la casilla que acabamos de crear, NO se manda:
+      // la persona necesita la contraseña para abrirla — mandársela ahí es
+      // el círculo vicioso. La contraseña temporal viaja en la RESPUESTA y
+      // el admin la entrega en mano (decisión de Jhon: el reset también es
+      // por admin).
+      const entregaEnMano = !recoveryStored &&
+        !!casillaFinal && welcomeTo.toLowerCase() === casillaFinal;
 
       const resendKey = Deno.env.get("RESEND_API_KEY");
       let emailSent = false;
       let emailError: string | null = null;
 
-      if (!resendKey) {
+      if (entregaEnMano) {
+        // A propósito: ver arriba. emailSent queda en false sin error.
+      } else if (!resendKey) {
         emailError = "RESEND_API_KEY no configurada";
       } else {
         try {
@@ -293,7 +379,7 @@ Deno.serve(async (req) => {
                   <code style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#111827;">${tempPassword}</code>
                 </div>
                 <p style="color:#6b7280;font-size:13px;line-height:1.55;margin:0 0 16px;">
-                  Iniciá sesión con tu correo (<strong>${email}</strong>)
+                  Iniciá sesión con tu correo (<strong>${loginEmail}</strong>)
                   y esta contraseña, después cambiala desde
                   Settings → Cuenta. Si no esperabas este correo,
                   ignoralo o avisale al admin.
@@ -343,10 +429,15 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           user_id: newUser?.user?.id,
+          // El correo con el que la persona entra a Maven. Cuando se generó
+          // del nombre, el admin lo ve por primera vez ACÁ.
+          email: loginEmail,
           temp_password: tempPassword,
+          // true = la contraseña no viajó por correo: el admin la entrega.
+          hand_delivery: entregaEnMano,
           email_sent: emailSent,
           email_error: emailError,
-          email_sent_to: welcomeTo,
+          email_sent_to: entregaEnMano ? null : welcomeTo,
           recovery_email_stored: recoveryStored,
           // El admin tiene que ver si la casilla quedo o no: el alta
           // termina bien igual, y sin esto el fallo pasa desapercibido.
