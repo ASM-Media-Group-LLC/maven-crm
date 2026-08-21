@@ -24,10 +24,10 @@ import {
   createMailbox,
   disableMailbox,
   listAccounts,
-  resetMailboxPassword,
   zohoConfigured,
 } from "../_shared/zoho.ts";
-import { cryptoConfigured, seal } from "../_shared/mail-crypto.ts";
+import { cryptoConfigured } from "../_shared/mail-crypto.ts";
+import { generateMailboxPassword, provisionMailbox } from "../_shared/mail-provision.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,37 +42,6 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Sin caracteres ambiguos (I/O/0/l/1) porque estas contraseñas se pasan
-// por chat — PERO con al menos un símbolo, una mayúscula, una minúscula y
-// un dígito garantizados: la política de Zoho rechaza el password (400
-// "Invalid Input", sin decir cuál campo) si no los tiene.
-function generatePassword(): string {
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const lower = "abcdefghjkmnpqrstuvwxyz";
-  const digit = "23456789";
-  const symbol = "@#$%*+=?";
-  const all = upper + lower + digit + symbol;
-
-  const pick = (set: string, n: number) => {
-    const buf = new Uint32Array(n);
-    crypto.getRandomValues(buf);
-    return Array.from(buf, (b) => set[b % set.length]);
-  };
-
-  // Uno de cada clase + relleno, después barajado Fisher-Yates para no
-  // dejar las clases obligatorias siempre en las mismas posiciones.
-  const chars = [
-    ...pick(upper, 1), ...pick(lower, 1), ...pick(digit, 1), ...pick(symbol, 1),
-    ...pick(all, 12),
-  ];
-  const ord = new Uint32Array(chars.length);
-  crypto.getRandomValues(ord);
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = ord[i] % (i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join("");
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -159,7 +128,7 @@ Deno.serve(async (req) => {
       if (!email || !first_name || !last_name) {
         return json({ error: "email, first_name y last_name son requeridos" }, 400);
       }
-      const password = generatePassword();
+      const password = generateMailboxPassword();
       const res = await createMailbox({ email, firstName: first_name, lastName: last_name, password });
 
       if (res.skipped) return json({ error: "Zoho no configurado todavía" }, 409);
@@ -190,42 +159,23 @@ Deno.serve(async (req) => {
         return json({ error: "falta el secret MAIL_CRED_KEY" }, 409);
       }
 
-      // Necesitamos el zuid, y solo se obtiene listando la organización.
-      const accounts = await listAccounts();
-      if (!accounts.ok) return json({ error: accounts.error, status: accounts.status }, 502);
-      const acct = (accounts.data ?? []).find(
-        (a) => (a.primaryEmailAddress ?? "").toLowerCase() === email.toLowerCase(),
-      );
-      if (!acct?.zuid) {
-        return json({ error: `no existe casilla para ${email} en la organización` }, 404);
-      }
-
-      const password = generatePassword();
-      const reset = await resetMailboxPassword(acct.zuid, password);
-      if (!reset.ok) return json({ error: reset.error, status: reset.status }, 502);
-
-      const sealed = await seal(password);
-      if (!sealed) return json({ error: "no se pudo cifrar la credencial" }, 500);
-
-      const { error: upErr } = await adminClient
-        .from("mail_credentials")
-        .upsert({
-          user_id,
-          email_address: email,
-          secret_cipher: sealed.cipher,
-          secret_nonce: sealed.nonce,
-          key_version: sealed.keyVersion,
-          last_error: null,
-          revoked_at: null,
-        }, { onConflict: "user_id,email_address" });
-
-      if (upErr) {
-        console.error("[zoho-provision] upsert de credencial falló:", upErr.message);
-        return json({ error: "no se pudo guardar la credencial" }, 500);
-      }
+      // Delega en el módulo compartido: es EXACTAMENTE lo mismo que corre
+      // el alta de usuario. Tener dos implementaciones de esto es pedir que
+      // se separen, y la reparación manual es justo lo que se usa el día
+      // que algo ya salió mal — no puede estar desactualizada.
+      const nombre = (first_name ?? "Usuario") as string;
+      const apellido = (last_name ?? "Maven") as string;
+      const res = await provisionMailbox({
+        adminClient,
+        userId: user_id,
+        email,
+        firstName: nombre,
+        lastName: apellido,
+      });
+      if (!res.ok) return json({ error: res.error }, 502);
 
       // La contraseña NO se devuelve: nadie la necesita, es de máquina.
-      return json({ ok: true, email_address: email, zuid: acct.zuid });
+      return json({ ok: true, email_address: res.email_address, outcome: res.outcome });
     }
 
     return json({ error: `Acción desconocida: ${action}` }, 400);

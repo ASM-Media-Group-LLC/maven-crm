@@ -23,6 +23,7 @@ import { parseMessage } from "../_shared/mime.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
+import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -290,12 +291,17 @@ Deno.serve(async (req) => {
           .update({ last_used_at: new Date().toISOString(), last_error: null })
           .eq("id", cred.id);
 
+        const visibles = ocultarAvisosDelProveedor(list.messages);
+
         return json({
           ok: true,
           via: "imap",
           folder: box,
           total: sel.exists,
-          messages: list.messages,
+          messages: visibles,
+          // Cuántos se ocultaron, para poder auditar el filtro si alguien
+          // reporta que "le falta un correo".
+          hidden: list.messages.length - visibles.length,
         });
       } catch (e) {
         const msg = (e as Error).message ?? "error de IMAP";

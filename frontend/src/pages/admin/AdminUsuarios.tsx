@@ -264,9 +264,31 @@ const AdminUsuarios = () => {
                   adminAction.mutate(
                     { action: "create_user", ...data },
                     {
-                      onSuccess: () => {
+                      onSuccess: (res) => {
                         setAddUserOpen(false);
-                        toast({ title: "Usuario creado exitosamente" });
+                        // La casilla se crea con mejor esfuerzo: si falla,
+                        // el usuario igual queda creado. Hay que DECIRLO —
+                        // un "creado exitosamente" a secas esconde que esa
+                        // persona se va a quedar sin correo.
+                        const r = res as {
+                          email_sent_to?: string;
+                          mailbox?: { ok: boolean; error?: string | null } | null;
+                        } | undefined;
+                        const casilla = r?.mailbox;
+                        if (casilla && !casilla.ok) {
+                          toast({
+                            title: "Usuario creado, pero sin casilla de correo",
+                            description: `${casilla.error ?? "no se pudo crear"} — se puede reintentar sin romper nada.`,
+                            variant: "destructive",
+                          });
+                        } else {
+                          toast({
+                            title: "Usuario creado exitosamente",
+                            description: r?.email_sent_to
+                              ? `Contraseña temporal enviada a ${r.email_sent_to}`
+                              : undefined,
+                          });
+                        }
                       },
                     }
                   );

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { provisionMailbox, type ProvisionResult } from "../_shared/mail-provision.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +79,17 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, user_id, full_name, email, first_name, last_name, role, ai_daily_quota_override } = body;
+    const {
+      action, user_id, full_name, email, first_name, last_name, role,
+      ai_daily_quota_override,
+      // Correo personal, fuera de Maven. Ahí van la contraseña temporal y
+      // los links de recuperación: la casilla de trabajo se lee solo desde
+      // adentro de Maven, así que no sirve para recuperar el acceso a Maven.
+      recovery_email,
+      // Casilla de trabajo a crear (ej. nombre@maven-ai.me). Si no viene,
+      // no se provisiona nada.
+      mailbox_email,
+    } = body;
 
     if (!action) {
       return new Response(JSON.stringify({ error: "action is required" }), {
@@ -194,6 +205,52 @@ Deno.serve(async (req) => {
         }
       }
 
+      // === Correo personal de recuperación ===
+      // Va antes que todo lo demás porque de esto depende que la persona
+      // pueda recibir su contraseña temporal.
+      let recoveryStored = false;
+      if (recovery_email && newUser?.user?.id) {
+        const { error: recErr } = await adminClient
+          .from("user_recovery_emails")
+          .upsert(
+            { user_id: newUser.user.id, recovery_email: String(recovery_email).trim().toLowerCase() },
+            { onConflict: "user_id" },
+          );
+        if (recErr) {
+          console.error("[create_user] no se pudo guardar el correo de recuperación:", recErr.message);
+        } else {
+          recoveryStored = true;
+        }
+      }
+
+      // === Casilla de correo de trabajo ===
+      // MEJOR ESFUERZO A PROPÓSITO: crear usuarios es camino crítico. Si
+      // el proveedor de correo está caído o sin configurar, el alta tiene
+      // que terminar igual — la casilla se repara después reintentando,
+      // que es idempotente. Lo que NO puede pasar es que un admin no
+      // pueda dar de alta a nadie porque un servicio de terceros falla.
+      let mailboxResult: ProvisionResult | null = null;
+      if (mailbox_email && newUser?.user?.id) {
+        try {
+          mailboxResult = await provisionMailbox({
+            adminClient,
+            userId: newUser.user.id,
+            email: String(mailbox_email).trim().toLowerCase(),
+            firstName: first_name,
+            lastName: last_name,
+          });
+          if (!mailboxResult.ok) {
+            console.error("[create_user] provisión de casilla falló:", mailboxResult.error);
+          }
+        } catch (e) {
+          const msg = (e as Error).message ?? "error inesperado";
+          console.error("[create_user] provisión de casilla explotó:", msg);
+          mailboxResult = {
+            ok: false, email_address: String(mailbox_email), outcome: null, error: msg,
+          };
+        }
+      }
+
       // Email de bienvenida con el password temporal vía Resend.
       // ANTES estaba en EdgeRuntime.waitUntil para no bloquear la
       // respuesta, pero los logs mostraban que el isolate moría antes
@@ -201,6 +258,10 @@ Deno.serve(async (req) => {
       // Pasamos a await sincrónico: 1-2s extra de latencia en el modal
       // a cambio de garantía de delivery. Crear cuenta es una acción
       // poco frecuente, esa latencia es aceptable.
+      const welcomeTo = recoveryStored
+        ? String(recovery_email).trim().toLowerCase()
+        : email;
+
       const resendKey = Deno.env.get("RESEND_API_KEY");
       let emailSent = false;
       let emailError: string | null = null;
@@ -257,7 +318,10 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               from: fromEmail,
-              to: [email],
+              // Al correo personal si lo hay. Si la direccion de login es
+              // la casilla interna, mandarle ahi la contrasena temporal es
+              // pedirle que entre para poder entrar.
+              to: [welcomeTo],
               subject: "Maven CRM · Bienvenido/a — tu contraseña temporal",
               html,
             }),
@@ -282,6 +346,11 @@ Deno.serve(async (req) => {
           temp_password: tempPassword,
           email_sent: emailSent,
           email_error: emailError,
+          email_sent_to: welcomeTo,
+          recovery_email_stored: recoveryStored,
+          // El admin tiene que ver si la casilla quedo o no: el alta
+          // termina bien igual, y sin esto el fallo pasa desapercibido.
+          mailbox: mailboxResult,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

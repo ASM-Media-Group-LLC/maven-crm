@@ -27,7 +27,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const RATE_LIMIT_PER_HOUR = 5; // por email — anti-abuse
+// ⚠️ NO HAY RATE LIMIT PROPIO. Antes había una constante
+// `RATE_LIMIT_PER_HOUR = 5` que no se usaba en ningún lado: el código
+// aparentaba una protección que no existe. Lo único que limita hoy es
+// el rate limit por defecto de la admin API de Supabase.
+// Importa más desde que el link se manda al correo PERSONAL: sin tope
+// propio, cualquiera puede inundar la casilla privada de alguien
+// pidiendo resets. Pendiente: tabla de intentos por email.
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -57,11 +63,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
-
-    // Rate limit naive: contar últimas N horas de password_recovery
-    // events para este email. La tabla auth.audit_log_entries no es
-    // pública desde edge, así que usamos un esquema más simple: la
-    // misma admin API limita rate por defecto.
 
     const appUrl = Deno.env.get("APP_URL") || "https://maven.asmtech.ai";
     const redirectTo = `${appUrl}/reset-password`;
@@ -105,23 +106,51 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Buscar el nombre del user (si tiene profile) para personalizar.
+    // El id sale de `generateLink`, que ya nos devolvió el usuario.
+    // ANTES esto era `listUsers({ perPage: 1 })` y después buscaba la
+    // coincidencia entre esa ÚNICA fila: salvo casualidad no encontraba
+    // nada, así que los correos salían siempre sin nombre. Y ahora el id
+    // hace falta de verdad, para saber a dónde mandar el link.
+    const userId = (linkData as { user?: { id?: string } } | null)?.user?.id;
+
     let fullName = "";
-    try {
-      const { data: users } = await adminClient.auth.admin.listUsers({ perPage: 1 });
-      const matchUser = users?.users?.find(
-        (u) => (u.email ?? "").toLowerCase() === normalizedEmail,
-      );
-      if (matchUser?.id) {
+    if (userId) {
+      try {
         const { data: profile } = await adminClient
           .from("profiles")
           .select("full_name")
-          .eq("id", matchUser.id)
+          .eq("id", userId)
           .maybeSingle();
         fullName = (profile as { full_name?: string } | null)?.full_name ?? "";
+      } catch {
+        // No crítico — el email se manda sin nombre.
       }
-    } catch {
-      // No crítico — el email se manda sin nombre.
+    }
+
+    // A DÓNDE VA EL LINK. Este es el punto entero de la recuperación: si
+    // la persona solo tiene casilla interna de Maven, mandarle el link a
+    // esa casilla es pedirle que entre para poder entrar. Cuando hay un
+    // correo personal cargado, el link va AHÍ y solo ahí — mandarlo a los
+    // dos lados duplicaría la superficie de una credencial de un solo uso.
+    let destino = normalizedEmail;
+    let fueraDeMaven = false;
+    if (userId) {
+      try {
+        const { data: rec } = await adminClient
+          .from("user_recovery_emails")
+          .select("recovery_email")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const alterno = (rec as { recovery_email?: string } | null)?.recovery_email;
+        if (alterno) {
+          destino = alterno;
+          fueraDeMaven = true;
+        }
+      } catch (e) {
+        // Si esta consulta falla caemos al correo de login, que es el
+        // comportamiento de antes: peor, pero no deja a nadie sin nada.
+        console.error("[forgot-password] lectura de correo alterno falló:", e);
+      }
     }
 
     const rawFrom =
@@ -140,6 +169,19 @@ Deno.serve(async (req) => {
             recibimos una solicitud para restablecer tu contraseña de Maven CRM.
             Hacé click en el botón de abajo para crear una nueva.
           </p>
+          ${
+            // Si el link salió al correo personal, hay que decir de qué
+            // cuenta es: llega a una bandeja que no tiene nada que ver con
+            // Maven, y sin esto es un enlace sin contexto.
+            fueraDeMaven
+              ? `<p style="color:#6b7280;font-size:13px;line-height:1.55;margin:0 0 16px;">
+                   Es para la cuenta <strong>${normalizedEmail}</strong>. Te lo
+                   mandamos a este correo personal porque tu casilla de trabajo
+                   se lee desde adentro de Maven, y no podrías abrirla sin
+                   entrar primero.
+                 </p>`
+              : ""
+          }
           <div style="text-align:center;margin:22px 0;">
             <a href="${actionLink}" style="display:inline-block;background:linear-gradient(135deg,#6d28d9,#4338ca);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:9999px;">
               Restablecer contraseña →
@@ -168,7 +210,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to: [normalizedEmail],
+        to: [destino],
         subject: "Maven CRM · Recuperá tu contraseña",
         html,
       }),
