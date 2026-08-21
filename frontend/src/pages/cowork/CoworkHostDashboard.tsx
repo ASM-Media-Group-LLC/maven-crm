@@ -783,6 +783,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               callDisplayName={activeRoomName || undefined}
               isAdmin={true}
               onLeave={leaveActiveRoom}
+              recording={{ source: "cowork", title: activeRoomName || undefined }}
               hideShareLink
               suppressLeaveToast
               initialMicOn={false}

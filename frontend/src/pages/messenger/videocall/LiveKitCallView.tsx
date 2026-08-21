@@ -9,6 +9,7 @@ import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
+import RecordingControl from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 
@@ -47,9 +48,13 @@ interface LiveKitCallViewProps {
   getToken?: () => Promise<{ token: string; url: string }>;
   /** Fires whenever the local participant's media state changes */
   onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
+  /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
+   *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
+   *  está grabando — que un invitado sepa que lo graban no es opcional. */
+  recording?: { source: "meet" | "cowork"; title?: string };
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, recording }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
@@ -277,6 +282,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       <div className="flex-1 flex overflow-hidden">
         <div className="relative flex-1 p-3 overflow-hidden">
+          <div className="absolute left-5 top-5 z-20">
+            <RecordingControl
+              room={room}
+              roomName={roomName}
+              source={recording?.source ?? "cowork"}
+              title={recording?.title}
+              canControl={!!recording}
+              compact={effectiveCompact}
+            />
+          </div>
           {effectiveLayout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}

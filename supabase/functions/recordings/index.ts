@@ -16,7 +16,7 @@
 // admin) — el service_role bypassa RLS, así que el chequeo es explícito.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { EgressClient, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2";
+import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 
@@ -115,7 +115,28 @@ Deno.serve(async (req) => {
           fallas.push(`${v.id}: ${(e as Error).message}`);
         }
       }
-      return json({ ok: true, borradas, fallas });
+
+      // Filas colgadas en 'recording'/'processing' hace más de 24 h: quien
+      // grababa se cayó y nadie la paró. Sin este barrido nunca pasan a
+      // 'ready', o sea nunca vencen, o sea el archivo queda ocupando disco
+      // para siempre — exactamente el crecimiento sin techo que este diseño
+      // promete evitar. Se cierran acá y el vencimiento normal las agarra.
+      const hace24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { data: colgadas } = await admin
+        .from("meeting_recordings")
+        .select("id, egress_id, storage_key")
+        .in("status", ["recording", "processing"])
+        .lt("started_at", hace24h)
+        .is("deleted_at", null)
+        .limit(50);
+      let cerradas = 0;
+      for (const c of colgadas ?? []) {
+        if (await egressActivo(c.egress_id)) continue; // 24 h y sigue viva: no tocar
+        await finalizarHuerfana(admin, c);
+        cerradas++;
+      }
+
+      return json({ ok: true, borradas, cerradas, fallas });
     }
 
     // === Resto: requiere usuario autenticado ===
@@ -141,9 +162,18 @@ Deno.serve(async (req) => {
       // puro gasto y confunde a todos.
       const { data: activa } = await admin
         .from("meeting_recordings")
-        .select("id").eq("room_name", room_name).eq("status", "recording")
+        .select("id, egress_id, storage_key").eq("room_name", room_name).eq("status", "recording")
         .is("deleted_at", null).maybeSingle();
-      if (activa) return json({ error: "Esta reunión ya se está grabando." }, 409);
+      if (activa) {
+        // ¿Sigue viva de verdad? Si quien grababa se cayó sin parar, la fila
+        // queda en 'recording' para siempre y la sala no se puede volver a
+        // grabar nunca. Se le pregunta a LiveKit: si el egress ya murió, la
+        // fila se cierra acá mismo y este start continúa normal.
+        if (await egressActivo(activa.egress_id)) {
+          return json({ error: "Esta reunión ya se está grabando." }, 409);
+        }
+        await finalizarHuerfana(admin, activa);
+      }
 
       const { data: fila, error: insErr } = await admin
         .from("meeting_recordings")
@@ -177,15 +207,24 @@ Deno.serve(async (req) => {
 
     // === STOP ===
     if (action === "stop") {
-      const { recording_id, recipients } = body as {
-        recording_id?: string; recipients?: string[];
+      const { recording_id, room_name, recipients } = body as {
+        recording_id?: string; room_name?: string; recipients?: string[];
       };
-      if (!recording_id) return json({ error: "recording_id es requerido" }, 400);
+      if (!recording_id && !room_name) {
+        return json({ error: "recording_id o room_name es requerido" }, 400);
+      }
 
-      const { data: rec } = await admin
-        .from("meeting_recordings")
-        .select("id, started_by, egress_id, storage_key, room_name, title, started_at, status")
-        .eq("id", recording_id).maybeSingle();
+      // Por id (quien la inició lo guardó) o por sala: quien NO la inició no
+      // conoce el id (el RLS no le deja ver la fila), pero tiene que poder
+      // pararla igual — si no, la grabación depende de que el iniciador no
+      // se caiga de la llamada.
+      const cols = "id, started_by, egress_id, storage_key, room_name, title, started_at, status";
+      const { data: rec } = recording_id
+        ? await admin.from("meeting_recordings").select(cols).eq("id", recording_id).maybeSingle()
+        : await admin.from("meeting_recordings").select(cols)
+            .eq("room_name", room_name).eq("status", "recording")
+            .is("deleted_at", null).order("started_at", { ascending: false })
+            .limit(1).maybeSingle();
       if (!rec) return json({ error: "grabación no encontrada" }, 404);
       // Detener puede cualquiera que esté en la reunión; el frontend solo
       // lo ofrece dentro de la llamada. Restringir al iniciador dejaría
@@ -288,6 +327,44 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });
+
+const EGRESS_VIVO = new Set<EgressStatus>([
+  EgressStatus.EGRESS_STARTING,
+  EgressStatus.EGRESS_ACTIVE,
+  EgressStatus.EGRESS_ENDING,
+]);
+
+/** ¿El egress sigue componiendo? Si LiveKit no contesta, se asume que sí:
+ *  un 409 de más es molesto; dos egress sobre la misma sala es plata tirada. */
+async function egressActivo(egressId: string | null): Promise<boolean> {
+  if (!egressId) return false;
+  try {
+    const lista = await egress().listEgress({ egressId });
+    const info = lista?.[0];
+    return !!info && EGRESS_VIVO.has(info.status as EgressStatus);
+  } catch {
+    return true;
+  }
+}
+
+/** Cierra una fila cuyo egress murió sin que nadie llamara a stop: 'ready'
+ *  si el archivo existe (y el vencimiento de 90 días la agarra normal),
+ *  'failed' si no dejó nada. */
+// deno-lint-ignore no-explicit-any
+async function finalizarHuerfana(admin: any, rec: { id: string; storage_key: string | null }) {
+  let size: number | null = null;
+  if (rec.storage_key) {
+    try {
+      const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
+      if (r.ok) size = (await r.json()).size ?? null;
+    } catch { /* sin tamaño: se trata como sin archivo */ }
+  }
+  await admin.from("meeting_recordings")
+    .update(size
+      ? { status: "ready", ended_at: new Date().toISOString(), size_bytes: size }
+      : { status: "failed", ended_at: new Date().toISOString(), error: "el egress terminó sin stop y no dejó archivo" })
+    .eq("id", rec.id);
+}
 
 /** Manda el link de la grabación a los destinatarios que tengan correo en
  *  Maven, desde la casilla de quien grabó. Mejor esfuerzo: el correo que

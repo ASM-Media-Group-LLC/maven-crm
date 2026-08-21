@@ -415,6 +415,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             displayName={displayName}
             callDisplayName={myRoom?.name}
             isAdmin={false}
+            recording={{ source: "cowork", title: myRoom?.name || undefined }}
             onLeave={async () => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);

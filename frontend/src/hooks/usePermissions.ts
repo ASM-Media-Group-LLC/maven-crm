@@ -49,7 +49,7 @@ export const usePermissions = () => {
   // pestaña tiene que estar ahí sin que nadie configure permisos. Quien no
   // tenga casilla ve un estado vacío que se lo explica, y un admin puede
   // apagarlo por rol con can_access: false, que siempre gana.
-  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo"];
+  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones"];
 
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access

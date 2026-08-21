@@ -44,6 +44,7 @@ const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
+const GrabacionesPage = lazy(() => import("./pages/grabaciones/GrabacionesPage"));
 // Correo (Zoho detrás). El módulo "Correo" todavía no está en
 // UNIVERSAL_MODULES, así que hoy solo lo alcanzan los admin — a propósito,
 // mientras la bandeja se construye.
@@ -341,6 +342,7 @@ const App = () => (
                 <Route path="/messenger" element={<PermissionRoute module="Messenger"><Messenger /></PermissionRoute>} />
                 <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
                 <Route path="/meet" element={<PermissionRoute module="Meet"><MeetPage /></PermissionRoute>} />
+                <Route path="/grabaciones" element={<PermissionRoute module="Grabaciones"><GrabacionesPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
