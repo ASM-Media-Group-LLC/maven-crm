@@ -140,10 +140,26 @@ export function ordenarCarpetas(folders: string[]): string[] {
   return [...folders].sort((a, b) => peso(a) - peso(b) || a.localeCompare(b));
 }
 
+/** Reglas comunes de las consultas que abren una sesión IMAP.
+ *
+ *  - `retry: false`: cuando el proveedor está estrangulando la cuenta
+ *    (pasa tras ráfagas de logins), cada reintento automático es más
+ *    presión sobre lo que ya está castigado — y el castigo se alarga.
+ *    Para reintentar está el botón de actualizar.
+ *  - `refetchOnWindowFocus: false`: el default de react-query refetchea
+ *    al volver a la pestaña. Para una API HTTP es gratis; acá cada
+ *    refetch es una CONEXIÓN nueva contra el proveedor. Cambiar de
+ *    pestaña y volver no puede costar sesiones IMAP. */
+const SESION_IMAP = {
+  retry: false,
+  refetchOnWindowFocus: false,
+} as const;
+
 export function useMailFolders(enabled: boolean) {
   return useQuery({
     queryKey: ["mail-folders"],
     enabled,
+    ...SESION_IMAP,
     // Las carpetas casi no cambian; no tiene sentido abrir IMAP en cada render.
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
@@ -160,6 +176,10 @@ export function useMailMessages(folder: string, enabled: boolean) {
   return useQuery({
     queryKey: ["mail-messages", folder],
     enabled: enabled && !!folder,
+    ...SESION_IMAP,
+    // Un minuto de frescura: volver a una carpeta recién vista no abre
+    // otra sesión. El botón de actualizar la fuerza cuando haga falta.
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const r = await callMail<{
         folder: string;
@@ -209,6 +229,7 @@ export function useMailMessage(folder: string, seq: number | null) {
   return useQuery({
     queryKey: ["mail-message", folder, seq],
     enabled: !!folder && seq != null,
+    ...SESION_IMAP,
     ...MENSAJE_CACHE,
     queryFn: () => fetchMensaje(folder, seq as number),
   });
