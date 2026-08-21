@@ -74,8 +74,11 @@ services:
     deploy:
       resources:
         limits:
-          # Componer video es caro: 2 cores por grabación en curso aprox.
-          cpus: "3"
+          # OJO: 4 no es capricho — el egress de LiveKit exige minimumCpu=4
+          # para RoomComposite; con menos se registra pero RECHAZA los trabajos
+          # y el server responde 503 "no egress available" (pasó el 21/08 con
+          # cpus:3). Es un TECHO, no reserva: en reposo consume ~0.
+          cpus: "4"
           memory: 2g
 
   # Descargas firmadas + borrado de los MP4 (ver rec-server.mjs).
