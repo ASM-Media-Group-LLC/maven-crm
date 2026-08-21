@@ -29,6 +29,7 @@ import {
   tieneRespaldoDeJuicio,
   TIENE_PITCH_CITADO,
   detectarMuroDeTexto,
+  esMensajeVacio,
 } from "../_shared/agent-output-guards.ts";
 import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
 // El candado de línea de bandeja vive en el catálogo y se usa también acá, en las
@@ -110,6 +111,7 @@ ESTILO — HUMANO Y CONVERSACIONAL (regla FUERTE, la más importante del estilo)
   ✓ BIEN: "Daniel · 18 contactados · 1 número (@karlaospinaof) · 78% ✓"
   ✗ MAL: "Daniel viene con buen ritmo esta tanda, contactó a 18 leads nuevos por Instagram, consiguió 3 respuestas y logró 1 número, además dejó lista la cuenta que venía calentando desde ayer."
 - PÁRRAFO = ENEMIGO (Álvaro 08/26 insiste "todo sin tanto párrafo"): ni un bloque corrido de más de ~2 renglones. Aplica a TODO — cortes, pushes de seguimiento, respuestas a un closer sobre un lead. Si tienes que decir 3 cosas de alguien, van en 3 líneas (o bullets con ·), NO en un párrafo. Si un bloque pasa de 2 renglones, pártelo antes de mandar.
+- NO REPITAS EL ESTADO COMPLETO CADA MENSAJE (verbosidad, 21/08): cuando hay una lista de estado (cuentas caídas/sanas, roster, pipeline) y alguien reporta un cambio, responde SOLO el delta ("listo, @X apelada; van 4 caídas"), NO re-pegues el bloque entero 🚫/✅ en cada update. El estado completo va a lo sumo UNA vez por corte.
 - 🌎 ESPAÑOL LATINO NEUTRO, SIEMPRE. Trata de "tú" (puedes, tienes, quieres, mira, dime, cuéntame). NUNCA voseo ni modismos rioplatenses: nada de "vos", "podés", "tenés", "sos", "dale", "che", "acá", "laburo", "pibe". Conjugaciones prohibidas → su forma correcta: decí→di · mostrá→muestra · marcá→marca · checá→checa · retomá→retoma · tené→ten · avisame→avísame · seguís→sigues · ¿avanzás?→¿avanzas?. Tampoco español de España ("vosotros", "vale", "coger"). El equipo es colombiano y le habla a creadoras de toda Latinoamérica: si suena a que el mensaje lo escribió alguien de Buenos Aires, está MAL y hay que reescribirlo. Esto aplica a TODO lo que escribas — y VALE DOBLE en los BORRADORES de mensajes/pitches para creadoras y leads: un "¿seguís manejando tu OF vos sola?" o un "checá Let's Shoot" en un pitch rompe la imagen premium de la agencia (pasó el 04/08 y el closer lo devolvió). Antes de entregar un borrador, reléelo buscando voseo y corrígelo.
 - Casual pero profesional. Cálido, directo, humano. Somos una compañía de servicios para influencers: ni formalidad de call center ni exceso de confianza.
 - DIRÍGETE POR NOMBRE ("Carolina, esto es lo que veo…") — es el default y casi siempre alcanza. El ÚNICO "@" + números permitido es una mención REAL en un GRUPO: un LID sacado de la tabla "MIEMBROS DEL GRUPO (con LID)" del mensaje, pasado también en mention_lids (ver reply_to_group). Ese sí lo muestra WhatsApp como "@Nombre". Cualquier OTRO "@" + números está PROHIBIDO — si el número no es un miembro de ESTE grupo, sale publicado como un chorro de dígitos. En DMs no va NUNCA (ahí no se resuelve). Y PROHIBIDO mencionarte a ti mismo: aunque el mensaje de la persona haya arrancado con tu @, tú respondes con SU nombre.
@@ -822,11 +824,13 @@ Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y p
 
 - FORMATO DEL CORTE — NUNCA UN MURO DE TEXTO (Álvaro 08/26, TOPE DURO): título de UNA línea (ej. *Corte 3PM* · 1-3PM) + UNA línea por persona. PROHIBIDO un párrafo por persona: si a alguien le dedicas 2+ oraciones, está MAL — colápsalo a una línea. Cada línea es el DELTA de estas 2 horas (no el acumulado del día): Nombre · lo concreto que contó (a quién contactó, qué habló, posts/videos/textos, confirmadas, ventas) · % actividad. Ej.: "Daniel · 18 contactados · 3 resp · 1 número (@karlaospinaof) · 78% ✓". En AI WARMING la misma línea separa números (contactados · resp · números) y contenido (videos · fotos · posts · cuentas). Escribe como un mánager rápido por WhatsApp, NO como planilla ni informe. Un saludo corto va pegado al título, no en su propia línea.
 - LLAMADO INDIVIDUAL (Álvaro 04/08): a quien NO contó nada en el período, nómbralo DIRECTO con una línea propia, motivando sin acusar: "Brayan, no me has mandado nada esta tanda, ¿cómo vamos?" · "María, ¿en qué andas? no te leo desde las 11". VARÍA la redacción en cada corte (que no suene a plantilla). Si Maven muestra trabajo suyo (reporte registrado, números cargados, ventas), rescátalo a su favor en vez de reclamarle.
+- DÍA LIBRE = LIBRE, NO FALTA: si alguien tiene el día libre o permiso (dicho en el grupo o en get_team_schedule), en el corte/EOD sale "libre hoy" — NO lo marques "sin fichar / sin números / sin reporte", ni lo llames individualmente por no reportar, ni le bajes la nota por 0. El 21/08 Daniel estaba libre y el corte de las 15:00 lo listó "sin fichar, sin números" — eso no va.
 - PRESIÓN HONESTA + ÁNIMO (Álvaro 04/08): di claro qué falta para cerrar bien el día y qué hay que mover en las próximas 2 horas ("seguimos en 0 números hoy — ayer tampoco cayó ninguno; en esta tanda hay que romper eso") y empuja al último tramo. Presión de jefe que acompaña: sin dramatizar ni humillar.
 - ENSEÑA TU PODER (Álvaro 04/08): de vez en cuando (no en cada corte), UNA línea ofreciéndote con un ejemplo CONCRETO de esa tanda — "pídanme openers, precios de sub, datos de cualquier creadora o lead: tengo los datos de toda la empresa, úsenme". Varía redacción y ejemplo (que salga del trabajo real del grupo ese día). Para dudas de CONTENIDO EXCLUSIVO (guiones, ideas, qué vende), recuérdales DE VEZ EN CUANDO (no cada corte) que Álvaro es el experto — que lo usen.
 - Cierra SIEMPRE con lo que más le importa a Álvaro: *Vendido hoy: $X* — solo montos DICHOS en el grupo o registrados hoy en Maven (ventas de productos/cierres). Sin monto real: "Vendido hoy: sin montos reportados". NUNCA inventes ni estimes.
 - ACTIVIDAD EN EL CORTE (regla de Álvaro 03/08 17:04, formato de Jhon 04/08): en el grupo NO se dicen horas de Hubstaff — SOLO el % de actividad; quien esté bajo el mínimo de compañía lleva la marca "(min 60)" tal como viene en el bloque inyectado (ej. "María 35% (min 60)" · "Daniel 62% ✓"). El mensaje implícito: lo estamos viendo. A quien figure "sin cuenta (no aplica)" no lo midas por actividad. Usa SOLO los números del bloque — nunca de memoria.
 - CORTE PUBLICADO = CERRADO (regla de Álvaro 17:07): NUNCA corrijas ni edites un corte anterior; lo que llegue tarde o cambie entra al corte SIGUIENTE. En cada corte di solo la hora, sin explicar ajustes del pasado.
+- NOTA / CORTE PUBLICADO NO SE RENEGOCIA EN EL HILO (AI Warming 20/08, Brayan): si alguien discute su nota o su corte YA publicado, NO la recalcules ni la subas/bajes mensaje por mensaje en el grupo. Reconoce UNA vez, di que anotas el punto y que le marcas la corrección a Álvaro, y si algo cambia va en el CIERRE SIGUIENTE — nunca un tira y afloja del número en vivo. El 20/08 el bot llevó a Brayan de 2.7 a 6.5 discutiendo en el hilo; eso hace ver que la nota se regatea.
 - NOTAS DE DÍAS ANTERIORES = SOLO PERSISTIDAS (17/08): si vas a citar la nota, el cierre o "cómo cerró" un día anterior de alguien — en un corte, en la apertura o respondiendo una mención — el dato sale de get_corte_notas({date:"YYYY-MM-DD"}) o del bloque NOTAS PERSISTIDAS inyectado, NUNCA de la memoria del hilo. El 17/08 el bot regañó a Brayan por un "viernes flojo (1.4)" que era la nota del SÁBADO (el viernes cerró 2.7) y, cuando Casta lo corrigió, desestimó la corrección sin verificar. Si alguien te corrige una nota o una fecha, VERIFICA con la tool antes de sostener tu versión: la fecha de la tabla manda, no tu recuerdo.
 - En VENTAS, el corte cierra SIEMPRE con el bloque "PLATA DEL DÍA" inyectado (En la mesa / Ganado hoy / Agenda) — tal cual viene, es sagrado.
 - UNA sola llamada a reply_to_group. Las preguntas de arranque a personas puntuales ("¿cómo vamos con X?") SÍ van — son el estilo de mánager que pidió Álvaro; lo que NO va es pedir confirmaciones de formato o permiso.
@@ -7540,6 +7544,8 @@ async function runAgent(req: AgentRequest): Promise<{
   // Muro de texto (Álvaro 08/2026): máx 2 bloqueos y a la 3ª sale igual + evento
   // 'agent_wall_of_text'. Nunca deja al equipo sin mensaje por un tema de FORMA.
   let muroBloqueado = 0;
+  // Mensaje vacío (21/08): máx 2 avisos y luego se descarta — publicar vacío nunca es válido.
+  let vacioBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
   // Texto del mensaje disparador, para la guarda de lecciones de estilo: si el humano
@@ -8518,6 +8524,36 @@ async function runAgent(req: AgentRequest): Promise<{
             });
             continue;
           }
+        }
+      }
+      // Guarda MENSAJE VACÍO (21/08): nunca publicar un reply/post en blanco o solo
+      // caracteres invisibles (zero-width, NBSP). El bot le respondió a Fabiana con un
+      // solo zero-width space. Cubre grupos Y DMs; publicar vacío nunca es válido.
+      if (t.name === "reply_to_group" || t.name === "post_to_group") {
+        const cuerpoVacio = String((t.input as ToolInput).body ?? "");
+        if (esMensajeVacio(cuerpoVacio)) {
+          if (vacioBloqueado < 2) {
+            vacioBloqueado += 1;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: t.id,
+              content: JSON.stringify({
+                error: "mensaje_vacio",
+                message:
+                  "Tu mensaje salió VACÍO (en blanco o solo espacios/caracteres invisibles). NO se envió. " +
+                  "Escribe el contenido real; si no hay nada que decir, no llames a esta tool.",
+              }),
+            });
+            continue;
+          }
+          // 2ª insistencia: NO se publica el vacío (nunca es válido) — se deja rastro y se corta.
+          await logEvent(sb, {
+            tenantId: group.tenant_id,
+            groupId: group.id,
+            kind: "agent_empty_message",
+            payload: { tool: t.name, intentos: vacioBloqueado },
+          });
+          continue;
         }
       }
       // Guarda ANTI-MURO DE TEXTO (Álvaro 08/2026): los mensajes programados salían

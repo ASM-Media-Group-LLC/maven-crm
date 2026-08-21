@@ -23,6 +23,7 @@ import {
   tieneRespaldoDeJuicio,
   detectarMuroDeTexto,
   esMuroDeTexto,
+  esMensajeVacio,
 } from "./agent-output-guards.ts";
 
 Deno.test("ack falso — los casos reales siguen bloqueados", () => {
@@ -563,4 +564,13 @@ Deno.test("muro de texto — un pitch citado largo NO dispara (los pitches no se
     'ocupa de todo. Regálame un meet y te muestro números reales de casos parecidos al tuyo."';
   assert(conPitch.length > 350, "el pitch hace el mensaje largo (disparía sin la exención)");
   assertEquals(esMuroDeTexto(conPitch), false, "un pitch citado es prosa legítima, no se toca");
+});
+
+Deno.test("mensaje vacío — blanco / espacios / zero-width disparan; texto real no", () => {
+  assert(esMensajeVacio(""));
+  assert(esMensajeVacio("   \n  "));
+  assert(esMensajeVacio("​")); // zero-width space: el bug del 21/08 con Fabiana
+  assert(esMensajeVacio("﻿ ⁠"));
+  assert(!esMensajeVacio("ok"));
+  assert(!esMensajeVacio("María, dale 👍"));
 });
