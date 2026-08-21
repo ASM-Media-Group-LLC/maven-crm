@@ -34,6 +34,8 @@ import {
   useMailFolders,
   useMailMessage,
   useMailMessages,
+  useMarkSeen,
+  usePrefetchMailMessage,
   correoDe,
   nombreDe,
   type MailSummary,
@@ -113,6 +115,8 @@ export default function CorreoPage() {
   const carpetas = useMailFolders(hayBuzon);
   const lista = useMailMessages(carpeta, hayBuzon);
   const mensaje = useMailMessage(carpeta, seq);
+  const precargar = usePrefetchMailMessage();
+  const marcarLeido = useMarkSeen();
 
   // Al cambiar de carpeta el mensaje abierto ya no corresponde: los números
   // de secuencia son por carpeta, así que dejarlo abriría OTRO correo.
@@ -155,8 +159,26 @@ export default function CorreoPage() {
     );
   }
 
-  const mensajes = lista.data?.messages ?? [];
+  // ORDEN EXPLICITO, no confiar en el del servidor: una version lo daba
+  // vuelta asumiendo "viejo a nuevo" y quedaba al reves. El numero de
+  // secuencia crece con cada mensaje nuevo, asi que mayor = mas reciente.
+  const mensajes = [...(lista.data?.messages ?? [])].sort((a, b) => b.seq - a.seq);
   const enLista = seq === null;
+
+  // Abrir un correo cuesta una sesion IMAP completa (~2-4 s). Precargamos
+  // los DOS mas nuevos apenas llega la lista: son los que la gente abre.
+  // Dos y no mas: cada precarga es una conexion real contra el proveedor.
+  useEffect(() => {
+    for (const m of mensajes.slice(0, 2)) precargar(carpeta, m.seq);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista.data, carpeta]);
+
+  const abrir = (m: MailSummary) => {
+    setSeq(m.seq);
+    // "Leido" se marca al ABRIR, no al descargar: la precarga baja el
+    // cuerpo sin tocar la bandera.
+    if (m.unread) marcarLeido.mutate({ folder: carpeta, seq: m.seq });
+  };
 
   const responder = () => {
     const m = mensaje.data;
@@ -305,14 +327,14 @@ export default function CorreoPage() {
                   texto={`No hay correos en ${nombreCarpeta(carpeta)}.`}
                 />
               )}
-              {/* El servidor entrega del más viejo al más nuevo; arriba va lo
-                  último que llegó, que es lo que la gente busca. */}
-              {[...mensajes].reverse().map((m) => (
+              {mensajes.map((m) => (
                 <FilaMensaje
                   key={m.seq}
                   m={m}
                   activo={m.seq === seq}
-                  onClick={() => setSeq(m.seq)}
+                  onClick={() => abrir(m)}
+                  onPrecargar={() => precargar(carpeta, m.seq)}
+                  mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
                 />
               ))}
             </div>
@@ -440,15 +462,28 @@ function FilaMensaje({
   m,
   activo,
   onClick,
+  onPrecargar,
+  mostrarDestinatario,
 }: {
   m: MailSummary;
   activo: boolean;
   onClick: () => void;
+  /** Pasar el mouse (o apoyar el dedo) ya dispara la descarga: para
+   *  cuando llega el clic, el mensaje suele estar listo. */
+  onPrecargar: () => void;
+  /** En Enviados y Borradores el remitente sos vos: verte a vos mismo en
+   *  cada fila no informa nada. Lo util es A QUIEN fue. */
+  mostrarDestinatario?: boolean;
 }) {
-  const nombre = nombreDe(m.from);
+  // Con varios destinatarios ("a@x, b@y") se muestra el primero.
+  const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
+  const nombre = nombreDe(quien);
   return (
     <button
       onClick={onClick}
+      onMouseEnter={onPrecargar}
+      onFocus={onPrecargar}
+      onTouchStart={onPrecargar}
       className={cn(
         "relative flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-all duration-150",
         activo
@@ -461,7 +496,7 @@ function FilaMensaje({
         <AvatarFallback
           className={cn(
             "bg-gradient-to-br text-xs font-bold text-white",
-            avatarGradient(correoDe(m.from)),
+            avatarGradient(correoDe(quien)),
           )}
         >
           {iniciales(nombre)}
@@ -476,6 +511,9 @@ function FilaMensaje({
               m.unread ? "font-bold text-foreground" : "font-medium text-foreground",
             )}
           >
+            {mostrarDestinatario && (
+              <span className="font-normal text-muted-foreground">Para </span>
+            )}
             {nombre}
           </span>
           <span

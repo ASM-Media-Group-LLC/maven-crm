@@ -319,6 +319,53 @@ Deno.serve(async (req) => {
     // === IMAP_MESSAGE ===
     // Un mensaje completo: se trae en crudo, se parsea el árbol MIME y se
     // sanea el HTML antes de devolverlo.
+    // === MARK_SEEN ===
+    // Solo pone la bandera \Seen, sin bajar el cuerpo. Existe para que el
+    // frontend pueda PRE-CARGAR mensajes (al pasar el mouse, los más
+    // nuevos al entrar) sin marcarlos leídos: "leído" es una decisión de
+    // quien lo abre, no un efecto de que lo hayamos descargado.
+    if (action === "mark_seen") {
+      if (!seq || seq < 1) return json({ error: "seq es requerido" }, 400);
+
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (credErr) return json({ error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json({ error: "no_credential" }, 409);
+
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) {
+        return json({ error: "no se pudo descifrar la credencial — hay que re-provisionarla" }, 500);
+      }
+
+      const box = (folder ?? "INBOX").slice(0, 200);
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        const sel = await client.selectFolder(box);
+        if (!sel.ok) return json({ error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
+        if (seq > sel.exists) return json({ error: "ese mensaje no existe en la carpeta" }, 404);
+        await client.markSeen(seq);
+        return json({ ok: true, folder: box, seq });
+      } catch (e) {
+        return json({ error: (e as Error).message ?? "error de IMAP" }, 502);
+      } finally {
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
+    }
+
     if (action === "imap_message") {
       if (!seq || seq < 1) return json({ error: "seq es requerido" }, 400);
 

@@ -140,19 +140,72 @@ export function useMailMessages(folder: string, enabled: boolean) {
   });
 }
 
+/** Cada apertura de mensaje es una sesión IMAP completa contra el
+ *  proveedor (TLS + login + select + fetch ≈ 2-4 s). Estos parámetros son
+ *  la mitigación: un mensaje ya bajado no cambia, así que se cachea largo
+ *  y volver a él es instantáneo. */
+const MENSAJE_CACHE = {
+  staleTime: 30 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
+} as const;
+
+/** OJO: `mark_read: false` acá a propósito. Este mismo fetch se usa para
+ *  PRE-CARGAR (hover, los más nuevos al entrar), y precargar no puede
+ *  marcar leído: "leído" lo decide quien lo abre, vía `useMarkSeen`. */
+function fetchMensaje(folder: string, seq: number) {
+  return callMail<MailMessage>({
+    action: "imap_message",
+    folder,
+    seq,
+    mark_read: false,
+  });
+}
+
 export function useMailMessage(folder: string, seq: number | null) {
   return useQuery({
     queryKey: ["mail-message", folder, seq],
     enabled: !!folder && seq != null,
-    // Un mensaje ya leído no cambia: no vale reabrir IMAP al volver a él.
-    staleTime: 30 * 60 * 1000,
-    queryFn: () =>
-      callMail<MailMessage>({
-        action: "imap_message",
-        folder,
-        seq,
-        mark_read: true,
-      }),
+    ...MENSAJE_CACHE,
+    queryFn: () => fetchMensaje(folder, seq as number),
+  });
+}
+
+/** Pre-carga un mensaje a la misma clave que usa `useMailMessage`: si la
+ *  persona después lo abre, ya está — el clic se siente instantáneo. */
+export function usePrefetchMailMessage() {
+  const qc = useQueryClient();
+  return (folder: string, seq: number) => {
+    void qc.prefetchQuery({
+      queryKey: ["mail-message", folder, seq],
+      ...MENSAJE_CACHE,
+      queryFn: () => fetchMensaje(folder, seq),
+    });
+  };
+}
+
+/** Marca leído en el servidor y apaga el punto azul al instante en la
+ *  lista cacheada — sin esperar el round-trip ni refetchear la carpeta. */
+export function useMarkSeen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ folder, seq }: { folder: string; seq: number }) =>
+      callMail<{ ok: true }>({ action: "mark_seen", folder, seq }),
+    onMutate: ({ folder, seq }) => {
+      qc.setQueryData(
+        ["mail-messages", folder],
+        (prev: { messages?: MailSummary[] } | undefined) =>
+          prev?.messages
+            ? {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.seq === seq ? { ...m, unread: false } : m,
+                ),
+              }
+            : prev,
+      );
+    },
+    // Si el servidor falla, el punto vuelve solo en el próximo refetch de
+    // la carpeta; no vale la pena un rollback para una bandera visual.
   });
 }
 

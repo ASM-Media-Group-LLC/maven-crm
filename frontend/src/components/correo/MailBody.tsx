@@ -63,14 +63,18 @@ function documento(cuerpo: string, cargarRemotas: boolean): string {
 <meta http-equiv="Content-Security-Policy" content="${csp(cargarRemotas)}">
 <base target="_blank">
 <style>
-  :root { color-scheme: light dark; }
+  /* LIENZO SIEMPRE CLARO, a propósito. Los correos HTML se escriben
+     asumiendo fondo blanco: llegan con color:#222 inline y sin fondo.
+     Con un iframe transparente sobre el tema oscuro de Maven, ese texto
+     era casi invisible (negro sobre negro). Gmail resuelve esto igual:
+     el mensaje se pinta como tarjeta clara, sin importar el tema. */
+  :root { color-scheme: light; }
   body {
-    margin: 0; padding: 4px 2px;
+    margin: 0; padding: 16px 18px;
     font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-    color: #18181b; background: transparent;
+    color: #1c1c22; background: #ffffff;
     overflow-wrap: break-word; word-break: break-word;
   }
-  @media (prefers-color-scheme: dark) { body { color: #e4e4e7; } }
   /* Los correos vienen con tablas de ancho fijo pensadas para escritorio.
      Sin esto, en un teléfono se sale de la pantalla y rompe el layout. */
   img, table, td, pre { max-width: 100% !important; }
@@ -167,13 +171,16 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         </p>
       )}
 
+      {/* La tarjeta blanca redondeada es deliberada: el documento de
+          adentro tiene fondo blanco fijo (ver `documento()`), y el borde
+          redondeado lo integra al tema oscuro en vez de verse pegado. */}
       <iframe
         ref={ref}
         title="Contenido del correo"
         srcDoc={srcDoc}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer"
-        className="w-full border-0 bg-transparent"
+        className="w-full rounded-2xl border-0 bg-white"
         style={{ height: alto }}
       />
     </div>
