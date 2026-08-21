@@ -83,6 +83,18 @@ async function unseal(cipherB64, nonceB64) {
 // Sincronización de una cuenta
 // ---------------------------------------------------------------------------
 
+/** Clave CANÓNICA de una carpeta para la base.
+ *
+ *  Zoho anuncia el inbox por IMAP con su nombre LOCALIZADO ("Bandeja de
+ *  entrada") — descubierto en el primer barrido real: la UI pide "INBOX"
+ *  y no encontraba nada. El protocolo garantiza que "INBOX" (reservado,
+ *  case-insensitive) siempre abre el buzón de entrada, así que: se ABRE
+ *  por el path que anuncie el servidor, se GUARDA siempre como INBOX. */
+function claveCanonica(buzon) {
+  if (buzon.specialUse === "\\Inbox" || /^inbox$/i.test(buzon.path)) return "INBOX";
+  return buzon.path;
+}
+
 class CuentaSync {
   constructor(cred) {
     this.cred = cred; // { user_id, email_address, imap_host, imap_port, secret_cipher, secret_nonce }
@@ -188,13 +200,13 @@ class CuentaSync {
     for (const b of buzones) {
       if (this.detenida) return;
       if (b.flags?.has("\\Noselect")) continue;
-      await this.sincronizarCarpeta(b.path);
+      await this.sincronizarCarpeta(b.path, claveCanonica(b));
     }
     this.ultimoBarrido = new Date().toISOString();
     this.estado = "idle";
   }
 
-  async sincronizarCarpeta(path) {
+  async sincronizarCarpeta(path, clave = path) {
     const lock = await this.client.getMailboxLock(path);
     try {
       const mb = this.client.mailbox;
@@ -206,7 +218,7 @@ class CuentaSync {
         .from("mail_sync_state")
         .select("uidvalidity, last_uid")
         .eq("user_id", this.cred.user_id)
-        .eq("folder", path)
+        .eq("folder", clave)
         .maybeSingle();
 
       let desdeUid = 0;
@@ -221,7 +233,7 @@ class CuentaSync {
           .from("mail_messages")
           .delete()
           .eq("user_id", this.cred.user_id)
-          .eq("folder", path);
+          .eq("folder", clave);
       }
 
       let maxUid = desdeUid;
@@ -241,18 +253,18 @@ class CuentaSync {
         )) {
           const uid = Number(msg.uid);
           if (uid <= desdeUid) continue; // '*' puede devolver el último igual
-          await this.guardarMensaje(path, uidValidity, uid, msg);
+          await this.guardarMensaje(clave, uidValidity, uid, msg);
           if (uid > maxUid) maxUid = uid;
         }
       }
 
       // Banderas de lo reciente: si alguien leyó desde otro lado (o el
       // propio mark_seen), el punto azul de la caché tiene que apagarse.
-      await this.refrescarBanderas(path, uidValidity, exists);
+      await this.refrescarBanderas(clave, uidValidity, exists);
 
       await db.from("mail_sync_state").upsert({
         user_id: this.cred.user_id,
-        folder: path,
+        folder: clave,
         uidvalidity: uidValidity,
         last_uid: maxUid,
         updated_at: new Date().toISOString(),
@@ -261,7 +273,7 @@ class CuentaSync {
       const status = await this.client.status(path, { messages: true, unseen: true });
       await db.from("mail_folders").upsert({
         user_id: this.cred.user_id,
-        folder: path,
+        folder: clave,
         total: status.messages ?? 0,
         unread: status.unseen ?? 0,
         synced_at: new Date().toISOString(),
@@ -271,7 +283,7 @@ class CuentaSync {
     }
   }
 
-  async refrescarBanderas(path, uidValidity, exists) {
+  async refrescarBanderas(clave, uidValidity, exists) {
     if (exists === 0) return;
     const desde = Math.max(1, exists - PER_FOLDER_INIT + 1);
     const vistos = [];
@@ -284,7 +296,7 @@ class CuentaSync {
       await db.from("mail_messages")
         .update({ unread: false })
         .eq("user_id", this.cred.user_id)
-        .eq("folder", path)
+        .eq("folder", clave)
         .eq("uidvalidity", uidValidity)
         .in("uid", vistos)
         .eq("unread", true);
@@ -293,19 +305,19 @@ class CuentaSync {
       await db.from("mail_messages")
         .update({ unread: true })
         .eq("user_id", this.cred.user_id)
-        .eq("folder", path)
+        .eq("folder", clave)
         .eq("uidvalidity", uidValidity)
         .in("uid", noVistos)
         .eq("unread", false);
     }
   }
 
-  async guardarMensaje(path, uidValidity, uid, msg) {
+  async guardarMensaje(clave, uidValidity, uid, msg) {
     let parsed;
     try {
       parsed = await simpleParser(msg.source, { skipImageLinks: true });
     } catch (e) {
-      this.log(`no se pudo parsear uid ${uid} de ${path}:`, e?.message);
+      this.log(`no se pudo parsear uid ${uid} de ${clave}:`, e?.message);
       return;
     }
 
@@ -331,7 +343,7 @@ class CuentaSync {
 
     const { error } = await db.from("mail_messages").upsert({
       user_id: this.cred.user_id,
-      folder: path,
+      folder: clave,
       uid,
       uidvalidity: uidValidity,
       message_id: parsed.messageId ?? null,
