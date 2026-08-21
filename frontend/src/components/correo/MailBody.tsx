@@ -142,8 +142,8 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
   return (
     <div className="space-y-3">
       {remoteImages > 0 && !cargarRemotas && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-          <ImageOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-primary/5 px-4 py-2.5 text-sm">
+          <ImageOff className="h-4 w-4 shrink-0 text-primary/70" />
           <span className="text-muted-foreground">
             {remoteImages === 1
               ? "Se bloqueó 1 imagen externa."
@@ -153,7 +153,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
           <Button
             size="sm"
             variant="outline"
-            className="ml-auto"
+            className="ml-auto rounded-full"
             onClick={() => setCargarRemotas(true)}
           >
             Mostrar imágenes
@@ -162,7 +162,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
       )}
 
       {truncated && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-muted-foreground">
+        <p className="rounded-2xl bg-amber-500/10 px-4 py-2.5 text-sm text-muted-foreground">
           El correo es muy largo y se muestra recortado.
         </p>
       )}

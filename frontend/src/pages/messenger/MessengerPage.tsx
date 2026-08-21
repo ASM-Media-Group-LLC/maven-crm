@@ -210,13 +210,19 @@ export default function MessengerPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center bg-primary/[0.02]">
             <div className="text-center space-y-4 px-4">
-              <div className="h-20 w-20 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
+              {/* Mismo estilo de estado vacío que Correo: círculo con
+                  degradé suave accent→primary. Que pasar de una pestaña a
+                  la otra no se sienta como cambiar de aplicación. */}
+              <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10 flex items-center justify-center mx-auto">
                 <MessageSquare className="h-10 w-10 text-primary/60" />
               </div>
               <div className="space-y-1.5">
-                <h3 className="text-lg font-semibold text-foreground">No conversation selected</h3>
+                {/* Estaba en inglés ("No conversation selected") con el
+                    subtítulo en español — mezcla de idiomas en la misma
+                    pantalla. */}
+                <h3 className="text-lg font-semibold text-foreground">Ninguna conversación abierta</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Selecciona un chat o contacto para comenzar a conversar
+                  Seleccioná un chat o contacto para comenzar a conversar
                 </p>
               </div>
             </div>

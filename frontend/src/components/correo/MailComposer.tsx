@@ -190,7 +190,11 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
           <Button variant="ghost" onClick={onCerrar} disabled={enviar.isPending}>
             Cancelar
           </Button>
-          <Button onClick={handleEnviar} disabled={!puedeEnviar}>
+          <Button
+            onClick={handleEnviar}
+            disabled={!puedeEnviar}
+            className="rounded-full bg-gradient-to-r from-accent to-primary text-white transition-opacity hover:opacity-90"
+          >
             {enviar.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (

@@ -72,7 +72,9 @@ function formatTime(dateStr?: string) {
     return date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
   }
   if (diff < 172800000) return "Ayer";
-  return date.toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+  // "14 jul", no "14/07": el formato numérico es ambiguo (¿día/mes o
+  // mes/día?) y el resto de la app ya usa el mes abreviado.
+  return date.toLocaleDateString("es", { day: "numeric", month: "short" });
 }
 
 function truncate(text: string, max: number) {
