@@ -368,6 +368,13 @@ export class ImapClient {
     return res.ok;
   }
 
+  /** Igual, pero por UID — el identificador ESTABLE que usa la caché de
+   *  Postgres (el seq se corre cuando se borra un mensaje anterior). */
+  async markSeenUid(uid: number): Promise<boolean> {
+    const res = await this.command(`UID STORE ${uid} +FLAGS (\\Seen)`);
+    return res.ok;
+  }
+
   async logout(): Promise<void> {
     try {
       await this.command("LOGOUT");

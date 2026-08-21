@@ -1,0 +1,16 @@
+{
+  "name": "mail-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sincronizador de correo: el UNICO proceso que habla IMAP con el proveedor. Una conexion tranquila por casilla (IDLE en INBOX = push), baja lo nuevo, lo sanea y lo deja en Postgres (mail_messages). La UI lee de la base y se entera por Realtime.",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test test.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.1"
+  }
+}

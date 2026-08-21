@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,14 +7,21 @@ import { describeFunctionError } from "@/hooks/useMailConnection";
 /**
  * Buzón del usuario: carpetas, mensajes, lectura y envío.
  *
- * Todo pasa por la edge function `mail-fetch`, que abre IMAP/SMTP con la
- * credencial cifrada del usuario. El navegador nunca ve esa credencial ni
- * habla con Zoho: solo conoce a Maven.
+ * DOS FUENTES, en este orden:
  *
- * Distinto de `useMailConnection`, que maneja el OAuth por usuario. Ese
- * camino quedó como plan B: obliga a pasar por una pantalla de
- * consentimiento con el logo de Zoho, y el principio del módulo es que el
- * empleado no se entere de que Zoho existe.
+ * 1. LA CACHÉ (mail_messages en Postgres) — el camino normal. La llena el
+ *    sincronizador (infra/mail-sync), que es el único proceso que habla
+ *    IMAP con el proveedor. Leer de acá es instantáneo, funciona para 60
+ *    personas igual que para 5, y no depende del humor del proveedor
+ *    (que raciona conexiones y castiga ráfagas — aprendido el 21/08 a
+ *    fuerza de cuelgues).
+ *
+ * 2. EL CAMINO EN VIVO (edge function mail-fetch → IMAP) — fallback SOLO
+ *    cuando la caché está vacía para ese usuario (worker aún no corre o
+ *    casilla recién creada sin primer barrido). Así el correo funciona
+ *    aunque el worker esté caído; lento, pero funciona.
+ *
+ * El envío no cambia: SMTP vía edge function, siempre.
  */
 
 /** Buzón provisionado para el usuario. Sale de `v_my_mailbox`, no de la
@@ -28,15 +35,22 @@ export interface Mailbox {
 }
 
 export interface MailSummary {
-  seq: number;
-  uid: string | null;
-  flags: string[];
+  /** id de la fila en caché. Presente solo cuando vino de la caché. */
+  id?: string;
+  /** Identificador IMAP estable (caché). */
+  uid?: number | string | null;
+  /** Número de secuencia (solo camino en vivo). */
+  seq?: number;
   from: string;
   to: string;
   subject: string;
   date: string;
-  messageId: string;
+  /** Primeras líneas del cuerpo — solo lo trae la caché. */
+  snippet?: string;
+  messageId?: string;
   unread: boolean;
+  /** De dónde salió: decide cómo abrirlo y cómo marcarlo leído. */
+  origen: "cache" | "vivo";
 }
 
 export interface MailAttachment {
@@ -48,7 +62,6 @@ export interface MailAttachment {
 
 export interface MailMessage {
   folder: string;
-  seq: number;
   from: string;
   to: string;
   cc: string;
@@ -60,20 +73,15 @@ export interface MailMessage {
    *  usuario decida: cargarlas le confirma al remitente que abrió el
    *  correo, que es exactamente para lo que sirve un píxel de rastreo. */
   remote_images: number;
-  dropped: string[];
   attachments: MailAttachment[];
-  /** El cuerpo se corta a 512 KB para que la función no muera por timeout. */
   truncated: boolean;
 }
 
-/** Semáforo: MÁXIMO 2 llamadas de correo simultáneas por pestaña.
- *
- *  Cada llamada abre una conexión IMAP/SMTP nueva contra el proveedor, y
- *  el proveedor RACIONA las conexiones concurrentes de una cuenta. Medido
- *  en producción (21/08): 2-3 a la vez responden en ~1,5 s; una ráfaga de
- *  6 se queda colgada >45 s y termina en 504. La interfaz dispara llamadas
- *  desde varios lados a la vez (carpetas, lista, hover, marcar leído):
- *  sin este tope, pasear el mouse por la bandeja tumbaba la cuenta. */
+/** Semáforo: MÁXIMO 2 llamadas al camino EN VIVO simultáneas por pestaña.
+ *  Solo aplica a la edge function (que abre IMAP/SMTP): el proveedor
+ *  raciona conexiones concurrentes — medido: 2-3 a la vez ~1,5 s, una
+ *  ráfaga de 6 colgada >45 s. Las lecturas de la caché no pasan por acá:
+ *  son Postgres y aguantan lo que les tires. */
 const MAX_SIMULTANEAS = 2;
 let enVuelo = 0;
 const fila: Array<() => void> = [];
@@ -104,6 +112,14 @@ function callMail<T>(body: Record<string, unknown>): Promise<T> {
   });
 }
 
+/** Reglas de las consultas que PUEDEN abrir una sesión IMAP (el fallback).
+ *  - retry: false — reintentar contra un proveedor que castiga alarga el castigo.
+ *  - refetchOnWindowFocus: false — volver a la pestaña no puede costar conexiones. */
+const SESION_IMAP = {
+  retry: false,
+  refetchOnWindowFocus: false,
+} as const;
+
 /** ¿Tiene buzón este usuario? Se provisiona solo al crear la cuenta. */
 export function useMailbox() {
   const { user } = useAuth();
@@ -121,8 +137,7 @@ export function useMailbox() {
   });
 }
 
-/** Nombres de carpeta que Zoho devuelve traducidos, y su orden natural.
- *  Sin esto la bandeja arranca con "Archive" y "Borrador" antes que INBOX. */
+/** Nombres de carpeta que el proveedor devuelve traducidos, y su orden. */
 const ORDEN_CARPETAS = [
   "INBOX",
   "Enviado",
@@ -140,33 +155,33 @@ export function ordenarCarpetas(folders: string[]): string[] {
   return [...folders].sort((a, b) => peso(a) - peso(b) || a.localeCompare(b));
 }
 
-/** Reglas comunes de las consultas que abren una sesión IMAP.
- *
- *  - `retry: false`: cuando el proveedor está estrangulando la cuenta
- *    (pasa tras ráfagas de logins), cada reintento automático es más
- *    presión sobre lo que ya está castigado — y el castigo se alarga.
- *    Para reintentar está el botón de actualizar.
- *  - `refetchOnWindowFocus: false`: el default de react-query refetchea
- *    al volver a la pestaña. Para una API HTTP es gratis; acá cada
- *    refetch es una CONEXIÓN nueva contra el proveedor. Cambiar de
- *    pestaña y volver no puede costar sesiones IMAP. */
-const SESION_IMAP = {
-  retry: false,
-  refetchOnWindowFocus: false,
-} as const;
+export interface CarpetaInfo {
+  folder: string;
+  unread: number;
+}
 
 export function useMailFolders(enabled: boolean) {
   return useQuery({
     queryKey: ["mail-folders"],
     enabled,
     ...SESION_IMAP,
-    // Las carpetas casi no cambian; no tiene sentido abrir IMAP en cada render.
-    staleTime: 10 * 60 * 1000,
-    queryFn: async () => {
-      const r = await callMail<{ folders: string[]; inbox_unseen?: number }>({
-        action: "imap_folders",
-      });
-      return ordenarCarpetas(r.folders ?? []);
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<CarpetaInfo[]> => {
+      // Caché primero: mantenida por el sincronizador, con no-leídos.
+      const { data, error } = await supabase
+        .from("mail_folders")
+        .select("folder, unread");
+      if (error) throw error;
+      if (data && data.length > 0) {
+        const orden = ordenarCarpetas(data.map((f) => f.folder as string));
+        return orden.map((f) => ({
+          folder: f,
+          unread: (data.find((x) => x.folder === f)?.unread as number) ?? 0,
+        }));
+      }
+      // Fallback en vivo (el worker aún no barrió esta casilla).
+      const r = await callMail<{ folders: string[] }>({ action: "imap_folders" });
+      return ordenarCarpetas(r.folders ?? []).map((f) => ({ folder: f, unread: 0 }));
     },
   });
 }
@@ -177,106 +192,189 @@ export function useMailMessages(folder: string, enabled: boolean) {
     queryKey: ["mail-messages", folder],
     enabled: enabled && !!folder,
     ...SESION_IMAP,
-    // Un minuto de frescura: volver a una carpeta recién vista no abre
-    // otra sesión. El botón de actualizar la fuerza cuando haga falta.
     staleTime: 60 * 1000,
-    queryFn: async () => {
-      const r = await callMail<{
-        folder: string;
-        total: number;
-        messages: MailSummary[];
-        bodies?: MailMessage[];
-      }>({
-        action: "imap_messages",
-        folder,
-        limit: 50,
-        // Los cuerpos de los 2 más nuevos vienen EN la misma sesión IMAP:
-        // el proveedor raciona conexiones, no datos. Antes esto eran dos
-        // conexiones extra (precarga), y era parte de lo que lo colgaba.
-        with_bodies: 2,
-      });
-      // Se siembran en la caché de mensaje: abrirlos es instantáneo.
-      for (const b of r.bodies ?? []) {
-        qc.setQueryData(["mail-message", folder, b.seq], b);
+    queryFn: async (): Promise<{ messages: MailSummary[] }> => {
+      // Caché primero.
+      const { data, error } = await supabase
+        .from("mail_messages")
+        .select("id, uid, from_addr, to_addr, subject, date, snippet, unread, message_id")
+        .eq("folder", folder)
+        .order("date", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return {
+          messages: data.map((m) => ({
+            id: m.id as string,
+            uid: m.uid as number,
+            from: (m.from_addr as string) ?? "",
+            to: (m.to_addr as string) ?? "",
+            subject: (m.subject as string) ?? "(sin asunto)",
+            date: (m.date as string) ?? "",
+            snippet: (m.snippet as string) ?? "",
+            messageId: (m.message_id as string) ?? undefined,
+            unread: !!m.unread,
+            origen: "cache" as const,
+          })),
+        };
       }
-      return r;
+
+      // Fallback en vivo, con los cuerpos de los 2 más nuevos en la misma
+      // sesión IMAP (sembrados en la caché de react-query).
+      const r = await callMail<{
+        messages: Array<{
+          seq: number; uid: string | null; from: string; to: string;
+          subject: string; date: string; unread: boolean; messageId: string;
+        }>;
+        bodies?: Array<MailMessage & { seq: number }>;
+      }>({ action: "imap_messages", folder, limit: 50, with_bodies: 2 });
+      for (const b of r.bodies ?? []) {
+        qc.setQueryData(["mail-message", folder, `seq:${b.seq}`], b);
+      }
+      // Orden explícito por seq descendente: no confiar en el del servidor.
+      const orden = [...(r.messages ?? [])].sort((a, b) => b.seq - a.seq);
+      return {
+        messages: orden.map((m) => ({ ...m, origen: "vivo" as const })),
+      };
     },
   });
 }
 
-/** Cada apertura de mensaje es una sesión IMAP completa contra el
- *  proveedor (TLS + login + select + fetch ≈ 2-4 s). Estos parámetros son
- *  la mitigación: un mensaje ya bajado no cambia, así que se cachea largo
- *  y volver a él es instantáneo. */
+/** Clave de un mensaje para la caché de react-query, según su origen. */
+export function claveDe(m: Pick<MailSummary, "id" | "seq" | "origen">): string {
+  return m.origen === "cache" ? `id:${m.id}` : `seq:${m.seq}`;
+}
+
 const MENSAJE_CACHE = {
   staleTime: 30 * 60 * 1000,
   gcTime: 30 * 60 * 1000,
 } as const;
 
-/** OJO: `mark_read: false` acá a propósito. Este mismo fetch se usa para
- *  PRE-CARGAR (hover, los más nuevos al entrar), y precargar no puede
- *  marcar leído: "leído" lo decide quien lo abre, vía `useMarkSeen`. */
-function fetchMensaje(folder: string, seq: number) {
-  return callMail<MailMessage>({
-    action: "imap_message",
-    folder,
-    seq,
-    mark_read: false,
-  });
+async function fetchMensajeCache(id: string): Promise<MailMessage> {
+  const { data, error } = await supabase
+    .from("mail_messages")
+    .select(
+      "folder, from_addr, to_addr, cc_addr, subject, date, html, text_body, remote_images, attachments, truncated",
+    )
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return {
+    folder: data.folder as string,
+    from: (data.from_addr as string) ?? "",
+    to: (data.to_addr as string) ?? "",
+    cc: (data.cc_addr as string) ?? "",
+    subject: (data.subject as string) ?? "(sin asunto)",
+    date: (data.date as string) ?? "",
+    html: (data.html as string | null) ?? null,
+    text: (data.text_body as string | null) ?? null,
+    remote_images: (data.remote_images as number) ?? 0,
+    attachments: (data.attachments as MailAttachment[]) ?? [],
+    truncated: !!data.truncated,
+  };
 }
 
-export function useMailMessage(folder: string, seq: number | null) {
+function fetchMensajeVivo(folder: string, seq: number): Promise<MailMessage> {
+  return callMail<MailMessage>({ action: "imap_message", folder, seq, mark_read: false });
+}
+
+export function useMailMessage(folder: string, sel: MailSummary | null) {
   return useQuery({
-    queryKey: ["mail-message", folder, seq],
-    enabled: !!folder && seq != null,
+    queryKey: ["mail-message", folder, sel ? claveDe(sel) : null],
+    enabled: !!folder && !!sel,
     ...SESION_IMAP,
     ...MENSAJE_CACHE,
-    queryFn: () => fetchMensaje(folder, seq as number),
+    queryFn: () =>
+      sel!.origen === "cache"
+        ? fetchMensajeCache(sel!.id!)
+        : fetchMensajeVivo(folder, sel!.seq!),
   });
 }
 
-/** Pre-carga un mensaje a la misma clave que usa `useMailMessage`: si la
- *  persona después lo abre, ya está — el clic se siente instantáneo. */
+/** Pre-carga un mensaje a la misma clave que usa `useMailMessage`. Para la
+ *  caché es una consulta a Postgres (gratis); el camino en vivo pasa por el
+ *  semáforo como todo lo demás. */
 export function usePrefetchMailMessage() {
   const qc = useQueryClient();
-  // useCallback: esta función va en las dependencias de un useEffect del
-  // llamador; si se recreara en cada render, el efecto dispararía siempre.
   return useCallback(
-    (folder: string, seq: number) => {
+    (folder: string, m: MailSummary) => {
       void qc.prefetchQuery({
-        queryKey: ["mail-message", folder, seq],
+        queryKey: ["mail-message", folder, claveDe(m)],
         ...MENSAJE_CACHE,
-        queryFn: () => fetchMensaje(folder, seq),
+        queryFn: () =>
+          m.origen === "cache"
+            ? fetchMensajeCache(m.id!)
+            : fetchMensajeVivo(folder, m.seq!),
       });
     },
     [qc],
   );
 }
 
-/** Marca leído en el servidor y apaga el punto azul al instante en la
- *  lista cacheada — sin esperar el round-trip ni refetchear la carpeta. */
+/** Marca leído: apaga el punto azul al instante y lleva la bandera al
+ *  proveedor en segundo plano. */
 export function useMarkSeen() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ folder, seq }: { folder: string; seq: number }) =>
-      callMail<{ ok: true }>({ action: "mark_seen", folder, seq }),
-    onMutate: ({ folder, seq }) => {
+    mutationFn: async ({ folder, m }: { folder: string; m: MailSummary }) => {
+      if (m.origen === "cache" && m.id) {
+        // Directo a la fila propia (la política RLS + el GRANT de columna
+        // permiten exactamente esto y nada más).
+        await supabase.from("mail_messages").update({ unread: false }).eq("id", m.id);
+        // Y al proveedor por UID, sin bloquear a nadie si falla: el
+        // sincronizador reconcilia banderas en cada barrido igual.
+        if (m.uid) {
+          void callMail({ action: "mark_seen", folder, uid: Number(m.uid) }).catch(() => {});
+        }
+        return;
+      }
+      if (m.seq) await callMail({ action: "mark_seen", folder, seq: m.seq });
+    },
+    onMutate: ({ folder, m }) => {
       qc.setQueryData(
         ["mail-messages", folder],
         (prev: { messages?: MailSummary[] } | undefined) =>
           prev?.messages
             ? {
                 ...prev,
-                messages: prev.messages.map((m) =>
-                  m.seq === seq ? { ...m, unread: false } : m,
+                messages: prev.messages.map((x) =>
+                  claveDe(x) === claveDe(m) ? { ...x, unread: false } : x,
                 ),
               }
             : prev,
       );
     },
-    // Si el servidor falla, el punto vuelve solo en el próximo refetch de
-    // la carpeta; no vale la pena un rollback para una bandera visual.
   });
+}
+
+/** La bandeja se actualiza SOLA: el sincronizador inserta en mail_messages
+ *  y Realtime lo empuja hasta acá — el mismo mecanismo de los ✓✓ del chat.
+ *  RLS aplica también en Realtime: cada quien recibe solo sus filas. */
+export function useMailRealtime(enabled: boolean) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
+    const canal = supabase
+      .channel(`mail-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mail_messages",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["mail-messages"] });
+          qc.invalidateQueries({ queryKey: ["mail-folders"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(canal);
+    };
+  }, [enabled, user?.id, qc]);
 }
 
 export interface OutgoingMail {

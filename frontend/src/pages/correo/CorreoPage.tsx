@@ -34,8 +34,10 @@ import {
   useMailFolders,
   useMailMessage,
   useMailMessages,
+  useMailRealtime,
   useMarkSeen,
   usePrefetchMailMessage,
+  claveDe,
   correoDe,
   nombreDe,
   type MailSummary,
@@ -109,28 +111,26 @@ export default function CorreoPage() {
   const hayBuzon = !!buzon?.is_active;
 
   const [carpeta, setCarpeta] = useState("INBOX");
-  const [seq, setSeq] = useState<number | null>(null);
+  const [sel, setSel] = useState<MailSummary | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
 
   const carpetas = useMailFolders(hayBuzon);
   const lista = useMailMessages(carpeta, hayBuzon);
-  const mensaje = useMailMessage(carpeta, seq);
+  const mensaje = useMailMessage(carpeta, sel);
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
+  // La bandeja se actualiza sola cuando el sincronizador escribe (push).
+  useMailRealtime(hayBuzon);
 
   // Al cambiar de carpeta el mensaje abierto ya no corresponde: los números
   // de secuencia son por carpeta, así que dejarlo abriría OTRO correo.
   useEffect(() => {
-    setSeq(null);
+    setSel(null);
   }, [carpeta]);
 
-  // ORDEN EXPLÍCITO, no confiar en el del servidor: una versión lo daba
-  // vuelta asumiendo "viejo a nuevo" y quedaba al revés. El número de
-  // secuencia crece con cada mensaje nuevo: mayor = más reciente.
-  const mensajes = useMemo(
-    () => [...(lista.data?.messages ?? [])].sort((a, b) => b.seq - a.seq),
-    [lista.data],
-  );
+  // El hook entrega los mensajes ya ordenados (más nuevo primero) venga de
+  // la caché o del camino en vivo.
+  const mensajes = useMemo(() => lista.data?.messages ?? [], [lista.data]);
 
   // La precarga de los 2 más nuevos ya NO se hace desde acá: viene con la
   // lista (`with_bodies`), en la misma sesión IMAP. Disparar conexiones
@@ -171,21 +171,21 @@ export default function CorreoPage() {
     );
   }
 
-  const enLista = seq === null;
+  const enLista = sel === null;
 
   const abrir = (m: MailSummary) => {
-    setSeq(m.seq);
-    // "Leido" se marca al ABRIR, no al descargar: la precarga baja el
+    setSel(m);
+    // "Leído" se marca al ABRIR, no al descargar: la precarga baja el
     // cuerpo sin tocar la bandera.
-    if (m.unread) marcarLeido.mutate({ folder: carpeta, seq: m.seq });
+    if (m.unread) marcarLeido.mutate({ folder: carpeta, m });
   };
 
   const responder = () => {
     const m = mensaje.data;
     if (!m) return;
-    // El `Message-ID` no viene con el cuerpo, sí con el resumen de la lista.
-    // Sin él la respuesta le aparece suelta al otro, fuera de la conversación.
-    const messageId = mensajes.find((x) => x.seq === m.seq)?.messageId;
+    // El `Message-ID` viaja en el resumen seleccionado (caché o vivo). Sin
+    // él la respuesta le aparece suelta al otro, fuera de la conversación.
+    const messageId = sel?.messageId;
     setRedactar({
       to: correoDe(m.from),
       subject: /^re:/i.test(m.subject) ? m.subject : `Re: ${m.subject}`,
@@ -208,7 +208,7 @@ export default function CorreoPage() {
             variant="ghost"
             size="icon"
             className="rounded-full md:hidden"
-            onClick={() => setSeq(null)}
+            onClick={() => setSel(null)}
             aria-label="Volver a la lista"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -251,7 +251,7 @@ export default function CorreoPage() {
                 <Skeleton className="h-3.5 w-24" />
               </div>
             ))}
-          {(carpetas.data ?? []).map((f) => {
+          {(carpetas.data ?? []).map(({ folder: f, unread }) => {
             const Icono = iconoCarpeta(f);
             const activa = f === carpeta;
             return (
@@ -267,6 +267,11 @@ export default function CorreoPage() {
               >
                 <Icono className={cn("h-4 w-4 shrink-0", activa && "text-primary")} />
                 <span className="truncate">{nombreCarpeta(f)}</span>
+                {unread > 0 && (
+                  <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -282,7 +287,7 @@ export default function CorreoPage() {
           {/* Carpetas como píldoras cuando no está la columna lateral —
               mismo patrón que los filtros de Messenger. */}
           <div className="scrollbar-hide flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2 lg:hidden">
-            {(carpetas.data ?? [carpeta]).map((f) => {
+            {(carpetas.data ?? [{ folder: carpeta, unread: 0 }]).map(({ folder: f }) => {
               const Icono = iconoCarpeta(f);
               const activa = f === carpeta;
               return (
@@ -329,11 +334,11 @@ export default function CorreoPage() {
               )}
               {mensajes.map((m) => (
                 <FilaMensaje
-                  key={m.seq}
+                  key={claveDe(m)}
                   m={m}
-                  activo={m.seq === seq}
+                  activo={sel ? claveDe(m) === claveDe(sel) : false}
                   onClick={() => abrir(m)}
-                  onPrecargar={() => precargar(carpeta, m.seq)}
+                  onPrecargar={() => precargar(carpeta, m)}
                   mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
                 />
               ))}
@@ -343,7 +348,7 @@ export default function CorreoPage() {
 
         {/* Lectura */}
         <div className={cn("min-w-0 flex-1", enLista ? "hidden md:block" : "block")}>
-          {seq === null ? (
+          {sel === null ? (
             <div className="hidden h-full flex-col items-center justify-center gap-3 md:flex">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
                 <Mail className="h-7 w-7 text-primary/70" />
@@ -536,6 +541,11 @@ function FilaMensaje({
             {m.subject || "(sin asunto)"}
           </span>
         </div>
+        {m.snippet ? (
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
+            {m.snippet}
+          </span>
+        ) : null}
       </div>
     </button>
   );

@@ -363,7 +363,11 @@ Deno.serve(async (req) => {
     // nuevos al entrar) sin marcarlos leídos: "leído" es una decisión de
     // quien lo abre, no un efecto de que lo hayamos descargado.
     if (action === "mark_seen") {
-      if (!seq || seq < 1) return json({ error: "seq es requerido" }, 400);
+      const porUid = typeof (body as { uid?: number }).uid === "number" &&
+        (body as { uid: number }).uid > 0;
+      if (!porUid && (!seq || seq < 1)) {
+        return json({ error: "seq o uid es requerido" }, 400);
+      }
 
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
@@ -391,8 +395,14 @@ Deno.serve(async (req) => {
         if (!auth.ok) return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
         const sel = await client.selectFolder(box);
         if (!sel.ok) return json({ error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
-        if (seq > sel.exists) return json({ error: "ese mensaje no existe en la carpeta" }, 404);
-        await client.markSeen(seq);
+        if (porUid) {
+          // Por UID (lo que usa la caché): estable, no requiere validar
+          // contra `exists` — un UID inexistente es un no-op inofensivo.
+          await client.markSeenUid((body as { uid: number }).uid);
+          return json({ ok: true, folder: box, uid: (body as { uid: number }).uid });
+        }
+        if ((seq as number) > sel.exists) return json({ error: "ese mensaje no existe en la carpeta" }, 404);
+        await client.markSeen(seq as number);
         return json({ ok: true, folder: box, seq });
       } catch (e) {
         return json({ error: (e as Error).message ?? "error de IMAP" }, 502);
