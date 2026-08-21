@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Loader2 } from "lucide-react";
@@ -10,6 +10,7 @@ interface PermissionRouteProps {
 }
 
 const PermissionRoute = ({ module, submodule, children }: PermissionRouteProps) => {
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { canAccess, isLoading: permsLoading } = usePermissions();
 
@@ -22,7 +23,9 @@ const PermissionRoute = ({ module, submodule, children }: PermissionRouteProps) 
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Se recuerda a dónde iba: Login lo devuelve ahí después de entrar
+    // (sin esto, un link compartido moría en el dashboard).
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (!canAccess(module, submodule)) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,23 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // A dónde volver después de entrar. Sin esto, quien llega desde un link
+  // compartido (una reunión de Meet, un correo, un ticket) aterrizaba en
+  // el dashboard y tenía que volver a buscar el link — reportado por Jhon
+  // con los links de Meet. Dos fuentes: el state que dejan las rutas
+  // protegidas al expulsar, o ?returnTo= para links armados a mano.
+  // SOLO rutas internas (empiezan con "/"): un returnTo absoluto sería un
+  // open redirect — llegás de un phishing, te logueás en el Maven real y
+  // te devuelve a un clon sin que notes el salto.
+  const crudo =
+    (location.state as { from?: { pathname?: string; search?: string } } | null)?.from
+      ? `${(location.state as { from: { pathname: string; search?: string } }).from.pathname}${(location.state as { from: { search?: string } }).from.search ?? ""}`
+      : new URLSearchParams(location.search).get("returnTo");
+  const destino = crudo && crudo.startsWith("/") && !crudo.startsWith("//")
+    ? crudo
+    : "/dashboard";
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +44,7 @@ const Login = () => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={destino} replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -45,7 +62,7 @@ const Login = () => {
     if (error) {
       toast({ title: "Error al iniciar sesión", description: error.message, variant: "destructive" });
     } else {
-      navigate("/dashboard");
+      navigate(destino);
     }
   };
 

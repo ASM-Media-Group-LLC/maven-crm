@@ -176,6 +176,17 @@ export default function MeetGuestPage() {
         <p className="text-[11px] text-muted-foreground/70 text-center">
           Tu nombre se muestra a quienes están en la reunión para que puedan aceptarte.
         </p>
+        {/* Quien SÍ tiene cuenta no debería golpear como invitado: entra
+            directo. El returnTo lo devuelve a ESTA página tras loguearse —
+            y la verificación de sesión de arriba lo mete a la reunión sin
+            más pasos (antes el login lo dejaba tirado en el dashboard). */}
+        <Button
+          variant="ghost"
+          className="w-full rounded-full text-muted-foreground"
+          onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/entrar/${code}`)}`)}
+        >
+          ¿Tenés cuenta en Maven? Iniciá sesión
+        </Button>
       </div>
       {error && <p className="text-xs text-destructive text-center">{error}</p>}
     </Shell>
