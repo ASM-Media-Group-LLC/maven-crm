@@ -339,20 +339,20 @@ export function marcarAckSinPersistencia(cuerpo: string): string {
 // >=40 chars, vía TIENE_PITCH_CITADO), NO dispara. Los pitches a creadoras/agencias
 // son la única prosa larga que se preserva pulida — nunca se parten en bullets.
 //
-// Dos disparadores, ambos exigen ausencia de estructura de líneas:
-//  1. PÁRRAFO GIGANTE: el trozo más largo entre saltos de línea supera ~350 chars
-//     (un solo chorro sin respirar), sin importar cuántas líneas tenga el resto.
-//  2. TOTAL GRANDE EN POCAS LÍNEAS: > ~900 chars repartidos en <=3 líneas (un muro
-//     que ni siquiera se molestó en partir).
-export const MURO_PARRAFO_MAX = 350;
-export const MURO_TOTAL_MAX = 900;
+// Disparador único (para no penalizar listas legítimas): PÁRRAFO LARGO — el trozo
+// más largo entre saltos de línea supera ~250 chars (un bloque corrido de 3+ renglones
+// sin respirar). Bajado de 350→250 el 21/08: el bot escribía bloques de 290-345 (uno
+// por persona/tema) que quedaban justo bajo el viejo umbral; párrafos que Álvaro quiere
+// partidos en líneas. Una lista de 12 personas una-por-línea o un corte de 6 líneas
+// siguen pasando (cada línea corta). El viejo 2º disparador (total en <=3 líneas) quedó
+// subsumido por este y se retiró.
+export const MURO_PARRAFO_MAX = 250;
 
 export function detectarMuroDeTexto(
   s: string,
-  opts: { parrafoMax?: number; totalMax?: number } = {},
-): { motivo: "parrafo_gigante" | "total_en_pocas_lineas"; chars: number } | null {
+  opts: { parrafoMax?: number } = {},
+): { motivo: "parrafo_largo"; chars: number } | null {
   const parrafoMax = opts.parrafoMax ?? MURO_PARRAFO_MAX;
-  const totalMax = opts.totalMax ?? MURO_TOTAL_MAX;
   const texto = (s ?? "").trim();
   if (!texto) return null;
   // Un pitch/opener citado es prosa larga LEGÍTIMA — no se parte nunca.
@@ -362,12 +362,9 @@ export function detectarMuroDeTexto(
   // acá un muro con "\\n" a la vista queda como un solo trozo, y bien.
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   const trozoMasLargo = lineas.reduce((max, l) => Math.max(max, l.length), 0);
-  // Disparador 1: un párrafo corrido gigantesco.
-  if (trozoMasLargo > parrafoMax) return { motivo: "parrafo_gigante", chars: trozoMasLargo };
-  // Disparador 2: mucho texto total en muy pocas líneas (ni lista ni bullets).
-  if (texto.length > totalMax && lineas.length <= 3) {
-    return { motivo: "total_en_pocas_lineas", chars: texto.length };
-  }
+  // Un párrafo corrido largo (3+ renglones sin cortar) = muro. Se devuelve el control
+  // para que el modelo lo parta en líneas; los datos se preservan por construcción.
+  if (trozoMasLargo > parrafoMax) return { motivo: "parrafo_largo", chars: trozoMasLargo };
   return null;
 }
 export const esMuroDeTexto = (s: string): boolean => detectarMuroDeTexto(s) !== null;

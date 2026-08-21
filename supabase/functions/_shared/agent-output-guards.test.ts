@@ -508,15 +508,19 @@ Deno.test("muro de texto — un párrafo gigante sin saltos dispara", () => {
     "confirme los horarios antes del mediodía, mientras Daniel carga los perfiles nuevos del scraper y " +
     "saca al menos 3 números antes de las 2pm para no quedar cortos con la meta semanal.";
   assert(esMuroDeTexto(muro), `debía detectar muro: ${muro.length} chars en 1 línea`);
-  assertEquals(detectarMuroDeTexto(muro)?.motivo, "parrafo_gigante");
+  assertEquals(detectarMuroDeTexto(muro)?.motivo, "parrafo_largo");
 });
 
-Deno.test("muro de texto — mucho total en <=3 líneas dispara aunque cada línea sea <350", () => {
-  const linea = ("reactivamos las agencias frías y confirmamos las llamadas de la tarde, ".repeat(5)).trim().slice(0, 320);
-  assert(linea.length <= 350, "cada línea queda bajo el umbral de párrafo");
-  const muro = `${linea}\n${linea}\n${linea}`;
-  assert(muro.length > 900 && muro.split("\n").length === 3);
-  assertEquals(detectarMuroDeTexto(muro)?.motivo, "total_en_pocas_lineas");
+Deno.test("muro de texto — un bloque denso por persona (~300 chars) dispara con el umbral 250", () => {
+  // Caso real del 21/08: el push escribía un párrafo de ~300 chars por persona, justo
+  // bajo el viejo umbral de 350. Con 250 se caza y el modelo lo parte en líneas.
+  const bloque =
+    "Miguel — marcoslfrall y guillaumewoff siguen en Confirmada sin firmar (17/08 y 19/08), " +
+    "hoy toca cerrar sin otro reagendamiento; overdue tuyos sin tocar: geraldine_haze, yesyn13 y " +
+    "mmmariangel con 15 días, más macagastaldo y ana_acvkk con 3 días, y Jake/Brian de Blu sin login.";
+  assert(bloque.length > 250 && bloque.length < 350, `bloque denso: ${bloque.length} chars`);
+  assert(esMuroDeTexto(bloque), "un bloque denso de ~300 chars debe caer con el umbral de 250");
+  assertEquals(detectarMuroDeTexto(bloque)?.motivo, "parrafo_largo");
 });
 
 Deno.test("muro de texto — una lista de 12+ personas una-por-línea NO dispara", () => {
