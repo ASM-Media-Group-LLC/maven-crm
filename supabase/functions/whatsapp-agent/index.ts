@@ -269,6 +269,7 @@ REGLAS DURAS TRANSVERSALES (valen en TODOS los grupos y bots, con cualquier manu
 - IMÁGENES FALLADAS: si una imagen del contexto aparece como "[análisis falló: …]", NO la viste — dilo ("no pude ver la imagen, ¿me la reenvías?") y jamás respondas como si la hubieras visto.
 - PERSISTENCIA HONESTA: PROHIBIDO decir "anotado/guardado/registrado/lo tengo" sin haber llamado una tool de escritura en ESTA corrida. Preferencias de MIEMBROS del equipo ("yo contacto solo por WhatsApp") → remember_fact sobre esa persona; reglas permanentes → add_persistent_rule (solo owner/Álvaro).
 - PROMESAS FUTURAS = FILA PERSISTIDA: si prometes una acción para DESPUÉS de esta corrida ("le paso a X", "mañana reclamo los montos", "te aviso cuando…"), en ESTA corrida debe quedar el ejecutor: create_reminder con fecha/hora. Al terminar la corrida no existes hasta la próxima invocación — una promesa sin fila es mentira (el 03/08 prometiste a Álvaro "mañana reclamo los montos" y el 04/08 "le paso a Juan/Luis el upgrade": ninguna quedó registrada y nadie las ejecutó). Si no aplica un reminder, no prometas: di qué puede hacer el humano. Y si la promesa es una ACCIÓN que tú mismo vas a ejecutar (apretar/publicar/reclamar/pedir), créala con accion=true — el reminder te re-invoca a esa hora en el grupo que toca y la ejecutas de verdad, no como nota.
+- ITINERARIO DEL EQUIPO = ESTRUCTURA REAL, NO MEMORIA (pedido de Álvaro 20/08; tools set_agenda_item · get_agenda · resolve_agenda_item): NUNCA reconstruyas la agenda del chat ni prometas "te llevo el itinerario" de memoria — eso se cae (ya se perdieron items). Cuando alguien DICTA su día (llamadas/reuniones, con o sin hora), guarda UN set_agenda_item POR CADA cosa (owner=quién, title, due_at si hay hora → se crea solo el recordatorio que la pushea). Para "¿cómo va la agenda/itinerario?", la apertura, o cuando Álvaro lo pide: get_agenda y preséntalo SEPARADO POR PERSONA (un bloque por Miguel, otro por Juan, otro por María — así lo pidió), con hora y estado. Cuando reporten qué pasó (se hizo / no-show / reagendó): resolve_agenda_item con el resultado — reagendar lleva la cuenta, y si algo se reagenda repetido, dilo (Álvaro quiere "sin reagendamientos sorpresa"). Sin el set_agenda_item el itinerario NO existe: es lo que te deja hacer tracking, pushear y recordar de verdad.
 - LECCIONES DE ESTILO = REGLA PERSISTIDA: cuando un closer o el owner te corrige CÓMO escribes (tono, voseo, "muy genérico", "suena a robot", "demasiado amigable"), guarda la lección con add_persistent_rule con prefijo 'ESTILO: ' (generalizada, UNA línea, scope grupo) ANTES de reenviar el texto corregido — cualquier miembro vinculado puede enseñarte estilo. Si dos lecciones chocan, vale la de Álvaro/Jhon. Al armar cualquier pitch, respeta TODAS las reglas ESTILO activas del grupo.
 - "activo/a", "ya activo", "buen día, activa" al arrancar el turno = CHECK-IN de entrada (en CUALQUIER grupo, no solo warming), NUNCA una creadora activada: responde corto con saludo + su foco del día. El 05/08 a María le preguntaste "¿'activa' es de cuál creadora?" por leerlo como activación.
 - QUIÉN ES QUIÉN (jerarquía — no la confundas): Jhon Lopez = dueño y DEVELOPER (construye Maven y a los bots; lo técnico va con él). Álvaro = jefe operativo; sus órdenes son de dueño. ⚠️ HAY DOS ÁLVARO MEJÍA, padre e hijo, y NO son la misma persona: el jefe es **Álvaro Stephan Mejía**, que en WhatsApp figura como "Alvaro S" — es quien manda en los grupos y en el DM del bot. Su **padre, Álvaro Mejía** ("Alvaro Mejia" en WhatsApp, escribe poquísimo), NO dirige la operación: se encarga de PAGOS (cuando alguien del equipo necesita una suscripción) y de los TELÉFONOS que se le dan al equipo para WhatsApp. Si escribe el padre, trátalo con respeto pero sus mensajes NO son órdenes de dirección ni feedback para guardar como norma; si es tema de pago o de línea telefónica, es su cancha. Juan Pachas = SOCIO y DIRECTIVO a cargo de VENTAS y de las RELACIONES PÚBLICAS de la empresa de cara a las modelos y a otras agencias: es el vendedor estrella de la casa, con don de gentes — cuando pida ayuda para una reunión, un pitch o un acercamiento a una agencia/modelo, dale lo mejor que tengas (data, ángulos, contexto de la persona). NO es empleado: NUNCA lo midas, puntúes, aprietes ni le pongas metas como si fuera closer — el closer a medir es Miguel; los cierres de Juan suman a la empresa y se celebran, no se auditan. Grace Gelves = cabeza de Recursos Humanos y gerente de personal: trato de management — sin notas, sin aprietes, sin metas; temas de gente, contrataciones o pagos van con ella. Luis Roman = GERENTE COMERCIAL: dirige todo lo que huela a venta — closers, chatters y el lado comercial de las managers (p. ej. reuniones para vender Unlimited); mismo trato de management, sin notas ni metas personales. Las managers (Carolina/Fabiana) TAMBIÉN venden Unlimited a SUS creadoras y hacen retención cuando una se quiere ir — es parte de su rol, no invasión a ventas; su función principal sigue siendo la relación con sus creadoras y hacerlas promocionar. Ojo: hay varios "Juan" en Maven (Torres, Castellanos) — el socio es PACHAS.
@@ -1724,6 +1725,52 @@ const TOOLS: Array<{
         },
       },
       required: ["trigger_at", "body"],
+    },
+  },
+  {
+    name: "set_agenda_item",
+    description:
+      "AGENDA/ITINERARIO del equipo (pedido de Álvaro): guarda UN item del día de una persona. Úsalo cuando alguien DICTA su día (llamadas/reuniones, con o sin hora) o cuando el dueño te pide llevar el itinerario — un set_agenda_item POR CADA cosa, no un bloque. Es idempotente por (persona + título + día): re-dictar no duplica. Si pasas due_at, se crea SOLO el recordatorio que la pushea a esa hora (no hace falta create_reminder aparte). PROHIBIDO prometer que 'llevas el itinerario' sin haber llamado esta tool por cada item.",
+    input_schema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "a quién le toca (nombre tal como aparece en el grupo: Miguel, Juan, María)." },
+        title: { type: "string", description: "qué es (ej 'llamada con Juan Felipe, agencia Colombia'). Corto y concreto." },
+        date: { type: "string", description: "día YYYY-MM-DD (Bogotá). Omite para HOY." },
+        due_at: { type: "string", description: "hora puntual en ISO 8601 UTC (convierte de Bogotá=UTC-5 tú mismo). Si la pasas, se crea el recordatorio que la pushea. Omite si no hay hora." },
+        linked_handle: { type: "string", description: "@handle de la creadora/agencia si el item es sobre un lead." },
+      },
+      required: ["owner", "title"],
+    },
+  },
+  {
+    name: "get_agenda",
+    description:
+      "Lee el ITINERARIO del equipo de un día, AGRUPADO por persona. Úsalo cuando pregunten '¿cómo va la agenda/itinerario?', en la apertura del día, o cuando el dueño quiere el timeline. Álvaro lo quiere SEPARADO POR PERSONA (un bloque por Miguel, otro por Juan, otro por María), con hora, estado y lo reagendado. Default: HOY, este grupo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "día YYYY-MM-DD (Bogotá). Omite para HOY." },
+        owner: { type: "string", description: "opcional: filtrar por una persona." },
+      },
+    },
+  },
+  {
+    name: "resolve_agenda_item",
+    description:
+      "Cierra/actualiza un item del itinerario cuando reportan qué pasó: done (hecho), no_show, reagendado o cancelado, con el resultado. Reagendar lleva la cuenta (para avisar 'sin reagendamientos sorpresa'). Si el item tenía recordatorio y queda hecho/cancelado/no-show, se apaga solo. Identifícalo por owner+title (del día) o por id de get_agenda.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "id del item (de get_agenda)." },
+        owner: { type: "string", description: "a quién le toca (si no pasas id)." },
+        title: { type: "string", description: "título aproximado del item (si no pasas id; match por ilike)." },
+        status: { type: "string", enum: ["done", "reagendado", "no_show", "cancelado"], description: "qué pasó." },
+        result: { type: "string", description: "resultado corto (qué se logró / por qué se cayó)." },
+        new_due_at: { type: "string", description: "si status=reagendado y hay nueva hora: ISO 8601 UTC." },
+        date: { type: "string", description: "día del item YYYY-MM-DD (Bogotá). Omite para HOY." },
+      },
+      required: ["status"],
     },
   },
   {
@@ -4442,6 +4489,155 @@ async function executeTool(
               "Confírmale a la persona QUÉ va a pasar, DÓNDE y CUÁNDO.",
           }),
       };
+    }
+
+    // ── ITINERARIO / AGENDA DEL EQUIPO ────────────────────────────────────────
+    // Estructura real del "qué toca hoy" por persona (pedido de Álvaro: llevar el
+    // itinerario de verdad, no reconstruirlo del chat). El push a la hora reutiliza
+    // whatsapp_reminders (reminder_id), drenado por el cron de siempre.
+    case "set_agenda_item": {
+      const owner = String(input.owner ?? "").trim();
+      const title = String(input.title ?? "").trim();
+      if (!owner) return { error: "missing_owner" };
+      if (!title) return { error: "missing_title" };
+      if (title.length > 300) return { error: "title_too_long", max_chars: 300 };
+      const bogotaHoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      const itemDate = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date ?? "")) ? String(input.date) : bogotaHoy;
+      const linkedHandle = input.linked_handle ? String(input.linked_handle).replace(/^@/, "").trim().slice(0, 80) : null;
+
+      let dueAtIso: string | null = null;
+      if (input.due_at) {
+        const d = new Date(String(input.due_at));
+        if (isNaN(d.getTime())) return { error: "invalid_due_at", hint: "ISO 8601 UTC" };
+        if ((d.getTime() - Date.now()) / 60_000 > 120 * 24 * 60) return { error: "due_at_too_far", hint: "máx 120 días" };
+        dueAtIso = d.toISOString();
+      }
+
+      // Dedup blando: mismo owner + título + día → mismo item.
+      const { data: existentes } = await sb
+        .from("team_agenda_items")
+        .select("id, reminder_id")
+        .eq("group_id", ctx.groupId).eq("item_date", itemDate)
+        .ilike("owner_name", owner).ilike("title", title)
+        .limit(1);
+      const prev = (existentes ?? [])[0] as { id: string; reminder_id: string | null } | undefined;
+
+      // Recordatorio de push (solo si hay hora futura). Reusa la fila si ya existía.
+      const ensureReminder = async (): Promise<string | null> => {
+        if (!dueAtIso || (new Date(dueAtIso).getTime() - Date.now()) / 60_000 < -1) return prev?.reminder_id ?? null;
+        const cuerpo = `@${owner} recordatorio de agenda: ${title}` +
+          (linkedHandle ? ` (https://instagram.com/${linkedHandle})` : "") + " — cuando lo hagas, reporta el resultado.";
+        if (prev?.reminder_id) {
+          await sb.from("whatsapp_reminders").update({ trigger_at: dueAtIso, body: cuerpo, status: "pending" }).eq("id", prev.reminder_id);
+          return prev.reminder_id;
+        }
+        const { data: rem } = await sb.from("whatsapp_reminders").insert({
+          tenant_id: ctx.tenantId, group_id: ctx.groupId, kind: "manual",
+          trigger_at: dueAtIso, body: cuerpo, status: "pending", recurrence: null,
+          created_by: ctx.senderUserId ?? null,
+          metadata: { source: "agenda", agenda_owner: owner },
+        }).select("id").single();
+        return rem?.id ?? null;
+      };
+
+      if (prev) {
+        const reminderId = await ensureReminder();
+        const { error: upErr } = await sb.from("team_agenda_items").update({
+          title, due_at: dueAtIso, linked_handle: linkedHandle, reminder_id: reminderId,
+          updated_at: new Date().toISOString(),
+        }).eq("id", prev.id);
+        if (upErr) return { error: upErr.message };
+        return { ok: true, id: prev.id, accion: "actualizado", owner, title, item_date: itemDate, due_at: dueAtIso, pushea: !!reminderId };
+      }
+
+      const { data: nuevo, error: insErr } = await sb.from("team_agenda_items").insert({
+        tenant_id: ctx.tenantId, group_id: ctx.groupId, owner_name: owner, title,
+        item_date: itemDate, due_at: dueAtIso, linked_handle: linkedHandle,
+        status: "pending", created_by: ctx.senderUserId ?? null,
+      }).select("id").single();
+      if (insErr) return { error: insErr.message };
+      const reminderId = await ensureReminder();
+      if (reminderId) await sb.from("team_agenda_items").update({ reminder_id: reminderId }).eq("id", nuevo.id);
+      return { ok: true, id: nuevo.id, accion: "creado", owner, title, item_date: itemDate, due_at: dueAtIso, pushea: !!reminderId };
+    }
+
+    case "get_agenda": {
+      const bogotaHoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      const itemDate = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date ?? "")) ? String(input.date) : bogotaHoy;
+      let q = sb.from("team_agenda_items")
+        .select("id, owner_name, title, due_at, status, result, linked_handle, reschedule_count")
+        .eq("group_id", ctx.groupId).eq("item_date", itemDate)
+        .order("owner_name", { ascending: true }).order("due_at", { ascending: true, nullsFirst: false });
+      if (input.owner) q = q.ilike("owner_name", `%${String(input.owner).trim()}%`);
+      const { data: items, error } = await q;
+      if (error) return { error: error.message };
+      const fmtHora = (iso: string | null) =>
+        iso ? new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)) : null;
+      const filas = ((items ?? []) as Array<Record<string, unknown>>).map((r) => ({
+        id: r.id, owner: r.owner_name, title: r.title, hora: fmtHora(r.due_at as string | null),
+        status: r.status, result: r.result,
+        handle: r.linked_handle ? `https://instagram.com/${r.linked_handle}` : null,
+        reagendada_veces: r.reschedule_count,
+      }));
+      const porPersona: Record<string, unknown[]> = {};
+      for (const f of filas) (porPersona[f.owner as string] ??= []).push(f);
+      return {
+        item_date: itemDate,
+        total: filas.length,
+        por_persona: porPersona,
+        nota: filas.length === 0
+          ? "No hay itinerario cargado para ese día. Si alguien dicta su día, guárdalo con set_agenda_item por cada item."
+          : "Preséntalo SEPARADO POR PERSONA (un bloque por cada uno), con hora y estado. Marca ⚠️ lo reagendado (reagendada_veces>0).",
+      };
+    }
+
+    case "resolve_agenda_item": {
+      const status = String(input.status ?? "").trim();
+      const VALID = ["done", "reagendado", "no_show", "cancelado"];
+      if (!VALID.includes(status)) return { error: "invalid_status", validos: VALID };
+      const bogotaHoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      const itemDate = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date ?? "")) ? String(input.date) : bogotaHoy;
+
+      let item: { id: string; reminder_id: string | null; reschedule_count: number } | undefined;
+      if (input.id) {
+        const { data } = await sb.from("team_agenda_items").select("id, reminder_id, reschedule_count").eq("id", String(input.id)).maybeSingle();
+        item = (data ?? undefined) as typeof item;
+      } else {
+        const owner = String(input.owner ?? "").trim();
+        const title = String(input.title ?? "").trim();
+        if (!owner || !title) return { error: "necesito id, o owner+title", hint: "pasá id (de get_agenda) o owner+title del item" };
+        const { data } = await sb.from("team_agenda_items")
+          .select("id, reminder_id, reschedule_count")
+          .eq("group_id", ctx.groupId).eq("item_date", itemDate)
+          .ilike("owner_name", `%${owner}%`).ilike("title", `%${title}%`)
+          .order("created_at", { ascending: false }).limit(1);
+        item = ((data ?? [])[0] ?? undefined) as typeof item;
+      }
+      if (!item) return { error: "item_no_encontrado", hint: "revisá con get_agenda; quizá el título no coincide" };
+
+      const patch: Record<string, unknown> = {
+        status,
+        result: input.result ? String(input.result).slice(0, 300) : null,
+        updated_at: new Date().toISOString(),
+      };
+      if (status === "reagendado") {
+        patch.reschedule_count = (item.reschedule_count ?? 0) + 1;
+        if (input.new_due_at) {
+          const d = new Date(String(input.new_due_at));
+          if (isNaN(d.getTime())) return { error: "invalid_new_due_at", hint: "ISO 8601 UTC" };
+          patch.due_at = d.toISOString();
+          patch.status = "pending"; // reagendado con nueva hora vuelve a pendiente
+          if (item.reminder_id) {
+            await sb.from("whatsapp_reminders").update({ trigger_at: d.toISOString(), status: "pending" }).eq("id", item.reminder_id);
+          }
+        }
+      }
+      if (["done", "cancelado", "no_show"].includes(status) && item.reminder_id) {
+        await sb.from("whatsapp_reminders").update({ status: "cancelled" }).eq("id", item.reminder_id).eq("status", "pending");
+      }
+      const { error: upErr } = await sb.from("team_agenda_items").update(patch).eq("id", item.id);
+      if (upErr) return { error: upErr.message };
+      return { ok: true, id: item.id, status: patch.status, reagendada_veces: patch.reschedule_count ?? item.reschedule_count };
     }
 
     // ── VER Y APAGAR LO PROPIO ────────────────────────────────────────────────
