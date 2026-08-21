@@ -263,3 +263,6 @@ verify_jwt = false  # auth propia: Bearer del usuario + state firmado (HMAC) en 
 
 [functions.mail-fetch]
 verify_jwt = false  # auth propia: Bearer del usuario + resuelve su conexión adentro
+
+[functions.recordings]
+verify_jwt = false  # auth propia: Bearer del usuario en start/stop/download/delete; X-Cron-Token en expire (el cron no manda JWT)

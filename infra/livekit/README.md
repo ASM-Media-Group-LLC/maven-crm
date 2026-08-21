@@ -55,3 +55,37 @@ entrar a `/call/<sala>` → "Unirse ahora" → debe conectar contra lk.asmtech.a
 - **Redis**: no hace falta para un solo nodo. Agregar si algún día se escala a multi-nodo.
 - **Puerto UDP único vs rango**: para muy alta concurrencia conviene un rango; para este
   uso (docenas de participantes, all-hands ocasional de ~50) el puerto único va bien.
+
+## Grabaciones (egress) — agregado 21/08/2026
+
+El compose ahora trae `redis` (coordinación), `egress` (compone el MP4) y
+`rec-server` (descargas firmadas + borrado). Los archivos viven en
+`/var/lib/maven/grabaciones` del host — viable SOLO porque el vencimiento a
+90 días no tiene excepciones (espacio acotado, ~36 GB máx).
+
+### Activación (una vez)
+1. **Env del compose** (Dokploy > este servicio > Environment), además de
+   `LIVEKIT_KEYS`:
+   - `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (los MISMOS del par de LIVEKIT_KEYS)
+   - `RECORDINGS_SIGNING_SECRET` (generar: `openssl rand -hex 32`)
+2. **DNS**: A record `rec.asmtech.ai` → `147.93.3.97` (GoDaddy, cuenta de Álvaro).
+3. **Domains** en Dokploy: `rec.asmtech.ai` → contenedor `rec-server` puerto `8080`, HTTPS ON.
+4. **Secrets de Supabase** (para la edge `recordings`):
+   ```
+   supabase secrets set \
+     RECORDINGS_SIGNING_SECRET=<el mismo de arriba> \
+     RECORDINGS_BASE_URL=https://rec.asmtech.ai \
+     RECORDINGS_CRON_TOKEN=<openssl rand -hex 24> \
+     --project-ref lsagslbkliprespbyhts
+   ```
+5. **Redeploy del compose**. ⚠️ CORTA las llamadas en curso (~30 s): hacerlo
+   en horario tranquilo.
+6. **Cron diario** (SQL Editor): ver el comentario al final de la migración
+   `20260820210000_meeting_recordings.sql` (llama a la edge con `{"action":"expire"}`
+   y el header `X-Cron-Token`).
+
+### Verificar
+- `docker logs` del egress sin errores de redis/ws.
+- `https://rec.asmtech.ai/health` → `{ok:true, archivos, bytes}`.
+- Grabar 1 min de una sala de prueba → aparece el MP4 en el host y la fila
+  en `meeting_recordings` pasa a `ready` con tamaño.

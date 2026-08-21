@@ -6,5 +6,9 @@ rtc:
   use_external_ip: true    # anuncia la IP pública del VPS en los candidatos ICE — CLAVE para que conecte
 logging:
   level: info
+# Redis: OBLIGATORIO para egress (el server publica ahí los trabajos de
+# grabación). Solo red interna del compose.
+redis:
+  address: redis:6379
 # keys: se inyectan por la variable de entorno LIVEKIT_KEYS (Dokploy), no van en este archivo.
 # turn: (opcional, Slice 2) se activa solo si hay clientes detrás de NAT/firewall estricto que no conecten.

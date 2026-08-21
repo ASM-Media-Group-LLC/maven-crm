@@ -33,6 +33,70 @@ services:
           cpus: "4"
           memory: 3g
 
+  # Coordina servidor <-> egress (obligatorio para grabar; el server solo
+  # no lo necesitaba). Solo en la red interna, sin puertos al host.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # Grabador: se une a la sala como participante invisible, compone la
+  # vista (speaker layout) y escribe el MP4 al disco del VPS.
+  egress:
+    image: livekit/egress:v1.9
+    restart: unless-stopped
+    environment:
+      # Config inline con sustitución de compose: las claves son las MISMAS
+      # LIVEKIT_API_KEY/SECRET de los secrets de Supabase (se setean en
+      # Dokploy > Environment de este compose, NO se commitean).
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://livekit:7880
+        redis:
+          address: redis:6379
+        logging:
+          level: info
+    volumes:
+      # El disco del VPS, decisión de Jhon: viable SOLO porque el
+      # vencimiento a 90 días no tiene excepciones (espacio acotado).
+      - /var/lib/maven/grabaciones:/out
+    networks:
+      - dokploy-network
+    depends_on:
+      - redis
+      - livekit
+    deploy:
+      resources:
+        limits:
+          # Componer video es caro: 2 cores por grabación en curso aprox.
+          cpus: "3"
+          memory: 2g
+
+  # Descargas firmadas + borrado de los MP4 (ver rec-server.mjs).
+  # Dominio en Dokploy: rec.asmtech.ai -> este contenedor :8080.
+  rec-server:
+    image: node:22-alpine
+    restart: unless-stopped
+    command: ["node", "/app/rec-server.mjs"]
+    environment:
+      RECORDINGS_SIGNING_SECRET: ${RECORDINGS_SIGNING_SECRET}
+      RECORDINGS_DIR: /out
+    volumes:
+      - ./rec-server.mjs:/app/rec-server.mjs:ro
+      - /var/lib/maven/grabaciones:/out
+    networks:
+      - dokploy-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
 networks:
   # Red de Dokploy (para que Traefik alcance el puerto 7880 de señalización).
   dokploy-network:

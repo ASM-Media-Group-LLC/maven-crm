@@ -19,7 +19,8 @@
     "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.111.0"
   },
   "remote": {
-    "https://esm.sh/@supabase/supabase-js@2.111.0": "276104e20b7318fac2be1c67eb9be93f4280f5ec9f2fc5ac7b32e1f0ed6f31ba"
+    "https://esm.sh/@supabase/supabase-js@2.111.0": "276104e20b7318fac2be1c67eb9be93f4280f5ec9f2fc5ac7b32e1f0ed6f31ba",
+    "https://esm.sh/livekit-server-sdk@2.9.2": "0498e75265f48d197581563a68db01f62c02e3d3f7cd4dfd35d739fbd6ba0827"
   },
   "workspace": {
     "packageJson": {
