@@ -16,7 +16,11 @@
 // admin) — el service_role bypassa RLS, así que el chequeo es explícito.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2";
+// ?deps= NO es opcional: sin pinear @bufbuild/protobuf, esm.sh resuelve la
+// v2 (que movio Duration a /wkt) y el import explota AL BOOTEAR -- deno check
+// pasa igual porque tipa contra los .d.ts, no contra el bundle. Fue un
+// BOOT_ERROR real en prod el 21/08: la funcion nunca llego a servir.
+import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 
