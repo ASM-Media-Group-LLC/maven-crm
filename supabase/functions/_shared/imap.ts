@@ -38,18 +38,27 @@ async function conReloj<T>(
   let timer: ReturnType<typeof setTimeout> | undefined;
   const reloj = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
+      // ORDEN CRÍTICO: rechazar ANTES de cerrar. Cerrar hace que la
+      // promesa original rechace con "Bad resource ID", y si ese rechazo
+      // se encola primero le gana la carrera al nuestro — la persona ve
+      // el error críptico del socket en vez del motivo real (pasó en
+      // producción: "Bad resource ID" en la pantalla de Jhon).
+      reject(new Error(mensaje));
       try {
         onTimeout?.();
       } catch {
         // cerrar una conexión ya muerta no es noticia
       }
-      reject(new Error(mensaje));
     }, ms);
   });
   try {
     return await Promise.race([p, reloj]);
   } finally {
     clearTimeout(timer);
+    // La promesa perdedora va a rechazar tarde (el socket cerrado) y ya
+    // nadie la escucha: sin esto queda un "unhandled rejection" que puede
+    // voltear el isolate entero.
+    p.catch(() => {});
   }
 }
 
