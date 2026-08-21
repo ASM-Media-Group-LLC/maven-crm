@@ -327,7 +327,7 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - Si el closer reportó hoy múltiples veces (medio día + cierre), usa el ÚLTIMO reporte como source of truth, no el primero.
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí dilo.
 - NUNCA le digas a alguien que su número "quedó en blanco" / "no se cargó" / "revisa en LeadGen" / "recargalo", ni escales al owner por un número faltante, SIN haberlo confirmado primero. Para verificar el número de UNA modelo puntual (ej. un LLG dice "cargué el número de @handle"), usa lookup_lead_history(@handle) y mira el campo "numero": si numero.cargado es true, el teléfono YA ESTÁ (te lo muestra enmascarado, ej. ***6868) → confírmaselo y listo, NO lo mandes a recargar. El status del lead ("contactado", etc.) y el campo phone_e164 de leadgen_entries NO sirven para esto: ese campo está muerto y siempre da vacío. El número vive en closers_contacts. Si numero.cargado es false, recién ahí di que falta. Regla de oro de este caso: ante la duda entre "la persona dice que lo cargó" y "mi tool no lo ve", asume que estás mirando el campo equivocado ANTES de contradecir a la persona. Ojo con el borde de día: "hoy" es en Bogotá (GMT-5), no UTC.
-- CONTACTOS DE UN CLOSER ≠ MÉTRICA DE LLG (caso Miguel 20/08): a un closer NUNCA le pidas "¿cuántos textos/contactos/leads cargaste hoy?" ni le exijas una cifra verbal — ese es el ritual del LLG. "Cargar leads" es lenguaje de LLG, no de cerrador. La actividad de un closer se LEE de Maven (get_closer_pipeline_status / get_member_maven_activity): pipeline, confirmadas, llamadas, contactos de agencias en Oportunidades. Si el dueño pide "cuántos contactos hoy", lo sacas TÚ del CRM — no se lo preguntas al equipo.
+- CONTACTOS DE UN CLOSER ≠ MÉTRICA DE LLG (caso Miguel 20/08): a un closer NUNCA le pidas "¿cuántos textos/contactos/leads cargaste hoy?" ni le exijas una cifra verbal — ese es el ritual del LLG. "Cargar leads" es lenguaje de LLG, no de cerrador. La actividad de un closer se LEE de Maven (get_closer_pipeline_status / get_member_maven_activity): pipeline, confirmadas, llamadas, y sus AGENCIAS del pipeline — la SECCIÓN AGENCIAS es closer_creators lead_source='agencia', y get_member_maven_activity la trae como agencias_en_gestion / agencias_contactadas_en_ventana. Si el dueño pide "cuántos contactos/agencias hoy", lo sacas TÚ del CRM de ahí — no se lo preguntas al equipo. (El conteo diario solo sube si cada toque queda con su fecha de contacto en el lead; si da 0 y la persona dice que contactó, revisá que lo haya registrado — no la acuses.)
 - NO ACUSAR AUSENCIA SIN MIRAR LA FUENTE CORRECTA (mismo caso): antes de decir "no veo X / 0 hoy / no cargaste", tuviste que consultar la fuente PUNTUAL de esa persona para hoy. Si sale vacía, dilo NEUTRO y pregunta DÓNDE lo dejó ("¿en qué módulo lo registraste?") — NO lo acuses ni lo contradigas cuando dice "está en Maven". Vale la regla de oro de arriba: ante "la persona dice que está" vs "mi tool no lo ve", asume que miras la fuente equivocada. El 20/08 le dijiste a Miguel "no veo contactos cargados por ti" leyendo daily_reports/QA, cuando su gestión de agencias vive en el pipeline.
 - NO SELLAR PANTALLAZOS COMO DATO DE MAVEN: un número que sale de un screenshot (OCR) o de lo que alguien escribió NO es dato verificado. Atribúyelo ("según el pantallazo de X" / "según lo que reportas"), no lo marques "✓ Correcto" como si viniera del CRM. "Verificado" = vino de una tool. El 20/08 leíste "12 contactos" de un pantallazo y lo sellaste como dato de Maven sin poder confirmarlo.
 
@@ -1280,7 +1280,7 @@ const TOOLS: Array<{
   {
     name: "get_member_maven_activity",
     description:
-      "Dado el nombre como aparece en el grupo, la ACTIVIDAD REAL del usuario en Maven: leads cargados y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Para '¿qué hizo X hoy en Maven?', '¿cuántos NÚMEROS trajo Y este mes?' (números = leads con teléfono cargado). ⚠️ VENTANA: default = HOY calendario en hora Colombia (desde las 00:00, NO últimas 24h; para 'hoy' NO pases ventana, o pasa today:true). `since_hours` = móvil en horas (solo si piden 'últimas Nh'). `since_days` = móvil en días ('este mes'=30, 'este año'≈365); gana sobre since_hours. Requiere member linkeado a user de Maven; si no → member_not_linked.",
+      "Dado el nombre como aparece en el grupo, la ACTIVIDAD REAL del usuario en Maven: leads cargados y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA, y para un CLOSER que trabaja AGENCIAS (B2B) la SECCIÓN AGENCIAS del pipeline: `agencias_en_gestion` (sus agencias abiertas en closer_creators lead_source='agencia') y `agencias_contactadas_en_ventana` (las que tienen last_contact_date en la ventana). Esa es la fuente de '¿cuántas agencias contactó X hoy?' — NO daily_reports ni QA. Para '¿qué hizo X hoy en Maven?', '¿cuántos NÚMEROS trajo Y este mes?' (números = leads con teléfono cargado). ⚠️ VENTANA: default = HOY calendario en hora Colombia (desde las 00:00, NO últimas 24h; para 'hoy' NO pases ventana, o pasa today:true). `since_hours` = móvil en horas (solo si piden 'últimas Nh'). `since_days` = móvil en días ('este mes'=30, 'este año'≈365); gana sobre since_hours. Requiere member linkeado a user de Maven; si no → member_not_linked.",
     input_schema: {
       type: "object",
       properties: {
@@ -2479,6 +2479,8 @@ async function executeTool(
         creatorsCompleted,
         historyLogged,
         qaCalls,
+        agenciasEnGestion,
+        agenciasContactadasVentana,
       ] = await Promise.all([
         // Total leads cargados por el LLG
         sb.from("leadgen_entries").select("id", { count: "exact", head: true })
@@ -2520,6 +2522,19 @@ async function executeTool(
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("qa_calls").select("id", { count: "exact", head: true })
           .eq("closer_id", member.user_id).gte("created_at", since).then(head),
+        // Sección AGENCIAS del pipeline (Álvaro 08/2026): los contactos B2B de un
+        // closer viven en closer_creators con lead_source='agencia', NO en
+        // daily_reports/QA. "en gestión" = agencias abiertas del closer (dueño por
+        // created_by o assigned_to); "contactadas en la ventana" = las que tienen
+        // last_contact_date dentro de la ventana (hoy / últimas Nh).
+        sb.from("closer_creators").select("id", { count: "exact", head: true })
+          .or(`created_by.eq.${member.user_id},assigned_to.eq.${member.user_id}`)
+          .eq("lead_source", "agencia")
+          .not("stage", "in", "(Completada,No interesada,Rechazada)").then(head),
+        sb.from("closer_creators").select("id", { count: "exact", head: true })
+          .or(`created_by.eq.${member.user_id},assigned_to.eq.${member.user_id}`)
+          .eq("lead_source", "agencia")
+          .gte("last_contact_date", since.slice(0, 10)).then(head),
       ]);
 
       return {
@@ -2555,6 +2570,12 @@ async function executeTool(
           closer_creators_completed: creatorsCompleted,
           contact_history_logged: historyLogged,
           qa_calls: qaCalls,
+          // Sección AGENCIAS del pipeline (closer_creators lead_source='agencia').
+          // Para un CLOSER, los contactos/gestión de agencias B2B salen de acá — NO
+          // de daily_reports ni QA. "contactadas_en_ventana" solo sube si cada toque
+          // queda con last_contact_date del día (disciplina de logging del equipo).
+          agencias_en_gestion: agenciasEnGestion,
+          agencias_contactadas_en_ventana: agenciasContactadasVentana,
         },
       };
     }
