@@ -144,11 +144,10 @@ function scorePodium(rows: ScoreRow[]): { lines: string[]; pie: string } {
   // cuentan — jamás convertir "no poder leer" en "no promocionó" (#818).
   const sinLectura = rows.length - conDatos.length;
   const parciales = conDatos.filter((r) => r.is_partial && r.score > 0).length;
-  const pie = `_Score 0-100 sobre días LEÍDOS en las redes objetivo de cada una (frecuencia 40 · calidad 40 = promedio de las barritas diarias · constancia 20). ` +
-    `${conPuntaje.length} con promo de ${conDatos.length} con lectura` +
-    (parciales > 0 ? ` · ${parciales} con poca lectura (no compiten)` : "") +
+  const pie = `_${conPuntaje.length} con promo de ${conDatos.length} con lectura` +
+    (parciales > 0 ? ` · ${parciales} poca lectura (no compiten)` : "") +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
-    `. "$ con promo" = ingreso del día siguiente a un día con promo vs sin promo (BLU liquidado, NvM días)._`;
+    `. Score 0-100 (frec 40 · calidad 40 · const 20). Detalle: Maven → Promolog._`;
   return { lines, pie };
 }
 
@@ -177,10 +176,9 @@ async function buildDailyQuality(sb: any): Promise<string> {
       : `${medals[i]} *Empate — ${pc}%*: ${grupo.map(det).join(" · ")}`;
   });
   const sinLectura = scores.length - leidas.length;
-  const pie = `_% = barrita del día (60% la mejor promo × su creatividad + 25% la 2ª red + 15% el volumen). La creatividad la califica la IA por story: ella en cámara, sugerente, CTA visible, invitación a interactuar. ` +
-    `${conPromo.length} con promo de ${leidas.length} leídas hoy` +
+  const pie = `_${conPromo.length} con promo de ${leidas.length} leídas hoy` +
     (sinLectura > 0 ? ` · ${sinLectura} sin lectura (no cuentan)` : "") +
-    `. El acumulado del mes está en Maven → Promolog → Dashboard._`;
+    `. Detalle y mes: Maven → Promolog → Dashboard._`;
   return `${head}\n\n${lines.join("\n")}\n\n${pie}`;
 }
 
@@ -218,8 +216,8 @@ async function buildDailyIncome(sb: any): Promise<string> {
       const { data: ult } = await sb.from("creator_daily_earnings")
         .select("date").order("date", { ascending: false }).limit(1).maybeSingle();
       const ultimoDia = ult?.date ? fmtDia(String(ult.date)) : "sin registro";
-      return `${head}\n\n⚠️ No pude leer BLU, así que HOY NO TENGO DATO — esto no quiere decir que no se haya facturado. ` +
-        `El último día con datos es ${ultimoDia}. Avísenle a Jhon que el puente de BLU necesita renovar la sesión.`;
+      return `${head}\n\n⚠️ No pude leer BLU hoy, así que no tengo dato (no es que no se facturó). ` +
+        `Último día con datos: ${ultimoDia}. Avisen a Jhon: el puente de BLU necesita renovar sesión.`;
     }
     return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte)}).`;
   }
@@ -229,8 +227,8 @@ async function buildDailyIncome(sb: any): Promise<string> {
   // mensaje lo diga sin dramatizar — el "va a SUBIR" de antes era el bug del día
   // inclusivo (#1183), no liquidación.
   const nota = fresh === "fresh"
-    ? `_Sync BLU al día (corte ${fmtCorte(hoy.corte)}). La cifra es al corte: puede moverse con ajustes de BLU._`
-    : `_Corte BLU: ${fmtCorte(hoy.corte)} — no se pudo refrescar a tiempo; la cifra puede estar atrasada._`;
+    ? `_Corte BLU ${fmtCorte(hoy.corte)} · al corte, puede ajustar._`
+    : `_Corte BLU ${fmtCorte(hoy.corte)} · sin refrescar, puede estar atrasado._`;
   return `${head}\n\n${lines.join("\n")}\n\n${nota}`;
 }
 
@@ -256,8 +254,8 @@ async function buildWeekly(sb: any): Promise<string> {
     ``,
     qPie,
     fresh === "fresh"
-      ? `_Data BLU recién sincronizada (${fmtCorte(inc.corte)})_`
-      : `_Corte BLU: ${fmtCorte(inc.corte)} — no se pudo refrescar a tiempo_`,
+      ? `_Corte BLU ${fmtCorte(inc.corte)}_`
+      : `_Corte BLU ${fmtCorte(inc.corte)} · sin refrescar_`,
   ].join("\n");
 }
 

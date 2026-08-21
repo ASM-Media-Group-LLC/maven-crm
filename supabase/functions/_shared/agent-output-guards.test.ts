@@ -21,6 +21,8 @@ import {
   metaContraFact,
   niegaLeerAdjuntos,
   tieneRespaldoDeJuicio,
+  detectarMuroDeTexto,
+  esMuroDeTexto,
 } from "./agent-output-guards.ts";
 
 Deno.test("ack falso — los casos reales siguen bloqueados", () => {
@@ -492,4 +494,69 @@ Deno.test("niega adjuntos — NO dispara en negativos legítimos", () => {
     "pasame el PDF y te armo el resumen",
   ];
   for (const n of negativos) assert(!niegaLeerAdjuntos(n), `NO debería disparar: ${n}`);
+});
+
+// ── Muro de texto: dispara SOLO en muros reales, no en listas/cortes largos ─────
+Deno.test("muro de texto — un párrafo gigante sin saltos dispara", () => {
+  // Reconstrucción de una apertura del día escrita de corrido (561 chars, 1 línea):
+  // exactamente lo que Álvaro llama "demasiado texto".
+  const muro =
+    "Buenos días equipo, aquí va el foco del día: hoy toca priorizar a las agencias que quedaron sin " +
+    "respuesta desde ayer porque son las que más rápido se enfrían, en especial melossomconsulting y " +
+    "honeyfans.agency que ya llevan dos días sin que nadie las toque; además Miguel tiene 3 llamadas " +
+    "agendadas para la tarde con leads del pipeline de la semana pasada, así que sería bueno que " +
+    "confirme los horarios antes del mediodía, mientras Daniel carga los perfiles nuevos del scraper y " +
+    "saca al menos 3 números antes de las 2pm para no quedar cortos con la meta semanal.";
+  assert(esMuroDeTexto(muro), `debía detectar muro: ${muro.length} chars en 1 línea`);
+  assertEquals(detectarMuroDeTexto(muro)?.motivo, "parrafo_gigante");
+});
+
+Deno.test("muro de texto — mucho total en <=3 líneas dispara aunque cada línea sea <350", () => {
+  const linea = ("reactivamos las agencias frías y confirmamos las llamadas de la tarde, ".repeat(5)).trim().slice(0, 320);
+  assert(linea.length <= 350, "cada línea queda bajo el umbral de párrafo");
+  const muro = `${linea}\n${linea}\n${linea}`;
+  assert(muro.length > 900 && muro.split("\n").length === 3);
+  assertEquals(detectarMuroDeTexto(muro)?.motivo, "total_en_pocas_lineas");
+});
+
+Deno.test("muro de texto — una lista de 12+ personas una-por-línea NO dispara", () => {
+  const lista = [
+    "Radar de crecimiento de hoy:",
+    "- @luciacreator https://instagram.com/luciacreator +2.1k",
+    "- @martina.of https://instagram.com/martina.of +1.4k",
+    "- @sofivip https://instagram.com/sofivip +900",
+    "- @danielaruiz https://instagram.com/danielaruiz +780",
+    "- @valery.model https://instagram.com/valery.model +610",
+    "- @camilagz https://instagram.com/camilagz +540",
+    "- @andrea.soto https://instagram.com/andrea.soto +430",
+    "- @isabellaf https://instagram.com/isabellaf +410",
+    "- @gabbiel_of https://instagram.com/gabbiel_of +390",
+    "- @renata.vip https://instagram.com/renata.vip +250",
+    "- @paula.grow https://instagram.com/paula.grow +180",
+    "- @kellyfit https://instagram.com/kellyfit +120",
+  ].join("\n");
+  assert(lista.length > 600, "es una lista larga de verdad");
+  assertEquals(esMuroDeTexto(lista), false, "una lista estructurada no es un muro");
+});
+
+Deno.test("muro de texto — un corte de 6 líneas NO dispara", () => {
+  const corte = [
+    "CORTE 15:00 📊",
+    "Miguel: 12 contactados · 1 cierre (Let's Shoot) · 0 rechazos",
+    "Daniel: 8 perfiles cargados · 4 números",
+    "Casta: 5 videos · 3 fotos",
+    "Pendiente: confirmar llamada de las 17:00 con Velvet for Women",
+    "Promedio equipo: 6 contactos/persona. Cierren fuerte la tarde 💪",
+  ].join("\n");
+  assertEquals(esMuroDeTexto(corte), false, "un corte estructurado no es un muro");
+});
+
+Deno.test("muro de texto — un pitch citado largo NO dispara (los pitches no se parten)", () => {
+  const conPitch =
+    'Va este para @kyliee.chasee, quedó listo para copiar y pegar: "Hola Kylie! Te escribo de Kash, ' +
+    'somos una agencia de creadoras y tu perfil tiene con qué crecer en serio — desde que trabajamos con ' +
+    'otras chicas como tú multiplicamos sus ingresos con herramientas a la vanguardia y un equipo que se ' +
+    'ocupa de todo. Regálame un meet y te muestro números reales de casos parecidos al tuyo."';
+  assert(conPitch.length > 350, "el pitch hace el mensaje largo (disparía sin la exención)");
+  assertEquals(esMuroDeTexto(conPitch), false, "un pitch citado es prosa legítima, no se toca");
 });

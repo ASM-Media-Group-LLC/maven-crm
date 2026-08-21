@@ -320,3 +320,54 @@ export function marcarAckSinPersistencia(cuerpo: string): string {
   const limpio = cuerpo.replace(RE_AVISO_SIN_PERSISTENCIA, "").trimStart();
   return `${AVISO_SIN_PERSISTENCIA}\n\n${limpio}`;
 }
+
+// ── Muro de texto: mensaje largo Y SIN estructura de líneas ────────────────────────
+// Pedido de Álvaro (08/2026): los mensajes programados de los 4 bots salen "demasiado
+// largos / demasiado texto". El estilo aprobado para lo INTERNO al equipo es líneas
+// cortas (1–4), listas 1·2·3 con una cosa por línea, menos comas — si parece un
+// documento, está mal. La regla ya vive en el MOTOR como prosa, y la doctrina de la
+// casa la aprendió varias veces: lo que importa se chequea en el BORDE de salida, no
+// en el prompt (el modelo obedece "sé conciso" un rato y a las horas vuelve al muro).
+//
+// CONSERVADORA a propósito: castiga "largo Y SIN ESTRUCTURA", nunca "largo" a secas.
+// Una lista de 12 personas una-por-línea o un corte de 6 líneas SON largos y están
+// BIEN — tienen estructura, no disparan. Acortar = quitar ENVOLTORIO, jamás datos ni
+// personas, así que el mensaje que devuelve el control pide re-partir en líneas, no
+// recortar contenido.
+//
+// EXENCIÓN dura: si el mensaje trae un pitch/opener citado (bloque entre comillas de
+// >=40 chars, vía TIENE_PITCH_CITADO), NO dispara. Los pitches a creadoras/agencias
+// son la única prosa larga que se preserva pulida — nunca se parten en bullets.
+//
+// Dos disparadores, ambos exigen ausencia de estructura de líneas:
+//  1. PÁRRAFO GIGANTE: el trozo más largo entre saltos de línea supera ~350 chars
+//     (un solo chorro sin respirar), sin importar cuántas líneas tenga el resto.
+//  2. TOTAL GRANDE EN POCAS LÍNEAS: > ~900 chars repartidos en <=3 líneas (un muro
+//     que ni siquiera se molestó en partir).
+export const MURO_PARRAFO_MAX = 350;
+export const MURO_TOTAL_MAX = 900;
+
+export function detectarMuroDeTexto(
+  s: string,
+  opts: { parrafoMax?: number; totalMax?: number } = {},
+): { motivo: "parrafo_gigante" | "total_en_pocas_lineas"; chars: number } | null {
+  const parrafoMax = opts.parrafoMax ?? MURO_PARRAFO_MAX;
+  const totalMax = opts.totalMax ?? MURO_TOTAL_MAX;
+  const texto = (s ?? "").trim();
+  if (!texto) return null;
+  // Un pitch/opener citado es prosa larga LEGÍTIMA — no se parte nunca.
+  if (TIENE_PITCH_CITADO(texto)) return null;
+  // Trozos separados por saltos de línea REALES. Un "\\n" escapado llega como texto
+  // visible (no es estructura): de eso se encarga desescaparSaltosLiterales, así que
+  // acá un muro con "\\n" a la vista queda como un solo trozo, y bien.
+  const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  const trozoMasLargo = lineas.reduce((max, l) => Math.max(max, l.length), 0);
+  // Disparador 1: un párrafo corrido gigantesco.
+  if (trozoMasLargo > parrafoMax) return { motivo: "parrafo_gigante", chars: trozoMasLargo };
+  // Disparador 2: mucho texto total en muy pocas líneas (ni lista ni bullets).
+  if (texto.length > totalMax && lineas.length <= 3) {
+    return { motivo: "total_en_pocas_lineas", chars: texto.length };
+  }
+  return null;
+}
+export const esMuroDeTexto = (s: string): boolean => detectarMuroDeTexto(s) !== null;

@@ -39,14 +39,14 @@ function buildGroupedReminderText(args: {
         return `${who} 👋 ¿pudiste ${c.subject}? Lo tenías para hoy.`;
       }
       const days = Math.floor(c.hoursOverdue / 24);
-      return `${who} 👋 ¿qué pasó con "${c.subject}"? Lo habías agendado hace ${days} día${days > 1 ? "s" : ""}.`;
+      return `${who} 👋 ¿qué pasó con ${c.subject}? Era para hace ${days} día${days > 1 ? "s" : ""}.`;
     }
     // Segundo intento
-    return `${who} insisto: ¿se hizo "${c.subject}"? Si ya no aplica, decímelo y lo cierro.`;
+    return `${who} ¿se hizo ${c.subject}? Si ya no aplica, me dices y lo cierro.`;
   }
 
   // Multi-pendiente: un solo mensaje resumido.
-  const lines = [`${who} 👋 tenés ${n} pendientes:`];
+  const lines = [`${who} 👋 tienes ${n} pendientes:`];
   for (const c of args.commitments) {
     let when = "";
     if (c.hoursOverdue < 24) {
@@ -57,8 +57,7 @@ function buildGroupedReminderText(args: {
     }
     lines.push(`· ${c.subject}${when}`);
   }
-  lines.push("");
-  lines.push("¿Cómo va eso? Si alguno ya no aplica, decímelo y lo cierro.");
+  lines.push("¿Cómo van? Si alguno ya no aplica, me dices y lo cierro.");
   return lines.join("\n");
 }
 
@@ -201,7 +200,7 @@ async function enqueueFollowups(): Promise<number> {
     });
 
     if (more > 0) {
-      body += `\n\n(+ ${more} más pendientes, te paso esos en otro tick)`;
+      body += `\n(+${more} más pendientes, van en el próximo aviso)`;
     }
 
     const { error: insErr } = await sb.from("whatsapp_reminders").insert({

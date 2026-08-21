@@ -273,11 +273,11 @@ async function checkCloser(
     // Frase rotada por día (pedido de Jhon: que no sea siempre el mismo texto).
     // Índice por día calendario: cambia a diario, estable dentro del día.
     const VARIANTES: Array<(m: string, n: number, d: string) => string> = [
-      (m, n, d) => `${m} ¿cuántas llamadas hicieron hoy? Tenemos reportadas ${n} en QA${d}.`,
-      (m, n, d) => `${m} cierre de llamadas: QA marca ${n} hoy${d} — ¿coincide con las que hicieron?`,
-      (m, n, d) => `${m} antes de cerrar el día, ¿cuántas llamadas hubo? Llevo ${n} registradas en QA${d}.`,
-      (m, n, d) => `${m} ¿me confirman el número de llamadas de hoy? En QA hay ${n}${d}. Si falta subir alguna, este es el momento.`,
-      (m, n, d) => `${m} repaso rápido: ${n} llamadas en QA hoy${d}. ¿Están todas o quedó alguna sin subir?`,
+      (m, n, d) => `${m} ¿cuántas llamadas hoy? QA marca ${n}${d}.`,
+      (m, n, d) => `${m} cierre de llamadas: QA marca ${n} hoy${d}. ¿Coincide?`,
+      (m, n, d) => `${m} antes de cerrar: ¿cuántas llamadas? QA lleva ${n}${d}.`,
+      (m, n, d) => `${m} ¿me confirman las llamadas de hoy? QA tiene ${n}${d}. Suban las que falten.`,
+      (m, n, d) => `${m} repaso: ${n} llamadas en QA hoy${d}. ¿Están todas?`,
     ];
     const dia = Math.floor(Date.parse(now.date) / 86_400_000);
     const msg = VARIANTES[dia % VARIANTES.length](menciones, total, detalle);
@@ -301,10 +301,10 @@ async function checkCloser(
         // dé seguimiento hoy.
         const top = await topUnassignedLeads(sb, 4);
         const msg = top.length > 0
-          ? `@${mention} venís sin leads asignados hoy. Sin tomar, de mayor calidad: ${
-            top.map((l) => `${igLink(l.handle)} (${l.quality})`).join(", ")
-          } — agarra 2-3 y arrancales el seguimiento hoy. ¿Cuáles te asignás?`
-          : `@${mention} venís sin leads asignados hoy y el pool de Nuevas está vacío. ¿Reactivamos algún seguimiento pendiente o conseguimos más leads?`;
+          ? `@${mention} sin leads asignados hoy. Toma 2-3 de estos y arráncales seguimiento:\n${
+            top.map((l) => `· ${igLink(l.handle)} (${l.quality})`).join("\n")
+          }\n¿Cuáles tomas?`
+          : `@${mention} sin leads asignados hoy y el pool de Nuevas está vacío. ¿Reactivamos un seguimiento o conseguimos más leads?`;
         await sendToGroup(sb, group.id, msg);
       }
     }
@@ -503,10 +503,10 @@ async function checkUnannouncedAbsence(
 
   // DM al owner via gateway directo. Necesitamos el JID del owner.
   const ownerJid = owner.whatsapp_lid;
-  const msg = `🚨 Ausencia no anunciada · *${group.tenant_id ? "Marketing/Ventas" : "grupo"}*\n\n` +
-    `Estos miembros del equipo no se han reportado activos hoy (>30 min del inicio):\n` +
-    missing.map((m) => `  · ${m}`).join("\n") +
-    `\n\n¿Sabes si están OK?`;
+  const msg = `🚨 Ausencia no anunciada · *${group.tenant_id ? "Marketing/Ventas" : "grupo"}*\n` +
+    `Sin reportarse activos hoy (+30 min del inicio):\n` +
+    missing.map((m) => `· ${m}`).join("\n") +
+    `\n¿Sabes si están OK?`;
   // Send via gateway directo (DM al owner, no al grupo).
   try {
     const gwUrl = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
@@ -538,10 +538,10 @@ function lastContactSummary(
   const when = d <= 0 ? "hoy" : `hace ${d}d`;
   const parts: string[] = [];
   if (last.channel) parts.push(last.channel);
-  if (last.result) parts.push(`"${last.result}"`);
-  let s = `último ${when}${parts.length ? " · " + parts.join(" · ") : ""}`;
+  if (last.result) parts.push(last.result);
+  let s = `${when}${parts.length ? " · " + parts.join(" · ") : ""}`;
   const note = String(last.notes ?? "").trim();
-  if (note && note !== "(auto)") s += ` · nota: "${note.slice(0, 80)}"`;
+  if (note && note !== "(auto)") s += ` · ${note.slice(0, 80)}`;
   return s;
 }
 
@@ -730,7 +730,7 @@ async function checkCommitmentFollowups(
     const top = leads.slice(0, 6);
     const lista = top.map((l) => `· ${igLink(l.handle)} — ${l.detail}`).join("\n");
     const extra = leads.length > top.length ? `\n…y ${leads.length - top.length} más` : "";
-    const msg = `@${closerName}, tienes ${leads.length} lead${leads.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy? Si ya los tocaste, registra el contacto (canal + resultado).`;
+    const msg = `@${closerName} · ${leads.length} lead${leads.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\nAvánzalos hoy. Si ya los tocaste, registra canal + resultado.`;
     await sendFollowup(sb, group, `closer_contact_digest:${closerId}`, msg);
   }
 
@@ -808,7 +808,7 @@ async function checkCommitmentFollowups(
     const who = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "equipo";
     const prod = PRODUCT_ES[o.product] ?? o.product;
     const stageEs = STAGE_ES[o.stage] ?? o.stage;
-    const msg = `@${who}, seguimiento de monetización: ${igLink(handle)} quedó *${stageEs}* con ${prod} y ya toca volver a tocarla. ¿La avanzás hoy?`;
+    const msg = `@${who}, monetización: ${igLink(handle)} quedó *${stageEs}* con ${prod}. Toca retomar, ¿la avanzas hoy?`;
     await sendFollowup(sb, group, `monetization_followup:${o.id}`, msg);
   }
 }

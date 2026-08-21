@@ -106,23 +106,21 @@ function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string
   const bullet = (r: GrowthRow) => {
     const link = igUrl(r.instagram_handle);
     const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
-    // Denominador = días LEÍDOS (covered_days), el mismo con el que se decidió el
-    // cuadrante. Antes usaba mtd_day (días del mes) y no coincidía con el veredicto.
+    // Denominador = días LEÍDOS (covered_days), el mismo con el que se decidió el cuadrante.
+    // "X/Y = días con promo / días leídos" se explica una vez en el subtítulo del mensaje.
     const denom = r.covered_days ?? r.mtd_day ?? "?";
-    // Si IG no es su canal de promo, avisarlo ACÁ: si no, "revisar calidad" se lee como
-    // "revisá tus historias de IG" sobre alguien que promociona en X/Telegram.
+    // Si IG no es su canal de promo, avisarlo: así "revisar calidad" no se lee como "IG".
     const igNotChannel = (r.ig_promo_days ?? 0) === 0 ||
       (r.ig_promo_days ?? 0) * 10 < (r.promo_days ?? 0) * 3;
-    const redes = r.promo_networks ? `\n     promo en ${r.promo_networks}` : "\n     ⚠️ sin promo detectada en ninguna red";
-    const aviso = (r.promo_networks && igNotChannel)
-      ? `\n     ⚠️ IG no es su canal (IG ${r.ig_promo_days ?? 0}d de promo) → revisar la calidad EN ESAS REDES, no en historias de IG`
-      : "";
-    return `   • ${label}\n     promo ${r.promo_days}/${denom} días leídos · ingreso ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})${redes}${aviso}`;
+    const redes = r.promo_networks ? ` · en ${r.promo_networks}` : ` · sin promo detectada`;
+    const aviso = (r.promo_networks && igNotChannel) ? ` · IG no es su canal (${r.ig_promo_days ?? 0}d)` : "";
+    return `• ${label} · promo ${r.promo_days}/${denom} · ${trendStr(r.income_trend_pct)} (${money(r.income_mtd)})${redes}${aviso}`;
   };
   const silentBullet = (r: SilentRow) => {
     const link = igUrl(r.instagram_handle);
     const label = link ? `${r.name ?? r.instagram_handle} — ${link}` : (r.name ?? "?");
-    return `   • ${label}\n     hace ${r.days_since_contact}d sin escribirle + no promociona (${r.promo_days}/${r.mtd_day}) → escribile e incentivá promo`;
+    // Acción ("escríbeles") va en el encabezado 📵 de la sección, no repetida por línea.
+    return `• ${label} · ${r.days_since_contact}d sin contacto · promo ${r.promo_days}/${r.mtd_day}`;
   };
 
   // Las creadoras "sin contacto + sin promo" se muestran en su propia sección 📵
@@ -155,8 +153,8 @@ function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string
   }
 
   const lines: string[] = [
-    `🎯 *Supervisión de crecimiento* — ${rows.length} modelos necesitan atención`,
-    `_Promoción × ingresos, mes a la fecha (vs mismo tramo del mes pasado)_`,
+    `🎯 *Crecimiento* — ${rows.length} modelos en alerta`,
+    `_Promo × ingresos, mes a la fecha · X/Y = días con promo / días leídos_`,
     "",
   ];
 
@@ -177,23 +175,23 @@ function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string
     const rie = g.filter((r) => r.quadrant === "riesgo" && !silentIds.has(r.creator_id));
     const alertCount = crit.length + cal.length + rie.length + sil.length;
 
-    lines.push(`👤 ${tag} *${mgrName}* — ${alertCount} en alerta`);
+    lines.push(`👤 ${tag} *${mgrName}* · ${alertCount} en alerta`);
 
     if (crit.length) {
-      lines.push(`🔴 No crece + no promociona (${crit.length}):`);
+      lines.push(`🔴 no crece + no promo (${crit.length})`);
       lines.push(...crit.map(bullet));
     }
     if (cal.length) {
-      lines.push(`🟠 Promociona pero cae — revisar calidad (${cal.length}):`);
+      lines.push(`🟠 promociona pero cae, revisar calidad (${cal.length})`);
       lines.push(...cal.map(bullet));
     }
     if (rie.length) {
-      lines.push(`🟡 Riesgo, súbele promo (${rie.length}):`);
+      lines.push(`🟡 riesgo, sube promo (${rie.length})`);
       lines.push(...rie.slice(0, RIESGO_CAP).map(bullet));
-      if (rie.length > RIESGO_CAP) lines.push(`   • …y ${rie.length - RIESGO_CAP} más`);
+      if (rie.length > RIESGO_CAP) lines.push(`• …y ${rie.length - RIESGO_CAP} más`);
     }
     if (sil.length) {
-      lines.push(`📵 Sin contacto + sin promo (${sil.length}) — escribiles:`);
+      lines.push(`📵 sin contacto + sin promo (${sil.length}), escríbeles`);
       lines.push(...sil.map(silentBullet));
     }
     lines.push("");
@@ -204,7 +202,7 @@ function compose(rows: GrowthRow[], silentRows: SilentRow[], lorenaPhone: string
   const noGrow = critTotal + calTotal;
   if (noGrow > 0 && lorenaPhone) {
     lines.push(
-      `📊 @${phoneToken(lorenaPhone)} *${firstName("Lorena")}* — ${noGrow} modelos con ingreso a la baja esta semana; vale revisar estrategia de promoción.`,
+      `📊 @${phoneToken(lorenaPhone)} *${firstName("Lorena")}* · ${noGrow} modelos con ingreso a la baja · revisar estrategia de promo.`,
     );
     mentions.add(jidOf(lorenaPhone));
   }
