@@ -21,6 +21,7 @@ import {
   esCorreccionDeEstilo,
   esDisputaDeRegistro,
   esPromesaDeComportamiento,
+  esAckDeDirectiva,
   niegaLeerAdjuntos,
   esRetractacion,
   extraerParesNombreLid,
@@ -7547,6 +7548,8 @@ async function runAgent(req: AgentRequest): Promise<{
   let muroBloqueado = 0;
   // Mensaje vacío (21/08): máx 2 avisos y luego se descarta — publicar vacío nunca es válido.
   let vacioBloqueado = 0;
+  // Feedback del dueño confirmado sin persistir (21/08): bloquea 1 vez para exigir add_persistent_rule.
+  let feedbackOwnerBloqueado = 0;
   // Cierre forzado al borde del presupuesto (ver el tope del loop): una sola vez.
   let cierreForzado = false;
   // Texto del mensaje disparador, para la guarda de lecciones de estilo: si el humano
@@ -8274,6 +8277,42 @@ async function runAgent(req: AgentRequest): Promise<{
                   "llama remember_fact con el hecho en una línea y en 3ª persona, con `about` si es sobre otra " +
                   "persona. DESPUÉS reenvía tu mensaje. Si era un acuse puntual y no un compromiso permanente, " +
                   "reescríbelo sin prometer conducta futura.",
+            }),
+          });
+          continue;
+        }
+      }
+      // Guarda FEEDBACK DEL DUEÑO = REGLA GUARDADA (21/08, pedido de Jhon): si Álvaro
+      // (owner) dio una instrucción/política y el bot la CONFIRMA con un ack pelado
+      // ("Entendido/Captado/Escuchado") sin llamar add_persistent_rule, se evapora —
+      // mañana arranca en blanco. Complementa la guarda de promesa-de-conducta (que
+      // caza el "de ahora en adelante", no el "entendido" pelado). Solo owner (si no,
+      // add_persistent_rule lo rechaza). Bloquea 1 vez; a la 2ª pasa (válvula de escape).
+      if (t.name === "reply_to_group" && feedbackOwnerBloqueado < 1 &&
+          senderCtx.isOwner && !escriturasOk.has("add_persistent_rule") &&
+          textoDisparador.trim().length > 40) {
+        const cuerpoFb = String((t.input as ToolInput).body ?? "");
+        if (esAckDeDirectiva(cuerpoFb)) {
+          feedbackOwnerBloqueado += 1;
+          await logEvent(sb, {
+            tenantId: group.tenant_id,
+            groupId: group.id,
+            kind: "agent_owner_feedback_no_persist",
+            payload: { body_preview: cuerpoFb.slice(0, 160), disparador_len: textoDisparador.length },
+          });
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify({
+              error: "feedback_owner_sin_guardar",
+              message:
+                "NO se envió: Álvaro (el dueño) te dio una instrucción/política y la estás confirmando " +
+                "('entendido/captado/escuchado/...') SIN guardarla. Un 'Entendido' sin regla se evapora y " +
+                "mañana arrancas en blanco. PRIMERO llama add_persistent_rule con la política redactada como " +
+                "NORMA accionable en 1-2 líneas (no 'Álvaro pidió X' sino 'X se hace así'; scope 'global' si " +
+                "aplica a varios grupos). DESPUÉS confirma. Si de verdad NO era una política a recordar (solo " +
+                "una pregunta, un dato puntual o un acuse), reescribe tu mensaje SIN el 'entendido/captado' — " +
+                "así no fuerzas una regla que no toca.",
             }),
           });
           continue;

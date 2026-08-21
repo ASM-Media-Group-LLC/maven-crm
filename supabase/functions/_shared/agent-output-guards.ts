@@ -109,6 +109,21 @@ export const PROMESA_CONDUCTA_RE =
   /\b(?:qued[ao]n?\s+(?:aplicad|ajustad|como\s+(?:norma|regla))|de\s+(?:ahora|aqu[íi]|hoy)\s+en\s+(?:adelante|m[áa]s)|a\s+partir\s+de\s+(?:ahora|hoy)|voy\s+a\s+(?:llevar|empezar|dejar\s+de|cambiar|corregir|aplicar|exigir|pedir\s+siempre)|no\s+(?:lo\s+)?voy\s+a\s+(?:dejar\s+pasar|volver\s+a)|ya\s+no\s+voy\s+a|cambio\s+de\s+(?:estrategia|enfoque|criterio|foco)|lo\s+(?:ajusto|aplico|corrijo)\b|\bajusto\s*[:,]|lo\s+tomo\s+como\s+(?:norma|regla)|te\s+(?:aviso|avisar[ée]|paso|pasar[ée]|mando|mandar[ée])\s+siempre)/im;
 export const esPromesaDeComportamiento = (s: string): boolean => PROMESA_CONDUCTA_RE.test(s);
 
+// ── Ack de una DIRECTIVA del dueño (feedback que se evapora) ─────────────────────
+// 21/08: Álvaro da políticas/procesos ("el proceso de CP es escaneo gratis + PDF…",
+// "no vendan de entrada, regalen") y el bot a veces responde con un ack pelado
+// ("Entendido Álvaro", "✓ Escuchado", "captado") SIN llamar add_persistent_rule →
+// mañana arranca en blanco. PROMESA_CONDUCTA_RE no lo caza (esos verbos de cambio
+// no aparecen en un "entendido" pelado) y afirmaRegistro tampoco (no dice "anotado").
+// Este detector reconoce que el bot ARRANCA su reply CONFIRMANDO una orden. Es
+// start-anchored y solo con acks fuertes: una respuesta de DATO arranca con el dato o
+// el nombre, no con "entendido/captado/recibido". Se usa junto a isOwner (si el DUEÑO
+// dio la instrucción) + !add_persistent_rule para exigir persistir antes de confirmar.
+// Salta @menciones y un "Nombre, " inicial ("Álvaro, captado…").
+export const ACK_DIRECTIVA_RE =
+  /^\s*(?:@[\w.]+\s+)*(?:[A-ZÁÉÍÓÚ][\wáéíóúñ]+,\s+)?(?:✓|✅|👍|🙌)?\s*(?:entendid[oa]|escuchad[oa]|captad[oa]|capt[ée]|recibid[oa]|copiad[oa]|perfecto|listo|hecho|de\s+acuerdo|as[íi]\s+(?:lo\s+)?(?:hacemos|hago)|claro\s+que\s+s[íi])\b/iu;
+export const esAckDeDirectiva = (s: string): boolean => ACK_DIRECTIVA_RE.test(s);
+
 // ── Repetición: el bot re-mandando lo mismo ─────────────────────────────────────
 // 07/08 en Ventas: entre 15:11 y 15:13 mandó CUATRO mensajes casi idénticos
 // ("Entendido Álvaro 👆 PADRÓN DE AGENCIAS — peguen acá…") sin aportar un dato

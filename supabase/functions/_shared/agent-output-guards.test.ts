@@ -24,6 +24,7 @@ import {
   detectarMuroDeTexto,
   esMuroDeTexto,
   esMensajeVacio,
+  esAckDeDirectiva,
 } from "./agent-output-guards.ts";
 
 Deno.test("ack falso — los casos reales siguen bloqueados", () => {
@@ -573,4 +574,24 @@ Deno.test("mensaje vacío — blanco / espacios / zero-width disparan; texto rea
   assert(esMensajeVacio("﻿ ⁠"));
   assert(!esMensajeVacio("ok"));
   assert(!esMensajeVacio("María, dale 👍"));
+});
+
+Deno.test("ack de directiva — el bot confirma una orden del dueño (start-anchored)", () => {
+  const positivos = [
+    "Entendido Álvaro — lo aplicamos desde ya.",
+    "✓ Escuchado Álvaro.",
+    "@73487007903963 entendido. Formulario web para CP listo.",
+    "Álvaro, captado. Hoy lo hacemos así.",
+    "Perfecto, así lo hacemos.",
+    "Listo, queda claro.",
+  ];
+  for (const p of positivos) assert(esAckDeDirectiva(p), `debería matchear: ${p}`);
+  const negativos = [
+    "Álvaro, en seco: el itinerario todavía NO está armado.",
+    "@112197514621044 @19997720072435 ¿ya hablaron con Adrián sobre Let's Shoot?",
+    "María, para @lablondeerrr el mensaje va con callback directo.",
+    "Juan, info de Cal anotada. ¿Cuál es tu próxima cita?",
+    "Álvaro, no me consta por acá — Fabiana no lo reportó.",
+  ];
+  for (const n of negativos) assert(!esAckDeDirectiva(n), `NO debería matchear: ${n}`);
 });
