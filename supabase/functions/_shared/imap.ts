@@ -17,6 +17,41 @@ const dec = new TextDecoder();
 /** Techo por comando. Las edge functions tienen límite de ejecución, así que
  *  un servidor que no responde no puede colgar la request entera. */
 const CMD_TIMEOUT_MS = 15_000;
+/** Conectar no puede esperar más que esto. Sin tope, un proveedor que
+ *  estrangula (acepta el TCP y no manda nada) deja la función colgada
+ *  hasta que el gateway la mate — y la persona ve esqueletos eternos. */
+const CONNECT_TIMEOUT_MS = 10_000;
+
+/** Corre `p` contra un reloj DE VERDAD.
+ *
+ *  El patrón anterior chequeaba `Date.now()` ENTRE lecturas: si el servidor
+ *  acepta la conexión y no manda nada (el tarpit clásico de un proveedor
+ *  enojado), `conn.read()` bloquea para siempre y el reloj nunca se vuelve
+ *  a mirar. Acá el timer corre en paralelo; al vencer, `onTimeout` cierra
+ *  la conexión, lo que hace fallar también al read pendiente. */
+async function conReloj<T>(
+  p: Promise<T>,
+  ms: number,
+  mensaje: string,
+  onTimeout?: () => void,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reloj = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      try {
+        onTimeout?.();
+      } catch {
+        // cerrar una conexión ya muerta no es noticia
+      }
+      reject(new Error(mensaje));
+    }, ms);
+  });
+  try {
+    return await Promise.race([p, reloj]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface ImapResult {
   ok: boolean;
@@ -42,7 +77,11 @@ export class ImapClient {
   }
 
   static async connect(host: string, port: number): Promise<ImapClient> {
-    const conn = await Deno.connectTls({ hostname: host, port });
+    const conn = await conReloj(
+      Deno.connectTls({ hostname: host, port }),
+      CONNECT_TIMEOUT_MS,
+      "el servidor de correo no responde (timeout al conectar)",
+    );
     const client = new ImapClient(conn);
     // El servidor saluda solo, antes de cualquier comando. Hay que
     // consumirlo o queda mezclado con la respuesta del primer comando.
@@ -56,10 +95,16 @@ export class ImapClient {
     const chunk = new Uint8Array(8192);
 
     while (!done(this.buffer)) {
-      if (Date.now() > deadline) {
+      const restante = deadline - Date.now();
+      if (restante <= 0) {
         throw new Error("timeout esperando respuesta del servidor IMAP");
       }
-      const n = await this.conn.read(chunk);
+      const n = await conReloj(
+        this.conn.read(chunk),
+        restante,
+        "timeout esperando respuesta del servidor IMAP",
+        () => this.conn.close(),
+      );
       if (n === null) throw new Error("el servidor IMAP cerró la conexión");
       this.buffer += dec.decode(chunk.subarray(0, n));
     }
@@ -90,8 +135,14 @@ export class ImapClient {
     let pos = 0; // cuánto de `out` ya inspeccionamos
 
     const pull = async (): Promise<void> => {
-      if (Date.now() > deadline) throw new Error("timeout esperando respuesta IMAP");
-      const n = await this.conn.read(chunk);
+      const restante = deadline - Date.now();
+      if (restante <= 0) throw new Error("timeout esperando respuesta IMAP");
+      const n = await conReloj(
+        this.conn.read(chunk),
+        restante,
+        "timeout esperando respuesta IMAP",
+        () => this.conn.close(),
+      );
       if (n === null) throw new Error("el servidor IMAP cerró la conexión");
       out += dec.decode(chunk.subarray(0, n));
     };

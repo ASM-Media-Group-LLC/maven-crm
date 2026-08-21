@@ -12,6 +12,35 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 const CMD_TIMEOUT_MS = 20_000;
+const CONNECT_TIMEOUT_MS = 10_000;
+
+/** Reloj REAL contra la promesa (mismo arreglo que en imap.ts): el patrón
+ *  de chequear Date.now() entre lecturas no sirve cuando el servidor acepta
+ *  la conexión y no manda nada — el read bloquea y el reloj no se mira más.
+ *  Al vencer, cerrar la conexión hace fallar también al read pendiente. */
+async function conReloj<T>(
+  p: Promise<T>,
+  ms: number,
+  mensaje: string,
+  onTimeout?: () => void,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reloj = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      try {
+        onTimeout?.();
+      } catch {
+        // cerrar una conexión ya muerta no es noticia
+      }
+      reject(new Error(mensaje));
+    }, ms);
+  });
+  try {
+    return await Promise.race([p, reloj]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface SmtpResult {
   ok: boolean;
@@ -28,7 +57,11 @@ export class SmtpClient {
   }
 
   static async connect(host: string, port: number): Promise<SmtpClient> {
-    const conn = await Deno.connectTls({ hostname: host, port });
+    const conn = await conReloj(
+      Deno.connectTls({ hostname: host, port }),
+      CONNECT_TIMEOUT_MS,
+      "el servidor de correo no responde (timeout al conectar)",
+    );
     const client = new SmtpClient(conn);
     // El servidor saluda con un 220 antes de aceptar comandos.
     await client.readReply();
@@ -49,10 +82,21 @@ export class SmtpClient {
       /\r\n$/.test(b);
 
     while (!done(this.buffer)) {
-      if (Date.now() > deadline) {
+      const restante = deadline - Date.now();
+      if (restante <= 0) {
         return { ok: false, code: 0, message: "timeout esperando al servidor SMTP" };
       }
-      const n = await this.conn.read(chunk);
+      let n: number | null;
+      try {
+        n = await conReloj(
+          this.conn.read(chunk),
+          restante,
+          "timeout esperando al servidor SMTP",
+          () => this.conn.close(),
+        );
+      } catch {
+        return { ok: false, code: 0, message: "timeout esperando al servidor SMTP" };
+      }
       if (n === null) {
         return { ok: false, code: 0, message: "el servidor SMTP cerró la conexión" };
       }
