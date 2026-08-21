@@ -368,3 +368,10 @@ export function detectarMuroDeTexto(
   return null;
 }
 export const esMuroDeTexto = (s: string): boolean => detectarMuroDeTexto(s) !== null;
+
+// Mensaje vacío: en blanco, solo espacios, o solo caracteres invisibles (zero-width,
+// NBSP, word-joiner). El 21/08 el bot le respondió a Fabiana con un solo zero-width
+// space. Publicar un mensaje vacío nunca es correcto → se bloquea en el borde de salida.
+export function esMensajeVacio(s: string): boolean {
+  return (s ?? "").replace(/[\s\u200B\u200C\u200D\u2060\uFEFF]/g, "").length === 0;
+}
