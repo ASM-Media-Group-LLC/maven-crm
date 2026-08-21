@@ -132,17 +132,9 @@ export default function CorreoPage() {
     [lista.data],
   );
 
-  // Abrir un correo cuesta una sesión IMAP completa (~2-4 s). Precargamos
-  // los DOS más nuevos apenas llega la lista: son los que la gente abre.
-  // Dos y no más: cada precarga es una conexión real contra el proveedor.
-  //
-  // ⚠️ Este efecto vive ACÁ ARRIBA a propósito: una versión lo tenía
-  // después de los returns tempranos (buzón cargando / sin buzón) y eso
-  // viola la regla de los hooks — al terminar la carga aparecía un hook
-  // de más y React volteaba la página entera (error #310, visto en prod).
-  useEffect(() => {
-    for (const m of mensajes.slice(0, 2)) precargar(carpeta, m.seq);
-  }, [mensajes, carpeta, precargar]);
+  // La precarga de los 2 más nuevos ya NO se hace desde acá: viene con la
+  // lista (`with_bodies`), en la misma sesión IMAP. Disparar conexiones
+  // extra desde el cliente era parte de lo que colgaba la cuenta.
 
   if (cargandoBuzon) {
     return (

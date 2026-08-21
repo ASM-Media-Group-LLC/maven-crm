@@ -66,15 +66,42 @@ export interface MailMessage {
   truncated: boolean;
 }
 
+/** Semáforo: MÁXIMO 2 llamadas de correo simultáneas por pestaña.
+ *
+ *  Cada llamada abre una conexión IMAP/SMTP nueva contra el proveedor, y
+ *  el proveedor RACIONA las conexiones concurrentes de una cuenta. Medido
+ *  en producción (21/08): 2-3 a la vez responden en ~1,5 s; una ráfaga de
+ *  6 se queda colgada >45 s y termina en 504. La interfaz dispara llamadas
+ *  desde varios lados a la vez (carpetas, lista, hover, marcar leído):
+ *  sin este tope, pasear el mouse por la bandeja tumbaba la cuenta. */
+const MAX_SIMULTANEAS = 2;
+let enVuelo = 0;
+const fila: Array<() => void> = [];
+
+async function conTurno<T>(fn: () => Promise<T>): Promise<T> {
+  while (enVuelo >= MAX_SIMULTANEAS) {
+    await new Promise<void>((listo) => fila.push(listo));
+  }
+  enVuelo++;
+  try {
+    return await fn();
+  } finally {
+    enVuelo--;
+    fila.shift()?.();
+  }
+}
+
 /** Llama a `mail-fetch` y devuelve el cuerpo ya tipado. */
-async function callMail<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
-  // supabase-js deja "non-2xx status code" y esconde el motivo real en la
-  // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
-  if (error) throw new Error(await describeFunctionError(error));
-  const payload = data as T & { error?: string };
-  if (payload?.error) throw new Error(payload.error);
-  return payload as T;
+function callMail<T>(body: Record<string, unknown>): Promise<T> {
+  return conTurno(async () => {
+    const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
+    // supabase-js deja "non-2xx status code" y esconde el motivo real en la
+    // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
+    if (error) throw new Error(await describeFunctionError(error));
+    const payload = data as T & { error?: string };
+    if (payload?.error) throw new Error(payload.error);
+    return payload as T;
+  });
 }
 
 /** ¿Tiene buzón este usuario? Se provisiona solo al crear la cuenta. */
@@ -129,15 +156,31 @@ export function useMailFolders(enabled: boolean) {
 }
 
 export function useMailMessages(folder: string, enabled: boolean) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["mail-messages", folder],
     enabled: enabled && !!folder,
-    queryFn: () =>
-      callMail<{ folder: string; total: number; messages: MailSummary[] }>({
+    queryFn: async () => {
+      const r = await callMail<{
+        folder: string;
+        total: number;
+        messages: MailSummary[];
+        bodies?: MailMessage[];
+      }>({
         action: "imap_messages",
         folder,
         limit: 50,
-      }),
+        // Los cuerpos de los 2 más nuevos vienen EN la misma sesión IMAP:
+        // el proveedor raciona conexiones, no datos. Antes esto eran dos
+        // conexiones extra (precarga), y era parte de lo que lo colgaba.
+        with_bodies: 2,
+      });
+      // Se siembran en la caché de mensaje: abrirlos es instantáneo.
+      for (const b of r.bodies ?? []) {
+        qc.setQueryData(["mail-message", folder, b.seq], b);
+      }
+      return r;
+    },
   });
 }
 

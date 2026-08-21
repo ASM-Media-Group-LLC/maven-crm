@@ -65,12 +65,17 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const {
-      action, folder, limit, seq, mark_read,
+      action, folder, limit, seq, mark_read, with_bodies,
       to, cc, subject, text, html, in_reply_to, references,
     } = body as {
       action?: string;
       folder?: string;
       limit?: number;
+      /** Cuantos cuerpos (los mas nuevos) devolver JUNTO con la lista, en
+       *  la MISMA sesion IMAP. Zoho raciona las CONEXIONES concurrentes de
+       *  una cuenta (una rafaga de 6 se cuelga >45s y termina en 504); un
+       *  FETCH mas dentro de la sesion ya abierta cuesta milisegundos. */
+      with_bodies?: number;
       /** Número de secuencia del mensaje dentro de la carpeta. */
       seq?: number;
       /** Marcar como leído al abrirlo. Lo decide la interfaz. */
@@ -293,12 +298,45 @@ Deno.serve(async (req) => {
 
         const visibles = ocultarAvisosDelProveedor(list.messages);
 
+        // Cuerpos de los mas nuevos, en ESTA sesion. Tope 3: cada cuerpo
+        // agrega ~0.5s a la respuesta de la lista.
+        const nBodies = Math.min(Math.max(Number(with_bodies) || 0, 0), 3);
+        const bodies: unknown[] = [];
+        if (nBodies > 0) {
+          const top = [...visibles].sort((a, b) => b.seq - a.seq).slice(0, nBodies);
+          for (const m of top) {
+            const raw = await client.fetchRawMessage(m.seq);
+            // Mejor una lista sin cuerpo precargado que un error total.
+            if (!raw.ok) continue;
+            const parsed = parseMessage(raw.raw);
+            const clean = parsed.html ? sanitizeEmailHtml(parsed.html) : null;
+            bodies.push({
+              ok: true,
+              via: "imap",
+              folder: box,
+              seq: m.seq,
+              from: parsed.headers["from"] ?? "",
+              to: parsed.headers["to"] ?? "",
+              cc: parsed.headers["cc"] ?? "",
+              subject: parsed.headers["subject"] ?? "(sin asunto)",
+              date: parsed.headers["date"] ?? "",
+              html: clean?.html ?? null,
+              text: parsed.text,
+              remote_images: clean?.remoteImages ?? 0,
+              dropped: clean?.dropped ?? [],
+              attachments: parsed.attachments,
+              truncated: raw.truncated,
+            });
+          }
+        }
+
         return json({
           ok: true,
           via: "imap",
           folder: box,
           total: sel.exists,
           messages: visibles,
+          bodies,
           // Cuántos se ocultaron, para poder auditar el filtro si alguien
           // reporta que "le falta un correo".
           hidden: list.messages.length - visibles.length,
