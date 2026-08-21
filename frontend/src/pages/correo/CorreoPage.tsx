@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, isToday, isThisYear } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -124,6 +124,26 @@ export default function CorreoPage() {
     setSeq(null);
   }, [carpeta]);
 
+  // ORDEN EXPLÍCITO, no confiar en el del servidor: una versión lo daba
+  // vuelta asumiendo "viejo a nuevo" y quedaba al revés. El número de
+  // secuencia crece con cada mensaje nuevo: mayor = más reciente.
+  const mensajes = useMemo(
+    () => [...(lista.data?.messages ?? [])].sort((a, b) => b.seq - a.seq),
+    [lista.data],
+  );
+
+  // Abrir un correo cuesta una sesión IMAP completa (~2-4 s). Precargamos
+  // los DOS más nuevos apenas llega la lista: son los que la gente abre.
+  // Dos y no más: cada precarga es una conexión real contra el proveedor.
+  //
+  // ⚠️ Este efecto vive ACÁ ARRIBA a propósito: una versión lo tenía
+  // después de los returns tempranos (buzón cargando / sin buzón) y eso
+  // viola la regla de los hooks — al terminar la carga aparecía un hook
+  // de más y React volteaba la página entera (error #310, visto en prod).
+  useEffect(() => {
+    for (const m of mensajes.slice(0, 2)) precargar(carpeta, m.seq);
+  }, [mensajes, carpeta, precargar]);
+
   if (cargandoBuzon) {
     return (
       <div className="space-y-3 p-6">
@@ -159,19 +179,7 @@ export default function CorreoPage() {
     );
   }
 
-  // ORDEN EXPLICITO, no confiar en el del servidor: una version lo daba
-  // vuelta asumiendo "viejo a nuevo" y quedaba al reves. El numero de
-  // secuencia crece con cada mensaje nuevo, asi que mayor = mas reciente.
-  const mensajes = [...(lista.data?.messages ?? [])].sort((a, b) => b.seq - a.seq);
   const enLista = seq === null;
-
-  // Abrir un correo cuesta una sesion IMAP completa (~2-4 s). Precargamos
-  // los DOS mas nuevos apenas llega la lista: son los que la gente abre.
-  // Dos y no mas: cada precarga es una conexion real contra el proveedor.
-  useEffect(() => {
-    for (const m of mensajes.slice(0, 2)) precargar(carpeta, m.seq);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lista.data, carpeta]);
 
   const abrir = (m: MailSummary) => {
     setSeq(m.seq);

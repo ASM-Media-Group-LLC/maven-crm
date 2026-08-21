@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -174,13 +175,18 @@ export function useMailMessage(folder: string, seq: number | null) {
  *  persona después lo abre, ya está — el clic se siente instantáneo. */
 export function usePrefetchMailMessage() {
   const qc = useQueryClient();
-  return (folder: string, seq: number) => {
-    void qc.prefetchQuery({
-      queryKey: ["mail-message", folder, seq],
-      ...MENSAJE_CACHE,
-      queryFn: () => fetchMensaje(folder, seq),
-    });
-  };
+  // useCallback: esta función va en las dependencias de un useEffect del
+  // llamador; si se recreara en cada render, el efecto dispararía siempre.
+  return useCallback(
+    (folder: string, seq: number) => {
+      void qc.prefetchQuery({
+        queryKey: ["mail-message", folder, seq],
+        ...MENSAJE_CACHE,
+        queryFn: () => fetchMensaje(folder, seq),
+      });
+    },
+    [qc],
+  );
 }
 
 /** Marca leído en el servidor y apaga el punto azul al instante en la
