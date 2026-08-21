@@ -44,7 +44,12 @@ export const usePermissions = () => {
   // lookup so a `can_access: false` row still wins; this matters for
   // backwards compat — roles saved before a given module existed have
   // no row for it and would otherwise lose access on deploy.
-  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet"];
+  // "Correo" entra acá porque es parte de la suite que reemplaza a Google
+  // (como Messenger/Cowork/Meet): la casilla se provisiona en el alta y la
+  // pestaña tiene que estar ahí sin que nadie configure permisos. Quien no
+  // tenga casilla ve un estado vacío que se lo explica, y un admin puede
+  // apagarlo por rol con can_access: false, que siempre gana.
+  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo"];
 
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access
