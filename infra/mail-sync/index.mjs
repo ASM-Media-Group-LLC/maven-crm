@@ -23,6 +23,7 @@ import { createClient } from "@supabase/supabase-js";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
+import { esAvisoDelProveedor } from "./notices.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -270,12 +271,19 @@ class CuentaSync {
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id,folder" });
 
-      const status = await this.client.status(path, { messages: true, unseen: true });
+      // Los conteos salen de la CACHÉ, no del STATUS del servidor: el
+      // servidor cuenta también los avisos ocultos y el badge mentiría.
+      const { count: total } = await db.from("mail_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", this.cred.user_id).eq("folder", clave);
+      const { count: unread } = await db.from("mail_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", this.cred.user_id).eq("folder", clave).eq("unread", true);
       await db.from("mail_folders").upsert({
         user_id: this.cred.user_id,
         folder: clave,
-        total: status.messages ?? 0,
-        unread: status.unseen ?? 0,
+        total: total ?? 0,
+        unread: unread ?? 0,
         synced_at: new Date().toISOString(),
       }, { onConflict: "user_id,folder" });
     } finally {
@@ -320,6 +328,11 @@ class CuentaSync {
       this.log(`no se pudo parsear uid ${uid} de ${clave}:`, e?.message);
       return;
     }
+
+    // Los avisos del proveedor no llegan ni a la caché: el empleado solo
+    // conoce Maven. Los REBOTES (mailer-daemon) sí pasan — ocultarlos haría
+    // creer que un correo llegó cuando no.
+    if (esAvisoDelProveedor(parsed.from?.text ?? "")) return;
 
     const crudoHtml = typeof parsed.html === "string" ? parsed.html : null;
     const texto = parsed.text ?? "";
