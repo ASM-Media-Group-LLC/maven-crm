@@ -71,6 +71,34 @@ export default function VideoCallPage() {
     resolveAndRedirect();
   }, [roomName, navigate]);
 
+  // Link para "Copiar enlace" en salas de Meet: el PÚBLICO (/entrar/<código>),
+  // que atiende con y sin cuenta. El interno /call/... exige login y dejaba a
+  // los invitados externos mirando la pantalla de login (feedback 21/08).
+  // Mientras resuelve (o si falla), se queda el link interno de siempre.
+  const { data: meetShareLink } = useQuery({
+    queryKey: ["meet-share-link", roomName],
+    enabled: !!user?.id && !!roomName?.startsWith("meet_"),
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "resolve", livekitRoom: roomName }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok || !json.room?.code) return null;
+      return `${window.location.origin}/entrar/${json.room.code}`;
+    },
+  });
+
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-for-call", user?.id],
     queryFn: async () => {
@@ -158,6 +186,7 @@ export default function VideoCallPage() {
         // Grabar: solo reuniones de Meet. Las llamadas ad-hoc de Messenger
         // pasan por esta misma pagina y quedan afuera a proposito.
         recording={roomName.startsWith("meet_") ? { source: "meet", title: callDisplayName } : undefined}
+        shareLink={meetShareLink ?? undefined}
       />
       {/* Sala de espera: si es una reunión de Meet, quien está adentro (con cuenta)
           ve a los invitados sin cuenta que piden entrar y los admite. */}

@@ -52,9 +52,14 @@ interface LiveKitCallViewProps {
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
   recording?: { source: "meet" | "cowork"; title?: string };
+  /** Link que copia el botón "Copiar enlace". Sin esto se comparte
+   *  /call/<sala>, que exige login — a un externo lo deja mirando la
+   *  pantalla de login (feedback de Jhon 21/08). Meet pasa acá su link
+   *  público /entrar/<código>. */
+  shareLink?: string;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, recording }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
@@ -178,12 +183,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, []);
 
   const shareLink = useMemo(() => {
+    if (shareLinkProp) return shareLinkProp;
     const params = new URLSearchParams();
     const n = (callDisplayName || roomName).trim();
     if (n) params.set("name", n);
     const qs = params.toString();
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
-  }, [roomName, callDisplayName]);
+  }, [roomName, callDisplayName, shareLinkProp]);
 
   // Clear pin if participant left
   useEffect(() => {
