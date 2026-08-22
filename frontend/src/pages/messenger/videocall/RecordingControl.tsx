@@ -101,6 +101,9 @@ export default function RecordingControl({ room, roomName, source, title, canCon
       sessionStorage.removeItem(claveSesion(roomName));
       miGrabacionRef.current = null;
       setStopOpen(false);
+      // Optimista: LiveKit tarda unos segundos en apagar la marca de la sala
+      // y mientras tanto el pill seguia en REC con el cronometro corriendo.
+      setIsRecording(false);
       const emails = (res.emails as number) ?? 0;
       toast.success("Grabación guardada", {
         description: emails > 0

@@ -98,7 +98,12 @@ services:
   rec-server:
     image: node:22-alpine
     restart: unless-stopped
-    command: ["node", "/app/rec-server.mjs"]
+    # El chmod NO es decorativo: Docker crea /var/lib/maven/grabaciones como
+    # root:755 y el egress corre como usuario sin privilegios -> la grabacion
+    # componia bien y moria al ESCRIBIR con "permission denied" (21/08).
+    # rec-server es root, asi que deja el directorio escribible al bootear:
+    # permanente ante re-provisiones, sin pasos manuales en el host.
+    command: ["sh", "-c", "chmod 1777 /out && exec node /app/rec-server.mjs"]
     environment:
       RECORDINGS_SIGNING_SECRET: ${RECORDINGS_SIGNING_SECRET}
       RECORDINGS_DIR: /out
