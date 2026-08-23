@@ -42,7 +42,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode, useSaveAvatarSeed } from "@/hooks/useUserProfile";
+import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode, useSaveAvatarSeed, useRemoveUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 // Settings page — left rail with the user's role banner + tab list,
@@ -90,6 +90,7 @@ const MyAccountTab = () => {
   const profileQ = useMyProfile();
   const upload = useUploadUserAvatar();
   const saveSeed = useSaveAvatarSeed();
+  const removeAvatar = useRemoveUserAvatar();
   const [seedDraft, setSeedDraft] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pwOpen, setPwOpen] = useState(false);
@@ -163,6 +164,25 @@ const MyAccountTab = () => {
               <p className="mt-2 text-xs text-muted-foreground">
                 Pasa el cursor sobre la imagen para subir una nueva foto.
               </p>
+              {avatarUrl ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  disabled={removeAvatar.isPending}
+                  onClick={async () => {
+                    try {
+                      await removeAvatar.mutateAsync();
+                      toast.success("Foto quitada", { description: "Tu avatar vuelve al muñequito o a las iniciales." });
+                    } catch (e) {
+                      toast.error("No se pudo quitar", { description: (e as Error).message });
+                    }
+                  }}
+                >
+                  Quitar foto
+                </Button>
+              ) : null}
             </div>
           </div>
         </CardContent>

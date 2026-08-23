@@ -50,6 +50,28 @@ export interface VerificationCode {
   wa_link: string;
 }
 
+// Quita la foto de perfil (avatar_url → null): el avatar cae al muñequito
+// elegido o a las iniciales. El archivo en storage queda huérfano a propósito
+// (barato y reversible; la limpieza va con el canonical cleanup pendiente).
+export const useRemoveUserAvatar = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("No autenticado");
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null })
+        .eq("id", uid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
+};
+
 // Guarda el seed del muñequito elegido en el picker de Settings. Invalida
 // "my-profile" para que sidebar y demás consumidores tomen el nuevo seed.
 export const useSaveAvatarSeed = () => {

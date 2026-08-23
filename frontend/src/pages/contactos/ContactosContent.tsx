@@ -147,7 +147,7 @@ const ContactosContent = () => {
   // Estado de cada contacto (creadora activa / ex-creadora / en proceso) para el color de fila.
   const contactStatuses = useContactStatuses();
   // Backbone del dashboard: embudo + churn server-side, acotado por el calendario global.
-  const { stats: funnelStats } = useContactFunnelStats(filters.dateFrom, filters.dateTo);
+  const { stats: funnelStats, isError: funnelError, refetch: refetchFunnel } = useContactFunnelStats(filters.dateFrom, filters.dateTo);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -521,6 +521,14 @@ const ContactosContent = () => {
 
         {activeTab === "dashboard" && (
           <div className="space-y-5 overflow-auto px-6 py-5">
+            {funnelError ? (
+              <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+                <span>No se pudieron cargar las métricas del embudo — los contadores pueden verse en 0.</span>
+                <Button variant="outline" size="sm" onClick={() => void refetchFunnel()}>
+                  Reintentar
+                </Button>
+              </div>
+            ) : null}
             <ContactosKPICards
               stats={funnelStats}
               onClick={(key) => setKpiPopup(key)}

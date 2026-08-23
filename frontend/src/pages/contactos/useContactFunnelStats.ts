@@ -27,7 +27,7 @@ const EMPTY: ContactFunnelStats = {
 };
 
 export function useContactFunnelStats(dateFrom?: string, dateTo?: string) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["contact-funnel-stats", dateFrom || null, dateTo || null],
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<ContactFunnelStats> => {
@@ -56,5 +56,5 @@ export function useContactFunnelStats(dateFrom?: string, dateTo?: string) {
       };
     },
   });
-  return { stats: data ?? EMPTY, isLoading };
+  return { stats: data ?? EMPTY, isLoading, isError, refetch };
 }
