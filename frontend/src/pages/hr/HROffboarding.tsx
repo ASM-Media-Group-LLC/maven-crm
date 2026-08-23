@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -240,10 +241,10 @@ export default function HROffboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-warning" subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-success" subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
-              <KpiCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} color="bg-destructive" subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
+              <StatChip label="Total Offboarding" value={String(offboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los procesos" onClick={() => setKpiPopup("total")} />
+              <StatChip label="En Progreso" value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label="Completados" value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label="Pago Pendiente" value={String(totalPendingPayment)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
             </>
           )}
         </div>
@@ -309,10 +310,12 @@ export default function HROffboarding() {
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
-                        {offboardings.length === 0
-                          ? 'No hay procesos de offboarding. Haz clic en "Iniciar Offboarding" para empezar.'
-                          : "Sin resultados para los filtros aplicados."}
+                      <TableCell colSpan={9}>
+                        {offboardings.length === 0 ? (
+                          <EmptyState seed="hr-offboarding" title="No hay procesos de offboarding" description={'Haz clic en "Iniciar Offboarding" para empezar.'} />
+                        ) : (
+                          <EmptyState seed="hr-offboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -389,8 +392,12 @@ export default function HROffboarding() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-52 rounded-lg" />)
             ) : filtered.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                {offboardings.length === 0 ? "No hay procesos de offboarding." : "Sin resultados para los filtros aplicados."}
+              <div className="col-span-full">
+                {offboardings.length === 0 ? (
+                  <EmptyState seed="hr-offboarding" title="No hay procesos de offboarding" description={'Haz clic en "Iniciar Offboarding" para empezar.'} />
+                ) : (
+                  <EmptyState seed="hr-offboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                )}
               </div>
             ) : (
               filtered.map((ob) => {

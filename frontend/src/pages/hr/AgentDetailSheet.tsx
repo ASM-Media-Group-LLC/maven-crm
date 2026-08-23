@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Clock, Mouse, Keyboard, TrendingUp, Monitor, Play, Pause, Coffee,
   LogOut, Zap, AlertTriangle, ArrowLeft, Loader2, ImageOff,
@@ -8,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useHubstaffAgentDetail } from "@/hooks/useHubstaffAgentDetail";
 import type { HubstaffAgent } from "@/hooks/useHubstaffData";
@@ -67,9 +68,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onBack}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="text-sm bg-primary/10 text-primary">{agent.avatarInitials}</AvatarFallback>
-            </Avatar>
+            <UserAvatar name={agent.name} size="md" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-semibold text-foreground truncate">{agent.name}</h3>
@@ -94,15 +93,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                   <TabsTrigger value="monthly">Mensual</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mb-4">
-                  <Monitor className="h-7 w-7 text-muted-foreground" />
-                </div>
-                <h4 className="text-base font-semibold mb-1">Sin datos de actividad</h4>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  No se encontraron registros de actividad para este agente en el periodo seleccionado. Los datos aparecerán automáticamente cuando Hubstaff esté sincronizando.
-                </p>
-              </div>
+              <EmptyState icon={<Monitor className="h-8 w-8 text-muted-foreground" />} title="Sin datos de actividad" description="No se encontraron registros de actividad para este agente en el periodo seleccionado. Los datos aparecerán automáticamente cuando Hubstaff esté sincronizando." />
             </div>
           ) : (
             <div className="space-y-6">

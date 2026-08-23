@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,7 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, parseISO, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -501,10 +502,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                   <TableRow key={a.id}>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={emp?.profile_photo_url} />
-                          <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" />
                         <div>
                           <p className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                           <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
@@ -575,10 +573,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
           <Card key={a.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => onViewDetail(a)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2.5">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={emp?.profile_photo_url} />
-                  <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
-                </Avatar>
+                <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" className="h-9 w-9" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                   <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
@@ -950,7 +945,7 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-muted-foreground py-10">No hay programas configurados</p>
+            <EmptyState seed="hr-training-programas" title="No hay programas configurados" description="Crea un programa para comenzar." />
           ) : configView === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((p: any) => {
@@ -1183,7 +1178,7 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
           {isLoading ? (
             <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
           ) : modules.length === 0 ? (
-            <p className="text-center text-muted-foreground py-10">No hay módulos. Agrega uno para comenzar.</p>
+            <EmptyState seed="hr-training-modulos" title="No hay módulos" description="Agrega uno para comenzar." />
           ) : (
             <div className="border rounded-lg overflow-hidden">
               <Table>

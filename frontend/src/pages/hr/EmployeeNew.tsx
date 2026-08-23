@@ -21,7 +21,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import {
   CONTRACT_TYPES, WORK_MODALITIES, NATIONAL_ID_TYPES, GENDER_OPTIONS,
@@ -420,9 +420,7 @@ export default function EmployeeNew() {
                 <CardContent className="space-y-4">
                   {linkedProfileId ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback>{(allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "Usuario"} size="sm" className="h-9 w-9" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "Usuario"}</p>
                         <p className="text-xs text-muted-foreground">Usuario vinculado</p>
@@ -445,10 +443,7 @@ export default function EmployeeNew() {
                             <CommandGroup>
                               {allProfiles.map((profile) => (
                                 <CommandItem key={profile.id} value={profile.full_name ?? profile.id} onSelect={() => { setLinkedProfileId(profile.id); setProfileSearchOpen(false); }}>
-                                  <Avatar className="h-6 w-6 mr-2">
-                                    <AvatarImage src={profile.avatar_url ?? ""} />
-                                    <AvatarFallback className="text-xs">{(profile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                                  </Avatar>
+                                  <UserAvatar name={profile.full_name} src={profile.avatar_url} size="xs" className="mr-2" />
                                   {profile.full_name ?? "Sin nombre"}
                                 </CommandItem>
                               ))}

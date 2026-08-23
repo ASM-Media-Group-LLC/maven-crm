@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -22,12 +22,12 @@ import { format } from "date-fns";
 import { EMPLOYEE_STATUS_OPTIONS, CONTRACT_TYPES, WORK_MODALITIES } from "@/lib/hrConstants";
 import { useAuth } from "@/hooks/useAuth";
 
-/* ── KPI Cards ── usan KpiCard estándar (gradient + hover lift) */
+/* ── KPI Cards ── usan StatChip del reskin */
 const kpiCards = [
   { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, color: "bg-success" },
-  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, color: "bg-blue-500" },
-  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, color: "bg-amber-500" },
-  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, color: "bg-violet-500" },
+  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, color: "bg-primary" },
+  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, color: "bg-warning" },
+  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, color: "bg-primary" },
 ];
 
 const MODALITY_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
@@ -302,15 +302,7 @@ export default function EmployeeDirectory() {
         {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {kpiCards.map((card) => (
-            <KpiCard
-              key={card.key}
-              label={card.label}
-              value={kpiValues[card.key]}
-              icon={card.icon}
-              color={card.color}
-              subtitle={card.subtitle}
-              onClick={() => setKpiPopup(card.key)}
-            />
+            <StatChip key={card.key} label={card.label} value={kpiValues[card.key]} icon={<card.icon className="h-3.5 w-3.5" />} color={card.color} hint={card.subtitle} onClick={() => setKpiPopup(card.key)} />
           ))}
         </div>
 

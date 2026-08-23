@@ -28,7 +28,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -440,10 +440,10 @@ export default function HRPermisos() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total" value={String(total)} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
-              <KpiCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
-              <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
+              <StatChip label="Total" value={String(total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
+              <StatChip label="Aprobados" value={String(aprobados)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
+              <StatChip label="Este Mes" value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
             </>
           )}
         </div>

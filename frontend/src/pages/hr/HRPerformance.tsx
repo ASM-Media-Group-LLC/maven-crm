@@ -18,8 +18,8 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import KpiCard from "@/components/dashboard/KpiCard";
+import { UserAvatar } from "@/components/UserAvatar";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import HrPerformanceOperativo from "./HrPerformanceOperativo";
@@ -307,10 +307,10 @@ export default function HRPerformance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} color="bg-amber-500" subtitle="Score general" onClick={() => setKpiPopup("avg")} />
-              <KpiCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Total registradas" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} color="bg-success" subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
-              <KpiCard label="Con Objetivos" value={String(withGoals)} icon={Target} color="bg-violet-500" subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("withGoals")} />
+              <StatChip label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={<Star className="h-3.5 w-3.5" />} color="bg-warning" hint="Score general" onClick={() => setKpiPopup("avg")} />
+              <StatChip label="Evaluaciones" value={String(evals.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint="Total registradas" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Completadas" value={String(completedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label="Con Objetivos" value={String(withGoals)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("withGoals")} />
             </>
           )}
         </div>
@@ -396,10 +396,7 @@ export default function HRPerformance() {
                         <TableRow key={ev.id} className="group hover:bg-muted/30 transition-colors">
                           <TableCell>
                             <div className="flex items-center gap-2.5">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={emp?.profile_photo_url ?? undefined} />
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={fullName} src={emp?.profile_photo_url ?? undefined} size="sm" />
                               <div>
                                 <p className="text-sm font-medium">{fullName}</p>
                                 {emp?.employee_code && <p className="text-xs text-muted-foreground">{emp.employee_code}</p>}
@@ -486,10 +483,7 @@ export default function HRPerformance() {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <Avatar className="h-9 w-9">
-                            <AvatarImage src={emp?.profile_photo_url ?? undefined} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={fullName} src={emp?.profile_photo_url ?? undefined} size="sm" className="h-9 w-9" />
                           <div>
                             <p className="text-sm font-medium">{fullName}</p>
                             <p className="text-xs text-muted-foreground">{ev.period ?? "Sin período"}</p>
@@ -543,10 +537,7 @@ export default function HRPerformance() {
             return (
               <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={emp?.profile_photo_url ?? undefined} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url ?? undefined} size="md" />
                   <div>
                     <p className="font-medium">{fullName}</p>
                     <p className="text-sm text-muted-foreground">{viewItem.period} · {format(new Date(viewItem.evaluation_date), "dd MMM yyyy", { locale: es })}</p>

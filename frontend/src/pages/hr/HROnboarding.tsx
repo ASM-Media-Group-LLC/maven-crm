@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,7 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -219,10 +220,10 @@ export default function HROnboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-violet-500" subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-warning" subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-success" subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label="Total Onboarding" value={String(onboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los procesos" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label="En Progreso" value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label="Completados" value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
             </>
           )}
         </div>
@@ -290,10 +291,12 @@ export default function HROnboarding() {
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
-                        {onboardings.length === 0
-                          ? "No hay procesos de onboarding. Haz clic en \"Iniciar Onboarding\" para empezar."
-                          : "Sin resultados para los filtros aplicados."}
+                      <TableCell colSpan={8}>
+                        {onboardings.length === 0 ? (
+                          <EmptyState seed="hr-onboarding" title="No hay procesos de onboarding" description={'Haz clic en "Iniciar Onboarding" para empezar.'} />
+                        ) : (
+                          <EmptyState seed="hr-onboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -358,8 +361,12 @@ export default function HROnboarding() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)
             ) : filtered.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                {onboardings.length === 0 ? "No hay procesos de onboarding." : "Sin resultados para los filtros aplicados."}
+              <div className="col-span-full">
+                {onboardings.length === 0 ? (
+                  <EmptyState seed="hr-onboarding" title="No hay procesos de onboarding" description={'Haz clic en "Iniciar Onboarding" para empezar.'} />
+                ) : (
+                  <EmptyState seed="hr-onboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                )}
               </div>
             ) : (
               filtered.map((ob) => {

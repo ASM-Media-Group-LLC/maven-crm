@@ -25,7 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 const SCHEDULE_TYPES = [
@@ -312,8 +312,8 @@ const HRChatterSchedules = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <KpiCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="bg-blue-500" onClick={() => setKpiPopup("week")} />
-          <KpiCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="bg-violet-500" onClick={() => setKpiPopup("today")} />
+          <StatChip label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
+          <StatChip label="Turnos Hoy" value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

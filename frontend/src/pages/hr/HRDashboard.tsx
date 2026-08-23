@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { useHrProductivity } from "./useHrProductivity";
 import { useHrAttendance } from "./useHrAttendance";
@@ -130,23 +130,16 @@ function FinancialSummaryCards() {
     : 0;
 
   const cards = [
-    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-blue-500", path: "/finanzas/nomina" },
-    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-violet-500", path: "/finanzas/control" },
+    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-primary", path: "/finanzas/nomina" },
+    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-primary", path: "/finanzas/control" },
     { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning", path: "/hr/deducciones" },
-    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-emerald-500", path: "/finanzas/horas-variables" },
+    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-success", path: "/finanzas/horas-variables" },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map(c => (
-        <KpiCard
-          key={c.label}
-          label={c.label}
-          value={c.value}
-          icon={c.icon}
-          color={c.color}
-          onClick={() => navigate(c.path, { state: { fromHR: true } })}
-        />
+        <StatChip key={c.label} label={c.label} value={c.value} icon={<c.icon className="h-3.5 w-3.5" />} color={c.color} onClick={() => navigate(c.path, { state: { fromHR: true } })} />
       ))}
     </div>
   );
@@ -275,10 +268,10 @@ export default function HRDashboard() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
           ) : (
             <>
-              <KpiCard label="Total Empleados" value={String(total)} icon={Users} color="bg-blue-500" subtitle="En nómina" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Puntualidad equipo" value={avgPunct != null ? `${avgPunct}%` : "—"} icon={UserCheck} color="bg-emerald-500" subtitle={attRows.length ? `${attRows.length} trackeados · Hubstaff` : "Sin datos Hubstaff"} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
-              <KpiCard label="Ausencias Pend." value={String(pendingAbsences.length)} icon={AlertTriangle} color="bg-warning" subtitle="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
-              <KpiCard label="En Onboarding" value={String(nuevos30d)} icon={UserPlus} color="bg-emerald-500" subtitle="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
+              <StatChip label="Total Empleados" value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="En nómina" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Puntualidad equipo" value={avgPunct != null ? `${avgPunct}%` : "—"} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={attRows.length ? `${attRows.length} trackeados · Hubstaff` : "Sin datos Hubstaff"} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
+              <StatChip label="Ausencias Pend." value={String(pendingAbsences.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-warning" hint="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
+              <StatChip label="En Onboarding" value={String(nuevos30d)} icon={<UserPlus className="h-3.5 w-3.5" />} color="bg-success" hint="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
             </>
           )}
         </div>

@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -563,10 +563,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                   <TableRow key={a.id}>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={emp?.profile_photo_url} />
-                          <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" />
                         <div>
                           <p className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                           <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
@@ -648,10 +645,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
           <Card key={a.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => onViewDetail(a)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2.5">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={emp?.profile_photo_url} />
-                  <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
-                </Avatar>
+                <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" className="h-9 w-9" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                   <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>

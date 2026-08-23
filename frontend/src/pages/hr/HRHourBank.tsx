@@ -22,11 +22,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Progress } from "@/components/ui/progress";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 function getInitials(first: string, last: string) {
@@ -224,10 +224,10 @@ const HRHourBank = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} color="bg-violet-500" onClick={() => setKpiPopup("avg")} />
-          <KpiCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="bg-success" onClick={() => setKpiPopup("high")} />
-          <KpiCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="bg-warning" onClick={() => setKpiPopup("low")} />
+          <StatChip label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("avg")} />
+          <StatChip label="Balance Alto (+30h)" value={String(highBalance)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("high")} />
+          <StatChip label="Balance Bajo (<10h)" value={String(lowBalance)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("low")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -266,10 +266,7 @@ const HRHourBank = () => {
                         <TableRow key={b.employee_id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Avatar className="h-7 w-7">
-                                <AvatarImage src={emp?.profile_photo_url} />
-                                <AvatarFallback className="text-[10px]">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" className="h-7 w-7" />
                               <span className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</span>
                             </div>
                           </TableCell>
@@ -311,10 +308,7 @@ const HRHourBank = () => {
                         <TableRow key={m.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Avatar className="h-7 w-7">
-                                <AvatarImage src={emp?.profile_photo_url} />
-                                <AvatarFallback className="text-[10px]">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" className="h-7 w-7" />
                               <span className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</span>
                             </div>
                           </TableCell>

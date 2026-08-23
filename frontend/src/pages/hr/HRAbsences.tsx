@@ -29,7 +29,7 @@ import { ABSENCE_TYPES, ABSENCE_STATUSES } from "@/lib/hrConstants";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -495,9 +495,9 @@ export default function HRAbsences() {
 
         {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <KpiCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
-          <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
+          <StatChip label="Total Faltas" value={String(totalFaltas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label="Pendientes" value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
+          <StatChip label="Este Mes" value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
         </div>
 
         {/* Department Tabs */}

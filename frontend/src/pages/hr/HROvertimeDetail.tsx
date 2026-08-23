@@ -24,10 +24,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { CalendarIcon } from "lucide-react";
 
@@ -189,10 +189,10 @@ const HROvertimeDetail = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Total Horas" value={`${totalHours}h`} icon={Timer} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="bg-warning" onClick={() => setKpiPopup("pending")} />
-          <KpiCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="bg-success" onClick={() => setKpiPopup("approved")} />
-          <KpiCard label="Pagadas" value={String(paidCount)} icon={Banknote} color="bg-violet-500" onClick={() => setKpiPopup("paid")} />
+          <StatChip label="Total Horas" value={`${totalHours}h`} icon={<Timer className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label="Pendientes" value={String(pendingCount)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pending")} />
+          <StatChip label="Aprobadas" value={String(approvedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("approved")} />
+          <StatChip label="Pagadas" value={String(paidCount)} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("paid")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -240,10 +240,7 @@ const HROvertimeDetail = () => {
                       <TableRow key={r.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Avatar className="h-7 w-7">
-                              <AvatarImage src={emp?.profile_photo_url} />
-                              <AvatarFallback className="text-[10px]">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
-                            </Avatar>
+                            <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" className="h-7 w-7" />
                             <div>
                               <p className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                               <p className="text-xs text-muted-foreground">{emp?.email || ""}</p>
@@ -286,10 +283,7 @@ const HROvertimeDetail = () => {
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={emp?.profile_photo_url} />
-                          <AvatarFallback className="text-xs">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url} size="sm" />
                         <div>
                           <p className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
                           <p className="text-xs text-muted-foreground">{emp?.email}</p>

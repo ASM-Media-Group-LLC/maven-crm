@@ -26,7 +26,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -374,10 +374,10 @@ const HRSchedules = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Turnos clickeables (lista propia). Las dos últimas siguen
               navegando porque tienen su propia ruta detallada. */}
-          <KpiCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="bg-blue-500" onClick={() => setKpiPopup("week")} />
-          <KpiCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="bg-violet-500" onClick={() => setKpiPopup("today")} />
-          <KpiCard label="Horas Extra" value={String(overtimeCount)} icon={Timer} color="bg-amber-500" subtitle="Ver detalle" onClick={() => navigate("/hr/horarios/horas-extras")} />
-          <KpiCard label="Banco de Horas" value={`${hourBankTotal}h`} icon={Banknote} color="bg-emerald-500" subtitle="Ver detalle" onClick={() => navigate("/hr/horarios/banco-horas")} />
+          <StatChip label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
+          <StatChip label="Turnos Hoy" value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
+          <StatChip label="Horas Extra" value={String(overtimeCount)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-warning" hint="Ver detalle" onClick={() => navigate("/hr/horarios/horas-extras")} />
+          <StatChip label="Banco de Horas" value={`${hourBankTotal}h`} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-success" hint="Ver detalle" onClick={() => navigate("/hr/horarios/banco-horas")} />
         </div>
 
         {/* Navigation Cards */}

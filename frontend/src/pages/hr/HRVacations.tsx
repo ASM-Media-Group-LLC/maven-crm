@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -371,21 +371,21 @@ export default function HRVacations() {
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : activeType === "vacaciones" ? (
             <>
-              <KpiCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} color="bg-blue-500" subtitle={`${currentYear}`} onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-warning" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} color="bg-success" subtitle="Confirmadas" onClick={() => setKpiPopup("approved")} />
-              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-destructive" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
-              <KpiCard label="Próximas" value={String(upcoming)} icon={CalendarClock} color="bg-violet-500" subtitle="Programadas" onClick={() => setKpiPopup("upcoming")} />
+              <StatChip label="Total Solicitudes" value={String(totalRequests)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`${currentYear}`} onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <StatChip label="Aprobadas" value={String(approved)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Confirmadas" onClick={() => setKpiPopup("approved")} />
+              <StatChip label="Rechazadas" value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <StatChip label="Próximas" value={String(upcoming)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint="Programadas" onClick={() => setKpiPopup("upcoming")} />
             </>
           ) : (
             <>
               {/* "Días Usados / Disponibles" son métricas agregadas sin
                   lista propia: las dejamos estáticas (sin onClick). */}
-              <KpiCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} color="bg-blue-500" subtitle={`De ${maxDays} anuales`} />
-              <KpiCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} color="bg-success" subtitle="Restantes" />
-              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-warning" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} color="bg-violet-500" subtitle={format(new Date(), "MMMM yyyy", { locale: es })} onClick={() => setKpiPopup("thisMonth")} />
-              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-destructive" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <StatChip label="Días Usados" value={String(approvedThisYear)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`De ${maxDays} anuales`} />
+              <StatChip label="Disponibles" value={String(availableDays)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Restantes" />
+              <StatChip label="Pendientes" value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <StatChip label="Este Mes" value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: es })} onClick={() => setKpiPopup("thisMonth")} />
+              <StatChip label="Rechazadas" value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Denegadas" onClick={() => setKpiPopup("rejected")} />
             </>
           )}
         </div>

@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Copy, Archive, Eye, Megaphone, MoreHorizontal, Fi
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -130,11 +130,11 @@ const HRAnnouncements = () => {
       <main className="flex-1 overflow-auto p-6 space-y-5">
         {/* KPIs estilo estándar — clickeables (excepto Visualizaciones que es métrica agregada) */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <KpiCard label="Total" value={stats.total} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Activos" value={stats.active} icon={CheckCircle} color="bg-success" onClick={() => setKpiPopup("active")} />
-          <KpiCard label="Programados" value={stats.scheduled} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("scheduled")} />
-          <KpiCard label="Borradores" value={stats.draft} icon={Edit3} color="bg-slate-500" onClick={() => setKpiPopup("draft")} />
-          <KpiCard label="Visualizaciones" value={stats.totalViews} icon={EyeIcon} color="bg-violet-500" />
+          <StatChip label="Total" value={stats.total} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label="Activos" value={stats.active} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("active")} />
+          <StatChip label="Programados" value={stats.scheduled} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("scheduled")} />
+          <StatChip label="Borradores" value={stats.draft} icon={<Edit3 className="h-3.5 w-3.5" />} color="bg-muted-foreground" onClick={() => setKpiPopup("draft")} />
+          <StatChip label="Visualizaciones" value={stats.totalViews} icon={<EyeIcon className="h-3.5 w-3.5" />} color="bg-primary" />
         </div>
 
         {/* Tabs */}

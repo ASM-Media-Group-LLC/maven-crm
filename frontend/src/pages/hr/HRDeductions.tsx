@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -22,7 +23,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES, INFRACTION_CATEGORIES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
@@ -190,10 +191,10 @@ export default function HRDeductions() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-warning" subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} color="bg-success" subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
-              <KpiCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} color="bg-rose-500" subtitle="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
+              <StatChip label="Total Deducciones" value={String(deductions.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label="Aplicadas" value={String(totalApplied)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
+              <StatChip label="Monto Total" value={formatAmount(totalAmount)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-destructive" hint="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
             </>
           )}
         </div>
@@ -275,10 +276,12 @@ export default function HRDeductions() {
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                        {deductions.length === 0
-                          ? "No hay deducciones registradas. Haz clic en \"Nueva Deducción\" para empezar."
-                          : "Sin resultados para los filtros aplicados."}
+                      <TableCell colSpan={7}>
+                        {deductions.length === 0 ? (
+                          <EmptyState seed="hr-deducciones" title="No hay deducciones registradas" description={'Haz clic en "Nueva Deducción" para empezar.'} />
+                        ) : (
+                          <EmptyState seed="hr-deducciones" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -343,11 +346,11 @@ export default function HRDeductions() {
                 {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                {deductions.length === 0
-                  ? "No hay deducciones registradas. Haz clic en \"Nueva Deducción\" para empezar."
-                  : "Sin resultados para los filtros aplicados."}
-              </div>
+              deductions.length === 0 ? (
+                <EmptyState seed="hr-deducciones" title="No hay deducciones registradas" description={'Haz clic en "Nueva Deducción" para empezar.'} />
+              ) : (
+                <EmptyState seed="hr-deducciones" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+              )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filtered.map((ded) => {

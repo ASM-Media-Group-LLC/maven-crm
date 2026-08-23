@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,7 +24,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
@@ -196,10 +197,10 @@ export default function HRIncidents() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} color="bg-violet-500" subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("open")} />
-              <KpiCard label="En Proceso" value={String(totalInProgress)} icon={Clock} color="bg-warning" subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} color="bg-destructive" subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
+              <StatChip label="Total Incidentes" value={String(incidents.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Abiertos" value={String(totalOpen)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-primary" hint={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("open")} />
+              <StatChip label="En Proceso" value={String(totalInProgress)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label="Críticos" value={String(totalCritical)} icon={<ShieldAlert className="h-3.5 w-3.5" />} color="bg-destructive" hint={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
             </>
           )}
         </div>
@@ -281,10 +282,12 @@ export default function HRIncidents() {
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                        {incidents.length === 0
-                          ? "No hay incidentes registrados. Haz clic en \"Reportar Incidente\" para empezar."
-                          : "Sin resultados para los filtros aplicados."}
+                      <TableCell colSpan={7}>
+                        {incidents.length === 0 ? (
+                          <EmptyState seed="hr-incidentes" title="No hay incidentes registrados" description={'Haz clic en "Reportar Incidente" para empezar.'} />
+                        ) : (
+                          <EmptyState seed="hr-incidentes" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -352,11 +355,11 @@ export default function HRIncidents() {
                 {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                {incidents.length === 0
-                  ? "No hay incidentes registrados. Haz clic en \"Reportar Incidente\" para empezar."
-                  : "Sin resultados para los filtros aplicados."}
-              </div>
+              incidents.length === 0 ? (
+                <EmptyState seed="hr-incidentes" title="No hay incidentes registrados" description={'Haz clic en "Reportar Incidente" para empezar.'} />
+              ) : (
+                <EmptyState seed="hr-incidentes" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+              )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filtered.map((inc) => {

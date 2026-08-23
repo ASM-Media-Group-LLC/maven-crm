@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
@@ -292,9 +292,7 @@ function MonitoringTable({ agents, onSelectAgent }: { agents: HubstaffAgent[]; o
             <TableRow key={agent.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">{agent.avatarInitials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={agent.name} size="sm" />
                   <div>
                     <p className="text-sm font-medium text-foreground">{agent.name}</p>
                   </div>
@@ -335,9 +333,7 @@ function MonitoringGrid({ agents, onSelectAgent }: { agents: HubstaffAgent[]; on
         <Card key={agent.id} className="relative overflow-hidden cursor-pointer hover:border-primary/50 transition-colors" onClick={() => onSelectAgent(agent)}>
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-4">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="text-sm bg-primary/10 text-primary">{agent.avatarInitials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar name={agent.name} size="md" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{agent.name}</p>
               </div>

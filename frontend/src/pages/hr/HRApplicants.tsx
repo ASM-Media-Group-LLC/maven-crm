@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,7 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { APPLICANT_STATUSES, APPLICANT_SOURCES } from "@/lib/hrConstants";
 import { APPLICANT_STATUS_COLORS } from "@/lib/hrAreaUtils";
@@ -187,10 +188,10 @@ export default function HRApplicants() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Candidatos" value={String(applicants.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-warning" subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} color="bg-violet-500" subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("interview")} />
-              <KpiCard label="Contratados" value={String(totalHired)} icon={CheckCircle} color="bg-success" subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
+              <StatChip label="Total Candidatos" value={String(applicants.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label="En Entrevista" value={String(totalInterview)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-primary" hint={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("interview")} />
+              <StatChip label="Contratados" value={String(totalHired)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
             </>
           )}
         </div>
@@ -265,10 +266,12 @@ export default function HRApplicants() {
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
-                        {applicants.length === 0
-                          ? "No hay candidatos registrados. Haz clic en \"Nuevo Candidato\" para empezar."
-                          : "Sin resultados para los filtros aplicados."}
+                      <TableCell colSpan={8}>
+                        {applicants.length === 0 ? (
+                          <EmptyState seed="hr-candidatos" title="No hay candidatos registrados" description={'Haz clic en "Nuevo Candidato" para empezar.'} />
+                        ) : (
+                          <EmptyState seed="hr-candidatos" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -327,8 +330,12 @@ export default function HRApplicants() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)
             ) : filtered.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                {applicants.length === 0 ? "No hay candidatos registrados." : "Sin resultados para los filtros aplicados."}
+              <div className="col-span-full">
+                {applicants.length === 0 ? (
+                  <EmptyState seed="hr-candidatos" title="No hay candidatos registrados" description={'Haz clic en "Nuevo Candidato" para empezar.'} />
+                ) : (
+                  <EmptyState seed="hr-candidatos" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                )}
               </div>
             ) : (
               filtered.map((app) => {

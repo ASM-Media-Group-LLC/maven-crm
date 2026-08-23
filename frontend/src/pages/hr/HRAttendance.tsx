@@ -25,7 +25,7 @@ import { format, differenceInMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import HrAttendanceAuto from "./HrAttendanceAuto";
 
@@ -539,10 +539,10 @@ export default function HRAttendance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <KpiCard label="Total Registros" value={String(total)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Presentes" value={String(presentes)} icon={UserCheck} color="bg-success" subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
-              <KpiCard label="Tardanzas" value={String(tardanzas)} icon={Clock} color="bg-warning" subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
-              <KpiCard label="Ausentes" value={String(ausentes)} icon={UserX} color="bg-destructive" subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
+              <StatChip label="Total Registros" value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Presentes" value={String(presentes)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
+              <StatChip label="Tardanzas" value={String(tardanzas)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
+              <StatChip label="Ausentes" value={String(ausentes)} icon={<UserX className="h-3.5 w-3.5" />} color="bg-destructive" hint={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
             </>
           )}
         </div>

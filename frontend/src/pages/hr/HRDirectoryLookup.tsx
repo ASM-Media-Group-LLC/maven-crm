@@ -4,7 +4,7 @@ import { Search, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
@@ -124,12 +124,7 @@ export default function HRDirectoryLookup() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={emp.profile_photo_url ?? undefined} />
-                          <AvatarFallback className="text-xs">
-                            {emp.first_name[0]}{emp.last_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={`${emp.first_name} ${emp.last_name}`} src={emp.profile_photo_url ?? undefined} size="sm" />
                         <span className="font-medium text-sm">{emp.first_name} {emp.last_name}</span>
                       </div>
                     </TableCell>
