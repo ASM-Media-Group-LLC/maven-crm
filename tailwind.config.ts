@@ -74,6 +74,11 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        // Fuente display del reskin — solo títulos/números grandes vía
+        // `font-display`; el stack por defecto (body) no se toca.
+        display: ["Sora", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

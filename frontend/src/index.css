@@ -42,7 +42,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --input: 240 6% 90%;
     --ring: 211 100% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 10% 4%;
@@ -118,6 +118,13 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Reskin: los títulos llevan la fuente display (Sora). Los headings
+     semánticos la heredan solos; los títulos hechos con <div> se migran
+     pantalla por pantalla con la clase `font-display`. */
+  h1, h2, h3 {
+    @apply font-display;
   }
 
   /* Atmospheric body gradient — dos manchas radiales sutiles que
