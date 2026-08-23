@@ -64,7 +64,7 @@ export default function HRStaffSchedules() {
   const save = async () => {
     if (!selected) return;
     const bad = week.find((d) => d.works && (!d.start || !d.end));
-    if (bad) { toast({ title: "Completá entrada y salida de los días marcados", variant: "destructive" }); return; }
+    if (bad) { toast({ title: "Completa entrada y salida de los días marcados", variant: "destructive" }); return; }
     setSaving(true);
     try {
       await saveUserSchedule(selected.profile_id, roleKindOf(selected.role), week);
@@ -132,7 +132,7 @@ export default function HRStaffSchedules() {
           <CardContent className="p-4">
             {!selected ? (
               <div className="flex h-full items-center justify-center py-16 text-sm text-muted-foreground">
-                Elegí una persona de la izquierda para cargar/editar su horario.
+                Elige una persona de la izquierda para cargar/editar su horario.
               </div>
             ) : schedLoading ? (
               <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando horario…</div>

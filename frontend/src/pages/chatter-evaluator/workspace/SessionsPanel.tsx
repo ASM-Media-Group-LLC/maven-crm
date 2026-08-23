@@ -437,7 +437,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
             <AlertDialogTitle>Cerrar sesión activa</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <p>Esta sesión todavía está abierta. Si la cerrás del workspace ahora:</p>
+                <p>Esta sesión todavía está abierta. Si la cierras del workspace ahora:</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   <li>
                     Se <strong>termina la sesión para el chatter</strong> — no podrá enviar más mensajes y el link se invalida.

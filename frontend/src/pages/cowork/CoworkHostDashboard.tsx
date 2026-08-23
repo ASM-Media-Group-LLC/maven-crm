@@ -79,7 +79,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       const ok = await hubPip.openPip({ width: hubSize?.w ?? 480, height: hubSize?.h ?? 420 });
       if (!ok) { toast.error("No pude abrir la ventana flotante"); toggleHubPinned(); }
     } else {
-      toast.info("Tu navegador no soporta ventana flotante multi-monitor (usá Chrome/Edge). Fijo al frente dentro de Maven.");
+      toast.info("Tu navegador no soporta ventana flotante multi-monitor (usa Chrome/Edge). Fijo al frente dentro de Maven.");
       toggleHubPinned();
     }
   };
@@ -542,7 +542,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="sm"
                   variant={globalMic ? "default" : "outline"}
                   className={`gap-1.5 rounded-full h-8 ${globalMic ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
-                  title={globalMic ? "Micrófono activo: tu voz va a las salas que tengan el 🎤 encendido. Tocá para silenciar todo." : "Activá tu micrófono para poder hablarle a las salas (después elegí a cuáles con el 🎤 de cada sala)."}
+                  title={globalMic ? "Micrófono activo: tu voz va a las salas que tengan el 🎤 encendido. Toca para silenciar todo." : "Activa tu micrófono para poder hablarle a las salas (después elige a cuáles con el 🎤 de cada sala)."}
                   onClick={() => setGlobalMic((v) => !v)}
                 >
                   {globalMic ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
@@ -673,7 +673,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               variant="ghost"
                               size="sm"
                               className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
-                              title={hearFor(room.id) ? "Escuchando esta sala. Tocá para silenciar su audio." : "Sala silenciada (no la oís). Tocá para escuchar."}
+                              title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la oís). Toca para escuchar."}
                               onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
                             >
                               {hearFor(room.id) ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
@@ -683,7 +683,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               variant="ghost"
                               size="sm"
                               className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${broadcastFor(room.id) ? "text-success" : "text-muted-foreground/50"}`}
-                              title={globalMic ? (broadcastFor(room.id) ? "Tu voz va a esta sala. Tocá para dejar de hablarle." : "Tocá para hablarle a esta sala.") : "Activá 'Mi micrófono' arriba para poder hablarle a las salas."}
+                              title={globalMic ? (broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle a esta sala.") : "Activa 'Mi micrófono' arriba para poder hablarle a las salas."}
                               onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
                             >
                               {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
@@ -863,7 +863,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <div
                 className={`flex flex-1 items-center gap-1.5 text-xs text-amber-500 font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
                 onPointerDown={(e) => { if (!hubMaximized) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
-                title={hubMaximized ? undefined : "Arrastrá para mover la ventana"}
+                title={hubMaximized ? undefined : "Arrastra para mover la ventana"}
               >
                 <Headphones className="h-3 w-3" />
                 Coordinador Hub
@@ -929,7 +929,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             {!hubMaximized && (
               <div
                 onPointerDown={startHubResize}
-                title="Arrastrá para cambiar el tamaño"
+                title="Arrastra para cambiar el tamaño"
                 className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none z-10"
                 style={{ background: "linear-gradient(135deg, transparent 50%, hsl(var(--muted-foreground)/0.5) 50%)" }}
               />
@@ -974,7 +974,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center justify-between rounded-xl border border-border p-3 gap-3">
               <div>
                 <div className="text-sm font-medium text-foreground">Mostrar video en vivo</div>
-                <div className="text-xs text-muted-foreground">Si lo apagás, la miniatura muestra solo los participantes (sin video).</div>
+                <div className="text-xs text-muted-foreground">Si lo apagas, la miniatura muestra solo los participantes (sin video).</div>
               </div>
               <Switch checked={editVideo} onCheckedChange={setEditVideo} />
             </div>

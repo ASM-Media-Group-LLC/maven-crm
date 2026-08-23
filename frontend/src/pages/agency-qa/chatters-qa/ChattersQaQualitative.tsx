@@ -79,7 +79,7 @@ export default function ChattersQaQualitative() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Reportes de QA por chatter — reemplaza el correo del supervisor. Redactá manual o generá un borrador con IA desde Mensajes Pro.
+          Reportes de QA por chatter — reemplaza el correo del supervisor. Redacta manual o genera un borrador con IA desde Mensajes Pro.
         </p>
         <div className="flex items-center gap-2">
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
@@ -107,7 +107,7 @@ export default function ChattersQaQualitative() {
                   if (suggested.length) {
                     setNewModels(suggested);
                     if (matched.length > suggested.length)
-                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugerí ${suggested.length} (el análisis admite hasta 4). Ajustá si querés.`);
+                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugerí ${suggested.length} (el análisis admite hasta 4). Ajusta si quieres.`);
                   } else {
                     setNewModels([]);
                   }
@@ -135,7 +135,7 @@ export default function ChattersQaQualitative() {
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Modelos (podés agregar varias)</label>
+            <label className="text-[11px] font-medium text-muted-foreground">Modelos (puedes agregar varias)</label>
             <div className="flex min-h-9 flex-wrap items-center gap-1.5">
               {newModels.map((m) => (
                 <Badge key={m.model_id} variant="secondary" className="gap-1">{m.model_name}
@@ -154,7 +154,7 @@ export default function ChattersQaQualitative() {
       )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-      {!isLoading && reports.length === 0 && <p className="text-sm text-muted-foreground">No hay reportes todavía. Creá el primero con "Nuevo reporte".</p>}
+      {!isLoading && reports.length === 0 && <p className="text-sm text-muted-foreground">No hay reportes todavía. Crea el primero con "Nuevo reporte".</p>}
       {!isLoading && reports.length > 0 && shown.length === 0 && <p className="text-sm text-muted-foreground">Sin reportes en el rango de fechas seleccionado.</p>}
 
       <div className="space-y-2">
@@ -203,7 +203,7 @@ export default function ChattersQaQualitative() {
               <AlertTriangle className="h-5 w-5 text-destructive" /> Eliminar reporte
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que querés eliminar el QA de <strong>{toDelete?.chatter_name}</strong>
+              ¿Seguro que quieres eliminar el QA de <strong>{toDelete?.chatter_name}</strong>
               {toDelete ? ` (${companyLabel(toDelete.company)} · ${periodLabel(toDelete.period)})` : ""}? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>

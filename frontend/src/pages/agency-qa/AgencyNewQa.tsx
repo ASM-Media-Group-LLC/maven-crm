@@ -242,7 +242,7 @@ const AgencyNewQa = () => {
   const handleFileSelect = (file: File) => {
     if (!isAudioFile(file)) {
       toast.error("Formato no soportado", {
-        description: "Subí un archivo de audio (.mp3 / .m4a / .wav / .webm / .ogg / .flac).",
+        description: "Sube un archivo de audio (.mp3 / .m4a / .wav / .webm / .ogg / .flac).",
       });
       return;
     }
@@ -259,15 +259,15 @@ const AgencyNewQa = () => {
   };
 
   const errors: Record<string, string> = {};
-  if (!closerId) errors.closer = "Elegí un closer";
-  if (!selectedModelId) errors.model = "Seleccioná una modelo del catálogo (creá el lead primero si no existe)";
+  if (!closerId) errors.closer = "Elige un closer";
+  if (!selectedModelId) errors.model = "Selecciona una modelo del catálogo (crea el lead primero si no existe)";
   if (!modelCategory) errors.category = "Categoría requerida";
   if (!modelCountry.trim()) errors.country = "País de la modelo requerido";
   if (!modelIgUrl.trim()) errors.ig = "Instagram de la modelo requerido";
   if (!callDate) errors.callDate = "Fecha requerida";
   if (!evaluatorName.trim()) errors.evaluator = "Evaluador requerido";
-  if (isSaleType(callType) && !serviceSold) errors.service = "Elegí qué servicio/plataforma se le ofreció";
-  if (!audioFile) errors.audio = "Subí el audio de la llamada";
+  if (isSaleType(callType) && !serviceSold) errors.service = "Elige qué servicio/plataforma se le ofreció";
+  if (!audioFile) errors.audio = "Sube el audio de la llamada";
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -276,7 +276,7 @@ const AgencyNewQa = () => {
     if (!isValid || !audioFile) return;
     if (!tenantQ.data) {
       toast.error("No se pudo determinar tu tenant", {
-        description: "Reload e intenta de nuevo. Si sigue, avisá al admin.",
+        description: "Reload e intenta de nuevo. Si sigue, avisa al admin.",
       });
       return;
     }
@@ -423,7 +423,7 @@ const AgencyNewQa = () => {
       } catch (procErr) {
         toast.dismiss("process");
         toast.error("La QA quedó GUARDADA, pero falló el procesado", {
-          description: `${(procErr as Error).message} · Reintentá desde Calls (no se perdió).`,
+          description: `${(procErr as Error).message} · Reintenta desde Calls (no se perdió).`,
         });
       }
     } catch (err) {
@@ -459,11 +459,11 @@ const AgencyNewQa = () => {
       <div>
         <h2 className="text-base font-semibold">Nueva QA</h2>
         <p className="text-xs text-muted-foreground">
-          Subí el audio crudo de la llamada. La transcripción se hace
+          Sube el audio crudo de la llamada. La transcripción se hace
           server-side (no editable). El audio queda guardado
           para auditoría y se puede escuchar desde el detalle de la QA.
           Si el closer o la modelo todavía no están en el catálogo, los
-          tipeás y se crean al guardar.
+          tipeas y se crean al guardar.
         </p>
       </div>
 
@@ -624,7 +624,7 @@ const AgencyNewQa = () => {
                   onValueChange={(v) => setModelCategory(v as ModelCategory)}
                 >
                   <SelectTrigger id="category">
-                    <SelectValue placeholder="Elegí" />
+                    <SelectValue placeholder="Elige" />
                   </SelectTrigger>
                   <SelectContent>
                     {MODEL_CATEGORIES.map((c) => (
@@ -890,7 +890,7 @@ const CloserCombobox = ({
                 ? "Cargando…"
                 : options.length === 0
                   ? "Sin empleados en el tenant"
-                  : "Elegí un closer")}
+                  : "Elige un closer")}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
         </Button>
@@ -1034,7 +1034,7 @@ const CountryCombobox = ({
           className="w-full justify-between font-normal"
         >
           <span className={cn(!value && "text-muted-foreground")}>
-            {value || "Elegí un país"}
+            {value || "Elige un país"}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
         </Button>

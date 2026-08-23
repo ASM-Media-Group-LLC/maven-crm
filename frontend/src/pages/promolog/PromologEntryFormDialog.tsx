@@ -345,12 +345,12 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       if (mode === "add") {
         if (!creator?.id) return;
         if (selectedNets.length === 0) {
-          toast({ title: "Elegí al menos una red", description: "Marcá las redes que revisaste.", variant: "destructive" });
+          toast({ title: "Elige al menos una red", description: "Marca las redes que revisaste.", variant: "destructive" });
           setSaving(false);
           return;
         }
         if (addAnySi && !platform) {
-          toast({ title: "Falta la plataforma", description: "Elegí a dónde apunta la promo (OnlyFans, etc.).", variant: "destructive" });
+          toast({ title: "Falta la plataforma", description: "Elige a dónde apunta la promo (OnlyFans, etc.).", variant: "destructive" });
           setSaving(false);
           return;
         }
@@ -378,12 +378,12 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         // EDIT multi-red: upsert por red. NUNCA borra filas del bot (solo fotos manuales removidas).
         if (!entry) return;
         if (selectedNets.length === 0) {
-          toast({ title: "Elegí al menos una red", description: "Marcá las redes del día.", variant: "destructive" });
+          toast({ title: "Elige al menos una red", description: "Marca las redes del día.", variant: "destructive" });
           setSaving(false);
           return;
         }
         if (addAnySi && !platform) {
-          toast({ title: "Falta la plataforma", description: "Elegí a dónde apunta la promo (OnlyFans/Unlok).", variant: "destructive" });
+          toast({ title: "Falta la plataforma", description: "Elige a dónde apunta la promo (OnlyFans/Unlok).", variant: "destructive" });
           setSaving(false);
           return;
         }
@@ -524,7 +524,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 {/* Multi-select de redes */}
                 <div className="space-y-2">
                   <span className="text-sm font-medium">Redes Sociales <span className="text-destructive">*</span></span>
-                  <p className="text-xs text-muted-foreground">Elegí una o varias. Por cada red marcás si promocionó y subís su evidencia.</p>
+                  <p className="text-xs text-muted-foreground">Elige una o varias. Por cada red marcas si promocionó y subes su evidencia.</p>
                   <div className="grid grid-cols-4 gap-2">
                     {networkOptions.map((opt) => {
                       const Icon = opt.icon;
@@ -679,7 +679,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                           </div>
                         ))}
                       </div>
-                      {result === "si" && <p className="text-[11px] text-muted-foreground">Marcá Sí/No en cada foto. El día queda "Sí" si al menos una es Sí.</p>}
+                      {result === "si" && <p className="text-[11px] text-muted-foreground">Marca Sí/No en cada foto. El día queda "Sí" si al menos una es Sí.</p>}
                     </>
                   )}
                 </div>

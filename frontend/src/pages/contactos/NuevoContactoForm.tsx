@@ -394,7 +394,7 @@ const NuevoContactoForm = () => {
             {esAgencia && (
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Al asignarla a un closer entra al pipeline como <strong>venta de plataforma</strong> y
-                aparece en el tab <strong>Agencias</strong>. Usá la categoría como prioridad y el
+                aparece en el tab <strong>Agencias</strong>. Usa la categoría como prioridad y el
                 website/Telegram en las notas.
               </p>
             )}

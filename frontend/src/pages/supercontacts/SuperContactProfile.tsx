@@ -955,7 +955,7 @@ const SuperContactProfile = () => {
         </div>
         <div><Label className="text-xs">Teléfono</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
         <div><Label className="text-xs">Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-        {!isAdmin && <div className="sm:col-span-3 text-[11px] text-muted-foreground -mt-1">📞 Teléfono/email enmascarados (••••); escribí uno nuevo para cambiarlos.</div>}
+        {!isAdmin && <div className="sm:col-span-3 text-[11px] text-muted-foreground -mt-1">📞 Teléfono/email enmascarados (••••); escribe uno nuevo para cambiarlos.</div>}
         <div>
           <Label className="text-xs">Estado</Label>
           <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>

@@ -110,10 +110,10 @@ export default function WhatsappAgentTab() {
         <Bot className="h-10 w-10 text-muted-foreground mx-auto" />
         <h3 className="text-lg font-semibold">No hay grupos de WhatsApp configurados</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Para empezar, conectá un provider (Evolution API o similar) y agregá el bot a un
+          Para empezar, conecta un provider (Evolution API o similar) y agrega el bot a un
           grupo del equipo. El primer mensaje que reciba va a aparecer en los eventos como{" "}
           <code className="text-xs bg-muted px-1 rounded">group_not_registered</code> y desde
-          ahí podés activar el grupo.
+          ahí puedes activar el grupo.
         </p>
         <p className="text-xs text-muted-foreground">
           La doc del setup está en el repo, en{" "}
@@ -299,7 +299,7 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
           <div>
             <p className="text-sm font-medium">Preguntale al bot</p>
             <p className="text-xs text-muted-foreground">
-              Probá una pregunta sin escribir en el grupo. La respuesta se manda igual al
+              Prueba una pregunta sin escribir en el grupo. La respuesta se manda igual al
               grupo (si bot_enabled está on).
             </p>
           </div>
@@ -996,7 +996,7 @@ function SettingsDialog({
         <Textarea
           value={persona}
           onChange={(e) => setPersona(e.target.value)}
-          placeholder='Ej: "En este grupo, no respondas en menos de 30s — esperá a que el equipo discuta. Llamale Sofí, no Sofía."'
+          placeholder='Ej: "En este grupo, no respondas en menos de 30s — espera a que el equipo discuta. Llámale Sofí, no Sofía."'
           rows={6}
         />
         <div className="flex justify-end gap-2">

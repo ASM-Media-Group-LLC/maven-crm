@@ -212,7 +212,7 @@ const HistoryContent = () => {
         // History no las puede borrar (esa policy no acompañó al global
         // read scope todavía).
         toast.error("No se pudo eliminar ninguna sesión", {
-          description: "Sólo podés borrar tus propias sesiones. Las que creaste otros examiners requieren un permiso que todavía no está habilitado.",
+          description: "Sólo puedes borrar tus propias sesiones. Las que creaste otros examiners requieren un permiso que todavía no está habilitado.",
         });
       } else {
         toast.warning(`${deleted} de ${requested} eliminadas`, {

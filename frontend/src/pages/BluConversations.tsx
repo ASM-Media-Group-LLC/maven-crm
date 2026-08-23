@@ -94,7 +94,7 @@ export default function BluConversations() {
           <p className="text-[11px] text-muted-foreground">Messages Pro de BLU, en vivo · no se almacena nada (solo lectura, management).</p>
         </div>
         <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => selectModel(Number(v))}>
-          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elegí un modelo"} /></SelectTrigger>
+          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elige un modelo"} /></SelectTrigger>
           <SelectContent className="max-h-80">
             {models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}
           </SelectContent>
@@ -106,7 +106,7 @@ export default function BluConversations() {
         {/* Panel izquierdo: fans del modelo */}
         <div className="flex w-72 shrink-0 flex-col border-r border-border">
           <div className="overflow-y-auto">
-            {!modelId && <p className="p-4 text-sm text-muted-foreground">Elegí un modelo arriba.</p>}
+            {!modelId && <p className="p-4 text-sm text-muted-foreground">Elige un modelo arriba.</p>}
             {modelId && partsLoading && <p className="p-4 text-sm text-muted-foreground">Cargando fans…</p>}
             {partsErr && <p className="p-4 text-sm text-destructive">{(partsErr as Error).message}</p>}
             {modelId && !partsLoading && participants.length === 0 && !partsErr && <p className="p-4 text-sm text-muted-foreground">Sin conversaciones.</p>}
@@ -124,7 +124,7 @@ export default function BluConversations() {
 
         {/* Panel central: hilo */}
         <div className="flex min-w-0 flex-1 flex-col bg-background">
-          {!chatId && <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Elegí una conversación.</div>}
+          {!chatId && <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Elige una conversación.</div>}
           {chatId && (
             <div className="flex flex-1 flex-col-reverse overflow-y-auto p-4">
               {/* col-reverse: el scroll arranca abajo (lo más nuevo). messages ya está cronológico. */}

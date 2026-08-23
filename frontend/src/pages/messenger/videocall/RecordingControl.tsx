@@ -81,7 +81,7 @@ export default function RecordingControl({ room, roomName, source, title, canCon
       sessionStorage.setItem(claveSesion(roomName), JSON.stringify(miGrabacionRef.current));
       setIsRecording(true); // la señal de LiveKit tarda unos segundos; el punto rojo no
       toast.success("Grabando la reunión", {
-        description: "Toda la sala ve el punto rojo. Al detener elegís con quién compartirla.",
+        description: "Toda la sala ve el punto rojo. Al detener eliges con quién compartirla.",
       });
     } catch (e) {
       toast.error((e as Error).message || "No se pudo iniciar la grabación");
@@ -216,7 +216,7 @@ function StopDialog({ open, onClose, onConfirm, busy }: {
         <DialogHeader>
           <DialogTitle>Detener y compartir</DialogTitle>
           <DialogDescription>
-            La grabación queda en <b>Grabaciones</b> para vos y para quienes elijas
+            La grabación queda en <b>Grabaciones</b> para ti y para quienes elijas
             (se les avisa por correo). <b>Se borra a los 90 días, sin excepciones</b> —
             quien la necesite más tiempo tiene que descargarla.
           </DialogDescription>

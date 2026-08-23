@@ -171,7 +171,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </div>
           )}
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Podés seguir navegando — te avisamos cuando termine.
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Puedes seguir navegando — te avisamos cuando termine.
           </div>
         </div>
       </div>
@@ -410,7 +410,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
               <p className="text-sm font-medium leading-relaxed"><Linkified text={report.hallazgo_principal} fanIndex={fanIndex} /></p>
             </div>
           )}
-          {!hasContent(row) && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Reporte vacío. Tocá <b>Editar</b> para redactarlo, o <b>Generar con IA</b> (agregá modelos primero).</p>}
+          {!hasContent(row) && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Reporte vacío. Toca <b>Editar</b> para redactarlo, o <b>Generar con IA</b> (agrega modelos primero).</p>}
         </div>
       )}
     </div>

@@ -60,7 +60,7 @@ export function WaChatButton({
     // Rechazo "suave" del gating (HTTP 200 + ok:false): no es un error, es un aviso de
     // que el lead no es tuyo → popup claro, no el toast rojo de error.
     if (res && res.ok === false) {
-      setGateMsg(res.error || "Este lead no está disponible para vos.");
+      setGateMsg(res.error || "Este lead no está disponible para ti.");
       return;
     }
     if (error || !res?.conversation_id) {
@@ -78,7 +78,7 @@ export function WaChatButton({
 
   if (!phone && !closerCreatorId && !contactId) return <span className="text-xs text-muted-foreground">—</span>;
   if (channels.length === 0) {
-    return <span className="text-xs text-muted-foreground" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
+    return <span className="text-xs text-muted-foreground" title="No tienes canales de WhatsApp asignados">WhatsApp</span>;
   }
   const btnClass = className ?? "h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700";
   const trigger = channels.length === 1 ? (

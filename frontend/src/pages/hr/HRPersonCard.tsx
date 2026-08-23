@@ -100,7 +100,7 @@ export default function HRPersonCard() {
       <div className="flex-1 space-y-4 overflow-auto p-6">
         {!effort && !attendance && !chatter && !closer && !llg && (
           <Card><CardContent className="p-6 text-sm text-muted-foreground">
-            Sin datos de Hubstaff/BLU para esta persona todavía. Si debería estar trackeada, verificá el mapeo en Hubstaff.
+            Sin datos de Hubstaff/BLU para esta persona todavía. Si debería estar trackeada, verifica el mapeo en Hubstaff.
           </CardContent></Card>
         )}
 

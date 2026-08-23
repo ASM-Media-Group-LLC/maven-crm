@@ -62,12 +62,12 @@ export default function ChattersQaMasivos() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Calidad de los <b>masivos</b> (PPV/blasts) por modelo, cruzada con veces visto · ventas · dinero recaudado.</p>
         <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => { setModelId(Number(v)); setAnalysis(null); }}>
-          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elegí un modelo"} /></SelectTrigger>
+          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elige un modelo"} /></SelectTrigger>
           <SelectContent className="max-h-80">{models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
 
-      {!modelId && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Elegí un modelo para ver sus masivos.</p>}
+      {!modelId && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Elige un modelo para ver sus masivos.</p>}
       {modelId && isLoading && <p className="text-sm text-muted-foreground">Cargando masivos…</p>}
       {modelId && !isLoading && masivos.length === 0 && <p className="text-sm text-muted-foreground">Este modelo no tiene masivos.</p>}
 

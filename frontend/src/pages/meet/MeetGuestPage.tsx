@@ -185,7 +185,7 @@ export default function MeetGuestPage() {
           className="w-full rounded-full text-muted-foreground"
           onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/entrar/${code}`)}`)}
         >
-          ¿Tenés cuenta en Maven? Iniciá sesión
+          ¿Tienes cuenta en Maven? Inicia sesión
         </Button>
       </div>
       {error && <p className="text-xs text-destructive text-center">{error}</p>}

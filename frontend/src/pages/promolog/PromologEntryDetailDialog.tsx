@@ -407,7 +407,7 @@ const PromologEntryDetailDialog = ({
                     if (parent && !parent.querySelector(".fallback")) {
                       const fb = document.createElement("div");
                       fb.className = "fallback p-6 text-center text-xs text-muted-foreground";
-                      fb.textContent = "La imagen ya no está disponible (URL expirada). Hacé click en 'Abrir en nueva pestaña' para verla en su origen.";
+                      fb.textContent = "La imagen ya no está disponible (URL expirada). Haz click en 'Abrir en nueva pestaña' para verla en su origen.";
                       parent.appendChild(fb);
                     }
                   }}

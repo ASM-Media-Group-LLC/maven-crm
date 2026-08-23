@@ -660,7 +660,7 @@ export const ChatPanel = ({ session }: Props) => {
     }
     if (!speechSupported) {
       toast.error("Tu navegador no soporta dictado por voz", {
-        description: "Probá con Chrome, Edge o Safari.",
+        description: "Prueba con Chrome, Edge o Safari.",
       });
       return;
     }

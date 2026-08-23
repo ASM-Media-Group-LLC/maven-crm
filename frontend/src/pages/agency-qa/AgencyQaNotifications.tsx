@@ -295,7 +295,7 @@ const AgencyQaNotifications = () => {
                   placeholder={
                     notifyUserIds.length === 0
                       ? "Seleccionar empleados…"
-                      : `${notifyUserIds.length} seleccionado(s) — escribí para filtrar`
+                      : `${notifyUserIds.length} seleccionado(s) — escribe para filtrar`
                   }
                   className="w-full pr-8"
                 />

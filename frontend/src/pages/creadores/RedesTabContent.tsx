@@ -303,7 +303,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         toast.success("WhatsApp cargado · el resto de los campos solo los edita un manager/admin");
         setIsEditing(false);
       } else if (permBlocked) {
-        toast.error("No se pudo guardar: no tenés permiso para editar esta creadora.");
+        toast.error("No se pudo guardar: no tienes permiso para editar esta creadora.");
       } else {
         toast("Sin cambios para guardar.");
       }

@@ -1008,7 +1008,7 @@ const ScouterDiscover = () => {
     if (!isAllScope && !enqueued && companyList.length > 0) {
       const names = companiesWithoutConfig.join(", ");
       toast.error("Las compañías elegidas no tienen seeds ni hashtags configurados", {
-        description: `${names} — agregá al menos un @handle o #hashtag en Settings → Compañías → Editar.`,
+        description: `${names} — agrega al menos un @handle o #hashtag en Settings → Compañías → Editar.`,
         action: {
           label: "Abrir Settings",
           onClick: () => navigate("/scouter/settings?sub=companies"),
@@ -1264,7 +1264,7 @@ const ScouterDiscover = () => {
           <p className="text-sm font-medium">Sin descubrimientos recientes</p>
           <p className="text-xs text-muted-foreground">
             Cuando el bot descubra cuentas IG y la IA las apruebe, aparecerán aquí.
-            Presioná "Nueva semilla" o "Descubrir" para comenzar.
+            Presiona "Nueva semilla" o "Descubrir" para comenzar.
           </p>
         </div>
       ) : (
@@ -1373,8 +1373,8 @@ const CompanyPickerModal = ({
           <DialogTitle>Compañías para el discovery</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground mb-3">
-          Tickeá las compañías para las que querés que el scouter corra
-          búsquedas. Si dejás "Todas" marcado, corre para todas las activas.
+          Marca las compañías para las que quieres que el scouter corra
+          búsquedas. Si dejas "Todas" marcado, corre para todas las activas.
         </p>
         <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
           <button

@@ -53,7 +53,7 @@ export function LeadAutocomplete({
   selectedLead,
   onLeadSelect,
   error,
-  placeholder = "Nombre completo (o buscá un lead existente)",
+  placeholder = "Nombre completo (o busca un lead existente)",
 }: Props) {
   const [focused, setFocused] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

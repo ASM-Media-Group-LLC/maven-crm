@@ -105,7 +105,7 @@ const AddSpammerAccountDialog = ({ open, onOpenChange }: Props) => {
         <DialogHeader>
           <DialogTitle>Agregar cuenta IG</DialogTitle>
           <DialogDescription>
-            Sumá una cuenta de Instagram que uses para hacer outreach.
+            Suma una cuenta de Instagram que uses para hacer outreach.
             La IA la escanea y te dice qué tan creíble se ve para las creadoras.
           </DialogDescription>
         </DialogHeader>
@@ -161,7 +161,7 @@ const AddSpammerAccountDialog = ({ open, onOpenChange }: Props) => {
             </label>
             <Select value={niche} onValueChange={(v) => setNiche(v as AccountNiche)}>
               <SelectTrigger className="mt-1 h-9 text-sm">
-                <SelectValue placeholder="Elegí un nicho…" />
+                <SelectValue placeholder="Elige un nicho…" />
               </SelectTrigger>
               <SelectContent>
                 {NICHES.map((n) => (

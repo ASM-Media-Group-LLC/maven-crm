@@ -201,7 +201,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                 <TableRow>
                   <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
                     Sin closers ni actividad en este rango.
-                    <br /><span className="text-xs">Probá ampliar las fechas arriba a la derecha.</span>
+                    <br /><span className="text-xs">Prueba ampliar las fechas arriba a la derecha.</span>
                   </TableCell>
                 </TableRow>
               ) : (

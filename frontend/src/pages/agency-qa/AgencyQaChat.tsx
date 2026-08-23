@@ -184,7 +184,7 @@ const useSpeechRecognition = ({
 
   const start = () => {
     if (!Ctor) {
-      onError?.("Tu navegador no soporta dictado por voz. Usá Chrome o Safari.");
+      onError?.("Tu navegador no soporta dictado por voz. Usa Chrome o Safari.");
       return;
     }
     if (recRef.current) {
@@ -466,9 +466,9 @@ const AgencyQaChat = () => {
                   </div>
                 ) : (messagesQ.data?.length ?? 0) === 0 ? (
                   <p className="text-xs italic text-muted-foreground">
-                    Escribí una pregunta para arrancar. Algunos ejemplos:
+                    Escribe una pregunta para arrancar. Algunos ejemplos:
                     "¿quién cierra más?", "¿qué le falta a [closer]?",
-                    "compará [closer1] vs [closer2]".
+                    "compara [closer1] vs [closer2]".
                   </p>
                 ) : (
                   messagesQ.data!.map((m) => {
@@ -625,7 +625,7 @@ const AgencyQaChat = () => {
                             Dictado por voz nativo del navegador (Web
                             Speech API, español).{" "}
                             {speech.listening
-                              ? "Hablá ahora — el texto aparece en el cuadro."
+                              ? "Habla ahora — el texto aparece en el cuadro."
                               : "Click para dictar tu pregunta."}
                           </p>
                         </TooltipContent>
@@ -643,7 +643,7 @@ const AgencyQaChat = () => {
                   Hola, soy Mike — supervisor del equipo.
                 </p>
                 <p className="max-w-md text-xs text-muted-foreground">
-                  Click "+ Nueva conversación" para arrancar. Elegí un closer
+                  Click "+ Nueva conversación" para arrancar. Elige un closer
                   específico o "todos" para preguntas cross-equipo.
                 </p>
               </div>
@@ -685,7 +685,7 @@ const AgencyQaChat = () => {
               Borrar conversación
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que querés borrar la conversación{" "}
+              ¿Seguro que quieres borrar la conversación{" "}
               <strong>&ldquo;{pendingDelete?.title}&rdquo;</strong>?
               <br />
               Se eliminan todos sus mensajes. Esta acción no se puede
@@ -744,14 +744,14 @@ const NewSessionDialog = ({
         <DialogHeader>
           <DialogTitle>Nueva conversación con Mike</DialogTitle>
           <DialogDescription>
-            El scope queda fijo en esta sesión. Si querés cambiar de closer
-            después, abrí una sesión nueva.
+            El scope queda fijo en esta sesión. Si quieres cambiar de closer
+            después, abre una sesión nueva.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">
-            ¿De qué querés hablar?
+            ¿De qué quieres hablar?
           </label>
           <Select value={scope} onValueChange={setScope}>
             <SelectTrigger>

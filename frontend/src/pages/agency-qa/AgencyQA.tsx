@@ -393,7 +393,7 @@ const AgencyQA = () => {
           </div>
           {visibleRoleSections.length === 0 && (
             <p className="px-2 py-3 text-[11px] italic text-muted-foreground">
-              Tu rol no tiene acceso a ninguna categoría. Pedile a un admin
+              Tu rol no tiene acceso a ninguna categoría. Pídele a un admin
               que te habilite al menos una en Settings → Usuarios → Roles.
             </p>
           )}

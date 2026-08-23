@@ -137,7 +137,7 @@ export async function compressAudioIfNeeded(
     const limitMb = (MAX_COMPRESSED_BYTES / 1024 / 1024).toFixed(0);
     throw new Error(
       `El audio comprimido pesa ${mb}MB, supera el límite de ${limitMb}MB de Whisper. ` +
-        `Probá recortar la llamada (la duración aprox. máxima es ~140 min) o dividirla en partes.`,
+        `Prueba recortar la llamada (la duración aprox. máxima es ~140 min) o dividirla en partes.`,
     );
   }
 

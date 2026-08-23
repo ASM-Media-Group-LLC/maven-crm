@@ -384,7 +384,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       if (step4.bluInflowwActive === null || step4.bluInflowwActive === undefined) {
         toast({
           title: "Falta responder Blu / Infloww",
-          description: "Marcá Sí o No al final del wizard antes de publicar.",
+          description: "Marca Sí o No al final del wizard antes de publicar.",
           variant: "destructive",
         });
         // Scroll al acordeón (data-attr en Step4WorkConfig) para que sea
@@ -465,7 +465,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       if (live) {
         toast({
           title: "Ya existe una creadora con ese Instagram",
-          description: `@${igHandle.replace(/^@/, "")} ya está en Creadoras como "${live.name ?? "?"}" (status: ${live.status}). Editá o reactivá ese perfil en vez de crear un duplicado.`,
+          description: `@${igHandle.replace(/^@/, "")} ya está en Creadoras como "${live.name ?? "?"}" (status: ${live.status}). Edita o reactiva ese perfil en vez de crear un duplicado.`,
           variant: "destructive",
         });
         return;

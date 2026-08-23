@@ -320,7 +320,7 @@ const WhatsappPhoneCard = ({
     const normalized = toE164(trimmed);
     if (!/^\+[0-9]{8,16}$/.test(normalized)) {
       toast.error("Número inválido", {
-        description: "Elegí el país y escribí el número completo (sin el código de área internacional, sin 0 inicial).",
+        description: "Elige el país y escribe el número completo (sin el código de área internacional, sin 0 inicial).",
       });
       return;
     }
@@ -329,7 +329,7 @@ const WhatsappPhoneCard = ({
       setValue(normalized);
       setDirty(false);
       toast.success("Número de WhatsApp guardado", {
-        description: "Ahora tocá \"Verificar por WhatsApp\" y envíale el código al bot.",
+        description: "Ahora toca \"Verificar por WhatsApp\" y envíale el código al bot.",
       });
     } catch (e) {
       const msg = (e as Error).message;
@@ -359,7 +359,7 @@ const WhatsappPhoneCard = ({
       setVerif(data);
       window.open(data.wa_link, "_blank", "noopener,noreferrer");
       toast.success("Código generado", {
-        description: "Se abrió WhatsApp con el mensaje listo — solo tocá enviar.",
+        description: "Se abrió WhatsApp con el mensaje listo — solo toca enviar.",
       });
     } catch (e) {
       toast.error("No se pudo generar el código", { description: (e as Error).message });
@@ -376,9 +376,9 @@ const WhatsappPhoneCard = ({
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">Número de WhatsApp</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cargá tu número para que el bot (Maven Asistente) te reconozca
+              Carga tu número para que el bot (Maven Asistente) te reconozca
               automáticamente cuando escribas en los grupos del equipo.
-              Elegí el país en el dropdown y escribí el resto del número.
+              Elige el país en el dropdown y escribe el resto del número.
             </p>
           </div>
           {isLinked && isVerified && (
@@ -442,9 +442,9 @@ const WhatsappPhoneCard = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  El bot ya te reconoce cuando escribís en los grupos. Si cambiaste
-                  el nombre que mostrás en WhatsApp, re-verificá: generás un código
-                  nuevo y se lo enviás al bot.
+                  El bot ya te reconoce cuando escribes en los grupos. Si cambiaste
+                  el nombre que muestras en WhatsApp, re-verifica: generas un código
+                  nuevo y se lo envías al bot.
                 </p>
                 <Button
                   variant="outline"
@@ -464,9 +464,9 @@ const WhatsappPhoneCard = ({
                   <span className="font-medium">Falta verificar tu número</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Tocá el botón: se abre tu WhatsApp con un código listo para enviarle a{" "}
+                  Toca el botón: se abre tu WhatsApp con un código listo para enviarle a{" "}
                   <strong>Maven Asistente</strong>. Cuando lo envíes, el bot te confirma
-                  con un ✅ y quedás vinculado. (El chat lo iniciás vos — el bot no te
+                  con un ✅ y quedas vinculado. (El chat lo inicias tú — el bot no te
                   escribe primero.)
                 </p>
                 <Button
@@ -493,7 +493,7 @@ const WhatsappPhoneCard = ({
                       >
                         Abrir de nuevo
                       </a>{" "}
-                      o mandale el código a <code className="px-1 rounded bg-muted">+{verif.bot_phone}</code> a mano.
+                      o mándale el código a <code className="px-1 rounded bg-muted">+{verif.bot_phone}</code> a mano.
                     </p>
                   </div>
                 )}

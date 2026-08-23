@@ -112,8 +112,8 @@ export default function GrabacionesPage() {
       <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-700 dark:text-amber-300">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitás
-          conservar una por más tiempo, descargala a tu equipo antes de que venza.
+          Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitas
+          conservar una por más tiempo, descárgala a tu equipo antes de que venza.
         </span>
       </div>
 

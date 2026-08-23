@@ -318,7 +318,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                       Va a entrar con <strong className="text-foreground">{sugerida}</strong>,
                       que es también su casilla de correo. Si ese nombre ya está
                       ocupado, se le agrega un número solo. La contraseña la
-                      entregás vos en mano al terminar.
+                      entregas tú en mano al terminar.
                     </p>
                   </div>
                 )

@@ -285,13 +285,13 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
         return {
           kind: "allowed_with_history",
           title: "Fue creadora de la agencia",
-          message: `${name} está ${statusLabel} ${fmtDateAgo(updated!)}. Podés volver a agregarla como lead.`,
+          message: `${name} está ${statusLabel} ${fmtDateAgo(updated!)}. Puedes volver a agregarla como lead.`,
         };
       }
       const daysLeft = 30 - daysInactive;
       return {
         kind: "blocked",
-        title: "Fue creadora — esperá",
+        title: "Fue creadora — espera",
         message: `${name} está ${statusLabel} ${fmtDateAgo(updated!)}. Hay que esperar 30 días desde el cambio de estado — faltan ${daysLeft} días.`,
       };
     }
@@ -340,13 +340,13 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
         return {
           kind: "allowed_with_history",
           title: "Cierre previo fallido",
-          message: `Esta modelo fue marcada "No interesada" ${fmtDateAgo(updated)}. Podés volver a agregarla como lead.`,
+          message: `Esta modelo fue marcada "No interesada" ${fmtDateAgo(updated)}. Puedes volver a agregarla como lead.`,
         };
       }
       const daysLeft = 60 - daysSince;
       return {
         kind: "blocked",
-        title: "Cierre fallido — esperá",
+        title: "Cierre fallido — espera",
         message: `Esta modelo fue marcada "No interesada" ${fmtDateAgo(updated)}. Hay que esperar 60 días desde entonces — faltan ${daysLeft} días.`,
       };
     }
@@ -382,7 +382,7 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
         const hoursLeft = Math.ceil(24 - hoursSince);
         return {
           kind: "blocked",
-          title: "Lead duplicado — esperá",
+          title: "Lead duplicado — espera",
           message: `Este lead fue agregado${agentLabel} hace ${Math.floor(hoursSince)}h. Podrás resubirlo en ~${hoursLeft}h (regla 24h).`,
         };
       }
@@ -409,7 +409,7 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
     return {
       kind: "allowed_with_history",
       title: "Encontrada por Scouter Assist",
-      message: `Esta modelo fue descubierta por Scouter Assist${created ? ` (${fmtDateAgo(created)})` : ""}${scouter.status ? ` · status "${scouter.status}"` : ""}. Podés agregarla como lead.`,
+      message: `Esta modelo fue descubierta por Scouter Assist${created ? ` (${fmtDateAgo(created)})` : ""}${scouter.status ? ` · status "${scouter.status}"` : ""}. Puedes agregarla como lead.`,
     };
   }
 

@@ -183,7 +183,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     if (!v) return;
     if (!isValidEmail(v)) {
       toast.error("Email inválido", {
-        description: "Verificá que no tenga puntos antes/después del @ y que tenga un dominio válido.",
+        description: "Verifica que no tenga puntos antes/después del @ y que tenga un dominio válido.",
       });
       return;
     }
@@ -203,19 +203,19 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       return;
     }
     if (recipients.length === 0) {
-      toast.error("Agregá al menos un destinatario");
+      toast.error("Agrega al menos un destinatario");
       return;
     }
     if (!roleName) {
-      toast.error("Elegí un rol");
+      toast.error("Elige un rol");
       return;
     }
     if (roleName === COMBINED_ROLE_SENTINEL && combinedRoles.length < 2) {
-      toast.error("Elegí al menos 2 roles para combinar");
+      toast.error("Elige al menos 2 roles para combinar");
       return;
     }
     if (selectedMetrics.length === 0) {
-      toast.error("Seleccioná al menos una métrica");
+      toast.error("Selecciona al menos una métrica");
       return;
     }
     setSaving(true);
@@ -242,7 +242,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       let dispatchMonthOfYearPayload: number | null = null;
       if (period === "weekly") {
         if (dispatchWeekdays.length === 0) {
-          toast.error("Elegí al menos un día de la semana");
+          toast.error("Elige al menos un día de la semana");
           setSaving(false);
           return;
         }
@@ -354,7 +354,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               maxLength={200}
             />
             <p className="text-[11px] text-muted-foreground">
-              Si lo dejás vacío, se genera automático según rol y periodicidad.
+              Si lo dejas vacío, se genera automático según rol y periodicidad.
             </p>
           </div>
 
@@ -363,7 +363,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               <Label>Rol *</Label>
               <Select value={roleName} onValueChange={handleRoleChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Elegí un rol" />
+                  <SelectValue placeholder="Elige un rol" />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
@@ -617,7 +617,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               const monthLabels = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
               if (period === "daily") return `Cada día a las ${hh} Miami recibirás los datos del día anterior (00:00 a 23:59).`;
               if (period === "weekly") {
-                const list = dispatchWeekdays.length === 0 ? "(elegí días)"
+                const list = dispatchWeekdays.length === 0 ? "(elige días)"
                   : dispatchWeekdays.sort((a, b) => a - b).map((d) => weekdayLabels[d]).join(", ");
                 return `Los ${list} a las ${hh} Miami recibirás los últimos 7 días.`;
               }
@@ -646,14 +646,14 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               <div className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
                 ⚠ El rol "{roleName}" no tiene permisos explícitos configurados para los módulos del catálogo de reportes.
                 Te muestro <strong>todas</strong> las métricas del módulo <strong>{roleToModule(roleName)}</strong> para que elijas las que apliquen.
-                Si quieres restringir esto en el futuro, configurá permisos del rol en <em>Administración → Roles</em>.
+                Si quieres restringir esto en el futuro, configura permisos del rol en <em>Administración → Roles</em>.
               </div>
             )}
             {availableMetrics.length === 0 ? (
               <p className="text-[11px] text-muted-foreground italic">
                 {roleName
                   ? `El módulo "${roleToModule(roleName)}" no tiene métricas en el catálogo.`
-                  : "Elegí un rol para ver las métricas disponibles."}
+                  : "Elige un rol para ver las métricas disponibles."}
               </p>
             ) : (
               <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-72 overflow-y-auto space-y-1.5">
@@ -804,8 +804,8 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             {availableMetrics.length > 0 && (
               <p className="text-[10px] text-muted-foreground">
                 {roleName === COMBINED_ROLE_SENTINEL
-                  ? "Métricas agrupadas por rol — cada grupo es una sección del email. Usá ▲▼ para reordenar dentro del grupo."
-                  : "Métricas seleccionadas aparecen arriba en el orden de las columnas del correo. Usá ▲▼ para reordenar."}
+                  ? "Métricas agrupadas por rol — cada grupo es una sección del email. Usa ▲▼ para reordenar dentro del grupo."
+                  : "Métricas seleccionadas aparecen arriba en el orden de las columnas del correo. Usa ▲▼ para reordenar."}
               </p>
             )}
           </div>

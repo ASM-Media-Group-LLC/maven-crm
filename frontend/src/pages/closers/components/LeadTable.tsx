@@ -160,7 +160,7 @@ const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Not
             }}
             autoFocus
             rows={4}
-            placeholder={`Escribí ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
+            placeholder={`Escribe ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
             className="resize-none rounded-none border-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           {footer}
@@ -467,7 +467,7 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
     // Rechazo "suave" del gating (HTTP 200 + ok:false): NO es un error, es un aviso de
     // que el lead no es tuyo → popup claro, no el toast rojo de error.
     if (data && data.ok === false) {
-      setGateMsg(data.error || "Este lead no está disponible para vos.");
+      setGateMsg(data.error || "Este lead no está disponible para ti.");
       return;
     }
     if (error || !data?.conversation_id) {
@@ -482,7 +482,7 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   // Leadgen (sin fila de closer): sí necesita el teléfono resuelto en el cliente.
   if (source !== "closer" && !resolvedPhone) return <span className="text-muted-foreground text-xs">—</span>;
   if (channels.length === 0) {
-    return <span className="text-muted-foreground text-xs" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
+    return <span className="text-muted-foreground text-xs" title="No tienes canales de WhatsApp asignados">WhatsApp</span>;
   }
 
   const trigger = channels.length === 1 ? (
@@ -1379,7 +1379,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <AlertDialogHeader>
             <AlertDialogTitle>¿Por qué se cierra?</AlertDialogTitle>
             <AlertDialogDescription>
-              Elegí el motivo del cierre. Alimenta el embudo de reclutamiento para ver dónde y por qué se caen los leads.
+              Elige el motivo del cierre. Alimenta el embudo de reclutamiento para ver dónde y por qué se caen los leads.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-1">

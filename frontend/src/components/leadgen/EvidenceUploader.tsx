@@ -279,7 +279,7 @@ const EvidenceUploader = ({
 
       {minNotMet && (
         <p className="text-xs text-destructive">
-          Necesitás al menos {minFiles} {minFiles === 1 ? "imagen" : "imágenes"} para guardar.
+          Necesitas al menos {minFiles} {minFiles === 1 ? "imagen" : "imágenes"} para guardar.
         </p>
       )}
     </div>

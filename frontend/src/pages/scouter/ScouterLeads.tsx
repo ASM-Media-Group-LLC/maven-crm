@@ -303,7 +303,7 @@ const ManualLeadDialog = ({
         <DialogHeader>
           <DialogTitle>Agregar lead manualmente</DialogTitle>
           <DialogDescription>
-            Insertá un @handle directo a la tabla de leads. Si tenés más
+            Inserta un @handle directo a la tabla de leads. Si tienes más
             datos, completalos — sino, el worker los enriquecerá después.
           </DialogDescription>
         </DialogHeader>
@@ -382,7 +382,7 @@ const ManualLeadDialog = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Por qué la querés trackear, etc."
+              placeholder="Por qué la quieres trackear, etc."
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

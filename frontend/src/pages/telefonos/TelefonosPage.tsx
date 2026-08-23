@@ -274,7 +274,7 @@ export default function TelefonosPage() {
       try { pip?.close(); } catch { /* noop */ }
       toast({
         title: "Teléfono en uso",
-        description: `Lo está usando ${res.inUseBy ?? "otra persona"}. Esperá a que lo cierre para abrirlo.`,
+        description: `Lo está usando ${res.inUseBy ?? "otra persona"}. Espera a que lo cierre para abrirlo.`,
         variant: "destructive",
       });
       return;
@@ -326,7 +326,7 @@ export default function TelefonosPage() {
         const n = s - 1;
         if (n === 120 && !warnedRef.current) {
           warnedRef.current = true;
-          toast({ title: "Te quedan 2 minutos", description: "Se cierra solo. Tocá Extender si seguís." });
+          toast({ title: "Te quedan 2 minutos", description: "Se cierra solo. Toca Extender si sigues." });
         }
         if (n <= 0) {
           closeRef.current();
@@ -377,7 +377,7 @@ export default function TelefonosPage() {
       </div>
     ) : phones.length === 0 ? (
       <p className="text-muted-foreground">
-        {isAdmin ? "No hay teléfonos disponibles." : "No tenés teléfonos asignados todavía."}
+        {isAdmin ? "No hay teléfonos disponibles." : "No tienes teléfonos asignados todavía."}
       </p>
     ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

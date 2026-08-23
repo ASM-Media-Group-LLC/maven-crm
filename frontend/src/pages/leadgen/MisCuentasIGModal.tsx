@@ -36,7 +36,7 @@ const MisCuentasIGModal = ({ open, onOpenChange }: Props) => {
         <DialogHeader className="shrink-0">
           <DialogTitle>Mis Cuentas IG</DialogTitle>
           <DialogDescription>
-            Cuentas de Instagram que usás para hacer outreach a creadoras.
+            Cuentas de Instagram que usas para hacer outreach a creadoras.
             La IA analiza qué tan creíble se ve cada una para que las
             modelos respondan. Mientras peor la cuenta, menos respuestas
             vas a sacar.

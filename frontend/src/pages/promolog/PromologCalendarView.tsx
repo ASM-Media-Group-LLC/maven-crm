@@ -372,7 +372,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       <div className="flex flex-wrap items-center gap-3">
         <Select value={creatorId || undefined} onValueChange={setCreatorId}>
           <SelectTrigger className="w-[260px] h-10">
-            <SelectValue placeholder="Seleccioná una creadora…" />
+            <SelectValue placeholder="Selecciona una creadora…" />
           </SelectTrigger>
           <SelectContent>
             {creators.map((c) => (
@@ -412,7 +412,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       {!creatorId ? (
         <Card className="flex flex-col items-center justify-center gap-2 py-20 text-center">
           <CircleDashed className="h-10 w-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Seleccioná una creadora para ver su calendario de promos.</p>
+          <p className="text-sm text-muted-foreground">Selecciona una creadora para ver su calendario de promos.</p>
         </Card>
       ) : (
         <>

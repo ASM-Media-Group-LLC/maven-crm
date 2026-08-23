@@ -219,7 +219,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               </div>
               {!isAdmin && (
                 <p className="text-[11px] text-muted-foreground -mt-2">
-                  📞 Ves el teléfono/email enmascarados (••••). Para cambiarlos, escribí uno nuevo; si los dejás así, no se modifican.
+                  📞 Ves el teléfono/email enmascarados (••••). Para cambiarlos, escribe uno nuevo; si los dejas así, no se modifican.
                 </p>
               )}
 

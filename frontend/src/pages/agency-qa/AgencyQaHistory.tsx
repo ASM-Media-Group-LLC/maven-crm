@@ -291,7 +291,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
         <p className="text-xs text-muted-foreground">
           {isAdmin
             ? "Listado completo de todas las QAs del equipo. Click en una fila para ver el detalle."
-            : "Las llamadas que vos subiste. Click en una fila para ver el detalle completo."}
+            : "Las llamadas que tú subiste. Click en una fila para ver el detalle completo."}
         </p>
       </div>
 
@@ -310,7 +310,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                   : "Todavía no subiste ninguna QA."}
               </p>
               <p className="text-xs text-muted-foreground">
-                Andá al tab Nueva QA, subí el audio de una llamada y al volver
+                Ve al tab Nueva QA, sube el audio de una llamada y al volver
                 acá vas a ver el estado del análisis.
               </p>
             </div>
@@ -474,7 +474,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               Borrar QA
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que querés borrar la QA de{" "}
+              ¿Seguro que quieres borrar la QA de{" "}
               <strong>{pendingDelete?.label}</strong>?
               <br />
               Se eliminan también sus feedbacks y comentarios. Esta acción no
@@ -522,7 +522,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               a todos los destinatarios configurados.
               <br />
               El correo automático ya se mandó al terminar el análisis. Solo
-              reenvíalo si necesitás una segunda copia.
+              reenvíalo si necesitas una segunda copia.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

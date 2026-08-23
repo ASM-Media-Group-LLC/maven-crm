@@ -41,7 +41,7 @@ export default function CorreoConectarPage() {
       return;
     }
     if (!code || !state) {
-      setFailed("Zoho no devolvió los datos necesarios. Volvé a intentar desde Correo.");
+      setFailed("Zoho no devolvió los datos necesarios. Vuelve a intentar desde Correo.");
       return;
     }
 

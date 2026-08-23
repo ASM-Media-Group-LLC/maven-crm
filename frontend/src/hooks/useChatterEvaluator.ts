@@ -1412,7 +1412,7 @@ const fireWebhookInBackground = async (
     const recipients = config?.notification_emails ?? [];
     if (recipients.length === 0) {
       toast.warning("Reporte sin destinatarios", {
-        description: "Configurá emails en Admin → Notificaciones.",
+        description: "Configura emails en Admin → Notificaciones.",
       });
       return;
     }

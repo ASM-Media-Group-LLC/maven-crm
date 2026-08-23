@@ -83,7 +83,7 @@ export default function HRPayroll() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Definí el salario base por rol. <strong>Chatters</strong> usan el costo modelado (base + comisión) de Hubstaff/BLU,
+                Define el salario base por rol. <strong>Chatters</strong> usan el costo modelado (base + comisión) de Hubstaff/BLU,
                 así que su base acá es referencial. El costo de los demás roles = base ÷ tasa de cambio.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -156,7 +156,7 @@ export default function HRPayroll() {
         </Card>
         <p className="px-1 text-[11px] text-muted-foreground">
           El costo de <strong>chatters</strong> es modelado (base + comisión, incluye la tajada de OF y el % de agencia) y trae ingreso atribuido desde BLU → margen y ROI reales.
-          Para los demás roles, cargá el salario base por rol (botón arriba) y el costo se calcula automáticamente; el ingreso atribuido directo aplica solo a chatters. Click en una fila abre la ficha.
+          Para los demás roles, carga el salario base por rol (botón arriba) y el costo se calcula automáticamente; el ingreso atribuido directo aplica solo a chatters. Click en una fila abre la ficha.
         </p>
       </div>
     </div>

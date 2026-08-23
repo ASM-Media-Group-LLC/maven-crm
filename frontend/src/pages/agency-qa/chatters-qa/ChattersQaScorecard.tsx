@@ -256,7 +256,7 @@ export default function ChattersQaScorecard() {
       roster = (data ?? []) as Scorecard[];
     }
     const payload = (roster ?? []).map((r) => ({ chatter_name: r.chatter_name, company: r.company, period: periodDate, source: "manual", blu_employee_id: r.blu_employee_id ?? null }));
-    if (payload.length === 0) { toast.error("No hay roster para clonar; agregá chatters manualmente."); setPeriod(periodDate); setCreatingMonth(false); return; }
+    if (payload.length === 0) { toast.error("No hay roster para clonar; agrega chatters manualmente."); setPeriod(periodDate); setCreatingMonth(false); return; }
     const { error } = await (supabase as any).from("chatter_scorecards").insert(payload);
     if (error) { toast.error(error.message); return; }
     toast.success(`${periodLabel(periodDate)} creado con ${payload.length} chatters`);
@@ -305,12 +305,12 @@ export default function ChattersQaScorecard() {
 
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Editá una celda y se guarda solo (0-5 por criterio). Los criterios en <span className="text-primary">azul</span> se auto-completarán cuando conectemos Hubstaff (Fase 2). Abre en el último mes con notas.
+        Edita una celda y se guarda solo (0-5 por criterio). Los criterios en <span className="text-primary">azul</span> se auto-completarán cuando conectemos Hubstaff (Fase 2). Abre en el último mes con notas.
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {!isLoading && rows.length === 0 && period && (
-        <p className="text-sm text-muted-foreground">No hay chatters cargados para {periodLabel(period)}. Agregá uno abajo o creá el mes desde el roster anterior.</p>
+        <p className="text-sm text-muted-foreground">No hay chatters cargados para {periodLabel(period)}. Agrega uno abajo o crea el mes desde el roster anterior.</p>
       )}
 
       <div className="space-y-5">
@@ -329,7 +329,7 @@ export default function ChattersQaScorecard() {
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={pickerOpen} className="h-9 w-56 justify-between font-normal">
-                  <span className="truncate">{newChatter?.name ?? "Elegí un chatter…"}</span>
+                  <span className="truncate">{newChatter?.name ?? "Elige un chatter…"}</span>
                   <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>

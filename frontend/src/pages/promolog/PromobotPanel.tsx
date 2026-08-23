@@ -421,7 +421,7 @@ const PromobotPanel = () => {
                 </button>
               );
             })}
-            {netCount === 0 && <span className="text-[11px] text-destructive">· elegí al menos una red</span>}
+            {netCount === 0 && <span className="text-[11px] text-destructive">· elige al menos una red</span>}
           </div>
 
           {/* Buscador + lista de modelos */}
@@ -493,7 +493,7 @@ const PromobotPanel = () => {
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>
                     El bot no completa una corrida desde hace <b>{ago(staleH)}</b> (debería correr 1×/día).
-                    Revisá el cron o lanzá una corrida manual.
+                    Revisa el cron o lanza una corrida manual.
                   </span>
                 </div>
               )}

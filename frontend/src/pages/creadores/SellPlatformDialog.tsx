@@ -74,7 +74,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
 
   const sell = useMutation({
     mutationFn: async () => {
-      if (!platform) throw new Error("Elegí qué venderle.");
+      if (!platform) throw new Error("Elige qué venderle.");
       const closer = closerId === POOL ? null : closerId;
 
       // ── Kash = la agencia → RECLUTAMIENTO, no venta de plataforma ──
@@ -84,8 +84,8 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       if (platform === KASH) {
         const monet = Number(monetization);
         const pct = Number(commission);
-        if (!monet || monet <= 0) throw new Error("Ingresá la monetización estimada (USD/mes).");
-        if (!pct || pct <= 0 || pct > 100) throw new Error("Ingresá el % de comisión de la agencia (1-100).");
+        if (!monet || monet <= 0) throw new Error("Ingresa la monetización estimada (USD/mes).");
+        if (!pct || pct <= 0 || pct > 100) throw new Error("Ingresa el % de comisión de la agencia (1-100).");
         const { data, error } = await (supabase as any).rpc("create_recruitment_deal_for_creator", {
           p_creator_id: creatorId,
           p_closer_id: closer,
@@ -97,7 +97,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       }
 
       const amt = Number(amount);
-      if (!amt || amt <= 0) throw new Error("Ingresá el monto mensual de la suscripción.");
+      if (!amt || amt <= 0) throw new Error("Ingresa el monto mensual de la suscripción.");
       // RPC nuevo: no está en los tipos generados de Supabase → cast.
       const { data, error } = await (supabase as any).rpc("create_platform_deal_for_creator", {
         p_creator_id: creatorId,
@@ -153,7 +153,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
             <Label>¿Qué le vendemos?</Label>
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger>
-                <SelectValue placeholder="Elegí..." />
+                <SelectValue placeholder="Elige..." />
               </SelectTrigger>
               <SelectContent>
                 {/* Kash = la agencia → dispara el flujo de RECLUTAMIENTO. Va
@@ -195,7 +195,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
                 />
               </div>
               <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                Si sigue en el roster (saliendo o pausada), al cerrarla usá <strong>Reactivar</strong> en
+                Si sigue en el roster (saliendo o pausada), al cerrarla usa <strong>Reactivar</strong> en
                 Creadoras — no "Convertir a Creadora", que falla porque la ficha ya existe.
               </p>
             </>

@@ -602,7 +602,7 @@ const InboxPage = () => {
               }
             : {
                 title: "No se pudo enviar por esta línea",
-                description: `La línea de WhatsApp puede estar desconectada — revisá su conexión (panel del gateway) o probá desde otra línea. Detalle: ${res.error ?? "error del gateway"}`,
+                description: `La línea de WhatsApp puede estar desconectada — revisa su conexión (panel del gateway) o prueba desde otra línea. Detalle: ${res.error ?? "error del gateway"}`,
                 variant: "destructive",
               },
         );
@@ -1068,7 +1068,7 @@ const InboxPage = () => {
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
             <MessageSquare className="h-10 w-10 opacity-30" />
-            <p className="text-sm">Elegí una conversación para verla.</p>
+            <p className="text-sm">Elige una conversación para verla.</p>
           </div>
         ) : (
           <>
@@ -1279,9 +1279,9 @@ const InboxPage = () => {
                               <div className="mt-0.5 flex flex-col items-end gap-0.5">
                                 <p
                                   className="flex items-center gap-1 text-[10px] font-medium text-destructive"
-                                  title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verificá el número del contacto."
+                                  title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verifica el número del contacto."
                                 >
-                                  <AlertCircle className="h-3 w-3" /> No entregado · revisá el número
+                                  <AlertCircle className="h-3 w-3" /> No entregado · revisa el número
                                 </p>
                                 {m.body && m.msg_type === "text" && (
                                   <button
@@ -1516,7 +1516,7 @@ const InboxPage = () => {
                 <div className="flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-primary">
-                      {replyingTo.direction === "out" ? "Respondiendo a vos" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
+                      {replyingTo.direction === "out" ? "Respondiendo a ti" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
                     </p>
                     <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
                   </div>
@@ -1564,7 +1564,7 @@ const InboxPage = () => {
                       }
                     }
                   }}
-                  placeholder="Escribí un mensaje…"
+                  placeholder="Escribe un mensaje…"
                   className="block min-h-[44px] max-h-[160px] w-full resize-none rounded-2xl border-0 bg-primary/5 px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                 />
                 {/* Enviar DENTRO del cajón, pegado al borde inferior (crece con el cajón). */}

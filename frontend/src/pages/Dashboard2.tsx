@@ -2433,7 +2433,7 @@ const Dashboard2 = () => {
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
                           <p className="text-xs font-semibold text-foreground">🐋 Ballenas — Top spenders por creadora</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Los fans que más gastaron (snapshot {snap}). Para retención/upsell: priorizá a los que están por expirar. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code> (BLU fan-reports).</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Los fans que más gastaron (snapshot {snap}). Para retención/upsell: prioriza a los que están por expirar. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code> (BLU fan-reports).</p>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
@@ -2452,7 +2452,7 @@ const Dashboard2 = () => {
                         {topFansLoading ? (
                           <div className="p-8 text-center text-sm text-muted-foreground">Cargando ballenas…</div>
                         ) : topFans.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin ballenas todavía — esperá la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin ballenas todavía — espera la próxima sincronización de BLU.</div>
                         ) : (
                           <div className="rounded-xl border border-border overflow-hidden">
                             <Table>
@@ -2532,7 +2532,7 @@ const Dashboard2 = () => {
                         {retLoading ? (
                           <div className="p-8 text-center text-sm text-muted-foreground">Cargando retención…</div>
                         ) : rows.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de retención todavía — esperá la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de retención todavía — espera la próxima sincronización de BLU.</div>
                         ) : (
                           <>
                             <div className="rounded-xl border border-border bg-card p-4">
@@ -2601,7 +2601,7 @@ const Dashboard2 = () => {
                         {chattersLoading ? (
                           <div className="p-8 text-center text-sm text-muted-foreground">Cargando chatters…</div>
                         ) : list.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de chatters todavía — esperá la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de chatters todavía — espera la próxima sincronización de BLU.</div>
                         ) : (
                           <>
                             <div className="grid grid-cols-3 gap-3">

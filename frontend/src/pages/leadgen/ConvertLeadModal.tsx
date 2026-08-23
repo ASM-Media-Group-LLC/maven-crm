@@ -127,7 +127,7 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
             <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
             <p className="text-xs text-warning">
               <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
-              contacto puede entrar al pipeline sin handle. Editá el lead para agregarlo y volvé a intentar.
+              contacto puede entrar al pipeline sin handle. Edita el lead para agregarlo y vuelve a intentar.
             </p>
           </div>
         ) : (

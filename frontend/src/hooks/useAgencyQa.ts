@@ -619,7 +619,7 @@ export const useUpsertQaCloser = () =>
         .maybeSingle();
       if (lookupErr) throw lookupErr;
       if (!existing?.id) {
-        throw new Error(`No existe un user con nombre "${trimmed}". Creálo en Settings → Administración → Usuarios.`);
+        throw new Error(`No existe un user con nombre "${trimmed}". Créalo en Settings → Administración → Usuarios.`);
       }
       return existing.id as string;
     },

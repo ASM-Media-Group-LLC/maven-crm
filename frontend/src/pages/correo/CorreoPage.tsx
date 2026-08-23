@@ -357,7 +357,7 @@ export default function CorreoPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
                 <Mail className="h-7 w-7 text-primary/70" />
               </div>
-              <p className="text-sm text-muted-foreground">Elegí un correo para leerlo.</p>
+              <p className="text-sm text-muted-foreground">Elige un correo para leerlo.</p>
             </div>
           ) : mensaje.isLoading ? (
             <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">

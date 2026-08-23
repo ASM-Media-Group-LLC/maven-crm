@@ -147,7 +147,7 @@ const TelegramChannelsPage = () => {
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Cada conversación NUEVA de una línea se asigna automáticamente a quien marques (podés elegir
+          Cada conversación NUEVA de una línea se asigna automáticamente a quien marques (puedes elegir
           varias personas) — igual que en WhatsApp. Las líneas aparecen acá solas al recibir su primer mensaje.
         </p>
         {isLoading ? (
@@ -220,7 +220,7 @@ const TelegramChannelsPage = () => {
               <Label>Auto-asignar conversaciones nuevas a</Label>
               <p className="text-[11px] text-muted-foreground">
                 Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques
-                (podés elegir varias personas). Las existentes no se tocan.
+                (puedes elegir varias personas). Las existentes no se tocan.
               </p>
               <Input value={assigneeSearch} onChange={(e) => setAssigneeSearch(e.target.value)} placeholder="Buscar persona…" className="h-8 text-sm" />
               <div className="max-h-44 space-y-1 overflow-auto rounded-md border p-2">

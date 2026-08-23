@@ -467,8 +467,8 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           <div className="pt-2 space-y-3">
             <p className="text-xs text-muted-foreground">
               Si está activa en el CRM externo (donde se gestiona su cuenta de
-              OnlyFans), marcá <strong>Sí</strong>. Cuenta como ingreso al CRM en
-              el Panel de Control. Si todavía no, marcá <strong>No</strong> —
+              OnlyFans), marca <strong>Sí</strong>. Cuenta como ingreso al CRM en
+              el Panel de Control. Si todavía no, marca <strong>No</strong> —
               después se puede activar desde el listado de Creadoras.
             </p>
             <div className="flex gap-2">

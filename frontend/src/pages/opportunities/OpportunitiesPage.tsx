@@ -160,7 +160,7 @@ const OpportunitiesPage = () => {
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Oportunidades de monetización</h1>
           <p className="text-xs text-muted-foreground">
-            Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; acá las ves y manejás.
+            Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; acá las ves y manejas.
           </p>
         </div>
         <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
@@ -225,7 +225,7 @@ const OpportunitiesPage = () => {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            No hay oportunidades en esta vista. Creá una con “Nueva oportunidad”.
+            No hay oportunidades en esta vista. Crea una con “Nueva oportunidad”.
           </div>
         ) : (
           <table className="w-full text-sm">

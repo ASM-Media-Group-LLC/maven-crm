@@ -552,7 +552,7 @@ const CreadoresTable = ({ creators }: Props) => {
             ) : (
               <>
                 <strong>{bluToggleTarget?.creator.name}</strong> va a contar como
-                baja (↓) en el Panel de Control. Podés volver a marcarla cuando quieras.
+                baja (↓) en el Panel de Control. Puedes volver a marcarla cuando quieras.
               </>
             )}
           </AlertDialogDescription>
@@ -596,7 +596,7 @@ const CreadoresTable = ({ creators }: Props) => {
               // otros componentes (ViewCreadorModal); gatear acá evita
               // que se ejecute la mutation si el rol perdió permiso.
               if (!canDeleteCreator) {
-                toast.error("No tenés permiso para eliminar creators.");
+                toast.error("No tienes permiso para eliminar creators.");
                 setDeletingCreator(null);
                 return;
               }

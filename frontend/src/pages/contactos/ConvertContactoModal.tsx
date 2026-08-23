@@ -101,8 +101,8 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
             <AlertTriangle className="h-4 w-4 text-warning dark:text-warning shrink-0 mt-0.5" />
             <p className="text-xs text-warning dark:text-warning">
               <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
-              creador puede entrar al sistema sin handle. Cerrá este modal, editá el contacto
-              para agregarlo y volvé a intentar.
+              creador puede entrar al sistema sin handle. Cierra este modal, edita el contacto
+              para agregarlo y vuelve a intentar.
             </p>
           </div>
         ) : (

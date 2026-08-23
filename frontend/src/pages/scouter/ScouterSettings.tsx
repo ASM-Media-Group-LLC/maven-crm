@@ -443,7 +443,7 @@ const CountriesPicker = ({
         Países objetivo (opcional)
       </label>
       <p className="text-[10px] text-muted-foreground mb-2">
-        Dejar vacío = sin restricción. Elegí uno o varios países si la
+        Dejar vacío = sin restricción. Elige uno o varios países si la
         compañía solo busca creadores de un país específico.
       </p>
 
@@ -466,7 +466,7 @@ const CountriesPicker = ({
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Filtrá país…" className="h-9 text-xs" />
+            <CommandInput placeholder="Filtra país…" className="h-9 text-xs" />
             <CommandList>
               <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">
                 No se encontró ningún país.
@@ -641,7 +641,7 @@ const CompanyFormModal = ({
 
   const startAiChat = useCallback(async () => {
     if (!form.description.trim() && !form.name.trim()) {
-      toast.error("Escribí al menos el nombre o descripción de la compañía");
+      toast.error("Escribe al menos el nombre o descripción de la compañía");
       return;
     }
     setChatOpen(true);
@@ -700,7 +700,7 @@ const CompanyFormModal = ({
       ...chatMessages,
       {
         role: "user",
-        content: "Llená la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudás, dejá las dudas en scoring_notes.",
+        content: "Llena la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudas, deja las dudas en scoring_notes.",
       },
     ];
     setChatMessages(next);
@@ -777,7 +777,7 @@ const CompanyFormModal = ({
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar compañía" : "Nueva compañía"}</DialogTitle>
           <DialogDescription>
-            Describí tu compañía y usá "Mejorar con IA" para generar la configuración de búsqueda automáticamente.
+            Describe tu compañía y usa "Mejorar con IA" para generar la configuración de búsqueda automáticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -906,7 +906,7 @@ const CompanyFormModal = ({
                         sendChatReply();
                       }
                     }}
-                    placeholder="Respondé la pregunta…"
+                    placeholder="Responde la pregunta…"
                     className="min-h-[40px] max-h-[120px] text-xs"
                     disabled={aiLoading}
                   />
@@ -927,7 +927,7 @@ const CompanyFormModal = ({
                       className="h-7 text-[11px]"
                       title="Llenar con la mejor inferencia disponible"
                     >
-                      Llená igual
+                      Llena igual
                     </Button>
                   </div>
                 </div>
@@ -986,7 +986,7 @@ const CompanyFormModal = ({
                 className="text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Describí en tus palabras qué perfil de creator buscás. Dejá vacío si la compañía no segmenta por tipo.
+                Describe en tus palabras qué perfil de creator buscas. Deja vacío si la compañía no segmenta por tipo.
               </p>
             </div>
           </div>
@@ -1278,7 +1278,7 @@ const CompanyCard = ({
           <div className="flex items-center gap-1.5 rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2">
             <Sparkles className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-[11px] text-amber-400">
-              Sin configuración IA — editá y usá "Mejorar con IA"
+              Sin configuración IA — edita y usa "Mejorar con IA"
             </span>
           </div>
         )}
@@ -1561,7 +1561,7 @@ const SpammerAccountsSection = () => {
                 <Instagram className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium">No hay cuentas registradas</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Completá el asistente de bienvenida en "Mis Tareas" o usá el botón "Agregar cuenta".
+                  Completa el asistente de bienvenida en "Mis Tareas" o usa el botón "Agregar cuenta".
                 </p>
               </div>
             ) : (
@@ -1710,7 +1710,7 @@ const DailyGenerationSection = () => {
           <CardTitle className="text-base">Generación Diaria</CardTitle>
         </div>
         <CardDescription className="text-xs">
-          Generá tareas de interacción manualmente o ajustá los parámetros del cron diario.
+          Genera tareas de interacción manualmente o ajusta los parámetros del cron diario.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1764,7 +1764,7 @@ const DailyGenerationSection = () => {
 
         {!tenantId && !tenantQ.isLoading && (
           <p className="text-[11px] text-destructive">
-            No se pudo resolver el tenant ID. Verificá tu sesión.
+            No se pudo resolver el tenant ID. Verifica tu sesión.
           </p>
         )}
       </CardContent>
@@ -1813,7 +1813,7 @@ const ScouterSettings = () => {
         <div>
           <h2 className="text-lg font-semibold">Compañías</h2>
           <p className="text-xs text-muted-foreground">
-            Configurá qué busca cada compañía. Usá "Mejorar con IA" para generar filtros automáticamente.
+            Configura qué busca cada compañía. Usa "Mejorar con IA" para generar filtros automáticamente.
           </p>
         </div>
         {canEditCompanies && (
@@ -1836,7 +1836,7 @@ const ScouterSettings = () => {
           {canEditCompanies ? (
             <>
               <p className="text-xs text-muted-foreground mb-4">
-                Creá tu primera compañía para empezar a configurar las búsquedas.
+                Crea tu primera compañía para empezar a configurar las búsquedas.
               </p>
               <Button onClick={handleNew} variant="outline" className="gap-1.5">
                 <Plus className="h-4 w-4" />
@@ -1845,7 +1845,7 @@ const ScouterSettings = () => {
             </>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Pedile a un admin que cree las compañías o que active tu permiso "Editar Compañías".
+              Pídele a un admin que cree las compañías o que active tu permiso "Editar Compañías".
             </p>
           )}
         </div>

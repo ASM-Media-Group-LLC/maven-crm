@@ -541,7 +541,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
                 </span>
                 {activeConf != null && <span className="text-xs tabular-nums text-white/70">IA: {activeConf}%</span>}
               </div>
-              {/* Veredicto editable (marcá si promocionó o no en esta historia) */}
+              {/* Veredicto editable (marca si promocionó o no en esta historia) */}
               <div className="mx-auto max-w-[220px]">
                 <VerdictToggle story={active} onSetVerdict={onSetVerdict} saving={savingId === active.id} dark />
               </div>

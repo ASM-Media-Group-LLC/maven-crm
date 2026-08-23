@@ -54,7 +54,7 @@ export default function ChattersQaSection() {
     return (
       <Card>
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-          <Lock className="h-4 w-4" /> No tenés acceso a ningún subtab de Chatters QA. Pedile a un admin que te habilite alguno en Roles.
+          <Lock className="h-4 w-4" /> No tienes acceso a ningún subtab de Chatters QA. Pídele a un admin que te habilite alguno en Roles.
         </CardContent>
       </Card>
     );

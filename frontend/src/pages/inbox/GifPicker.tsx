@@ -90,7 +90,7 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
             <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">GIFs no configurados (falta la API key de Giphy).</div>
           )}
           {!loading && err === "api" && (
-            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">No se pudieron cargar los GIFs. Revisá la API key de Giphy.</div>
+            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">No se pudieron cargar los GIFs. Revisa la API key de Giphy.</div>
           )}
           {!loading && !err && items.length === 0 && (
             <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">{t("gif.none")}</div>

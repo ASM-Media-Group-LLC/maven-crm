@@ -151,7 +151,7 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
               ) : filtered.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">
-                  {scripts.length === 0 ? "Sin frases todavía. Creá una con “Nueva”." : "Nada coincide."}
+                  {scripts.length === 0 ? "Sin frases todavía. Crea una con “Nueva”." : "Nada coincide."}
                 </p>
               ) : (
                 filtered.map((s) => (

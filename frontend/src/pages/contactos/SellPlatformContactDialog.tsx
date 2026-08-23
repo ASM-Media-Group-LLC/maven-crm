@@ -82,12 +82,12 @@ const SellPlatformContactDialog = ({ open, onOpenChange, contactId, instagramHan
 
   const sell = useMutation({
     mutationFn: async () => {
-      if (!platform) throw new Error("Elegí qué venderle.");
+      if (!platform) throw new Error("Elige qué venderle.");
       // Kash = la agencia → reclutamiento (monetización × comisión), no suscripción.
       if (esKash) {
         const monet = Number(monetization);
         const pct = Number(commission);
-        if (!monet || monet <= 0) throw new Error("Ingresá la monetización estimada (USD/mes).");
+        if (!monet || monet <= 0) throw new Error("Ingresa la monetización estimada (USD/mes).");
         if (pct < 0 || pct > 100) throw new Error("La comisión debe estar entre 0 y 100.");
         const { data, error } = await (supabase as any).rpc("create_recruitment_deal_for_contact", {
           p_contact_id: contactId,
@@ -99,7 +99,7 @@ const SellPlatformContactDialog = ({ open, onOpenChange, contactId, instagramHan
         return data as string;
       }
       const amt = Number(amount);
-      if (!amt || amt <= 0) throw new Error("Ingresá el monto mensual de la suscripción.");
+      if (!amt || amt <= 0) throw new Error("Ingresa el monto mensual de la suscripción.");
       const { data, error } = await (supabase as any).rpc("create_platform_deal_for_contact", {
         p_contact_id: contactId,
         p_platform: platform,
@@ -154,7 +154,7 @@ const SellPlatformContactDialog = ({ open, onOpenChange, contactId, instagramHan
             <Label>{esKash ? "Qué le vendemos" : "Plataforma"}</Label>
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger>
-                <SelectValue placeholder="Elegí qué venderle..." />
+                <SelectValue placeholder="Elige qué venderle..." />
               </SelectTrigger>
               <SelectContent>
                 {/* Kash primero: es la oferta central. Se oculta para una agencia,

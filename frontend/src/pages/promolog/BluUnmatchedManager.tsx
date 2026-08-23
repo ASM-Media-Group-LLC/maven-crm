@@ -59,7 +59,7 @@ const BluUnmatchedManager = () => {
 
   const handleMap = async (bluName: string) => {
     const cid = picked[bluName];
-    if (!cid) { toast({ title: "Elegí una creadora primero", variant: "destructive" }); return; }
+    if (!cid) { toast({ title: "Elige una creadora primero", variant: "destructive" }); return; }
     setBusy(bluName);
     const { data, error } = await (supabase.rpc as any)("blu_map_creator", { p_blu_name: bluName, p_creator_id: cid });
     setBusy(null);

@@ -266,7 +266,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
               <Label htmlFor="examiner">Asignar a (examinador)</Label>
               <Select value={examinerUserId} onValueChange={setExaminerUserId}>
                 <SelectTrigger id="examiner">
-                  <SelectValue placeholder={evaluatorsQ.isLoading ? "Cargando…" : "Elegí examinador"} />
+                  <SelectValue placeholder={evaluatorsQ.isLoading ? "Cargando…" : "Elige examinador"} />
                 </SelectTrigger>
                 <SelectContent>
                   {orderedEvaluators.map((ev) => {
@@ -291,7 +291,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                 </SelectContent>
               </Select>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                La sesión aparece en el workspace del examinador asignado. Si te elegís a vos mismo, queda en tu workspace como siempre.
+                La sesión aparece en el workspace del examinador asignado. Si te eliges a ti mismo, queda en tu workspace como siempre.
               </p>
             </div>
 

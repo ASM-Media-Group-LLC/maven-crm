@@ -105,9 +105,9 @@ const resultVariant: Record<string, "success-soft" | "destructive-soft"> = {
 // Motivo legible del fallo de scan (para el tooltip de la fila "A revisar").
 const errorReasonLabel = (r?: string | null): string => {
   const map: Record<string, string> = {
-    json_parse: "La IA devolvió un veredicto ilegible — revisá la evidencia a mano.",
-    openrouter_timeout: "La IA tardó demasiado (timeout) — revisá la evidencia a mano.",
-    refusal: "La IA no analizó la imagen — revisá la evidencia a mano.",
+    json_parse: "La IA devolvió un veredicto ilegible — revisa la evidencia a mano.",
+    openrouter_timeout: "La IA tardó demasiado (timeout) — revisa la evidencia a mano.",
+    refusal: "La IA no analizó la imagen — revisa la evidencia a mano.",
   };
   if (r && map[r]) return map[r];
   return r ? `Necesita revisión manual (${r}).` : "Necesita revisión manual: la IA no pudo leer la evidencia.";
@@ -157,7 +157,7 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
           }}
           autoFocus
           rows={5}
-          placeholder="Escribí una nota…"
+          placeholder="Escribe una nota…"
           className="resize-none text-sm"
         />
         <div className="mt-2 flex items-center justify-between">

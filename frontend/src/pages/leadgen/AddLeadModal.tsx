@@ -462,7 +462,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 minFiles={0}
                 maxFiles={MAX_FILES}
                 label="Evidencia (opcional)"
-                description="Hasta 8 capturas. Click, drag&drop, o pegá con Cmd/Ctrl+V."
+                description="Hasta 8 capturas. Click, drag&drop, o pega con Cmd/Ctrl+V."
               />
             </div>
 

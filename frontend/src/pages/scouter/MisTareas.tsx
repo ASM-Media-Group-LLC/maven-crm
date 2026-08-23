@@ -229,7 +229,7 @@ const MisTareas = () => {
             looking at this view typically isn't the assignee), only on
             today's date, disabled cuando ya alcanzó el target o cuando
             está en cooldown 5h post-uso. El cooldown se muestra como
-            "Esperá 4h 23m" en el botón. */}
+            "Espera 4h 23m" en el botón. */}
         {!isManagerRole && isToday && (
           <Button
             size="sm"
@@ -241,7 +241,7 @@ const MisTareas = () => {
               cooldownRemainingMs > 0
                 ? `En cooldown — disponible en ${fmtCooldown(cooldownRemainingMs)}`
                 : !canTopUp
-                  ? `Ya tenés ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
+                  ? `Ya tienes ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
                   : `Generar ${TOP_UP_TARGET - pendingCount} tareas más`
             }
           >
@@ -254,7 +254,7 @@ const MisTareas = () => {
             )}
             <span className="text-xs">
               {cooldownRemainingMs > 0 ? (
-                <>Esperá {fmtCooldown(cooldownRemainingMs)}</>
+                <>Espera {fmtCooldown(cooldownRemainingMs)}</>
               ) : (
                 <>
                   Llenar a {TOP_UP_TARGET}

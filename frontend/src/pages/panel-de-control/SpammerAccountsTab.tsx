@@ -265,7 +265,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           className="text-[11px] text-muted-foreground"
           title={
             viewMode === "mine"
-              ? "Tus cuentas de IG que usás para outreach. Cada cuenta se escanea con IA que evalúa qué tan creíble se ve para que las creadoras respondan. Click en una card para ver el análisis del scan."
+              ? "Tus cuentas de IG que usas para outreach. Cada cuenta se escanea con IA que evalúa qué tan creíble se ve para que las creadoras respondan. Click en una card para ver el análisis del scan."
               : "Cuentas de IG que el equipo usa para outreach (LGs/scouters). Cada cuenta se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para que las creadoras objetivo respondan. Click en una card para ver el detalle del análisis."
           }
         >
@@ -332,16 +332,16 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           <p className="text-sm font-medium">
             {aggregated.length === 0
               ? viewMode === "mine"
-                ? "Todavía no tenés cuentas registradas"
+                ? "Todavía no tienes cuentas registradas"
                 : "Todavía no hay cuentas registradas"
               : "Sin resultados para esa búsqueda"}
           </p>
           <p className="max-w-md text-xs text-muted-foreground">
             {aggregated.length === 0
               ? viewMode === "mine"
-                ? "Agregá tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
+                ? "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
                 : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
-              : "Probá con otro handle, nombre o scouter."}
+              : "Prueba con otro handle, nombre o scouter."}
           </p>
           {viewMode === "mine" && aggregated.length === 0 && (
             <Button
@@ -369,7 +369,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
               </div>
               <span className="text-sm font-medium">Agregar cuenta</span>
               <span className="max-w-[180px] text-center text-[11px] leading-tight">
-                Sumá una cuenta IG. La IA la escanea automático.
+                Suma una cuenta IG. La IA la escanea automático.
               </span>
             </button>
           )}
@@ -483,7 +483,7 @@ const SpammerCard = ({
             {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
               <span
                 className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300"
-                title="No pudimos leer el perfil automáticamente. Reintentá el scan o subí un screenshot — no significa que esté restringida."
+                title="No pudimos leer el perfil automáticamente. Reintenta el scan o sube un screenshot — no significa que esté restringida."
               >
                 <AlertCircle className="h-2.5 w-2.5" />
                 Sin leer
@@ -520,7 +520,7 @@ const SpammerCard = ({
           <div className="flex items-start gap-1.5 text-xs text-amber-400">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span className="line-clamp-2">
-              No se pudo leer — reintentá el scan o subí un screenshot.
+              No se pudo leer — reintenta el scan o sube un screenshot.
             </span>
           </div>
         ) : r.ai_analysis ? (
@@ -556,7 +556,7 @@ const SpammerCard = ({
           <AlertDialogTitle>¿Eliminar @{r.instagram_handle}?</AlertDialogTitle>
           <AlertDialogDescription>
             Esta cuenta dejará de aparecer en "Mis Cuentas IG" y no se usará más
-            para outreach. Si la quemaron en IG y querés agregar una nueva,
+            para outreach. Si la quemaron en IG y quieres agregar una nueva,
             primero eliminala acá.
             <br /><br />
             Si más de un scouter la tenía registrada, se elimina solo TU
@@ -801,7 +801,7 @@ const RestrictedRecoveryGuide = () => {
 
         <div>
           <p className="font-semibold text-foreground mb-1">
-            Si decidís recuperar:
+            Si decides recuperar:
           </p>
           <ol className="list-decimal space-y-1.5 pl-4 text-muted-foreground marker:text-emerald-400">
             <li>
@@ -822,11 +822,11 @@ const RestrictedRecoveryGuide = () => {
             </li>
             <li>
               <strong className="text-foreground">Apelar formalmente</strong>: Settings → Help →
-              Report a Problem. Explicá que sos una agencia legítima.
+              Report a Problem. Explica que eres una agencia legítima.
             </li>
             <li>
               <strong className="text-foreground text-rose-400">PARAR todo outreach</strong> por 7-14 días.
-              Browseá normal, like a posts, seguí cuentas, postea 2-3 cosas propias. Si seguís
+              Navega normal, like a posts, sigue cuentas, postea 2-3 cosas propias. Si sigues
               spammeando DMs, IG nunca levanta el flag.
             </li>
             <li>
@@ -838,7 +838,7 @@ const RestrictedRecoveryGuide = () => {
 
         <div>
           <p className="font-semibold text-foreground mb-1">
-            Si decidís abandonar y crear nueva:
+            Si decides abandonar y crear nueva:
           </p>
           <ul className="list-disc space-y-1 pl-4 text-muted-foreground marker:text-emerald-400">
             <li>SIM física fresca, email dedicado, dispositivo limpio.</li>
@@ -936,13 +936,13 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
             {hasScreenshots
               ? `${paths.length} screenshot${paths.length > 1 ? "s" : ""} cargado${paths.length > 1 ? "s" : ""} — el análisis usa la data real`
               : awaiting
-              ? "Pegá uno o varios screenshots del perfil"
+              ? "Pega uno o varios screenshots del perfil"
               : "Mejorar análisis con screenshots"}
           </p>
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
             {account.is_restricted
-              ? "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Sacá screenshots del perfil desde tu browser (logueado) y subilos acá — podés agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis."
-              : "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Sacá screenshots del perfil desde tu browser (logueado) y subilos acá — podés agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real."}
+              ? "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis."
+              : "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real."}
           </p>
           <label className="inline-flex">
             <input
@@ -1130,7 +1130,7 @@ const SpammerDetailDialog = ({
         {r.is_restricted && (
           <details className="rounded-lg border border-border bg-card/40 p-3">
             <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
-              ¿Querés enriquecer el análisis con screenshots? (opcional)
+              ¿Quieres enriquecer el análisis con screenshots? (opcional)
             </summary>
             <div className="mt-3">
               <RestrictedScreenshotZone account={r} />
@@ -1151,8 +1151,8 @@ const SpammerDetailDialog = ({
                 </span>
                 <span className="text-foreground/80">
                   Suele pasar con cuentas muy nuevas (todavía sin indexar) o cuando IG bloquea la lectura
-                  desde el servidor. <strong>No</strong> significa que la cuenta esté restringida. Reintentá
-                  el scan con el botón de abajo, o subí un screenshot del perfil (logueado) para analizarla igual.
+                  desde el servidor. <strong>No</strong> significa que la cuenta esté restringida. Reintenta
+                  el scan con el botón de abajo, o sube un screenshot del perfil (logueado) para analizarla igual.
                 </span>
               </div>
             </div>

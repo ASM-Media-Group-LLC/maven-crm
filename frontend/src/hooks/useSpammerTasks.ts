@@ -488,7 +488,7 @@ export const useGenerateTasks = () => {
       if (data.created > 0) {
         toast.success(`Se generaron ${data.created} tareas nuevas`);
       } else {
-        toast.info(`Ya tenés ${data.target} tareas pendientes — no hace falta generar`);
+        toast.info(`Ya tienes ${data.target} tareas pendientes — no hace falta generar`);
       }
     },
     onError: (e) => {

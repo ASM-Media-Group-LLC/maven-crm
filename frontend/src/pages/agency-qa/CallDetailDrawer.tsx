@@ -259,7 +259,7 @@ const SectionThumbs = ({
             rows={3}
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
-            placeholder="Por qué corregís esto, qué le faltó al análisis…"
+            placeholder="Por qué corriges esto, qué le faltó al análisis…"
             className="text-sm"
           />
           <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -722,7 +722,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
   const handleSave = async () => {
     const trimmed = draft.trim();
     if (!trimmed) {
-      toast.error("Escribí algo de feedback antes de guardar");
+      toast.error("Escribe algo de feedback antes de guardar");
       return;
     }
     const numericScore =
@@ -739,7 +739,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
         human_score: numericScore,
       });
       toast.success("Feedback guardado", {
-        description: "Podés re-analizar la QA para que la IA lo considere.",
+        description: "Puedes re-analizar la QA para que la IA lo considere.",
       });
       setDraft("");
       setScore("");
@@ -752,7 +752,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
 
   const handleReanalyzeWithFeedback = async () => {
     if (!last && !draft.trim()) {
-      toast.error("Primero guardá un feedback humano");
+      toast.error("Primero guarda un feedback humano");
       return;
     }
     try {
@@ -795,8 +795,8 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
     <Section title="Feedback humano">
       <p className="text-[11px] text-muted-foreground">
         <Lightbulb className="mr-1 inline h-3 w-3" />
-        Dejá feedback sobre el análisis (qué le faltó, qué interpretó mal).
-        Después podés re-analizar y la IA lo va a tomar en cuenta.
+        Deja feedback sobre el análisis (qué le faltó, qué interpretó mal).
+        Después puedes re-analizar y la IA lo va a tomar en cuenta.
       </p>
 
       {feedbackQ.isLoading ? (
@@ -914,7 +914,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
           size="sm"
           onClick={handleReanalyzeWithFeedback}
           disabled={analyze.isPending || !last}
-          title={!last ? "Primero guardá feedback humano" : undefined}
+          title={!last ? "Primero guarda feedback humano" : undefined}
           className="gap-1.5"
         >
           {analyze.isPending ? (

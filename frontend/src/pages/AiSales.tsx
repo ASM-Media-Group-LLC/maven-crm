@@ -124,7 +124,7 @@ const AiSales = () => {
                 <p className="text-xs text-muted-foreground">
                   {activeConversation
                     ? "Hablando sobre todas tus creadoras y sus earnings"
-                    : "Iniciá una conversación o seleccioná una del listado"}
+                    : "Inicia una conversación o selecciona una del listado"}
                 </p>
               </div>
 

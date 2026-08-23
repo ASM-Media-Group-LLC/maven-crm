@@ -370,7 +370,7 @@ const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
         <CharacterInfoPanel profile={profile} lang={lang} compact />
       ) : (
         <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          Seleccioná una sesión para ver la información del personaje.
+          Selecciona una sesión para ver la información del personaje.
         </div>
       )}
     </div>

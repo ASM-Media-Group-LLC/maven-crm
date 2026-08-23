@@ -115,7 +115,7 @@ const AdminReportes = () => {
 
   const handleSendNow = (s: ReportScheduleWithRecipients) => {
     if (s.recipients.length === 0) {
-      toast.error("Agregá al menos un destinatario antes de enviar");
+      toast.error("Agrega al menos un destinatario antes de enviar");
       return;
     }
     setSendConfirm(s);
@@ -172,7 +172,7 @@ const AdminReportes = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reportes programados</h1>
           <p className="text-sm text-muted-foreground">
-            Reportes automáticos por email — configurá módulo, periodicidad y destinatarios.
+            Reportes automáticos por email — configura módulo, periodicidad y destinatarios.
           </p>
         </div>
         <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
@@ -195,7 +195,7 @@ const AdminReportes = () => {
             </div>
             <p className="text-base font-semibold">Sin reportes configurados</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Configurá un reporte automático y se enviará por email con la
+              Configura un reporte automático y se enviará por email con la
               periodicidad que elijas (diario, semanal, mensual o anual).
             </p>
             <Button className="mt-4" onClick={() => { setEditing(null); setModalOpen(true); }}>
@@ -335,7 +335,7 @@ const AdminReportes = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Borrar reporte</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que querés borrar <strong>"{deleteConfirm?.name}"</strong>? Esta acción no se puede deshacer.
+              ¿Seguro que quieres borrar <strong>"{deleteConfirm?.name}"</strong>? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

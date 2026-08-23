@@ -109,7 +109,7 @@ export default function ChatterQaNotifications() {
             <div className="relative">
               <Input value={pickerFilter} onFocus={() => setPickerOpen(true)}
                 onChange={(e) => { setPickerFilter(e.target.value); if (!pickerOpen) setPickerOpen(true); }}
-                placeholder={notifyUserIds.length === 0 ? "Seleccionar empleados…" : `${notifyUserIds.length} seleccionado(s) — escribí para filtrar`}
+                placeholder={notifyUserIds.length === 0 ? "Seleccionar empleados…" : `${notifyUserIds.length} seleccionado(s) — escribe para filtrar`}
                 className="w-full pr-8" />
               <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
             </div>

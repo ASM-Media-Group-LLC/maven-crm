@@ -132,8 +132,8 @@ const Step1 = ({
       <div>
         <h2 className="text-xl font-semibold mb-1">Registra tus cuentas de Instagram</h2>
         <p className="text-sm text-muted-foreground">
-          Ingresá hasta {MAX_ACCOUNTS} handles de Instagram que uses para hacer outreach.
-          Podés agregar más tarde desde Configuración.
+          Ingresa hasta {MAX_ACCOUNTS} handles de Instagram que uses para hacer outreach.
+          Puedes agregar más tarde desde Configuración.
         </p>
       </div>
 
@@ -166,7 +166,7 @@ const Step1 = ({
       <div className="flex items-start gap-2 rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2.5">
         <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
         <p className="text-xs text-blue-300">
-          Las cuentas serán sincronizadas automáticamente en segundo plano. Solo necesitás confirmar
+          Las cuentas serán sincronizadas automáticamente en segundo plano. Solo necesitas confirmar
           el handle — no hace falta ingresar ninguna contraseña.
         </p>
       </div>
@@ -277,7 +277,7 @@ const Step3 = ({
       <div>
         <h2 className="text-xl font-semibold mb-1">Etiqueta y nicho</h2>
         <p className="text-sm text-muted-foreground">
-          Ponele un nombre descriptivo a cada cuenta y elegí su nicho. Esto le permite
+          Ponele un nombre descriptivo a cada cuenta y elige su nicho. Esto le permite
           a la IA asignar leads afines a cada perfil.
         </p>
       </div>
@@ -317,7 +317,7 @@ const Step3 = ({
                   }
                 >
                   <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Seleccioná un nicho…" />
+                    <SelectValue placeholder="Selecciona un nicho…" />
                   </SelectTrigger>
                   <SelectContent>
                     {NICHES.map((n) => (

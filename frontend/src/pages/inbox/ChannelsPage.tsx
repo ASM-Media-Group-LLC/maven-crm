@@ -205,7 +205,7 @@ const ChannelsPage = () => {
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Canales del inbox</h1>
           <p className="text-xs text-muted-foreground">
-            Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usá el{" "}
+            Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usa el{" "}
             <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
           </p>
         </div>
@@ -227,7 +227,7 @@ const ChannelsPage = () => {
           </div>
         ) : channels.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            Todavía no hay canales. Creá uno con el nombre de su instancia de Evolution.
+            Todavía no hay canales. Crea uno con el nombre de su instancia de Evolution.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -304,7 +304,7 @@ const ChannelsPage = () => {
           <DialogHeader>
             <DialogTitle>Nuevo canal</DialogTitle>
             <DialogDescription>
-              Registrá quién atiende un canal. El "nombre de instancia" debe coincidir con una línea ya conectada en el panel del gateway.
+              Registra quién atiende un canal. El "nombre de instancia" debe coincidir con una línea ya conectada en el panel del gateway.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -357,7 +357,7 @@ const ChannelsPage = () => {
           <DialogHeader>
             <DialogTitle>Editar canal</DialogTitle>
             <DialogDescription>
-              Cambiá la etiqueta, el número, el departamento o el tipo. Desactivalo para ocultarlo de los selectores sin borrarlo.
+              Cambia la etiqueta, el número, el departamento o el tipo. Desactivalo para ocultarlo de los selectores sin borrarlo.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -396,13 +396,13 @@ const ChannelsPage = () => {
             </div>
             <label className="flex cursor-pointer items-center gap-2 pt-1">
               <Checkbox checked={editForm.active} onCheckedChange={(v) => setEditForm({ ...editForm, active: v === true })} />
-              <span className="text-sm">Activo <span className="text-muted-foreground">(si lo desactivás, deja de aparecer en los selectores)</span></span>
+              <span className="text-sm">Activo <span className="text-muted-foreground">(si lo desactivas, deja de aparecer en los selectores)</span></span>
             </label>
             {/* Auto-asignación por línea: las conversaciones NUEVAS de esta línea se asignan
                 a quien marques (uno o varios). Las existentes no se tocan. */}
             <div className="space-y-1.5 pt-1">
               <Label>Auto-asignar conversaciones nuevas a</Label>
-              <p className="text-[11px] text-muted-foreground">Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques (podés elegir varias personas). Las existentes no se tocan.</p>
+              <p className="text-[11px] text-muted-foreground">Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques (puedes elegir varias personas). Las existentes no se tocan.</p>
               <Input
                 value={assigneeSearch}
                 onChange={(e) => setAssigneeSearch(e.target.value)}

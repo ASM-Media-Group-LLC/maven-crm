@@ -1204,7 +1204,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
   const handleSave = async () => {
     const trimmed = draft.trim();
     if (!trimmed) {
-      toast.error("Escribí algo de feedback antes de guardar");
+      toast.error("Escribe algo de feedback antes de guardar");
       return;
     }
     const numericScore =
@@ -1234,7 +1234,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
 
   const handleReanalyzeWithFeedback = async () => {
     if (!draft.trim()) {
-      toast.error("Primero escribí un feedback");
+      toast.error("Primero escribe un feedback");
       return;
     }
     try {
@@ -1450,7 +1450,7 @@ const CallDetailPage = ({
                   a todos los destinatarios configurados.
                   <br />
                   El correo automático ya se mandó al terminar el análisis.
-                  Solo reenvíalo si necesitás una segunda copia.
+                  Solo reenvíalo si necesitas una segunda copia.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1916,7 +1916,7 @@ const AudioWithCaptions = ({
           <p className="text-sm leading-relaxed text-foreground/80">
             {window.length === 0 ? (
               <span className="italic text-muted-foreground">
-                Apretá play para ver el texto sincronizarse con el audio.
+                Aprieta play para ver el texto sincronizarse con el audio.
               </span>
             ) : (
               window.map(({ idx, w }) => {

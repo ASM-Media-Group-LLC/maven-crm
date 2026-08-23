@@ -102,7 +102,7 @@ const InboxAnalyticsPage = () => {
         </div>
       ) : !isLoading && !data ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Esta sección es solo para management. Si creés que deberías tener acceso, pedíselo a un admin.
+          Esta sección es solo para management. Si crees que deberías tener acceso, pedíselo a un admin.
         </div>
       ) : isLoading ? (
         <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>

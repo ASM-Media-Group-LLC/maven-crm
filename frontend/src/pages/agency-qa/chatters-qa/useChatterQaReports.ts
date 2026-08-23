@@ -320,7 +320,7 @@ export const useSendChatterQaEmail = () => {
       const alsoIds: string[] = [...(cfg?.notify_user_ids ?? [])];
       if (row.created_by && !alsoIds.includes(row.created_by)) alsoIds.push(row.created_by);
       if (to.length === 0 && alsoIds.length === 0)
-        throw new Error("No hay destinatarios. Configurá emails en el tab Notificaciones.");
+        throw new Error("No hay destinatarios. Configura emails en el tab Notificaciones.");
       const p = buildPayload(row);
       const { data, error } = await supabase.functions.invoke("send-notification-email", {
         body: { to, subject: buildChatterQaEmailSubject(p), html: buildChatterQaEmailHtml(p), tag: "chatter-qa", also_include_user_ids: alsoIds.length ? alsoIds : undefined },

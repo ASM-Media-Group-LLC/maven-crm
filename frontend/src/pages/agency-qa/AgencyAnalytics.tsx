@@ -157,7 +157,7 @@ const AgencyAnalytics = () => {
           <p className="text-sm font-medium">Sin datos en este período</p>
           <p className="text-xs text-muted-foreground">
             Cuando el equipo cargue una QA desde "Nueva QA", el dashboard se llena
-            automáticamente. Probá ampliar la ventana de tiempo si esperabas ver algo.
+            automáticamente. Prueba ampliar la ventana de tiempo si esperabas ver algo.
           </p>
         </div>
       ) : (

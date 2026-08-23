@@ -186,7 +186,7 @@ export default function CoworkPage() {
           <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
             {canCreateSessions
               ? mySessions.length > 0
-                ? "Volvé a una de tus salas activas o crea una nueva sesión."
+                ? "Vuelve a una de tus salas activas o crea una nueva sesión."
                 : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
               : mySessions.length > 0
                 ? "Vuelve a una de tus salas activas."

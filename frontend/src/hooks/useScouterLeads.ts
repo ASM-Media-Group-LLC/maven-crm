@@ -889,11 +889,11 @@ export const useEnqueueDiscoverySeed = () => {
   return useMutation({
     mutationFn: async (input: EnqueueDiscoverSeedInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintentá en un segundo.");
+      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintenta en un segundo.");
       const cleaned = (input.seeds ?? [])
         .map((s) => s.trim().replace(/^@/, ""))
         .filter(Boolean);
-      if (cleaned.length === 0) throw new Error("Pasá al menos un @handle.");
+      if (cleaned.length === 0) throw new Error("Pasa al menos un @handle.");
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -935,9 +935,9 @@ export const useEnqueueDiscoveryHashtag = () => {
   return useMutation({
     mutationFn: async (input: EnqueueDiscoverHashtagInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintentá en un segundo.");
+      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintenta en un segundo.");
       const tag = input.hashtag.trim().replace(/^#/, "");
-      if (!tag) throw new Error("Pasá un hashtag.");
+      if (!tag) throw new Error("Pasa un hashtag.");
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -1067,10 +1067,10 @@ export const useCreateLeadManual = () => {
   return useMutation({
     mutationFn: async (input: ManualLeadInput): Promise<ScouterLead> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto. Reintentá en un segundo.");
+      if (!tenantId) throw new Error("Tenant no resuelto. Reintenta en un segundo.");
       const handle = input.instagram_handle.trim().replace(/^@/, "").toLowerCase();
-      if (!handle) throw new Error("Pasá un @handle.");
-      if (!input.company_id) throw new Error("Seleccioná una compañía.");
+      if (!handle) throw new Error("Pasa un @handle.");
+      if (!input.company_id) throw new Error("Selecciona una compañía.");
 
       // Cross-system dedup contra Lead Gen. (No bloqueamos cross-company
       // dentro de Scouter — un mismo modelo puede calificar legítimamente

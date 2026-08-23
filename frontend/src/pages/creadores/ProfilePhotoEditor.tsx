@@ -36,7 +36,7 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
     if (!file) return;
 
     if (!ALLOWED.includes(file.type)) {
-      toast.error("Formato no válido", { description: "Usá una imagen JPG, PNG o WebP." });
+      toast.error("Formato no válido", { description: "Usa una imagen JPG, PNG o WebP." });
       return;
     }
     if (file.size > MAX_BYTES) {

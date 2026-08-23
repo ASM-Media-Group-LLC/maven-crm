@@ -132,7 +132,7 @@ const BotsPage = () => {
           </div>
         ) : bots.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            Todavía no hay bots. El de Ventas ya existe en datos; creá los demás (ej. Managers) o editá los que haya.
+            Todavía no hay bots. El de Ventas ya existe en datos; crea los demás (ej. Managers) o edita los que haya.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -238,7 +238,7 @@ const BotDialog = ({
         <DialogHeader>
           <DialogTitle>{isNew ? "Nuevo bot" : "Editar bot"}</DialogTitle>
           <DialogDescription>
-            El motor base (no-alucinar, tono, uso de tools) es común. Acá definís lo específico de este bot.
+            El motor base (no-alucinar, tono, uso de tools) es común. Acá defines lo específico de este bot.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-3">

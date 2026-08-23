@@ -85,7 +85,7 @@ export function useMailConnection() {
       const expected = sessionStorage.getItem("mail_oauth_state");
       if (!expected || expected !== state) {
         throw new Error(
-          "El state no coincide con el que iniciamos. Por seguridad no se completó la conexión — volvé a intentar desde Maven.",
+          "El state no coincide con el que iniciamos. Por seguridad no se completó la conexión — vuelve a intentar desde Maven.",
         );
       }
       const { data, error } = await supabase.functions.invoke("mail-connect", {

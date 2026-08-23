@@ -270,14 +270,14 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     // lead. Si no aparece en el autocomplete, el LLG debe crear el
     // lead primero en LeadGen.
     if (!selectedLead) {
-      setLeadError("Tenés que seleccionar un lead existente. Si no aparece, agregalo primero en LeadGen.");
+      setLeadError("Tienes que seleccionar un lead existente. Si no aparece, agregalo primero en LeadGen.");
       return;
     }
     // Evidencia obligatoria — mínimo 4 capturas.
     if (evidenceFiles.length < MIN_EVIDENCE) {
       toast({
         title: "Evidencia insuficiente",
-        description: `Necesitás adjuntar al menos ${MIN_EVIDENCE} screenshots del contacto para guardar.`,
+        description: `Necesitas adjuntar al menos ${MIN_EVIDENCE} screenshots del contacto para guardar.`,
         variant: "destructive",
       });
       return;
@@ -383,7 +383,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         } catch (e: any) {
           toast({
             title: "Contacto creado, pero algunas capturas no subieron",
-            description: e?.message ?? "Reintentá desde el detalle del contacto.",
+            description: e?.message ?? "Reintenta desde el detalle del contacto.",
             variant: "destructive",
           });
         }
@@ -488,7 +488,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         } catch (e: any) {
           toast({
             title: "Contacto creado, pero algunas capturas no subieron",
-            description: e?.message ?? "Reintentá desde el detalle del contacto.",
+            description: e?.message ?? "Reintenta desde el detalle del contacto.",
             variant: "destructive",
           });
         }
@@ -671,7 +671,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 minFiles={MIN_EVIDENCE}
                 maxFiles={MAX_EVIDENCE}
                 label="Evidencia del contacto"
-                description={`Adjuntá al menos ${MIN_EVIDENCE} screenshots del chat con la modelo (conversación, número compartido, etc.). Podés pegar con Cmd/Ctrl+V.`}
+                description={`Adjunta al menos ${MIN_EVIDENCE} screenshots del chat con la modelo (conversación, número compartido, etc.). Puedes pegar con Cmd/Ctrl+V.`}
               />
             </div>
 
