@@ -4,6 +4,7 @@ import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, s
 import { es } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { cn } from "@/lib/utils";
+import StatChip from "@/components/StatChip";
 import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
@@ -843,77 +844,47 @@ const Dashboard2 = () => {
               )}
               {!isLoading && !isError && hasData && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Revenue Bruto — clickable */}
-                  <button
-                    type="button"
-                    onClick={() => {/* Retención no tiene popup todavía */}}
-                    disabled
-                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left disabled:cursor-default"
-                  >
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
-                    <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
-                        <Repeat className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Retención</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.renewalRate.toFixed(1)}%</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Tasa de renovación</p>
-                      </div>
-                    </div>
-                  </button>
+                  {/* Retención — sin popup todavía */}
+                  <StatChip
+                    label="Retención"
+                    value={`${hlKpis.renewalRate.toFixed(1)}%`}
+                    hint="Tasa de renovación"
+                    color="bg-cyan-500"
+                    icon={<Repeat className="h-3.5 w-3.5" />}
+                  />
 
-                  {/* Creadoras — clickable */}
-                  <button
-                    type="button"
+                  {/* Creadoras — clickable, abre lista */}
+                  <StatChip
+                    label="Creadoras"
+                    value={hlKpis.activeCount}
+                    hint={
+                      <>
+                        {hlKpis.zeroCreators} inactivas
+                        {hlKpis.zeroCreators > 0 && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive/60 align-middle" />}
+                      </>
+                    }
+                    color="bg-blue-500"
+                    icon={<Users className="h-3.5 w-3.5" />}
                     onClick={() => setKpiListOpen("creators")}
-                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
-                  >
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-blue-500 transition-opacity group-hover:opacity-50" />
-                    <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
-                        <Users className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Creadoras</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.activeCount}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {hlKpis.zeroCreators} inactivas
-                          {hlKpis.zeroCreators > 0 && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive/60 align-middle" />}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
+                  />
 
-                  {/* ARPC — derived metric, no popup */}
-                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-violet-500" />
-                    <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500">
-                        <TrendingUp className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">ARPC</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{fmtK(hlKpis.avgPerCreator)}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Avg Revenue / Creator</p>
-                      </div>
-                    </div>
-                  </div>
+                  {/* ARPC — métrica derivada, sin popup */}
+                  <StatChip
+                    label="ARPC"
+                    value={fmtK(hlKpis.avgPerCreator)}
+                    hint="Avg Revenue / Creator"
+                    color="bg-violet-500"
+                    icon={<TrendingUp className="h-3.5 w-3.5" />}
+                  />
 
-                  {/* $/Fan — derived metric */}
-                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-rose-500" />
-                    <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500">
-                        <Heart className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">$/Fan</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.totalFansAll > 0 ? `$${hlKpis.avgPerFanGlobal.toFixed(2)}` : "—"}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "Sincronizando fans…"}</p>
-                      </div>
-                    </div>
-                  </div>
+                  {/* $/Fan — métrica derivada */}
+                  <StatChip
+                    label="$/Fan"
+                    value={hlKpis.totalFansAll > 0 ? `$${hlKpis.avgPerFanGlobal.toFixed(2)}` : "—"}
+                    hint={hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "Sincronizando fans…"}
+                    color="bg-rose-500"
+                    icon={<Heart className="h-3.5 w-3.5" />}
+                  />
 
                 </div>
               )}
@@ -1702,27 +1673,24 @@ const Dashboard2 = () => {
                   Métricas — {selectedPeriod?.label}
                 </h2>
                 <div className="space-y-6">
-                  {/* Retención & Fans — 4 cards estilo Panel de Control */}
+                  {/* Retención & Fans — stat-chips compactos */}
                   <div>
                     <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Retención & Fans</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { icon: <Repeat className="h-5 w-5 text-white" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación", color: "bg-cyan-500" },
-                        { icon: <DollarSign className="h-5 w-5 text-white" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan", color: "bg-rose-500" },
-                        { icon: <Users className="h-5 w-5 text-white" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período", color: "bg-emerald-500" },
-                        { icon: <Repeat className="h-5 w-5 text-white" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones", color: "bg-violet-500" },
+                        { icon: <Repeat className="h-3.5 w-3.5" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación", color: "bg-cyan-500" },
+                        { icon: <DollarSign className="h-3.5 w-3.5" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan", color: "bg-rose-500" },
+                        { icon: <Users className="h-3.5 w-3.5" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período", color: "bg-emerald-500" },
+                        { icon: <Repeat className="h-3.5 w-3.5" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones", color: "bg-violet-500" },
                       ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${item.color}`} />
-                          <div className="relative space-y-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${item.color}`}>{item.icon}</div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{item.label}</p>
-                              <p className="text-3xl font-bold tabular-nums leading-tight">{item.value}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">{item.sub}</p>
-                            </div>
-                          </div>
-                        </div>
+                        <StatChip
+                          key={idx}
+                          label={item.label}
+                          value={item.value}
+                          hint={item.sub}
+                          color={item.color}
+                          icon={item.icon}
+                        />
                       ))}
                     </div>
                   </div>

@@ -21,7 +21,7 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import KpiCard from "./KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { formatDistanceToNow, format } from "date-fns";
@@ -332,16 +332,16 @@ const DashboardContent = () => {
 
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Cards — patrón estándar; click abre modal */}
+        {/* KPI Cards — stat-chips compactos; click abre modal */}
         <div className={`grid gap-3 ${getGridCols(kpis.length)}`}>
           {kpis.map((k) => (
-            <KpiCard
+            <StatChip
               key={k.label}
               label={k.label}
               value={k.value}
-              icon={k.icon}
+              icon={<k.icon className="h-3.5 w-3.5" />}
               color={k.color}
-              subtitle={k.subtitle}
+              hint={k.subtitle || undefined}
               onClick={() => setKpiPopup(k.key)}
             />
           ))}
