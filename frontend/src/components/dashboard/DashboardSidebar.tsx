@@ -46,6 +46,7 @@ const BADGE_TINTS: Record<string, string> = {
   Closers: "bg-warning/15 text-warning",
   WhatsApp: "bg-success/15 text-success",
   Messenger: "bg-success/15 text-success",
+  Telegram: "bg-success/15 text-success",
 };
 const badgeTint = (module: string | undefined): string =>
   (module && BADGE_TINTS[module]) || "bg-destructive text-destructive-foreground";
