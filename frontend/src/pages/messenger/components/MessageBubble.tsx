@@ -3,7 +3,7 @@ import {
   MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -16,7 +16,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { renderTextWithMentions } from "./MentionAutocomplete";
-import { getInitials, formatTime as formatMsgTime } from "../utils";
+import { formatTime as formatMsgTime } from "../utils";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -307,11 +307,13 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         {!isMe && (
           <div className="w-8 shrink-0 flex justify-center">
             {showAvatar ? (
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold">
-                  {getInitials(senderName)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={senderName}
+                src={profiles[message.sender_id]?.avatar_url}
+                seed={message.sender_id}
+                size="sm"
+                className="h-7 w-7"
+              />
             ) : null}
           </div>
         )}

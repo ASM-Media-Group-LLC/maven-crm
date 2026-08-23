@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -28,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
-import { avatarGradient } from "@/lib/avatarColor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -37,7 +37,6 @@ import DeleteChatDialog from "./components/DeleteChatDialog";
 import SpacesPanel from "./components/SpacesPanel";
 import { ChatSpace } from "@/hooks/useSpaces";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
-import { getInitials } from "./utils";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -398,12 +397,13 @@ export default function ChatSidebar({
                       className="w-full flex items-center gap-2.5 px-3 py-[7px] min-h-[40px] sm:min-h-0 rounded-2xl text-left hover:bg-primary/5 transition-colors"
                     >
                       <div className="relative shrink-0">
-                        <Avatar className="h-7 w-7">
-                          {p.avatar_url && <AvatarImage src={p.avatar_url} alt={p.full_name || ""} className="object-cover" />}
-                          <AvatarFallback className={cn("text-[10px] font-bold text-white bg-gradient-to-br", avatarGradient(p.id))}>
-                            {getInitials(p.full_name || "?")}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          name={p.full_name || "?"}
+                          src={p.avatar_url}
+                          seed={p.id}
+                          size="sm"
+                          className="h-7 w-7"
+                        />
                         <span className={cn(
                           "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[1.5px] border-card",
                           getStatusColor(status, online)
@@ -523,18 +523,21 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
 
           {/* Avatar */}
           <div className="relative shrink-0">
-            <Avatar className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}>
-              {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
-              {!conversation.avatar_url && !isGroup && otherParticipant?.profile?.avatar_url && (
-                <AvatarImage src={otherParticipant.profile.avatar_url} alt={conversation.displayName} className="object-cover" />
-              )}
-              <AvatarFallback className={cn(
-                "text-xs font-bold text-white bg-gradient-to-br",
-                isGroup ? "from-violet-600 to-fuchsia-600" : avatarGradient(conversation.id)
-              )}>
-                {isGroup ? <Users className="h-4 w-4" /> : getInitials(conversation.displayName)}
-              </AvatarFallback>
-            </Avatar>
+            {isGroup ? (
+              <Avatar className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}>
+                {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
+                <AvatarFallback className="text-xs font-bold text-white bg-gradient-to-br from-violet-600 to-fuchsia-600">
+                  <Users className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <UserAvatar
+                name={conversation.displayName}
+                src={conversation.avatar_url || otherParticipant?.profile?.avatar_url}
+                seed={otherParticipant?.user_id || conversation.id}
+                className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}
+              />
+            )}
             {!isGroup && (
               <span className={cn(
                 "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",

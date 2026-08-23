@@ -1,5 +1,5 @@
 import { X, MicOff, Hand, UserX, MoreVertical, MicVocal, Eye, Crown, PhoneOff } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
@@ -19,9 +19,6 @@ interface CallParticipantsSidebarProps {
   onSetCohost?: (identity: string, isCohost: boolean) => void;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
 
 export default function CallParticipantsSidebar({
   participants, isAdmin, onMuteParticipant, onRemoveParticipant, onClose,
@@ -57,11 +54,7 @@ export default function CallParticipantsSidebar({
               )}
             >
               <div className="relative">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-[10px] bg-[hsl(220_50%_45%)] text-white font-medium">
-                    {getInitials(p.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar name={p.name} seed={p.identity} size="sm" />
                 {p.isSpeaking && (
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-[hsl(145_63%_49%)] border-2 border-[hsl(220_3%_17%)]" />
                 )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo, useCallback } from "react";
 import { Track, Room } from "livekit-client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
@@ -19,9 +19,6 @@ interface ParticipantTileProps {
   isAdmin?: boolean;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
 
 function areReactionsEqual(a: string[], b: string[]) {
   if (a === b) return true;
@@ -289,11 +286,12 @@ const ParticipantTile = memo(function ParticipantTile({
           style={{ transform: participant.isLocal && !participant.isScreenSharing ? "scaleX(-1)" : undefined }}
         />
       ) : (
-        <Avatar className={cn("z-[1]", large ? "h-24 w-24" : "h-16 w-16")}>
-          <AvatarFallback className={cn("bg-[hsl(220_50%_45%)] text-white font-medium", large ? "text-3xl" : "text-lg")}>
-            {getInitials(participant.name)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          name={participant.name}
+          seed={participant.identity}
+          size="xl"
+          className={cn("z-[1]", large ? "h-24 w-24" : "h-16 w-16")}
+        />
       )}
 
       {!participant.isLocal && (

@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "./BackgroundSelector";
 
@@ -17,9 +17,6 @@ interface PreJoinLobbyProps {
   onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string; audioOutputDeviceId?: string; backgroundEffect?: BackgroundEffect }) => void;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
 
 interface DeviceInfo {
   deviceId: string;
@@ -426,11 +423,12 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_20%)]">
-                <Avatar className="h-20 w-20 md:h-24 md:w-24">
-                  <AvatarFallback className="text-3xl md:text-4xl bg-[hsl(220_50%_45%)] text-white font-medium">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={displayName}
+                  seed={displayName}
+                  size="xl"
+                  className="h-20 w-20 md:h-24 md:w-24"
+                />
               </div>
             )}
 

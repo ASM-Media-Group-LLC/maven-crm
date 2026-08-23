@@ -51,10 +51,11 @@ describe("PreJoinLobby", () => {
     expect(screen.getByText("Unirse ahora")).toBeInTheDocument();
   });
 
-  it("shows avatar initials when camera is off (default)", () => {
+  it("shows avatar (muñequito determinista) when camera is off (default)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    // Camera defaults to OFF, so initials should be visible
-    expect(screen.getByText("JP")).toBeInTheDocument();
+    // La cámara arranca apagada → UserAvatar con muñequito DiceBear por seed.
+    const img = screen.getByAltText("Juan Pérez") as HTMLImageElement;
+    expect(img.src.startsWith("data:image/svg+xml")).toBe(true);
   });
 
   it("toggles microphone button (starts OFF)", () => {

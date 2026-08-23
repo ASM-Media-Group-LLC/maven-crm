@@ -8,7 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
@@ -805,27 +805,13 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
 
   const fullName =
     user?.user_metadata?.full_name || profileQ.data?.full_name || "Usuario";
-  const initials = fullName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
   const avatarUrl = profileQ.data?.avatar_url ?? null;
 
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-2">
-        <div className="relative">
-          <Avatar className="h-8 w-8">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
-            <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
-          </Avatar>
-          <span
-            aria-label="Sesión activa"
-            title="Sesión activa"
-            className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background"
-          />
+        <div title="Sesión activa" aria-label="Sesión activa">
+          <UserAvatar name={fullName} src={avatarUrl} seed={user?.id} size="sm" status="online" />
         </div>
         {mounted && (
           <Button
@@ -862,16 +848,8 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           borde inferior-derecho del avatar (patrón estándar Slack/Discord/
           Linear) y el nombre tiene su línea completa, más limpio. */}
       <div className="flex items-center gap-2">
-        <div className="relative shrink-0">
-          <Avatar className="h-9 w-9">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
-            <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
-          </Avatar>
-          <span
-            aria-label="Sesión activa"
-            title="Sesión activa"
-            className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background"
-          />
+        <div className="shrink-0" title="Sesión activa" aria-label="Sesión activa">
+          <UserAvatar name={fullName} src={avatarUrl} seed={user?.id} size="md" status="online" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">{fullName}</div>
