@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, BarChart3 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -456,7 +457,7 @@ const ProjectsListContent = () => {
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-8">Cargando proyectos...</p>
           ) : filteredProjects.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No hay proyectos aún. Crea el primero.</p>
+            <EmptyState seed="empty-tareas" title="No hay proyectos aún" description="Crea el primero." />
           ) : viewMode === "list" ? (
             <ProjectsTable
               projects={filteredProjects}

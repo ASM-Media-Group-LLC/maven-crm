@@ -27,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { avatarGradient } from "@/lib/avatarColor";
+import { EmptyState } from "@/components/EmptyState";
 import { MailBody } from "@/components/correo/MailBody";
 import { MailComposer, type BorradorInicial } from "@/components/correo/MailComposer";
 import {
@@ -156,18 +157,12 @@ export default function CorreoPage() {
 
   if (!hayBuzon) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-20 text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/15 to-primary/15">
-          <Mail className="h-8 w-8 text-primary" />
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Todavía no tenés casilla
-        </h1>
-        <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Tu cuenta de correo se crea junto con tu usuario de Maven. Pedile a
-          un administrador que la active y esta pantalla se llena sola.
-        </p>
-      </div>
+      <EmptyState
+        className="mx-auto max-w-xl py-20"
+        seed="empty-correo"
+        title="Todavía no tienes casilla"
+        description="Tu cuenta de correo se crea junto con tu usuario de Maven. Pídele a un administrador que la active y esta pantalla se llena sola."
+      />
     );
   }
 

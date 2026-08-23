@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock,
 } from "lucide-react";
@@ -107,16 +108,12 @@ export default function GrabacionesPage() {
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
         </div>
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border/70 px-6 py-14 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-            <Clapperboard className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="font-semibold text-foreground">Todavía no hay grabaciones</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Dentro de una reunión de Meet o de una sala de Cowork vas a ver el botón
-            <b> Grabar</b> arriba a la izquierda. Al detener, elegís con quién compartirla.
-          </p>
-        </div>
+        <EmptyState
+          className="rounded-3xl border border-dashed border-border/70"
+          seed="empty-grabaciones"
+          title="Todavía no hay grabaciones"
+          description="Dentro de una reunión de Meet o de una sala de Cowork verás el botón Grabar arriba a la izquierda. Al detener, eliges con quién compartirla."
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((r) => {
