@@ -7,7 +7,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -759,13 +759,6 @@ const ContactosContent = () => {
             };
             const renderContactRow = (c: typeof kpiPopupContacts[number]) => {
               const cleanHandle = (c.handle || "").replace(/^@/, "");
-              const initials = (c.name || "")
-                .split(/\s+/)
-                .map((p) => p[0])
-                .filter(Boolean)
-                .slice(0, 2)
-                .join("")
-                .toUpperCase() || "?";
               const created = c.created_at
                 ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
                 : "—";
@@ -811,10 +804,13 @@ const ContactosContent = () => {
                   }}
                   className="group"
                 >
-                  <Avatar className="h-8 w-8 shrink-0">
-                    {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
-                    <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={c.name}
+                    src={c.profile_picture_url}
+                    seed={c.id}
+                    size="sm"
+                    className="h-8 w-8 shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {c.country_code && <span className="text-xs shrink-0">{getCountryFlag(c.country_code)}</span>}

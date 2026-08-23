@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useCreadores, type CreatorWithBusiness } from "./useCreadores";
 import { ListRowButton } from "@/components/ui/list-row";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
@@ -321,13 +321,6 @@ const CreadorasDashboardContent = () => {
             <div className="space-y-2">
               {latestCreators.map((c) => {
                 const handle = (c.instagram_handle || "").replace(/^@/, "");
-                const initials = (c.artistic_name || c.name || "")
-                  .split(/\s+/)
-                  .map((p) => p[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || "?";
                 return (
                   <button
                     key={c.id}
@@ -336,10 +329,13 @@ const CreadorasDashboardContent = () => {
                     className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 hover:border-primary/40"
                   >
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 shrink-0">
-                        {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
-                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={c.artistic_name || c.name}
+                        src={c.profile_photo_url}
+                        seed={c.id}
+                        size="md"
+                        className="h-10 w-10 shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{c.artistic_name ?? c.name}</p>
                         {handle && (
@@ -436,13 +432,6 @@ const CreadorasDashboardContent = () => {
             const c = creatorDetail;
             const handle = (c.instagram_handle || "").replace(/^@/, "");
             const igUrl = handle ? `https://instagram.com/${handle}` : null;
-            const initials = (c.artistic_name || c.name || "")
-              .split(/\s+/)
-              .map((p) => p[0])
-              .filter(Boolean)
-              .slice(0, 2)
-              .join("")
-              .toUpperCase() || "?";
             const stats: { label: string; value: string }[] = [
               { label: "Estado", value: c.status ?? "—" },
               { label: "Agencia", value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
@@ -455,10 +444,13 @@ const CreadorasDashboardContent = () => {
               <>
                 <DialogHeader>
                   <div className="flex items-start gap-4">
-                    <Avatar className="h-20 w-20 shrink-0">
-                      {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
-                      <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      name={c.artistic_name || c.name}
+                      src={c.profile_photo_url}
+                      seed={c.id}
+                      size="xl"
+                      className="h-20 w-20 shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                       <DialogTitle className="text-2xl mb-1 truncate">{c.artistic_name ?? c.name}</DialogTitle>
                       {handle && (
@@ -568,13 +560,6 @@ const CreadorasDashboardContent = () => {
             };
             const renderCreatorRow = (c: typeof popupCreators[number]) => {
               const handle = (c.instagram_handle || "").replace(/^@/, "");
-              const initials = (c.artistic_name || c.name || "")
-                .split(/\s+/)
-                .map((p) => p[0])
-                .filter(Boolean)
-                .slice(0, 2)
-                .join("")
-                .toUpperCase() || "?";
               return (
                 <ListRowButton
                   key={c.id}
@@ -585,10 +570,13 @@ const CreadorasDashboardContent = () => {
                   }}
                   className="group"
                 >
-                  <Avatar className="h-8 w-8 shrink-0">
-                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
-                    <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={c.artistic_name || c.name}
+                    src={c.profile_photo_url}
+                    seed={c.id}
+                    size="sm"
+                    className="h-8 w-8 shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{c.artistic_name || c.name || "Sin nombre"}</p>
                     {handle && (

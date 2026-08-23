@@ -4,7 +4,7 @@ import { Users, Building2, MapPin, Network, ChevronDown, ChevronRight } from "lu
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,10 +69,13 @@ function TreeNodeComponent({ node, level = 0 }: { node: TreeNode; level?: number
         ) : (
           <span className="w-5" />
         )}
-        <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={node.profile_photo_url ?? undefined} />
-          <AvatarFallback className="text-xs">{node.first_name[0]}{node.last_name[0]}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          name={`${node.first_name} ${node.last_name}`}
+          src={node.profile_photo_url}
+          seed={node.id}
+          size="sm"
+          className="h-8 w-8 shrink-0"
+        />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{node.first_name} {node.last_name}</p>
           <p className="text-xs text-muted-foreground truncate">{node.positions?.name ?? "Sin cargo"}</p>
@@ -223,10 +226,13 @@ export default function HROrganigrama() {
                 <TableRow key={emp.id} className="cursor-pointer" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={emp.profile_photo_url ?? undefined} />
-                        <AvatarFallback className="text-xs">{emp.first_name[0]}{emp.last_name[0]}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={`${emp.first_name} ${emp.last_name}`}
+                        src={emp.profile_photo_url}
+                        seed={emp.id}
+                        size="sm"
+                        className="h-8 w-8"
+                      />
                       <div>
                         <p className="text-sm font-medium">{emp.first_name} {emp.last_name}</p>
                         <p className="text-xs text-muted-foreground">{emp.email ?? ""}</p>
@@ -273,10 +279,13 @@ export default function HROrganigrama() {
                 onClick={() => navigate(`/hr/empleado/${emp.id}`)}
               >
                 <CardContent className="p-4 flex items-center gap-3">
-                  <Avatar className="h-12 w-12 shrink-0">
-                    <AvatarImage src={emp.profile_photo_url ?? undefined} />
-                    <AvatarFallback>{emp.first_name[0]}{emp.last_name[0]}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={`${emp.first_name} ${emp.last_name}`}
+                    src={emp.profile_photo_url}
+                    seed={emp.id}
+                    size="lg"
+                    className="h-12 w-12 shrink-0"
+                  />
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{emp.first_name} {emp.last_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? "Sin cargo"}</p>
@@ -304,10 +313,13 @@ export default function HROrganigrama() {
                       className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => navigate(`/hr/empleado/${emp.id}`)}
                     >
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarImage src={emp.profile_photo_url ?? undefined} />
-                        <AvatarFallback className="text-xs">{emp.first_name[0]}{emp.last_name[0]}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={`${emp.first_name} ${emp.last_name}`}
+                        src={emp.profile_photo_url}
+                        seed={emp.id}
+                        size="sm"
+                        className="h-9 w-9 shrink-0"
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{emp.first_name} {emp.last_name}</p>
                         <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? "Sin cargo"}</p>

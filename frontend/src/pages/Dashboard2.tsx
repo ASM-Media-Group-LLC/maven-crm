@@ -40,7 +40,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ExternalLink } from "lucide-react";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -1194,7 +1194,6 @@ const Dashboard2 = () => {
                     <div className="space-y-2">
                       {projection.map((c, i) => {
                         const igHandle = c.ig?.replace(/^@/, "") || "";
-                        const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                         return (
                           <button
                             key={c.creatorId}
@@ -1204,10 +1203,13 @@ const Dashboard2 = () => {
                           >
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-muted-foreground tabular-nums w-6 text-center shrink-0">{i + 1}</span>
-                              <Avatar className="h-10 w-10 shrink-0">
-                                {c.photo && <AvatarImage src={c.photo} alt={c.name} />}
-                                <AvatarFallback className="text-xs font-semibold">{initials || "?"}</AvatarFallback>
-                              </Avatar>
+                              <UserAvatar
+                                name={c.name}
+                                src={c.photo}
+                                seed={c.creatorId}
+                                size="md"
+                                className="h-10 w-10 shrink-0"
+                              />
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">{c.name}</p>
                                 {igHandle && (
@@ -1316,7 +1318,6 @@ const Dashboard2 = () => {
               ) : (
                 <div className="space-y-2">
                   {creators.map((c, i) => {
-                    const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                     return (
                       <button
                         key={c.creatorId}
@@ -1325,10 +1326,13 @@ const Dashboard2 = () => {
                         className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40 hover:border-primary/40 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.12)] transition-all duration-150"
                       >
                         <span className="text-xs font-bold text-muted-foreground w-7 shrink-0 tabular-nums">{i + 1}</span>
-                        <Avatar className="h-11 w-11 shrink-0">
-                          {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
-                          <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          name={c.name}
+                          src={c.profilePhotoUrl}
+                          seed={c.creatorId}
+                          size="md"
+                          className="h-11 w-11 shrink-0"
+                        />
                         <div className="min-w-[140px] flex-1">
                           <p className="font-medium text-sm truncate">{c.name}</p>
                           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -1494,7 +1498,6 @@ const Dashboard2 = () => {
                   const c = creatorDetail;
                   const igHandle = c.instagramHandle?.replace(/^@/, "") || "";
                   const igUrl = igHandle ? `https://instagram.com/${igHandle}` : null;
-                  const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                   const stats = [
                     { label: "Bruto", value: fmt(c.total), highlight: true },
                     { label: "Neto (80%)", value: fmt(c.net), highlight: true, color: "text-success" },
@@ -1520,10 +1523,13 @@ const Dashboard2 = () => {
                             className="relative group/avatar shrink-0 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-default"
                             title="Subir foto de perfil"
                           >
-                            <Avatar className="h-20 w-20">
-                              {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
-                              <AvatarFallback className="text-lg font-semibold">{initials || "?"}</AvatarFallback>
-                            </Avatar>
+                            <UserAvatar
+                              name={c.name}
+                              src={c.profilePhotoUrl}
+                              seed={c.creatorId}
+                              size="xl"
+                              className="h-20 w-20"
+                            />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity rounded-full">
                               {photoUploading ? (
                                 <Loader2 className="h-5 w-5 text-white animate-spin" />
@@ -1613,7 +1619,6 @@ const Dashboard2 = () => {
                   const p = projectionDetail;
                   const igHandle = p.ig?.replace(/^@/, "") || "";
                   const igUrl = igHandle ? `https://instagram.com/${igHandle}` : null;
-                  const initials = p.name.split(" ").map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                   const stats = [
                     { label: "Acumulado", value: fmt(p.total) },
                     { label: "$/Día", value: fmt(p.dailyAvg) },
@@ -1624,10 +1629,13 @@ const Dashboard2 = () => {
                     <>
                       <DialogHeader>
                         <div className="flex items-start gap-4">
-                          <Avatar className="h-20 w-20 shrink-0">
-                            {p.photo && <AvatarImage src={p.photo} alt={p.name} />}
-                            <AvatarFallback className="text-lg font-semibold">{initials || "?"}</AvatarFallback>
-                          </Avatar>
+                          <UserAvatar
+                            name={p.name}
+                            src={p.photo}
+                            seed={p.creatorId}
+                            size="xl"
+                            className="h-20 w-20 shrink-0"
+                          />
                           <div className="flex-1 min-w-0">
                             <DialogTitle className="text-2xl mb-1 truncate">{p.name}</DialogTitle>
                             {igHandle && (
@@ -1853,7 +1861,6 @@ const Dashboard2 = () => {
                           {paretoAnalysis.top.map((c, i) => {
                             const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
                             const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
-                            const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                             return (
                               <button
                                 key={c.creatorId}
@@ -1862,10 +1869,13 @@ const Dashboard2 = () => {
                                 className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40 hover:border-primary/40 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.12)] transition-all duration-150"
                               >
                                 <span className="text-xs font-bold text-primary w-6 shrink-0 tabular-nums">{i + 1}</span>
-                                <Avatar className="h-10 w-10 shrink-0">
-                                  {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
-                                  <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
-                                </Avatar>
+                                <UserAvatar
+                                  name={c.name}
+                                  src={c.profilePhotoUrl}
+                                  seed={c.creatorId}
+                                  size="md"
+                                  className="h-10 w-10 shrink-0"
+                                />
                                 <div className="min-w-0 flex-1">
                                   <p className="font-medium text-sm truncate">{c.name}</p>
                                   {c.instagramHandle && (
@@ -1897,7 +1907,6 @@ const Dashboard2 = () => {
                               const restRevenue = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
                               const pctOfRest = restRevenue > 0 ? (c.total / restRevenue) * 100 : 0;
                               const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
-                              const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                               return (
                                 <button
                                   key={c.creatorId}
@@ -1906,10 +1915,13 @@ const Dashboard2 = () => {
                                   className="w-full flex items-center gap-3 rounded-xl border border-border/50 bg-muted/15 px-4 py-2.5 text-left hover:bg-muted/35 hover:border-primary/30 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.08)] transition-all duration-150"
                                 >
                                   <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
-                                  <Avatar className="h-9 w-9 shrink-0 opacity-80">
-                                    {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
-                                    <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
-                                  </Avatar>
+                                  <UserAvatar
+                                    name={c.name}
+                                    src={c.profilePhotoUrl}
+                                    seed={c.creatorId}
+                                    size="sm"
+                                    className="h-9 w-9 shrink-0 opacity-80"
+                                  />
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm text-muted-foreground truncate">{c.name}</p>
                                     {c.instagramHandle && (

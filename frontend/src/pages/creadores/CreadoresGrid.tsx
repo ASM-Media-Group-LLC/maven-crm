@@ -4,7 +4,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -81,13 +81,6 @@ const CreadoresGrid = ({ creators }: Props) => {
           const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
           const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
           const displayName = showRealName ? c.name : (c.artistic_name || c.name);
-          const initials = displayName
-            .split(" ")
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join("")
-            .toUpperCase();
-
           const flag = showRealLocation ? getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null) : "";
           const location = showRealLocation
             ? [c.country, c.city].filter(Boolean).join(", ")
@@ -106,10 +99,13 @@ const CreadoresGrid = ({ creators }: Props) => {
                 
                 {/* Header: Avatar + Name + Badges */}
                 <div className="flex items-start gap-3">
-                  <Avatar className="h-12 w-12 shrink-0">
-                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-                    <AvatarFallback className="text-sm">{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={displayName}
+                    src={c.profile_photo_url}
+                    seed={c.id}
+                    size="lg"
+                    className="h-12 w-12 shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-semibold text-primary">
                       {showRealName ? (c.artistic_name || c.name) : displayName}
