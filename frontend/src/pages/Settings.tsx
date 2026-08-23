@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   Rocket,
   Shield,
@@ -41,7 +42,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode } from "@/hooks/useUserProfile";
+import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode, useSaveAvatarSeed } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 // Settings page — left rail with the user's role banner + tab list,
@@ -88,6 +89,8 @@ const MyAccountTab = () => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const upload = useUploadUserAvatar();
+  const saveSeed = useSaveAvatarSeed();
+  const [seedDraft, setSeedDraft] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pwOpen, setPwOpen] = useState(false);
 
@@ -164,6 +167,59 @@ const MyAccountTab = () => {
               <p className="mt-2 text-xs text-muted-foreground">
                 Pasa el cursor sobre la imagen para subir una nueva foto.
               </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Picker de muñequito: si el usuario no tiene foto, su avatar es un
+          muñequito determinista. Acá puede "mezclar" variantes y guardar la
+          que le guste (profiles.avatar_seed). La foto real siempre gana. */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-5">
+            <UserAvatar
+              name={fullName}
+              seed={seedDraft ?? profileQ.data?.avatar_seed ?? user?.id}
+              size="xl"
+              ring
+              className="shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-semibold">Tu muñequito</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Es tu avatar cuando no tienes foto de perfil. Mezcla hasta
+                encontrar uno que te guste y guárdalo.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setSeedDraft(`${user?.id ?? "seed"}:${Math.random().toString(36).slice(2, 8)}`)
+                  }
+                >
+                  Mezclar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!seedDraft || saveSeed.isPending}
+                  onClick={async () => {
+                    if (!seedDraft) return;
+                    try {
+                      await saveSeed.mutateAsync(seedDraft);
+                      setSeedDraft(null);
+                      toast.success("Muñequito guardado");
+                    } catch (e) {
+                      toast.error("No se pudo guardar", { description: (e as Error).message });
+                    }
+                  }}
+                >
+                  Guardar este
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

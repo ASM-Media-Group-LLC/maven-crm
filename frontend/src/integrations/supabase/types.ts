@@ -9189,6 +9189,7 @@ export type Database = {
       profiles: {
         Row: {
           ai_daily_quota_override: number | null
+          avatar_seed: string | null
           avatar_url: string | null
           company_id: string | null
           created_at: string | null
@@ -9202,6 +9203,7 @@ export type Database = {
         }
         Insert: {
           ai_daily_quota_override?: number | null
+          avatar_seed?: string | null
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -9215,6 +9217,7 @@ export type Database = {
         }
         Update: {
           ai_daily_quota_override?: number | null
+          avatar_seed?: string | null
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null

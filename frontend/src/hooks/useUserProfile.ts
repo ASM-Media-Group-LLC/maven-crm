@@ -16,6 +16,7 @@ export interface MyProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  avatar_seed: string | null;
   phone_e164: string | null;
   whatsapp_push_name: string | null;
   whatsapp_verified_at: string | null;
@@ -30,7 +31,7 @@ export const useMyProfile = () =>
       if (!uid) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, phone_e164, whatsapp_push_name, whatsapp_verified_at")
+        .select("id, full_name, avatar_url, avatar_seed, phone_e164, whatsapp_push_name, whatsapp_verified_at")
         .eq("id", uid)
         .maybeSingle();
       if (error) throw error;
@@ -48,6 +49,27 @@ export interface VerificationCode {
   bot_phone: string;
   wa_link: string;
 }
+
+// Guarda el seed del muñequito elegido en el picker de Settings. Invalida
+// "my-profile" para que sidebar y demás consumidores tomen el nuevo seed.
+export const useSaveAvatarSeed = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (seed: string) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("No autenticado");
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_seed: seed })
+        .eq("id", uid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
+};
 
 export const useRequestWhatsappVerification = () =>
   useMutation({
