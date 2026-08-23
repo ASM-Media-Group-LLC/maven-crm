@@ -22,6 +22,12 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import StatChip from "@/components/StatChip";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Crown } from "lucide-react";
+import { startOfMonth } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyProfile } from "@/hooks/useUserProfile";
+import { useBestCloser } from "@/hooks/useOperationsDashboard";
 import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { formatDistanceToNow, format } from "date-fns";
@@ -151,6 +157,23 @@ const DashboardContent = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccess } = usePermissions();
+  const { user } = useAuth();
+  const profileQ = useMyProfile();
+  // Banner "Mejor cerrador" del mes en curso (mismo hook que Closers/Panel).
+  // Solo se consulta si el rol puede ver Closers.
+  const bestCloserRange = useMemo(
+    () => ({ from: startOfMonth(new Date()), to: new Date() }),
+    [],
+  );
+  const bestCloserQ = useBestCloser(bestCloserRange);
+  const firstName = (
+    user?.user_metadata?.full_name || profileQ.data?.full_name || ""
+  ).split(" ")[0];
+  // "domingo 23 de agosto" con la primera letra en mayúscula
+  const fechaHoy = (() => {
+    const f = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
+    return f.charAt(0).toUpperCase() + f.slice(1);
+  })();
 
   // Quick Actions state
   const [selectedIds, setSelectedIds] = useState<string[]>(loadShortcuts);
@@ -318,12 +341,23 @@ const DashboardContent = () => {
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Vista general de toda la operación en tiempo real</p>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {firstName ? `Buenas, ${firstName}` : "Dashboard"}
+            </h1>
+            <p className="text-sm text-muted-foreground">{fechaHoy} · la operación en tiempo real</p>
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
-            <RefreshCw className="h-3.5 w-3.5" /> Actualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
+              <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5 border-0 bg-gradient-to-br from-primary to-accent text-white shadow-lg shadow-primary/25 hover:opacity-90"
+              onClick={() => navigate("/tareas")}
+            >
+              Nueva tarea
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -332,6 +366,27 @@ const DashboardContent = () => {
 
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Mejor cerrador del mes — el momento con personalidad del mockup.
+            Mismo dato que el hero de Closers; visible solo con permiso. */}
+        {canAccess("Closers") && bestCloserQ.data ? (
+          <button
+            type="button"
+            onClick={() => navigate("/closers")}
+            className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform hover:scale-[1.005]"
+          >
+            <UserAvatar name={bestCloserQ.data.name} size="lg" ring />
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
+                Mejor cerrador · {format(new Date(), "MMMM", { locale: es })}
+              </div>
+              <div className="truncate text-lg font-bold">{bestCloserQ.data.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {bestCloserQ.data.closes} {bestCloserQ.data.closes === 1 ? "cierre" : "cierres"} · Calif. QA promedio {Math.round(bestCloserQ.data.avgScore)}/100
+              </div>
+            </div>
+            <Crown className="h-7 w-7 shrink-0 text-amber-500" />
+          </button>
+        ) : null}
         {/* KPI Cards — stat-chips compactos; click abre modal */}
         <div className={`grid gap-3 ${getGridCols(kpis.length)}`}>
           {kpis.map((k) => (

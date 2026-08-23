@@ -96,12 +96,6 @@ const MyAccountTab = () => {
 
   const fullName = user?.user_metadata?.full_name || profileQ.data?.full_name || "Usuario";
   const email = user?.email || "";
-  const initials = fullName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
   const avatarUrl = profileQ.data?.avatar_url ?? null;
 
   const handleFile = async (file: File) => {
@@ -127,10 +121,12 @@ const MyAccountTab = () => {
         <CardContent className="p-6">
           <div className="flex items-center gap-5">
             <div className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-full">
-              <Avatar className="h-full w-full">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
-                <AvatarFallback className="text-xl">{initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={fullName}
+                src={avatarUrl}
+                seed={profileQ.data?.avatar_seed}
+                className="h-full w-full"
+              />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}

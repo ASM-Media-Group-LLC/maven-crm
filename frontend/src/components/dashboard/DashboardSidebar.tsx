@@ -35,7 +35,20 @@ import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { cn } from "@/lib/utils";
 
-const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-3 text-sm sidebar-glass-hover";
+const LINK_CLASS = "flex items-center gap-2 rounded-xl px-3 py-3 text-sm sidebar-glass-hover";
+
+// Tinte del badge por módulo (mockup "Maven sin corbata"): cada contador con
+// el color de su módulo en vez de rojo genérico. El rojo queda reservado para
+// lo urgente (Tareas vencidas / Telegram sin leer). El número no cambia.
+const BADGE_TINTS: Record<string, string> = {
+  Promolog: "bg-primary/15 text-primary",
+  LeadGen: "bg-accent/15 text-accent",
+  Closers: "bg-warning/15 text-warning",
+  WhatsApp: "bg-success/15 text-success",
+  Messenger: "bg-success/15 text-success",
+};
+const badgeTint = (module: string | undefined): string =>
+  (module && BADGE_TINTS[module]) || "bg-destructive text-destructive-foreground";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 // Cuando una fila de menú tiene su botón de mute (WhatsApp/Telegram/Messenger),
 // el NavLink reserva espacio a la derecha para que ni el título ni el badge se
@@ -391,7 +404,7 @@ const DashboardSidebar = () => {
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
-                        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
+                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
                           {item.badge > 99 ? "99+" : item.badge}
                         </span>
                       )}
@@ -443,7 +456,7 @@ const DashboardSidebar = () => {
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
-                        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
+                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
                           {item.badge}
                         </span>
                       )}
@@ -847,7 +860,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           ahora el estado de presencia vive como un dot 2.5px verde sobre el
           borde inferior-derecho del avatar (patrón estándar Slack/Discord/
           Linear) y el nombre tiene su línea completa, más limpio. */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/70 p-2">
         <div className="shrink-0" title="Sesión activa" aria-label="Sesión activa">
           <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed} size="md" status="online" />
         </div>
