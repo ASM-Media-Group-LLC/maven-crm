@@ -28,7 +28,7 @@ export function useChat() {
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, whatsapp_push_name");
+      .select("id, full_name, avatar_url, avatar_seed, whatsapp_push_name");
     if (data) {
       const map: Record<string, UserProfile> = {};
       data.forEach((p: any) => { map[p.id] = p; });

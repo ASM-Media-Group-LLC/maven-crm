@@ -310,7 +310,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               <UserAvatar
                 name={senderName}
                 src={profiles[message.sender_id]?.avatar_url}
-                seed={message.sender_id}
+                seed={profiles[message.sender_id]?.avatar_seed}
                 size="sm"
                 className="h-7 w-7"
               />

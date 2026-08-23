@@ -425,7 +425,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_20%)]">
                 <UserAvatar
                   name={displayName}
-                  seed={displayName}
                   size="xl"
                   className="h-20 w-20 md:h-24 md:w-24"
                 />

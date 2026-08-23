@@ -102,7 +102,6 @@ const CreadoresGrid = ({ creators }: Props) => {
                   <UserAvatar
                     name={displayName}
                     src={c.profile_photo_url}
-                    seed={c.id}
                     size="lg"
                     className="h-12 w-12 shrink-0"
                   />

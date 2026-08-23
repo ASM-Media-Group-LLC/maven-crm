@@ -1177,7 +1177,6 @@ const Dashboard2 = () => {
                               <UserAvatar
                                 name={c.name}
                                 src={c.photo}
-                                seed={c.creatorId}
                                 size="md"
                                 className="h-10 w-10 shrink-0"
                               />
@@ -1300,7 +1299,6 @@ const Dashboard2 = () => {
                         <UserAvatar
                           name={c.name}
                           src={c.profilePhotoUrl}
-                          seed={c.creatorId}
                           size="md"
                           className="h-11 w-11 shrink-0"
                         />
@@ -1497,7 +1495,6 @@ const Dashboard2 = () => {
                             <UserAvatar
                               name={c.name}
                               src={c.profilePhotoUrl}
-                              seed={c.creatorId}
                               size="xl"
                               className="h-20 w-20"
                             />
@@ -1603,7 +1600,6 @@ const Dashboard2 = () => {
                           <UserAvatar
                             name={p.name}
                             src={p.photo}
-                            seed={p.creatorId}
                             size="xl"
                             className="h-20 w-20 shrink-0"
                           />
@@ -1840,7 +1836,6 @@ const Dashboard2 = () => {
                                 <UserAvatar
                                   name={c.name}
                                   src={c.profilePhotoUrl}
-                                  seed={c.creatorId}
                                   size="md"
                                   className="h-10 w-10 shrink-0"
                                 />
@@ -1886,7 +1881,6 @@ const Dashboard2 = () => {
                                   <UserAvatar
                                     name={c.name}
                                     src={c.profilePhotoUrl}
-                                    seed={c.creatorId}
                                     size="sm"
                                     className="h-9 w-9 shrink-0 opacity-80"
                                   />

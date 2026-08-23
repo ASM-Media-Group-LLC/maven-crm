@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,6 @@ const OnboardingTable = ({ data, onManage }: Props) => {
           <TableBody>
             {data.map((item) => {
               const displayName = item.name?.trim() || "Sin nombre";
-              const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
               const sc = statusConfig[item.status];
               const StatusIcon = sc.icon;
               const pending = isPendingVerification(item);
@@ -90,10 +89,12 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                 <TableRow key={item.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={item.profile_photo_url || undefined} />
-                        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={displayName}
+                        src={item.profile_photo_url}
+                        size="sm"
+                        className="h-8 w-8"
+                      />
                       <span className="font-medium text-sm">{displayName}</span>
                       {pending && (
                         <Tooltip>

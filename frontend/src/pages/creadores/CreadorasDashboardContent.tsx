@@ -332,7 +332,6 @@ const CreadorasDashboardContent = () => {
                       <UserAvatar
                         name={c.artistic_name || c.name}
                         src={c.profile_photo_url}
-                        seed={c.id}
                         size="md"
                         className="h-10 w-10 shrink-0"
                       />
@@ -447,7 +446,6 @@ const CreadorasDashboardContent = () => {
                     <UserAvatar
                       name={c.artistic_name || c.name}
                       src={c.profile_photo_url}
-                      seed={c.id}
                       size="xl"
                       className="h-20 w-20 shrink-0"
                     />
@@ -573,7 +571,6 @@ const CreadorasDashboardContent = () => {
                   <UserAvatar
                     name={c.artistic_name || c.name}
                     src={c.profile_photo_url}
-                    seed={c.id}
                     size="sm"
                     className="h-8 w-8 shrink-0"
                   />

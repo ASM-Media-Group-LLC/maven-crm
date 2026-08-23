@@ -288,7 +288,6 @@ const ParticipantTile = memo(function ParticipantTile({
       ) : (
         <UserAvatar
           name={participant.name}
-          seed={participant.identity}
           size="xl"
           className={cn("z-[1]", large ? "h-24 w-24" : "h-16 w-16")}
         />

@@ -54,7 +54,7 @@ export default function CallParticipantsSidebar({
               )}
             >
               <div className="relative">
-                <UserAvatar name={p.name} seed={p.identity} size="sm" />
+                <UserAvatar name={p.name} size="sm" />
                 {p.isSpeaking && (
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-[hsl(145_63%_49%)] border-2 border-[hsl(220_3%_17%)]" />
                 )}

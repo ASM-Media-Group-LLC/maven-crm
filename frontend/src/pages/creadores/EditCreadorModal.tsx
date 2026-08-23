@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   Select,
   SelectContent,
@@ -145,12 +145,6 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
 
   // Identity bits para el header del modal.
   const displayName = creator.artistic_name || creator.name || "Creadora";
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
   const igUrl = buildSocialUrl("instagram", creator.instagram_handle);
 
   // Sub-componente: nombre como link a IG si existe; sino texto plano.
@@ -188,20 +182,20 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 className="shrink-0 group"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Avatar className="h-14 w-14 ring-2 ring-border transition-all group-hover:ring-primary/50">
-                  {creator.profile_photo_url && (
-                    <AvatarImage src={creator.profile_photo_url} alt={displayName} />
-                  )}
-                  <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={displayName}
+                  src={creator.profile_photo_url}
+                  size="lg"
+                  className="h-14 w-14 ring-2 ring-border transition-all group-hover:ring-primary/50"
+                />
               </a>
             ) : (
-              <Avatar className="h-14 w-14 shrink-0 ring-2 ring-border">
-                {creator.profile_photo_url && (
-                  <AvatarImage src={creator.profile_photo_url} alt={displayName} />
-                )}
-                <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={displayName}
+                src={creator.profile_photo_url}
+                size="lg"
+                className="h-14 w-14 shrink-0 ring-2 ring-border"
+              />
             )}
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-lg">Editar Creador</DialogTitle>

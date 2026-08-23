@@ -400,7 +400,7 @@ export default function ChatSidebar({
                         <UserAvatar
                           name={p.full_name || "?"}
                           src={p.avatar_url}
-                          seed={p.id}
+                          seed={p.avatar_seed}
                           size="sm"
                           className="h-7 w-7"
                         />
@@ -534,7 +534,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
               <UserAvatar
                 name={conversation.displayName}
                 src={conversation.avatar_url || otherParticipant?.profile?.avatar_url}
-                seed={otherParticipant?.user_id || conversation.id}
+                seed={otherParticipant?.profile?.avatar_seed}
                 className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}
               />
             )}

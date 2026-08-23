@@ -1,10 +1,11 @@
 // Avatar único de Maven — cadena de fallback: foto real → muñequito DiceBear
-// (seed determinista, normalmente el id del usuario) → iniciales sobre un
-// degradé determinista. Reemplaza a los Avatar+AvatarFallback armados a mano
-// en cada pantalla. Reglas:
-//   - `seed`: pasar SIEMPRE que haya un id estable; si falta, se usa `name`.
-//   - `ring`: anillo degradé azul→violeta, reservado para lo destacado
-//     (perfil propio, selección, podios) — no ponérselo a todo.
+// (SOLO si la persona eligió uno: profiles.avatar_seed) → iniciales sobre un
+// degradé determinista. Reglas:
+//   - Por defecto: foto o iniciales. NO pasar ids como `seed`.
+//   - `seed`: únicamente el avatar_seed elegido en Settings (o un seed
+//     decorativo en ilustraciones tipo EmptyState). Cuando hay muñequito,
+//     lleva SIEMPRE el anillo degradé azul→violeta (como en los mockups).
+//   - `ring`: fuerza el anillo también sin muñequito (destacados/podios).
 //   - `status`: punto de presencia (online/busy/away) sobre el borde.
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { avatarGradient } from "@/lib/avatarColor";
@@ -31,7 +32,7 @@ export interface UserAvatarProps {
   name: string | null | undefined;
   /** URL de la foto real (avatar_url / profile_photo_url / profile_picture_url). */
   src?: string | null;
-  /** Clave estable para el muñequito (id de usuario/contacto). Sin seed ni foto → iniciales. */
+  /** avatar_seed elegido por la persona (o seed decorativo). Sin seed ni foto → iniciales. */
   seed?: string | null;
   size?: UserAvatarSize;
   /** Anillo degradé azul→violeta para elementos destacados. */
@@ -53,7 +54,7 @@ export function UserAvatar({
   const fallbackSeed = seed || null;
 
   const core = (
-    <Avatar className={cn(s.avatar, !ring && className)}>
+    <Avatar className={cn(s.avatar, !(ring || (!src && !!seed)) && className)}>
       {src ? <AvatarImage src={src} alt={name ?? ""} /> : null}
       {fallbackSeed ? (
         <AvatarFallback className="bg-secondary p-0">
@@ -78,11 +79,14 @@ export function UserAvatar({
     </Avatar>
   );
 
-  if (!ring && !status) return core;
+  // El muñequito elegido lleva anillo siempre; `ring` lo fuerza para el resto.
+  const showRing = ring || (!src && !!fallbackSeed);
+
+  if (!showRing && !status) return core;
 
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
-      {ring ? (
+      {showRing ? (
         <div className="rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
           <div className="rounded-full bg-background p-[2px]">{core}</div>
         </div>

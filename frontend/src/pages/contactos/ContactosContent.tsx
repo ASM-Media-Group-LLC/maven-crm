@@ -807,7 +807,6 @@ const ContactosContent = () => {
                   <UserAvatar
                     name={c.name}
                     src={c.profile_picture_url}
-                    seed={c.id}
                     size="sm"
                     className="h-8 w-8 shrink-0"
                   />

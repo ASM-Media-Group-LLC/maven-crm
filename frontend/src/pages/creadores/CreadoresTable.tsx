@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CreatorWithBusiness } from "./useCreadores";
@@ -236,12 +236,6 @@ const CreadoresTable = ({ creators }: Props) => {
           const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
           const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
           const displayName = showRealName ? c.name : (c.artistic_name || c.name);
-          const initials = displayName
-            .split(" ")
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join("")
-            .toUpperCase();
 
           const flag = showRealLocation ? getFlagEmoji(c.country_code) : "";
           const agencyLabel = canonicalAgency(c.creator_business);
@@ -250,10 +244,11 @@ const CreadoresTable = ({ creators }: Props) => {
             <TableRow key={c.id}>
               <TableCell className="cursor-pointer" onClick={() => setViewingCreator(c)}>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={displayName}
+                    src={c.profile_photo_url}
+                    className="h-10 w-10"
+                  />
                   <div>
                     <p className="text-sm font-medium leading-none">{showRealName ? (c.artistic_name || c.name) : displayName}</p>
                     {showRealName && c.artistic_name && (

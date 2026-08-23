@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {data.map((item) => {
           const displayName = item.name?.trim() || "Sin nombre";
-          const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
           const sc = statusConfig[item.status];
           const StatusIcon = sc.icon;
           const pending = item.dbStatus === "pendiente_verificacion";
@@ -36,10 +35,11 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
             <Card key={item.id} className="hover:border-primary/30 transition-colors">
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={item.profile_photo_url || undefined} />
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={displayName}
+                    src={item.profile_photo_url}
+                    className="h-10 w-10"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="font-medium text-sm truncate">{displayName}</p>

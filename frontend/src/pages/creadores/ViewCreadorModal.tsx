@@ -13,7 +13,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -117,7 +117,6 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const { isAdmin } = useUserRole();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const c = creator;
-  const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
   const igUrl = c.instagram_handle ? buildSocialUrl("instagram", c.instagram_handle) : null;
@@ -153,16 +152,20 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 title="Ver Instagram"
                 aria-label="Ver Instagram"
               >
-                <Avatar className="h-16 w-16 cursor-pointer">
-                  {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-                  <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={c.name}
+                  src={c.profile_photo_url}
+                  size="xl"
+                  className="h-16 w-16 cursor-pointer"
+                />
               </a>
             ) : (
-              <Avatar className="h-16 w-16">
-                {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={c.name}
+                src={c.profile_photo_url}
+                size="xl"
+                className="h-16 w-16"
+              />
             )}
             <div className="flex-1 min-w-0">
               <DialogTitle className="text-xl">

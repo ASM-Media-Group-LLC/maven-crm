@@ -38,12 +38,10 @@ describe("ParticipantTile", () => {
     expect(screen.getByText("Tú")).toBeInTheDocument();
   });
 
-  it("shows avatar (muñequito determinista) when camera is off", () => {
+  it("shows avatar fallback initials when camera is off", () => {
     render(<ParticipantTile participant={makeMockParticipant({ isCameraOff: true })} room={null} />);
-    // Con cámara apagada cae al UserAvatar: muñequito DiceBear por seed
-    // (identity), renderizado como <img> con el nombre en el alt.
-    const img = screen.getByAltText("Juan Pérez") as HTMLImageElement;
-    expect(img.src.startsWith("data:image/svg+xml")).toBe(true);
+    // Sin foto ni muñequito elegido, UserAvatar cae a las iniciales.
+    expect(screen.getByText("JP")).toBeInTheDocument();
   });
 
   it("renders video element when camera is on", () => {

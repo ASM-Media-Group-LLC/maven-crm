@@ -811,7 +811,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
     return (
       <div className="flex flex-col items-center gap-2">
         <div title="Sesión activa" aria-label="Sesión activa">
-          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed || user?.id} size="sm" status="online" />
+          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed} size="sm" status="online" />
         </div>
         {mounted && (
           <Button
@@ -849,7 +849,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           Linear) y el nombre tiene su línea completa, más limpio. */}
       <div className="flex items-center gap-2">
         <div className="shrink-0" title="Sesión activa" aria-label="Sesión activa">
-          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed || user?.id} size="md" status="online" />
+          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed} size="md" status="online" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">{fullName}</div>
