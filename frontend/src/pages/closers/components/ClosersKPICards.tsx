@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown, Repeat } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { es } from "date-fns/locale";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
@@ -165,43 +166,35 @@ const ClosersKPICards = ({
       <button
         type="button"
         onClick={() => setMonthlyOpen(true)}
-        className="w-full text-left"
+        className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform hover:scale-[1.005]"
       >
-        <Card className="p-5 border-2 border-amber-500/30 relative overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:border-amber-500/60 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)] cursor-pointer">
-          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-amber-500" />
-          <div className="relative flex items-center gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg">
-              <Crown className="h-8 w-8 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
-                Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· {format(today, "MMMM yyyy", { locale: es })}</span>
-              </p>
-              {bestCloserLoading ? (
-                <Skeleton className="mt-1 h-7 w-48" />
-              ) : bestCloser ? (
-                <>
-                  <p className="text-2xl font-bold leading-tight mt-1 truncate">
-                    {bestCloser.name}
-                  </p>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                    <span className="tabular-nums">
-                      <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
-                    </span>
-                    <span className="text-border">·</span>
-                    <span className="tabular-nums">
-                      Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Sin calls en el rango seleccionado.
-                </p>
-              )}
-            </div>
+        <UserAvatar name={bestCloser?.name ?? "?"} size="lg" ring />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
+            Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· {format(today, "MMMM yyyy", { locale: es })}</span>
           </div>
-        </Card>
+          {bestCloserLoading ? (
+            <Skeleton className="mt-1 h-7 w-48" />
+          ) : bestCloser ? (
+            <>
+              <div className="truncate text-lg font-bold">{bestCloser.name}</div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
+                </span>
+                <span className="text-border">·</span>
+                <span className="tabular-nums">
+                  Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">
+              Sin calls en el rango seleccionado.
+            </p>
+          )}
+        </div>
+        <Crown className="h-7 w-7 shrink-0 text-amber-500" />
       </button>
 
       <BestCloserMonthlyDialog open={monthlyOpen} onOpenChange={setMonthlyOpen} />
@@ -244,11 +237,11 @@ const ClosersKPICards = ({
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {pipelineCards.map((card) => (
-            <KpiCard
+            <StatChip
               key={card.label}
               label={card.label}
               value={card.count}
-              icon={card.icon}
+              icon={<card.icon className="h-3.5 w-3.5" />}
               color={card.color}
               onClick={onPipelineClick ? () => onPipelineClick(card.key) : undefined}
             />
@@ -263,11 +256,11 @@ const ClosersKPICards = ({
         </h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {heroRevenue.map((card) => (
-            <KpiCard
+            <StatChip
               key={card.label}
               label={card.label}
               value={fmtMoney(card.amount)}
-              icon={card.icon}
+              icon={<card.icon className="h-3.5 w-3.5" />}
               color={card.color}
               onClick={onRevenueClick ? () => onRevenueClick(card.label) : undefined}
             />
