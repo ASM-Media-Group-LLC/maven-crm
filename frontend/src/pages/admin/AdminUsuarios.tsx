@@ -278,11 +278,19 @@ const AdminUsuarios = () => {
                         const r = res as {
                           email?: string;
                           temp_password?: string;
+                          hand_delivery?: boolean;
+                          email_sent?: boolean;
+                          email_sent_to?: string | null;
+                          email_error?: string | null;
                           mailbox?: { ok: boolean; error?: string | null } | null;
                         } | undefined;
                         setCredenciales({
                           email: r?.email ?? "",
                           temp_password: r?.temp_password ?? "",
+                          hand_delivery: r?.hand_delivery ?? true,
+                          email_sent: r?.email_sent ?? false,
+                          email_sent_to: r?.email_sent_to ?? null,
+                          email_error: r?.email_error ?? null,
                           mailbox_ok: r?.mailbox?.ok ?? false,
                           mailbox_error: r?.mailbox?.error ?? null,
                         });

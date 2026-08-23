@@ -9,17 +9,20 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Alta de usuario: NOMBRE, APELLIDO y ROL. Nada más.
+ * Alta de usuario: NOMBRE, APELLIDO, ROL y el TIPO de correo.
  *
- * El correo de acceso NO se pide: se genera del nombre
- * (juan.perez@maven-ai.me; si está ocupado, juan.perez1@...) y es a la vez
- * la casilla de correo — identidad = casilla. La contraseña temporal
- * aparece acá al terminar, para que el admin se la entregue en mano: la
- * recuperación también es por admin (reset y entrega), así que no hay
- * correo personal que pedir.
+ * Dos modos (decisión de Jhon, 23/08/2026):
+ *  · Casilla Maven (default): el correo de acceso se genera del nombre
+ *    (juan.perez@maven-ai.me; ocupado → juan.perez1@...) y es a la vez la
+ *    casilla — identidad = casilla. La contraseña temporal aparece acá al
+ *    terminar y el admin la entrega EN MANO (mandarla a una casilla que
+ *    se abre con esa misma contraseña es el círculo vicioso).
+ *  · Correo externo: se escribe el correo de la persona, entra con ese, y
+ *    la contraseña temporal LE LLEGA AHÍ (el flujo de siempre). No se le
+ *    crea casilla @maven-ai.me.
  *
- * Decisión de producto de Jhon (21/08/2026), reemplaza al formulario de
- * cinco campos.
+ * El backend ya distingue solo: con `email` no provisiona casilla y manda
+ * la bienvenida por Resend; sin `email` genera la dirección y no manda nada.
  */
 
 /** Dominio de las casillas. Copia SOLO para previsualizar: la dirección
@@ -43,12 +46,21 @@ export interface NuevoUsuario {
   first_name: string;
   last_name: string;
   role?: string;
+  /** Solo en modo "correo externo": el login es este correo y la
+   *  contraseña temporal viaja ahí. Ausente = casilla Maven generada. */
+  email?: string;
 }
 
-/** Lo que el backend devuelve y el admin tiene que ENTREGAR. */
+/** Lo que el backend devuelve y el admin tiene que ENTREGAR (o confirmar
+ *  que ya viajó por correo, según el modo). */
 export interface CredencialesCreadas {
   email: string;
   temp_password: string;
+  /** true = la contraseña NO viajó por correo: el admin la entrega en mano. */
+  hand_delivery: boolean;
+  email_sent: boolean;
+  email_sent_to: string | null;
+  email_error: string | null;
   mailbox_ok: boolean;
   mailbox_error?: string | null;
 }
@@ -66,6 +78,8 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
+  const [tipoCorreo, setTipoCorreo] = useState<"maven" | "externo">("maven");
+  const [emailExterno, setEmailExterno] = useState("");
   const [copiado, setCopiado] = useState<"correo" | "clave" | null>(null);
 
   // Resetea el form cada vez que el modal se abre (el cierre programático
@@ -75,6 +89,8 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
       setFirstName("");
       setLastName("");
       setRole("employee");
+      setTipoCorreo("maven");
+      setEmailExterno("");
       setCopiado(null);
     }
   }, [open]);
@@ -97,10 +113,20 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
     },
   });
 
+  const externoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailExterno.trim());
+  const puedeEnviar =
+    !!firstName.trim() && !!lastName.trim() &&
+    (tipoCorreo === "maven" || externoValido);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim()) return;
-    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), role });
+    if (!puedeEnviar) return;
+    onConfirm({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      role,
+      ...(tipoCorreo === "externo" ? { email: emailExterno.trim().toLowerCase() } : {}),
+    });
   };
 
   const copiar = async (texto: string, cual: "correo" | "clave") => {
@@ -126,39 +152,87 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Entregale estos datos a la persona. La contraseña
-                <strong> no se muestra de nuevo</strong>: si se pierde, se le
-                hace un reset desde acá mismo.
-              </p>
+              {credenciales.hand_delivery ? (
+                /* Casilla Maven: la contraseña se entrega en mano. */
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Entregale estos datos a la persona. La contraseña
+                    <strong> no se muestra de nuevo</strong>: si se pierde, se le
+                    hace un reset desde acá mismo.
+                  </p>
 
-              <Credencial
-                etiqueta="Correo de acceso"
-                valor={credenciales.email}
-                icono={Mail}
-                copiado={copiado === "correo"}
-                onCopiar={() => copiar(credenciales.email, "correo")}
-              />
-              <Credencial
-                etiqueta="Contraseña temporal"
-                valor={credenciales.temp_password}
-                icono={KeyRound}
-                mono
-                copiado={copiado === "clave"}
-                onCopiar={() => copiar(credenciales.temp_password, "clave")}
-              />
+                  <Credencial
+                    etiqueta="Correo de acceso"
+                    valor={credenciales.email}
+                    icono={Mail}
+                    copiado={copiado === "correo"}
+                    onCopiar={() => copiar(credenciales.email, "correo")}
+                  />
+                  <Credencial
+                    etiqueta="Contraseña temporal"
+                    valor={credenciales.temp_password}
+                    icono={KeyRound}
+                    mono
+                    copiado={copiado === "clave"}
+                    onCopiar={() => copiar(credenciales.temp_password, "clave")}
+                  />
 
-              {credenciales.mailbox_ok ? (
-                <p className="text-xs text-muted-foreground">
-                  La casilla de correo quedó creada y aparece en la pestaña
-                  Correo al entrar.
-                </p>
+                  {credenciales.mailbox_ok ? (
+                    <p className="text-xs text-muted-foreground">
+                      La casilla de correo quedó creada y aparece en la pestaña
+                      Correo al entrar.
+                    </p>
+                  ) : (
+                    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
+                      El acceso a Maven quedó bien, pero la casilla de correo no
+                      se pudo crear{credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : ""}.
+                      Se puede reintentar después sin romper nada.
+                    </p>
+                  )}
+                </>
+              ) : credenciales.email_sent ? (
+                /* Correo externo y el envío salió: no hay nada que entregar. */
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    La contraseña temporal ya le llegó por correo a{" "}
+                    <strong className="text-foreground">{credenciales.email_sent_to}</strong>.
+                    No hay nada que entregar en mano.
+                  </p>
+                  <Credencial
+                    etiqueta="Correo de acceso"
+                    valor={credenciales.email}
+                    icono={Mail}
+                    copiado={copiado === "correo"}
+                    onCopiar={() => copiar(credenciales.email, "correo")}
+                  />
+                </>
               ) : (
-                <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
-                  El acceso a Maven quedó bien, pero la casilla de correo no
-                  se pudo crear{credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : ""}.
-                  Se puede reintentar después sin romper nada.
-                </p>
+                /* Correo externo pero el envío FALLÓ: el fallback es la
+                   entrega en mano — sin esto la persona queda sin poder
+                   entrar y nadie se entera. */
+                <>
+                  <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-muted-foreground">
+                    La cuenta quedó creada pero <strong>el correo con la
+                    contraseña no salió</strong>
+                    {credenciales.email_error ? ` (${credenciales.email_error})` : ""}.
+                    Entregale estos datos en mano:
+                  </p>
+                  <Credencial
+                    etiqueta="Correo de acceso"
+                    valor={credenciales.email}
+                    icono={Mail}
+                    copiado={copiado === "correo"}
+                    onCopiar={() => copiar(credenciales.email, "correo")}
+                  />
+                  <Credencial
+                    etiqueta="Contraseña temporal"
+                    valor={credenciales.temp_password}
+                    icono={KeyRound}
+                    mono
+                    copiado={copiado === "clave"}
+                    onCopiar={() => copiar(credenciales.temp_password, "clave")}
+                  />
+                </>
               )}
             </div>
             <DialogFooter>
@@ -204,13 +278,68 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                 </div>
               </div>
 
-              {sugerida && (
-                <div className="flex items-start gap-2 rounded-lg bg-primary/5 px-3 py-2.5">
-                  <AtSign className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
-                  <p className="text-xs text-muted-foreground">
-                    Va a entrar con <strong className="text-foreground">{sugerida}</strong>,
-                    que es también su casilla de correo. Si ese nombre ya está
-                    ocupado, se le agrega un número solo.
+              <div className="space-y-2">
+                <Label>Correo de acceso</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoCorreo("maven")}
+                    className={
+                      "rounded-lg border px-3 py-2 text-left text-xs transition-colors " +
+                      (tipoCorreo === "maven"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted/50")
+                    }
+                  >
+                    <span className="block font-semibold">Casilla Maven</span>
+                    <span className="block text-[11px] opacity-80">Se genera del nombre</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoCorreo("externo")}
+                    className={
+                      "rounded-lg border px-3 py-2 text-left text-xs transition-colors " +
+                      (tipoCorreo === "externo"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted/50")
+                    }
+                  >
+                    <span className="block font-semibold">Correo externo</span>
+                    <span className="block text-[11px] opacity-80">Gmail, etc.</span>
+                  </button>
+                </div>
+              </div>
+
+              {tipoCorreo === "maven" ? (
+                sugerida && (
+                  <div className="flex items-start gap-2 rounded-lg bg-primary/5 px-3 py-2.5">
+                    <AtSign className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
+                    <p className="text-xs text-muted-foreground">
+                      Va a entrar con <strong className="text-foreground">{sugerida}</strong>,
+                      que es también su casilla de correo. Si ese nombre ya está
+                      ocupado, se le agrega un número solo. La contraseña la
+                      entregás vos en mano al terminar.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="persona@gmail.com"
+                      value={emailExterno}
+                      onChange={(e) => setEmailExterno(e.target.value)}
+                      className="pl-9"
+                      required
+                      maxLength={120}
+                    />
+                  </div>
+                  <p className="rounded-lg bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
+                    Va a entrar con ese correo y <strong className="text-foreground">la
+                    contraseña temporal le llega ahí</strong> — no hay nada que
+                    entregar en mano. No se le crea casilla @{DOMINIO_CASILLA}.
                   </p>
                 </div>
               )}
@@ -235,7 +364,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isLoading || !firstName.trim() || !lastName.trim()}>
+                <Button type="submit" disabled={isLoading || !puedeEnviar}>
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Agregar
                 </Button>
