@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
@@ -299,10 +299,10 @@ export default function ControlFinancieroPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} color="bg-success" subtitle="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
-              <KpiCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} color="bg-destructive" subtitle="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />
-              <KpiCard label="Balance" value={fmt(balance)} icon={DollarSign} color={balance < 0 ? "bg-destructive" : "bg-success"} subtitle={balance >= 0 ? "Positivo" : "Negativo"} onClick={() => setKpiPopup("balance")} />
-              <KpiCard label="Margen" value={`${margenPct}%`} icon={BarChart3} color="bg-amber-500" subtitle="Sobre ingresos" onClick={() => setKpiPopup("margen")} />
+              <StatChip label="Ingresos Totales" value={fmt(ingresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
+              <StatChip label="Egresos Totales" value={fmt(egresos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />
+              <StatChip label="Balance" value={fmt(balance)} icon={<DollarSign className="h-3.5 w-3.5" />} color={balance < 0 ? "bg-destructive" : "bg-success"} hint={balance >= 0 ? "Positivo" : "Negativo"} onClick={() => setKpiPopup("balance")} />
+              <StatChip label="Margen" value={`${margenPct}%`} icon={<BarChart3 className="h-3.5 w-3.5" />} color="bg-warning" hint="Sobre ingresos" onClick={() => setKpiPopup("margen")} />
             </>
           )}
         </div>

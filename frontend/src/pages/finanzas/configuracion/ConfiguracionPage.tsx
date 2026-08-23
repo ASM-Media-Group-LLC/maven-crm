@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Save, FileText, CreditCard, Building2, Percent, Calculator } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -404,11 +404,11 @@ export default function ConfiguracionPage() {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Summary — clickeables */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <KpiCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} color="bg-blue-500" subtitle="cuentas configuradas" onClick={() => setKpiPopup("qb")} />
-          <KpiCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} color="bg-emerald-500" subtitle="métodos activos" onClick={() => setKpiPopup("methods")} />
-          <KpiCard label="Centros de Costo" value={String(centers.length)} icon={Building2} color="bg-violet-500" subtitle={fmt(totalBudget) + " presupuesto"} onClick={() => setKpiPopup("centers")} />
-          <KpiCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} color="bg-amber-500" subtitle={`${exceptionsCount} excepciones`} onClick={() => setKpiPopup("commissions")} />
-          <KpiCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} color="bg-rose-500" subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} onClick={() => setKpiPopup("payroll")} />
+          <StatChip label="Mapeos QB" value={String(mappings.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="cuentas configuradas" onClick={() => setKpiPopup("qb")} />
+          <StatChip label="Métodos de Pago" value={String(activeMethods)} icon={<CreditCard className="h-3.5 w-3.5" />} color="bg-success" hint="métodos activos" onClick={() => setKpiPopup("methods")} />
+          <StatChip label="Centros de Costo" value={String(centers.length)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-accent" hint={fmt(totalBudget) + " presupuesto"} onClick={() => setKpiPopup("centers")} />
+          <StatChip label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={<Percent className="h-3.5 w-3.5" />} color="bg-warning" hint={`${exceptionsCount} excepciones`} onClick={() => setKpiPopup("commissions")} />
+          <StatChip label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={<Calculator className="h-3.5 w-3.5" />} color="bg-destructive" hint={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} onClick={() => setKpiPopup("payroll")} />
         </div>
 
         {/* Section Cards */}
@@ -422,19 +422,19 @@ export default function ConfiguracionPage() {
               `${params?.hour_bank?.validity_months ?? 0} meses vigencia`;
 
             const sectionColor = (key: string) =>
-              key === "quickbooks" ? "bg-blue-500" :
-              key === "payment_methods" ? "bg-emerald-500" :
-              key === "cost_centers" ? "bg-violet-500" :
-              key === "commissions" ? "bg-amber-500" :
-              "bg-rose-500";
+              key === "quickbooks" ? "bg-primary" :
+              key === "payment_methods" ? "bg-success" :
+              key === "cost_centers" ? "bg-accent" :
+              key === "commissions" ? "bg-warning" :
+              "bg-destructive";
             return (
-              <KpiCard
+              <StatChip
                 key={s.key}
                 label={s.title}
                 value={count}
-                icon={s.icon}
+                icon={<s.icon className="h-3.5 w-3.5" />}
                 color={sectionColor(s.key)}
-                subtitle={s.description}
+                hint={s.description}
                 onClick={() => setActiveSection(s.key)}
               />
             );

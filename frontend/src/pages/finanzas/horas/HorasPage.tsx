@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 
 const TABS = ["Horas Extra", "Banco de Horas"] as const;
 type Tab = typeof TABS[number];
@@ -56,9 +56,9 @@ export default function HorasPage() {
               {isLoading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
                   {/* Cards estáticas — la tabla abajo ya muestra el detalle */}
-                  <KpiCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} color="bg-blue-500" subtitle={`${uniqueEmps} empleados`} />
-                  <KpiCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} color="bg-destructive" subtitle="Monto acumulado" />
-                  <KpiCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} color="bg-violet-500" subtitle="Horas extra" />
+                  <StatChip label="Total Horas Extra" value={String(totalOvertimeHours)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={`${uniqueEmps} empleados`} />
+                  <StatChip label="Costo Total" value={fmt(totalOvertimeAmount)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Monto acumulado" />
+                  <StatChip label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={<Users className="h-3.5 w-3.5" />} color="bg-accent" hint="Horas extra" />
                 </>
               )}
             </div>
@@ -94,8 +94,8 @@ export default function HorasPage() {
             <div className="grid grid-cols-2 gap-4">
               {isLoading ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
-                  <KpiCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} color="bg-emerald-500" subtitle="Banco total" />
-                  <KpiCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} color="bg-violet-500" subtitle="Valoración" />
+                  <StatChip label="Horas Acumuladas" value={String(totalBankHours)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-success" hint="Banco total" />
+                  <StatChip label="Valor Total" value={fmt(totalBankAmount)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-accent" hint="Valoración" />
                 </>
               )}
             </div>

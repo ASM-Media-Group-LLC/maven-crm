@@ -21,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
@@ -281,11 +281,11 @@ export default function CollectionsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Total" value={String(invoices.length)} icon={Users} color="bg-blue-500" subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} color="bg-success" subtitle={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
-              <KpiCard label="Pendientes" value={String(pendientes.length)} icon={Clock} color="bg-warning" subtitle={fmt(totalPendiente)} onClick={() => setKpiPopup("pendientes")} />
-              <KpiCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} color="bg-destructive" subtitle={fmt(totalVencido)} onClick={() => setKpiPopup("vencidas")} />
-              <KpiCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} color="bg-slate-500" subtitle="$0" onClick={() => setKpiPopup("sinCobro")} />
+              <StatChip label="Total" value={String(invoices.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pagadas" value={String(cobrados.length)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
+              <StatChip label="Pendientes" value={String(pendientes.length)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={fmt(totalPendiente)} onClick={() => setKpiPopup("pendientes")} />
+              <StatChip label="Vencidas" value={String(vencidos.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint={fmt(totalVencido)} onClick={() => setKpiPopup("vencidas")} />
+              <StatChip label="Sin Cobro" value={String(sinCobro.length)} icon={<Ban className="h-3.5 w-3.5" />} color="bg-muted-foreground" hint="$0" onClick={() => setKpiPopup("sinCobro")} />
             </>
           )}
         </div>
@@ -317,10 +317,10 @@ export default function CollectionsPage() {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" color="bg-emerald-500" />
-              <KpiCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" color="bg-blue-500" />
-              <KpiCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" color="bg-amber-500" />
-              <KpiCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" color="bg-violet-500" />
+              <StatChip label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={<TrendingUp className="h-3.5 w-3.5" />} hint="Total invoices" color="bg-success" />
+              <StatChip label="Promedio 6 Meses" value={fmt(promedio6)} icon={<BarChart3 className="h-3.5 w-3.5" />} hint="Promedio histórico" color="bg-primary" />
+              <StatChip label="Comisión Socios" value={fmt(comisionSocios)} icon={<DollarSign className="h-3.5 w-3.5" />} hint="Fees acumulados" color="bg-warning" />
+              <StatChip label="Facturación Neta" value={fmt(facturacionNeta)} icon={<DollarSign className="h-3.5 w-3.5" />} hint="Neto real" color="bg-accent" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

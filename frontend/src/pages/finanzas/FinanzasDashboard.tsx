@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
@@ -413,14 +413,14 @@ export default function FinanzasDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} color="bg-success" subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
-              <KpiCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} color="bg-destructive" subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("costos")} />
-              <KpiCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} color={curMargen >= 0 ? "bg-success" : "bg-destructive"} subtitle={`${curMargenPct.toFixed(1)}% margen`} onClick={() => setKpiPopup("margen")} />
-              <KpiCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} color="bg-warning" subtitle="Borrador + calculado" onClick={() => setKpiPopup("nominaProy")} />
-              <KpiCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} color="bg-blue-500" subtitle={`${curCommissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
-              <KpiCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} color="bg-warning" subtitle="Enviadas" onClick={() => setKpiPopup("facturasPend")} />
-              <KpiCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} color="bg-destructive" subtitle="Requieren atención" onClick={() => setKpiPopup("facturasVenc")} />
-              <KpiCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} color={variacion >= 0 ? "bg-success" : "bg-destructive"} subtitle="Ingresos mes a mes" onClick={() => setKpiPopup("variacion")} />
+              <StatChip label="Ingresos del Mes" value={fmt(curIngresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
+              <StatChip label="Costos del Mes" value={fmt(curCostos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("costos")} />
+              <StatChip label="Margen Operativo" value={fmt(curMargen)} icon={<BarChart3 className="h-3.5 w-3.5" />} color={curMargen >= 0 ? "bg-success" : "bg-destructive"} hint={`${curMargenPct.toFixed(1)}% margen`} onClick={() => setKpiPopup("margen")} />
+              <StatChip label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" hint="Borrador + calculado" onClick={() => setKpiPopup("nominaProy")} />
+              <StatChip label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint={`${curCommissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
+              <StatChip label="Facturas Pendientes" value={String(facturasPendientes)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas" onClick={() => setKpiPopup("facturasPend")} />
+              <StatChip label="Facturas Vencidas" value={String(facturasVencidas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Requieren atención" onClick={() => setKpiPopup("facturasVenc")} />
+              <StatChip label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color={variacion >= 0 ? "bg-success" : "bg-destructive"} hint="Ingresos mes a mes" onClick={() => setKpiPopup("variacion")} />
             </>
           )}
         </div>
@@ -432,10 +432,10 @@ export default function FinanzasDashboard() {
             Headcount y Costos de Personal
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Empleados Activos" value={String(hrData?.headcount ?? 0)} icon={Users} color="bg-blue-500" subtitle="Headcount" onClick={() => setKpiPopup("headcount")} />
-            <KpiCard label="Costo Prom/Emp" value={fmt(hrData?.costPerEmp ?? 0)} icon={Briefcase} color="bg-violet-500" subtitle="Nómina / headcount" onClick={() => setKpiPopup("costoEmp")} />
-            <KpiCard label="Deducciones Mes" value={fmt(hrData?.dedTotal ?? 0)} icon={ArrowDown} color="bg-destructive" subtitle="Acumuladas" onClick={() => setKpiPopup("deducciones")} />
-            <KpiCard label="Departamentos" value={String(hrData?.deptCount ?? 0)} icon={Building2} color="bg-emerald-500" subtitle="Con empleados activos" onClick={() => setKpiPopup("departamentos")} />
+            <StatChip label="Empleados Activos" value={String(hrData?.headcount ?? 0)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Headcount" onClick={() => setKpiPopup("headcount")} />
+            <StatChip label="Costo Prom/Emp" value={fmt(hrData?.costPerEmp ?? 0)} icon={<Briefcase className="h-3.5 w-3.5" />} color="bg-accent" hint="Nómina / headcount" onClick={() => setKpiPopup("costoEmp")} />
+            <StatChip label="Deducciones Mes" value={fmt(hrData?.dedTotal ?? 0)} icon={<ArrowDown className="h-3.5 w-3.5" />} color="bg-destructive" hint="Acumuladas" onClick={() => setKpiPopup("deducciones")} />
+            <StatChip label="Departamentos" value={String(hrData?.deptCount ?? 0)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-success" hint="Con empleados activos" onClick={() => setKpiPopup("departamentos")} />
           </div>
         </div>
 
@@ -468,12 +468,12 @@ export default function FinanzasDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Alertas Operativas — card resumen clickeable */}
-          <KpiCard
+          <StatChip
             label="Alertas Operativas"
             value={String(alerts.length)}
-            icon={AlertTriangle}
-            color={alerts.length > 0 ? "bg-warning" : "bg-slate-500"}
-            subtitle={alerts.length === 0 ? "Sin alertas activas" : "Click para ver detalle"}
+            icon={<AlertTriangle className="h-3.5 w-3.5" />}
+            color={alerts.length > 0 ? "bg-warning" : "bg-muted-foreground"}
+            hint={alerts.length === 0 ? "Sin alertas activas" : "Click para ver detalle"}
             onClick={() => setKpiPopup("alertas")}
             className="lg:col-span-1"
           />
@@ -485,10 +485,10 @@ export default function FinanzasDashboard() {
               Próximas Acciones
             </h2>
             <div className="grid grid-cols-2 gap-3">
-              <KpiCard label="Nómina por cerrar" value={String(nominaSinCerrar)} icon={Users} color="bg-warning" onClick={() => setKpiPopup("accion-nomina")} />
-              <KpiCard label="Comisiones por aprobar" value={String(comisionesPorAprobar)} icon={DollarSign} color="bg-blue-500" onClick={() => setKpiPopup("accion-comisiones")} />
-              <KpiCard label="Invoices por enviar" value={String(invoicesPorEnviar)} icon={FileText} color="bg-violet-500" onClick={() => setKpiPopup("accion-invoices")} />
-              <KpiCard label="Archivos bancarios" value="0" icon={FileText} color="bg-slate-500" subtitle="Por generar" onClick={() => setKpiPopup("accion-archivos")} />
+              <StatChip label="Nómina por cerrar" value={String(nominaSinCerrar)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("accion-nomina")} />
+              <StatChip label="Comisiones por aprobar" value={String(comisionesPorAprobar)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("accion-comisiones")} />
+              <StatChip label="Invoices por enviar" value={String(invoicesPorEnviar)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-accent" onClick={() => setKpiPopup("accion-invoices")} />
+              <StatChip label="Archivos bancarios" value="0" icon={<FileText className="h-3.5 w-3.5" />} color="bg-muted-foreground" hint="Por generar" onClick={() => setKpiPopup("accion-archivos")} />
             </div>
           </div>
         </div>

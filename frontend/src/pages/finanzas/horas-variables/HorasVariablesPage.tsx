@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "../comisiones/NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
@@ -535,10 +535,10 @@ export default function HorasVariablesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={Clock} color="bg-blue-500" subtitle={`${uniqueEmps} empleados`} onClick={() => setKpiPopup("horasExtra")} />
-              <KpiCard label="Banco de Horas" value={`${totalBankHours}h`} icon={Wallet} color="bg-emerald-500" subtitle={fmt(totalBankAmount)} onClick={() => setKpiPopup("banco")} />
-              <KpiCard label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={DollarSign} color="bg-amber-500" subtitle={`${commissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
-              <KpiCard label="Empleados Activos" value={String(uniqueEmps)} icon={TrendingUp} color="bg-violet-500" subtitle="Con registros" onClick={() => setKpiPopup("empleados")} />
+              <StatChip label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={`${uniqueEmps} empleados`} onClick={() => setKpiPopup("horasExtra")} />
+              <StatChip label="Banco de Horas" value={`${totalBankHours}h`} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-success" hint={fmt(totalBankAmount)} onClick={() => setKpiPopup("banco")} />
+              <StatChip label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-warning" hint={`${commissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
+              <StatChip label="Empleados Activos" value={String(uniqueEmps)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-accent" hint="Con registros" onClick={() => setKpiPopup("empleados")} />
             </>
           )}
         </div>

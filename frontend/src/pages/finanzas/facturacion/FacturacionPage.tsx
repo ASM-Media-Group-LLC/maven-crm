@@ -25,7 +25,7 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import CrearInvoiceModal from "./CrearInvoiceModal";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
@@ -615,10 +615,10 @@ export default function FacturacionPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Total Invoices" value={String(invoices.length)} icon={FileText} color="bg-blue-500" subtitle="Todos" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPendientes)} icon={Clock} color="bg-warning" subtitle="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
-              <KpiCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma" onClick={() => setKpiPopup("monto")} />
-              <KpiCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} color="bg-rose-500" subtitle="Fees cobrados" onClick={() => setKpiPopup("fee")} />
+              <StatChip label="Total Invoices" value={String(invoices.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Pendientes" value={String(totalPendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
+              <StatChip label="Monto Total" value={fmt(totalMonto)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma" onClick={() => setKpiPopup("monto")} />
+              <StatChip label="Fee Total" value={fmt(totalFee)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Fees cobrados" onClick={() => setKpiPopup("fee")} />
             </>
           )}
         </div>

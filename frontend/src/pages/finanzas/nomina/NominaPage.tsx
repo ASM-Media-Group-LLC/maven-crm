@@ -20,7 +20,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import CalcularNominaModal from "./CalcularNominaModal";
 import CrearBatchModal from "./CrearBatchModal";
@@ -405,10 +405,10 @@ export default function NominaPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Borradores" value={String(totalBorradores)} icon={Clock} color="bg-warning" subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
-              <KpiCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma bruta" onClick={() => setKpiPopup("bruto")} />
-              <KpiCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} color="bg-violet-500" subtitle="Suma neta" onClick={() => setKpiPopup("neto")} />
+              <StatChip label="Total Periodos" value={String(periods.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Borradores" value={String(totalBorradores)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
+              <StatChip label="Monto Bruto Total" value={fmt(totalBruto)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma bruta" onClick={() => setKpiPopup("bruto")} />
+              <StatChip label="Monto Neto Total" value={fmt(totalNeto)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-accent" hint="Suma neta" onClick={() => setKpiPopup("neto")} />
             </>
           )}
         </div>

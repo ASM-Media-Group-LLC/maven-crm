@@ -19,7 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "./NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
@@ -178,10 +178,10 @@ export default function ComisionesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <KpiCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Todas las comisiones" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} color="bg-warning" subtitle="Pendientes" onClick={() => setKpiPopup("proyectadas")} />
-              <KpiCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} color="bg-success" subtitle="Listas para pago" onClick={() => setKpiPopup("confirmadas")} />
-              <KpiCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} color="bg-rose-500" subtitle="Suma estimada" onClick={() => setKpiPopup("monto")} />
+              <StatChip label="Total Registros" value={String(commissions.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint="Todas las comisiones" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Proyectadas" value={String(totalProyectadas)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Pendientes" onClick={() => setKpiPopup("proyectadas")} />
+              <StatChip label="Confirmadas" value={String(totalConfirmadas)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint="Listas para pago" onClick={() => setKpiPopup("confirmadas")} />
+              <StatChip label="Monto Estimado" value={fmt(totalEstimado)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Suma estimada" onClick={() => setKpiPopup("monto")} />
             </>
           )}
         </div>
