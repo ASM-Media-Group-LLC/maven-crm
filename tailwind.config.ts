@@ -95,6 +95,10 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-4px)" },
         },
+        "presence-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--success) / 0.4)" },
+          "50%": { boxShadow: "0 0 0 4px hsl(var(--success) / 0)" },
+        },
         "reaction-float": {
           "0%": { opacity: "0", transform: "translateY(30px) scale(0.5)" },
           "15%": { opacity: "1", transform: "translateY(-10px) scale(1.15)" },
@@ -109,6 +113,7 @@ export default {
         "clari-pulse": "clari-pulse 2s ease-in-out infinite",
         "fade-in-up": "fade-in-up 0.6s ease-out both",
         "float": "float 3s ease-in-out infinite",
+        "presence-pulse": "presence-pulse 2.5s ease-in-out infinite",
         "reaction-float": "reaction-float 5s ease-out forwards",
       },
     },

@@ -95,6 +95,7 @@ export function UserAvatar({
             "absolute bottom-0 right-0 rounded-full border-background",
             s.dot,
             STATUS_COLORS[status],
+            status === "online" && "animate-presence-pulse motion-reduce:animate-none",
           )}
         />
       ) : null}

@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import confetti from "canvas-confetti";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -194,6 +195,26 @@ const DashboardContent = () => {
   const { data: pendingTasks = [] } = usePendingTasks();
   const { feed: announcements, banners } = useAnnouncementsByChannel();
   const { data: birthdays = [] } = useUpcomingBirthdays();
+
+  // Confetti breve cuando hay al menos un cumpleaños en el widget de
+  // Avisos y Celebraciones. Una sola vez por montaje y una vez por dia
+  // (flag en sessionStorage), y nunca si el usuario prefiere menos movimiento.
+  const confettiFiredRef = useRef(false);
+  useEffect(() => {
+    if (confettiFiredRef.current) return;
+    if (birthdays.length === 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const key = `confetti-celebraciones-${new Date().toISOString().slice(0, 10)}`;
+    if (sessionStorage.getItem(key)) return;
+    confettiFiredRef.current = true;
+    sessionStorage.setItem(key, "1");
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+      disableForReducedMotion: true,
+    });
+  }, [birthdays]);
   const recordView = useRecordAnnouncementView();
   const recordOpen = useRecordAnnouncementOpen();
   const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
