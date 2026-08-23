@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -28,8 +29,6 @@ interface SpacesPanelProps {
   onDragStart?: (conversationId: string) => void;
   draggingChatId?: string | null;
 }
-
-import { getInitials } from "../utils";
 
 export default function SpacesPanel({
   spaces, conversations, activeChatId, onSelectChat,
@@ -248,11 +247,16 @@ export default function SpacesPanel({
                         )}
                         onClick={() => onSelectChat(cid)}
                       >
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-[9px] font-semibold bg-primary/10 text-primary">
-                            {isGroup ? <Users className="h-3 w-3" /> : getInitials(conv.displayName)}
-                          </AvatarFallback>
-                        </Avatar>
+                        {isGroup ? (
+                          /* Avatar de GRUPO: conserva su icono actual, no es una persona */
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-[9px] font-semibold bg-primary/10 text-primary">
+                              <Users className="h-3 w-3" />
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <UserAvatar name={conv.displayName} src={conv.avatar_url} size="xs" />
+                        )}
                         <span className="text-xs truncate flex-1 text-foreground">{conv.displayName}</span>
                         {conv.unreadCount > 0 && (
                           <Badge className="h-4 min-w-4 px-1 text-[9px] bg-primary text-primary-foreground rounded-full font-bold">

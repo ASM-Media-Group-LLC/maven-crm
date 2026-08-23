@@ -2,7 +2,7 @@ import { useState, forwardRef } from "react";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,6 @@ interface NewChatModalProps {
   isOnlineFn?: (userId: string) => boolean;
   getStatusFn?: (userId: string) => UserStatus | null;
 }
-
-import { getInitials } from "./utils";
 
 const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewChatModal(
   { open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn },
@@ -112,12 +110,13 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
                   <Checkbox checked={selected.includes(profile.id)} className="shrink-0" />
                 )}
                 <div className="relative">
-                  <Avatar className="h-9 w-9 shrink-0">
-                    {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.full_name || ""} className="object-cover" />}
-                    <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                      {getInitials(profile.full_name || "?")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={profile.full_name}
+                    src={profile.avatar_url}
+                    seed={profile.avatar_seed}
+                    size="sm"
+                    className="h-9 w-9 shrink-0"
+                  />
                   <span
                     className={cn(
                       "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",

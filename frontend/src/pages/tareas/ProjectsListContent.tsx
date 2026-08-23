@@ -11,7 +11,7 @@ import StatChip from "@/components/StatChip";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
@@ -281,16 +281,13 @@ const ProjectsListContent = () => {
                     <HoverCardTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <div className="flex -space-x-1.5 cursor-pointer">
                         {projectMembers.slice(0, 3).map(m => (
-                          <Avatar key={m.id} className="h-6 w-6 border-2 border-background">
-                            <AvatarFallback className="text-[9px] bg-muted">
-                              {(m.full_name || "?").charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar key={m.id} name={m.full_name} size="xs" className="h-6 w-6 rounded-full border-2 border-background" />
                         ))}
+                        {/* Contador de desborde: no es una persona, no usa UserAvatar */}
                         {projectMembers.length > 3 && (
-                          <Avatar className="h-6 w-6 border-2 border-background">
-                            <AvatarFallback className="text-[9px] bg-muted">+{projectMembers.length - 3}</AvatarFallback>
-                          </Avatar>
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-[9px]">
+                            +{projectMembers.length - 3}
+                          </span>
                         )}
                       </div>
                     </HoverCardTrigger>
@@ -299,11 +296,7 @@ const ProjectsListContent = () => {
                       <div className="space-y-1.5">
                         {projectMembers.map(m => (
                           <div key={m.id} className="flex items-center gap-2">
-                            <Avatar className="h-5 w-5">
-                              <AvatarFallback className="text-[8px] bg-muted">
-                                {(m.full_name || "?").charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar name={m.full_name} size="xs" className="h-5 w-5" />
                             <span className="text-xs truncate">{m.full_name || "Sin nombre"}</span>
                           </div>
                         ))}

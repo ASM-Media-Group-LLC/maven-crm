@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTaskComments } from "./useTaskComments";
@@ -111,12 +111,9 @@ const TaskDetailSheet = ({ task, open, onOpenChange, profiles, onEdit, onStatusC
               <div className="flex flex-wrap gap-2">
                 {(task.assignees || []).map((uid) => {
                   const p = profileMap[uid];
-                  const initials = p?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
                   return (
                     <div key={uid} className="flex items-center gap-1.5 bg-muted rounded-full px-2 py-0.5">
-                      <Avatar className="h-5 w-5">
-                        <AvatarFallback className="text-[9px] bg-primary/20 text-primary">{initials}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={p?.full_name} src={p?.avatar_url} size="xs" className="h-5 w-5" />
                       <span className="text-xs">{p?.full_name || "Sin nombre"}</span>
                     </div>
                   );
@@ -158,12 +155,9 @@ const TaskDetailSheet = ({ task, open, onOpenChange, profiles, onEdit, onStatusC
               ) : (
                 <div className="space-y-3">
                   {comments.map((c) => {
-                    const initials = c.profile?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
                     return (
                       <div key={c.id} className="flex gap-2.5 group">
-                        <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                          <AvatarFallback className="text-[10px] bg-primary/15 text-primary">{initials}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={c.profile?.full_name} src={c.profile?.avatar_url} size="sm" className="h-7 w-7 shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium">{c.profile?.full_name || "Usuario"}</span>

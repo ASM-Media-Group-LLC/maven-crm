@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -108,19 +108,19 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
                   {members.slice(0, 3).map(m => (
                     <Tooltip key={m.id}>
                       <TooltipTrigger asChild>
-                        <Avatar className="h-6 w-6 border-2 border-background">
-                          <AvatarFallback className="text-[9px] bg-muted">
-                            {(m.full_name || "?").charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        {/* span envoltorio: UserAvatar no reenvia ref y asChild lo necesita */}
+                        <span className="inline-flex">
+                          <UserAvatar name={m.full_name} size="xs" className="h-6 w-6 rounded-full border-2 border-background" />
+                        </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="text-xs">{m.full_name || "Sin nombre"}</TooltipContent>
                     </Tooltip>
                   ))}
+                  {/* Contador de desborde: no es una persona, no usa UserAvatar */}
                   {members.length > 3 && (
-                    <Avatar className="h-6 w-6 border-2 border-background">
-                      <AvatarFallback className="text-[9px] bg-muted">+{members.length - 3}</AvatarFallback>
-                    </Avatar>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-[9px]">
+                      +{members.length - 3}
+                    </span>
                   )}
                 </div>
               </TooltipProvider>

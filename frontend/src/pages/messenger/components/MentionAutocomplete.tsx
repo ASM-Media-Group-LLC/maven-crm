@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -9,10 +9,6 @@ interface MentionAutocompleteProps {
   participants: { user_id: string; profile?: UserProfile }[];
   currentUserId?: string;
   onSelect: (mention: string, userId: string) => void;
-}
-
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export function useMentionDetection(text: string, cursorPos: number) {
@@ -136,11 +132,12 @@ export default function MentionAutocomplete({
           onMouseDown={(e) => { e.preventDefault(); handleSelect(p); }}
           onMouseEnter={() => setSelectedIndex(i)}
         >
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-[9px] font-semibold bg-primary/10 text-primary">
-              {getInitials(p.profile?.full_name || "?")}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            name={p.profile?.full_name}
+            src={p.profile?.avatar_url}
+            seed={p.profile?.avatar_seed}
+            size="xs"
+          />
           <span className="truncate font-medium">{p.profile?.full_name}</span>
         </button>
       ))}

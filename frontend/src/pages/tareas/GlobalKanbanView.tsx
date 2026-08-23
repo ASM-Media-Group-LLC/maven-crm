@@ -3,13 +3,14 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { Clock, Play, Pause, AlertTriangle, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { Task } from "./useTareas";
 
 interface Profile {
   id: string;
   full_name: string | null;
+  avatar_url?: string | null;
 }
 
 interface ProjectInfo {
@@ -144,11 +145,8 @@ const GlobalKanbanView = ({ tasks, profiles, projects, onStatusChange, onTaskCli
                               <div className="flex -space-x-1.5">
                                 {(task.assignees || []).slice(0, 3).map((uid) => {
                                   const p = profileMap[uid];
-                                  const initials = p?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
                                   return (
-                                    <Avatar key={uid} className="h-5 w-5 border border-card">
-                                      <AvatarFallback className="text-[9px] bg-primary/20 text-primary">{initials}</AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar key={uid} name={p?.full_name} src={p?.avatar_url} size="xs" className="h-5 w-5 rounded-full border border-card" />
                                   );
                                 })}
                               </div>

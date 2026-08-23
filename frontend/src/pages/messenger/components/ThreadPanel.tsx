@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -22,7 +22,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
-import { getInitials, formatTime, formatDate } from "../utils";
+import { formatTime, formatDate } from "../utils";
 
 import { EMOJIS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
@@ -257,15 +257,13 @@ export default function ThreadPanel({
         )}
       >
         <div className="flex items-start gap-2">
-          <Avatar className={cn("shrink-0 mt-0.5", isParent ? "h-7 w-7" : "h-6 w-6")}>
-            <AvatarFallback className={cn(
-              "font-semibold",
-              isParent ? "text-[10px]" : "text-[9px]",
-              isMe ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
-            )}>
-              {getInitials(sender)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            name={sender}
+            src={profiles[msg.sender_id]?.avatar_url}
+            seed={profiles[msg.sender_id]?.avatar_seed}
+            size="xs"
+            className={cn("shrink-0 mt-0.5", isParent ? "h-7 w-7" : "h-6 w-6")}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-xs font-semibold text-foreground">{isMe ? "Tú" : sender}</span>

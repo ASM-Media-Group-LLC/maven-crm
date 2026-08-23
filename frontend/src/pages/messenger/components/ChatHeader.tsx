@@ -130,6 +130,7 @@ export default function ChatHeader({
               editable={otherUserId === user?.id || !otherUserId}
             />
           ) : (
+            /* Avatar de GRUPO (miembro sin admin): conserva su estilo actual, no es una persona */
             <Avatar className="h-9 w-9 shrink-0">
               {avatarUrl && <AvatarImage src={avatarUrl} alt={conversation.displayName} className="object-cover" />}
               <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">

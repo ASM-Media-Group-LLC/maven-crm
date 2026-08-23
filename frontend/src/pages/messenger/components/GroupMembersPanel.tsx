@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -14,7 +14,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getInitials } from "../utils";
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
@@ -196,11 +195,13 @@ export default function GroupMembersPanel({
                     disabled={addingUserId === u.id}
                     className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
                   >
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold">
-                        {getInitials(u.full_name || "?")}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      name={u.full_name}
+                      src={u.avatar_url}
+                      seed={u.avatar_seed}
+                      size="sm"
+                      className="h-7 w-7 shrink-0"
+                    />
                     <span className="text-sm font-medium text-foreground flex-1 truncate">
                       {u.full_name || "Usuario"}
                     </span>
@@ -229,14 +230,12 @@ export default function GroupMembersPanel({
             return (
               <div key={p.id} className="flex items-center gap-3 px-4 py-2 hover:bg-primary/5 rounded-2xl mx-1 transition-colors">
                 <div className="relative">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className={cn(
-                      "text-[10px] font-semibold",
-                      isSelf ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
-                    )}>
-                      {getInitials(name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={name}
+                    src={profile?.avatar_url}
+                    seed={profile?.avatar_seed}
+                    size="sm"
+                  />
                   <span className={cn(
                     "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
                     online ? "bg-green-500" : "bg-muted-foreground/30"

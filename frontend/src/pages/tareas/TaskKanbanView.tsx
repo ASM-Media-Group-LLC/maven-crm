@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -361,15 +361,13 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                                   <div className="flex -space-x-1.5">
                                     {(task.assignees || []).slice(0, 3).map((uid) => {
                                       const p = profileMap[uid];
-                                      const initials = p?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
                                       return (
                                         <Tooltip key={uid}>
                                           <TooltipTrigger asChild>
-                                            <Avatar className="h-5 w-5 border border-card">
-                                              <AvatarFallback className="text-[9px] bg-primary/20 text-primary">
-                                                {initials}
-                                              </AvatarFallback>
-                                            </Avatar>
+                                            {/* span envoltorio: UserAvatar no reenvia ref y asChild lo necesita */}
+                                            <span className="inline-flex">
+                                              <UserAvatar name={p?.full_name} src={p?.avatar_url} size="xs" className="h-5 w-5 rounded-full border border-card" />
+                                            </span>
                                           </TooltipTrigger>
                                           <TooltipContent>{p?.full_name || "Sin nombre"}</TooltipContent>
                                         </Tooltip>

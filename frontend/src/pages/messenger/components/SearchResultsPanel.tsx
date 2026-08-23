@@ -2,10 +2,10 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage, UserProfile } from "../types";
-import { getInitials, formatTime, formatDate } from "../utils";
+import { formatTime, formatDate } from "../utils";
 import { cn } from "@/lib/utils";
 
 interface SearchResultsPanelProps {
@@ -129,14 +129,13 @@ export default function SearchResultsPanel({
                   )}
                   onClick={() => onResultClick(msg.id)}
                 >
-                  <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                    {profile?.avatar_url && (
-                      <AvatarImage src={profile.avatar_url} alt={name} className="object-cover" />
-                    )}
-                    <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold">
-                      {getInitials(name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={name}
+                    src={profile?.avatar_url}
+                    seed={profile?.avatar_seed}
+                    size="sm"
+                    className="h-7 w-7 shrink-0 mt-0.5"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-xs font-medium text-foreground truncate">

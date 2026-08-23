@@ -3,7 +3,7 @@ import { Ban, CheckCircle2, Plus, User, Check, ChevronsUpDown } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -114,7 +114,6 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
           {blockers.map((b) => {
             const reporter = profileMap[b.reported_by];
             const blocker = b.blocked_by_user_id ? profileMap[b.blocked_by_user_id] : null;
-            const reporterInitials = reporter?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
 
             return (
               <div
@@ -142,9 +141,7 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <Avatar className="h-4 w-4">
-                      <AvatarFallback className="text-[8px] bg-primary/20 text-primary">{reporterInitials}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={reporter?.full_name} size="xs" className="h-4 w-4" />
                     {reporter?.full_name || "Usuario"}
                   </span>
                   {blocker && (
