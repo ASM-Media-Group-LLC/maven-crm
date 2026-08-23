@@ -1,5 +1,5 @@
 import { LucideIcon } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 
 interface HRMetricCardProps {
   title: string;
@@ -12,41 +12,39 @@ interface HRMetricCardProps {
   onClick?: () => void;
 }
 
-// Mapeo de los colores semánticos viejos a las clases bg-* que usa
-// KpiCard. Mantener este mapping permite que todas las páginas HR
-// (Training/Chatters/Tech/Performance/Organigrama, etc.) hereden el
-// nuevo diseño sin modificar cada llamada.
+// Mapeo de los colores semánticos viejos al puntito del StatChip. Mantener
+// este mapping permite que todas las páginas HR que consumen HRMetricCard
+// (Training/Chatters/Tech/Performance/Organigrama, etc.) hereden el diseño
+// nuevo sin modificar cada llamada.
 const colorMap: Record<NonNullable<HRMetricCardProps["color"]>, string> = {
-  primary: "bg-blue-500",
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  destructive: "bg-rose-500",
-  default: "bg-slate-500",
+  primary: "bg-primary",
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
+  default: "bg-muted-foreground",
 };
 
 export function HRMetricCard({
   title,
   value,
   subtitle,
-  icon,
+  icon: Icon,
   trend,
   color = "default",
   className,
   onClick,
 }: HRMetricCardProps) {
-  // El "trend" del API viejo se renderiza como subtitle anexado, ya que
-  // KpiCard solo tiene 1 línea de subtitle.
-  const sub = trend
+  const hint = trend
     ? `${subtitle ? subtitle + " · " : ""}${trend.value >= 0 ? "+" : ""}${trend.value} ${trend.label}`
     : subtitle;
 
   return (
-    <KpiCard
+    <StatChip
       label={title}
       value={value}
-      icon={icon}
+      icon={<Icon className="h-3.5 w-3.5 text-muted-foreground" />}
       color={colorMap[color]}
-      subtitle={sub}
+      hint={hint}
       onClick={onClick}
       className={className}
     />

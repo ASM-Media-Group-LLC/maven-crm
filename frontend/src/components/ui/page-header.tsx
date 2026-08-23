@@ -25,7 +25,7 @@ export function PageHeader({ title, subtitle, icon, actions, className }: PageHe
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold leading-tight tracking-tight">{title}</h1>
+          <h1 className="font-display text-2xl font-bold leading-tight tracking-tight">{title}</h1>
           {subtitle != null && (
             <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
           )}
