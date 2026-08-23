@@ -49,6 +49,11 @@ const BADGE_TINTS: Record<string, string> = {
 };
 const badgeTint = (module: string | undefined): string =>
   (module && BADGE_TINTS[module]) || "bg-destructive text-destructive-foreground";
+
+// Contadores compactos como el mockup: 6929 → "6.9k". Debajo de 1000 el
+// número va tal cual; el valor exacto queda en el title de la fila.
+const compactBadge = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(n);
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 // Cuando una fila de menú tiene su botón de mute (WhatsApp/Telegram/Messenger),
 // el NavLink reserva espacio a la derecha para que ni el título ni el badge se
@@ -405,7 +410,7 @@ const DashboardSidebar = () => {
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
                         <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
-                          {item.badge > 99 ? "99+" : item.badge}
+                          {compactBadge(item.badge)}
                         </span>
                       )}
                     </NavLink>
@@ -457,7 +462,7 @@ const DashboardSidebar = () => {
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
                         <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
-                          {item.badge}
+                          {compactBadge(item.badge)}
                         </span>
                       )}
                     </NavLink>
