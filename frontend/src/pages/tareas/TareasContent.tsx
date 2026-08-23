@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -440,14 +440,20 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </CardContent>
           </Card>
           {kpis.map((kpi) => (
-            <KpiCard
+            <button
               key={kpi.label}
-              label={kpi.label}
-              value={kpi.value}
-              icon={kpi.icon}
-              color={kpi.color}
+              type="button"
+              className="text-left"
               onClick={() => setKpiPopup(kpi.key)}
-            />
+            >
+              <StatChip
+                label={kpi.label}
+                value={kpi.value}
+                color={kpi.color}
+                icon={<kpi.icon className="h-3.5 w-3.5" />}
+                className="h-full transition-colors hover:bg-accent/40"
+              />
+            </button>
           ))}
         </div>
 

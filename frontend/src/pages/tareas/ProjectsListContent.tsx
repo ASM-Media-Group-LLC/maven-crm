@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -377,7 +377,13 @@ const ProjectsListContent = () => {
           {/* KPI Stats Cards — patrón estándar (estáticas, la lista de proyectos vive abajo) */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} color={kpi.color} />
+              <StatChip
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                color={kpi.color}
+                icon={<kpi.icon className="h-3.5 w-3.5" />}
+              />
             ))}
           </div>
 

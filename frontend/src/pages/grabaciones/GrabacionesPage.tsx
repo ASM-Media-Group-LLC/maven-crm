@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import StatChip from "@/components/StatChip";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock,
@@ -84,14 +85,27 @@ export default function GrabacionesPage() {
 
       {/* El espacio y el vencimiento, siempre a la vista. */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <UsageCard icon={Clapperboard} label="Grabaciones" value={usage ? String(usage.total_recordings) : "—"} />
-        <UsageCard icon={HardDrive} label="Espacio usado" value={usage ? formatBytes(usage.total_bytes) : "—"} />
-        <UsageCard
-          icon={Clock}
+        <StatChip
+          label="Grabaciones"
+          value={usage ? String(usage.total_recordings) : "—"}
+          color="bg-primary"
+          icon={<Clapperboard className="h-3.5 w-3.5" />}
+        />
+        <StatChip
+          label="Espacio usado"
+          value={usage ? formatBytes(usage.total_bytes) : "—"}
+          color="bg-sky-500"
+          icon={<HardDrive className="h-3.5 w-3.5" />}
+        />
+        <StatChip
           label="Vencen esta semana"
           value={usage ? String(usage.expiring_next_week) : "—"}
-          warn={!!usage && usage.expiring_next_week > 0}
-          className="col-span-2 sm:col-span-1"
+          color={usage && usage.expiring_next_week > 0 ? "bg-amber-500" : "bg-muted-foreground/40"}
+          icon={<Clock className="h-3.5 w-3.5" />}
+          className={cn(
+            "col-span-2 sm:col-span-1",
+            !!usage && usage.expiring_next_week > 0 && "border-amber-500/30 bg-amber-500/10",
+          )}
         />
       </div>
 
@@ -191,24 +205,6 @@ export default function GrabacionesPage() {
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function UsageCard({ icon: Icon, label, value, warn, className }: {
-  icon: typeof Clapperboard; label: string; value: string; warn?: boolean; className?: string;
-}) {
-  return (
-    <div className={cn(
-      "flex items-center gap-3 rounded-2xl border px-4 py-3",
-      warn ? "border-amber-500/30 bg-amber-500/10" : "border-border bg-card",
-      className,
-    )}>
-      <Icon className={cn("h-4 w-4 shrink-0", warn ? "text-amber-500" : "text-muted-foreground")} />
-      <div className="min-w-0">
-        <div className={cn("text-lg font-bold leading-tight", warn ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>{value}</div>
-        <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      </div>
     </div>
   );
 }

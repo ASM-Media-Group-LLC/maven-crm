@@ -1,5 +1,5 @@
 import { Users, Sparkles, TrendingUp, Loader, Inbox, TrendingDown } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import type { ContactFunnelStats } from "./useContactFunnelStats";
 
 export type ContactKpiKey = "pipeline" | "creadoras" | "conversion" | "proceso" | "sinTocar" | "churn";
@@ -73,17 +73,25 @@ const ContactosKPICards = ({ stats, onClick }: Props) => {
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      {cards.map((card) => (
-        <KpiCard
-          key={card.key}
-          label={card.label}
-          value={card.value}
-          subtitle={card.subtitle}
-          icon={card.icon}
-          color={card.color}
-          onClick={onClick ? () => onClick(card.key) : undefined}
-        />
-      ))}
+      {cards.map((card) => {
+        const chip = (
+          <StatChip
+            label={card.label}
+            value={card.value}
+            hint={card.subtitle}
+            color={card.color}
+            icon={<card.icon className="h-3.5 w-3.5" />}
+            className={onClick ? "h-full transition-colors hover:bg-accent/40" : "h-full"}
+          />
+        );
+        return onClick ? (
+          <button key={card.key} type="button" className="text-left" onClick={() => onClick(card.key)}>
+            {chip}
+          </button>
+        ) : (
+          <div key={card.key}>{chip}</div>
+        );
+      })}
     </div>
   );
 };
