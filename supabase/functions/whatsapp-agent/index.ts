@@ -116,6 +116,8 @@ ESTILO — HUMANO Y CONVERSACIONAL (regla FUERTE, la más importante del estilo)
 - 🌎 ESPAÑOL LATINO NEUTRO, SIEMPRE. Trata de "tú" (puedes, tienes, quieres, mira, dime, cuéntame). NUNCA voseo ni modismos rioplatenses: nada de "vos", "podés", "tenés", "sos", "dale", "che", "acá", "laburo", "pibe". Conjugaciones prohibidas → su forma correcta: decí→di · mostrá→muestra · marcá→marca · checá→checa · retomá→retoma · tené→ten · avisame→avísame · seguís→sigues · ¿avanzás?→¿avanzas?. Tampoco español de España ("vosotros", "vale", "coger"). El equipo es colombiano y le habla a creadoras de toda Latinoamérica: si suena a que el mensaje lo escribió alguien de Buenos Aires, está MAL y hay que reescribirlo. Esto aplica a TODO lo que escribas — y VALE DOBLE en los BORRADORES de mensajes/pitches para creadoras y leads: un "¿seguís manejando tu OF vos sola?" o un "checá Let's Shoot" en un pitch rompe la imagen premium de la agencia (pasó el 04/08 y el closer lo devolvió). Antes de entregar un borrador, reléelo buscando voseo y corrígelo.
 - Casual pero profesional. Cálido, directo, humano. Somos una compañía de servicios para influencers: ni formalidad de call center ni exceso de confianza.
 - DIRÍGETE POR NOMBRE ("Carolina, esto es lo que veo…") — es el default y casi siempre alcanza. El ÚNICO "@" + números permitido es una mención REAL en un GRUPO: un LID sacado de la tabla "MIEMBROS DEL GRUPO (con LID)" del mensaje, pasado también en mention_lids (ver reply_to_group). Ese sí lo muestra WhatsApp como "@Nombre". Cualquier OTRO "@" + números está PROHIBIDO — si el número no es un miembro de ESTE grupo, sale publicado como un chorro de dígitos. En DMs no va NUNCA (ahí no se resuelve). Y PROHIBIDO mencionarte a ti mismo: aunque el mensaje de la persona haya arrancado con tu @, tú respondes con SU nombre.
+- CITAS DE WHATSAPP (función "responder"): cuando alguien te responde citando un mensaje, ahora LO VES: en el contexto aparece como ↩[responde a X: "…"]. ÚSALO — es lo que le da sentido a un "ok", un "y esa cuánto cobra?" o un "no, era la otra". Si ves esa marca, la persona está hablando de ESE mensaje, no del último del hilo. Y si dice ↩[responde a un mensaje que no tengo guardado], dilo y pide que te repitan a qué se refieren, no adivines.
+- CITAR TÚ es AUTOMÁTICO, no lo escribas a mano: cuando tu respuesta ya no queda pegada debajo del mensaje de la persona, el sistema la manda citándolo solo. NO pegues el texto anterior con ">" ni "respondiendo a X:" — sale duplicado.
 - HANDLE PEGADO EN UNA URL = HANDLE DADO: si alguien pega un link de instagram.com/<x>, x.com/<x> o tiktok.com/@<x> (con o sin www, con o sin barra o punto final), ESE es el handle — extráelo (ignora el punto o coma final) y úsalo directo. PROHIBIDO responder "no me figura / no tengo su @ / pásame el handle" o inventar OTRO nombre cuando la URL ya está en el mensaje. Si un closer te pega el link, dalo por recibido y sigue. El 21/08 Miguel pegó instagram.com/pepegoitia e instagram.com/itslararae y el bot igual pidió el @ e inventó "lara_rae" — no se repite.
 - 🔑 INFO DE A POCO: responde SOLO lo que preguntaron. NO vuelques todo lo que sabes de una. Si hay más, OFRÉCELO en una línea ("¿quieres que profundice / te paso el resto / te armo el mensaje?") y espera — no mandes el bloque completo sin que lo pidan. Es una CONVERSACIÓN, no un volcado.
 - PATRÓN para preguntas AMPLIAS ("¿cómo va mi pipeline?", "¿cómo estoy?", "resumime X", "¿qué hay?"): NO listes todo. Dá el TITULAR — lo 1-2 más importante/urgente en 2-3 líneas — y OFRECE el detalle. Recién listás todo si te dicen que sí.
@@ -6099,6 +6101,33 @@ async function executeTool(
           };
         }
       }
+      // ── CITAR A QUIEN RESPONDE (pedido de Jhon 21/08) ────────────────────────
+      // Regla: se cita SOLO si la respuesta ya no queda pegada debajo del mensaje
+      // de la persona — o sea, si entró al menos otro mensaje en el medio. Si su
+      // mensaje sigue siendo el último del grupo, citar es redundante y ensucia.
+      // Es determinística a propósito (no la decide el modelo): depende de un
+      // hecho verificable —cuántos mensajes entraron después— no de su criterio.
+      // Los cortes/pushes programados no entran acá: no tienen messageId humano.
+      let quoted: { id: string; fromMe: boolean; text: string } | undefined;
+      if (ctx.messageId && (ctx.invokedBy === "mention" || ctx.invokedBy === "auto")) {
+        const { data: disp } = await sb
+          .from("whatsapp_messages")
+          .select("external_id, sent_at, body, transcribed_text, msg_type")
+          .eq("id", ctx.messageId)
+          .maybeSingle();
+        if (disp?.external_id && disp.sent_at) {
+          const { count: posteriores } = await sb
+            .from("whatsapp_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("group_id", ctx.groupId)
+            .gt("sent_at", disp.sent_at);
+          if ((posteriores ?? 0) > 0) {
+            const t = String(disp.body ?? disp.transcribed_text ?? `[${disp.msg_type}]`)
+              .replace(/\s+/g, " ").slice(0, 120);
+            quoted = { id: String(disp.external_id), fromMe: false, text: t };
+          }
+        }
+      }
       // Llamamos a whatsapp-send para que despache.
       const url = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`;
       const resp = await fetch(url, {
@@ -6112,6 +6141,7 @@ async function executeTool(
           body,
           mentions: mentions.length > 0 ? mentions : undefined,
           image_url: imageUrl,
+          quoted,
         }),
       });
       const data = await resp.json();
@@ -7038,7 +7068,7 @@ async function buildInitialUserMessage(args: {
     const sb = adminClient();
     let { data: msg } = await sb
       .from("whatsapp_messages")
-      .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+      .select("external_id, reply_to_external_id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
       .eq("id", args.req.message_id)
       .single();
 
@@ -7059,7 +7089,7 @@ async function buildInitialUserMessage(args: {
     // comentario promete "al proceder ya vemos su respuesta en la ventana de contexto":
     // solo era cierto si la ventana se lee DESPUÉS del lock y sin este corte. El
     // disparador se excluye por id porque se muestra aparte, al final del prompt.
-    const CTX_SEL = "id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at";
+    const CTX_SEL = "id, external_id, reply_to_external_id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at";
     const leerContexto = async () => {
       const { data } = await sb
         .from("whatsapp_messages")
@@ -7089,7 +7119,7 @@ async function buildInitialUserMessage(args: {
         await new Promise((r) => setTimeout(r, 2000));
         msg = (await sb
           .from("whatsapp_messages")
-          .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+          .select("external_id, reply_to_external_id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
           .eq("id", args.req.message_id)
           .single()).data;
         ctx = await leerContexto();
@@ -7169,12 +7199,54 @@ async function buildInitialUserMessage(args: {
         String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
     };
 
+    // ── CITAS (WhatsApp "responder") ─────────────────────────────────────────
+    // 21/08: el 24% de los mensajes que el equipo le manda al bot son RESPUESTAS
+    // citando un mensaje anterior (61% de esas citan al propio bot), y el modelo
+    // nunca las veía: `reply_to_external_id` se guardaba desde el ingest pero no
+    // se inyectaba acá. Resultado: un "ok" o un "¿esto es para Kash o Unlimited?"
+    // llegaban sueltos y el bot adivinaba. Se resuelve el texto citado y se
+    // muestra inline.
+    const citados = new Map<string, { quien: string; texto: string }>();
+    {
+      const ids = new Set<string>();
+      for (const m of (ctx ?? []) as Array<Record<string, unknown>>) {
+        const r = m.reply_to_external_id as string | null;
+        if (r) ids.add(r);
+      }
+      const rMsg = (msg as Record<string, unknown> | null)?.reply_to_external_id as string | null | undefined;
+      if (rMsg) ids.add(rMsg);
+      if (ids.size > 0) {
+        const { data: qs } = await sb
+          .from("whatsapp_messages")
+          .select("external_id, is_from_bot, sender_display_name, sender_external_id, body, transcribed_text, msg_type")
+          .eq("group_id", args.groupId)
+          .in("external_id", Array.from(ids))
+          .limit(40);
+        for (const q of (qs ?? []) as Array<Record<string, unknown>>) {
+          const t = effectiveText(q as never) ?? "";
+          citados.set(String(q.external_id), {
+            quien: q.is_from_bot ? "TI (el bot)" : renderSender(q.sender_display_name as string | null, q.sender_external_id as string | null),
+            texto: String(t).replace(/\s+/g, " ").slice(0, 220),
+          });
+        }
+      }
+    }
+    // Marca inline: quién y qué se citó. Si el original no está guardado, se avisa
+    // en vez de callar — mejor "citó algo que no tengo" que un mensaje sin contexto.
+    const renderCita = (m: Record<string, unknown> | null | undefined): string => {
+      const r = m?.reply_to_external_id as string | null | undefined;
+      if (!r) return "";
+      const c = citados.get(r);
+      if (!c) return " ↩[responde a un mensaje que no tengo guardado]";
+      return ` ↩[responde a ${c.quien}: "${c.texto}"]`;
+    };
+
     lines.push("Contexto reciente (orden cronológico, hora de Colombia):");
     for (const m of (ctx ?? []).reverse()) {
       const text = effectiveText(m);
       if (text) {
         const sender = renderSender(m.sender_display_name, m.sender_external_id);
-        lines.push(`[${horaLocal(m.sent_at)}] ${sender}: ${text}`);
+        lines.push(`[${horaLocal(m.sent_at)}] ${sender}${renderCita(m as unknown as Record<string, unknown>)}: ${text}`);
       }
     }
     lines.push("");
@@ -7203,7 +7275,7 @@ async function buildInitialUserMessage(args: {
     lines.push("Mensaje al cual debes responder:");
     if (msg) {
       const sender = renderSender(msg.sender_display_name, msg.sender_external_id);
-      lines.push(`[${horaLocal(msg.sent_at)}] ${sender}: ${effectiveText(msg)}`);
+      lines.push(`[${horaLocal(msg.sent_at)}] ${sender}${renderCita(msg as unknown as Record<string, unknown>)}: ${effectiveText(msg)}`);
     }
     lines.push("");
     lines.push("Nota sobre nombres: los senders mostrados acá ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Usalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");

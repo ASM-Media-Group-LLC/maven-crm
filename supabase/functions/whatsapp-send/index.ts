@@ -42,6 +42,7 @@ interface SendRequest {
   // El texto en `body` debe contener "@<lid_o_phone_sin_sufijo>" en
   // los lugares donde quieras la mención.
   mentions?: string[];
+  quoted?: { id: string; fromMe: boolean; text: string };
   // Imagen adjunta (opcional): el mensaje sale como imagen con `body` de caption
   // vía /message/sendMedia del gateway. Lo usa el agente para mandar EVIDENCIA
   // del scan (screenshot de la promo) cuando una manager disputa un registro
@@ -62,6 +63,9 @@ async function sendViaEvolution(
   groupExternalId: string,
   body: string,
   mentions?: string[],
+  // Cita (WhatsApp "responder"): nuestro gateway Baileys lo lee como body.quoted
+  // y lo convierte en options.quoted. Las Evolution oficiales lo ignoran.
+  quoted?: { id: string; fromMe: boolean; text: string },
 ): Promise<ProviderSendResult> {
   if (!EVOLUTION_URL || !EVOLUTION_API_KEY) {
     return { ok: false, error: "evolution_not_configured" };
@@ -77,9 +81,8 @@ async function sendViaEvolution(
         options: { delay: 0, presence: "composing" },
         textMessage: { text: body },
       };
-  const payload = mentions && mentions.length > 0
-    ? { ...basePayload, mentions }
-    : basePayload;
+  const conMentions = mentions && mentions.length > 0 ? { ...basePayload, mentions } : basePayload;
+  const payload = quoted ? { ...conMentions, quoted } : conMentions;
   try {
     const resp = await fetch(url, {
       method: "POST",
@@ -134,6 +137,7 @@ async function sendOne(args: {
   tenantId: string;
   reminderId?: string;
   mentions?: string[];
+  quoted?: { id: string; fromMe: boolean; text: string };
   imageUrl?: string;
 }): Promise<ProviderSendResult> {
   const sb = adminClient();
@@ -222,7 +226,7 @@ async function sendOne(args: {
   if (group.provider === "evolution") {
     result = args.imageUrl
       ? await sendMediaViaEvolution(group.external_id, args.imageUrl, bodyFinal)
-      : await sendViaEvolution(group.external_id, bodyFinal, mentionsFinal.length > 0 ? mentionsFinal : undefined);
+      : await sendViaEvolution(group.external_id, bodyFinal, mentionsFinal.length > 0 ? mentionsFinal : undefined, args.quoted);
   } else if (group.provider === "manual") {
     // Modo manual: no mandamos al provider, solo grabamos la salida en
     // whatsapp_messages para testing y para ver lo que el bot habría
@@ -644,6 +648,7 @@ serve(async (req) => {
         tenantId: g.tenant_id,
         mentions: body.mentions,
         imageUrl: body.image_url,
+        quoted: body.quoted,
       });
       return new Response(JSON.stringify(result), {
         status: result.ok ? 200 : 500,
