@@ -103,6 +103,17 @@ export default function MessengerPage() {
     if (convId) selectChat(convId);
   }, [createDirectChat, selectChat]);
 
+  // Abrir (o crear) un DM al llegar desde el ⌘K (/messenger?dm=<userId>).
+  // Espera a que las conversaciones carguen para reutilizar el DM existente,
+  // y limpia el parámetro para que un back/refresh no lo re-dispare.
+  useEffect(() => {
+    const dm = searchParams.get("dm");
+    if (!dm || loading) return;
+    searchParams.delete("dm");
+    setSearchParams(searchParams, { replace: true });
+    handleSelectUser(dm);
+  }, [searchParams, loading, handleSelectUser, setSearchParams]);
+
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);
     if (convId) selectChat(convId);

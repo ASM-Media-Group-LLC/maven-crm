@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Users, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp, LayoutDashboard, ArrowRight } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -141,6 +141,19 @@ const ContactosContent = () => {
   useEffect(() => {
     sessionStorage.setItem(VIEWSTATE_KEY, JSON.stringify({ activeTab, filters, page }));
   }, [activeTab, filters, page]);
+
+  // Deep-link desde el ⌘K: /contactos?q=<handle|nombre> abre el directorio con
+  // la búsqueda precargada (pisa filtros restaurados) y limpia el parámetro.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q === null) return;
+    setActiveTab("contactos");
+    setFilters({ ...emptyFilters, search: q });
+    setPage(1);
+    searchParams.delete("q");
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Canales de venta por contacto (server-side vía RPC; react-query dedupea).
   const salesChannels = useContactSalesChannels(canSeeChannels);
