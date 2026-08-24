@@ -259,12 +259,33 @@ Deno.serve(async (req) => {
     }`;
 
     // Delega en el relay que ya usa el resto de Maven.
+    //
+    // ⚠️ Authorization EXPLÍCITO. `functions.invoke` NO hereda la credencial del
+    // createClient(url, serviceKey) en llamadas edge→edge: llega sin header y
+    // send-notification-email (verify_jwt=true) responde 401. Es el mismo pozo
+    // en el que cayeron los correos de QA (ver el comentario en qa-analyze), y
+    // acá volvió a pasar: el primer ticket de prueba dio 401 → 502.
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const { data: sent, error: sendErr } = await admin.functions.invoke(
       "send-notification-email",
-      { body: { to: recipients, subject, html, tag: "ticket-nuevo" } },
+      {
+        headers: { Authorization: `Bearer ${serviceKey}` },
+        body: { to: recipients, subject, html, tag: "ticket-nuevo" },
+      },
     );
     if (sendErr) {
-      return json(502, { error: "Falló el envío", detail: sendErr.message });
+      // supabase-js devuelve "non-2xx status code" sin el motivo, que no sirve
+      // para diagnosticar. El detalle real está en el body de la Response.
+      let detail = sendErr.message;
+      const ctx = (sendErr as { context?: Response }).context;
+      if (ctx && typeof ctx.text === "function") {
+        try {
+          detail += ` | ${(await ctx.text()).slice(0, 500)}`;
+        } catch {
+          // Si el body ya se consumió, nos quedamos con el mensaje base.
+        }
+      }
+      return json(502, { error: "Falló el envío", detail });
     }
 
     return json(200, { sent: true, recipients: recipients.length, relay: sent });
