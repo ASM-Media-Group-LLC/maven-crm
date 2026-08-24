@@ -4,7 +4,6 @@ import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import NewChatModal from "./NewChatModal";
 
-import IncomingCallModal from "./components/IncomingCallModal";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import { ConversationWithDetails, ChatMessage } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
@@ -13,7 +12,7 @@ import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission } from "@/hooks/useBrowserNotifications";
 import { useAuth } from "@/hooks/useAuth";
-import { useVideoCall } from "@/hooks/useVideoCall";
+import { useCall } from "@/components/CallProvider";
 import { useSpaces } from "@/hooks/useSpaces";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
 import { useArchivedChats } from "@/hooks/useArchivedChats";
@@ -37,7 +36,7 @@ export default function MessengerPage() {
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
   useNotificationPermission();
-  const { incomingCall, acceptCall, declineCall } = useVideoCall();
+  const { initiateCall } = useCall();
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();
@@ -111,6 +110,16 @@ export default function MessengerPage() {
   };
 
   const handleStartVideoCall = async (conv: ConversationWithDetails) => {
+    const otro = conv.participants.find((p) => p.user_id !== user?.id);
+    // 1-a-1: llamada estilo WhatsApp — al otro le SUENA y aparece el modal para
+    // aceptar o rechazar, esté en la sección de Maven que esté. `initiateCall`
+    // crea el "ringing" (que dispara el modal por realtime) y abre la sala.
+    if (conv.participants.length === 2 && otro) {
+      await initiateCall(conv.id, otro.user_id, conv.displayName, "video");
+      return;
+    }
+    // Grupo: por ahora se comparte el link (hacer sonar a varios a la vez es
+    // otra vuelta — la tabla `calls` tiene un solo receiver_id).
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
     const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
@@ -235,13 +244,8 @@ export default function MessengerPage() {
         )}
       </div>
 
-      {incomingCall && (
-        <IncomingCallModal
-          call={incomingCall}
-          onAccept={acceptCall}
-          onDecline={declineCall}
-        />
-      )}
+      {/* El modal de llamada entrante ahora es GLOBAL (CallProvider), para que
+          suene estés en la sección de Maven que estés, no solo acá. */}
 
       <NewChatModal
         open={newChatOpen}

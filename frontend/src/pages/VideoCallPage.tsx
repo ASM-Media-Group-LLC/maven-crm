@@ -183,9 +183,14 @@ export default function VideoCallPage() {
         initialVideoDeviceId={joinOpts.videoDeviceId}
         initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
         initialBackgroundEffect={joinOpts.backgroundEffect}
-        // Grabar: solo reuniones de Meet. Las llamadas ad-hoc de Messenger
-        // pasan por esta misma pagina y quedan afuera a proposito.
-        recording={roomName.startsWith("meet_") ? { source: "meet", title: callDisplayName } : undefined}
+        // Grabar: reuniones de Meet Y llamadas del chat (`call-`). Se guardan
+        // en Grabaciones con la misma lógica; el título (nombre del chat) las
+        // distingue. Con botón, como en Meet — no arranca sola.
+        recording={
+          roomName.startsWith("meet_") || roomName.startsWith("call-")
+            ? { source: "meet", title: callDisplayName }
+            : undefined
+        }
         shareLink={meetShareLink ?? undefined}
       />
       {/* Sala de espera: si es una reunión de Meet, quien está adentro (con cuenta)
