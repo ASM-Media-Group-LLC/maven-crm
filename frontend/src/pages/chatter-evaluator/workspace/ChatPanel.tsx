@@ -27,7 +27,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
-import { VolumeControl, playSoundFile } from "./VolumeControl";
+import { VolumeControl, getSoundVolume } from "./VolumeControl";
+import { playMessageNotification } from "@/lib/notificationSound";
 import { FontZoom, useChatFontSize } from "./ChatToolbar";
 import { MediaViewer } from "./MediaViewer";
 import { TipPopup, playTipSound } from "./TipPopup";
@@ -605,11 +606,10 @@ const MessageBubble = ({
   );
 };
 
-// New-message ding. Uses the same notification.mp3 the original
-// Roleplaychatters shipped (copied to /public/sounds) — the WebAudio
-// fallback the migration started with sounded different, and the user
-// asked to match the original 1:1.
-const playPing = () => playSoundFile("notification");
+// Ding de mensaje nuevo → tono "Pulso" unificado (Web Audio, sin asset),
+// respetando el slider de volumen del Chatter Evaluator. Los tips siguen con
+// sus mp3 en TipPopup.
+const playPing = () => playMessageNotification(getSoundVolume());
 
 const formatRemaining = (ms: number): string => {
   if (ms <= 0) return "00:00";

@@ -21,7 +21,8 @@ import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/Em
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
-import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
+import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspace/VolumeControl";
+import { playMessageNotification } from "@/lib/notificationSound";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { TipPopup, playTipSound } from "@/pages/chatter-evaluator/workspace/TipPopup";
 import {
@@ -619,8 +620,8 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-// Same notification.mp3 as the original — see ChatPanel.tsx for context.
-const playPing = () => playSoundFile("notification");
+// Ding de mensaje nuevo → tono "Pulso" unificado (ver ChatPanel.tsx).
+const playPing = () => playMessageNotification(getSoundVolume());
 
 const formatRemaining = (ms: number): string => {
   if (ms <= 0) return "00:00";

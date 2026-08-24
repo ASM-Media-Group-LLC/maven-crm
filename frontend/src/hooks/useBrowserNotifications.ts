@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { playMessageNotification } from "@/lib/notificationSound";
 
 /** Request notification permission on mount */
 export function useNotificationPermission() {
@@ -9,25 +10,11 @@ export function useNotificationPermission() {
   }, []);
 }
 
-// Preload audio once
-let cachedAudio: HTMLAudioElement | null = null;
-function getNotificationAudio(): HTMLAudioElement {
-  if (!cachedAudio) {
-    cachedAudio = new Audio("/sounds/message.wav");
-    cachedAudio.volume = 0.5;
-  }
-  return cachedAudio;
-}
-
-/** Play notification sound */
+/** Tono de mensaje nuevo (Pulso). Unificado para Messenger, bandeja de
+ *  WhatsApp y bandeja de Telegram — todos pasan por acá. Sintetizado, sin
+ *  archivo (antes: /sounds/message.wav). */
 export function playNotificationSound() {
-  try {
-    const audio = getNotificationAudio();
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  } catch {
-    // ignore
-  }
+  playMessageNotification();
 }
 
 /** Show a browser notification when the tab is hidden */

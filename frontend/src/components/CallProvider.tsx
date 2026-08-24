@@ -14,8 +14,8 @@ import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
 type CallCtx = ReturnType<typeof useVideoCall>;
 const CallContext = createContext<CallCtx | null>(null);
 
-/** Timbre tipo WhatsApp con Web Audio (sin asset): un par de tonos que se
- *  repite mientras suena. */
+/** Timbre "Clásico" (teléfono) con Web Audio, sin asset: dos ráfagas de un tono
+ *  con trémolo (el "briiing briiing") que se repiten mientras suena. */
 function Ringtone() {
   useEffect(() => {
     const AC = window.AudioContext ||
@@ -25,28 +25,48 @@ function Ringtone() {
     // Si el navegador lo tiene suspendido (sin gesto previo), intentamos
     // reanudarlo; si igual no deja, el modal visual queda como respaldo.
     ac.resume?.().catch(() => {});
+    const master = ac.createGain();
+    master.gain.value = 0.9;
+    const lp = ac.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 7000;
+    master.connect(lp).connect(ac.destination);
     let timer: number | undefined;
     let stopped = false;
 
-    const beep = (freq: number, at: number, dur: number) => {
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.18, at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-      osc.connect(gain).connect(ac.destination);
-      osc.start(at);
-      osc.stop(at + dur);
+    // Una ráfaga: dos triángulos levemente detonados con un LFO de 18 Hz sobre
+    // el volumen → el "warble" característico del timbre de teléfono.
+    const warble = (t0: number, dur: number) => {
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+      g.gain.setValueAtTime(0.22, t0 + dur - 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      const lfo = ac.createOscillator();
+      lfo.type = "sine";
+      lfo.frequency.value = 18;
+      const lg = ac.createGain();
+      lg.gain.value = 0.16;
+      lfo.connect(lg).connect(g.gain);
+      [440, 462].forEach((f) => {
+        const o = ac.createOscillator();
+        o.type = "triangle";
+        o.frequency.value = f;
+        o.connect(g);
+        o.start(t0);
+        o.stop(t0 + dur + 0.03);
+      });
+      g.connect(master);
+      lfo.start(t0);
+      lfo.stop(t0 + dur + 0.03);
     };
 
     const cycle = () => {
       if (stopped) return;
-      const t = ac.currentTime;
-      beep(480, t, 0.4);
-      beep(620, t + 0.5, 0.4);
-      timer = window.setTimeout(cycle, 2400);
+      const t = ac.currentTime + 0.03;
+      warble(t, 0.4);
+      warble(t + 0.6, 0.4);
+      timer = window.setTimeout(cycle, 2000);
     };
     cycle();
 
