@@ -9,7 +9,8 @@ import {
   useChatterProfiles,
   useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
-import { playSoundFile } from "./VolumeControl";
+import { getSoundVolume } from "./VolumeControl";
+import { playMessageNotification } from "@/lib/notificationSound";
 import { loadDismissedFromStorage, dismissSession, DISMISSED_EVENT } from "./dismissedSessions";
 import { NewSessionDialog } from "../NewSessionDialog";
 import {
@@ -277,7 +278,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
     for (const [sessionId, count] of Object.entries(unreadById)) {
       const prevCount = prev[sessionId] ?? 0;
       if (count > prevCount && sessionId !== selectedIdRef.current) {
-        playSoundFile("notification");
+        playMessageNotification(getSoundVolume());
         break;
       }
     }
