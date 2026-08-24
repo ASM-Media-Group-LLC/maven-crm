@@ -41,11 +41,13 @@ const EarningsHeatmap = ({ rows, earningsMode }: Props) => {
     return { grid: map, dates, maxVal };
   }, [rows, factor]);
 
+  // Rampa por alpha sobre el token primario: la intensidad CRECE con el valor
+  // en ambos temas (la rampa anterior, diseñada para fondo claro, hacía brillar
+  // los valores BAJOS sobre el tema oscuro — auditoría dataviz #19).
   const getColor = (val: number) => {
     if (maxVal === 0 || val === 0) return "hsl(var(--muted))";
     const intensity = Math.min(val / maxVal, 1);
-    const lightness = 90 - intensity * 50;
-    return `hsl(211, 100%, ${lightness}%)`;
+    return `hsl(var(--primary) / ${(0.15 + 0.85 * intensity).toFixed(3)})`;
   };
 
   if (dates.length === 0) {
@@ -106,7 +108,7 @@ const EarningsHeatmap = ({ rows, earningsMode }: Props) => {
                 <div
                   key={p}
                   className="h-3 w-5 rounded-[2px]"
-                  style={{ backgroundColor: `hsl(211, 100%, ${90 - p * 50}%)` }}
+                  style={{ backgroundColor: p === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${0.15 + 0.85 * p})` }}
                 />
               ))}
             </div>

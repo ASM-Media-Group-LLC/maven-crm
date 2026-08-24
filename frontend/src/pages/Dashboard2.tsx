@@ -51,8 +51,11 @@ import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import {
-  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
+  ComposedChart, Bar, Line, Cell, XAxis, YAxis, CartesianGrid,
+  ReferenceLine, LabelList, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { CHART_AXIS, CHART_COLOR, CHART_GRID, CHART_SERIES } from "@/lib/chartTheme";
+import { MavenTooltip } from "@/components/charts/MavenTooltip";
 import { useUserRole } from "@/hooks/useUserRole";
 // jspdf + jspdf-autotable are loaded on demand inside exportPdf() so
 // the (large) PDF chunk only enters the bundle when the user actually
@@ -106,7 +109,8 @@ function rangeForPreset(preset: RangePreset, ref: Date): { from: Date; to: Date 
   }
 }
 
-const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
+// (Los 20 tonos arbitrarios PIE_COLORS se retiraron con el donut del 80/20:
+// el Pareto usa los tokens de serie de lib/chartTheme — auditoría #20.)
 
 // ─── Component ───────────────────────────────────────────────────
 const Dashboard2 = () => {
@@ -461,18 +465,33 @@ const Dashboard2 = () => {
     return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs, totalBruto, avgPerCreator, topCreator, zeroCreators, creatorsUnder1k, creatorsOver10k, activeCount: active.length, totalFansAll, topCreatorImpact };
   }, [rawCreators]);
 
-  // Pie data
+  // Datos del grupo visible del análisis 80/20 (ya ordenados desc)
   const pieData = useMemo(() => {
     if (paretoGroup === "80") {
-      const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
+      const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total, isResto: false }));
       const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
-      if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
+      if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal, isResto: true });
       return items;
     }
-    return paretoAnalysis.rest.map((c) => ({ name: c.name, value: c.total }));
+    return paretoAnalysis.rest.map((c) => ({ name: c.name, value: c.total, isResto: false }));
   }, [paretoAnalysis, paretoGroup]);
 
   const pieGroupTotal = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData]);
+
+  // Pareto real (auditoría dataviz #20): a cada fila se le suma el acumulado
+  // en dólares (mismo eje que las barras) y los % para el tooltip.
+  const paretoChartData = useMemo(() => {
+    let cum = 0;
+    return pieData.map((d) => {
+      cum += d.value;
+      return {
+        ...d,
+        cum,
+        pctOfTotal: pieGroupTotal > 0 ? (d.value / pieGroupTotal) * 100 : 0,
+        cumPct: pieGroupTotal > 0 ? (cum / pieGroupTotal) * 100 : 0,
+      };
+    });
+  }, [pieData, pieGroupTotal]);
 
   // Previous month for comparison
   const prevMonthMap = useMemo(() => {
@@ -1780,33 +1799,67 @@ const Dashboard2 = () => {
 
                   {paretoView === "chart" && (
                     <div className="space-y-4">
-                      <div className="flex flex-col items-center">
-                        <ResponsiveContainer width="100%" height={400}>
-                          <RechartsPie>
-                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={80} outerRadius={160} paddingAngle={1} stroke="hsl(var(--border))"
-                              label={({ name, percent }: { name: string; percent: number }) => percent > 0.03 ? `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%` : ''}
-                              labelLine={true}
-                            >
-                              {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
-                              itemStyle={{ color: "hsl(var(--foreground))" }}
-                              labelStyle={{ color: "hsl(var(--foreground))" }}
-                              formatter={(value: number, name: string) => [fmt(value), name]}
+                      {/* Pareto real (auditoría #20): barras horizontales ordenadas desc +
+                          línea de acumulado en el MISMO eje ($) y corte punteado en el 80%
+                          del total. Antes: donut de ~20 slices con 20 tonos arbitrarios. */}
+                      <ResponsiveContainer width="100%" height={Math.max(280, paretoChartData.length * 32 + 48)}>
+                        <ComposedChart data={paretoChartData} layout="vertical" margin={{ top: 8, right: 64, bottom: 8, left: 8 }}>
+                          <CartesianGrid {...CHART_GRID} vertical horizontal={false} />
+                          <XAxis type="number" {...CHART_AXIS} tickFormatter={(v: number) => fmtK(v)} />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            width={150}
+                            interval={0}
+                            {...CHART_AXIS}
+                            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                            tickFormatter={(n: string) => (n.length > 18 ? `${n.slice(0, 18)}…` : n)}
+                          />
+                          <Tooltip
+                            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                            content={
+                              <MavenTooltip
+                                formatter={(value, name, entry) => {
+                                  const d = (entry.payload ?? {}) as { pctOfTotal?: number; cumPct?: number };
+                                  const pct = name === "Acumulado" ? d.cumPct : d.pctOfTotal;
+                                  return [`${fmt(Number(value))} · ${(pct ?? 0).toFixed(1)}%`, name];
+                                }}
+                              />
+                            }
+                          />
+                          <Bar dataKey="value" name="Bruto" barSize={16} radius={[0, 4, 4, 0]} fill={CHART_SERIES[0]}>
+                            {paretoChartData.map((d, idx) => (
+                              <Cell key={idx} fill={d.isResto ? "hsl(var(--muted-foreground) / 0.45)" : CHART_SERIES[0]} />
+                            ))}
+                            <LabelList dataKey="value" position="right" fill="hsl(var(--muted-foreground))" fontSize={10} formatter={(v: number) => fmtK(v)} />
+                          </Bar>
+                          <Line type="monotone" dataKey="cum" name="Acumulado" stroke={CHART_COLOR.pink} strokeWidth={2} dot={{ r: 2, fill: CHART_COLOR.pink }} activeDot={{ r: 4 }} />
+                          {paretoGroup === "80" && paretoAnalysis.totalRevenue > 0 && (
+                            <ReferenceLine
+                              x={paretoAnalysis.totalRevenue * 0.8}
+                              stroke="hsl(var(--warning))"
+                              strokeDasharray="4 4"
+                              label={{ value: "80% del total", position: "insideBottomRight", fill: "hsl(var(--warning))", fontSize: 10 }}
                             />
-                          </RechartsPie>
-                        </ResponsiveContainer>
-                      </div>
-                      {/* Legend with names */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 px-2">
-                        {pieData.map((d, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5 text-xs truncate">
-                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }} />
-                            <span className="truncate text-foreground">{d.name}</span>
-                            <span className="text-muted-foreground tabular-nums ml-auto shrink-0">{fmtK(d.value)}</span>
-                          </div>
-                        ))}
+                          )}
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                      {/* Leyenda de las dos series (+ corte) */}
+                      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-3 rounded-sm" style={{ background: CHART_SERIES[0] }} />
+                          Bruto por creadora
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-0.5 w-4 rounded-full" style={{ background: CHART_COLOR.pink }} />
+                          Acumulado
+                        </span>
+                        {paretoGroup === "80" && (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 border-t-2 border-dashed" style={{ borderColor: "hsl(var(--warning))" }} />
+                            Corte 80%
+                          </span>
+                        )}
                       </div>
                       <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center rounded-b-lg">
                         <p className="text-[10px] text-muted-foreground">

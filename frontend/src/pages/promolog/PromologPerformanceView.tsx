@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
+import { CHART_AXIS, CHART_GRID } from "@/lib/chartTheme";
 import { BarChart3, Clock, ChevronsUpDown, Check, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -202,17 +203,18 @@ const PromologPerformanceView = ({ profiles }: Props) => {
                     <ResponsiveContainer width="100%" height="100%">
                       {chart.type === "line" ? (
                         <LineChart data={chart.data}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey={chart.dataKey} tick={{ fontSize: 10 }} interval={4} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          {/* stroke como ATRIBUTO: className="stroke-border" no pisaba el #ccc default (auditoría #16) */}
+                          <CartesianGrid {...CHART_GRID} />
+                          <XAxis dataKey={chart.dataKey} {...CHART_AXIS} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} interval={4} />
+                          <YAxis allowDecimals={false} {...CHART_AXIS} />
                           <Tooltip contentStyle={tooltipStyle} />
                           <Line type="monotone" dataKey="count" name="Promos" stroke={chart.color} strokeWidth={2} dot={{ fill: chart.color, r: 3 }} activeDot={{ r: 5 }} />
                         </LineChart>
                       ) : (
                         <BarChart data={chart.data}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey={chart.dataKey} tick={{ fontSize: 10 }} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <CartesianGrid {...CHART_GRID} />
+                          <XAxis dataKey={chart.dataKey} {...CHART_AXIS} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                          <YAxis allowDecimals={false} {...CHART_AXIS} />
                           <Tooltip contentStyle={tooltipStyle} />
                           <Bar dataKey="count" name="Promos" fill={chart.color} radius={[4, 4, 0, 0]} />
                         </BarChart>

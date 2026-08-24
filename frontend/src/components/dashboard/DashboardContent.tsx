@@ -20,6 +20,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
 } from "recharts";
+import { CHART_AXIS, CHART_COLOR, CHART_GRID, CHART_SERIES } from "@/lib/chartTheme";
+import { MavenTooltip } from "@/components/charts/MavenTooltip";
 import { supabase } from "@/integrations/supabase/client";
 import StatChip from "@/components/StatChip";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -99,13 +101,8 @@ const useLeadsData = () =>
     },
   });
 
-const PIPELINE_COLORS = [
-  "hsl(211, 100%, 50%)",
-  "hsl(271, 91%, 50%)",
-  "hsl(40, 96%, 40%)",
-  "hsl(145, 63%, 32%)",
-  "hsl(0, 84%, 60%)",
-];
+// Series del mini-sistema de charts: orden fijo validado (ver lib/chartTheme.ts).
+const PIPELINE_COLORS = CHART_SERIES;
 
 const ACTIVITY_CONFIG = {
   ticket: { icon: Ticket, bg: "bg-destructive/10", text: "text-destructive", label: "Ticket" },
@@ -436,13 +433,13 @@ const DashboardContent = () => {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={weeklyData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                      <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                      <Tooltip />
+                      <CartesianGrid {...CHART_GRID} />
+                      <XAxis dataKey="day" {...CHART_AXIS} />
+                      <YAxis {...CHART_AXIS} />
+                      <Tooltip content={<MavenTooltip />} />
                       <Legend />
-                      <Line type="monotone" dataKey="leads" stroke="hsl(211,100%,50%)" strokeWidth={2} name="Leads" dot={false} />
-                      <Line type="monotone" dataKey="deals" stroke="hsl(145,63%,32%)" strokeWidth={2} name="Deals" dot={false} />
+                      <Line type="monotone" dataKey="leads" stroke={CHART_COLOR.azul} strokeWidth={2} name="Leads" dot={false} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="deals" stroke={CHART_COLOR.verde} strokeWidth={2} name="Deals" dot={false} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -568,7 +565,7 @@ const DashboardContent = () => {
                               <Cell key={i} fill={PIPELINE_COLORS[i % PIPELINE_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip content={<MavenTooltip />} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>

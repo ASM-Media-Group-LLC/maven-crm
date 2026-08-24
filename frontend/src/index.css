@@ -56,6 +56,17 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
     --instagram-orange: 25 95% 53%;
+
+    /* Series de charts (mini-sistema dataviz, ola 2 UX — ver lib/chartTheme.ts).
+       Orden FIJO azul → verde → cyan → ámbar → violeta → pink, validado con
+       simulación CVD (protan/deutan ΔE ≥ 15 entre vecinos) y contraste ≥ 3:1
+       sobre la superficie clara. No reordenar sin re-validar. */
+    --chart-1: 211 100% 50%; /* azul (= primary) */
+    --chart-2: 145 63% 32%;  /* verde (= success light) */
+    --chart-3: 190 90% 38%;  /* cyan */
+    --chart-4: 40 96% 40%;   /* ámbar (= warning light) */
+    --chart-5: 271 91% 50%;  /* violeta (= accent) */
+    --chart-6: 340 78% 59%;  /* pink #e8467c */
   }
 
   .dark {
@@ -108,6 +119,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
     --instagram-orange: 25 95% 53%;
+
+    /* Charts: mismos matices que :root pero con pasos re-calibrados para la
+       superficie oscura (banda de luminosidad OKLCH + contraste ≥ 3:1 sobre
+       la card 227 30% 12%, verificado con el validador CVD). */
+    --chart-1: 211 100% 50%; /* azul */
+    --chart-2: 150 56% 34%;  /* verde */
+    --chart-3: 190 90% 40%;  /* cyan */
+    --chart-4: 40 92% 34%;   /* ámbar */
+    --chart-5: 271 91% 54%;  /* violeta */
+    --chart-6: 340 78% 59%;  /* pink */
   }
 }
 
