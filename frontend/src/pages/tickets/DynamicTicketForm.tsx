@@ -73,8 +73,14 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
     () =>
       (creatorsQuery.data || []).map((c) => ({
         value: c.id,
-        label: c.artistic_name || c.name,
-        searchAdditional: [c.name, c.instagram_handle].filter(Boolean).join(" "),
+        // El handle va en la etiqueta, no solo en el texto de busqueda: sin el,
+        // la lista parece corta y ambigua (hay 338 creadoras y homonimas).
+        label: c.instagram_handle
+          ? `${c.artistic_name || c.name} · @${String(c.instagram_handle).replace(/^@/, "")}`
+          : c.artistic_name || c.name,
+        searchAdditional: [c.name, c.artistic_name, c.instagram_handle]
+          .filter(Boolean)
+          .join(" "),
       })),
     [creatorsQuery.data],
   );
@@ -350,6 +356,10 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
                   placeholder="Buscar creadora…"
                   triggerClassName={touched && creatorMissing ? "border-destructive" : ""}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {creatorOptions.length} creadoras de la base de Maven — escribí para buscar por
+                  nombre o handle. Queda vinculada al perfil, no es texto libre.
+                </p>
               </div>
             )}
 

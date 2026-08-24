@@ -2,6 +2,13 @@ import { useState, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useTickets, type TicketWithCreator } from "./useTickets";
 import TicketsFilters from "./TicketsFilters";
 import TicketsList from "./TicketsList";
@@ -28,6 +35,10 @@ const TicketsContent = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
   const [tab, setTab] = useState(canCreate ? "new" : canSeeList ? "list" : "calendar");
+  // El boton del header abre un selector de plantilla. Antes hacia setTab("new"),
+  // que no hacia NADA si ya estabas en esa pestana (y es la pestana por defecto):
+  // un boton muerto. Como dialogo funciona desde cualquier pestana.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [selectedTicket, setSelectedTicket] = useState<TicketWithCreator | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -91,7 +102,7 @@ const TicketsContent = () => {
           subtitle="Gestión de soporte y escalaciones"
           actions={
             canCreate && (
-              <Button onClick={() => setTab("new")}>
+              <Button onClick={() => setPickerOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" />
                 Nuevo Ticket
               </Button>
@@ -118,7 +129,7 @@ const TicketsContent = () => {
             </p>
           </div>
 
-          <NewTicketLauncher canCreate={canCreate} />
+          <NewTicketLauncher canCreate={canCreate} canManageForms={canManageForms} />
 
           {/* Se conserva el alta libre de siempre, sin plantilla, para no quitar
               una funcionalidad que ya existía. */}
@@ -174,6 +185,18 @@ const TicketsContent = () => {
         </TabsContent>
         )}
       </Tabs>
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nuevo ticket</DialogTitle>
+            <DialogDescription>
+              Elegi una plantilla y completa el formulario. El codigo se asigna solo.
+            </DialogDescription>
+          </DialogHeader>
+          <NewTicketLauncher canCreate={canCreate} canManageForms={canManageForms} />
+        </DialogContent>
+      </Dialog>
 
       <CreateTicketModal open={modalOpen} onOpenChange={setModalOpen} />
       {selectedTicket && (
