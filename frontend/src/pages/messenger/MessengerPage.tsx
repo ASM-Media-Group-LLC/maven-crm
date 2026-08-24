@@ -6,6 +6,7 @@ import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
 
 import IncomingCallModal from "./components/IncomingCallModal";
+import DeleteChatDialog from "./components/DeleteChatDialog";
 import { ConversationWithDetails, ChatMessage } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
@@ -47,7 +48,9 @@ export default function MessengerPage() {
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
-  
+  const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const joinedFromLinkRef = useRef(false);
 
   const selectChat = useCallback((chatId: string | null) => {
@@ -94,7 +97,9 @@ export default function MessengerPage() {
   const { getReadBy, getDeliveredBy } = useReadReceipts(activeChatId, messageIds);
 
   const handleSelectUser = useCallback((userId: string) => {
-    const convId = createDirectChat(userId);
+    // onResolved: si el DM ya existía en el server, reapuntamos la selección al id real
+    // (evita quedar en una conv optimista que se elimina bajo el usuario).
+    const convId = createDirectChat(userId, (realId) => selectChat(realId));
     if (convId) selectChat(convId);
   }, [createDirectChat, selectChat]);
 
@@ -115,6 +120,16 @@ export default function MessengerPage() {
     const success = await deleteConversation(chatId);
     if (success && activeChatId === chatId) selectChat(null);
     return success;
+  };
+
+  // Borrar desde el header del chat SIEMPRE pasa por confirmación (antes borraba directo,
+  // sin diálogo — irreversible con un solo click).
+  const handleConfirmDeleteActive = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await handleDeleteChat(deleteTarget.id);
+    setDeleting(false);
+    setDeleteTarget(null);
   };
 
   useEffect(() => {
@@ -203,7 +218,7 @@ export default function MessengerPage() {
               isPinned={isPinned(activeConv.id)}
               onTogglePin={() => togglePin(activeConv.id)}
               onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
-              onDelete={() => handleDeleteChat(activeConv.id)}
+              onDelete={() => setDeleteTarget(activeConv)}
               canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === user?.id && p.role === "admin")}
             />
           </div>
@@ -244,6 +259,15 @@ export default function MessengerPage() {
         onCreateGroup={handleCreateGroup}
         isOnlineFn={isOnline}
         getStatusFn={getStatus}
+      />
+
+      <DeleteChatDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        chatName={deleteTarget?.displayName || ""}
+        isGroup={deleteTarget?.type === "group"}
+        onConfirm={handleConfirmDeleteActive}
+        isLoading={deleting}
       />
     </div>
   );

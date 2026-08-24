@@ -320,8 +320,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
         <div className={cn("relative max-w-[70%]", isMe ? "order-first" : "")}>
           {/* Hover actions — M3 tonal */}
+          {/* En touch (hover:none) las acciones quedan SIEMPRE visibles; en mouse se
+              revelan al hover como antes. Sin esto, en la PWA del celular responder/
+              reaccionar/editar/eliminar eran inalcanzables. */}
           <div className={cn(
-            "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-0.5",
+            "absolute top-0 transition-opacity z-10 flex items-center gap-0.5",
+            "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
             isMe ? "-left-16" : "-right-16"
           )}>
             <ReactionPicker onSelect={onToggleReaction} className="bg-primary/10 border-0 rounded-full shadow-none" />

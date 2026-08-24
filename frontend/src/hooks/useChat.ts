@@ -464,7 +464,7 @@ export function useChat() {
   }, [user, loadConversations, chatRealtimeVersion]);
 
   const createDirectChat = useCallback(
-    (otherUserId: string): string | null => {
+    (otherUserId: string, onResolved?: (realId: string) => void): string | null => {
       if (!user) return null;
 
       // Use ref for up-to-date conversations (avoid stale closures)
@@ -539,9 +539,18 @@ export function useChat() {
             .limit(1);
 
           if (otherP && otherP.length > 0) {
-            // Already exists — replace optimistic with real one
+            // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
+            // por el otro no aparece en mi lista). Antes solo borrábamos la conv optimista
+            // → el chat abierto se cerraba solo y NUNCA se podía reabrir. Ahora reapuntamos
+            // al id real y reseleccionamos: si ya está en la lista quitamos la optimista;
+            // si no, reusamos la optimista con el id real (queda visible: created_by = yo).
             const existingConvId = otherP[0].conversation_id;
-            setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+            setConversations((prev) =>
+              prev.some((c) => c.id === existingConvId)
+                ? prev.filter((c) => c.id !== newConvId)
+                : prev.map((c) => (c.id === newConvId ? { ...c, id: existingConvId } : c))
+            );
+            onResolved?.(existingConvId);
             return;
           }
         }

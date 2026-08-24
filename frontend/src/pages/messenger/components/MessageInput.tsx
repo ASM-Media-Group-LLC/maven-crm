@@ -131,6 +131,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   }, []);
 
   const handleSend = useCallback(async () => {
+    // Guard: si ya hay una subida en curso, Enter no debe re-disparar el envío
+    // (re-subía y duplicaba los archivos porque pendingFiles sigue poblado hasta el final).
+    if (uploading) return;
     if (pendingFiles.length > 0) {
       setUploading(true);
       for (let i = 0; i < pendingFiles.length; i++) {
@@ -183,7 +186,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     onCancelReply();
     onSendTyping(false);
     inputRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
