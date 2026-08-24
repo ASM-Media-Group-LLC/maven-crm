@@ -9,6 +9,16 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Bold,
   Italic,
   Link2,
@@ -542,6 +552,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
   // tipear la "j" de juan@… ya mostraba el error en rojo — o sea el estado
   // de error era el estado normal mientras se escribía.
   const [tocado, setTocado] = useState<{ to?: boolean; cc?: boolean; bcc?: boolean }>({});
+  const [confirmarDescarte, setConfirmarDescarte] = useState(false);
 
   const destinatarios = partirDirecciones(to);
   const copias = partirDirecciones(cc);
@@ -605,7 +616,12 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
       (contenidoInicial === ""
         ? !cuerpoVacio
         : (editor?.getHTML() ?? "") !== contenidoInicial);
-    if (cambio && !window.confirm("¿Descartar este correo? Lo escrito se pierde.")) return;
+    // Diálogo propio y no window.confirm: el nativo congela la pestaña
+    // entera mientras está abierto y desentona con el resto de Maven.
+    if (cambio) {
+      setConfirmarDescarte(true);
+      return;
+    }
     onCerrar();
   };
 
@@ -789,6 +805,26 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
           {editor && <BarraFormato editor={editor} />}
         </div>
       </DialogContent>
+
+      <AlertDialog open={confirmarDescarte} onOpenChange={setConfirmarDescarte}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar este correo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Lo que escribiste se pierde. Todavía no hay borradores guardados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setConfirmarDescarte(false); onCerrar(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
