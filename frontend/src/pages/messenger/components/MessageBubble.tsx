@@ -1,6 +1,6 @@
-import { forwardRef, useState, useMemo, memo } from "react";
+import { forwardRef, useState, useMemo, memo, useRef, useEffect } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -60,6 +60,30 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
   const [showAllImages, setShowAllImages] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  const startEdit = () => { setEditValue(message.content || ""); setIsEditing(true); };
+  const cancelEdit = () => setIsEditing(false);
+  const saveEdit = () => {
+    const v = editValue.trim();
+    if (v && v !== message.content) onEdit(v);
+    setIsEditing(false);
+  };
+  useEffect(() => {
+    if (!isEditing) return;
+    const el = editRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    autoGrow(el);
+  }, [isEditing]);
 
   const participantNames = useMemo(() => {
     return Object.values(profiles).map(p => p.full_name).filter(Boolean) as string[];
@@ -288,6 +312,46 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       );
     }
 
+    if (isEditing) {
+      return (
+        <div className="min-w-[220px]">
+          <textarea
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => { setEditValue(e.target.value); autoGrow(e.target); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+              if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+            }}
+            rows={1}
+            className={cn(
+              "w-full resize-none rounded-xl px-2.5 py-1.5 text-[13px] leading-relaxed outline-none focus:ring-2 max-h-40 overflow-y-auto",
+              isMe
+                ? "bg-primary-foreground/15 text-white placeholder-white/50 focus:ring-white/40"
+                : "bg-background text-foreground focus:ring-primary/40"
+            )}
+          />
+          <div className="flex items-center justify-end gap-1 mt-1">
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className={cn("text-[11px] px-2 py-0.5 rounded-lg transition-colors", isMe ? "text-white/70 hover:text-white hover:bg-primary-foreground/10" : "text-muted-foreground hover:bg-muted")}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={saveEdit}
+              className={cn("text-[11px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors", isMe ? "bg-primary-foreground/20 text-white hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90")}
+            >
+              <Check className="h-3 w-3" /> Guardar
+            </button>
+          </div>
+          <p className={cn("text-[10px] mt-0.5", isMe ? "text-white/40" : "text-muted-foreground")}>Enter para guardar · Esc para cancelar</p>
+        </div>
+      );
+    }
+
     return (
       <p className="text-[13px] whitespace-pre-wrap break-words leading-relaxed">
         {highlightText(message.content || "")}
@@ -350,12 +414,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 </DropdownMenuItem>
                 {isMe && (
                   <>
-                    <DropdownMenuItem onClick={() => {
-                      const newContent = prompt("Editar mensaje:", message.content || "");
-                      if (newContent && newContent !== message.content) onEdit(newContent);
-                    }}>
-                      <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
-                    </DropdownMenuItem>
+                    {message.type === "text" && (
+                      <DropdownMenuItem onClick={startEdit}>
+                        <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem className="text-destructive" onClick={onDelete}>
                       <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
                     </DropdownMenuItem>

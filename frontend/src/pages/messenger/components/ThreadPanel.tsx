@@ -57,6 +57,23 @@ export default function ThreadPanel({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const startEdit = (msg: ChatMessage) => { setEditValue(msg.content || ""); setEditingId(msg.id); };
+  const cancelEdit = () => setEditingId(null);
+  const saveEdit = (msg: ChatMessage) => {
+    const v = editValue.trim();
+    if (v && v !== msg.content) onEditMessage(msg.id, v);
+    setEditingId(null);
+  };
+  useEffect(() => {
+    if (!editingId) return;
+    const el = editRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingId]);
   const [isRecording, setIsRecording] = useState(false);
   const abortRef = useRef<{ abort: () => void } | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -233,6 +250,32 @@ export default function ThreadPanel({
       return <span className="italic text-muted-foreground text-[13px]">Mensaje eliminado</span>;
     }
 
+    if (editingId === msg.id) {
+      return (
+        <div>
+          <Textarea
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(msg); }
+              if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+            }}
+            rows={1}
+            className="text-[13px] min-h-0 resize-none"
+          />
+          <div className="flex items-center justify-end gap-1 mt-1">
+            <button type="button" onClick={cancelEdit} className="text-[11px] px-2 py-0.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={() => saveEdit(msg)} className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-colors">
+              Guardar
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <p className="text-[13px] text-foreground/90 whitespace-pre-wrap break-words">
         {renderTextWithMentions(msg.content || "", participantNames)}
@@ -291,12 +334,11 @@ export default function ThreadPanel({
                       </DropdownMenuItem>
                       {isMe && (
                         <>
-                          <DropdownMenuItem onClick={() => {
-                            const newContent = prompt("Editar mensaje:", msg.content || "");
-                            if (newContent && newContent !== msg.content) onEditMessage(msg.id, newContent);
-                          }}>
-                            <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
-                          </DropdownMenuItem>
+                          {msg.type === "text" && (
+                            <DropdownMenuItem onClick={() => startEdit(msg)}>
+                              <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem className="text-destructive" onClick={() => onDeleteMessage(msg.id)}>
                             <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
                           </DropdownMenuItem>
