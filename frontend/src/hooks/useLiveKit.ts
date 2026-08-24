@@ -59,10 +59,16 @@ function getDeviceConstraint(deviceId?: string) {
   return deviceId ? ({ deviceId: { ideal: deviceId } } as any) : undefined;
 }
 
+// Perfil de cámara cuando hay fondo borroso/virtual activo. El blur corre
+// segmentación con ML por CADA cuadro + compositing a la resolución de captura,
+// así que es de lo más pesado de CPU y hace congelar el video. Antes era
+// 720p@24 (poco "seguro"). Lo bajamos a 540p@15: ~la mitad de píxeles y 37%
+// menos cuadros que segmentar (~60-65% menos trabajo), y para una videollamada
+// con fondo se ve perfecto. Sin fondo, la cámara usa el perfil normal (720p).
 const BACKGROUND_SAFE_VIDEO_CONSTRAINTS = {
-  width: { ideal: 1280, max: 1280 },
-  height: { ideal: 720, max: 720 },
-  frameRate: { ideal: 24, max: 24 },
+  width: { ideal: 960, max: 960 },
+  height: { ideal: 540, max: 540 },
+  frameRate: { ideal: 15, max: 15 },
 } as const;
 
 function getVideoConstraint(deviceId?: string, backgroundSafeProfile = false) {
