@@ -95,8 +95,7 @@ export default function MessengerPage() {
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
 
   useEffect(() => { messages.forEach((m) => addMessageId(m.id)); }, [messages, addMessageId]);
-  const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
-  const { getReadBy, getDeliveredBy } = useReadReceipts(activeChatId, messageIds);
+  const { getReadBy, getDeliveredBy } = useReadReceipts(activeChatId, messages);
 
   const handleSelectUser = useCallback((userId: string) => {
     // onResolved: si el DM ya existía en el server, reapuntamos la selección al id real

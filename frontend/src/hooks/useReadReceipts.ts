@@ -21,13 +21,18 @@ export async function markMessagesDelivered(userId: string, messageIds: string[]
     .upsert(rows, { onConflict: "message_id,user_id", ignoreDuplicates: true });
 }
 
-export function useReadReceipts(conversationId: string | null, messageIds: string[]) {
+export function useReadReceipts(conversationId: string | null, messages: { id: string; sender_id: string }[]) {
   const { user } = useAuth();
   const [receipts, setReceipts] = useState<ReadReceipt[]>([]);
 
-  // Stabilize messageIds to avoid infinite channel re-subscriptions
-  const messageIdsKey = messageIds.join(",");
-  const stableMessageIds = useMemo(() => messageIds, [messageIdsKey]);
+  // TODOS los ids (para cargar/mostrar recibos, incluidos los de mis propios mensajes).
+  // Stabilize to avoid infinite channel re-subscriptions.
+  const messageIdsKey = messages.map(m => m.id).join(",");
+  const stableMessageIds = useMemo(() => messages.map(m => m.id), [messageIdsKey]);
+  // Solo ids de mensajes de OTROS: uno NO "lee" sus propios mensajes → no generamos un
+  // read_at propio inútil sobre lo que yo mismo mandé (antes se marcaba y ensuciaba la tabla).
+  const othersIdsKey = messages.filter(m => m.sender_id !== user?.id).map(m => m.id).join(",");
+  const stableOthersIds = useMemo(() => messages.filter(m => m.sender_id !== user?.id).map(m => m.id), [othersIdsKey]);
 
   const loadReceipts = useCallback(async () => {
     if (!conversationId || stableMessageIds.length === 0) { setReceipts([]); return; }
@@ -89,12 +94,12 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
   receiptsRef.current = receipts;
 
   useEffect(() => {
-    if (!user || !conversationId || stableMessageIds.length === 0) return;
+    if (!user || !conversationId || stableOthersIds.length === 0) return;
 
     const markUnread = () => {
       if (!document.hasFocus()) return;
-      // "sin leer" = no hay recibo MÍO con read_at (puede haber uno solo-entregado).
-      const unread = stableMessageIds.filter(id =>
+      // "sin leer" = mensaje de OTRO sin recibo MÍO con read_at (puede haber uno solo-entregado).
+      const unread = stableOthersIds.filter(id =>
         !receiptsRef.current.find(r => r.message_id === id && r.user_id === user.id && r.read_at)
       );
       if (unread.length > 0) markAsRead(unread);
@@ -104,7 +109,7 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
 
     window.addEventListener("focus", markUnread);
     return () => window.removeEventListener("focus", markUnread);
-  }, [stableMessageIds, user, conversationId, markAsRead]);
+  }, [stableOthersIds, user, conversationId, markAsRead]);
 
   const getReadBy = useCallback((messageId: string): string[] => {
     return receipts
