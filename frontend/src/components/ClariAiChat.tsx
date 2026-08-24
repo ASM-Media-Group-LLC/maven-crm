@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
 
-// Avatar de Clari renderizado desde /clari-avatar.png con fallback a
+// Avatar de Clari renderizado desde /clari-avatar.svg con fallback a
 // Bot icon si la imagen no carga. Usado en las burbujas del chat y en
 // el indicador "escribiendo…" para coherencia con el FAB.
 const ClariBubbleAvatar = ({ size = 32 }: { size?: number }) => {
@@ -16,7 +16,7 @@ const ClariBubbleAvatar = ({ size = 32 }: { size?: number }) => {
         <Bot style={{ width: size * 0.5, height: size * 0.5 }} />
       ) : (
         <img
-          src="/clari-avatar.png"
+          src="/clari-avatar.svg"
           alt="Clari"
           className="h-full w-full object-cover"
           onError={() => setErrored(true)}

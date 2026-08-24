@@ -4,7 +4,7 @@ import ClariAiChat from "./ClariAiChat";
 import { useAiConversations } from "@/hooks/useAiConversations";
 import { useUserRole } from "@/hooks/useUserRole";
 
-// ClariAvatar — círculo con la imagen del personaje en /clari-avatar.png.
+// ClariAvatar — círculo con la imagen del personaje en /clari-avatar.svg.
 // Si la imagen falla a cargar (404, network), cae a un Bot icon sobre
 // fondo gradient para que el botón nunca quede "vacío".
 const ClariAvatar = ({
@@ -24,7 +24,7 @@ const ClariAvatar = ({
         <Bot style={{ width: size * 0.5, height: size * 0.5 }} />
       ) : (
         <img
-          src="/clari-avatar.png"
+          src="/clari-avatar.svg"
           alt="Clari AI"
           className="h-full w-full object-cover"
           onError={() => setErrored(true)}

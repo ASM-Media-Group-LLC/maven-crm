@@ -22,7 +22,7 @@ const ClariAvatar = ({ size = 44 }: { size?: number }) => {
         <Sparkles className="h-1/2 w-1/2" />
       ) : (
         <img
-          src="/clari-avatar.png"
+          src="/clari-avatar.svg"
           alt="Clari"
           className="h-full w-full object-cover"
           onError={() => setErrored(true)}

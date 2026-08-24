@@ -106,7 +106,7 @@ const sessionTitle = (s: {
 };
 
 // MikeAvatar — el muñequito del supervisor IA. La imagen vive en
-// /mike-avatar.png (drop tu PNG en frontend/public/mike-avatar.png) y
+// /mike-avatar.svg (drop tu PNG en frontend/public/mike-avatar.svg) y
 // hace fallback a un círculo con gradient + ícono Sparkles si la
 // imagen no carga, así el chat nunca se ve roto.
 const MikeAvatar = ({
@@ -129,7 +129,7 @@ const MikeAvatar = ({
         <Sparkles className="h-1/2 w-1/2" />
       ) : (
         <img
-          src="/mike-avatar.png"
+          src="/mike-avatar.svg"
           alt="Mike"
           className="h-full w-full object-cover"
           onError={() => setErrored(true)}
