@@ -28,6 +28,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 import {
   type SpammerAccount,
   type SpammerAccountAiAnalysis,
@@ -327,32 +328,32 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
         // a agregar cuenta (en vez del mensaje genérico "completá el
         // asistente"). Para Panel de Control general (viewMode='all') sin
         // resultados, dejamos el copy original.
-        <Card className="flex flex-col items-center gap-3 p-12 text-center">
-          <Instagram className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm font-medium">
-            {aggregated.length === 0
-              ? viewMode === "mine"
-                ? "Todavía no tienes cuentas registradas"
-                : "Todavía no hay cuentas registradas"
-              : "Sin resultados para esa búsqueda"}
-          </p>
-          <p className="max-w-md text-xs text-muted-foreground">
-            {aggregated.length === 0
-              ? viewMode === "mine"
-                ? "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
-                : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
-              : "Prueba con otro handle, nombre o scouter."}
-          </p>
-          {viewMode === "mine" && aggregated.length === 0 && (
-            <Button
-              size="sm"
-              className="mt-2 gap-1.5"
-              onClick={() => setAddDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Agregar mi primera cuenta
-            </Button>
-          )}
+        <Card>
+          <EmptyState
+            seed="spammer-cuentas"
+            title={
+              aggregated.length === 0
+                ? viewMode === "mine"
+                  ? "Todavía no tienes cuentas registradas"
+                  : "Todavía no hay cuentas registradas"
+                : "Sin resultados para esa búsqueda"
+            }
+            description={
+              aggregated.length === 0
+                ? viewMode === "mine"
+                  ? "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
+                  : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
+                : "Prueba con otro handle, nombre o scouter."
+            }
+            action={
+              viewMode === "mine" && aggregated.length === 0 ? (
+                <Button size="sm" className="gap-1.5" onClick={() => setAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Agregar mi primera cuenta
+                </Button>
+              ) : undefined
+            }
+          />
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1379,11 +1380,17 @@ const StatListDialog = ({
           </div>
         </DialogHeader>
         {items.length === 0 ? (
-          <div className="rounded-md border border-border/40 bg-muted/20 p-6 text-center text-sm italic text-muted-foreground">
-            {kind === "pending" && "No hay cuentas en cola de scan."}
-            {kind === "failed" && "No hay cuentas con scan fallido."}
-            {kind === "all" && "No hay cuentas registradas todavía."}
-          </div>
+          <EmptyState
+            className="rounded-md border border-border/40 bg-muted/20 py-8"
+            icon={<Instagram className="h-8 w-8 text-muted-foreground" />}
+            title={
+              kind === "pending"
+                ? "No hay cuentas en cola de scan."
+                : kind === "failed"
+                  ? "No hay cuentas con scan fallido."
+                  : "No hay cuentas registradas todavía."
+            }
+          />
         ) : (
           <ul className="divide-y divide-border/40 rounded-md border border-border/40">
             {items.map((a) => {

@@ -26,6 +26,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { TrendingUp, Plus, Loader2, Clock, AlertCircle } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 // ── catálogo de productos y etapas ───────────────────────────────────────────
 const PRODUCTS: { value: string; label: string }[] = [
@@ -224,9 +225,12 @@ const OpportunitiesPage = () => {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            No hay oportunidades en esta vista. Crea una con “Nueva oportunidad”.
-          </div>
+          <EmptyState
+            className="py-10"
+            seed="oportunidades"
+            title="No hay oportunidades en esta vista."
+            description="Crea una con “Nueva oportunidad”."
+          />
         ) : (
           <table className="w-full text-sm">
             <thead>

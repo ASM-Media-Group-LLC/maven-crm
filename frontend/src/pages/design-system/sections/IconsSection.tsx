@@ -158,19 +158,19 @@ export const IconsSection = () => (
       <h3 className="text-xl font-semibold">Reglas de uso</h3>
       <div className="rounded-lg border border-border bg-card p-5 space-y-2 text-sm text-muted-foreground">
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Siempre importar iconos individualmente de <code className="bg-muted px-1 py-0.5 rounded text-xs">lucide-react</code> (tree-shakable)</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Incluir <code className="bg-muted px-1 py-0.5 rounded text-xs">aria-hidden="true"</code> si el icono es decorativo</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Si el icono es el único elemento interactivo, acompañar con <code className="bg-muted px-1 py-0.5 rounded text-xs">aria-label</code> o tooltip</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Para redes sociales, usar <strong>siempre</strong> los iconos custom (<code className="bg-muted px-1 py-0.5 rounded text-xs">InstagramIcon</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">TikTokIcon</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">XIcon</code>) en lugar de Lucide</span>
         </div>
         <div className="flex items-start gap-2">

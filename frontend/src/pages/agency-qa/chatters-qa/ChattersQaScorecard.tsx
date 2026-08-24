@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2, ClipboardCheck, ChevronsUpDown, Check,
 } from "lucide-react";
@@ -310,7 +311,12 @@ export default function ChattersQaScorecard() {
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {!isLoading && rows.length === 0 && period && (
-        <p className="text-sm text-muted-foreground">No hay chatters cargados para {periodLabel(period)}. Agrega uno abajo o crea el mes desde el roster anterior.</p>
+        <EmptyState
+          className="py-8"
+          seed="chatters-qa"
+          title={`No hay chatters cargados para ${periodLabel(period)}.`}
+          description="Agrega uno abajo o crea el mes desde el roster anterior."
+        />
       )}
 
       <div className="space-y-5">

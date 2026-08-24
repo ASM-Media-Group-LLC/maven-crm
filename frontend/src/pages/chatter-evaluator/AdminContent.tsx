@@ -47,6 +47,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Bell, ChevronsUpDown, Check as CheckIcon, UserPlus, Pencil } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,12 +93,17 @@ const ProfilesSection = () => {
         )}
 
         {!profilesQ.isLoading && profiles.length === 0 && (
-          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-            <UserPlus className="h-8 w-8 opacity-40" />
-            <p>Todavía no hay modelos.</p>
-            <Button variant="outline" size="sm" onClick={() => setNewOpen(true)} className="gap-1">
-              <Plus className="h-3 w-3" /> Crear el primero
-            </Button>
+          <div className="rounded-md border border-dashed">
+            <EmptyState
+              className="py-8"
+              icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
+              title="Todavía no hay modelos."
+              action={
+                <Button variant="outline" size="sm" onClick={() => setNewOpen(true)} className="gap-1">
+                  <Plus className="h-3 w-3" /> Crear el primero
+                </Button>
+              }
+            />
           </div>
         )}
 

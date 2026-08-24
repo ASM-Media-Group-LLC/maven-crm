@@ -5,6 +5,7 @@ import { AlertTriangle, ListTodo } from "lucide-react";
 import { format, differenceInDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Task } from "./useTareas";
+import { EmptyState } from "@/components/EmptyState";
 
 interface Profile {
   id: string;
@@ -47,12 +48,6 @@ const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgente",
 };
 
-const EmptyState = ({ message }: { message: string }) => (
-  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-    <ListTodo className="h-8 w-8 mb-2 opacity-40" />
-    <p className="text-xs">{message}</p>
-  </div>
-);
 
 const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabProps) => {
   // KPI calculations
@@ -142,11 +137,11 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
 
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <ListTodo className="h-12 w-12 mb-3 opacity-30" />
-        <p className="text-sm font-medium">No hay tareas para analizar</p>
-        <p className="text-xs mt-1">Crea tareas en este proyecto para ver las analíticas.</p>
-      </div>
+      <EmptyState
+        seed="tareas-analytics"
+        title="No hay tareas para analizar"
+        description="Crea tareas en este proyecto para ver las analíticas."
+      />
     );
   }
 
@@ -168,7 +163,7 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message="Sin datos de estado disponibles" />
+              <EmptyState className="py-8" icon={<ListTodo className="h-8 w-8 text-muted-foreground" />} title="Sin datos de estado disponibles" />
             )}
           </CardContent>
         </Card>
@@ -189,7 +184,7 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message="Sin datos de prioridad disponibles" />
+              <EmptyState className="py-8" icon={<ListTodo className="h-8 w-8 text-muted-foreground" />} title="Sin datos de prioridad disponibles" />
             )}
           </CardContent>
         </Card>
@@ -229,7 +224,7 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message="No hay tareas con fecha de inicio para el diagrama Gantt. Asigna fechas de inicio a las tareas." />
+              <EmptyState className="py-8" icon={<ListTodo className="h-8 w-8 text-muted-foreground" />} title="No hay tareas con fecha de inicio para el diagrama Gantt." description="Asigna fechas de inicio a las tareas." />
             )}
           </CardContent>
         </Card>
@@ -250,7 +245,7 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message="No hay tareas asignadas a miembros del equipo." />
+              <EmptyState className="py-8" icon={<ListTodo className="h-8 w-8 text-muted-foreground" />} title="No hay tareas asignadas a miembros del equipo." />
             )}
           </CardContent>
         </Card>

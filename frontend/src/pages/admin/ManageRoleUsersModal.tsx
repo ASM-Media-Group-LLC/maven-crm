@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, UserMinus, UserPlus, Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { useAdminUsers } from "./useAdminUsers";
 import type { RoleConfig } from "./useRoles";
 
@@ -121,11 +122,11 @@ const ManageRoleUsersModal = ({
 
               <ScrollArea className="flex-1 min-h-[280px] border rounded-md">
                 {assignedMembers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12">
-                    {role?.user_count === 0
-                      ? "Aún no hay usuarios con este rol."
-                      : "No hay resultados."}
-                  </p>
+                  <EmptyState
+                    className="py-12"
+                    icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
+                    title={role?.user_count === 0 ? "Aún no hay usuarios con este rol." : "No hay resultados."}
+                  />
                 ) : (
                   <ul className="divide-y">
                     {assignedMembers.map((m) => (
@@ -171,11 +172,11 @@ const ManageRoleUsersModal = ({
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : availableUsers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12">
-                    {users.length === 0
-                      ? "No hay usuarios."
-                      : "Todos los usuarios ya tienen este rol o no coinciden con la búsqueda."}
-                  </p>
+                  <EmptyState
+                    className="py-12"
+                    icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
+                    title={users.length === 0 ? "No hay usuarios." : "Todos los usuarios ya tienen este rol o no coinciden con la búsqueda."}
+                  />
                 ) : (
                   <ul className="divide-y">
                     {availableUsers.map((u) => (

@@ -31,6 +31,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -226,9 +227,12 @@ const ChannelsPage = () => {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
           </div>
         ) : channels.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            Todavía no hay canales. Crea uno con el nombre de su instancia de Evolution.
-          </div>
+          <EmptyState
+            className="py-10"
+            seed="inbox-canales"
+            title="Todavía no hay canales."
+            description="Crea uno con el nombre de su instancia de Evolution."
+          />
         ) : (
           <table className="w-full text-sm">
             <thead>

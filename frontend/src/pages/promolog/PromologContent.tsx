@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import KpiCard from "@/components/dashboard/KpiCard";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
@@ -1238,12 +1239,7 @@ const PromologContent = () => {
           agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
             <Card>
               <CardContent className="pt-6">
-                <div className="flex flex-col items-center justify-center py-16">
-                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Users className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                  <p className="text-muted-foreground text-sm">No hay datos para esta fecha</p>
-                </div>
+                <EmptyState seed="promolog-agentes" title="No hay datos para esta fecha" />
               </CardContent>
             </Card>
           ) : (
@@ -1387,7 +1383,14 @@ const PromologContent = () => {
                   setCreatorModalCollapsed(base);
                 };
                 if (sorted.length === 0) {
-                  return <p className="text-center text-sm text-muted-foreground py-8">Sin resultados para "{searchCreator}"</p>;
+                  return (
+                    <EmptyState
+                      className="py-8"
+                      icon={<Search className="h-8 w-8 text-muted-foreground" />}
+                      title="Sin resultados"
+                      description={`Sin resultados para "${searchCreator}"`}
+                    />
+                  );
                 }
                 return (
                   <div className="space-y-3 pr-2">
@@ -1658,10 +1661,11 @@ const PromologContent = () => {
             // resultados expandida. Click en una creadora navega a su
             // perfil.
             creatorsScan.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Info className="h-10 w-10 mb-2 opacity-40" />
-                <p className="text-sm">No hay creadoras escaneadas en este período.</p>
-              </div>
+              <EmptyState
+                className="py-12"
+                icon={<Info className="h-8 w-8 text-muted-foreground" />}
+                title="No hay creadoras escaneadas en este período."
+              />
             ) : (() => {
               const sorted = [...creatorsScan].sort((a, b) => a.name.localeCompare(b.name));
               const buckets = new Map<string, CreatorScanRow[]>();
@@ -1761,10 +1765,11 @@ const PromologContent = () => {
               );
             })()
           ) : kpiModalEntries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Info className="h-10 w-10 mb-2 opacity-40" />
-              <p className="text-sm">No hay entradas para mostrar</p>
-            </div>
+            <EmptyState
+              className="py-12"
+              icon={<Info className="h-8 w-8 text-muted-foreground" />}
+              title="No hay entradas para mostrar"
+            />
           ) : (
             <div className="max-h-[500px] overflow-auto space-y-1.5">
               {/* Header labels — sticky para alinearse con las columnas

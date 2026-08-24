@@ -218,15 +218,15 @@ export const DocumentationSection = () => (
       <div className="rounded-lg border border-border bg-card p-5 space-y-2 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">Reglas de tokens</p>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Usar siempre variables CSS del design system — nunca hardcodear colores hex/rgb</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Usar clases semánticas de Tailwind (<code className="bg-muted px-1 py-0.5 rounded text-xs">bg-primary</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">text-muted-foreground</code>)</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
           <span>Documentar cualquier token nuevo en <code className="bg-muted px-1 py-0.5 rounded text-xs">index.css</code> y <code className="bg-muted px-1 py-0.5 rounded text-xs">tailwind.config.ts</code></span>
         </div>
       </div>

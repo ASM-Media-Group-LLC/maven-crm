@@ -1,19 +1,14 @@
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+// Documenta el avatar canónico de Maven: `UserAvatar` (components/UserAvatar.tsx).
+// Los ejemplos usan el componente real — si UserAvatar cambia, esta página cambia con él.
+import { UserAvatar, type UserAvatarSize } from "@/components/UserAvatar";
 import { Check, X } from "lucide-react";
 
-const avatarSizes = [
-  { className: "h-8 w-8", label: "32px", usage: "Listas compactas, comentarios", initials: "AB" },
-  { className: "h-10 w-10", label: "40px", usage: "Default, menús de usuario", initials: "CD" },
-  { className: "h-12 w-12", label: "48px", usage: "Cards de perfil, headers", initials: "EF" },
-  { className: "h-16 w-16", label: "64px", usage: "Páginas de perfil, hero", initials: "GH" },
-];
-
-const avatarGroupData = [
-  { initials: "JD", color: "bg-primary" },
-  { initials: "MR", color: "bg-accent" },
-  { initials: "AL", color: "bg-[hsl(var(--success))]" },
-  { initials: "KP", color: "bg-[hsl(var(--warning))]" },
-  { initials: "+3", color: "bg-muted" },
+const sizeRows: { size: UserAvatarSize; px: string; usage: string }[] = [
+  { size: "xs", px: "24px", usage: "Chips, menciones, celdas densas" },
+  { size: "sm", px: "32px", usage: "Listas compactas, comentarios" },
+  { size: "md", px: "40px", usage: "Default: menús de usuario, filas" },
+  { size: "lg", px: "48px", usage: "Cards de perfil, headers" },
+  { size: "xl", px: "64px", usage: "Páginas de perfil, hero" },
 ];
 
 export const AvatarsSection = () => (
@@ -21,57 +16,105 @@ export const AvatarsSection = () => (
     <div>
       <h2 className="text-3xl font-bold tracking-tight">4.2 Avatares y Logos</h2>
       <p className="text-muted-foreground mt-1">
-        Componente <code className="text-sm bg-muted px-1.5 py-0.5 rounded">Avatar</code> de Radix/shadcn con fallback de iniciales y reglas para logos.
+        Componente <code className="text-sm bg-muted px-1.5 py-0.5 rounded">UserAvatar</code>{" "}
+        (<code className="text-sm bg-muted px-1.5 py-0.5 rounded">components/UserAvatar.tsx</code>) — el único avatar
+        de la app. No usar <code className="text-sm bg-muted px-1.5 py-0.5 rounded">Avatar</code> de shadcn directo ni{" "}
+        <code className="text-sm bg-muted px-1.5 py-0.5 rounded">&lt;img&gt;</code> sueltas.
       </p>
+    </div>
+
+    {/* Cadena de fallback */}
+    <div className="space-y-4">
+      <h3 className="text-xl font-semibold">Cadena de fallback</h3>
+      <p className="text-sm text-muted-foreground">
+        <code className="bg-muted px-1 py-0.5 rounded text-xs">foto real</code> →{" "}
+        <code className="bg-muted px-1 py-0.5 rounded text-xs">muñequito elegido</code> (solo si la persona eligió uno
+        en Settings: <code className="bg-muted px-1 py-0.5 rounded text-xs">profiles.avatar_seed</code>) →{" "}
+        <code className="bg-muted px-1 py-0.5 rounded text-xs">iniciales</code> sobre degradé determinista por nombre.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <UserAvatar name="Jhon Lopez" src="/placeholder.svg" size="lg" />
+          <div className="text-sm">
+            <p className="font-medium">1 · Foto real</p>
+            <p className="text-muted-foreground">
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">src</code> = avatar_url / profile_photo_url
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <UserAvatar name="Maria Rivas" seed="ds-demo-seed" size="lg" />
+          <div className="text-sm">
+            <p className="font-medium">2 · Muñequito elegido</p>
+            <p className="text-muted-foreground">
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">seed</code> = avatar_seed · anillo automático
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <UserAvatar name="Ana Lucia Torres" size="lg" />
+          <div className="text-sm">
+            <p className="font-medium">3 · Iniciales</p>
+            <p className="text-muted-foreground">Degradé determinista por nombre</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     {/* Tamaños */}
     <div className="space-y-4">
       <h3 className="text-xl font-semibold">Tamaños</h3>
-      <p className="text-sm text-muted-foreground">Cuatro tamaños estándar con sus casos de uso.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {avatarSizes.map((size) => (
-          <div key={size.label} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Cinco tamaños vía la prop <code className="bg-muted px-1 py-0.5 rounded text-xs">size</code> — nunca clases{" "}
+        <code className="bg-muted px-1 py-0.5 rounded text-xs">h-* w-*</code> a mano.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {sizeRows.map((row) => (
+          <div key={row.size} className="rounded-xl border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-center h-20">
-              <Avatar className={size.className}>
-                <AvatarImage src="/placeholder.svg" alt="Avatar ejemplo" />
-                <AvatarFallback className="text-xs">{size.initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar name={`Demo ${row.size.toUpperCase()}`} size={row.size} />
             </div>
             <div className="text-center space-y-1">
-              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{size.className}</code>
-              <p className="text-xs text-muted-foreground">{size.label}</p>
-              <p className="text-xs text-muted-foreground">{size.usage}</p>
+              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">size="{row.size}"</code>
+              <p className="text-xs text-muted-foreground">{row.px}</p>
+              <p className="text-xs text-muted-foreground">{row.usage}</p>
             </div>
           </div>
         ))}
       </div>
     </div>
 
-    {/* Fallback */}
+    {/* Anillo y estado */}
     <div className="space-y-4">
-      <h3 className="text-xl font-semibold">Fallback con iniciales</h3>
-      <p className="text-sm text-muted-foreground">
-        Cuando la imagen no carga, <code className="bg-muted px-1 py-0.5 rounded text-xs">AvatarFallback</code> muestra iniciales sobre fondo <code className="bg-muted px-1 py-0.5 rounded text-xs">bg-muted</code>.
-      </p>
-      <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src="/placeholder.svg" alt="Con imagen" />
-          <AvatarFallback>JD</AvatarFallback>
-        </Avatar>
-        <div className="text-sm">
-          <p className="font-medium">Con imagen válida</p>
-          <p className="text-muted-foreground">Muestra la imagen cargada</p>
+      <h3 className="text-xl font-semibold">Anillo y presencia</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <UserAvatar name="Kash Podium" size="lg" ring />
+          <div className="text-sm">
+            <p className="font-medium">
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">ring</code>
+            </p>
+            <p className="text-muted-foreground">
+              Anillo degradé azul→violeta para destacados/podios. Con muñequito el anillo es automático.
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src="/invalid-url-that-wont-load.jpg" alt="Sin imagen" />
-          <AvatarFallback>MR</AvatarFallback>
-        </Avatar>
-        <div className="text-sm">
-          <p className="font-medium">Con fallback</p>
-          <p className="text-muted-foreground">Muestra las iniciales cuando la imagen falla</p>
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-5">
+          <div className="flex items-center gap-3">
+            <UserAvatar name="On Line" size="md" status="online" />
+            <UserAvatar name="Bu Sy" size="md" status="busy" />
+            <UserAvatar name="Aw Ay" size="md" status="away" />
+          </div>
+          <div className="text-sm">
+            <p className="font-medium">
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">status</code>
+            </p>
+            <p className="text-muted-foreground">
+              Punto de presencia: <code className="bg-muted px-1 py-0.5 rounded text-xs">online</code> ·{" "}
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">busy</code> ·{" "}
+              <code className="bg-muted px-1 py-0.5 rounded text-xs">away</code>
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -80,21 +123,15 @@ export const AvatarsSection = () => (
     <div className="space-y-4">
       <h3 className="text-xl font-semibold">Grupo de avatares</h3>
       <p className="text-sm text-muted-foreground">
-        Patrón de avatares solapados con <code className="bg-muted px-1 py-0.5 rounded text-xs">-space-x-2</code> y borde para separación visual.
+        Avatares solapados con <code className="bg-muted px-1 py-0.5 rounded text-xs">-space-x-2</code>; los degradés
+        por nombre separan visualmente sin bordes extra.
       </p>
       <div className="rounded-lg border border-border bg-card p-5">
         <div className="flex -space-x-2">
-          {avatarGroupData.map((avatar, i) => (
-            <Avatar key={i} className="h-10 w-10 border-2 border-card">
-              <AvatarFallback className={`${avatar.color} text-primary-foreground text-xs`}>
-                {avatar.initials}
-              </AvatarFallback>
-            </Avatar>
+          {["Juan Diaz", "Maria Rojas", "Alvaro Lopez", "Karla Perez"].map((n) => (
+            <UserAvatar key={n} name={n} size="md" className="ring-2 ring-card rounded-full" />
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Cada avatar usa <code className="bg-muted px-1 py-0.5 rounded">border-2 border-card</code> para crear separación visual.
-        </p>
       </div>
     </div>
 
@@ -133,24 +170,24 @@ export const AvatarsSection = () => (
       <h3 className="text-xl font-semibold">Reglas de uso</h3>
       <div className="rounded-lg border border-border bg-card p-5 space-y-2 text-sm text-muted-foreground">
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
-          <span>Siempre usar el componente <code className="bg-muted px-1 py-0.5 rounded text-xs">Avatar</code> — nunca <code className="bg-muted px-1 py-0.5 rounded text-xs">&lt;img&gt;</code> directas para fotos de usuario</span>
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
+          <span>Siempre usar <code className="bg-muted px-1 py-0.5 rounded text-xs">UserAvatar</code> — nunca <code className="bg-muted px-1 py-0.5 rounded text-xs">Avatar</code> de shadcn a mano ni <code className="bg-muted px-1 py-0.5 rounded text-xs">&lt;img&gt;</code> directas para fotos de usuario</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
-          <span>Siempre incluir <code className="bg-muted px-1 py-0.5 rounded text-xs">AvatarFallback</code> con iniciales</span>
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
+          <span>Pasar siempre <code className="bg-muted px-1 py-0.5 rounded text-xs">name</code>: es la fuente de las iniciales y del degradé determinista</span>
         </div>
         <div className="flex items-start gap-2">
-          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
-          <span>Usar <code className="bg-muted px-1 py-0.5 rounded text-xs">rounded-full</code> siempre (ya incluido en el componente base)</span>
-        </div>
-        <div className="flex items-start gap-2">
-          <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden="true" />
-          <span>No crear variantes de forma cuadrada o redondeada personalizada</span>
+          <Check className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden="true" />
+          <span><code className="bg-muted px-1 py-0.5 rounded text-xs">seed</code> = únicamente el <code className="bg-muted px-1 py-0.5 rounded text-xs">avatar_seed</code> elegido en Settings (o un seed decorativo en ilustraciones tipo EmptyState)</span>
         </div>
         <div className="flex items-start gap-2">
           <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden="true" />
-          <span>No omitir el fallback — siempre debe haber contenido visible si la imagen falla</span>
+          <span><strong className="text-foreground">Nunca pasar ids como <code className="bg-muted px-1 py-0.5 rounded text-xs">seed</code></strong> — un id genera un muñequito que la persona no eligió; sin foto ni seed, el fallback correcto son las iniciales</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden="true" />
+          <span>No crear variantes de forma cuadrada ni tamaños ad-hoc fuera de <code className="bg-muted px-1 py-0.5 rounded text-xs">xs–xl</code></span>
         </div>
       </div>
     </div>

@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 import {
   useAskWhatsappAgent,
   useLinkWhatsappMember,
@@ -371,8 +372,13 @@ function CommitmentsList({ groupId }: { groupId: string }) {
 
       {isLoading && <div className="text-xs text-muted-foreground">cargando…</div>}
       {rows && rows.length === 0 && (
-        <Card className="p-4 text-center text-xs text-muted-foreground">
-          No hay compromisos con status <code>{status}</code>.
+        <Card>
+          <EmptyState
+            className="py-8"
+            icon={<Bot className="h-8 w-8 text-muted-foreground" />}
+            title="No hay compromisos"
+            description={`No hay compromisos con status ${status}.`}
+          />
         </Card>
       )}
 
@@ -451,8 +457,12 @@ function MessagesList({ groupId }: { groupId: string }) {
   if (isLoading) return <div className="text-xs text-muted-foreground">cargando…</div>;
   if (!msgs || msgs.length === 0) {
     return (
-      <Card className="p-4 text-center text-xs text-muted-foreground">
-        Sin mensajes todavía.
+      <Card>
+        <EmptyState
+          className="py-8"
+          icon={<Bot className="h-8 w-8 text-muted-foreground" />}
+          title="Sin mensajes todavía."
+        />
       </Card>
     );
   }
@@ -512,9 +522,13 @@ function MembersList({ groupId }: { groupId: string }) {
   if (isLoading) return <div className="text-xs text-muted-foreground">cargando…</div>;
   if (!members || members.length === 0) {
     return (
-      <Card className="p-4 text-center text-xs text-muted-foreground">
-        Todavía no hay miembros detectados. Aparecen cuando alguien
-        escribe en el grupo por primera vez.
+      <Card>
+        <EmptyState
+          className="py-8"
+          icon={<Users className="h-8 w-8 text-muted-foreground" />}
+          title="Todavía no hay miembros detectados."
+          description="Aparecen cuando alguien escribe en el grupo por primera vez."
+        />
       </Card>
     );
   }

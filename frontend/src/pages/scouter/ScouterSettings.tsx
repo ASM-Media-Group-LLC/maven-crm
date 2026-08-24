@@ -81,6 +81,7 @@ import {
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCurrentTenantId } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/EmptyState";
 
 // ─── Asistente conversacional via edge fn `scouter-company-fill` ─────
 // Reemplaza el one-shot Groq llama-3.1-8b que daba siempre la misma
@@ -1557,13 +1558,12 @@ const SpammerAccountsSection = () => {
         ) : (
           <div className="space-y-2">
             {accounts.length === 0 && !showAdd ? (
-              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
-                <Instagram className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
-                <p className="text-sm font-medium">No hay cuentas registradas</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Completa el asistente de bienvenida en "Mis Tareas" o usa el botón "Agregar cuenta".
-                </p>
-              </div>
+              <EmptyState
+                className="rounded-xl border border-dashed border-border bg-muted/20 py-8"
+                icon={<Instagram className="h-8 w-8 text-muted-foreground" />}
+                title="No hay cuentas registradas"
+                description={'Completa el asistente de bienvenida en "Mis Tareas" o usa el botón "Agregar cuenta".'}
+              />
             ) : (
               accounts.map((acc) => (
                 <SpammerAccountRow key={acc.id} account={acc} />
@@ -1830,25 +1830,24 @@ const ScouterSettings = () => {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : companies.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
-          <Building2 className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
-          <p className="text-sm font-medium">Sin compañías todavía</p>
-          {canEditCompanies ? (
-            <>
-              <p className="text-xs text-muted-foreground mb-4">
-                Crea tu primera compañía para empezar a configurar las búsquedas.
-              </p>
+        <EmptyState
+          className="rounded-xl border border-dashed border-border bg-muted/20 py-10"
+          seed="scouter-companias"
+          title="Sin compañías todavía"
+          description={
+            canEditCompanies
+              ? "Crea tu primera compañía para empezar a configurar las búsquedas."
+              : 'Pídele a un admin que cree las compañías o que active tu permiso "Editar Compañías".'
+          }
+          action={
+            canEditCompanies ? (
               <Button onClick={handleNew} variant="outline" className="gap-1.5">
                 <Plus className="h-4 w-4" />
                 Crear compañía
               </Button>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Pídele a un admin que cree las compañías o que active tu permiso "Editar Compañías".
-            </p>
-          )}
-        </div>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {companies.map((c) => (

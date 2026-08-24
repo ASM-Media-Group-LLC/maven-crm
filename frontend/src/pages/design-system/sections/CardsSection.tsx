@@ -136,7 +136,7 @@ export const CardsSection = () => (
         modales y cards destacadas, y <code className="font-mono text-primary">.glass-card-subtle</code> para paneles secundarios.
         Requiere fondo oscuro para apreciarse correctamente.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 rounded-xl bg-[hsl(240,8%,10%)] p-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 dark rounded-xl border border-border bg-background p-8">
         <div className="glass-card p-6 space-y-2">
           <p className="text-sm font-medium text-white">glass-card</p>
           <p className="text-xs text-white/60">

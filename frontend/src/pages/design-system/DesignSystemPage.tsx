@@ -12,6 +12,7 @@ import { ButtonsSection } from "./sections/ButtonsSection";
 import { InputsSection } from "./sections/InputsSection";
 import { DropdownsSection } from "./sections/DropdownsSection";
 import { CardsSection } from "./sections/CardsSection";
+import { StatChipEmptyStateSection } from "./sections/StatChipEmptyStateSection";
 import { ModalsSection } from "./sections/ModalsSection";
 import { FeedbackSection } from "./sections/FeedbackSection";
 import { DataDisplaySection } from "./sections/DataDisplaySection";
@@ -86,6 +87,7 @@ const DesignSystemPage = () => {
             <InputsSection />
             <DropdownsSection />
             <CardsSection />
+            <StatChipEmptyStateSection />
             <ModalsSection />
             <FeedbackSection />
             <DataDisplaySection />

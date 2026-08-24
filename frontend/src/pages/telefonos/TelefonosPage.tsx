@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard, Activity, ListChecks } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 // Tab "Teléfonos" (Operaciones), estilo Maven (header + Tabs + KpiCards como Panel de control).
 // Subtabs Dashboard + Dispositivos (gateables por rol). El teléfono abre en una ventana flotante
@@ -376,9 +377,10 @@ export default function TelefonosPage() {
         <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
       </div>
     ) : phones.length === 0 ? (
-      <p className="text-muted-foreground">
-        {isAdmin ? "No hay teléfonos disponibles." : "No tienes teléfonos asignados todavía."}
-      </p>
+      <EmptyState
+        seed="telefonos"
+        title={isAdmin ? "No hay teléfonos disponibles." : "No tienes teléfonos asignados todavía."}
+      />
     ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {phones.map((p) => (
