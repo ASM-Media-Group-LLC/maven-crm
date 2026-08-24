@@ -78,6 +78,12 @@ export function useVideoCall() {
       // Open call in new tab
       window.open(`/call/${encodeURIComponent(roomId)}?admin=1`, `call-${roomId}`, "noopener");
 
+      // Push al receptor: si tiene Maven cerrado o en otra pestaña, igual le
+      // suena. Best-effort — el modal in-app cubre "Maven abierto".
+      void supabase.functions
+        .invoke("web-push", { body: { action: "notify_call", callId: call.id } })
+        .catch(() => {});
+
       // Auto-end after 30s if no answer
       clearRingingTimer();
       ringingTimerRef.current = setTimeout(async () => {

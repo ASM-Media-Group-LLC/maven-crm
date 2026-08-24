@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { useVideoCall } from "@/hooks/useVideoCall";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
 
 // Sistema de llamadas GLOBAL. Antes vivía dentro de MessengerPage, así que una
@@ -60,6 +61,8 @@ function Ringtone() {
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const call = useVideoCall();
+  // Suscribe el navegador a Web Push (llamada entrante con Maven cerrado).
+  usePushSubscription();
   return (
     <CallContext.Provider value={call}>
       {children}
