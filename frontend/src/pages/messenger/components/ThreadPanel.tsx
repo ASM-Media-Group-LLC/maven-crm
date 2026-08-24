@@ -371,6 +371,7 @@ export default function ThreadPanel({
                   readByUsers={readBy}
                   profiles={profiles}
                   totalParticipants={totalParticipants}
+                  variant="onSurface"
                 />
               </div>
             )}

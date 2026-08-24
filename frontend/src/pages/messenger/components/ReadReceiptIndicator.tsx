@@ -10,14 +10,23 @@ interface ReadReceiptIndicatorProps {
   readByUsers: string[];
   profiles: Record<string, UserProfile>;
   totalParticipants: number;
+  /** Fondo sobre el que se pinta el check, para elegir colores que contrasten:
+   *  - "onPrimary": burbuja propia azul→violeta (Messenger). El "leído" en azul NO se veía
+   *    (azul sobre azul) → acá va cyan/aqua brillante.
+   *  - "onSurface": fondo claro/card (hilos). Ahí sí funciona el azul clásico tipo WhatsApp. */
+  variant?: "onPrimary" | "onSurface";
 }
 
-// Modelo WhatsApp:
-//   ✓  gris   = enviado (aún no le llegó a la otra persona)
-//   ✓✓ gris   = entregado (le llegó a todos, nadie lo leyó aún)
-//   ✓✓ azul   = leído (lo leyeron todos)
-export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUsers, profiles, totalParticipants }: ReadReceiptIndicatorProps) {
+// Modelo WhatsApp (el color del "leído" cambia según el fondo, ver `variant`):
+//   ✓  tenue   = enviado (aún no le llegó a la otra persona)
+//   ✓✓ tenue   = entregado (le llegó a todos, nadie lo leyó aún)
+//   ✓✓ color   = leído (lo leyeron todos) — cyan sobre la burbuja azul, azul sobre fondo claro
+export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUsers, profiles, totalParticipants, variant = "onPrimary" }: ReadReceiptIndicatorProps) {
   if (!isMe) return null;
+
+  const palette = variant === "onSurface"
+    ? { dim: "text-muted-foreground", read: "text-sky-500" }
+    : { dim: "text-primary-foreground/50", read: "text-cyan-300" };
 
   const othersCount = Math.max(totalParticipants - 1, 1);
   const readCount = readByUsers.length;
@@ -27,7 +36,7 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
 
   // Enviado: todavía no le llegó a (todos) los demás → un solo check.
   if (!allDelivered && !allRead) {
-    return <Check className="h-3 w-3 text-primary-foreground/50" />;
+    return <Check className={cn("h-3 w-3", palette.dim)} />;
   }
 
   const names = (uids: string[]) => uids.map((uid) => profileName(profiles[uid])).join(", ");
@@ -38,7 +47,7 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex">
-            <CheckCheck className={cn("h-3 w-3", allRead ? "text-blue-300" : "text-primary-foreground/50")} />
+            <CheckCheck className={cn("h-3 w-3", allRead ? palette.read : palette.dim)} />
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-xs">{label}</TooltipContent>
