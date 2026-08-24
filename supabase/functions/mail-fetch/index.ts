@@ -63,11 +63,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const {
       action, folder, limit, seq, mark_read, with_bodies, uid, attachment_index,
-      to, cc, bcc, subject, text, html, in_reply_to, references, attachments,
+      to, cc, bcc, subject, text, html, in_reply_to, references, attachments, query,
     } = body as {
       action?: string;
       folder?: string;
       limit?: number;
+      /** Texto a buscar (acción imap_search). */
+      query?: string;
       /** UID estable del mensaje (para descargar un adjunto). */
       uid?: number;
       /** Posición del adjunto en el mensaje, igual orden que `attachments`. */
@@ -489,6 +491,82 @@ Deno.serve(async (req) => {
           dropped: clean?.dropped ?? [],
           attachments: parsed.attachments,
           truncated: raw.truncated,
+        });
+      } catch (e) {
+        const msg = (e as Error).message ?? "error de IMAP";
+        await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
+        return json(req, { error: msg }, 502);
+      } finally {
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
+    }
+
+    // === BÚSQUEDA EN EL BUZÓN ===
+    // IMAP SEARCH del lado del servidor: encuentra en TODO el histórico de la
+    // carpeta, no solo en los ~50 que tiene la caché de Postgres. El texto se
+    // escapa antes de tocar el socket — mismo cuidado que las direcciones en
+    // SMTP: un CRLF sin limpiar inyecta comandos IMAP.
+    if (action === "imap_search") {
+      const q = (query ?? "").trim();
+      if (!q) return json(req, { error: "falta el texto de búsqueda" }, 400);
+
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
+
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) {
+        return json(req, {
+          error: "no se pudo descifrar la credencial — hay que re-provisionarla",
+        }, 500);
+      }
+
+      const box = (folder ?? "INBOX").slice(0, 200);
+      // Escapado para el quoted-string de IMAP: fuera CR/LF (inyección de
+      // comandos) y escapar " y \. CHARSET UTF-8 solo si hay acentos/emojis.
+      const esc = q.replace(/[\r\n]/g, " ").replace(/(["\\])/g, "\\$1").slice(0, 200);
+      const noAscii = /[^\x00-\x7F]/.test(q);
+      const criterio = `${noAscii ? "CHARSET UTF-8 " : ""}TEXT "${esc}"`;
+
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+
+        const selr = await client.selectFolder(box);
+        if (!selr.ok) return json(req, { error: `IMAP SELECT ${box}: ${selr.error}` }, 502);
+
+        const sr = await client.searchUids(criterio);
+        if (!sr.ok) return json(req, { error: `IMAP SEARCH: ${sr.error}` }, 502);
+
+        // Los más recientes primero, tope 50 (una búsqueda amplia trae cientos
+        // de UIDs; traer todos los cuerpos colgaría la función).
+        const uids = sr.uids.slice(-50);
+        const fr = await client.fetchSummariesByUids(uids);
+        if (!fr.ok) return json(req, { error: `IMAP FETCH: ${fr.error}` }, 502);
+
+        await admin.from("mail_credentials")
+          .update({ last_used_at: new Date().toISOString(), last_error: null })
+          .eq("id", cred.id);
+
+        return json(req, {
+          ok: true,
+          folder: box,
+          total: sr.uids.length,
+          messages: fr.messages,
         });
       } catch (e) {
         const msg = (e as Error).message ?? "error de IMAP";

@@ -281,20 +281,10 @@ export class ImapClient {
    *  parsean con reglas conocidas de RFC 822 en vez de la sintaxis anidada y
    *  con comillas escapadas de ENVELOPE, que es una fuente clásica de bugs.
    */
-  async fetchSummaries(
-    from: number,
-    to: number,
-  ): Promise<{ ok: boolean; messages: MailSummary[]; error?: string }> {
-    const fields = "FROM TO SUBJECT DATE MESSAGE-ID";
-    const res = await this.command(
-      `FETCH ${from}:${to} (UID FLAGS BODY.PEEK[HEADER.FIELDS (${fields})])`,
-    );
-    if (!res.ok) return { ok: false, messages: [], error: res.error };
-
+  /** Parsea los bloques "* N FETCH (...)" de una respuesta a summaries. Común
+   *  a la lista por rango (fetchSummaries) y por UIDs (búsqueda). */
+  private parseSummaryBlocks(raw: string): MailSummary[] {
     const messages: MailSummary[] = [];
-    const raw = res.raw;
-
-    // Caminamos la respuesta buscando cada bloque "* N FETCH (...".
     const blockRe = /^\* (\d+) FETCH \(/gm;
     let m: RegExpExecArray | null;
     while ((m = blockRe.exec(raw)) !== null) {
@@ -325,10 +315,53 @@ export class ImapClient {
         unread: !flags.some((f) => f.toLowerCase() === "\\seen"),
       });
     }
-
     // IMAP entrega en orden ascendente; la bandeja se lee al revés.
     messages.sort((a, b) => b.seq - a.seq);
-    return { ok: true, messages };
+    return messages;
+  }
+
+  private static readonly SUMMARY_FIELDS = "FROM TO SUBJECT DATE MESSAGE-ID";
+
+  async fetchSummaries(
+    from: number,
+    to: number,
+  ): Promise<{ ok: boolean; messages: MailSummary[]; error?: string }> {
+    const res = await this.command(
+      `FETCH ${from}:${to} (UID FLAGS BODY.PEEK[HEADER.FIELDS (${ImapClient.SUMMARY_FIELDS})])`,
+    );
+    if (!res.ok) return { ok: false, messages: [], error: res.error };
+    return { ok: true, messages: this.parseSummaryBlocks(res.raw) };
+  }
+
+  /** Summaries de una lista concreta de UIDs (los que devolvió una búsqueda). */
+  async fetchSummariesByUids(
+    uids: number[],
+  ): Promise<{ ok: boolean; messages: MailSummary[]; error?: string }> {
+    if (uids.length === 0) return { ok: true, messages: [] };
+    const res = await this.command(
+      `UID FETCH ${uids.join(",")} (UID FLAGS BODY.PEEK[HEADER.FIELDS (${ImapClient.SUMMARY_FIELDS})])`,
+    );
+    if (!res.ok) return { ok: false, messages: [], error: res.error };
+    return { ok: true, messages: this.parseSummaryBlocks(res.raw) };
+  }
+
+  /** UID SEARCH: devuelve los UIDs que matchean. `criteria` va YA armado y
+   *  escapado por el llamador (ej. `CHARSET UTF-8 TEXT "hola"`): esto toca el
+   *  socket IMAP, así que un texto sin escapar es inyección de comandos. */
+  async searchUids(
+    criteria: string,
+  ): Promise<{ ok: boolean; uids: number[]; error?: string }> {
+    const res = await this.command(`UID SEARCH ${criteria}`);
+    if (!res.ok) return { ok: false, uids: [], error: res.error };
+    // Respuesta: "* SEARCH 12 45 78\r\n" (o "* SEARCH\r\n" si no hubo match).
+    const linea = res.raw.match(/^\* SEARCH([^\r\n]*)/im);
+    const uids = (linea?.[1] ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0);
+    return { ok: true, uids };
   }
 
   /** Trae un mensaje completo en crudo (RFC 822), para parsear su MIME.
