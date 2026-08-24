@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -107,10 +108,7 @@ export default function TemplatesPage() {
         {isLoading ? (
           <p className="text-muted-foreground text-sm">Cargando...</p>
         ) : templates.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p className="text-lg font-medium">No hay templates</p>
-            <p className="text-sm mt-1">Crea tu primer template para personalizar tus documentos</p>
-          </div>
+          <EmptyState seed="invoice-templates" title="No hay templates" description="Crea tu primer template para personalizar tus documentos" />
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
             <div className="overflow-auto max-h-[calc(100vh-20rem)]">

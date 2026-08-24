@@ -176,7 +176,7 @@ export default function ComisionesPage() {
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Total Registros" value={String(commissions.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint="Todas las comisiones" onClick={() => setKpiPopup("total")} />
               <StatChip label="Proyectadas" value={String(totalProyectadas)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Pendientes" onClick={() => setKpiPopup("proyectadas")} />

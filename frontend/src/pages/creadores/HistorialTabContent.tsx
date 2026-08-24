@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { EmptyState } from "@/components/EmptyState";
 import { History } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -117,11 +118,11 @@ const HistorialTabContent = ({ creatorId }: Props) => {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-16 bg-muted/50 rounded-lg">
-            <History className="h-12 w-12 text-muted-foreground/50 mb-3" />
-            <h4 className="font-semibold text-muted-foreground">No hay registros de historial</h4>
-            <p className="text-sm text-muted-foreground/70 mt-1">Los cambios se registrarán automáticamente</p>
-          </div>
+          <EmptyState
+            icon={<History className="h-8 w-8 text-muted-foreground" />}
+            title="No hay registros de historial"
+            description="Los cambios se registrarán automáticamente"
+          />
         )}
       </CardContent>
     </Card>

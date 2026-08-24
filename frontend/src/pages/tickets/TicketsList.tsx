@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -105,16 +106,7 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
   if (tickets.length === 0) {
     return (
       <div className="rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead colSpan={9} className="text-center py-16 text-muted-foreground">
-                <p className="text-lg font-medium">No hay tickets</p>
-                <p className="text-sm">Crea un nuevo ticket para comenzar</p>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-        </Table>
+        <EmptyState seed="tickets" title="No hay tickets" description="Crea un nuevo ticket para comenzar" />
       </div>
     );
   }

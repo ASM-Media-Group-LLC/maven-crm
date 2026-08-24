@@ -219,7 +219,7 @@ export default function HRDashboard() {
 
   const rotacionCards = [
     { label: "Rotación 30d",   value: `${rotacion30d}%`,      color: "bg-destructive/10 border-destructive/20", icon: RotateCcw,    textColor: "text-destructive" },
-    { label: "Retiros 30d",    value: `${terminados30d}`,      color: "bg-orange-950/40 border-orange-800/30",   icon: TrendingDown,  textColor: "text-orange-300" },
+    { label: "Retiros 30d",    value: `${terminados30d}`,      color: "bg-warning/10 border-warning/20",              icon: TrendingDown,  textColor: "text-warning" },
     { label: "% Ingresos 30d", value: `${pctIngresos30d}%`,   color: "bg-success/10 border-success/20",         icon: TrendingUp,    textColor: "text-success" },
     { label: "Antigüedad Prom.", value: `${avgAntiguedadMeses}m`, color: "bg-primary/10 border-primary/20",     icon: Timer,         textColor: "text-primary" },
     { label: "Rotación 12m",   value: `${rotacion12m}%`,      color: "bg-muted border-border",                  icon: Percent,       textColor: "text-muted-foreground" },
@@ -228,7 +228,7 @@ export default function HRDashboard() {
   const teamStatus = [
     { label: "Activos",      value: activos,    subtitle: pct(activos),    icon: UserCheck,  color: "bg-success/10 border-success/20",       textColor: "text-success" },
     { label: "En Licencia",  value: enLicencia, subtitle: pct(enLicencia), icon: Clock,      color: "bg-warning/10 border-warning/20",        textColor: "text-warning" },
-    { label: "Vacaciones",   value: vacaciones, subtitle: pct(vacaciones), icon: CalendarDays, color: "bg-blue-500/10 border-blue-500/20",    textColor: "text-blue-400" },
+    { label: "Vacaciones",   value: vacaciones, subtitle: pct(vacaciones), icon: CalendarDays, color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
     { label: "Inactivos",    value: inactivos,  subtitle: pct(inactivos),  icon: UserMinus,  color: "bg-destructive/10 border-destructive/20", textColor: "text-destructive" },
     { label: "Nuevos (30d)", value: nuevos30d,  subtitle: pct(nuevos30d),  icon: UserPlus,   color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
     { label: "Total",        value: total,      subtitle: "plantilla",     icon: Users,      color: "bg-muted border-border",                  textColor: "text-foreground" },
@@ -293,8 +293,8 @@ export default function HRDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString("es-CO")}h` : "—", icon: Clock, color: "bg-blue-500/10 border-blue-500/20", textColor: "text-blue-400" },
-                { label: "Actividad prom.", value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-violet-500/10 border-violet-500/20", textColor: "text-violet-400" },
+                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString("es-CO")}h` : "—", icon: Clock, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+                { label: "Actividad prom.", value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-accent/10 border-accent/20", textColor: "text-accent" },
                 { label: "Personas activas", value: prod ? String(prod.people) : "—", icon: Users, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
                 { label: "Puntualidad prom.", value: avgPunct != null ? `${avgPunct}%` : "—", icon: Percent, color: "bg-success/10 border-success/20", textColor: "text-success" },
               ].map((c) => (

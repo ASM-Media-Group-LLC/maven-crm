@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useQuery } from "@tanstack/react-query";
 import { Ticket, Plus } from "lucide-react";
 import { format } from "date-fns";
@@ -77,14 +78,16 @@ const TicketsTabContent = ({ creatorId }: Props) => {
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-8">Cargando tickets...</p>
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg bg-muted/50 py-16 px-6">
-              <Ticket className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h4 className="font-semibold text-muted-foreground">No hay tickets registrados</h4>
-              <p className="text-sm text-muted-foreground/70 mt-1">Crea un ticket para comenzar</p>
-              <Button variant="outline" className="mt-4" onClick={() => setModalOpen(true)}>
-                Crear Primer Ticket
-              </Button>
-            </div>
+            <EmptyState
+              icon={<Ticket className="h-8 w-8 text-muted-foreground" />}
+              title="No hay tickets registrados"
+              description="Crea un ticket para comenzar"
+              action={
+                <Button variant="outline" onClick={() => setModalOpen(true)}>
+                  Crear Primer Ticket
+                </Button>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {tickets.map((t: any) => (

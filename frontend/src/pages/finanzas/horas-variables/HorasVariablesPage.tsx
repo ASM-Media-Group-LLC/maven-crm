@@ -533,7 +533,7 @@ export default function HorasVariablesPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
         {/* KPIs globales — clickeables, abren modal */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={`${uniqueEmps} empleados`} onClick={() => setKpiPopup("horasExtra")} />
               <StatChip label="Banco de Horas" value={`${totalBankHours}h`} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-success" hint={fmt(totalBankAmount)} onClick={() => setKpiPopup("banco")} />

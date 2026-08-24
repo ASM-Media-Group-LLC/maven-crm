@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +21,7 @@ const statusConfig = {
 
 const OnboardingGrid = ({ data, onManage }: Props) => {
   if (data.length === 0) {
-    return <p className="text-center text-muted-foreground py-8">No hay creadores en onboarding</p>;
+    return <EmptyState seed="onboarding-creadores" title="No hay creadores en onboarding" />;
   }
 
   return (

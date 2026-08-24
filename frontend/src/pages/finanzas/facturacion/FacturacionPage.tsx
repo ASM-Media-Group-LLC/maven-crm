@@ -613,7 +613,7 @@ export default function FacturacionPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
         {/* KPIs globales — clickeables, abren modal con detalle */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Total Invoices" value={String(invoices.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos" onClick={() => setKpiPopup("total")} />
               <StatChip label="Pendientes" value={String(totalPendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />

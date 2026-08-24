@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,9 +125,10 @@ const Notificaciones = () => {
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando...</div>
             ) : notifications.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">
-                No hay notificaciones{hasFilters ? " con estos filtros" : ""}.
-              </div>
+              <EmptyState
+                seed="notificaciones"
+                title={`No hay notificaciones${hasFilters ? " con estos filtros" : ""}.`}
+              />
             ) : (
               notifications.map((n) => (
                 <NotificationItem

@@ -403,7 +403,7 @@ export default function NominaPage() {
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Total Periodos" value={String(periods.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
               <StatChip label="Borradores" value={String(totalBorradores)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />

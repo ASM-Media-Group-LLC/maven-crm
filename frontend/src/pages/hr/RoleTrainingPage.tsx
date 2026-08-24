@@ -338,7 +338,7 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
               <Badge variant="outline" className="ml-1">{programs.length}</Badge>
             </div>
             {programs.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">No hay programas configurados para {roleLabel}.</p>
+              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">No hay programas configurados para {roleLabel}.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {programs.map((p: any) => {
@@ -695,7 +695,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
             {isLoading ? (
               <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
             ) : modules.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">Este programa no tiene módulos configurados.</p>
+              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">Este programa no tiene módulos configurados.</p>
             ) : (
               <div className="border rounded-lg divide-y">
                 {modules.map((m: any, idx: number) => {

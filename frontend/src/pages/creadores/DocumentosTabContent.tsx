@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
@@ -139,7 +140,7 @@ export default function DocumentosTabContent({ creatorId }: Props) {
             </Table>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">No hay documentos</p>
+            <EmptyState seed="creador-documentos" title="No hay documentos" />
           );
           })()}
         </CardContent>

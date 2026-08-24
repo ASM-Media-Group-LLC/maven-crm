@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { EmptyState } from "@/components/EmptyState";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -134,9 +135,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               </Table>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">
-              No hay datos de monetización registrados
-            </p>
+            <EmptyState seed="creador-monetizacion" title="No hay datos de monetización registrados" />
           )}
         </CardContent>
       </Card>

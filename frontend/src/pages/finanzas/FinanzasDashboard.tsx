@@ -411,7 +411,7 @@ export default function FinanzasDashboard() {
 
         {/* 8 KPI Cards — todas con el patrón estándar y onClick → modal */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Ingresos del Mes" value={fmt(curIngresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
               <StatChip label="Costos del Mes" value={fmt(curCostos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("costos")} />

@@ -196,7 +196,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-6 text-muted-foreground">
+                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-muted-foreground">
                     <ImageOff className="h-5 w-5 shrink-0" />
                     <p className="text-sm">No hay capturas de pantalla disponibles para hoy. Se mostrarán automáticamente al sincronizar con Hubstaff.</p>
                   </div>
@@ -228,7 +228,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                     })}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-6 text-muted-foreground">
+                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-muted-foreground">
                     <Clock className="h-5 w-5 shrink-0" />
                     <p className="text-sm">No hay eventos de timeline registrados para hoy.</p>
                   </div>

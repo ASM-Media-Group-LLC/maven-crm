@@ -53,7 +53,7 @@ export default function HorasPage() {
         {activeTab === "Horas Extra" ? (
           <div className="space-y-5">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {isLoading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+              {isLoading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
                 <>
                   {/* Cards estáticas — la tabla abajo ya muestra el detalle */}
                   <StatChip label="Total Horas Extra" value={String(totalOvertimeHours)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={`${uniqueEmps} empleados`} />
@@ -92,7 +92,7 @@ export default function HorasPage() {
         ) : (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              {isLoading ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+              {isLoading ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
                 <>
                   <StatChip label="Horas Acumuladas" value={String(totalBankHours)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-success" hint="Banco total" />
                   <StatChip label="Valor Total" value={fmt(totalBankAmount)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-accent" hint="Valoración" />

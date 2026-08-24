@@ -297,7 +297,7 @@ export default function ControlFinancieroPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
         {/* Global KPIs — clickeables, abren modal */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Ingresos Totales" value={fmt(ingresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
               <StatChip label="Egresos Totales" value={fmt(egresos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />

@@ -279,7 +279,7 @@ export default function CollectionsPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
         {/* KPIs estilo estándar — cada uno abre modal con detalle */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
+          {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
               <StatChip label="Total" value={String(invoices.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} onClick={() => setKpiPopup("total")} />
               <StatChip label="Pagadas" value={String(cobrados.length)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
