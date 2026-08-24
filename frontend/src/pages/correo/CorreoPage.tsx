@@ -53,7 +53,7 @@ import {
   nombreDe,
   type MailSummary,
 } from "@/hooks/useMailbox";
-import { destinatariosRespuesta, tieneVariosInvolucrados } from "@/lib/mailAddr";
+import { destinatariosRespuesta, direccionesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
 /**
@@ -234,6 +234,20 @@ export default function CorreoPage() {
 
   const responder = () => abrirRespuesta(false);
   const responderATodos = () => abrirRespuesta(true);
+
+  // Retomar un borrador del servidor en el compositor: se cargan sus campos y
+  // su UID, para reemplazarlo al re-guardar o borrarlo al enviar.
+  const editarBorrador = () => {
+    const m = mensaje.data;
+    if (!m || !sel) return;
+    setRedactar({
+      to: direccionesDe(m.to).join(", "),
+      cc: m.cc ? direccionesDe(m.cc).join(", ") || undefined : undefined,
+      subject: m.subject === "(sin asunto)" ? "" : m.subject,
+      cuerpoHtml: m.html ?? undefined,
+      serverDraftUid: sel.uid != null ? Number(sel.uid) : undefined,
+    });
+  };
 
   // "Responder a todos" solo aparece cuando hay más de una persona en juego
   // además de mí: si el correo venía de una sola, es idéntico a "Responder".
@@ -519,25 +533,41 @@ export default function CorreoPage() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={responder}
-                  >
-                    <Reply className="mr-2 h-4 w-4" />
-                    Responder
-                  </Button>
-                  {hayVariosDestinatarios && (
+                  {carpeta === "Borrador" ? (
+                    // En Borradores no se responde: se retoma para seguir
+                    // editándolo y mandarlo.
                     <Button
                       size="sm"
                       variant="outline"
                       className="rounded-full"
-                      onClick={responderATodos}
+                      onClick={editarBorrador}
                     >
-                      <ReplyAll className="mr-2 h-4 w-4" />
-                      Responder a todos
+                      <PenLine className="mr-2 h-4 w-4" />
+                      Editar borrador
                     </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={responder}
+                      >
+                        <Reply className="mr-2 h-4 w-4" />
+                        Responder
+                      </Button>
+                      {hayVariosDestinatarios && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={responderATodos}
+                        >
+                          <ReplyAll className="mr-2 h-4 w-4" />
+                          Responder a todos
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
 

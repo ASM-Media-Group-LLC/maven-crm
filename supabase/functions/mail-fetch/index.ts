@@ -665,6 +665,92 @@ Deno.serve(async (req) => {
       }
     }
 
+    // === GUARDAR / BORRAR BORRADOR EN EL SERVIDOR ===
+    // El borrador se sube a la carpeta Borrador (IMAP APPEND, flag \Draft) para
+    // verlo desde cualquier dispositivo. El autoguardado local (localStorage)
+    // sigue existiendo para no perder lo escrito al instante; esto es la copia
+    // persistente y compartida.
+    if (action === "save_draft" || action === "delete_draft") {
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
+
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) {
+        return json(req, {
+          error: "no se pudo descifrar la credencial — hay que re-provisionarla",
+        }, 500);
+      }
+
+      const box = (folder ?? "Borrador").slice(0, 200);
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+
+        // La carpeta debe estar seleccionada para poder borrar por UID.
+        const selr = await client.selectFolder(box);
+        if (!selr.ok) return json(req, { error: `IMAP SELECT ${box}: ${selr.error}` }, 502);
+
+        if (action === "delete_draft") {
+          if (typeof uid !== "number") return json(req, { error: "uid es requerido" }, 400);
+          const ok = await client.deleteByUid(uid);
+          return json(req, { ok });
+        }
+
+        // save_draft: armar el MIME con el remitente del usuario y subirlo.
+        const { data: perfil } = await admin
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const rfc822 = buildMessage({
+          from: cred.email_address as string,
+          fromName: (perfil?.full_name as string) ?? undefined,
+          to: to ?? [],
+          cc,
+          subject: subject ?? "(sin asunto)",
+          text,
+          html,
+          inReplyTo: in_reply_to,
+          references,
+        });
+
+        const ap = await client.appendMessage(box, "\\Draft \\Seen", rfc822);
+        if (!ap.ok) return json(req, { error: `no se pudo guardar el borrador: ${ap.error}` }, 502);
+
+        // Recién ahora (subido el nuevo) se borra el anterior, si lo había: así
+        // un fallo del APPEND nunca deja sin borrador.
+        if (typeof uid === "number") await client.deleteByUid(uid);
+
+        await admin.from("mail_credentials")
+          .update({ last_used_at: new Date().toISOString(), last_error: null })
+          .eq("id", cred.id);
+
+        return json(req, { ok: true, uid: ap.uid ?? null, folder: box });
+      } catch (e) {
+        const msg = (e as Error).message ?? "error de IMAP";
+        await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
+        return json(req, { error: msg }, 502);
+      } finally {
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
+    }
+
     // === SEND ===
     if (action === "send") {
       if (!to?.length) return json(req, { error: "hace falta al menos un destinatario" }, 400);

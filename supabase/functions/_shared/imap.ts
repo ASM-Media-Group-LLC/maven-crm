@@ -431,6 +431,55 @@ export class ImapClient {
     return res.ok;
   }
 
+  /** Sube un mensaje a una carpeta (para guardar borradores en el servidor).
+   *
+   *  APPEND usa un LITERAL síncrono, igual que AUTHENTICATE: se manda el
+   *  comando con el tamaño en octetos, el servidor responde "+", y recién
+   *  entonces va el mensaje. `size` se mide en BYTES (UTF-8), no en caracteres.
+   *  Devuelve el UID nuevo si el servidor reporta APPENDUID (RFC 4315). */
+  async appendMessage(
+    folder: string,
+    flags: string,
+    rfc822: string,
+  ): Promise<{ ok: boolean; uid?: number; error?: string }> {
+    const tag = this.nextTag();
+    const bytes = enc.encode(rfc822);
+    // El nombre de carpeta va entre comillas; escapamos " y \ por las dudas.
+    const box = folder.replace(/(["\\])/g, "\\$1");
+    await this.conn.write(
+      enc.encode(`${tag} APPEND "${box}" (${flags}) {${bytes.length}}\r\n`),
+    );
+    // Esperar la continuación "+". Si en vez de "+" llega el tag con NO/BAD,
+    // la carpeta no existe o el mensaje fue rechazado: cortamos sin mandar el
+    // literal (mandarlo desincronizaría la sesión).
+    const tagErr = new RegExp(`^${tag} (NO|BAD)`, "im");
+    try {
+      const buf = await this.readUntil((b) => /^\+/m.test(b) || tagErr.test(b));
+      if (tagErr.test(buf)) {
+        return { ok: false, error: buf.match(tagErr)?.[0] ?? "APPEND rechazado" };
+      }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+    await this.conn.write(bytes);
+    await this.conn.write(enc.encode("\r\n"));
+    const res = await this.awaitCompletion(tag);
+    if (!res.ok) return { ok: false, error: res.error };
+    const uid = res.completion.match(/APPENDUID \d+ (\d+)/)?.[1];
+    return { ok: true, uid: uid ? Number(uid) : undefined };
+  }
+
+  /** Borra un mensaje por UID: lo marca \Deleted y lo expunga. UID EXPUNGE
+   *  (RFC 4315) saca SOLO ese; si el servidor no lo soporta, el mensaje queda
+   *  marcado \Deleted (invisible en la mayoría de los clientes) y se limpiará
+   *  en el próximo EXPUNGE de la carpeta. */
+  async deleteByUid(uid: number): Promise<boolean> {
+    const store = await this.command(`UID STORE ${uid} +FLAGS (\\Deleted)`);
+    if (!store.ok) return false;
+    const expunge = await this.command(`UID EXPUNGE ${uid}`);
+    return expunge.ok;
+  }
+
   async logout(): Promise<void> {
     try {
       await this.command("LOGOUT");
