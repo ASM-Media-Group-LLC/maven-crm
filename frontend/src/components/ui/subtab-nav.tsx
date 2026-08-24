@@ -14,7 +14,11 @@ const SubtabNav = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
     <div
       ref={ref}
       className={cn(
-        "inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1",
+        // max-w-full + min-w-0 + overflow-x-auto: en móvil los items
+        // (whitespace-nowrap + shrink-0) desbordan el ancho disponible;
+        // sin scroll horizontal las pestañas del final quedan inalcanzables
+        // (pasaba en Closers y LeadGen; Creadores ya lo parcheaba local).
+        "inline-flex max-w-full min-w-0 items-center gap-1 overflow-x-auto scrollbar-thin-x rounded-xl border border-white/10 bg-white/5 p-1",
         className,
       )}
       {...props}

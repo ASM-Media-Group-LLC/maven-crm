@@ -46,16 +46,37 @@ import AnnouncementBanner from "./AnnouncementBanner";
 
 /* ── Existing data hooks ─────────────────────────────── */
 
+// Counts server-side vía RPC (un solo round-trip, SECURITY INVOKER → respeta RLS).
+// Antes se bajaban las tablas enteras de creators y leads para hacer
+// filter().length en el cliente: con el cap silencioso de 1000 filas de
+// PostgREST los KPI quedaban INCORRECTOS a partir de 1000 filas, no solo lentos.
+interface DashboardCounts {
+  creators: { total: number; active: number };
+  leads: {
+    today: number;
+    interested: number;
+    in_progress: number;
+    closed: number;
+    by_status: Record<string, number>;
+  };
+}
+
+const fetchDashboardCounts = async (): Promise<DashboardCounts> => {
+  const { data, error } = await (supabase as any).rpc("get_dashboard_counts");
+  if (error) throw error;
+  return data as DashboardCounts;
+};
+
+// Ambos hooks comparten queryKey: React Query deduplica y hace UNA sola request.
 const useCreatorsCount = () =>
   useQuery({
-    queryKey: ["dashboard-creators-count"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("creators").select("id, status");
-      if (error) throw error;
-      const total = data?.length ?? 0;
-      const active = data?.filter((c) => c.status === "active").length ?? 0;
-      return { total, active, inactive: total - active };
-    },
+    queryKey: ["dashboard-counts"],
+    queryFn: fetchDashboardCounts,
+    select: (d: DashboardCounts) => ({
+      total: d.creators.total,
+      active: d.creators.active,
+      inactive: d.creators.total - d.creators.active,
+    }),
   });
 
 const useTicketsData = () =>
@@ -78,27 +99,15 @@ const useTicketsData = () =>
 
 const useLeadsData = () =>
   useQuery({
-    queryKey: ["dashboard-leads"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("leads").select("id, status, created_at");
-      if (error) throw error;
-      const all = data ?? [];
-      const today = new Date().toISOString().slice(0, 10);
-      const todayLeads = all.filter((l) => l.created_at.slice(0, 10) === today);
-      const interested = all.filter((l) => l.status === "interesado" || l.status === "contactado");
-      const inProgress = all.filter((l) => l.status !== "cerrado" && l.status !== "descartado");
-      const statusMap: Record<string, number> = {};
-      for (const l of all) {
-        statusMap[l.status] = (statusMap[l.status] || 0) + 1;
-      }
-      return {
-        todayCount: todayLeads.length,
-        interestedCount: interested.length,
-        inProgressCount: inProgress.length,
-        closedCount: all.filter((l) => l.status === "cerrado").length,
-        pipeline: statusMap,
-      };
-    },
+    queryKey: ["dashboard-counts"],
+    queryFn: fetchDashboardCounts,
+    select: (d: DashboardCounts) => ({
+      todayCount: d.leads.today,
+      interestedCount: d.leads.interested,
+      inProgressCount: d.leads.in_progress,
+      closedCount: d.leads.closed,
+      pipeline: d.leads.by_status,
+    }),
   });
 
 // Series del mini-sistema de charts: orden fijo validado (ver lib/chartTheme.ts).

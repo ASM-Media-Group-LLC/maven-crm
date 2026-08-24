@@ -101,9 +101,15 @@ const pickActiveUrl = (urls: string[], pathname: string): string | null => {
 };
 
 const DashboardSidebar = () => {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
+
+  // En móvil el sidebar es un Sheet overlay: cerrarlo al navegar para que la
+  // pantalla destino no quede tapada por el drawer (un tap menos por navegación).
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isAdmin } = useUserRole();

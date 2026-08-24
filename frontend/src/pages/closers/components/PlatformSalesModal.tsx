@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
 
@@ -32,6 +36,8 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string>>({});
+  // Confirmación antes de borrar: es un registro monetario, nada de borrado en un clic.
+  const [saleToDelete, setSaleToDelete] = useState<PlatformSale | null>(null);
 
   const { data: sales = [] } = useQuery({
     queryKey: ["closer-platform-sales", creatorId],
@@ -86,6 +92,11 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales-all"] });
+      setSaleToDelete(null);
+      toast({ title: "Venta eliminada" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error al eliminar", description: e.message, variant: "destructive" });
     },
   });
 
@@ -121,7 +132,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">${Number(s.price).toLocaleString()}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSale.mutate(s.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSaleToDelete(s)}>
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </div>
@@ -178,6 +189,30 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
             <span className="text-sm font-bold">${total.toLocaleString()}</span>
           </div>
         )}
+
+        <AlertDialog open={!!saleToDelete} onOpenChange={(o) => { if (!o) setSaleToDelete(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Estás a punto de eliminar la venta de{" "}
+                <strong>{saleToDelete?.platform}</strong>
+                {saleToDelete?.product ? <> – {saleToDelete.product}</> : null}{" "}
+                por <strong>${Number(saleToDelete?.price ?? 0).toLocaleString()}</strong>. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { if (saleToDelete) deleteSale.mutate(saleToDelete.id); }}
+                disabled={deleteSale.isPending}
+              >
+                {deleteSale.isPending ? "Eliminando..." : "Eliminar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

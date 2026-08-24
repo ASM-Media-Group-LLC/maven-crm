@@ -29,7 +29,7 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
   }, [open, onOpenChange]);
 
   const pages = [
-    { label: t("nav.dashboard"), url: "/sales-overview", icon: LayoutDashboard },
+    { label: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { label: t("nav.contacts"), url: "/contactos", icon: UserPlus },
     { label: t("nav.creators"), url: "/creadores", icon: Users },
     { label: t("nav.creatorSales") + " - Dashboard", url: "/sales-overview", icon: TrendingUp },

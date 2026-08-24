@@ -180,6 +180,8 @@ const InboxPage = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [channelFilter, setChannelFilter] = useState<string | null>(null); // id de canal activo (null = todos)
   const [destructive, setDestructive] = useState<{ kind: "clear" | "delete"; id: string; label: string } | null>(null);
+  // Confirmación antes de borrar una lista personal (antes era borrado de un solo clic).
+  const [labelToDelete, setLabelToDelete] = useState<{ id: string; name: string } | null>(null);
   // Diálogo "Nueva lista" (forConversation: si viene de "Añadir a la lista" de un chat, lo agrega a la nueva lista).
   const [listDialog, setListDialog] = useState<{ forConversation: string | null } | null>(null);
   const [newListName, setNewListName] = useState("");
@@ -740,6 +742,7 @@ const InboxPage = () => {
     if (labelFilter === labelId) setLabelFilter(null);
     qc.invalidateQueries({ queryKey: ["wa-inbox-labels"] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    toast({ title: "Lista eliminada" });
   };
 
   const setConversationStatus = async (status: string) => {
@@ -1689,7 +1692,7 @@ const InboxPage = () => {
               {myLabels.map((lb) => (
                 <div key={lb.id} className="flex items-center justify-between rounded-md border border-border/60 px-2.5 py-1.5 text-sm">
                   <span className="inline-flex items-center gap-1.5"><Tags className="h-3.5 w-3.5 text-muted-foreground" />{lb.name}</span>
-                  <button type="button" onClick={() => deleteLabel(lb.id)} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-destructive">
+                  <button type="button" onClick={() => setLabelToDelete({ id: lb.id, name: lb.name })} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -1699,6 +1702,27 @@ const InboxPage = () => {
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setListDialog(null)}>Cerrar</Button>
             <Button onClick={createLabel} disabled={!newListName.trim()}>Crear</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmación de borrado de una lista personal */}
+      <Dialog open={!!labelToDelete} onOpenChange={(o) => !o && setLabelToDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Borrar lista</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se borrará la lista <b>{labelToDelete?.name}</b> y se quitará de las conversaciones que la tengan. Los chats no se tocan. No se puede deshacer.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setLabelToDelete(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { if (labelToDelete) { deleteLabel(labelToDelete.id); setLabelToDelete(null); } }}
+            >
+              Borrar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

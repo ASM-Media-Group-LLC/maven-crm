@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
@@ -16,9 +18,38 @@ import { useMessengerNotifications } from "@/hooks/useMessengerNotifications";
 // route layout level — instead of inside every page wrapper — lets
 // React Router swap only the inner content via <Outlet />.
 //
-// All sidebar-reachable pages are imported eagerly in App.tsx, so we
-// don't need a runtime prefetch step here — the chunks are already in
-// the initial bundle and nav is instant.
+// Casi todas las páginas del sidebar se importan eager en App.tsx, así que
+// la navegación entre ellas es instantánea. Las lazy (/inbox, /correo,
+// /grabaciones, etc.) se cubren con el Suspense de acá abajo: el fallback
+// vive DENTRO del área de contenido, con sidebar y topbar montados, para
+// que cargar un chunk se sienta como cambio de tab y no como reload
+// completo (el Suspense raíz de App.tsx tapaba toda la pantalla con el
+// splash del logo a los 180ms — exactamente lo que quería evitar).
+
+// Fallback liviano solo para el área de contenido: barra fina arriba +
+// skeleton, con el mismo fade retrasado del splash para que un chunk
+// cacheado no flashee nada.
+const ContentLoadingFallback = () => (
+  <div className="relative flex-1 min-h-0 overflow-hidden">
+    <div className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden">
+      <div className="h-full w-1/3 animate-[loading-bar_1.2s_ease-in-out_infinite] bg-primary" />
+    </div>
+    <div
+      className="space-y-4 p-6 opacity-0"
+      style={{ animation: "delayed-fade-in 0.25s ease-out 0.18s forwards" }}
+    >
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-96 max-w-full" />
+      <div className="grid gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+      </div>
+      <Skeleton className="h-64 w-full" />
+    </div>
+  </div>
+);
 const AppShell = () => {
   const { popups } = useAnnouncementsByChannel();
   const { isAdmin } = useUserRole();
@@ -39,7 +70,9 @@ const AppShell = () => {
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
           <BackToDashboardBar />
-          <Outlet />
+          <Suspense fallback={<ContentLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
       {isAdmin && <ClariAiFab />}

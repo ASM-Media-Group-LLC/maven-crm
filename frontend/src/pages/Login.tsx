@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { traducirErrorAuth } from "@/lib/authErrors";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
@@ -62,7 +63,7 @@ const Login = () => {
     setLoading(false);
 
     if (error) {
-      toast({ title: t("auth.loginError"), description: error.message, variant: "destructive" });
+      toast({ title: t("auth.loginError"), description: traducirErrorAuth(error), variant: "destructive" });
     } else {
       navigate(destino);
     }

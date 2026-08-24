@@ -11,6 +11,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronRight, Plus, Trash2, CalendarIcon, FileText } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfWeek, addWeeks, isWithinInterval, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -31,6 +35,8 @@ const RoadmapContent = () => {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ id: string; field: "task" | "submodule" | "description" } | null>(null);
   const [editValue, setEditValue] = useState("");
+  // Confirmación antes de borrar (el icono aparece solo en hover: un mis-click es plausible).
+  const [pendingDelete, setPendingDelete] = useState<{ kind: "item" | "category"; id: string; name: string } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const catEditRef = useRef<HTMLInputElement>(null);
@@ -263,7 +269,7 @@ const RoadmapContent = () => {
                     <Progress value={catPercent} className="h-1.5" />
                   </div>
                   <button
-                    onClick={() => deleteCategory.mutate(cat.id)}
+                    onClick={() => setPendingDelete({ kind: "category", id: cat.id, name: cat.name })}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -419,7 +425,7 @@ const RoadmapContent = () => {
                             })}
                             <TableCell className="py-2 px-2">
                               <button
-                                onClick={() => deleteItem.mutate(item.id)}
+                                onClick={() => setPendingDelete({ kind: "item", id: item.id, name: item.task })}
                                 className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -472,6 +478,34 @@ const RoadmapContent = () => {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.kind === "category" ? "¿Eliminar esta categoría?" : "¿Eliminar esta tarea?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar <strong>{pendingDelete?.name}</strong>
+              {pendingDelete?.kind === "category" ? " con todas sus tareas" : ""}. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!pendingDelete) return;
+                if (pendingDelete.kind === "category") deleteCategory.mutate(pendingDelete.id);
+                else deleteItem.mutate(pendingDelete.id);
+                setPendingDelete(null);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -97,17 +97,43 @@ export const useCloserCreators = () => {
     },
   });
 
+  // ── Patrón optimista (espejo de useCloserLeads) ─────────────────────────
+  // La tabla refleja el cambio al instante (setQueriesData sobre el cache),
+  // y si el UPDATE falla se restaura el snapshot y se avisa con toast — antes
+  // el fallo era SILENCIOSO: el closer creía que guardó y no.
+  const patchCreatorsCache = (id: string, updates: Partial<CloserCreator>) => {
+    queryClient.setQueriesData<CloserCreator[]>(
+      { queryKey: ["closer-creators"] },
+      (old) => old?.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+    );
+  };
+
+  const snapshotCreatorsCache = async () => {
+    await queryClient.cancelQueries({ queryKey: ["closer-creators"] });
+    return { previous: queryClient.getQueriesData<CloserCreator[]>({ queryKey: ["closer-creators"] }) };
+  };
+
+  const rollbackCreatorsCache = (context?: { previous: [readonly unknown[], CloserCreator[] | undefined][] }) => {
+    context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+  };
+
   const updateCreator = useMutation({
     mutationFn: async ({ id, ...fields }: { id: string } & Partial<CloserCreator>) => {
       const { error } = await supabase.from("closer_creators").update(fields).eq("id", id);
       if (error) throw error;
     },
+    onMutate: async ({ id, ...fields }) => {
+      const context = await snapshotCreatorsCache();
+      patchCreatorsCache(id, fields);
+      return context;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
       toast({ title: "Creator actualizada" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "No se pudo actualizar.", variant: "destructive" });
+    onError: (e: Error, _vars, context) => {
+      rollbackCreatorsCache(context);
+      toast({ title: "Error", description: e.message || "No se pudo actualizar.", variant: "destructive" });
     },
   });
 
@@ -126,8 +152,17 @@ export const useCloserCreators = () => {
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
       if (error) throw error;
     },
+    onMutate: async ({ id, stage }) => {
+      const context = await snapshotCreatorsCache();
+      patchCreatorsCache(id, { stage });
+      return context;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
+    },
+    onError: (e: Error, _vars, context) => {
+      rollbackCreatorsCache(context);
+      toast({ title: "Error", description: e.message || "No se pudo cambiar la etapa.", variant: "destructive" });
     },
   });
 
@@ -147,9 +182,18 @@ export const useCloserCreators = () => {
       const { error } = await supabase.from("closer_creators").update({ assigned_to }).eq("id", id);
       if (error) throw error;
     },
+    onMutate: async ({ id, assigned_to }) => {
+      const context = await snapshotCreatorsCache();
+      patchCreatorsCache(id, { assigned_to });
+      return context;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
       toast({ title: "Creator asignada" });
+    },
+    onError: (e: Error, _vars, context) => {
+      rollbackCreatorsCache(context);
+      toast({ title: "Error", description: e.message || "No se pudo asignar.", variant: "destructive" });
     },
   });
 

@@ -7,6 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle, MessageSquare, XCircle, ImageIcon } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import StatChip from "@/components/StatChip";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -62,6 +66,8 @@ const PersonalizadosPage = () => {
   const [newOpen, setNewOpen] = useState(false);
   const [viewRequest, setViewRequest] = useState<CustomContentRequest | null>(null);
   const [drawerRequest, setDrawerRequest] = useState<CustomContentRequest | null>(null);
+  // Confirmación antes de borrar un pedido: sin borrados de un solo clic.
+  const [requestToDelete, setRequestToDelete] = useState<CustomContentRequest | null>(null);
 
   const handleRowClick = (r: CustomContentRequest) => {
     const isOverdue = r.status !== "completado" && !!r.due_date && new Date(r.due_date) < new Date();
@@ -209,7 +215,7 @@ const PersonalizadosPage = () => {
                               size="icon"
                               variant="ghost"
                               className="text-destructive hover:text-destructive"
-                              onClick={(e) => { e.stopPropagation(); deleteRequest.mutate(r.id); }}
+                              onClick={(e) => { e.stopPropagation(); setRequestToDelete(r); }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -227,6 +233,28 @@ const PersonalizadosPage = () => {
       <NewRequestModal open={newOpen} onOpenChange={setNewOpen} />
       <ViewRequestModal request={viewRequest} open={!!viewRequest} onOpenChange={(open) => !open && setViewRequest(null)} />
       <TrackingDrawer request={drawerRequest} open={!!drawerRequest} onOpenChange={(open) => !open && setDrawerRequest(null)} />
+
+      <AlertDialog open={!!requestToDelete} onOpenChange={(open) => { if (!open) setRequestToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este pedido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar <strong>{requestToDelete?.title}</strong>
+              {requestToDelete?.creators?.name ? <> de {requestToDelete.creators.name}</> : null}. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (requestToDelete) { deleteRequest.mutate(requestToDelete.id); setRequestToDelete(null); } }}
+              disabled={deleteRequest.isPending}
+            >
+              {deleteRequest.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
