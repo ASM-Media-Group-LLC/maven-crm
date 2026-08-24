@@ -12808,6 +12808,116 @@ export type Database = {
           },
         ]
       }
+      ticket_form_fields: {
+        Row: {
+          created_at: string
+          field_key: string
+          field_type: string
+          form_id: string
+          help_text: string | null
+          id: string
+          is_required: boolean
+          label: string
+          maps_to: string | null
+          options: Json
+          placeholder: string | null
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          field_key: string
+          field_type: string
+          form_id: string
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          label: string
+          maps_to?: string | null
+          options?: Json
+          placeholder?: string | null
+          position?: number
+        }
+        Update: {
+          created_at?: string
+          field_key?: string
+          field_type?: string
+          form_id?: string
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          label?: string
+          maps_to?: string | null
+          options?: Json
+          placeholder?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_form_fields_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_forms: {
+        Row: {
+          archived_at: string | null
+          code_prefix: string
+          color: string
+          created_at: string
+          created_by: string | null
+          creator_mode: string
+          description: string | null
+          icon: string
+          id: string
+          is_published: boolean
+          name: string
+          next_number: number
+          notify_emails: string[]
+          notify_enabled: boolean
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          code_prefix: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          creator_mode?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_published?: boolean
+          name: string
+          next_number?: number
+          notify_emails?: string[]
+          notify_enabled?: boolean
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          code_prefix?: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          creator_mode?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_published?: boolean
+          name?: string
+          next_number?: number
+          notify_emails?: string[]
+          notify_enabled?: boolean
+          position?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tickets: {
         Row: {
           assigned_to: string | null
@@ -16411,6 +16521,33 @@ export type Database = {
       }
     }
     Functions: {
+      create_ticket_from_form: {
+        Args: { p_answers: Json; p_creator_id?: string; p_form_id: string }
+        Returns: {
+          answers: Json
+          assigned_to: string | null
+          company: string | null
+          created_at: string | null
+          creator_id: string | null
+          creator_notes: string | null
+          description: string | null
+          form_id: string | null
+          id: string
+          priority: string
+          status: string
+          ticket_code: string | null
+          ticket_type: string
+          title: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tickets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      next_ticket_code: { Args: { p_form_id: string }; Returns: string }
       alvaro_pulse: { Args: { p_dry_run?: boolean }; Returns: string }
       api_usage_summary: { Args: { _from: string; _to: string }; Returns: Json }
       app_force_delete_auth_user: {
