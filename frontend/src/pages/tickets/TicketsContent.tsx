@@ -13,7 +13,6 @@ import { useTickets, type TicketWithCreator } from "./useTickets";
 import TicketsFilters from "./TicketsFilters";
 import TicketsList from "./TicketsList";
 import TicketsGrid from "./TicketsGrid";
-import CreateTicketModal from "./CreateTicketModal";
 import NewTicketLauncher from "./NewTicketLauncher";
 import TicketFormsManager from "./TicketFormsManager";
 import TicketFormEditor from "./TicketFormEditor";
@@ -33,7 +32,6 @@ const TicketsContent = () => {
   // Constructor de plantillas: mismo permiso que lee la RLS de ticket_forms.
   const canManageForms = canAccess("Tickets", "Gestionar Plantillas");
   const { ticketsQuery } = useTickets();
-  const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
   const [tab, setTab] = useState(canCreate ? "new" : canSeeList ? "list" : "calendar");
   // Boton principal del header. Para quien administra plantillas, la accion
@@ -140,16 +138,6 @@ const TicketsContent = () => {
           </div>
 
           <NewTicketLauncher canCreate={canCreate} canManageForms={canManageForms} />
-
-          {/* Se conserva el alta libre de siempre, sin plantilla, para no quitar
-              una funcionalidad que ya existía. */}
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-          >
-            O crear un ticket libre, sin plantilla
-          </button>
         </TabsContent>
         )}
 
@@ -212,7 +200,6 @@ const TicketsContent = () => {
         </DialogContent>
       </Dialog>
 
-      <CreateTicketModal open={modalOpen} onOpenChange={setModalOpen} />
       {selectedTicket && (
         <>
           <ViewTicketModal

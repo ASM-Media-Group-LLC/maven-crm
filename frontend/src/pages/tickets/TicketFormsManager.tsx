@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Archive } from "lucide-react";
+import { Pencil, Archive } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,17 +40,12 @@ const TicketFormsManager = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-medium">Plantillas de ticket</h2>
-          <p className="text-xs text-muted-foreground">
-            Arma los formularios que el equipo va a usar. Publica una para que aparezca en Nuevo Ticket.
-          </p>
-        </div>
-        <Button onClick={() => openEditor(null)}>
-          <Plus className="mr-1 h-4 w-4" />
-          Nueva plantilla
-        </Button>
+      <div>
+        <h2 className="text-sm font-medium">Plantillas de ticket</h2>
+        <p className="text-xs text-muted-foreground">
+          Arma los formularios que el equipo va a usar. El boton "Nueva plantilla" de arriba crea
+          una; el interruptor de cada fila la publica.
+        </p>
       </div>
 
       {formsQuery.isLoading ? (
@@ -59,7 +54,8 @@ const TicketFormsManager = () => {
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm font-medium">Todavia no hay plantillas</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crea la primera y defini sus campos, su prefijo y a quien le llega el correo.
+            Usa "Nueva plantilla" arriba para crear la primera: sus campos, su prefijo y a
+            quien le llega el correo.
           </p>
         </div>
       ) : (
@@ -84,8 +80,10 @@ const TicketFormsManager = () => {
                     {f.is_published ? (
                       <Badge className="text-[10px]">Publicada</Badge>
                     ) : (
+                      // Sin esta aclaracion nadie ata "Borrador" con "no me
+                      // aparece en Nuevo Ticket".
                       <Badge variant="secondary" className="text-[10px]">
-                        Borrador
+                        Borrador - no aparece en Nuevo Ticket
                       </Badge>
                     )}
                   </div>
