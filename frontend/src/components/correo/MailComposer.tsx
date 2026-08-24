@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,6 +43,12 @@ import { toast } from "sonner";
 import { useSendMail } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
+import {
+  borrarBorrador,
+  firmaContexto,
+  guardarBorrador,
+  leerBorrador,
+} from "@/lib/mailDraft";
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -527,12 +533,26 @@ function BarraFormato({ editor }: { editor: Editor }) {
 /* ── El compositor ──────────────────────────────────────────────────────── */
 
 export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
-  const [to, setTo] = useState(inicial?.to ?? "");
-  const [cc, setCc] = useState(inicial?.cc ?? "");
-  const [bcc, setBcc] = useState("");
-  const [verCc, setVerCc] = useState(!!inicial?.cc);
-  const [verBcc, setVerBcc] = useState(false);
-  const [subject, setSubject] = useState(inicial?.subject ?? "");
+  // Firma del contexto (nuevo vs. responder a tal hilo) y borrador guardado
+  // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
+  // cero en cada apertura, así que no hace falta re-leer.
+  const firma = firmaContexto(inicial?.inReplyTo);
+  const recuperado = useMemo(
+    () => leerBorrador(remitente, firma),
+    [remitente, firma],
+  );
+
+  // Arranca del borrador guardado si lo hay; si no, de lo que traiga `inicial`
+  // (una respuesta prellena Para/Asunto/cita).
+  const [to, setTo] = useState(recuperado?.to ?? inicial?.to ?? "");
+  const [cc, setCc] = useState(recuperado?.cc ?? inicial?.cc ?? "");
+  const [bcc, setBcc] = useState(recuperado?.bcc ?? "");
+  const [verCc, setVerCc] = useState(!!(recuperado?.cc ?? inicial?.cc));
+  const [verBcc, setVerBcc] = useState(!!recuperado?.bcc);
+  const [subject, setSubject] = useState(recuperado?.subject ?? inicial?.subject ?? "");
+  const [avisoRecuperado, setAvisoRecuperado] = useState(!!recuperado);
+  // Los adjuntos NO se guardan en el borrador (el base64 es pesado para
+  // localStorage): recuperar un borrador no los trae de vuelta.
   const [adjuntos, setAdjuntos] = useState<
     Array<{ filename: string; contentType: string; sizeBytes: number; contentBase64: string }>
   >([]);
@@ -588,7 +608,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
       FontSize,
       Placeholder.configure({ placeholder: "Escribe tu mensaje…" }),
     ],
-    content: contenidoInicial,
+    content: recuperado?.html ?? contenidoInicial,
     autofocus: inicial?.citar ? "start" : false,
     editorProps: {
       attributes: {
@@ -624,6 +644,75 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
     (!cuerpoVacio || subject.trim().length > 0 || adjuntos.length > 0) &&
     !enviar.isPending;
 
+  // ── Autoguardado del borrador ──────────────────────────────────────────
+  // Baseline para saber si el usuario escribió algo encima. Mientras se está
+  // sobre el borrador recuperado, el baseline ES ese borrador; tras "empezar
+  // de cero" (avisoRecuperado=false) vuelve a `inicial`, si no el autosave
+  // regeneraría el borrador que se acaba de borrar.
+  const fuente = avisoRecuperado ? recuperado : null;
+  const base = {
+    to: fuente?.to ?? inicial?.to ?? "",
+    cc: fuente?.cc ?? inicial?.cc ?? "",
+    bcc: fuente?.bcc ?? "",
+    subject: fuente?.subject ?? inicial?.subject ?? "",
+    html: fuente?.html ?? contenidoInicial,
+  };
+  const huboCambios =
+    to !== base.to ||
+    cc !== base.cc ||
+    bcc !== base.bcc ||
+    subject !== base.subject ||
+    // Adjuntar un archivo es trabajo que no se puede tirar sin avisar (no se
+    // guarda en el borrador, así que cerrar y perderlo dolería más todavía).
+    adjuntos.length > 0 ||
+    // Editor vacío = "<p></p>", que no es el "" de un correo nuevo sin cita.
+    (base.html === "" ? !cuerpoVacio : (editor?.getHTML() ?? "") !== base.html);
+
+  // Guardado con el contenido actual. En un ref para que el autosave y el
+  // `beforeunload` siempre vean el estado más nuevo sin re-registrarse.
+  const guardarRef = useRef(() => {});
+  guardarRef.current = () => {
+    if (!editor || !huboCambios) return;
+    guardarBorrador(remitente, {
+      firma,
+      to,
+      cc,
+      bcc,
+      subject,
+      html: editor.getHTML(),
+      inReplyTo: inicial?.inReplyTo,
+      references: inicial?.references,
+      ts: Date.now(),
+    });
+  };
+
+  // Autosave con debounce ~1s. Dos fuentes de cambio: el cuerpo (suscripción
+  // a `update` del editor) y los campos de dirección/asunto (deps del efecto).
+  // Suscribirse al editor en vez de confiar en el re-render evita perder
+  // cambios del cuerpo si TipTap deja de re-renderizar en cada tecla.
+  useEffect(() => {
+    if (!editor) return;
+    let t: number | undefined;
+    const programar = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => guardarRef.current(), 900);
+    };
+    editor.on("update", programar);
+    programar(); // cambió un campo (to/cc/bcc/subject)
+    return () => {
+      window.clearTimeout(t);
+      editor.off("update", programar);
+    };
+  }, [editor, to, cc, bcc, subject]);
+
+  // Refrescar o cerrar la pestaña no pasa por el diálogo: un guardado
+  // sincrónico en `beforeunload` cierra ese hueco.
+  useEffect(() => {
+    const alSalir = () => guardarRef.current();
+    window.addEventListener("beforeunload", alSalir);
+    return () => window.removeEventListener("beforeunload", alSalir);
+  }, []);
+
   const handleEnviar = async () => {
     if (!editor) return;
     try {
@@ -642,6 +731,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
           contentBase64,
         })),
       });
+      // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
+      borrarBorrador(remitente, firma);
       toast.success("Correo enviado");
       onCerrar();
     } catch (e) {
@@ -649,37 +740,51 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
     }
   };
 
-  // Cerrar con algo escrito pide confirmación: un ESC o un click afuera no
-  // pueden costar diez minutos de redacción (no hay borradores todavía —
-  // cuando los haya, esto pasa a guardar en vez de preguntar).
-  //
-  // Se compara contra el estado INICIAL, no contra vacío: al responder ya
-  // vienen prellenados el destinatario, el "Re: …" y la cita en el editor,
-  // así que "¿hay algo?" contra vacío daba siempre true y abrir una
-  // respuesta y cerrarla preguntaba aunque no se hubiera escrito una letra.
+  // Cerrar con algo escrito pregunta si guardar el borrador o descartarlo. Un
+  // ESC o un click afuera no pueden costar diez minutos de redacción. Si no se
+  // tocó nada respecto a lo que se abrió (`huboCambios` compara contra el
+  // borrador recuperado o `inicial`, no contra vacío: una respuesta ya viene
+  // con Para/Asunto/cita), cierra directo.
   const cerrarConCuidado = () => {
     // Mientras el envío está en vuelo, cerrar desmonta el composer y el
     // toast de error caería sobre un borrador que ya no existe.
     if (enviar.isPending) return;
-    const cambio =
-      to !== (inicial?.to ?? "") ||
-      cc !== (inicial?.cc ?? "") ||
-      bcc !== "" ||
-      subject !== (inicial?.subject ?? "") ||
-      adjuntos.length > 0 ||
-      // Con el editor vacío TipTap devuelve "<p></p>", que no es igual al
-      // contenidoInicial "" de un correo nuevo: comparar strings a secas
-      // preguntaba al cerrar un compositor en el que no se tocó nada.
-      (contenidoInicial === ""
-        ? !cuerpoVacio
-        : (editor?.getHTML() ?? "") !== contenidoInicial);
     // Diálogo propio y no window.confirm: el nativo congela la pestaña
     // entera mientras está abierto y desentona con el resto de Maven.
-    if (cambio) {
+    if (huboCambios) {
       setConfirmarDescarte(true);
       return;
     }
     onCerrar();
+  };
+
+  // Guardar el borrador y cerrar (botón primario del diálogo).
+  const guardarYCerrar = () => {
+    guardarRef.current();
+    setConfirmarDescarte(false);
+    toast.success("Borrador guardado");
+    onCerrar();
+  };
+
+  // Tirar el borrador de este contexto y cerrar.
+  const descartar = () => {
+    borrarBorrador(remitente, firma);
+    setConfirmarDescarte(false);
+    onCerrar();
+  };
+
+  // Para quien reabrió y NO quería seguir el borrador viejo: vuelve al estado
+  // de un correo nuevo / una respuesta limpia y borra lo guardado.
+  const empezarDeCero = () => {
+    setTo(inicial?.to ?? "");
+    setCc(inicial?.cc ?? "");
+    setBcc("");
+    setVerCc(!!inicial?.cc);
+    setVerBcc(false);
+    setSubject(inicial?.subject ?? "");
+    editor?.commands.setContent(contenidoInicial || "<p></p>");
+    borrarBorrador(remitente, firma);
+    setAvisoRecuperado(false);
   };
 
   return (
@@ -691,6 +796,21 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
           </DialogTitle>
           <p className="text-xs text-muted-foreground">Desde {remitente}</p>
         </DialogHeader>
+
+        {avisoRecuperado && (
+          <div className="flex items-center justify-between gap-2 border-b border-border/40 bg-primary/5 px-5 py-2 text-xs">
+            <span className="text-muted-foreground">
+              Retomaste un borrador que habías empezado.
+            </span>
+            <button
+              type="button"
+              onClick={empezarDeCero}
+              className="shrink-0 font-medium text-primary hover:underline"
+            >
+              Empezar de cero
+            </button>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Destinatarios estilo Gmail: filas finas, Cc/Cco plegados.
@@ -914,18 +1034,25 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
       <AlertDialog open={confirmarDescarte} onOpenChange={setConfirmarDescarte}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Descartar este correo?</AlertDialogTitle>
+            <AlertDialogTitle>¿Guardar este borrador?</AlertDialogTitle>
             <AlertDialogDescription>
-              Lo que escribiste se pierde. Todavía no hay borradores guardados.
+              Puedes guardarlo y seguir después, o descartarlo. El borrador
+              queda guardado en este navegador.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Seguir editando</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => { setConfirmarDescarte(false); onCerrar(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            {/* No es AlertDialogAction/Cancel: `descartar` ya cierra el
+                diálogo y desmonta el compositor. */}
+            <Button
+              variant="ghost"
+              onClick={descartar}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               Descartar
+            </Button>
+            <AlertDialogAction onClick={guardarYCerrar}>
+              Guardar borrador
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
