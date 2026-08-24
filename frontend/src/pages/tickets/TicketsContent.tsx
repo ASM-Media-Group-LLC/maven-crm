@@ -28,12 +28,11 @@ const TicketsContent = () => {
   // hoy nadie pierde acceso; solo permite restringir por rol desde el modal de permisos.
   const canCreate = canAccess("Tickets", "Crear Ticket");
   const canSeeList = canAccess("Tickets", "Lista de Tickets");
-  const canSeeCalendar = canAccess("Tickets", "Calendario");
   // Constructor de plantillas: mismo permiso que lee la RLS de ticket_forms.
   const canManageForms = canAccess("Tickets", "Gestionar Plantillas");
   const { ticketsQuery } = useTickets();
   const [view, setView] = useState<"list" | "grid">("list");
-  const [tab, setTab] = useState(canCreate ? "new" : canSeeList ? "list" : "calendar");
+  const [tab, setTab] = useState(canCreate ? "new" : "list");
   // Boton principal del header. Para quien administra plantillas, la accion
   // valiosa es CREAR una plantilla nueva (el equivalente a "Formulario en
   // blanco" de Google Forms), no elegir entre las existentes. Para el resto es
@@ -124,7 +123,6 @@ const TicketsContent = () => {
         <TabsList className="mb-4">
           {canCreate && <TabsTrigger value="new">Nuevo Ticket</TabsTrigger>}
           {canSeeList && <TabsTrigger value="list">Lista de Tickets</TabsTrigger>}
-          {canSeeCalendar && <TabsTrigger value="calendar">Calendario</TabsTrigger>}
           {canManageForms && <TabsTrigger value="forms">Plantillas</TabsTrigger>}
         </TabsList>
 
@@ -166,14 +164,6 @@ const TicketsContent = () => {
           ) : (
             <TicketsGrid tickets={filtered} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           )}
-        </TabsContent>
-        )}
-
-        {canSeeCalendar && (
-        <TabsContent value="calendar">
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <p>Calendario de tickets — próximamente</p>
-          </div>
         </TabsContent>
         )}
 

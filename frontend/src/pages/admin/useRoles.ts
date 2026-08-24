@@ -163,12 +163,15 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Telegram (canal): "Cuentas" (vincular cuenta en el gateway) + "Bandeja" (recibir/responder)
   // + función "Asignar conversaciones" — espejo de WhatsApp.
   def("Operaciones", "Telegram", ["Cuentas", "Bandeja"], ["Asignar conversaciones"]),
-  // Tickets: subtabs (Lista/Calendario/Plantillas) + acciones.
+  // Tickets: subtabs (Lista/Plantillas) + acciones.
   // "Gestionar Plantillas" gatea el constructor de formularios: quien lo tenga
   // puede crear/editar plantillas y su lista de destinatarios de correo. Lo lee
   // la RLS de ticket_forms vía can_use_module_function, así que prenderlo o
   // apagarlo desde Administración → Roles surte efecto también en la base.
-  def("Operaciones", "Tickets", ["Lista de Tickets", "Calendario", "Plantillas"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket", "Gestionar Plantillas"]),
+  // "Calendario" se quitó: era una pestaña placeholder que nunca se construyó
+  // (venía del split del repo). Las filas viejas en role_permissions quedan
+  // huérfanas y sin efecto; no hace falta borrarlas.
+  def("Operaciones", "Tickets", ["Lista de Tickets", "Plantillas"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket", "Gestionar Plantillas"]),
   def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),
   // Scouter Assist: 8 subtabs navegables + 3 acciones dentro de Settings (gastan créditos / disparan RPCs).
   def("Operaciones", "Scouter Assist",
