@@ -1,9 +1,9 @@
-import { useRef, useEffect, useCallback, useMemo } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -75,23 +75,53 @@ export default function MessageList({
   // de cargar, reacciones, mensaje nuevo) vuelve a bajar al último mensaje. Se apaga cuando
   // el usuario scrollea hacia arriba y se reactiva cuando vuelve al fondo.
   const pinToBottomRef = useRef(true);
+  const prevLastIdRef = useRef<string | null>(null);
+  // Botón "↓ N nuevos": visible cuando el usuario está scrolleado hacia arriba; el badge
+  // cuenta los mensajes que llegaron mientras no estaba mirando el fondo.
+  const [showJump, setShowJump] = useState(false);
+  const [newCount, setNewCount] = useState(0);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinToBottomRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setNewCount(0);
+    setShowJump(false);
+  }, []);
 
   // Al abrir/cambiar de conversación → al fondo. Con la MISMA conversación, si llega un
-  // mensaje nuevo y estabas abajo, seguí el fondo.
+  // mensaje nuevo y estabas abajo (o lo mandaste vos), seguí el fondo; si estabas arriba,
+  // contalo para el badge.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || messages.length === 0) return;
     const conv = messages[0]?.conversation_id ?? null;
+    const lastMsg = messages[messages.length - 1];
+    const lastId = lastMsg.id;
 
     if (conv !== currentConvRef.current) {
       currentConvRef.current = conv;
       pinToBottomRef.current = true;
       el.scrollTop = el.scrollHeight;
-    } else if (messages.length > prevMessagesLengthRef.current && pinToBottomRef.current) {
-      el.scrollTop = el.scrollHeight;
+      setNewCount(0);
+      setShowJump(false);
+    } else if (messages.length > prevMessagesLengthRef.current) {
+      // Distingue mensaje NUEVO al fondo de históricos prepend-eados arriba (mismo lastId).
+      const isNewAtBottom = lastId !== prevLastIdRef.current;
+      if (isNewAtBottom && (pinToBottomRef.current || lastMsg.sender_id === currentUserId)) {
+        pinToBottomRef.current = true;
+        el.scrollTop = el.scrollHeight;
+        setNewCount(0);
+        setShowJump(false);
+      } else if (isNewAtBottom) {
+        setNewCount((c) => c + (messages.length - prevMessagesLengthRef.current));
+        setShowJump(true);
+      }
     }
     prevMessagesLengthRef.current = messages.length;
-  }, [messages]);
+    prevLastIdRef.current = lastId;
+  }, [messages, currentUserId]);
 
   // ResizeObserver: mientras esté pegado al fondo, mantener el scroll abajo cuando el
   // contenido crece de alto DESPUÉS del render inicial. Las imágenes que cargan async eran
@@ -132,7 +162,11 @@ export default function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     // ¿el usuario está pegado al fondo? Define si seguimos autoscrolleando.
-    pinToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    pinToBottomRef.current = atBottom;
+    // Botón "↓": visible mientras esté scrolleado arriba; al volver al fondo se limpia.
+    if (atBottom) { setNewCount(0); setShowJump(false); }
+    else setShowJump(true);
     // Cargar mensajes más viejos al llegar arriba.
     if (hasMore && !loadingMore && onLoadMore && el.scrollTop < 80) {
       prevScrollHeightRef.current = el.scrollHeight;
@@ -172,7 +206,8 @@ export default function MessageList({
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto">
+    <div className="flex-1 relative overflow-hidden">
+    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (
           <div className="flex justify-center py-3">
@@ -287,6 +322,20 @@ export default function MessageList({
           </div>
         ))}
       </div>
+    </div>
+
+      {showJump && (
+        <button
+          onClick={scrollToBottom}
+          aria-label="Ir al último mensaje"
+          className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-card shadow-lg border border-border/60 pl-3 pr-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors animate-fade-in"
+        >
+          {newCount > 0 && (
+            <span className="text-primary">{newCount} {newCount === 1 ? "nuevo" : "nuevos"}</span>
+          )}
+          <ChevronDown className="h-4 w-4 text-primary" />
+        </button>
+      )}
     </div>
   );
 }

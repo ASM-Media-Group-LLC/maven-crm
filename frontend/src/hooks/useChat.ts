@@ -725,29 +725,39 @@ export function useChat() {
   // Silenciar / reactivar una conversación (contacto o grupo) para el usuario actual.
   // Actualiza chat_participants.is_muted; el hook global useMessengerNotifications lo respeta
   // para NO sonar/avisar en conversaciones silenciadas (los recibos ✓✓ siguen igual).
-  const toggleMute = useCallback((conversationId: string, muted: boolean) => {
+  const toggleMute = useCallback(async (conversationId: string, muted: boolean) => {
     if (!user) return;
 
-    // Optimista: refleja el cambio en la fila de mi participante al instante.
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === conversationId
-          ? {
-              ...c,
-              participants: c.participants.map((p) =>
-                p.user_id === user.id ? { ...p, is_muted: muted } : p
-              ),
-            }
-          : c
-      )
-    );
+    const applyMuted = (value: boolean) =>
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                participants: c.participants.map((p) =>
+                  p.user_id === user.id ? { ...p, is_muted: value } : p
+                ),
+              }
+            : c
+        )
+      );
 
-    supabase
+    // Optimista: refleja el cambio en la fila de mi participante al instante.
+    applyMuted(muted);
+
+    // Un UPDATE bajo RLS que no matchea ninguna fila NO devuelve error → hay que pedir
+    // .select('id') y revisar que efectivamente actualizó algo, o el silencio nos engaña.
+    const { data, error } = await supabase
       .from("chat_participants")
       .update({ is_muted: muted })
       .eq("conversation_id", conversationId)
       .eq("user_id", user.id)
-      .then();
+      .select("id");
+
+    if (error || !data || data.length === 0) {
+      applyMuted(!muted); // revertir
+      toast.error(muted ? "No se pudo silenciar" : "No se pudo reactivar");
+    }
   }, [user]);
 
   return {
