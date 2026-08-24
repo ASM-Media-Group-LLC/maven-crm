@@ -443,7 +443,9 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         </DialogTitle>
 
         {/* ── Barra superior ─────────────────────────────────────────────── */}
-        <div className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5">
+        {/* pr-12: la X propia del DialogContent va en absolute right-3 top-3 y
+            antes se montaba sobre los botones de la barra. */}
+        <div className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5 pr-12">
           <div className={`rounded-lg p-1.5 ${accent.wrap}`}>
             <AccentIcon className={`h-4 w-4 ${accent.icon}`} />
           </div>
@@ -493,15 +495,6 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
               Publicar
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onOpenChange(false)}
-            aria-label="Cerrar"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
         {/* ── Cuerpo ─────────────────────────────────────────────────────── */}
