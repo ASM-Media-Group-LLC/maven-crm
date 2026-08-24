@@ -1,4 +1,5 @@
 import { corsFor } from "../_shared/cors.ts";
+import { assertCanManage } from "../_shared/user-hierarchy.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
@@ -42,16 +43,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is admin
-    const { data: callerRole } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", callerId)
-      .eq("role", "admin")
-      .maybeSingle();
+    // Gate de ENTRADA: permiso de GESTIONAR USUARIOS (can_use_module_function),
+    // ya no el literal role='admin'. La jerarquía por acción se chequea abajo con
+    // assertCanManage → public.can_manage_user.
+    const { data: canManage, error: gateErr } = await adminClient
+      .rpc("can_manage_users", { _user_id: callerId });
 
-    if (!callerRole) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+    if (gateErr || !canManage) {
+      return new Response(JSON.stringify({ error: "Forbidden: sin permiso de gestión de usuarios" }), {
         status: 403,
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
@@ -89,6 +88,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      // JERARQUÍA: no se puede asignar un rol de nivel >= al propio (estricto).
+      const gAssign = await assertCanManage(adminClient, callerId, user_id, "assign_role", role);
+      if (!gAssign.ok) {
+        return new Response(JSON.stringify(gAssign.body), {
+          status: gAssign.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Delete existing roles for this user then insert new one (one role per user)
       await adminClient.from("user_roles").delete().eq("user_id", user_id);
       const { error: insertError } = await adminClient
@@ -117,6 +125,15 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders(req), "Content-Type": "application/json" },
           }
         );
+      }
+
+      // JERARQUÍA: no se le puede quitar el rol a alguien de nivel >= al propio.
+      const gRemove = await assertCanManage(adminClient, callerId, user_id, "remove_role");
+      if (!gRemove.ok) {
+        return new Response(JSON.stringify(gRemove.body), {
+          status: gRemove.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const { error: deleteError } = await adminClient

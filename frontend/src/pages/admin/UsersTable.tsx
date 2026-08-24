@@ -59,12 +59,14 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
                 {user.role ? (
                   <Badge variant={roleBadgeVariant[user.role] ?? "outline"} className="inline-flex items-center gap-1 pr-1">
                     {user.role}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    {user.manageable && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </Badge>
                 ) : (
                   <span className="text-muted-foreground text-sm">Sin rol</span>
@@ -97,30 +99,37 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
                       </TooltipTrigger>
                       <TooltipContent>Editar</TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)}>
-                          <UserCog className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Asignar rol</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)}>
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Reset contraseña</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Eliminar</TooltipContent>
-                    </Tooltip>
+                    {/* Jerarquía (24/08): estas 3 solo se muestran si la RPC dijo que
+                        puedes gestionar esa cuenta (nivel menor al tuyo y no eres tú).
+                        Es UX — el candado real está en las edge functions. */}
+                    {user.manageable && (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)}>
+                              <UserCog className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Asignar rol</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)}>
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reset contraseña</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eliminar</TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
                   </div>
                 </TooltipProvider>
               </TableCell>

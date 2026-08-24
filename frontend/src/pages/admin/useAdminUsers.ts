@@ -5,6 +5,10 @@ import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import type { AppRole } from "@/hooks/useUserRole";
 
 export interface AdminUser {
+  /** false para uno mismo y para cuentas de nivel >= al propio. Solo UX. */
+  manageable?: boolean;
+  /** nivel del rol del usuario (roles_config.level). 0 = sin rol. */
+  role_level?: number;
   id: string;
   full_name: string | null;
   avatar_url: string | null;
@@ -29,10 +33,13 @@ export const useAdminUsers = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all roles
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
+      // Roles vía RPC admin_list_user_roles (SECURITY DEFINER), NO por select directo
+      // a user_roles: la RLS de esa tabla solo deja ver la fila propia, así que un
+      // no-admin veía a los 52 usuarios como "Sin rol" y los contadores en 0 (bug
+      // reportado 24/08). La RPC exige permiso de gestión de usuarios y además
+      // devuelve `manageable`, que es lo que usamos para esconder acciones.
+      const { data: roles, error: rolesError } = await (supabase as any)
+        .rpc("admin_list_user_roles");
 
       if (rolesError) throw rolesError;
 
@@ -58,7 +65,14 @@ export const useAdminUsers = () => {
       }
 
       const rolesMap = new Map<string, AppRole>();
-      roles?.forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
+      const manageableMap = new Map<string, boolean>();
+      const levelMap = new Map<string, number>();
+      (roles as Array<{ user_id: string; role: string | null; level: number; manageable: boolean }> | null)
+        ?.forEach((r) => {
+          if (r.role) rolesMap.set(r.user_id, r.role as AppRole);
+          manageableMap.set(r.user_id, r.manageable);
+          levelMap.set(r.user_id, r.level);
+        });
 
       const employeeByProfileId = new Map<string, { id: string; first_name: string; last_name: string }>();
       employees?.forEach((e) => {
@@ -72,6 +86,11 @@ export const useAdminUsers = () => {
         email: emailsMap.get(p.id) || "",
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
+        // manageable = la RPC ya comparó niveles: false para uno mismo y para
+        // cualquiera de nivel >= al propio. El front lo usa SOLO para esconder
+        // botones (UX); el candado real está en las edge functions.
+        manageable: manageableMap.get(p.id) ?? false,
+        role_level: levelMap.get(p.id) ?? 0,
         linked_employee: employeeByProfileId.get(p.id) ?? null,
         ai_daily_quota_override: (p as { ai_daily_quota_override?: number | null }).ai_daily_quota_override ?? null,
       })) as AdminUser[];
