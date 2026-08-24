@@ -457,3 +457,53 @@ export function useDownloadAttachment() {
     },
   });
 }
+
+export interface MailSignature {
+  /** HTML de la firma (lo produce el mismo editor del compositor). */
+  html: string;
+  /** Si false, la firma existe pero no se agrega sola. */
+  enabled: boolean;
+}
+
+/** Firma del usuario: una fila por persona (RLS self). Si no configuró
+ *  ninguna, devuelve una vacía habilitada (que no inserta nada). */
+export function useMailSignature() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["mail-signature", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<MailSignature> => {
+      // RLS filtra a la fila propia; no hace falta el .eq(user_id).
+      const { data, error } = await supabase
+        .from("mail_signatures")
+        .select("html, enabled")
+        .maybeSingle();
+      if (error) throw error;
+      return {
+        html: (data?.html as string) ?? "",
+        enabled: (data?.enabled as boolean) ?? true,
+      };
+    },
+  });
+}
+
+/** Guarda (upsert) la firma del usuario. */
+export function useSaveMailSignature() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (sig: MailSignature) => {
+      if (!user) throw new Error("sin sesión");
+      const { error } = await supabase
+        .from("mail_signatures")
+        .upsert(
+          { user_id: user.id, html: sig.html, enabled: sig.enabled },
+          { onConflict: "user_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mail-signature", user?.id] });
+    },
+  });
+}
