@@ -14,17 +14,47 @@ import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
 type CallCtx = ReturnType<typeof useVideoCall>;
 const CallContext = createContext<CallCtx | null>(null);
 
+// AudioContext COMPARTIDO para el timbre. Clave del "no suena": cuando llega una
+// llamada, el que llama abre la pestaña /call (le roba el foco) y la de Maven
+// queda de fondo; un AudioContext creado ahí nace "suspended" y no suena. Si en
+// cambio lo creamos/desbloqueamos con un gesto MIENTRAS Maven está en primer
+// plano (installRingAudioUnlock), queda "running" y suena aunque la pestaña pase
+// a segundo plano.
+let sharedRingCtx: AudioContext | null = null;
+function getRingCtx(): AudioContext | null {
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AC) return null;
+    if (!sharedRingCtx) sharedRingCtx = new AC();
+    if (sharedRingCtx.state === "suspended") void sharedRingCtx.resume().catch(() => {});
+    return sharedRingCtx;
+  } catch {
+    return null;
+  }
+}
+/** Desbloquea/reanuda el contexto del timbre con cualquier gesto del usuario.
+ *  Se instala una vez al montar el provider. */
+function installRingAudioUnlock(): () => void {
+  const unlock = () => {
+    getRingCtx();
+  };
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+  return () => {
+    window.removeEventListener("pointerdown", unlock, true);
+    window.removeEventListener("keydown", unlock, true);
+  };
+}
+
 /** Timbre "Clásico" (teléfono) con Web Audio, sin asset: dos ráfagas de un tono
  *  con trémolo (el "briiing briiing") que se repiten mientras suena. */
 function Ringtone() {
   useEffect(() => {
-    const AC = window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const ac = new AC();
-    // Si el navegador lo tiene suspendido (sin gesto previo), intentamos
-    // reanudarlo; si igual no deja, el modal visual queda como respaldo.
-    ac.resume?.().catch(() => {});
+    const ac = getRingCtx();
+    if (!ac) return;
     const master = ac.createGain();
     master.gain.value = 0.9;
     const lp = ac.createBiquadFilter();
@@ -73,7 +103,8 @@ function Ringtone() {
     return () => {
       stopped = true;
       if (timer) window.clearTimeout(timer);
-      ac.close().catch(() => {});
+      // No cerramos el contexto: es compartido y queremos que siga "running"
+      // para el próximo timbre. Los osciladores en vuelo se auto-detienen.
     };
   }, []);
   return null;
@@ -83,6 +114,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const call = useVideoCall();
   // Suscribe el navegador a Web Push (llamada entrante con Maven cerrado).
   usePushSubscription();
+  // Pre-desbloquea el audio del timbre con el primer gesto, así suena aunque la
+  // pestaña de Maven quede de fondo cuando llega la llamada.
+  useEffect(() => installRingAudioUnlock(), []);
   return (
     <CallContext.Provider value={call}>
       {children}
