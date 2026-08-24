@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -121,6 +121,30 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
     () => fields.filter((f) => f.is_required && isBlank(answers[f.field_key] ?? null)),
     [fields, answers],
   );
+
+  /**
+   * Pedido explicito: al elegir la creadora, la casilla de Instagram se llena
+   * sola con su perfil. Solo pisa campos VACIOS — si alguien ya escribio algo
+   * a mano, se respeta.
+   */
+  useEffect(() => {
+    if (!creatorId) return;
+    const c = (creatorsQuery.data || []).find((x) => x.id === creatorId);
+    const handle = normalizeHandle(c?.instagram_handle);
+    if (!handle) return;
+    const url = `https://www.instagram.com/${handle}/`;
+    setAnswers((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const f of fields) {
+        if (f.field_type !== "instagram") continue;
+        if (!isBlank((next[f.field_key] as AnswerValue) ?? null)) continue;
+        next[f.field_key] = url;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [creatorId, creatorsQuery.data, fields]);
 
   const creatorMissing = form?.creator_mode === "required" && !creatorId;
 
