@@ -406,16 +406,7 @@ export function useSendMail() {
   });
 }
 
-/** Saca el nombre a mostrar de un `From:` tipo `Juan Pérez <j@x.com>`. */
-export function nombreDe(direccion: string): string {
-  const m = direccion.match(/^\s*"?([^"<]*?)"?\s*<[^>]+>\s*$/);
-  const nombre = m?.[1]?.trim();
-  if (nombre) return nombre;
-  return direccion.replace(/[<>]/g, "").trim() || "(sin remitente)";
-}
-
-/** Saca la dirección de un `From:`, para responder. */
-export function correoDe(direccion: string): string {
-  const m = direccion.match(/<([^>]+)>/);
-  return (m?.[1] ?? direccion).trim();
-}
+// El parseo de direcciones vive en un módulo puro (sin Supabase encima) para
+// poder testearlo; se re-exporta acá para que el resto lo siga importando
+// desde `useMailbox` como siempre.
+export { correoDe, direccionesDe, nombreDe } from "@/lib/mailAddr";

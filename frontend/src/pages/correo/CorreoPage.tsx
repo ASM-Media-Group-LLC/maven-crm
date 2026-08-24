@@ -16,6 +16,7 @@ import {
   PenSquare,
   RefreshCw,
   Reply,
+  ReplyAll,
   Send,
   ShieldAlert,
   Trash2,
@@ -43,6 +44,7 @@ import {
   nombreDe,
   type MailSummary,
 } from "@/hooks/useMailbox";
+import { destinatariosRespuesta, tieneVariosInvolucrados } from "@/lib/mailAddr";
 
 /**
  * Correo dentro de Maven.
@@ -175,14 +177,23 @@ export default function CorreoPage() {
     if (m.unread) marcarLeido.mutate({ folder: carpeta, m });
   };
 
-  const responder = () => {
+  // Arma el borrador de respuesta. `aTodos`: además del remitente, arrastra
+  // el resto del Para y el Copia del original (menos yo mismo), como Gmail.
+  // La decisión de a QUIÉN va (lo delicado) vive en `destinatariosRespuesta`,
+  // que es pura y está testeada.
+  const abrirRespuesta = (aTodos: boolean) => {
     const m = mensaje.data;
     if (!m) return;
     // El `Message-ID` viaja en el resumen seleccionado (caché o vivo). Sin
     // él la respuesta le aparece suelta al otro, fuera de la conversación.
     const messageId = sel?.messageId;
+    const { to, cc } = destinatariosRespuesta(
+      { from: m.from, to: m.to, cc: m.cc, yo: buzon?.email_address ?? "" },
+      aTodos,
+    );
     setRedactar({
-      to: correoDe(m.from),
+      to,
+      cc: cc || undefined,
       subject: /^re:/i.test(m.subject) ? m.subject : `Re: ${m.subject}`,
       inReplyTo: messageId || undefined,
       citar: {
@@ -192,6 +203,20 @@ export default function CorreoPage() {
       },
     });
   };
+
+  const responder = () => abrirRespuesta(false);
+  const responderATodos = () => abrirRespuesta(true);
+
+  // "Responder a todos" solo aparece cuando hay más de una persona en juego
+  // además de mí: si el correo venía de una sola, es idéntico a "Responder".
+  const hayVariosDestinatarios = mensaje.data
+    ? tieneVariosInvolucrados({
+        from: mensaje.data.from,
+        to: mensaje.data.to,
+        cc: mensaje.data.cc,
+        yo: buzon?.email_address ?? "",
+      })
+    : false;
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col">
@@ -411,7 +436,7 @@ export default function CorreoPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -421,6 +446,17 @@ export default function CorreoPage() {
                     <Reply className="mr-2 h-4 w-4" />
                     Responder
                   </Button>
+                  {hayVariosDestinatarios && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={responderATodos}
+                    >
+                      <ReplyAll className="mr-2 h-4 w-4" />
+                      Responder a todos
+                    </Button>
+                  )}
                 </div>
 
                 {mensaje.data.attachments.length > 0 && (
