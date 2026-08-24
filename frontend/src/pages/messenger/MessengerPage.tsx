@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import NewChatModal from "./NewChatModal";
@@ -121,16 +122,33 @@ export default function MessengerPage() {
   };
 
   const handleStartVideoCall = async (conv: ConversationWithDetails) => {
-    const otro = conv.participants.find((p) => p.user_id !== user?.id);
     // 1-a-1: llamada estilo WhatsApp — al otro le SUENA y aparece el modal para
-    // aceptar o rechazar, esté en la sección de Maven que esté. `initiateCall`
-    // crea el "ringing" (que dispara el modal por realtime) y abre la sala.
-    if (conv.participants.length === 2 && otro) {
-      await initiateCall(conv.id, otro.user_id, conv.displayName, "video");
-      return;
+    // aceptar o rechazar, esté en la sección de Maven que esté. Se detecta por
+    // `type === "direct"` (confiable), NO por participants.length: esa lista
+    // viene con un límite global que los grupos grandes agotan, así que a
+    // algunos DMs les llega incompleta (por eso antes caía al link).
+    if (conv.type === "direct") {
+      let otroId = conv.participants.find((p) => p.user_id !== user?.id)?.user_id;
+      // Si no vino en la lista (incompleta), se resuelve contra la DB.
+      if (!otroId && user?.id) {
+        const { data } = await supabase
+          .from("chat_participants")
+          .select("user_id")
+          .eq("conversation_id", conv.id)
+          .neq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        otroId = (data?.user_id as string) ?? undefined;
+      }
+      if (otroId) {
+        // `initiateCall` crea el "ringing" (dispara el modal por realtime + el
+        // push) y abre la sala.
+        await initiateCall(conv.id, otroId, conv.displayName, "video");
+        return;
+      }
     }
-    // Grupo: por ahora se comparte el link (hacer sonar a varios a la vez es
-    // otra vuelta — la tabla `calls` tiene un solo receiver_id).
+    // Grupo (o no se pudo resolver el otro) → se comparte el link. Hacer sonar
+    // a varios a la vez es otra vuelta (la tabla `calls` tiene un solo receiver).
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
     const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
