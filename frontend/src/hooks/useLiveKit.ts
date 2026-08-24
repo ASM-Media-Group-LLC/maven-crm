@@ -230,7 +230,11 @@ const ROOM_OPTIONS: RoomOptions = {
   // during quick toggling which causes visible camera flashes
   stopLocalTrackOnUnpublish: false,
   videoCaptureDefaults: {
-    resolution: VideoPresets.h1080.resolution,
+    // 720p (antes 1080p): capturar la cámara a 1080p + simulcast recargaba la
+    // CPU y hacía congelar el video en llamadas normales (reportado con Grace y
+    // Jackeline). 720p es estándar para videollamadas y no toca la nitidez del
+    // screen share (usa sus propios presets, no videoCaptureDefaults).
+    resolution: VideoPresets.h720.resolution,
     facingMode: "user",
   },
   audioCaptureDefaults: {
@@ -249,7 +253,11 @@ const ROOM_OPTIONS: RoomOptions = {
       VideoPresets.h360,
       VideoPresets.h720,
     ],
-    videoCodec: "vp9",
+    // VP8 (antes VP9): VP9 con simulcast es mucho más pesado de codificar y en
+    // navegadores es históricamente inestable → cuadros congelados. VP8 es el
+    // códec más confiable para simulcast y bastante más liviano de CPU; la capa
+    // adaptativa (adaptiveStream + dynacast) compensa el bitrate un poco mayor.
+    videoCodec: "vp8",
   },
   // NO desconectar al pasar la pestaña a segundo plano / congelarse (cambiar de ventana o app):
   // esto tiraba a los participantes cuando se iban a hacer otra cosa. El cierre REAL de la
