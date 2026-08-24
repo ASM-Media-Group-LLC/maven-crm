@@ -49,18 +49,12 @@ export const useOperationalKPIs = () =>
   useQuery({
     queryKey: ["dashboard-operational-kpis"],
     queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
-
       const employeesRes = await (supabase.from("employees_directory").select("id", { count: "exact", head: true }) as any).eq("status", "activo");
       const absencesRes = await (supabase.from("absences").select("id", { count: "exact", head: true }) as any).eq("status", "approved");
-      const overdueRes = await (supabase.from("tasks").select("id", { count: "exact", head: true }) as any).neq("status", "done");
-      const eventsRes = await (supabase.from("events").select("id", { count: "exact", head: true }) as any).eq("date", today);
 
       return {
         totalEmployees: employeesRes.count ?? 0,
         absencesToday: absencesRes.count ?? 0,
-        overdueTasks: overdueRes.count ?? 0,
-        eventsToday: eventsRes.count ?? 0,
       };
     },
     staleTime: 2 * 60 * 1000,
@@ -68,7 +62,7 @@ export const useOperationalKPIs = () =>
 
 export interface ActivityItem {
   id: string;
-  type: "ticket" | "task" | "event";
+  type: "ticket";
   title: string;
   date: string;
   status?: string;
@@ -78,35 +72,11 @@ export const useRecentActivity = () =>
   useQuery({
     queryKey: ["dashboard-recent-activity"],
     queryFn: async () => {
-      const [{ data: tickets }, { data: tasks }, { data: events }] = await Promise.all([
-        supabase.from("tickets").select("id, title, status, created_at").order("created_at", { ascending: false }).limit(5),
-        supabase.from("tasks").select("id, title, status, updated_at").order("updated_at", { ascending: false }).limit(5),
-        supabase.from("events").select("id, name, status, created_at").order("created_at", { ascending: false }).limit(5),
-      ]);
+      const { data: tickets } = await supabase.from("tickets").select("id, title, status, created_at").order("created_at", { ascending: false }).limit(8);
 
-      const items: ActivityItem[] = [
-        ...(tickets ?? []).map((t) => ({ id: t.id, type: "ticket" as const, title: t.title, date: t.created_at, status: t.status })),
-        ...(tasks ?? []).map((t) => ({ id: t.id, type: "task" as const, title: t.title, date: t.updated_at, status: t.status })),
-        ...(events ?? []).map((e) => ({ id: e.id, type: "event" as const, title: e.name, date: e.created_at, status: e.status })),
-      ];
+      const items: ActivityItem[] = (tickets ?? []).map((t) => ({ id: t.id, type: "ticket" as const, title: t.title, date: t.created_at, status: t.status }));
 
       return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8);
-    },
-    staleTime: 2 * 60 * 1000,
-  });
-
-export const usePendingTasks = () =>
-  useQuery({
-    queryKey: ["dashboard-pending-tasks"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("id, title, status, due_at, priority")
-        .neq("status", "done")
-        .order("due_at", { ascending: true })
-        .limit(5);
-      if (error) throw error;
-      return data ?? [];
     },
     staleTime: 2 * 60 * 1000,
   });

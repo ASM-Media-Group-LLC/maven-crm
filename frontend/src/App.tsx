@@ -36,10 +36,6 @@ const Credentials = import.meta.env.DEV ? lazy(() => import("./pages/Credentials
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
-const EventoSharePage = lazy(() => import("./pages/eventos/EventoSharePage"));
-const SharedAgendaPage = lazy(() => import("./pages/eventos/SharedAgendaPage"));
-const TaskSharePage = lazy(() => import("./pages/tareas/TaskSharePage"));
-const ProjectSharePage = lazy(() => import("./pages/tareas/ProjectSharePage"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
@@ -96,12 +92,6 @@ import PersonalizadosPage from "./pages/creadores/personalizados/PersonalizadosP
 // Teléfonos (cloud phones)
 import TelefonosPage from "./pages/telefonos/TelefonosPage";
 
-// Eventos
-import Eventos from "./pages/Eventos";
-import NuevoEvento from "./pages/NuevoEvento";
-import EditEvento from "./pages/EditEvento";
-import EventoDetail from "./pages/EventoDetail";
-
 // LeadGen / Closers / Contactos
 import LeadGen from "./pages/LeadGen";
 import LeadGenBaseDatos from "./pages/LeadGenBaseDatos";
@@ -111,7 +101,6 @@ import Promolog from "./pages/Promolog";
 import ChatterEvaluator from "./pages/ChatterEvaluator";
 import ScouterAssist from "./pages/scouter/ScouterAssist";
 import AgencyQA from "./pages/agency-qa/AgencyQA";
-import BluConversations from "./pages/BluConversations";
 import ChatterProfileDetail from "./pages/ChatterProfileDetail";
 import ChatterProfileEdit from "./pages/ChatterProfileEdit";
 import ChatterAdmin from "./pages/ChatterAdmin";
@@ -121,17 +110,10 @@ import ChatterWorkspace from "./pages/ChatterWorkspace";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
 
-// Tareas
-import Tareas from "./pages/Tareas";
-import TareaProject from "./pages/TareaProject";
-
 // Admin
 import AdminUsuarios from "./pages/admin/AdminUsuarios";
 import AuditoriaRoles from "./pages/admin/AuditoriaRoles";
 
-// Wishlist
-import Wishlist from "./pages/SuperContacts";
-import WishlistProfile from "./pages/supercontacts/SuperContactProfile";
 
 // Misc
 import Roadmap from "./pages/Roadmap";
@@ -257,15 +239,11 @@ const App = () => (
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/eventos/share/:token" element={<EventoSharePage />} />
               {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
               <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
               {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
                   alguien de adentro lo admita. Pública a propósito. */}
               <Route path="/entrar/:code" element={<MeetGuestPage />} />
-              <Route path="/shared/agenda/:token" element={<SharedAgendaPage />} />
-              <Route path="/tareas/share/:token" element={<TaskSharePage />} />
-              <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />
 
               {/* Protected routes that share the AppShell — Sidebar +
                   Topbar mount once and persist across nav between these
@@ -289,10 +267,6 @@ const App = () => (
                 <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingDetailPage /></PermissionRoute>} />
                 <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores" submodule="Personalizados"><PersonalizadosPage /></PermissionRoute>} />
                 <Route path="/creadores/:id" element={<PermissionRoute module="Creadores" submodule="Perfil"><CreadorProfile /></PermissionRoute>} />
-                <Route path="/eventos" element={<PermissionRoute module="Eventos"><Eventos /></PermissionRoute>} />
-                <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />
-                <Route path="/eventos/:id/editar" element={<PermissionRoute module="Eventos"><EditEvento /></PermissionRoute>} />
-                <Route path="/eventos/:id" element={<PermissionRoute module="Eventos"><EventoDetail /></PermissionRoute>} />
                 <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
                 <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
                 <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
@@ -312,8 +286,6 @@ const App = () => (
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
-                {/* Conversaciones BLU (Mensajes Pro on-demand) — módulo propio en Operaciones */}
-                <Route path="/conversaciones" element={<PermissionRoute module="Mensajes Pro"><BluConversations /></PermissionRoute>} />
                 {/* Sales Overview — sub-rutas eliminadas; ahora vive todo en modales */}
                 <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
                 <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />
@@ -329,8 +301,6 @@ const App = () => (
                 <Route path="/chatter-evaluator/workspace" element={<PermissionRoute module="Chatters" submodule="Workspace"><ChatterWorkspace /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterProfileDetail /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey/edit" element={<PermissionRoute module="Chatters" submodule="Admin"><ChatterProfileEdit /></PermissionRoute>} />
-                <Route path="/tareas" element={<PermissionRoute module="Tareas"><Tareas /></PermissionRoute>} />
-                <Route path="/tareas/:projectId" element={<PermissionRoute module="Tareas"><TareaProject /></PermissionRoute>} />
                 <Route path="/roadmap" element={<Roadmap />} />
                 <Route path="/correo" element={<PermissionRoute module="Correo"><CorreoPage /></PermissionRoute>} />
                 {/* Retorno del OAuth de Zoho. SIN PermissionRoute: la URL está
@@ -346,8 +316,6 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
-                <Route path="/wishlist" element={<PermissionRoute module="SuperContacts"><Wishlist /></PermissionRoute>} />
-                <Route path="/wishlist/:id" element={<PermissionRoute module="SuperContacts"><WishlistProfile /></PermissionRoute>} />
                 {/* HR routes */}
                 <Route path="/hr" element={<PermissionRoute module="HR" submodule="Dashboard"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/personal" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><HRPersonnel /></HRLayout></PermissionRoute>} />

@@ -3,9 +3,6 @@ project_id = "lsagslbkliprespbyhts"
 [functions.ai-sales-chat]
 verify_jwt = false
 
-[functions.event-external-action]
-verify_jwt = false
-
 [functions.manage-user-roles]
 verify_jwt = false
 
@@ -192,9 +189,6 @@ verify_jwt = false  # chequeo de handles rotos; auth propia
 verify_jwt = false  # lectura de stories; auth propia
 
 # --- Chatter / QA / BLU / ventas ---
-[functions.supercontact-ai]
-verify_jwt = false  # IA de super-contactos; auth propia
-
 [functions.qa-analyze]
 verify_jwt = false  # análisis QA; auth propia
 

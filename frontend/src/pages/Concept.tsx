@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import AnimatedGradientBackground from "@/components/auth/AnimatedGradientBackground";
 import ScrollReveal from "@/components/landing/ScrollReveal";
 import {
-  LayoutDashboard, Users, DollarSign, MessageSquare, Video, ListTodo,
-  Calendar, Target, TrendingUp, Megaphone, TicketCheck, Building2,
+  LayoutDashboard, Users, DollarSign, MessageSquare, Video,
+  Target, TrendingUp, Megaphone, TicketCheck, Building2,
   Wallet, ShieldCheck, Bell, Palette, Map, Check, Star, Zap,
   Brain, ChevronRight, Globe, BarChart3, FileText, UserPlus,
   Settings, Clock, BookOpen, HeartHandshake, Mail, Server, Plug
@@ -125,34 +125,6 @@ const modules = [
       "Vista grid y tabla",
       "Filtros por fecha y creador",
       "Historial completo de promociones",
-    ],
-  },
-  {
-    icon: Calendar,
-    name: "Eventos",
-    description: "Gestión completa de eventos con agenda compartida.",
-    features: [
-      "Creación de eventos con invitados y checklist",
-      "Links compartibles públicos",
-      "Agenda compartida con token de acceso",
-      "Vista calendario mensual/semanal",
-      "Cierre de evento con resumen",
-      "Notificaciones automáticas",
-    ],
-  },
-  {
-    icon: ListTodo,
-    name: "Tareas & Proyectos",
-    description: "Gestión de tareas estilo Kanban con proyectos y carpetas.",
-    features: [
-      "Kanban board + vista lista",
-      "Subtareas y dependencias",
-      "Asignación a múltiples usuarios",
-      "Proyectos con carpetas organizativas",
-      "Compartir externo con link público",
-      "Countdown y fechas límite",
-      "Prioridades editables inline",
-      "Filtros avanzados y búsqueda",
     ],
   },
   {

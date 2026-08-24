@@ -134,12 +134,6 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Menú", "Meet", [], ["Crear reunión", "Terminar reunión"]),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
-  // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.
-  def("Menú", "Tareas", ["List", "Kanban", "Analytics", "Docs"], ["Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"]),
-  // Eventos: tabs del detalle del evento + acciones.
-  def("Menú", "Eventos", ["Invitados", "Checklist", "Historial", "Métricas", "Enlaces"], ["Crear Evento", "Editar Evento", "Eliminar Evento"]),
-  // SuperContacts (sidebar = "Wishlist"): es una sola lista; todo lo demás abre modales (acciones).
-  def("Menú", "SuperContacts", [], ["Gráficas", "Productividad", "Agregar Handle", "Pegar Handles", "Importar Archivo"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.
   def("Menú", "Creadores",
     [
@@ -198,8 +192,6 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     ],
     ["Borrar Calls"],
   ),
-  // Mensajes Pro = visor on-demand de conversaciones (BLU), tab propio del sidebar.
-  def("Operaciones", "Mensajes Pro"),
 
   // === Finanzas ===
   def("Finanzas", "Finanzas", ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"]),

@@ -15,10 +15,7 @@ export function resolveDeepLink(
   if (!referenceType || !referenceId) return "/dashboard";
 
   const routes: Record<string, string> = {
-    task: `/tareas?taskId=${referenceId}`,
-    project: `/tareas?projectId=${referenceId}`,
     creator: `/creadores/${referenceId}`,
-    event: `/eventos/${referenceId}`,
     employee: `/hr/empleado/${referenceId}`,
     absence: `/hr/ausencias?id=${referenceId}`,
     ticket: `/tickets?id=${referenceId}`,
@@ -100,8 +97,6 @@ export function getPriorityDotClass(priority: string | null): string {
 // ─── Module label for filters ─────────────────────────────────────
 export const MODULE_OPTIONS = [
   { value: "creadores", label: "Creadores" },
-  { value: "tareas", label: "Tareas" },
-  { value: "eventos", label: "Eventos" },
   { value: "hr", label: "RRHH" },
   { value: "finanzas", label: "Finanzas" },
   { value: "tickets", label: "Tickets" },
@@ -115,8 +110,6 @@ export const MODULE_OPTIONS = [
 // Maps module option values to RBAC permission module names (capitalized)
 export const MODULE_PERMISSION_MAP: Record<string, string | null> = {
   creadores: "Creadores",
-  tareas: "Tareas",
-  eventos: "Eventos",
   hr: "HR",
   finanzas: "Finanzas",
   tickets: "Tickets",
@@ -149,14 +142,6 @@ export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label:
     { type: "verification_approved", label: "Verificación aprobada" },
     { type: "verification_rejected", label: "Verificación rechazada" },
   ],
-  Tareas: [
-    { type: "task_assignment", label: "Tarea asignada" },
-    { type: "task_due_soon", label: "Tarea próxima a vencer" },
-    { type: "task_completed", label: "Tarea completada" },
-    { type: "task_overdue", label: "Tarea vencida" },
-    { type: "task_stale", label: "Tarea sin actividad" },
-    { type: "project_assignment", label: "Proyecto asignado" },
-  ],
   HR: [
     { type: "absence_request", label: "Solicitud de ausencia" },
     { type: "contract_expiring", label: "Contrato por vencer" },
@@ -166,11 +151,6 @@ export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label:
     { type: "invoice_created", label: "Factura creada" },
     { type: "payment_pending", label: "Pago pendiente" },
     { type: "payroll_ready", label: "Nómina lista" },
-  ],
-  Eventos: [
-    { type: "event_created", label: "Evento creado" },
-    { type: "event_reminder", label: "Recordatorio de evento" },
-    { type: "guest_confirmed", label: "Invitado confirmado" },
   ],
   Tickets: [
     { type: "ticket_assigned", label: "Ticket asignado" },

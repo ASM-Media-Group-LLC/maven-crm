@@ -1,9 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, Save, Loader2, AlertTriangle, Pencil, X,
-  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown, Mail,
+  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ChevronDown, Mail,
   MailCheck, CheckCircle2, XCircle, Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,17 +25,14 @@ const toneBadge: Record<string, string> = {
   bad: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
-// @handle → link a la conversación real en Mensajes Pro (si lo tenemos en el índice).
+// @handle → nombre real del fan (si lo tenemos en el índice de BLU).
 function FanLink({ handle, fanIndex }: { handle: string; fanIndex: FanIndex }) {
   const hit = fanIndex[handle];
   if (!hit) return <span className="font-mono text-[0.95em] text-muted-foreground">{handle}</span>;
   return (
-    <Link to={`/conversaciones?model=${hit.m}&chat=${hit.c}`}
-      className="inline-flex items-center gap-1 text-[0.95em] font-medium text-primary hover:underline"
-      title="Abrir la conversación en Mensajes Pro">
+    <span className="inline-flex items-center gap-1 text-[0.95em] font-medium text-primary">
       {hit.n ? <>{hit.n} <span className="font-mono opacity-80">{handle}</span></> : <span className="font-mono">{handle}</span>}
-      <ExternalLink className="h-3 w-3 opacity-70" />
-    </Link>
+    </span>
   );
 }
 // Renderiza texto reemplazando los @handles por links a la conversación.

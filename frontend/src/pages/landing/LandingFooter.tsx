@@ -29,7 +29,7 @@ const LandingFooter = () => (
         <div>
           <h4 className="mb-3 text-sm font-semibold text-white">Módulos</h4>
           <ul className="space-y-2">
-            {["Creadores", "Sales & Revenue", "HR & RRHH", "Finanzas", "Messenger", "Tareas"].map((label) => (
+            {["Creadores", "Sales & Revenue", "HR & RRHH", "Finanzas", "Messenger", "Promolog"].map((label) => (
               <li key={label}>
                 <a href="#modulos" className="text-sm text-white/50 transition-colors hover:text-white">
                   {label}

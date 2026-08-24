@@ -4,8 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Users, Ticket, CalendarCheck, MessageSquare, Phone,
-  Headphones, CheckSquare, AlertCircle, RefreshCw, Clock,
-  UserMinus, Calendar, ListTodo, Zap, Settings2, Check,
+  Headphones, AlertCircle, RefreshCw,
+  UserMinus, Zap, Settings2, Check,
   ChevronRight, UserPlus, Briefcase, DollarSign, Megaphone,
   TrendingUp, Settings, Cake, Bell,
 } from "lucide-react";
@@ -32,7 +32,7 @@ import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useWeeklyStats, useOperationalKPIs, useRecentActivity, usePendingTasks } from "@/hooks/useDashboardData";
+import { useWeeklyStats, useOperationalKPIs, useRecentActivity } from "@/hooks/useDashboardData";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAnnouncementsByChannel, useUpcomingBirthdays, useRecordAnnouncementView, useRecordAnnouncementOpen, type Announcement } from "@/hooks/useAnnouncements";
 import { useQuery } from "@tanstack/react-query";
@@ -107,8 +107,6 @@ const PIPELINE_COLORS = [
 
 const ACTIVITY_CONFIG = {
   ticket: { icon: Ticket, bg: "bg-destructive/10", text: "text-destructive", label: "Ticket" },
-  task: { icon: CheckSquare, bg: "bg-primary/10", text: "text-primary", label: "Tarea" },
-  event: { icon: Calendar, bg: "bg-accent/10", text: "text-accent-foreground", label: "Evento" },
 };
 
 /* ── Quick Actions ────────────────────────────────── */
@@ -123,8 +121,6 @@ interface QuickAction {
 
 const ALL_ACTIONS: QuickAction[] = [
   { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "Contactos" },
-  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "Tareas" },
-  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "Eventos" },
   { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "Creadores" },
   { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "LeadGen" },
   { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "Closers" },
@@ -136,7 +132,7 @@ const ALL_ACTIONS: QuickAction[] = [
   { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
 ];
 
-const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos"];
+const DEFAULT_ACTION_IDS = ["contactos", "creadores", "tickets"];
 const MAX_SHORTCUTS = 6;
 const LS_KEY = "dashboard_quick_actions";
 
@@ -215,7 +211,6 @@ const DashboardContent = () => {
   const { data: weeklyData = [] } = useWeeklyStats();
   const { data: opKPIs } = useOperationalKPIs();
   const { data: recentActivity = [], isLoading: activityLoading } = useRecentActivity();
-  const { data: pendingTasks = [] } = usePendingTasks();
   const { feed: announcements, banners } = useAnnouncementsByChannel();
   const { data: birthdays = [] } = useUpcomingBirthdays();
 
@@ -241,7 +236,7 @@ const DashboardContent = () => {
   const recordView = useRecordAnnouncementView();
   const recordOpen = useRecordAnnouncementOpen();
   const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
-  const [kpiPopup, setKpiPopup] = useState<"creators" | "tickets" | "leads" | "employees" | "overdue" | null>(null);
+  const [kpiPopup, setKpiPopup] = useState<"creators" | "tickets" | "leads" | "employees" | null>(null);
 
   const handleOpenDetail = useCallback((a: Announcement) => {
     setDetailAnnouncement(a);
@@ -284,7 +279,7 @@ const DashboardContent = () => {
     return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5";
   };
 
-  type KpiKey = "creators" | "tickets" | "leads" | "employees" | "overdue";
+  type KpiKey = "creators" | "tickets" | "leads" | "employees";
   const kpis = [
     {
       key: "creators" as KpiKey,
@@ -322,15 +317,6 @@ const DashboardContent = () => {
       subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
       show: canAccess("HR"),
     },
-    {
-      key: "overdue" as KpiKey,
-      label: "Tareas Vencidas",
-      value: String(opKPIs?.overdueTasks ?? 0),
-      icon: Clock,
-      color: "bg-amber-500",
-      subtitle: `${opKPIs?.eventsToday ?? 0} eventos hoy`,
-      show: true,
-    },
   ].filter((k) => k.show);
 
   
@@ -349,13 +335,6 @@ const DashboardContent = () => {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
               <RefreshCw className="h-3.5 w-3.5" /> Actualizar
-            </Button>
-            <Button
-              size="sm"
-              className="gap-1.5 border-0 bg-gradient-to-br from-primary to-accent text-white shadow-lg shadow-primary/25 hover:opacity-90"
-              onClick={() => navigate("/tareas")}
-            >
-              Nueva tarea
             </Button>
           </div>
         </div>
@@ -522,7 +501,7 @@ const DashboardContent = () => {
         <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Actividad Reciente</CardTitle>
-            <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
+            <CardDescription>Tickets recientes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
@@ -531,7 +510,6 @@ const DashboardContent = () => {
               ) : recentActivity.length > 0 ? (
                 recentActivity.filter((item) => {
                   if (item.type === "ticket" && !canAccess("Tickets")) return false;
-                  if (item.type === "event" && !canAccess("Eventos")) return false;
                   return true;
                 }).map((item) => {
                   const config = ACTIVITY_CONFIG[item.type];
@@ -564,9 +542,10 @@ const DashboardContent = () => {
           </CardContent>
         </Card>
 
-        {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
+        {/* Row 3: Pipeline + Top 5 */}
         {(() => {
-          const row3Count = [canAccess("LeadGen"), canAccess("Creadores"), true].filter(Boolean).length;
+          const row3Count = [canAccess("LeadGen"), canAccess("Creadores")].filter(Boolean).length;
+          if (row3Count === 0) return null;
           return (
         <div className={`grid gap-4 ${getGridCols(row3Count)}`}>
           {canAccess("LeadGen") && (
@@ -635,40 +614,6 @@ const DashboardContent = () => {
             </Card>
           )}
 
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-warning/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Tareas Pendientes</CardTitle>
-              <CardDescription>Próximas a vencer</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pendingTasks.length > 0 ? (
-                <div className="space-y-3">
-                  {pendingTasks.map((t) => (
-                    <div key={t.id} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                        <ListTodo className="h-3.5 w-3.5 text-warning" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{t.title}</p>
-                        <div className="flex items-center gap-2">
-                          {t.due_at && (
-                            <p className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(t.due_at), { addSuffix: true, locale: es })}
-                            </p>
-                          )}
-                          {t.priority && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t.priority}</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Sin tareas pendientes</p>
-              )}
-            </CardContent>
-          </Card>
         </div>
           );
         })()}
@@ -755,10 +700,6 @@ const DashboardContent = () => {
                   <span className="text-sm">Ausencias hoy</span>
                   <Badge variant="secondary">{opKPIs?.absencesToday ?? 0}</Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Eventos hoy</span>
-                  <Badge variant="outline">{opKPIs?.eventsToday ?? 0}</Badge>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -822,7 +763,6 @@ const DashboardContent = () => {
             case "tickets": return `Active Tickets — ${ticketsData?.active ?? 0}`;
             case "leads": return `New Leads Today — ${leadsData?.todayCount ?? 0}`;
             case "employees": return `Empleados Activos — ${opKPIs?.totalEmployees ?? 0}`;
-            case "overdue": return `Tareas Vencidas — ${opKPIs?.overdueTasks ?? 0}`;
             default: return "";
           }
         })()}
@@ -832,7 +772,6 @@ const DashboardContent = () => {
             case "tickets": return "Tickets abiertos vs resueltos";
             case "leads": return "Leads ingresados hoy";
             case "employees": return "Headcount activo y ausencias del día";
-            case "overdue": return "Tareas con due_date vencido + eventos del día";
             default: return undefined;
           }
         })()}
@@ -863,12 +802,6 @@ const DashboardContent = () => {
               { primary: "Ausencias hoy", right: String(opKPIs?.absencesToday ?? 0), rightTone: "warning" as const },
             ];
             return rows;
-          }
-          if (kpiPopup === "overdue") {
-            return [
-              { primary: "Tareas vencidas", right: String(opKPIs?.overdueTasks ?? 0), rightTone: "destructive" as const },
-              { primary: "Eventos hoy", right: String(opKPIs?.eventsToday ?? 0), rightTone: "default" as const },
-            ];
           }
           return [];
         })()}

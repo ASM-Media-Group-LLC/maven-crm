@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  LayoutDashboard, UserPlus, CheckSquare, Users, CalendarDays,
+  LayoutDashboard, UserPlus, Users,
   TrendingUp, Megaphone, Activity, Phone, Ticket, Palette, FileText,
   Bot, Sun, Moon,
 } from "lucide-react";
@@ -31,9 +31,7 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
   const pages = [
     { label: t("nav.dashboard"), url: "/sales-overview", icon: LayoutDashboard },
     { label: t("nav.contacts"), url: "/contactos", icon: UserPlus },
-    { label: t("nav.tasks"), url: "/tareas", icon: CheckSquare },
     { label: t("nav.creators"), url: "/creadores", icon: Users },
-    { label: t("nav.events"), url: "/eventos", icon: CalendarDays },
     { label: t("nav.creatorSales") + " - Dashboard", url: "/sales-overview", icon: TrendingUp },
     { label: t("nav.salesReport"), url: "/salesdashboard", icon: TrendingUp },
     { label: t("nav.aiSales"), url: "/aisales", icon: Bot },

@@ -9,9 +9,7 @@ const translations = {
   // Sidebar items - Menu
   "nav.dashboard": { es: "Dashboard", en: "Dashboard" },
   "nav.contacts": { es: "Contactos", en: "Contacts" },
-  "nav.tasks": { es: "Tareas", en: "Tasks" },
   "nav.creators": { es: "Creadores", en: "Creators" },
-  "nav.events": { es: "Eventos", en: "Events" },
   "nav.creatorSales": { es: "Ventas de Creadores", en: "Creator Sales" },
   "nav.salesReport": { es: "Reporte de Ventas", en: "Sales Report" },
   "nav.salesReportV1": { es: "Sale Report v.1", en: "Sale Report v.1" },

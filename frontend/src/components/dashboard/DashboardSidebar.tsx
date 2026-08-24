@@ -1,8 +1,8 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
-  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
+  Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
-  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
+  MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
   Volume2, VolumeX, Mail, Clapperboard,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -39,7 +39,7 @@ const LINK_CLASS = "flex items-center gap-2 rounded-xl px-3 py-3 text-sm sidebar
 
 // Tinte del badge por módulo (mockup "Maven sin corbata"): cada contador con
 // el color de su módulo en vez de rojo genérico. El rojo queda reservado para
-// lo urgente (Tareas vencidas / Telegram sin leer). El número no cambia.
+// lo urgente (Telegram sin leer). El número no cambia.
 const BADGE_TINTS: Record<string, string> = {
   Promolog: "bg-primary/15 text-primary",
   LeadGen: "bg-accent/15 text-accent",
@@ -121,9 +121,6 @@ const DashboardSidebar = () => {
     { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
     { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
-    { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
-    { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
-    { title: "Wishlist", url: "/wishlist", icon: Contact, module: "SuperContacts" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module) && (item.url !== "/dashboard2" || isAdmin));
 
@@ -164,7 +161,6 @@ const DashboardSidebar = () => {
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
-    { title: "Mensajes Pro", url: "/conversaciones", icon: MessageSquare, module: "Mensajes Pro", submodule: undefined },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 

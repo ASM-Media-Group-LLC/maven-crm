@@ -11,10 +11,8 @@ import { toast } from "sonner";
 // Maps NOTIFICATION_TYPES_BY_MODULE keys to RBAC permission module names
 const TYPES_MODULE_PERMISSION_MAP: Record<string, string> = {
   Creadores: "Creadores",
-  Tareas: "Tareas",
   HR: "HR",
   Finanzas: "Finanzas",
-  Eventos: "Eventos",
   Tickets: "Tickets",
   "Comunicación": "HR",
 };
