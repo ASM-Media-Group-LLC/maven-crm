@@ -30,7 +30,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MAIL_CRED_KEY = process.env.MAIL_CRED_KEY;
 
 // Cada cuánto se barren las carpetas que no son INBOX (INBOX es push).
-const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 180_000);
+const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 60_000);
 // Cada cuánto se relee mail_credentials (altas/bajas de casillas).
 const CREDS_REFRESH_MS = Number(process.env.CREDS_REFRESH_MS || 300_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
@@ -106,6 +106,9 @@ class CuentaSync {
     this.detenida = false;
     this.reintento = 0;
     this.inboxPendiente = false;
+    // Corta la espera del IDLE en cuanto el servidor avisa correo nuevo
+    // (lo setea el handler "exists"; lo consume el ciclo). Ver más abajo.
+    this.despertar = null;
   }
 
   log(...args) {
@@ -152,8 +155,14 @@ class CuentaSync {
       this.ultimoError = e?.message ?? String(e);
     });
     // El servidor avisa que llegó correo al buzón seleccionado (INBOX).
+    // Además de marcar la bandera, DESPERTAMOS la espera del ciclo: antes
+    // solo se ponía inboxPendiente=true y el correo no se bajaba hasta que
+    // vencía el timer del barrido (SWEEP_INTERVAL_MS) — por eso todo llegaba
+    // con el retraso del barrido en vez de al instante. Cortar acá hace que
+    // el push sea de verdad inmediato.
     this.client.on("exists", () => {
       this.inboxPendiente = true;
+      this.despertar?.();
     });
 
     await this.client.connect();
@@ -174,10 +183,23 @@ class CuentaSync {
         this.inboxPendiente = false;
         this.estado = "idle";
 
-        // idle() se resuelve cuando el servidor manda algo; el reloj lo
-        // corta para el barrido periódico de las otras carpetas.
+        // Tres formas de salir de la espera:
+        //  · `porEvento`: el handler "exists" la corta apenas llega correo
+        //    (push inmediato — es lo que faltaba);
+        //  · `client.idle()`: mantiene la conexión en IDLE para que Zoho
+        //    empuje ese EXISTS (algunos servidores además resuelven acá);
+        //  · `dormir(restante)`: red de seguridad hasta el próximo barrido.
         const restante = Math.max(proximoBarrido - Date.now(), 1_000);
-        await Promise.race([this.client.idle(), dormir(restante)]);
+        const porEvento = new Promise((res) => { this.despertar = res; });
+        try {
+          await Promise.race([
+            this.client.idle().catch(() => {}),
+            porEvento,
+            dormir(restante),
+          ]);
+        } finally {
+          this.despertar = null;
+        }
 
         if (this.inboxPendiente) {
           this.log("push: correo nuevo en INBOX");
