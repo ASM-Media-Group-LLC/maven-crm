@@ -20,7 +20,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
 import { ImapClient } from "../_shared/imap.ts";
-import { parseMessage } from "../_shared/mime.ts";
+import { extraerAdjunto, parseMessage } from "../_shared/mime.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
@@ -62,12 +62,16 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const {
-      action, folder, limit, seq, mark_read, with_bodies,
+      action, folder, limit, seq, mark_read, with_bodies, uid, attachment_index,
       to, cc, bcc, subject, text, html, in_reply_to, references,
     } = body as {
       action?: string;
       folder?: string;
       limit?: number;
+      /** UID estable del mensaje (para descargar un adjunto). */
+      uid?: number;
+      /** Posición del adjunto en el mensaje, igual orden que `attachments`. */
+      attachment_index?: number;
       /** Cuantos cuerpos (los mas nuevos) devolver JUNTO con la lista, en
        *  la MISMA sesion IMAP. Zoho raciona las CONEXIONES concurrentes de
        *  una cuenta (una rafaga de 6 se cuelga >45s y termina en 504); un
@@ -483,6 +487,91 @@ Deno.serve(async (req) => {
           dropped: clean?.dropped ?? [],
           attachments: parsed.attachments,
           truncated: raw.truncated,
+        });
+      } catch (e) {
+        const msg = (e as Error).message ?? "error de IMAP";
+        await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
+        return json(req, { error: msg }, 502);
+      } finally {
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
+    }
+
+    // === DESCARGA DE UN ADJUNTO ===
+    // El binario NO vive en la caché de Postgres (ahí solo está su metadata):
+    // se re-baja del proveedor por IMAP, bajo pedido y por UID (estable). Lo
+    // dispara el usuario al hacer click en el adjunto de SU correo.
+    if (action === "download_attachment") {
+      if (typeof uid !== "number") return json(req, { error: "uid es requerido" }, 400);
+      const idx = typeof attachment_index === "number" ? attachment_index : -1;
+      if (idx < 0) return json(req, { error: "attachment_index es requerido" }, 400);
+
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
+
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) {
+        return json(req, {
+          error: "no se pudo descifrar la credencial — hay que re-provisionarla",
+        }, 500);
+      }
+
+      const box = (folder ?? "INBOX").slice(0, 200);
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+
+        const selr = await client.selectFolder(box);
+        if (!selr.ok) return json(req, { error: `IMAP SELECT ${box}: ${selr.error}` }, 502);
+
+        const raw = await client.fetchRawMessageByUid(uid);
+        if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
+        // Si el mensaje se cortó en el tope, el adjunto saldría corrupto: mejor
+        // fallar claro que entregar un archivo a medias.
+        if (raw.truncated) {
+          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+        }
+
+        const adj = extraerAdjunto(raw.raw, idx);
+        if (!adj) return json(req, { error: "ese adjunto no está en el mensaje" }, 404);
+
+        // Techo de respuesta: el JSON con el base64 pesa ~1,37× el archivo, y
+        // pasarse revienta el límite de la edge con un error opaco. Mejor
+        // cortar claro (los adjuntos gigantes son casos raros).
+        if (adj.bytes.length > 15 * 1024 * 1024) {
+          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+        }
+
+        await admin.from("mail_credentials")
+          .update({ last_used_at: new Date().toISOString(), last_error: null })
+          .eq("id", cred.id);
+
+        // Uint8Array → base64 por bloques: `btoa(String.fromCharCode(...todo))`
+        // revienta la pila con archivos grandes (spread de cientos de miles).
+        let bin = "";
+        for (let i = 0; i < adj.bytes.length; i += 0x8000) {
+          bin += String.fromCharCode(...adj.bytes.subarray(i, i + 0x8000));
+        }
+        return json(req, {
+          ok: true,
+          filename: adj.filename,
+          contentType: adj.contentType,
+          contentBase64: btoa(bin),
         });
       } catch (e) {
         const msg = (e as Error).message ?? "error de IMAP";

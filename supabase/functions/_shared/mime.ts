@@ -17,6 +17,10 @@ export interface MimePart {
   contentId: string | null;
   /** Contenido ya decodificado. Vacío para adjuntos: no los traemos acá. */
   text: string;
+  /** Body crudo de la parte (aún codificado). Para materializar el binario de
+   *  un adjunto puntual bajo demanda con `extraerAdjunto`, sin decodificar
+   *  TODOS los adjuntos en el camino normal de lectura. */
+  rawBody: string;
   sizeBytes: number;
 }
 
@@ -159,6 +163,7 @@ function walk(raw: string, depth: number, out: MimePart[]): void {
     filename,
     contentId,
     text: isAttachment ? "" : decodeBody(body, encoding, charset),
+    rawBody: body,
     sizeBytes: body.length,
   });
 }
@@ -194,5 +199,73 @@ export function parseMessage(raw: string): ParsedMessage {
     html: htmlPart?.text ?? null,
     text: textPart?.text ?? null,
     attachments,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Descarga de un adjunto puntual (bytes reales, no texto)
+// ---------------------------------------------------------------------------
+
+/** base64 → bytes. A diferencia de `decodeBase64`, NO pasa por TextDecoder:
+ *  un adjunto es binario y decodificarlo como texto lo corrompería. */
+function base64ToBytes(input: string): Uint8Array {
+  const raw = atob(input.replace(/\s+/g, ""));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+/** quoted-printable → bytes. Cada `=XX` es un byte; el resto va como latin1. */
+function qpToBytes(input: string): Uint8Array {
+  const unfolded = input.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+  for (let i = 0; i < unfolded.length; i++) {
+    const c = unfolded[i];
+    if (c === "=" && /^[0-9A-Fa-f]{2}$/.test(unfolded.slice(i + 1, i + 3))) {
+      bytes.push(parseInt(unfolded.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(c.charCodeAt(0) & 0xff);
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+function decodeBodyToBytes(body: string, encoding: string): Uint8Array {
+  const enc = encoding.toLowerCase().trim();
+  if (enc === "base64") return base64ToBytes(body);
+  if (enc === "quoted-printable") return qpToBytes(body);
+  // 7bit / 8bit / binary: cada carácter ES un byte (latin1). Poco común en un
+  // adjunto real (viajan en base64), pero no lo rompemos.
+  const bytes = new Uint8Array(body.length);
+  for (let i = 0; i < body.length; i++) bytes[i] = body.charCodeAt(i) & 0xff;
+  return bytes;
+}
+
+/** Materializa el binario del adjunto en la posición `index` — el mismo orden
+ *  que `parseMessage(...).attachments`. Devuelve null si no hay adjunto ahí.
+ *
+ *  Los adjuntos casi siempre viajan en base64, que es ASCII de 7 bits: aunque
+ *  el mensaje crudo se haya leído del socket como texto, esos caracteres
+ *  sobreviven intactos y `base64ToBytes` recupera los bytes originales. */
+export function extraerAdjunto(
+  raw: string,
+  index: number,
+): { filename: string; contentType: string; bytes: Uint8Array } | null {
+  const parts: MimePart[] = [];
+  walk(raw, 0, parts);
+  const adjuntos = parts.filter(
+    (p) => p.disposition === "attachment" || (p.filename && !p.contentType.startsWith("text/")),
+  );
+  const p = adjuntos[index];
+  if (!p) return null;
+  // El CRLF final que precede al `--boundary` es del delimitador MIME, no del
+  // contenido. En base64 da igual (el whitespace se ignora), pero en QP o sin
+  // codificar sumaría 0x0D 0x0A de más al archivo.
+  const cuerpo = p.rawBody.replace(/\r?\n$/, "");
+  return {
+    filename: p.filename ?? "adjunto",
+    contentType: p.contentType,
+    bytes: decodeBodyToBytes(cuerpo, p.encoding),
   };
 }

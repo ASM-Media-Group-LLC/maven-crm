@@ -410,3 +410,48 @@ export function useSendMail() {
 // poder testearlo; se re-exporta acá para que el resto lo siga importando
 // desde `useMailbox` como siempre.
 export { correoDe, direccionesDe, nombreDe } from "@/lib/mailAddr";
+
+/** base64 → Blob → descarga del navegador. La DISPARA el usuario con su click
+ *  sobre el adjunto de su propio correo; acá solo materializamos el archivo. */
+function dispararDescarga(filename: string, contentType: string, base64: string): void {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(
+    new Blob([bytes], { type: contentType || "application/octet-stream" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "adjunto";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revocar enseguida cancelaría la descarga en algunos navegadores.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Descarga un adjunto entrante. El binario NO está en la caché de Postgres
+ *  (solo su metadata): la edge lo re-baja del proveedor por IMAP y por UID.
+ *  `index` es la posición del adjunto en `MailMessage.attachments`. */
+export function useDownloadAttachment() {
+  return useMutation({
+    mutationFn: async (args: {
+      folder: string;
+      uid: number;
+      index: number;
+      filename: string;
+    }) => {
+      const r = await callMail<{
+        filename: string;
+        contentType: string;
+        contentBase64: string;
+      }>({
+        action: "download_attachment",
+        folder: args.folder,
+        uid: args.uid,
+        attachment_index: args.index,
+      });
+      dispararDescarga(r.filename || args.filename, r.contentType, r.contentBase64);
+    },
+  });
+}

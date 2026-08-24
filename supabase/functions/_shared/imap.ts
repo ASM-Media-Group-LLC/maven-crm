@@ -361,6 +361,29 @@ export class ImapClient {
     };
   }
 
+  /** Igual que `fetchRawMessage` pero por UID (estable) y con tope propio:
+   *  para descargar un adjunto hace falta traer el mensaje ENTERO, no los
+   *  primeros 512 KB. Se usa solo bajo pedido explícito de descarga. */
+  async fetchRawMessageByUid(
+    uid: number,
+    maxBytes = 20 * 1024 * 1024,
+  ): Promise<{ ok: boolean; raw: string; truncated: boolean; error?: string }> {
+    const res = await this.command(`UID FETCH ${uid} (BODY.PEEK[]<0.${maxBytes}>)`);
+    if (!res.ok) return { ok: false, raw: "", truncated: false, error: res.error };
+
+    const m = res.raw.match(/\{(\d+)\}\r\n/);
+    if (!m || m.index === undefined) {
+      return { ok: false, raw: "", truncated: false, error: "respuesta sin literal" };
+    }
+    const start = m.index + m[0].length;
+    const len = Number(m[1]);
+    return {
+      ok: true,
+      raw: res.raw.slice(start, start + len),
+      truncated: len >= maxBytes,
+    };
+  }
+
   /** Marca un mensaje como leído. Explícito: lo decide la interfaz cuando el
    *  usuario abre el correo, no el hecho de traerlo. */
   async markSeen(seq: number): Promise<boolean> {

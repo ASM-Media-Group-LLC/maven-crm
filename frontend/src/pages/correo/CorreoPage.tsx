@@ -7,8 +7,10 @@ import {
   ArrowLeft,
   Bell,
   Clock,
+  Download,
   FileText,
   Inbox,
+  Loader2,
   Mail,
   Newspaper,
   Paperclip,
@@ -39,12 +41,14 @@ import {
   useMailRealtime,
   useMarkSeen,
   usePrefetchMailMessage,
+  useDownloadAttachment,
   claveDe,
   correoDe,
   nombreDe,
   type MailSummary,
 } from "@/hooks/useMailbox";
 import { destinatariosRespuesta, tieneVariosInvolucrados } from "@/lib/mailAddr";
+import { toast } from "sonner";
 
 /**
  * Correo dentro de Maven.
@@ -122,6 +126,7 @@ export default function CorreoPage() {
   const mensaje = useMailMessage(carpeta, sel);
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
+  const descargar = useDownloadAttachment();
   // La bandeja se actualiza sola cuando el sincronizador escribe (push).
   useMailRealtime(hayBuzon);
 
@@ -461,19 +466,44 @@ export default function CorreoPage() {
 
                 {mensaje.data.attachments.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {mensaje.data.attachments.map((a, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1.5 text-xs"
-                        title="Descargar adjuntos todavía no está disponible."
-                      >
-                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{a.filename}</span>
-                        <span className="shrink-0 text-muted-foreground">
-                          {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
-                        </span>
-                      </span>
-                    ))}
+                    {mensaje.data.attachments.map((a, i) => {
+                      // La descarga re-baja el mensaje por UID; sin UID (un
+                      // correo traído por el camino en vivo) no se puede.
+                      const uid = sel?.uid != null ? Number(sel.uid) : null;
+                      const bajando =
+                        descargar.isPending && descargar.variables?.index === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          disabled={uid == null || descargar.isPending}
+                          onClick={() =>
+                            uid != null &&
+                            descargar.mutate(
+                              { folder: carpeta, uid, index: i, filename: a.filename },
+                              { onError: (e) => toast.error((e as Error).message) },
+                            )
+                          }
+                          title={
+                            uid == null
+                              ? "No se puede descargar este adjunto"
+                              : `Descargar ${a.filename}`
+                          }
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1.5 text-xs transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {bajando ? (
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="truncate">{a.filename}</span>
+                          <span className="shrink-0 text-muted-foreground">
+                            {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
+                          </span>
+                          <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
