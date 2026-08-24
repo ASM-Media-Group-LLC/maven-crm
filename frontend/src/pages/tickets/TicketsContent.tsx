@@ -16,6 +16,7 @@ import TicketsGrid from "./TicketsGrid";
 import CreateTicketModal from "./CreateTicketModal";
 import NewTicketLauncher from "./NewTicketLauncher";
 import TicketFormsManager from "./TicketFormsManager";
+import TicketFormEditor from "./TicketFormEditor";
 import ViewTicketModal from "./ViewTicketModal";
 import EditTicketModal from "./EditTicketModal";
 import DeleteTicketDialog from "./DeleteTicketDialog";
@@ -35,10 +36,12 @@ const TicketsContent = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
   const [tab, setTab] = useState(canCreate ? "new" : canSeeList ? "list" : "calendar");
-  // El boton del header abre un selector de plantilla. Antes hacia setTab("new"),
-  // que no hacia NADA si ya estabas en esa pestana (y es la pestana por defecto):
-  // un boton muerto. Como dialogo funciona desde cualquier pestana.
+  // Boton principal del header. Para quien administra plantillas, la accion
+  // valiosa es CREAR una plantilla nueva (el equivalente a "Formulario en
+  // blanco" de Google Forms), no elegir entre las existentes. Para el resto es
+  // levantar un ticket, y ahi abre el selector de plantilla.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
 
   const [selectedTicket, setSelectedTicket] = useState<TicketWithCreator | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -101,11 +104,18 @@ const TicketsContent = () => {
           title="Customer Service"
           subtitle="Gestión de soporte y escalaciones"
           actions={
-            canCreate && (
-              <Button onClick={() => setPickerOpen(true)}>
+            canManageForms ? (
+              <Button onClick={() => setBuilderOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" />
-                Nuevo Ticket
+                Nueva plantilla
               </Button>
+            ) : (
+              canCreate && (
+                <Button onClick={() => setPickerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nuevo Ticket
+                </Button>
+              )
             )
           }
         />
@@ -185,6 +195,10 @@ const TicketsContent = () => {
         </TabsContent>
         )}
       </Tabs>
+
+      {canManageForms && (
+        <TicketFormEditor form={null} open={builderOpen} onOpenChange={setBuilderOpen} />
+      )}
 
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-3xl">
