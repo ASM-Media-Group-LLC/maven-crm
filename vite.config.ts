@@ -49,6 +49,9 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        // Handlers de Web Push (llamada entrante con Maven cerrado). Se importan
+        // al SW generado en vez de reescribirlo. El archivo vive en public/.
+        importScripts: ["sw-push.js"],
         // Bumped from 5 MB to 12 MB so the main bundle can include the
         // eager-loaded sidebar pages without blowing past the precache
         // limit. Workbox refuses to precache anything larger than this
