@@ -7081,6 +7081,16 @@ async function buildInitialUserMessage(args: {
     // movidos, 10 filas se llenaban en <3min y el bot "olvidaba" lo que un miembro
     // había dicho hace un rato (ej. "no manejo IG").
     //
+    // ⚠️ COSTO: el prefijo cacheado es ~95% del gasto del bot (~$530/mes) y la
+    // ventana entra en la parte NO cacheada del prompt — cada mensaje extra sube
+    // el costo de CADA invocación. Por eso el tamaño se lee de la env var
+    // AGENT_CONTEXT_WINDOW (ajustable en Supabase sin redeploy de código); el
+    // default preserva los 30 actuales para no regresionar el fix de "olvidos".
+    const ctxWindow = (() => {
+      const n = Number(Deno.env.get("AGENT_CONTEXT_WINDOW"));
+      return Number.isFinite(n) && n >= 5 && n <= 100 ? Math.floor(n) : 30;
+    })();
+    //
     // ⚠️ SIN filtro `.lt(sent_at, trigger)` a propósito. Ese corte dejaba al bot ciego a
     // lo que se publicó DESPUÉS del disparador —incluidas SUS PROPIAS respuestas— y era
     // la causa raíz de tres bugs distintos del 30/07: dos respuestas contradictorias con
@@ -7090,14 +7100,37 @@ async function buildInitialUserMessage(args: {
     // solo era cierto si la ventana se lee DESPUÉS del lock y sin este corte. El
     // disparador se excluye por id porque se muestra aparte, al final del prompt.
     const CTX_SEL = "id, external_id, reply_to_external_id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at";
+    // Dedupe de la ventana: el mismo texto del mismo remitente con timestamps
+    // cercanos (ej. reintentos del gateway, doble ingest de un audio transcrito)
+    // aparecía DOS veces en el contexto y el modelo lo leía como insistencia o
+    // como dos hechos contradictorios ("lo dijo dos veces"). Se queda la fila
+    // más reciente; mensajes vacíos (media sin transcribir) no se colapsan
+    // porque "[audio]" + "[audio]" pueden ser audios distintos de verdad.
+    const dedupeVentana = <T extends { sender_external_id: string | null; body: string | null; transcribed_text: string | null; sent_at: string }>(rows: T[]): T[] => {
+      const vistos: Array<{ key: string; t: number }> = [];
+      const out: T[] = [];
+      for (const r of rows) { // rows viene DESC → la primera aparición es la más nueva
+        const texto = (r.transcribed_text ?? r.body ?? "").trim();
+        if (!texto) { out.push(r); continue; }
+        const key = `${r.sender_external_id ?? "?"}|${texto}`;
+        const t = Date.parse(r.sent_at);
+        // "cercano" = mismo texto dentro de 90s; más lejos puede ser repetición humana legítima.
+        if (vistos.some((v) => v.key === key && Math.abs(v.t - t) < 90_000)) continue;
+        vistos.push({ key, t });
+        out.push(r);
+      }
+      return out;
+    };
     const leerContexto = async () => {
+      // Se piden filas de más (+10) para que el dedupe y la exclusión del
+      // disparador no achiquen la ventana efectiva por debajo de ctxWindow.
       const { data } = await sb
         .from("whatsapp_messages")
         .select(CTX_SEL)
         .eq("group_id", args.groupId)
         .order("sent_at", { ascending: false })
-        .limit(31);
-      return (data ?? []).filter((c) => c.id !== args.req.message_id).slice(0, 30);
+        .limit(ctxWindow + 10);
+      return dedupeVentana((data ?? []).filter((c) => c.id !== args.req.message_id)).slice(0, ctxWindow);
     };
     let ctx = await leerContexto();
 
