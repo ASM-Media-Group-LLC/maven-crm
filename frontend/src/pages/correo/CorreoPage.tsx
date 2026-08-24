@@ -19,10 +19,12 @@ import {
   RefreshCw,
   Reply,
   ReplyAll,
+  Search,
   Send,
   Signature,
   ShieldAlert,
   Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -45,6 +47,7 @@ import {
   usePrefetchMailMessage,
   useDownloadAttachment,
   useMailSignature,
+  useMailSearch,
   claveDe,
   correoDe,
   nombreDe,
@@ -128,8 +131,15 @@ export default function CorreoPage() {
   // La firma que recibe el compositor: solo si está activada y no vacía.
   const firmaHtml = firma.data?.enabled ? firma.data.html || undefined : undefined;
 
+  // Búsqueda: `busqueda` es lo que se escribe; `queryActiva` es lo que se
+  // ejecuta (al Enter). Separadas para no pegarle al IMAP en cada tecla.
+  const [busqueda, setBusqueda] = useState("");
+  const [queryActiva, setQueryActiva] = useState("");
+  const enBusqueda = queryActiva.trim().length > 0;
+
   const carpetas = useMailFolders(hayBuzon);
   const lista = useMailMessages(carpeta, hayBuzon);
+  const resultados = useMailSearch(carpeta, queryActiva, hayBuzon);
   const mensaje = useMailMessage(carpeta, sel);
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
@@ -138,14 +148,20 @@ export default function CorreoPage() {
   useMailRealtime(hayBuzon);
 
   // Al cambiar de carpeta el mensaje abierto ya no corresponde: los números
-  // de secuencia son por carpeta, así que dejarlo abriría OTRO correo.
+  // de secuencia son por carpeta, así que dejarlo abriría OTRO correo. Y la
+  // búsqueda se limpia: buscaba en la carpeta anterior.
   useEffect(() => {
     setSel(null);
+    setBusqueda("");
+    setQueryActiva("");
   }, [carpeta]);
 
   // El hook entrega los mensajes ya ordenados (más nuevo primero) venga de
-  // la caché o del camino en vivo.
+  // la caché o del camino en vivo. En búsqueda, la lista son los resultados.
   const mensajes = useMemo(() => lista.data?.messages ?? [], [lista.data]);
+  const items = enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
+  const cargandoItems = enBusqueda ? resultados.isFetching : lista.isLoading;
+  const errorItems = enBusqueda ? resultados.error : lista.error;
 
   // La precarga de los 2 más nuevos ya NO se hace desde acá: viene con la
   // lista (`with_bodies`), en la misma sesión IMAP. Disparar conexiones
@@ -354,6 +370,43 @@ export default function CorreoPage() {
             })}
           </div>
 
+          {/* Buscador de la carpeta actual (IMAP SEARCH del lado del
+              servidor: busca en TODO el histórico, no solo en la caché). */}
+          <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setQueryActiva(busqueda.trim());
+                  setSel(null);
+                }
+                if (e.key === "Escape") {
+                  setBusqueda("");
+                  setQueryActiva("");
+                }
+              }}
+              placeholder={`Buscar en ${nombreCarpeta(carpeta)}…`}
+              autoComplete="off"
+              className="h-7 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            />
+            {(busqueda || enBusqueda) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBusqueda("");
+                  setQueryActiva("");
+                }}
+                title="Limpiar búsqueda"
+                aria-label="Limpiar búsqueda"
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
           {/* [&_[data-radix-scroll-area-viewport]>div]: Radix envuelve el
               contenido en un div display:table; min-width:100% que crece más
               que el viewport y SE COME EL BORDE DERECHO (acá, las horas de
@@ -361,7 +414,7 @@ export default function CorreoPage() {
               block lo clampa y deja funcionar a truncate/min-w-0. */}
           <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
             <div className="space-y-0.5 p-2">
-              {lista.isLoading &&
+              {cargandoItems &&
                 [...Array(6)].map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-2.5 py-2.5">
                     <Skeleton className="h-10 w-10 rounded-full" />
@@ -371,19 +424,26 @@ export default function CorreoPage() {
                     </div>
                   </div>
                 ))}
-              {lista.error && (
+              {errorItems && (
                 <Aviso
-                  titulo="No se pudieron traer los mensajes"
-                  detalle={(lista.error as Error).message}
+                  titulo={enBusqueda ? "No se pudo buscar" : "No se pudieron traer los mensajes"}
+                  detalle={(errorItems as Error).message}
                 />
               )}
-              {!lista.isLoading && !lista.error && mensajes.length === 0 && (
-                <VacioSuave
-                  icono={iconoCarpeta(carpeta)}
-                  texto={`No hay correos en ${nombreCarpeta(carpeta)}.`}
-                />
+              {!cargandoItems && !errorItems && items.length === 0 && (
+                enBusqueda ? (
+                  <VacioSuave
+                    icono={Search}
+                    texto={`No se encontró "${queryActiva}" en ${nombreCarpeta(carpeta)}.`}
+                  />
+                ) : (
+                  <VacioSuave
+                    icono={iconoCarpeta(carpeta)}
+                    texto={`No hay correos en ${nombreCarpeta(carpeta)}.`}
+                  />
+                )
               )}
-              {mensajes.map((m) => (
+              {items.map((m) => (
                 <FilaMensaje
                   key={claveDe(m)}
                   m={m}

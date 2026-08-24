@@ -507,3 +507,44 @@ export function useSaveMailSignature() {
     },
   });
 }
+
+/** Búsqueda en el servidor (IMAP SEARCH) dentro de una carpeta: encuentra en
+ *  TODO el histórico, no solo en los ~50 que tiene la caché. Pasa por la edge
+ *  y abre una sesión IMAP, así que respeta el semáforo y no reintenta. */
+export function useMailSearch(folder: string, query: string, enabled: boolean) {
+  const q = query.trim();
+  return useQuery({
+    queryKey: ["mail-search", folder, q],
+    enabled: enabled && q.length > 0,
+    ...SESION_IMAP,
+    queryFn: async (): Promise<{ messages: MailSummary[]; total: number }> => {
+      const r = await callMail<{
+        total?: number;
+        messages?: Array<{
+          uid?: number | string | null;
+          seq?: number;
+          from?: string;
+          to?: string;
+          subject?: string;
+          date?: string;
+          messageId?: string;
+          unread?: boolean;
+        }>;
+      }>({ action: "imap_search", folder, query: q });
+      return {
+        total: r.total ?? 0,
+        messages: (r.messages ?? []).map((m) => ({
+          uid: m.uid ?? null,
+          seq: m.seq,
+          from: m.from ?? "",
+          to: m.to ?? "",
+          subject: m.subject ?? "(sin asunto)",
+          date: m.date ?? "",
+          messageId: m.messageId ?? undefined,
+          unread: !!m.unread,
+          origen: "vivo" as const,
+        })),
+      };
+    },
+  });
+}
