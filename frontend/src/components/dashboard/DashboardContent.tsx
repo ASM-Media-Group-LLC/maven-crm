@@ -367,7 +367,7 @@ const DashboardContent = () => {
               <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
                 {t("dashboard.bestCloser", { month: format(new Date(), "MMMM", { locale: es }) })}
               </div>
-              <div className="truncate text-lg font-bold">{bestCloserQ.data.name}</div>
+              <div className="truncate font-display text-lg font-bold">{bestCloserQ.data.name}</div>
               <div className="text-xs text-muted-foreground">
                 {bestCloserQ.data.closes} {bestCloserQ.data.closes === 1 ? t("dashboard.closeSingular") : t("dashboard.closePlural")} · {t("dashboard.qaAvg", { score: Math.round(bestCloserQ.data.avgScore) })}
               </div>

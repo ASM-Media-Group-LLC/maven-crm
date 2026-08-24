@@ -177,7 +177,7 @@ const ClosersKPICards = ({
             <Skeleton className="mt-1 h-7 w-48" />
           ) : bestCloser ? (
             <>
-              <div className="truncate text-lg font-bold">{bestCloser.name}</div>
+              <div className="truncate font-display text-lg font-bold">{bestCloser.name}</div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="tabular-nums">
                   <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres

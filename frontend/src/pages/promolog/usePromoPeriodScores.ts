@@ -34,13 +34,18 @@ export interface PromoPeriodScore {
 const BOG_OFFSET_MS = 5 * 3600 * 1000;
 const dayKey = (d: Date) => new Date(d.getTime() - BOG_OFFSET_MS).toISOString().slice(0, 10);
 
-/** Scores de la ventana móvil de `windowDays` días (default 7) terminando hoy. */
-export function usePromoPeriodScores(windowDays = 7) {
+/**
+ * Scores de la ventana móvil de `windowDays` días (default 7) terminando hoy.
+ * `endOffsetDays` corre el fin de la ventana hacia atrás: (7, 7) = los 7 días
+ * ANTERIORES a la ventana actual — lo usa el podio del leaderboard para los
+ * deltas ▲/▼ (#106), diffeando en cliente contra la misma fuente RPC.
+ */
+export function usePromoPeriodScores(windowDays = 7, endOffsetDays = 0) {
   return useQuery({
-    queryKey: ["promo-period-scores", windowDays],
+    queryKey: ["promo-period-scores", windowDays, endOffsetDays],
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PromoPeriodScore[]> => {
-      const to = new Date();
+      const to = new Date(Date.now() - endOffsetDays * 86400 * 1000);
       const from = new Date(to.getTime() - (windowDays - 1) * 86400 * 1000);
       const { data, error } = await (supabase as any).rpc("promo_creator_period_scores", {
         p_from: dayKey(from),

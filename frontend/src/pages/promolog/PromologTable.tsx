@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Plus, StickyNote, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, Flame, MoreHorizontal, Pencil, Plus, StickyNote, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,6 +26,7 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import { type PromologEntry } from "./PromologEntryCard";
 import PromoQualityBar from "./PromoQualityBar";
 import { displayPlatform } from "./promoScore";
+import { streakCreatorKey, type PromoStreak } from "./promoStreaks";
 
 interface Props {
   entries: PromologEntry[];
@@ -43,6 +44,10 @@ interface Props {
   sortKey?: SortKey;
   sortAsc?: boolean;
   onSort?: (key: SortKey) => void;
+  // Rachas por creadora (#109): días CONSECUTIVOS con promo dentro del
+  // rango/filtros cargados, calculadas por el padre sobre el dataset COMPLETO
+  // (no el slice paginado). Con ≥3 días aparece el chip junto al nombre.
+  streaks?: Map<string, PromoStreak>;
 }
 
 export type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
@@ -100,6 +105,25 @@ const networkLabel: Record<string, string> = {
 const resultVariant: Record<string, "success-soft" | "destructive-soft"> = {
   "Sí": "success-soft",
   "No": "destructive-soft",
+};
+
+// Chip de racha (#109) — sobrio y SIN animación: aparece recién con 3 días
+// consecutivos de promo (umbral del juez, para no premiar lo trivial) y pasa
+// a dorado (token warning) desde los hitos de 7/14/30 días.
+const StreakBadge = ({ streak }: { streak: number }) => {
+  if (streak < 3) return null;
+  const gold = streak >= 7;
+  return (
+    <span
+      title={`Racha: ${streak} días consecutivos con promo (dentro del rango y filtros cargados)`}
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[10px] font-medium tabular-nums ${
+        gold ? "border-warning/40 text-warning" : "border-border text-muted-foreground"
+      }`}
+    >
+      <Flame className="h-3 w-3" aria-hidden />
+      {streak} días
+    </span>
+  );
 };
 
 // Motivo legible del fallo de scan (para el tooltip de la fila "A revisar").
@@ -184,6 +208,7 @@ const PromologTable = ({
   sortKey: controlledSortKey,
   sortAsc: controlledSortAsc,
   onSort,
+  streaks,
 }: Props) => {
   // Orden interno LEGACY (solo se usa si el padre no controla el orden via onSort).
   const [localSortKey, setLocalSortKey] = useState<SortKey>("date");
@@ -274,7 +299,10 @@ const PromologTable = ({
             </TableCell>
             <TableCell className="min-w-[180px]">
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{entry.name}</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <span className="truncate">{entry.name}</span>
+                  <StreakBadge streak={streaks?.get(streakCreatorKey(entry))?.streak ?? 0} />
+                </span>
                 {entry.handle && (
                   <span className="text-xs text-muted-foreground">@{entry.handle}</span>
                 )}

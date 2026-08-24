@@ -13,6 +13,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2 } from "lucide-react";
+import { celebrateClose } from "@/lib/celebrateClose";
 import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
 
 interface Props {
@@ -111,13 +112,21 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Celebración del cierre (ola 3 UX, #105) — mismo gate por creadora que
+      // PlatformSalesModal: la primera venta de la sesión trae confetti breve
+      // (respeta prefers-reduced-motion); el toast siempre dice qué y cuánto.
+      const monto = Number(price) || 0;
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
+      celebrateClose(`venta-${creatorId}`);
+      toast({
+        title: "🎉 Venta cerrada",
+        description: `${platform}${product ? ` – ${product}` : ""}${monto > 0 ? ` · $${monto.toLocaleString()}` : ""}`,
+      });
       setShowForm(false);
       setPlatform("");
       setProduct("");
       setPrice("");
-      toast({ title: "Venta registrada" });
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });

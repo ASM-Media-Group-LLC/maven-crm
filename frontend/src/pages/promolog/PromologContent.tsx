@@ -76,6 +76,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable, { type SortKey, sortPromologEntries } from "./PromologTable";
+import { computePromoStreaks } from "./promoStreaks";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
 import PromologStoryGallery from "./PromologStoryGallery";
@@ -923,6 +924,11 @@ const PromologContent = () => {
     [filteredEntries, promoSortKey, promoSortAsc],
   );
 
+  // Rachas por creadora (#109) sobre el dataset COMPLETO filtrado (no el slice
+  // paginado) — mismos entries ya cargados, cero queries nuevas. La tabla
+  // muestra el chip "N días" recién con racha ≥3.
+  const promoStreaks = useMemo(() => computePromoStreaks(filteredEntries), [filteredEntries]);
+
   // Resumen por creator para el KPI "Creadores escaneados" + su modal.
   // Una creadora cuenta como "Promocionó" si tiene AL MENOS una entry
   // result === "Sí" en el período filtrado; sino cuenta como "No
@@ -1134,6 +1140,7 @@ const PromologContent = () => {
                   sortKey={promoSortKey ?? undefined}
                   sortAsc={promoSortAsc}
                   onSort={handlePromoSort}
+                  streaks={promoStreaks}
                 />
               </DataTableShell>
             ) : (

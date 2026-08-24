@@ -40,6 +40,17 @@ export const CHART_COLOR = {
   pink: CHART_SERIES[5],
 } as const;
 
+/**
+ * Colores de TENDENCIA (sparklines y afines): por SIGNO del cambio, con los
+ * tokens de estado — no colores de serie. Un sparkline junto a un badge
+ * Crece/Estable/Cae debe usar el mismo criterio que el badge (ola 3 UX, #21).
+ */
+export const TREND_COLOR = {
+  up: "hsl(var(--success))",
+  down: "hsl(var(--destructive))",
+  flat: "hsl(var(--muted-foreground))",
+} as const;
+
 /** Rejilla tenue del sistema: solo líneas horizontales, punteado sutil. */
 export const CHART_GRID = {
   stroke: "hsl(var(--border) / 0.5)",

@@ -32,6 +32,7 @@ import PromoScoreLeaderboard from "./PromoScoreLeaderboard";
 import { categoryTone } from "@/components/dashboard/categoryTones";
 import { type PromologEntry } from "./PromologEntryCard";
 import { displayPlatform } from "./promoScore";
+import { computePromoStreaks } from "./promoStreaks";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 
@@ -204,31 +205,12 @@ const PromologDashboardView = ({
   // (1) Streak: usando los entries crudos del filtered, buscar la
   //     creadora con más días consecutivos promocionando.
   const longestStreak = useMemo(() => {
-    // Racha CONSECUTIVA real: agrupamos los días con promo por creadora (usando rawDate,
-    // YYYY-MM-DD, para no depender del string formateado), ordenamos y contamos el run
-    // de días consecutivos más largo. Acotada al rango cargado, pero ya es una racha de
-    // verdad (antes contaba el total de días distintos, que no es lo mismo).
-    const daysByCreator = new Map<string, { name: string; days: Set<string> }>();
-    for (const e of filteredEntries) {
-      if (e.result !== "Sí") continue;
-      const key = (e.rawDate || "").slice(0, 10);
-      if (!key) continue;
-      const id = e.creator_id || `__no_id__${e.name}`;
-      const slot = daysByCreator.get(id);
-      if (slot) slot.days.add(key);
-      else daysByCreator.set(id, { name: e.name, days: new Set([key]) });
-    }
+    // Racha CONSECUTIVA real por creadora — el cálculo vive en promoStreaks.ts
+    // (#109 lo generalizó a un Map para el chip de racha de la tabla de Promos);
+    // acá solo nos quedamos con la mejor. Acotada al rango cargado.
     let best: { name: string; streak: number } = { name: "—", streak: 0 };
-    for (const { name, days } of daysByCreator.values()) {
-      const sorted = [...days].sort();
-      let run = 0, max = 0, prev: number | null = null;
-      for (const k of sorted) {
-        const t = Date.parse(`${k}T00:00:00Z`);
-        run = (prev !== null && t - prev === 86_400_000) ? run + 1 : 1;
-        prev = t;
-        if (run > max) max = run;
-      }
-      if (max > best.streak) best = { name, streak: max };
+    for (const s of computePromoStreaks(filteredEntries).values()) {
+      if (s.streak > best.streak) best = s;
     }
     return best;
   }, [filteredEntries]);
@@ -438,7 +420,7 @@ const PromologDashboardView = ({
       {/* ═══ Score de promo v2 — ranking oficial (RPC promo_creator_period_scores,
            misma fuente que los reportes de WhatsApp). Los podios de abajo miden
            volumen bruto del rango filtrado; esto mide cumplimiento del plan. ═══ */}
-      <PromoScoreLeaderboard />
+      <PromoScoreLeaderboard creators={activeCreators} />
 
       {/* ═══ Row 2: Dos podios Top 3 paralelos ═════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

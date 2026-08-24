@@ -28,7 +28,9 @@ const StatChip = ({ label, value, hint, color, icon, className, onClick }: StatC
         {icon && <span className="ml-auto shrink-0 text-muted-foreground">{icon}</span>}
       </div>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-        <span className="text-2xl font-bold leading-none tabular-nums">{value}</span>
+        {/* font-display: Sora en los números grandes — la firma tipográfica que
+            tailwind.config promete para títulos/números (ola 3 UX, #71). */}
+        <span className="font-display text-2xl font-bold leading-none tabular-nums">{value}</span>
         {hint != null && <span className="min-w-0 text-xs leading-snug text-muted-foreground">{hint}</span>}
       </div>
     </>

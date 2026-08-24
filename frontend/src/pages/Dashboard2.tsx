@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Sparkline } from "@/components/charts/Sparkline";
+import { TREND_COLOR } from "@/lib/chartTheme";
 import { ExternalLink } from "lucide-react";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -299,9 +301,33 @@ const Dashboard2 = () => {
   // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
   const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
   const { data: cohortData, isLoading: cohortLoading } = useCohortRetention(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "cohort");
-  // Filas diarias SOLO para Content ROI (lazy + acotado al período): necesita granularidad
-  // por-día para cruzar con días de promo. El resto del dashboard usa el resumen agregado.
-  const { data: contentRoiDaily = [] } = useDashboard2Daily(selectedPeriod.startStr, selectedPeriod.endStr, deepDiveTab === "content_roi");
+  // Filas diarias para Content ROI y para los sparklines de Tendencia del tab MoM
+  // (#21). Lazy (solo con uno de esos tabs abierto) + acotado al período; misma
+  // queryKey → un tab reaprovecha el fetch del otro. El resto del dashboard usa
+  // el resumen agregado.
+  const { data: periodDaily = [] } = useDashboard2Daily(
+    selectedPeriod.startStr,
+    selectedPeriod.endStr,
+    deepDiveTab === "content_roi" || deepDiveTab === "mom",
+  );
+
+  // #21 — serie diaria por creadora (orden cronológico) para los sparklines de
+  // la columna Tendencia del tab MoM. Derivado en cliente de las filas ya cargadas.
+  const dailyByCreator = useMemo(() => {
+    const out = new Map<string, number[]>();
+    if (deepDiveTab !== "mom") return out;
+    const byCreator = new Map<string, { date: string; v: number }[]>();
+    for (const r of periodDaily) {
+      const arr = byCreator.get(r.creator_id);
+      if (arr) arr.push({ date: r.date, v: r.total_gross });
+      else byCreator.set(r.creator_id, [{ date: r.date, v: r.total_gross }]);
+    }
+    for (const [id, arr] of byCreator) {
+      arr.sort((a, b) => a.date.localeCompare(b.date));
+      out.set(id, arr.map((x) => x.v));
+    }
+    return out;
+  }, [periodDaily, deepDiveTab]);
 
   // LTV estimado (interim): ARPU mensual × vida media. ARPU = ingreso del período /
   // fans activos prom / meses; vida media = subscription_length_days prom (top fans) / 30.
@@ -2065,7 +2091,7 @@ const Dashboard2 = () => {
                                  {ddHead("mom", "prev", "Mes Anterior")}
                                  {ddHead("mom", "delta", "Diferencia")}
                                  {ddHead("mom", "change", "Cambio %")}
-                                 <TableHead className="text-center w-20">Tendencia</TableHead>
+                                 <TableHead className="text-center w-32">Tendencia</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2086,9 +2112,30 @@ const Dashboard2 = () => {
                                     {c.prev > 0 ? `${c.change >= 0 ? "+" : ""}${c.change.toFixed(0)}%` : "Nueva"}
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-success/40 text-success">↑ Crece</Badge>}
-                                    {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= Estable</Badge>}
-                                    {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ Cae</Badge>}
+                                    {/* #21 — sparkline con la FORMA de la curva diaria (caída
+                                        reciente ≠ mes flojo parejo); el badge se mantiene al lado
+                                        con su mismo criterio de color (>±10%). */}
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      {(() => {
+                                        const serie = dailyByCreator.get(c.creatorId);
+                                        if (!serie || serie.length < 2) return null;
+                                        const color = c.change > 10 ? TREND_COLOR.up : c.change < -10 ? TREND_COLOR.down : TREND_COLOR.flat;
+                                        return (
+                                          <Sparkline
+                                            values={serie}
+                                            width={96}
+                                            height={32}
+                                            stroke={color}
+                                            title={`Ingreso diario de ${c.name} en el período (${serie.length} días con datos)`}
+                                          />
+                                        );
+                                      })()}
+                                      <span>
+                                        {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-success/40 text-success">↑ Crece</Badge>}
+                                        {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= Estable</Badge>}
+                                        {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ Cae</Badge>}
+                                      </span>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -2722,7 +2769,7 @@ const Dashboard2 = () => {
                     const pd = promoDays ?? new Map<string, Set<string>>();
                     const byC = new Map<string, { name: string; promoInc: number; promoDays: number; nonInc: number; nonDays: number }>();
                     let aPromoInc = 0, aPromoDays = 0, aNonInc = 0, aNonDays = 0;
-                    for (const r of contentRoiDaily) {
+                    for (const r of periodDaily) {
                       const d = r.date;
                       const isPromo = pd.get(r.creator_id)?.has(d) ?? false;
                       const inc = r.total_gross;

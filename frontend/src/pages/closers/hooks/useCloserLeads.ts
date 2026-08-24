@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeHandle } from "@/lib/handle-utils";
+import { celebrateClose } from "@/lib/celebrateClose";
 
 export interface ContactNote {
   contact_date: string;
@@ -1052,7 +1053,33 @@ export const useCloserLeads = () => {
     onMutate: ({ id, stage }) => {
       optimisticUpdate(id, { stage } as any);
     },
-    onSuccess: () => {
+    onSuccess: (_data, { id, stage }) => {
+      // ── Celebración del cierre (ola 3 UX, #105) ─────────────────────────
+      // Mover a "Completada" es el evento de mayor valor del CRM y se sentía
+      // igual que editar un campo. Ráfaga breve de confetti + toast con el
+      // nombre y el monto — UNA vez por cierre (gate en sessionStorage dentro
+      // de celebrateClose) y respetando prefers-reduced-motion.
+      if (stage === "Completada") {
+        let row: CloserCreatorRow | undefined;
+        for (const [, cached] of queryClient.getQueriesData<{ rows: CloserCreatorRow[]; total: number }>({
+          queryKey: ["closer-creators-list"],
+        })) {
+          row = cached?.rows?.find((r) => r.id === id);
+          if (row) break;
+        }
+        if (celebrateClose(`lead-${id}`)) {
+          // Venta de plataforma → suscripción fija; reclutamiento → monetización estimada.
+          const monto = row?.deal_type === "venta_plataforma"
+            ? Number(row?.subscription_amount ?? 0)
+            : Number(row?.estimated_monetization ?? 0);
+          toast({
+            title: row?.instagram_handle ? `🎉 Cerraste a @${row.instagram_handle}` : "🎉 Trato cerrado",
+            description: monto > 0
+              ? `Pasó a Completada · $${monto.toLocaleString()} ${row?.deal_type === "venta_plataforma" ? "de suscripción" : "de monetización estimada"}.`
+              : "Pasó a Completada.",
+          });
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
     },

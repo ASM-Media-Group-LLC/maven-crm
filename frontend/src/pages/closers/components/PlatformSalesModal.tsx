@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
+import { celebrateClose } from "@/lib/celebrateClose";
 
 interface PlatformSale {
   id: string;
@@ -71,11 +72,24 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       if (error) throw error;
     },
     onSuccess: () => {
+      // ── Celebración del cierre (ola 3 UX, #105) ───────────────────────────
+      // Registrar una venta respondía con un toast plano "Ventas registradas".
+      // Ahora: toast con la creadora y el monto recién guardado + confetti breve
+      // (una vez por creadora por sesión — gate en celebrateClose — y respetando
+      // prefers-reduced-motion). Leemos selectedPlatforms ANTES de limpiarlo.
+      const saved = Object.entries(selectedPlatforms);
+      const savedTotal = saved.reduce((s, [, price]) => s + (Number(price) || 0), 0);
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales-all"] });
       setSelectedPlatforms({});
-      toast({ title: "Ventas registradas" });
+      celebrateClose(`venta-${creatorId}`);
+      toast({
+        title: `🎉 Venta cerrada — @${instagramHandle}`,
+        description: savedTotal > 0
+          ? `${saved.length} plataforma${saved.length === 1 ? "" : "s"} · $${savedTotal.toLocaleString()}`
+          : `${saved.length} plataforma${saved.length === 1 ? "" : "s"} registrada${saved.length === 1 ? "" : "s"}`,
+      });
       onOpenChange(false);
     },
     onError: (e: Error) => {
