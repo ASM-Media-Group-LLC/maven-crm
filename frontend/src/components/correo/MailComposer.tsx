@@ -1,20 +1,50 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Send } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Bold,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  Loader2,
+  Palette,
+  Redo2,
+  RemoveFormatting,
+  Send,
+  Smile,
+  Strikethrough,
+  TextQuote,
+  Trash2,
+  Type,
+  Underline as UnderlineIcon,
+  Undo2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useSendMail } from "@/hooks/useMailbox";
+import { cn } from "@/lib/utils";
+import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
+
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import TextStyle from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import Placeholder from "@tiptap/extension-placeholder";
+import { Extension } from "@tiptap/core";
 
 /**
- * Redactar y responder.
+ * Redactar y responder, con editor rico (negrita, listas, links, color,
+ * emojis...) al estilo Gmail pero en la piel de Maven.
  *
  * El remitente NO se elige ni se manda: la edge function lo toma siempre de
  * la credencial del usuario. Por eso acá no hay campo "De" — no es una
@@ -40,18 +70,52 @@ interface Props {
   remitente: string;
 }
 
-/** Convierte el texto que escribió la persona a HTML.
- *  Se escapa todo: lo que se tipea es texto, nunca markup. */
-function aHtml(texto: string): string {
-  const esc = texto
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return esc
-    .split(/\n{2,}/)
-    .map((p) => `<p style="margin:0 0 12px">${p.replace(/\n/g, "<br>")}</p>`)
-    .join("");
+/* ── Tamaño de letra: extensión mínima sobre textStyle ─────────────────── */
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    fontSize: {
+      setFontSize: (size: string) => ReturnType;
+      unsetFontSize: () => ReturnType;
+    };
+  }
 }
+
+const FontSize = Extension.create({
+  name: "fontSize",
+  addOptions() {
+    return { types: ["textStyle"] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).style.fontSize || null,
+            renderHTML: (attrs) =>
+              attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {},
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontSize:
+        (size) =>
+        ({ chain }) =>
+          chain().setMark("textStyle", { fontSize: size }).run(),
+      unsetFontSize:
+        () =>
+        ({ chain }) =>
+          chain().setMark("textStyle", { fontSize: null }).removeEmptyTextStyle().run(),
+    };
+  },
+});
+
+/* ── Utilidades ─────────────────────────────────────────────────────────── */
 
 /** Separa direcciones escritas con coma, punto y coma o espacios. */
 function partirDirecciones(v: string): string[] {
@@ -63,146 +127,667 @@ function partirDirecciones(v: string): string[] {
 
 const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/* ── Paleta y emojis (sin dependencias) ─────────────────────────────────── */
+
+// La paleta son tintas para FONDO BLANCO, porque así se va a ver el correo en
+// Gmail/Outlook. Por eso el área de escritura se pinta blanca aunque Maven
+// esté en oscuro (que es su tema por defecto): si el editor fuera oscuro,
+// elegir "negro" dejaría el texto invisible mientras se escribe y perfecto
+// para quien lo recibe. Escribir sobre papel blanco es lo honesto: se ve
+// exactamente lo que va a llegar.
+const COLORES = [
+  ["#111827", "#6b7280", "#dc2626", "#ea580c", "#d97706", "#16a34a", "#0891b2", "#2563eb"],
+  ["#7c3aed", "#c026d3", "#db2777", "#9ca3af", "#f87171", "#fbbf24", "#4ade80", "#60a5fa"],
+];
+
+const EMOJIS: Array<{ grupo: string; lista: string[] }> = [
+  {
+    grupo: "Caritas",
+    lista: ["😀", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤩", "🥳", "😅", "😉", "🙃", "🤔", "🤯", "😳", "🥺", "😢", "😭", "😤", "😡", "😴", "🤒", "🥴", "😇", "🤗", "🤫", "🙄", "😬", "🫠", "💀"],
+  },
+  {
+    grupo: "Gestos",
+    lista: ["👍", "👎", "👌", "🤌", "✌️", "🤞", "🤟", "🤙", "👏", "🙌", "🤝", "🙏", "💪", "👀", "🫡", "👋", "☝️", "👉", "👈", "🫶", "✍️", "🤲", "🖖", "🤘"],
+  },
+  {
+    grupo: "Corazones",
+    lista: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💖", "💘", "💝", "💕", "💞", "💗", "💔", "❣️"],
+  },
+  {
+    grupo: "Trabajo",
+    lista: ["✅", "❌", "⚠️", "📌", "📎", "📈", "📉", "📊", "💼", "🗂️", "📁", "📄", "📝", "💰", "💵", "🧾", "📅", "⏰", "🚀", "🎯", "🏆", "🔥", "⭐", "✨", "💡", "🔔", "📣", "🔒", "🔑", "⚙️", "🛠️", "💻"],
+  },
+  {
+    grupo: "Festejo y varios",
+    lista: ["🎉", "🎁", "🥂", "🍾", "🎂", "☕", "🍕", "🌮", "🍔", "💯", "❓", "❗", "➕", "➖", "🔁", "🆗", "🆕", "🌎"],
+  },
+];
+
+const TAMANOS: Array<{ etiqueta: string; valor: string | null }> = [
+  { etiqueta: "Pequeño", valor: "12px" },
+  { etiqueta: "Normal", valor: null },
+  { etiqueta: "Grande", valor: "18px" },
+  { etiqueta: "Enorme", valor: "24px" },
+];
+
+/* ── Piezas de la barra ─────────────────────────────────────────────────── */
+
+function BotonBarra({
+  activo,
+  onClick,
+  titulo,
+  disabled,
+  children,
+}: {
+  activo?: boolean;
+  onClick: () => void;
+  titulo: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={titulo}
+      aria-label={titulo}
+      // El estado activo se comunicaba SOLO con un tinte del 15%: un lector
+      // de pantalla no podía decir si negrita estaba puesta.
+      aria-pressed={activo}
+      disabled={disabled}
+      // onMouseDown con preventDefault: si no, el click roba el foco del
+      // editor y se pierde la selección sobre la que se aplica el formato.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors",
+        "hover:bg-muted hover:text-foreground disabled:opacity-40",
+        activo && "bg-primary/15 text-primary",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Separador() {
+  return <div className="mx-0.5 h-5 w-px shrink-0 bg-border" />;
+}
+
+function BarraFormato({ editor }: { editor: Editor }) {
+  const [url, setUrl] = useState("");
+  const [linkAbierto, setLinkAbierto] = useState(false);
+
+  // Al abrir con el cursor sobre un link, se precarga su href: antes el
+  // campo salía vacío y "Aplicar" no hacía nada, así que un link mal escrito
+  // solo se podía quitar y volver a tipear entero.
+  const abrirLink = (abierto: boolean) => {
+    if (abierto) setUrl((editor.getAttributes("link").href as string) ?? "");
+    setLinkAbierto(abierto);
+  };
+
+  const aplicarLink = () => {
+    const limpia = url.trim();
+    if (!limpia) return;
+    const conProtocolo = /^https?:\/\//i.test(limpia) ? limpia : `https://${limpia}`;
+    if (editor.state.selection.empty) {
+      // Sin selección: se inserta el link como texto clickeable.
+      editor
+        .chain()
+        .focus()
+        .insertContent(
+          `<a href="${escaparAtributo(conProtocolo)}">${escapar(limpia)}</a> `,
+        )
+        .run();
+    } else {
+      editor.chain().focus().extendMarkRange("link").setLink({ href: conProtocolo }).run();
+    }
+    setUrl("");
+    setLinkAbierto(false);
+  };
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+      <BotonBarra
+        titulo="Deshacer"
+        onClick={() => editor.chain().focus().undo().run()}
+        disabled={!editor.can().undo()}
+      >
+        <Undo2 className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Rehacer"
+        onClick={() => editor.chain().focus().redo().run()}
+        disabled={!editor.can().redo()}
+      >
+        <Redo2 className="h-4 w-4" />
+      </BotonBarra>
+
+      <Separador />
+
+      {/* Tamaño de letra */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Tamaño de letra"
+            onMouseDown={(e) => e.preventDefault()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Type className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-36 p-1" align="start">
+          {TAMANOS.map((t) => (
+            <button
+              key={t.etiqueta}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (t.valor) editor.chain().focus().setFontSize(t.valor).run();
+                else editor.chain().focus().unsetFontSize().run();
+              }}
+              className="block w-full rounded-md px-3 py-1.5 text-left hover:bg-muted"
+              style={{ fontSize: t.valor ?? "14px" }}
+            >
+              {t.etiqueta}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+
+      <Separador />
+
+      <BotonBarra
+        titulo="Negrita"
+        activo={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <Bold className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Cursiva"
+        activo={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <Italic className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Subrayado"
+        activo={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
+        <UnderlineIcon className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Tachado"
+        activo={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
+        <Strikethrough className="h-4 w-4" />
+      </BotonBarra>
+
+      {/* Color de texto */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Color de texto"
+            onMouseDown={(e) => e.preventDefault()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Palette className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2" align="start">
+          <div className="flex flex-col gap-1.5">
+            {COLORES.map((fila, i) => (
+              <div key={i} className="flex gap-1.5">
+                {fila.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    title={c}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().setColor(c).run()}
+                    className="h-6 w-6 rounded-full border border-border/60 transition-transform hover:scale-110"
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            ))}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().unsetColor().run()}
+              className="mt-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            >
+              Color automático
+            </button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Separador />
+
+      <BotonBarra
+        titulo="Lista con viñetas"
+        activo={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        <List className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Lista numerada"
+        activo={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        <ListOrdered className="h-4 w-4" />
+      </BotonBarra>
+      <BotonBarra
+        titulo="Cita"
+        activo={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        <TextQuote className="h-4 w-4" />
+      </BotonBarra>
+
+      <Separador />
+
+      {/* Link */}
+      <Popover open={linkAbierto} onOpenChange={abrirLink}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Insertar link"
+            onMouseDown={(e) => e.preventDefault()}
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              editor.isActive("link") && "bg-primary/15 text-primary",
+            )}
+          >
+            <Link2 className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-2" align="start">
+          <div className="flex gap-2">
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && aplicarLink()}
+              placeholder="https://…"
+              className="h-8"
+              autoFocus
+            />
+            <Button size="sm" className="h-8" onClick={aplicarLink}>
+              Aplicar
+            </Button>
+          </div>
+          {editor.isActive("link") && (
+            <button
+              type="button"
+              onClick={() => {
+                editor.chain().focus().extendMarkRange("link").unsetLink().run();
+                setLinkAbierto(false);
+              }}
+              className="mt-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            >
+              Quitar link de la selección
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {/* Emojis */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Emoji"
+            onMouseDown={(e) => e.preventDefault()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Smile className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        {/* onFocusOutside: al insertar, TipTap manda el foco al editor por
+            requestAnimationFrame; el Popover de Radix (no-modal) lo lee como
+            "foco afuera" y se cerraba tras CADA emoji, obligando a reabrir y
+            volver a scrollear. Escape y click afuera lo siguen cerrando. */}
+        <PopoverContent
+          className="w-80 p-0"
+          align="start"
+          onFocusOutside={(e) => e.preventDefault()}
+        >
+          <div className="max-h-64 overflow-y-auto p-2">
+            {EMOJIS.map((seccion) => (
+              <div key={seccion.grupo}>
+                <p className="px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground first:pt-0">
+                  {seccion.grupo}
+                </p>
+                <div className="grid grid-cols-8">
+                  {seccion.lista.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => editor.chain().focus().insertContent(e).run()}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl hover:bg-muted"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Separador />
+
+      <BotonBarra
+        titulo="Limpiar formato"
+        onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
+      >
+        <RemoveFormatting className="h-4 w-4" />
+      </BotonBarra>
+    </div>
+  );
+}
+
+/* ── El compositor ──────────────────────────────────────────────────────── */
+
 export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
   const [to, setTo] = useState(inicial?.to ?? "");
   const [cc, setCc] = useState(inicial?.cc ?? "");
+  const [bcc, setBcc] = useState("");
+  const [verCc, setVerCc] = useState(!!inicial?.cc);
+  const [verBcc, setVerBcc] = useState(false);
   const [subject, setSubject] = useState(inicial?.subject ?? "");
-  const [cuerpo, setCuerpo] = useState("");
   const enviar = useSendMail();
 
+  // La cita del correo original entra AL editor como blockquote editable:
+  // igual que Gmail, se puede recortar o borrar antes de mandar.
+  const contenidoInicial = useMemo(() => {
+    if (!inicial?.citar) return "";
+    const c = inicial.citar;
+    const texto = escapar(c.texto).replace(/\n/g, "<br>");
+    return (
+      `<p></p><p></p><blockquote><p>El ${escapar(c.fecha)}, ${escapar(c.de)} escribió:</p>` +
+      `<p>${texto}</p></blockquote>`
+    );
+  }, [inicial]);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ heading: false, codeBlock: false, code: false, horizontalRule: false }),
+      Underline,
+      Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+      TextStyle,
+      Color,
+      FontSize,
+      Placeholder.configure({ placeholder: "Escribe tu mensaje…" }),
+    ],
+    content: contenidoInicial,
+    autofocus: inicial?.citar ? "start" : false,
+    editorProps: {
+      attributes: {
+        class: "focus:outline-none min-h-[220px] text-sm leading-relaxed",
+      },
+    },
+  });
+
+  // `tocado` marca qué campos ya perdieron el foco: el aviso de direcciones
+  // inválidas aparece al SALIR del campo, no en la primera tecla. Antes,
+  // tipear la "j" de juan@… ya mostraba el error en rojo — o sea el estado
+  // de error era el estado normal mientras se escribía.
+  const [tocado, setTocado] = useState<{ to?: boolean; cc?: boolean; bcc?: boolean }>({});
+
   const destinatarios = partirDirecciones(to);
-  const invalidos = destinatarios.filter((d) => !ES_CORREO.test(d));
+  const copias = partirDirecciones(cc);
+  const ocultas = partirDirecciones(bcc);
+  const malos = (lista: string[]) => lista.filter((d) => !ES_CORREO.test(d));
+  const avisos = [
+    tocado.to && malos(destinatarios).length ? `Para: ${malos(destinatarios).join(", ")}` : null,
+    tocado.cc && malos(copias).length ? `Cc: ${malos(copias).join(", ")}` : null,
+    tocado.bcc && malos(ocultas).length ? `Cco: ${malos(ocultas).join(", ")}` : null,
+  ].filter(Boolean) as string[];
+  // `puedeEnviar` SÍ mira todo en vivo: el botón no se habilita con basura
+  // aunque el aviso todavía no se muestre.
+  const invalidos = [...malos(destinatarios), ...malos(copias), ...malos(ocultas)];
+  const cuerpoVacio = editor?.isEmpty ?? true;
   const puedeEnviar =
-    destinatarios.length > 0 && invalidos.length === 0 && !enviar.isPending;
+    destinatarios.length > 0 &&
+    invalidos.length === 0 &&
+    (!cuerpoVacio || subject.trim().length > 0) &&
+    !enviar.isPending;
 
   const handleEnviar = async () => {
-    let html = aHtml(cuerpo);
-
-    // La cita del correo original va como bloque aparte, para que el otro
-    // vea el contexto sin que se confunda con lo que se escribió ahora.
-    if (inicial?.citar) {
-      const c = inicial.citar;
-      const esc = c.texto
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      html +=
-        `<blockquote style="margin:16px 0 0;padding-left:12px;border-left:3px solid #d4d4d8;color:#52525b">` +
-        `<p style="margin:0 0 8px;font-size:13px">El ${c.fecha}, ${c.de} escribió:</p>` +
-        `<pre style="white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;margin:0">${esc}</pre>` +
-        `</blockquote>`;
-    }
-
+    if (!editor) return;
     try {
       await enviar.mutateAsync({
         to: destinatarios,
-        cc: partirDirecciones(cc),
+        cc: copias,
+        bcc: ocultas,
         subject: subject.trim() || "(sin asunto)",
-        html,
-        text: cuerpo,
+        html: htmlParaCorreo(editor.getHTML()),
+        text: textoParaCorreo(editor.getHTML()),
         in_reply_to: inicial?.inReplyTo,
         references: inicial?.references,
       });
       toast.success("Correo enviado");
-      setTo("");
-      setCc("");
-      setSubject("");
-      setCuerpo("");
       onCerrar();
     } catch (e) {
       toast.error((e as Error).message);
     }
   };
 
+  // Cerrar con algo escrito pide confirmación: un ESC o un click afuera no
+  // pueden costar diez minutos de redacción (no hay borradores todavía —
+  // cuando los haya, esto pasa a guardar en vez de preguntar).
+  //
+  // Se compara contra el estado INICIAL, no contra vacío: al responder ya
+  // vienen prellenados el destinatario, el "Re: …" y la cita en el editor,
+  // así que "¿hay algo?" contra vacío daba siempre true y abrir una
+  // respuesta y cerrarla preguntaba aunque no se hubiera escrito una letra.
+  const cerrarConCuidado = () => {
+    // Mientras el envío está en vuelo, cerrar desmonta el composer y el
+    // toast de error caería sobre un borrador que ya no existe.
+    if (enviar.isPending) return;
+    const cambio =
+      to !== (inicial?.to ?? "") ||
+      cc !== (inicial?.cc ?? "") ||
+      bcc !== "" ||
+      subject !== (inicial?.subject ?? "") ||
+      // Con el editor vacío TipTap devuelve "<p></p>", que no es igual al
+      // contenidoInicial "" de un correo nuevo: comparar strings a secas
+      // preguntaba al cerrar un compositor en el que no se tocó nada.
+      (contenidoInicial === ""
+        ? !cuerpoVacio
+        : (editor?.getHTML() ?? "") !== contenidoInicial);
+    if (cambio && !window.confirm("¿Descartar este correo? Lo escrito se pierde.")) return;
+    onCerrar();
+  };
+
   return (
-    <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
-      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 p-0">
-        <DialogHeader className="border-b px-5 py-4">
+    <Dialog open={abierto} onOpenChange={(v) => !v && cerrarConCuidado()}>
+      <DialogContent className="flex max-h-[92dvh] w-[min(96vw,52rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border/60 px-5 py-3">
           <DialogTitle className="text-base">
             {inicial?.inReplyTo ? "Responder" : "Nuevo correo"}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">Desde {remitente}</p>
+          <p className="text-xs text-muted-foreground">Desde {remitente}</p>
         </DialogHeader>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="mail-to">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* Destinatarios estilo Gmail: filas finas, Cc/Cco plegados.
+              `focus-within` marca la fila activa: los inputs son pelados
+              (sin el ring del componente Input) para que la fila se vea como
+              una línea de Gmail, así que el foco tiene que verse en la fila. */}
+          <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+            <label htmlFor="mail-to" className="w-12 shrink-0 text-sm text-muted-foreground">
               Para
             </label>
-            <Input
+            <input
               id="mail-to"
               value={to}
               onChange={(e) => setTo(e.target.value)}
+              onBlur={() => setTocado((t) => ({ ...t, to: true }))}
               placeholder="nombre@empresa.com"
               autoComplete="off"
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
             />
-            {invalidos.length > 0 && (
-              <p className="text-sm text-destructive">
-                No parecen direcciones válidas: {invalidos.join(", ")}
-              </p>
-            )}
+            <div className="flex shrink-0 gap-2 text-sm text-muted-foreground">
+              {!verCc && (
+                <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerCc(true)}>
+                  Cc
+                </button>
+              )}
+              {!verBcc && (
+                <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerBcc(true)}>
+                  Cco
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="mail-cc">
-              Copia <span className="font-normal text-muted-foreground">(opcional)</span>
-            </label>
-            <Input
-              id="mail-cc"
-              value={cc}
-              onChange={(e) => setCc(e.target.value)}
-              autoComplete="off"
-            />
-          </div>
+          {verCc && (
+            <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+              <label htmlFor="mail-cc" className="w-12 shrink-0 text-sm text-muted-foreground">
+                Cc
+              </label>
+              <input
+                id="mail-cc"
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
+                onBlur={() => setTocado((t) => ({ ...t, cc: true }))}
+                autoComplete="off"
+                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+              <button
+                type="button"
+                title="Quitar Cc"
+                aria-label="Quitar Cc"
+                onClick={() => { setCc(""); setVerCc(false); }}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="mail-subject">
+          {verBcc && (
+            <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+              <label htmlFor="mail-bcc" className="w-12 shrink-0 text-sm text-muted-foreground">
+                Cco
+              </label>
+              <input
+                id="mail-bcc"
+                value={bcc}
+                onChange={(e) => setBcc(e.target.value)}
+                onBlur={() => setTocado((t) => ({ ...t, bcc: true }))}
+                autoComplete="off"
+                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+              {/* Plegar limpia el valor: una copia oculta olvidada en una fila
+                  que ya no se ve es justo el accidente a evitar. */}
+              <button
+                type="button"
+                title="Quitar Cco"
+                aria-label="Quitar Cco"
+                onClick={() => { setBcc(""); setVerBcc(false); }}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+            <label htmlFor="mail-subject" className="sr-only">
               Asunto
             </label>
-            <Input
+            <input
               id="mail-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              placeholder="Asunto"
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:font-normal placeholder:text-muted-foreground/60"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="mail-body">
-              Mensaje
-            </label>
-            <Textarea
-              id="mail-body"
-              value={cuerpo}
-              onChange={(e) => setCuerpo(e.target.value)}
-              rows={10}
-              className="resize-y"
-            />
-          </div>
-
-          {inicial?.citar && (
-            <p className="text-sm text-muted-foreground">
-              Se va a incluir abajo el correo al que estás respondiendo.
+          {avisos.length > 0 && (
+            <p
+              role="alert"
+              className="border-b border-border/40 bg-destructive/5 px-5 py-1.5 text-xs text-destructive"
+            >
+              No parecen direcciones válidas — {avisos.join(" · ")}
             </p>
           )}
+
+          {/* Editor: "hoja" blanca SIEMPRE, también con Maven en oscuro.
+              Es lo que hace el preview honesto — el correo se va a leer sobre
+              blanco en Gmail/Outlook, y las tintas de la paleta (incluido el
+              negro) están pensadas para ese fondo. Con editor oscuro, elegir
+              negro dejaba el texto invisible al escribir. */}
+          <div className="flex-1 bg-white px-5 py-4">
+            <div
+              className={cn(
+                "text-[#1f2937]",
+                // Tailwind resetea listas y citas: se restauran SOLO adentro
+                // del editor, con los mismos valores que htmlParaCorreo.
+                "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6",
+                "[&_blockquote]:border-l-[3px] [&_blockquote]:border-[#d4d4d8] [&_blockquote]:pl-3 [&_blockquote]:text-[#52525b]",
+                "[&_a]:text-[#4f46e5] [&_a]:underline",
+                "[&_p]:my-1",
+                "[&_.is-editor-empty]:before:text-neutral-400",
+              )}
+              onClick={() => editor?.chain().focus().run()}
+            >
+              <EditorContent editor={editor} />
+            </div>
+          </div>
         </div>
 
-        <DialogFooter className="border-t px-5 py-3">
-          <Button variant="ghost" onClick={onCerrar} disabled={enviar.isPending}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleEnviar}
-            disabled={!puedeEnviar}
-            className="rounded-full bg-gradient-to-r from-accent to-primary text-white transition-opacity hover:opacity-90"
-          >
-            {enviar.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-2 h-4 w-4" />
-            )}
-            Enviar
-          </Button>
-        </DialogFooter>
+        {/* Pie estilo Gmail. En pantalla chica la barra de formato baja a su
+            propia fila: compitiendo con Enviar (~110px) y la papelera dejaba
+            ~130px para 16 herramientas, o sea 4 visibles y el resto detrás de
+            un scroll sin ninguna señal de que estaba ahí. */}
+        <div className="flex flex-col gap-1.5 border-t border-border/60 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-2">
+          <div className="flex items-center gap-2 sm:contents">
+            <Button
+              onClick={handleEnviar}
+              disabled={!puedeEnviar}
+              title={
+                destinatarios.length === 0
+                  ? "Falta el destinatario"
+                  : invalidos.length > 0
+                    ? "Hay direcciones inválidas"
+                    : "Enviar"
+              }
+              className="shrink-0 rounded-full bg-gradient-to-r from-accent to-primary px-5 text-white transition-opacity hover:opacity-90"
+            >
+              {enviar.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Enviar
+            </Button>
+
+            <button
+              type="button"
+              title="Descartar"
+              onClick={cerrarConCuidado}
+              disabled={enviar.isPending}
+              className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:order-last"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+
+          {editor && <BarraFormato editor={editor} />}
+        </div>
       </DialogContent>
     </Dialog>
   );

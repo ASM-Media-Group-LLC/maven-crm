@@ -380,6 +380,8 @@ export function useMailRealtime(enabled: boolean) {
 export interface OutgoingMail {
   to: string[];
   cc?: string[];
+  /** Copia oculta: viaja como destinatario SMTP pero jamás en los headers. */
+  bcc?: string[];
   subject: string;
   html?: string;
   text?: string;

@@ -555,3 +555,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     background: hsl(var(--muted-foreground) / 0.5);
   }
 }
+
+
+/* ── TipTap (compositor de correo): placeholder y foco ─────────────────── */
+.ProseMirror {
+  outline: none;
+}
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground) / 0.6);
+  pointer-events: none;
+  height: 0;
+}

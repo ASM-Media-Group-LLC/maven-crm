@@ -146,6 +146,21 @@ export class SmtpClient {
     recipients: string[],
     rfc822: string,
   ): Promise<SmtpResult> {
+    // Cortafuegos: NADA que no sea una dirección limpia llega al socket.
+    // Si algo raro llegó hasta acá, el envío falla entero — es preferible a
+    // ejecutar comandos SMTP metidos por el atacante.
+    if (!esDireccionSmtp(from)) {
+      return { ok: false, code: 0, message: "remitente inválido" };
+    }
+    const sucio = recipients.find((r) => !esDireccionSmtp(r));
+    if (sucio !== undefined) {
+      return {
+        ok: false,
+        code: 0,
+        message: `destinatario inválido: ${String(sucio).replace(/[\r\n]/g, "\\n").slice(0, 60)}`,
+      };
+    }
+
     const mail = await this.send(`MAIL FROM:<${from}>`);
     if (!mail.ok) return mail;
 
@@ -189,11 +204,107 @@ export class SmtpClient {
 // ---------------------------------------------------------------------------
 
 /** Codifica un encabezado si tiene caracteres fuera de ASCII.
- *  Sin esto, un asunto con tildes llega roto o hace que el servidor rechace. */
-function encodeHeader(value: string): string {
-  if (/^[\x20-\x7E]*$/.test(value)) return value;
-  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(value)));
-  return `=?UTF-8?B?${b64}?=`;
+ *  Sin esto, un asunto con tildes llega roto o hace que el servidor rechace.
+ *
+ *  RFC 2047 §2 limita cada "encoded-word" a 75 caracteres. Antes se metía el
+ *  valor ENTERO en uno solo: un asunto real como "Re: Seguimiento de la
+ *  reunión de ayer con el equipo 🚀" daba 120+ chars, y los decodificadores
+ *  estrictos muestran la basura cruda (`=?UTF-8?B?…`) en vez del asunto.
+ *  Se corta en varias palabras plegadas con CRLF + espacio, sin partir un
+ *  carácter multibyte por el medio (cortar un emoji = rombo con signo). */
+export function encodeHeader(value: string): string {
+  // El camino ASCII también se pliega: sin esto un asunto largo (o un
+  // References, que acumula los ids de todo el hilo) salía como UNA línea
+  // que pasa los 998 octetos del RFC 5322 y el servidor la rechaza. La
+  // versión con tilde del MISMO asunto sí se plegaba: quedaba mitad y mitad.
+  if (/^[\x20-\x7E]*$/.test(value)) return plegarAscii(value);
+  const bytes = new TextEncoder().encode(value);
+  // "=?UTF-8?B?" + "?=" son 12 chars; 45 bytes → 60 de base64 → 72 en total.
+  const MAX_BYTES = 45;
+  const palabras: string[] = [];
+  let i = 0;
+  while (i < bytes.length) {
+    let fin = Math.min(i + MAX_BYTES, bytes.length);
+    // 0b10xxxxxx = continuación UTF-8: retroceder hasta el inicio del carácter.
+    while (fin > i + 1 && fin < bytes.length && (bytes[fin] & 0xc0) === 0x80) fin--;
+    // Cortar preferentemente DESPUÉS de un espacio. Partir a mitad de palabra
+    // es legal, pero los decodificadores que no eliden el espacio entre
+    // encoded-words (el camino de `phrase` del From es uno) muestran
+    // "Coordinaci ón" — un nombre que parece mal escrito. Cortando en el
+    // espacio, el peor caso es un espacio doble: feo pero legible.
+    if (fin < bytes.length) {
+      for (let j = fin - 1; j > i + Math.floor(MAX_BYTES / 2); j--) {
+        if (bytes[j] === 0x20) { fin = j + 1; break; }
+      }
+    }
+    const trozo = bytes.slice(i, fin);
+    palabras.push(`=?UTF-8?B?${btoa(String.fromCharCode(...trozo))}?=`);
+    i = fin;
+  }
+  return palabras.join("\r\n ");
+}
+
+/** Pliega un valor ASCII largo en líneas de <= 76 (RFC 5322 §2.2.3): la
+ *  continuación arranca con un espacio, que es lo que la marca como parte
+ *  del mismo encabezado. Un token suelto más largo que el límite (un
+ *  message-id enorme) se deja entero: partirlo lo rompería. */
+function plegarAscii(valor: string): string {
+  if (valor.length <= 76) return valor;
+  const lineas: string[] = [];
+  let actual = "";
+  for (const palabra of valor.split(" ")) {
+    if (actual && actual.length + 1 + palabra.length > 76) {
+      lineas.push(actual);
+      actual = ` ${palabra}`;
+    } else {
+      actual = actual ? `${actual} ${palabra}` : palabra;
+    }
+  }
+  if (actual) lineas.push(actual);
+  return lineas.join("\r\n");
+}
+
+/** Encabezado de lista de direcciones, plegado (RFC 5322 §2.2.3).
+ *
+ *  `To: a, b, c…` en UNA línea se pasa de los 998 octetos con ~30 direcciones
+ *  — y ahora que hay campos libres de Cc y Cco, pegar una lista larga es lo
+ *  natural. Se pliega con CRLF + espacio, que es continuación de la misma
+ *  cabecera. */
+function headerDeLista(nombre: string, direcciones: string[]): string {
+  const partes = direcciones.map(sanitizeHeaderValue);
+  const lineas: string[] = [];
+  let actual = `${nombre}:`;
+  partes.forEach((dir, idx) => {
+    const item = idx < partes.length - 1 ? `${dir},` : dir;
+    if (actual.length + 1 + item.length > 76) {
+      lineas.push(actual);
+      actual = ` ${item}`;
+    } else {
+      actual += ` ${item}`;
+    }
+  });
+  lineas.push(actual);
+  return lineas.join("\r\n");
+}
+
+/** ¿Es una dirección de correo que se puede poner en un comando SMTP?
+ *
+ *  🔴 CRÍTICO — INYECCIÓN DE COMANDOS SMTP. `MAIL FROM:<x>` y `RCPT TO:<x>`
+ *  se escriben como UNA LÍNEA en el socket. Si la dirección trae \r\n, lo que
+ *  vaya después se convierte en un COMANDO más dentro de la sesión ya
+ *  autenticada: se puede colar un destinatario invisible (RCPT TO) o, peor,
+ *  un segundo mensaje entero (DATA) firmado con el DKIM de la empresa —
+ *  primitiva de suplantación lista para usar.
+ *
+ *  Por eso la validación vive ACÁ y no solo en el frontend o en la edge: es
+ *  el último punto antes del socket y no se puede saltear llamando a la API
+ *  directo. Deliberadamente estricta: sin espacios, sin comillas, sin < >,
+ *  un solo @, y con punto en el dominio. */
+export function esDireccionSmtp(v: unknown): v is string {
+  return typeof v === "string" &&
+    v.length <= 254 &&
+    !/[\r\n\t\s<>",;:\\]/.test(v) &&
+    /^[^@]+@[^@]+\.[^@]+$/.test(v);
 }
 
 /** Quita saltos de línea de un encabezado.
@@ -217,22 +328,79 @@ export interface OutgoingMessage {
   references?: string;
 }
 
+/** Quoted-printable (RFC 2045): UTF-8 → ASCII de 7 bits con líneas de máximo
+ *  76 caracteres. Resuelve TRES problemas de una: los emojis y acentos viajan
+ *  sin depender de que cada relay soporte 8BITMIME, ninguna línea supera el
+ *  límite de 998 del RFC 5321 (el HTML de un editor sale como UNA línea
+ *  kilométrica), y el mensaje sobrevive reenvíos por servidores viejos. */
+export function quotedPrintable(s: string): string {
+  const bytes = new TextEncoder().encode(s.replace(/\r\n/g, "\n"));
+  let plano = "";
+  for (const b of bytes) {
+    if ((b >= 33 && b <= 126 && b !== 61) || b === 32 || b === 9) {
+      plano += String.fromCharCode(b);
+    } else if (b === 10) {
+      plano += "\n";
+    } else {
+      plano += "=" + b.toString(16).toUpperCase().padStart(2, "0");
+    }
+  }
+  return plano
+    .split("\n")
+    .map((linea) => {
+      // Espacio o tab al FINAL de una línea dura debe encodearse.
+      linea = linea.replace(/ $/, "=20").replace(/\t$/, "=09");
+      const partes: string[] = [];
+      while (linea.length > 75) {
+        let corte = 75;
+        // No partir un =XX por la mitad.
+        if (linea[corte - 1] === "=") corte -= 1;
+        else if (linea[corte - 2] === "=") corte -= 2;
+        partes.push(linea.slice(0, corte) + "=");
+        linea = linea.slice(corte);
+      }
+      partes.push(linea);
+      return partes.join("\r\n");
+    })
+    .join("\r\n");
+}
+
 function boundary(): string {
   return `=_maven_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+/** Prepara el display-name del From.
+ *
+ *  `full_name` lo edita el propio usuario en su perfil. Suelto y sin comillas
+ *  permite construir un From que parece otra persona: un nombre como
+ *  `Contabilidad <pagos@unlok.me> (via` deja el header con dos direcciones y
+ *  varios clientes muestran la primera. Se sacan `< > "` y se encierra entre
+ *  comillas; si tiene acentos o emojis va como encoded-word (que ya es un
+ *  átomo y no necesita comillas). */
+function nombreParaFrom(nombre: string): string {
+  const base = sanitizeHeaderValue(nombre).replace(/[<>]/g, "").trim();
+  if (/^[\x20-\x7E]*$/.test(base)) {
+    // Dentro de un quoted-string los metacaracteres son DOS: la comilla y la
+    // barra invertida (RFC 5322 `quoted-pair`). Borrar solo la comilla dejaba
+    // que un nombre terminado en "\" la volviera a habilitar: el string no
+    // cerraba nunca y se tragaba la dirección — el From salía sin remitente.
+    // Se ESCAPAN en vez de borrarse, así "C:\Users\jhon" se lee entero.
+    return `"${base.replace(/(["\\])/g, "\\$1")}"`;
+  }
+  // Con acentos o emojis va como encoded-word, que ya es un átomo.
+  return encodeHeader(base);
 }
 
 /** Arma el RFC 822 listo para mandar. */
 export function buildMessage(msg: OutgoingMessage): string {
   const b = boundary();
-  const fromHeader = msg.fromName
-    ? `${encodeHeader(sanitizeHeaderValue(msg.fromName))} <${msg.from}>`
-    : msg.from;
+  const fromHeader = msg.fromName ? `${nombreParaFrom(msg.fromName)} <${msg.from}>` : msg.from;
 
   const headers: string[] = [
     `From: ${fromHeader}`,
-    `To: ${msg.to.map(sanitizeHeaderValue).join(", ")}`,
+    headerDeLista("To", msg.to),
   ];
-  if (msg.cc?.length) headers.push(`Cc: ${msg.cc.map(sanitizeHeaderValue).join(", ")}`);
+  if (msg.cc?.length) headers.push(headerDeLista("Cc", msg.cc));
   headers.push(`Subject: ${encodeHeader(sanitizeHeaderValue(msg.subject))}`);
   headers.push(`Date: ${new Date().toUTCString()}`);
   headers.push(`Message-ID: <${crypto.randomUUID()}@maven-ai.me>`);
@@ -255,15 +423,15 @@ export function buildMessage(msg: OutgoingMessage): string {
       "",
       `--${b}`,
       'Content-Type: text/plain; charset="utf-8"',
-      "Content-Transfer-Encoding: 8bit",
+      "Content-Transfer-Encoding: quoted-printable",
       "",
-      text,
+      quotedPrintable(text),
       "",
       `--${b}`,
       'Content-Type: text/html; charset="utf-8"',
-      "Content-Transfer-Encoding: 8bit",
+      "Content-Transfer-Encoding: quoted-printable",
       "",
-      msg.html,
+      quotedPrintable(msg.html),
       "",
       `--${b}--`,
       "",
@@ -271,8 +439,8 @@ export function buildMessage(msg: OutgoingMessage): string {
   }
 
   headers.push('Content-Type: text/plain; charset="utf-8"');
-  headers.push("Content-Transfer-Encoding: 8bit");
-  return [headers.join("\r\n"), "", text, ""].join("\r\n");
+  headers.push("Content-Transfer-Encoding: quoted-printable");
+  return [headers.join("\r\n"), "", quotedPrintable(text), ""].join("\r\n");
 }
 
 /** Versión en texto de un HTML, para la parte alternativa. */

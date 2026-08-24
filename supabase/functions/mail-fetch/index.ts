@@ -22,7 +22,7 @@ import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
 import { ImapClient } from "../_shared/imap.ts";
 import { parseMessage } from "../_shared/mime.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
-import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
+import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
 
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const {
       action, folder, limit, seq, mark_read, with_bodies,
-      to, cc, subject, text, html, in_reply_to, references,
+      to, cc, bcc, subject, text, html, in_reply_to, references,
     } = body as {
       action?: string;
       folder?: string;
@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
       subject?: string;
       text?: string;
       html?: string;
+      bcc?: string[];
       /** Message-ID al que se responde, para que el hilo no se corte. */
       in_reply_to?: string;
       references?: string;
@@ -502,6 +503,19 @@ Deno.serve(async (req) => {
         return json(req, { error: "el correo está vacío" }, 400);
       }
 
+      // Validación en el SERVIDOR de cada dirección. La del composer es
+      // ayuda de UI: quien llame a esta función con el JWT y un cuerpo
+      // armado a mano se la saltea. Sin esto, un \r\n en un destinatario
+      // inyecta comandos en la sesión SMTP (ver esDireccionSmtp).
+      const sospechosas = [...to, ...(cc ?? []), ...(bcc ?? [])]
+        .filter((d) => !esDireccionSmtp(d));
+      if (sospechosas.length) {
+        return json(req, {
+          error: "hay direcciones inválidas",
+          direcciones: sospechosas.map((d) => String(d).replace(/[\r\n]/g, "\\n").slice(0, 60)),
+        }, 400);
+      }
+
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
         .select("id, email_address, secret_cipher, secret_nonce, key_version, smtp_host, smtp_port")
@@ -561,7 +575,10 @@ Deno.serve(async (req) => {
           return json(req, { error: `SMTP rechazó la credencial: ${auth.message}` }, 502);
         }
 
-        const all = [...to, ...(cc ?? [])];
+        // Cco va SOLO como destinatario SMTP (RCPT TO): buildMessage no
+        // escribe ningún header Bcc, que es exactamente lo que lo hace
+        // "oculto" — los demás destinatarios nunca lo ven.
+        const all = [...to, ...(cc ?? []), ...(bcc ?? [])];
         const sent = await smtp.sendMessage(fromAddress, all, rfc822);
         if (!sent.ok) {
           return json(req, { error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
