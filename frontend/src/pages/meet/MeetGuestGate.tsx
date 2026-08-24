@@ -73,7 +73,16 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       }, () => fetchPending(meetRoomId))
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Respaldo del realtime: re-consulta cada 5s. El invitado espera contra un
+    // panel que TIENE que ver su solicitud; si el canal se cae (pasa bajo
+    // carga), el polling garantiza que igual aparezca. Es una fila por
+    // reunión, cuesta nada.
+    const poll = window.setInterval(() => fetchPending(meetRoomId), 5000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+    };
   }, [meetRoomId, fetchPending]);
 
   const decide = async (request: GuestRequest, admit: boolean) => {
@@ -96,8 +105,8 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       if (!res.ok) throw new Error(json.error || "No se pudo decidir");
       toast.success(admit ? `${request.guest_name} puede entrar` : `${request.guest_name} fue rechazado`);
       if (meetRoomId) fetchPending(meetRoomId);
-    } catch (e: any) {
-      toast.error(e.message || "No se pudo decidir");
+    } catch (e) {
+      toast.error((e as Error).message || "No se pudo decidir");
     } finally {
       setDeciding(null);
     }
