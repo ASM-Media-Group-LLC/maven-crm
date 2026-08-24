@@ -35,6 +35,22 @@ interface Props {
 
 type AnswerValue = string | number | boolean | string[] | null;
 
+/**
+ * `creators.instagram_handle` no esta normalizado en la base: hay handles
+ * limpios, con @, y URLs completas de Instagram. Sin esto la opcion salia como
+ * "ILIANA CHACON · @https://www.instagram.com/pandoraletrain__/".
+ */
+function normalizeHandle(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  return s
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.)?instagram\.com\//i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/^@+/, "")
+    .trim();
+}
+
 /** ¿La respuesta cuenta como vacía para un campo obligatorio? */
 function isBlank(v: AnswerValue): boolean {
   if (v === null || v === undefined) return true;
@@ -75,9 +91,11 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
         value: c.id,
         // El handle va en la etiqueta, no solo en el texto de busqueda: sin el,
         // la lista parece corta y ambigua (hay 338 creadoras y homonimas).
-        label: c.instagram_handle
-          ? `${c.artistic_name || c.name} · @${String(c.instagram_handle).replace(/^@/, "")}`
-          : c.artistic_name || c.name,
+        label: (() => {
+          const nombre = c.artistic_name || c.name;
+          const h = normalizeHandle(c.instagram_handle);
+          return h ? `${nombre} · @${h}` : nombre;
+        })(),
         searchAdditional: [c.name, c.artistic_name, c.instagram_handle]
           .filter(Boolean)
           .join(" "),
