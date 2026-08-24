@@ -16,6 +16,7 @@ interface MessageListProps {
   onCopy: (content: string) => void;
   onEdit: (id: string, content: string) => void;
   onDelete: (id: string) => void;
+  onRetry?: (id: string) => void;
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
@@ -61,7 +62,7 @@ function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onCopy, onEdit, onDelete,
+  loading, onReply, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
@@ -262,6 +263,7 @@ export default function MessageList({
                       onCopy={() => onCopy(msg.content || "")}
                       onEdit={(content) => onEdit(msg.id, content)}
                       onDelete={() => onDelete(msg.id)}
+                      onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
                       showAvatar={isLastInGroup && !isMe}
                       showSender={isFirstInGroup && !isMe}

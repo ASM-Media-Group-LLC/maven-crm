@@ -10,6 +10,7 @@ import {
 } from "@/pages/messenger/types";
 import { profileName } from "@/pages/messenger/utils";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
+import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -775,15 +776,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const typingChannelRef = useRef<any>(null);
   const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
-  const offlineQueueRef = useRef<Array<{
-    optimisticId: string;
-    conversationId: string;
-    content: string;
-    type: ChatMessage["type"];
-    fileUrl?: string;
-    fileName?: string;
-    replyToId?: string;
-  }>>([]);
   const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
   const messagesRealtimeRetryRef = useRef(0);
   const messagesRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -818,6 +810,25 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       setMessages(sorted);
       setHasMore((data?.length || 0) >= PAGE_SIZE);
       optimisticIdsRef.current.clear();
+
+      // Restaurar mensajes propios NO confirmados (persistidos) para que sobrevivan a recargar.
+      // Se muestran como 'failed' (reintentables); el evento 'online' los reintenta solo.
+      if (user) {
+        const restored: ChatMessage[] = pendingForConversation(user.id, conversationId).map((p) => ({
+          id: p.optimisticId, conversation_id: p.conversationId, sender_id: user.id,
+          content: p.content, type: p.type as ChatMessage["type"], file_url: p.fileUrl || null,
+          file_name: p.fileName || null, file_size: null, reply_to_id: p.replyToId || null,
+          is_edited: false, is_deleted: false, created_at: p.createdAt, updated_at: p.createdAt,
+          _localStatus: "failed",
+        }));
+        if (restored.length) {
+          restored.forEach((m) => optimisticIdsRef.current.add(m.id));
+          setMessages((prev) => {
+            const have = new Set(prev.map((m) => m.id));
+            return [...prev, ...restored.filter((m) => !have.has(m.id))];
+          });
+        }
+      }
 
       // Backfill "entregado": al abrir la conversación, marcar como entregados los mensajes
       // de otros (los que llegaron mientras no estábamos conectados/mirando).
@@ -878,48 +889,17 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     loadMessages();
   }, [loadMessages]);
 
-  // Flush offline queue when back online
+  // Al recuperar conexión, reintentar automáticamente los mensajes fallidos.
+  const retryMessageRef = useRef<((id: string) => void) | null>(null);
   useEffect(() => {
-    const handleOnline = async () => {
-      if (!user) return;
-      const queue = offlineQueueRef.current;
-      if (queue.length === 0) return;
-      offlineQueueRef.current = [];
-
-      let synced = 0;
-      for (const item of queue) {
-        const { data, error } = await supabase.from("chat_messages").insert({
-          conversation_id: item.conversationId,
-          sender_id: user.id,
-          content: item.content,
-          type: item.type,
-          file_url: item.fileUrl || null,
-          file_name: item.fileName || null,
-          reply_to_id: item.replyToId || null,
-        }).select().single();
-
-        if (!error && data) {
-          synced += 1;
-          const real = data as ChatMessage;
-          optimisticIdsRef.current.delete(item.optimisticId);
-          // Reemplazar el placeholder optimista por la fila real. Si el canal realtime
-          // ya insertó esa fila (carrera), solo quitamos el optimista → nunca se duplica.
-          setMessages((prev) =>
-            prev.some((m) => m.id === real.id)
-              ? prev.filter((m) => m.id !== item.optimisticId)
-              : prev.map((m) => (m.id === item.optimisticId ? real : m))
-          );
-        } else {
-          // Falló el re-envío → re-encolar para el próximo reconnect (no perder el mensaje).
-          offlineQueueRef.current.push(item);
-        }
-      }
-      if (synced > 0) toast.success(`${synced} mensaje(s) sincronizado(s)`);
+    const handleOnline = () => {
+      messagesRef.current
+        .filter((m) => m._localStatus === "failed")
+        .forEach((m) => retryMessageRef.current?.(m.id));
     };
-
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  }, [conversationId, user]);
+  }, []);
 
   // Realtime messages with resilient reconnection
   useEffect(() => {
@@ -1078,6 +1058,50 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     };
   }, [conversationId, user?.id, messagesRealtimeVersion]);
 
+  // Envío real, compartido por sendMessage y el reintento. Marca 'sending'; en éxito reemplaza
+  // el optimista por la fila real (o lo quita si el realtime ya lo insertó) y limpia la cola
+  // persistente; en offline/error deja el mensaje como 'failed' (queda persistido → reintentable).
+  const performSend = useCallback(
+    async (p: {
+      optimisticId: string; conversationId: string; content: string;
+      type: ChatMessage["type"]; fileUrl?: string; fileName?: string; replyToId?: string;
+    }) => {
+      if (!user) return;
+      setMessages((prev) => prev.map((m) => (m.id === p.optimisticId ? { ...m, _localStatus: "sending" } : m)));
+
+      if (!navigator.onLine) {
+        setMessages((prev) => prev.map((m) => (m.id === p.optimisticId ? { ...m, _localStatus: "failed" } : m)));
+        return;
+      }
+
+      const { data, error } = await supabase.from("chat_messages").insert({
+        conversation_id: p.conversationId,
+        sender_id: user.id,
+        content: p.content,
+        type: p.type,
+        file_url: p.fileUrl || null,
+        file_name: p.fileName || null,
+        reply_to_id: p.replyToId || null,
+      }).select().single();
+
+      if (error || !data) {
+        setMessages((prev) => prev.map((m) => (m.id === p.optimisticId ? { ...m, _localStatus: "failed" } : m)));
+        return;
+      }
+
+      optimisticIdsRef.current.delete(p.optimisticId);
+      removePending(user.id, p.optimisticId);
+      const real = data as ChatMessage;
+      setMessages((prev) =>
+        prev.some((m) => m.id === real.id)
+          ? prev.filter((m) => m.id !== p.optimisticId)   // el realtime ya lo insertó → sin duplicar
+          : prev.map((m) => (m.id === p.optimisticId ? real : m))
+      );
+      supabase.from("chat_conversations").update({ updated_at: new Date().toISOString() }).eq("id", p.conversationId).then();
+    },
+    [user]
+  );
+
   const sendMessage = useCallback(
     async (
       content: string,
@@ -1087,63 +1111,40 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       replyToId?: string
     ) => {
       if (!conversationId || !user) return;
-
-      // Optimistic insert
       const optimisticId = crypto.randomUUID();
+      const now = new Date().toISOString();
       optimisticIdsRef.current.add(optimisticId);
-
       const optimisticMsg: ChatMessage = {
-        id: optimisticId,
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content,
-        type,
-        file_url: fileUrl || null,
-        file_name: fileName || null,
-        file_size: null,
-        reply_to_id: replyToId || null,
-        is_edited: false,
-        is_deleted: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        id: optimisticId, conversation_id: conversationId, sender_id: user.id,
+        content, type, file_url: fileUrl || null, file_name: fileName || null, file_size: null,
+        reply_to_id: replyToId || null, is_edited: false, is_deleted: false,
+        created_at: now, updated_at: now, _localStatus: "sending",
       };
       setMessages((prev) => [...prev, optimisticMsg]);
-
-      // If offline, queue the message (con el optimisticId para reconciliar por id al reconectar)
-      if (!navigator.onLine) {
-        offlineQueueRef.current.push({ optimisticId, conversationId, content, type, fileUrl, fileName, replyToId });
-        toast.info("Sin conexión — el mensaje se enviará al reconectar");
-        return;
-      }
-
-      const { data, error } = await supabase.from("chat_messages").insert({
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content,
-        type,
-        file_url: fileUrl || null,
-        file_name: fileName || null,
-        reply_to_id: replyToId || null,
-      }).select().single();
-
-      if (error) {
-        optimisticIdsRef.current.delete(optimisticId);
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast.error("Error al enviar mensaje");
-      } else if (data) {
-        optimisticIdsRef.current.delete(optimisticId);
-        setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
-      }
-
-      // Fire-and-forget: don't block UI for the updated_at bump
-      supabase
-        .from("chat_conversations")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", conversationId)
-        .then();
+      // Persistir ANTES de intentar: si no se confirma (offline/error/recarga), sobrevive.
+      addPending(user.id, { optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, createdAt: now });
+      await performSend({ optimisticId, conversationId, content, type, fileUrl, fileName, replyToId });
     },
-    [conversationId, user]
+    [conversationId, user, performSend]
   );
+
+  // Reintentar un mensaje fallido (botón manual o al recuperar conexión). Reconstruye el
+  // payload desde el mensaje en estado (robusto aunque localStorage no esté disponible).
+  const retryMessage = useCallback(
+    (optimisticId: string) => {
+      const m = messagesRef.current.find((x) => x.id === optimisticId);
+      if (!m || !user) return;
+      const payload = {
+        optimisticId, conversationId: m.conversation_id, content: m.content || "",
+        type: m.type, fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
+        replyToId: m.reply_to_id || undefined,
+      };
+      addPending(user.id, { ...payload, createdAt: m.created_at });
+      void performSend(payload);
+    },
+    [user, performSend]
+  );
+  retryMessageRef.current = retryMessage;
 
   const sendTyping = useCallback(
     async (isTyping: boolean) => {
@@ -1178,6 +1179,15 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {
+    // Mensaje LOCAL no confirmado (sending/failed): no existe en la BD → descartarlo local
+    // y quitarlo de la cola persistente (permite descartar un fallido que no querés reintentar).
+    const local = messagesRef.current.find((m) => m.id === messageId);
+    if (local?._localStatus) {
+      optimisticIdsRef.current.delete(messageId);
+      if (user) removePending(user.id, messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      return;
+    }
     // Igual que editMessage: si el id es optimista (aún enviándose), el UPDATE no
     // matchearía nada y el borrado se perdería en silencio → bloquear hasta que persista.
     if (optimisticIdsRef.current.has(messageId)) {
@@ -1194,7 +1204,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       toast.error("Error al eliminar mensaje");
       void loadMessagesRef.current?.();
     }
-  }, []);
+  }, [user]);
 
   return {
     messages,
@@ -1207,6 +1217,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     sendTyping,
     editMessage,
     deleteMessage,
+    retryMessage,
   };
 }
 

@@ -22,6 +22,7 @@ interface ChatViewProps {
   onSendTyping: (isTyping: boolean) => void;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
+  onRetryMessage?: (id: string) => void;
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   loading: boolean;
@@ -42,7 +43,7 @@ interface ChatViewProps {
 
 export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
-  onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
+  onEditMessage, onDeleteMessage, onRetryMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers,
   hasMore, loadingMore, onLoadMore, onMembersChanged,
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
@@ -205,6 +206,7 @@ export default function ChatView({
         onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
         onEdit={onEditMessage}
         onDelete={onDeleteMessage}
+        onRetry={onRetryMessage}
         getReactionsForMessage={getReactionsForMessage}
         onToggleReaction={onToggleReaction}
         getReadByUsers={getReadByUsers}

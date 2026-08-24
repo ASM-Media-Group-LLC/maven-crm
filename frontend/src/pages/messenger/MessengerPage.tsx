@@ -90,7 +90,7 @@ export default function MessengerPage() {
 
   const {
     messages, loading: msgsLoading, typingUsers,
-    sendMessage, sendTyping, editMessage, deleteMessage,
+    sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
     hasMore, loadingMore, loadOlderMessages,
   } = useMessages(activeChatId, handleNewMessage);
 
@@ -211,6 +211,7 @@ export default function MessengerPage() {
               onSendTyping={sendTyping}
               onEditMessage={editMessage}
               onDeleteMessage={deleteMessage}
+              onRetryMessage={retryMessage}
               onBack={() => selectChat(null)}
               onStartVideoCall={handleStartVideoCall}
               loading={msgsLoading}

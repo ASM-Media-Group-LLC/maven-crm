@@ -1,6 +1,6 @@
 import { forwardRef, useState, useMemo, memo } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -30,6 +30,7 @@ interface MessageBubbleProps {
   onCopy: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  onRetry?: () => void;
   replyMessage?: ChatMessage;
   showAvatar: boolean;
   showSender: boolean;
@@ -48,7 +49,7 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
-  message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
+  message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete, onRetry,
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
@@ -393,13 +394,29 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               <span className={cn("text-[10px]", isMe ? "text-primary-foreground/60" : "text-muted-foreground")}>
                 {formatMsgTime(message.created_at)}
               </span>
-              <ReadReceiptIndicator
-                isMe={isMe}
-                deliveredByUsers={deliveredByUsers}
-                readByUsers={readByUsers}
-                profiles={profiles}
-                totalParticipants={totalParticipants}
-              />
+              {isMe && message._localStatus === "sending" ? (
+                // Aún en vuelo: reloj (como el "reloj" de WhatsApp antes de la palomita).
+                <Clock className="h-3 w-3 text-primary-foreground/50" aria-label="Enviando" />
+              ) : isMe && message._localStatus === "failed" ? (
+                // No se pudo enviar → botón para reintentar (antes el mensaje desaparecía sin avisar).
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="flex items-center gap-0.5 text-[10px] font-medium text-red-200 hover:text-white transition-colors"
+                  title="No se envió · toca para reintentar"
+                >
+                  <RotateCw className="h-3 w-3" />
+                  Reintentar
+                </button>
+              ) : (
+                <ReadReceiptIndicator
+                  isMe={isMe}
+                  deliveredByUsers={deliveredByUsers}
+                  readByUsers={readByUsers}
+                  profiles={profiles}
+                  totalParticipants={totalParticipants}
+                />
+              )}
             </div>
             <ReactionsDisplay reactions={reactions} profiles={profiles} isMe={isMe} onToggle={onToggleReaction} />
           </div>

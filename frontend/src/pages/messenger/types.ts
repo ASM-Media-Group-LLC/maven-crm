@@ -34,6 +34,9 @@ export interface ChatMessage {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+  // Solo cliente (no viene de la BD): estado de envío de un mensaje propio optimista.
+  // 'sending' = en vuelo; 'failed' = no se pudo enviar (offline o error) → se puede reintentar.
+  _localStatus?: "sending" | "failed";
 }
 
 export interface ChatReadReceipt {
