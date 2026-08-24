@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2, LogOut } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -36,6 +36,7 @@ export default function GroupMembersPanel({
   const [removing, setRemoving] = useState(false);
   const [leavingGroup, setLeavingGroup] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
 
   const isAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const memberIds = new Set(conversation.participants.map(p => p.user_id));
@@ -109,9 +110,62 @@ export default function GroupMembersPanel({
     setRemovingUser(null);
   };
 
+  // Hacer / quitar admin (varios admins, modelo WhatsApp). La RLS permite a un admin editar
+  // la fila de otros; el trigger garantiza que solo un admin cambie 'role'. Se usa .select()
+  // para detectar el no-op silencioso de RLS (un UPDATE que no matchea no falla).
+  const handleToggleAdmin = async (userId: string, name: string, makeAdmin: boolean) => {
+    setUpdatingRole(userId);
+    const { data, error } = await supabase
+      .from("chat_participants")
+      .update({ role: makeAdmin ? "admin" : "member" })
+      .eq("conversation_id", conversation.id)
+      .eq("user_id", userId)
+      .select("id");
+    if (error || !data || data.length === 0) {
+      toast.error("No se pudo cambiar el rol");
+    } else {
+      toast.success(makeAdmin ? `${name} ahora es admin` : `${name} ya no es admin`);
+      await supabase.from("chat_messages").insert({
+        conversation_id: conversation.id,
+        sender_id: user!.id,
+        content: makeAdmin
+          ? `${profiles[user!.id]?.full_name || "Admin"} nombró admin a ${name}`
+          : `${profiles[user!.id]?.full_name || "Admin"} quitó admin a ${name}`,
+        type: "system",
+      });
+      onMembersChanged();
+    }
+    setUpdatingRole(null);
+  };
+
   const handleLeaveGroup = async () => {
     setLeavingGroup(true);
     const myName = profiles[user!.id]?.full_name || "Usuario";
+
+    // Si soy el ÚLTIMO admin y quedan otros miembros, promuevo al más antiguo para no dejar
+    // el grupo sin admin (mientras sigo siendo admin, que es cuando la RLS me deja).
+    const others = conversation.participants.filter(p => p.user_id !== user!.id);
+    const remainingAdmins = others.filter(p => p.role === "admin");
+    if (isAdmin && remainingAdmins.length === 0 && others.length > 0) {
+      const successor = [...others].sort(
+        (a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime()
+      )[0];
+      await supabase
+        .from("chat_participants")
+        .update({ role: "admin" })
+        .eq("conversation_id", conversation.id)
+        .eq("user_id", successor.user_id);
+    }
+
+    // El mensaje de sistema VA ANTES de borrar mi fila: una vez que dejo de ser participante,
+    // la RLS de chat_messages rechaza el INSERT (antes fallaba en silencio y nadie se enteraba).
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversation.id,
+      sender_id: user!.id,
+      content: `${myName} salió del grupo`,
+      type: "system",
+    });
+
     const { error } = await supabase
       .from("chat_participants")
       .delete()
@@ -120,12 +174,6 @@ export default function GroupMembersPanel({
     if (error) {
       toast.error("Error al salir del grupo");
     } else {
-      await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id,
-        sender_id: user!.id,
-        content: `${myName} salió del grupo`,
-        type: "system",
-      });
       toast.success("Has salido del grupo");
       onMembersChanged();
       onClose();
@@ -257,15 +305,35 @@ export default function GroupMembersPanel({
                   </p>
                 </div>
                 {isAdmin && !isSelf && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => setRemovingUser({ id: p.user_id, name })}
-                    title="Eliminar del grupo"
-                  >
-                    <UserMinus className="h-3.5 w-3.5" />
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-amber-500"
+                      onClick={() => handleToggleAdmin(p.user_id, name, p.role !== "admin")}
+                      disabled={updatingRole === p.user_id}
+                      title={p.role === "admin" ? "Quitar admin" : "Hacer admin"}
+                      aria-label={p.role === "admin" ? `Quitar admin a ${name}` : `Hacer admin a ${name}`}
+                    >
+                      {updatingRole === p.user_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : p.role === "admin" ? (
+                        <ShieldOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Crown className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => setRemovingUser({ id: p.user_id, name })}
+                      title="Eliminar del grupo"
+                      aria-label={`Eliminar a ${name} del grupo`}
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
                 )}
               </div>
             );
@@ -273,20 +341,19 @@ export default function GroupMembersPanel({
         </div>
       </ScrollArea>
 
-      {/* Leave group button for non-admin */}
-      {!isAdmin && (
-        <div className="px-4 py-3 border-t border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setShowLeaveConfirm(true)}
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Salir del grupo
-          </Button>
-        </div>
-      )}
+      {/* Salir del grupo — disponible para TODOS (los admins también; si sos el último admin,
+          handleLeaveGroup promueve al miembro más antiguo para no dejar el grupo sin admin). */}
+      <div className="px-4 py-3 border-t border-border">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setShowLeaveConfirm(true)}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Salir del grupo
+        </Button>
+      </div>
 
       {/* Remove confirmation */}
       <AlertDialog open={!!removingUser} onOpenChange={() => setRemovingUser(null)}>
