@@ -72,13 +72,13 @@ describe("CallControls", () => {
   it("applies red styling when mic is off", () => {
     render(<CallControls {...defaultProps} isMicOn={false} />);
     const micBtn = screen.getByTitle("Micrófono");
-    expect(micBtn.className).toContain("0_72%");
+    expect(micBtn.className).toContain("destructive");
   });
 
   it("applies red styling when cam is off", () => {
     render(<CallControls {...defaultProps} isCamOn={false} />);
     const camBtn = screen.getByTitle("Cámara");
-    expect(camBtn.className).toContain("0_72%");
+    expect(camBtn.className).toContain("destructive");
   });
 
   it("hides screen share button when hideScreenShare is true", () => {

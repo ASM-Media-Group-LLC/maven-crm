@@ -252,19 +252,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   if (lk.connectionState === ConnectionState.Connecting) {
     return (
-      <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)] items-center justify-center gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-[hsl(214_82%_51%)]" />
-        <p className="text-sm text-[hsl(220_3%_60%)]">Conectando a la sala...</p>
+      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Conectando a la sala...</p>
       </div>
     );
   }
 
   if (lk.error) {
     return (
-      <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)] items-center justify-center gap-4">
-        <p className="text-[hsl(0_72%_65%)] font-medium">Error de conexión</p>
-        <p className="text-sm text-[hsl(220_3%_55%)] max-w-md text-center">{lk.error}</p>
-        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-[hsl(214_82%_51%)] text-white text-sm hover:bg-[hsl(214_82%_45%)]">Volver</button>
+      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        <p className="text-destructive font-medium">Error de conexión</p>
+        <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
+        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">Volver</button>
       </div>
     );
   }
@@ -277,11 +277,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     : "grid-cols-3 md:grid-cols-4";
 
   return (
-    <div ref={rootRef} className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)]">
+    <div ref={rootRef} className="flex flex-col h-full bg-background text-foreground">
       <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
 
       {lk.isReconnecting && (
-        <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-[hsl(40_96%_50%/0.15)] text-[hsl(40_96%_60%)] text-xs font-medium">
+        <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
           <WifiOff className="h-3.5 w-3.5 animate-pulse" /> Reconectando...
         </div>
       )}
@@ -317,7 +317,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
           {lk.participants.length <= 1 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
-              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-[hsl(220_3%_30%)] px-3 py-1.5 text-xs text-[hsl(220_3%_60%)] backdrop-blur-sm">Esperando a que otros participantes se unan...</div>
+              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">Esperando a que otros participantes se unan...</div>
             </div>
           )}
 

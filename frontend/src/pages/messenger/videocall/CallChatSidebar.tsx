@@ -25,11 +25,11 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
   };
 
   return (
-    <div className="w-80 flex flex-col bg-[hsl(220_3%_17%)] border-l border-[hsl(220_3%_25%)] rounded-l-xl">
+    <div className="w-80 flex flex-col bg-background border-l border-secondary rounded-l-xl">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[hsl(220_3%_25%)]">
-        <h3 className="text-sm font-medium text-[hsl(220_3%_85%)]">Chat de la llamada</h3>
-        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-[hsl(220_3%_60%)] hover:bg-[hsl(220_3%_25%)] transition-colors">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
+        <h3 className="text-sm font-medium text-foreground">Chat de la llamada</h3>
+        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -38,7 +38,7 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-3">
           {messages.length === 0 && (
-            <p className="text-xs text-[hsl(220_3%_45%)] text-center py-8">
+            <p className="text-xs text-muted-foreground text-center py-8">
               Los mensajes del chat aparecerán aquí
             </p>
           )}
@@ -47,18 +47,18 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
             return (
               <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                 {!isMe && (
-                  <span className="text-[10px] text-[hsl(220_3%_55%)] mb-0.5">{msg.senderName}</span>
+                  <span className="text-[10px] text-muted-foreground mb-0.5">{msg.senderName}</span>
                 )}
                 <div
                   className={`rounded-2xl px-3 py-1.5 max-w-[85%] text-sm ${
                     isMe
-                      ? "bg-[hsl(214_82%_51%)] text-white rounded-br-md"
-                      : "bg-[hsl(220_3%_25%)] text-[hsl(220_3%_85%)] rounded-bl-md"
+                      ? "bg-primary text-white rounded-br-md"
+                      : "bg-secondary text-foreground rounded-bl-md"
                   }`}
                 >
                   {msg.content}
                 </div>
-                <span className="text-[9px] text-[hsl(220_3%_40%)] mt-0.5">
+                <span className="text-[9px] text-muted-foreground mt-0.5">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
@@ -69,19 +69,19 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 border-t border-[hsl(220_3%_25%)]">
+      <div className="p-3 border-t border-secondary">
         <div className="flex gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-[hsl(220_3%_22%)] border border-[hsl(220_3%_30%)] rounded-full px-3.5 py-2 text-sm text-[hsl(220_3%_85%)] placeholder:text-[hsl(220_3%_45%)] focus:outline-none focus:ring-1 focus:ring-[hsl(214_82%_51%)]"
+            className="flex-1 bg-card border border-border rounded-full px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="h-9 w-9 rounded-full bg-[hsl(214_82%_51%)] text-white flex items-center justify-center hover:bg-[hsl(214_82%_45%)] transition-colors disabled:opacity-40 shrink-0"
+            className="h-9 w-9 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-40 shrink-0"
           >
             <Send className="h-4 w-4" />
           </button>

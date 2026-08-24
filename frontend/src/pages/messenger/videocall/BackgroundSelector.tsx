@@ -74,31 +74,31 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           className={cn(
             "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
             selected !== "none"
-              ? "bg-[hsl(214_82%_51%/0.2)] text-[hsl(214_82%_65%)] hover:bg-[hsl(214_82%_51%/0.3)]"
-              : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+              ? "bg-primary/20 text-primary hover:bg-primary/30"
+              : "bg-card text-foreground hover:bg-muted"
           )}
         >
           <ImageIcon className="h-[18px] w-[18px]" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" className="w-80 p-3 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_25%)]">
-        <p className="text-xs font-medium text-[hsl(220_3%_85%)] mb-3">Fondos y efectos</p>
+      <PopoverContent side="top" align="center" className="w-80 p-3 bg-background border-secondary">
+        <p className="text-xs font-medium text-foreground mb-3">Fondos y efectos</p>
 
         {/* Effect options */}
         <div className="flex gap-2 mb-3">
           <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onSelect("none")}>
-            <div className="w-full h-full bg-[hsl(220_3%_25%)] rounded flex items-center justify-center">
-              <Ban className="h-4 w-4 text-[hsl(220_3%_55%)]" />
+            <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
+              <Ban className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
           <EffectOption label="Difuminar fondo" active={isSelected("blur")} onClick={() => onSelect("blur")}>
-            <div className="w-full h-full rounded bg-[hsl(220_3%_28%)] flex items-center justify-center">
-              <Cloud className="h-4 w-4 text-[hsl(220_3%_55%)]" />
+            <div className="w-full h-full rounded bg-muted flex items-center justify-center">
+              <Cloud className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
           <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
-            <div className="w-full h-full bg-[hsl(220_3%_25%)] rounded flex items-center justify-center">
-              <Plus className="h-4 w-4 text-[hsl(220_3%_55%)]" />
+            <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
+              <Plus className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
         </div>
@@ -108,7 +108,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         {/* Custom backgrounds */}
         {customBgs.length > 0 && (
           <>
-            <p className="text-[10px] uppercase tracking-wider text-[hsl(220_3%_50%)] mb-2">Tus fondos</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Tus fondos</p>
             <div className="grid grid-cols-4 gap-1.5 mb-3">
               {customBgs.map((bg) => (
                 <button
@@ -118,8 +118,8 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
                   className={cn(
                     "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
                     isSelected(`custom:${bg.objectUrl}`)
-                      ? "border-[hsl(214_82%_51%)] ring-1 ring-[hsl(214_82%_51%/0.3)]"
-                      : "border-transparent hover:border-[hsl(220_3%_40%)]"
+                      ? "border-primary ring-1 ring-primary/30"
+                      : "border-transparent hover:border-border"
                   )}
                 >
                   <img src={bg.objectUrl} alt="Custom" className="w-full h-full object-cover" />
@@ -141,7 +141,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         )}
 
         {/* Templates */}
-        <p className="text-[10px] uppercase tracking-wider text-[hsl(220_3%_50%)] mb-2">Fondos virtuales</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Fondos virtuales</p>
         <div className="grid grid-cols-4 gap-1.5 mb-3">
           {BACKGROUND_TEMPLATES.map((tpl) => (
             <button
@@ -150,7 +150,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
               onClick={() => onSelect(tpl.id)}
               className={cn(
                 "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
-                isSelected(tpl.id) ? "border-[hsl(214_82%_51%)] ring-1 ring-[hsl(214_82%_51%/0.3)]" : "border-transparent hover:border-[hsl(220_3%_40%)]"
+                isSelected(tpl.id) ? "border-primary ring-1 ring-primary/30" : "border-transparent hover:border-border"
               )}
             >
               <img src={tpl.src} alt={tpl.label} className="w-full h-full object-cover" loading="lazy" />
@@ -168,7 +168,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
 
         <button
           onClick={handleRandom}
-          className="w-full text-xs text-center py-1.5 rounded-md bg-[hsl(220_3%_25%)] text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_30%)] transition-colors"
+          className="w-full text-xs text-center py-1.5 rounded-md bg-secondary text-foreground hover:bg-muted transition-colors"
         >
           🎲 Fondo aleatorio
         </button>
@@ -186,12 +186,12 @@ function EffectOption({
     <button
       onClick={onClick}
       className={cn(
-        "flex-1 flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-[hsl(220_3%_22%)]",
-        active ? "border-[hsl(214_82%_51%)] bg-[hsl(214_82%_51%/0.08)]" : "border-transparent"
+        "flex-1 flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-card",
+        active ? "border-primary bg-primary/10" : "border-transparent"
       )}
     >
       <div className="w-full h-8 rounded overflow-hidden">{children}</div>
-      <span className="text-[9px] text-[hsl(220_3%_55%)] leading-tight">{label}</span>
+      <span className="text-[9px] text-muted-foreground leading-tight">{label}</span>
     </button>
   );
 }

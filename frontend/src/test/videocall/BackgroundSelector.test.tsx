@@ -16,7 +16,7 @@ describe("BackgroundSelector", () => {
   it("applies active styling when background is selected", () => {
     render(<BackgroundSelector {...defaultProps} selected="blur" />);
     const btn = screen.getByTitle("Fondo virtual");
-    expect(btn.className).toContain("214");
+    expect(btn.className).toContain("primary");
   });
 
   it("BACKGROUND_TEMPLATES has correct structure", () => {

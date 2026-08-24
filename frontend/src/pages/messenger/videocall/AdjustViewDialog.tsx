@@ -45,16 +45,16 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-      <div className="relative w-full max-w-md mx-4 rounded-2xl bg-[hsl(220_3%_17%)] border border-[hsl(220_3%_25%)] shadow-2xl text-[hsl(220_3%_85%)]">
+      <div className="relative w-full max-w-md mx-4 rounded-2xl bg-background border border-secondary shadow-2xl text-foreground">
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-1">
           <div>
             <h2 className="text-base font-medium">Ajustar vista</h2>
-            <p className="text-xs text-[hsl(220_3%_50%)] mt-0.5">La selección se guarda para futuras llamadas</p>
+            <p className="text-xs text-muted-foreground mt-0.5">La selección se guarda para futuras llamadas</p>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-[hsl(220_3%_25%)] transition-colors text-[hsl(220_3%_55%)]"
+            className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors text-muted-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -72,41 +72,41 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
                 className={cn(
                   "w-full flex items-center gap-4 rounded-xl px-4 py-3 transition-all text-left",
                   isActive
-                    ? "bg-[hsl(214_82%_51%/0.12)]"
-                    : "hover:bg-[hsl(220_3%_22%)]"
+                    ? "bg-primary/10"
+                    : "hover:bg-card"
                 )}
               >
                 <div className={cn(
                   "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                  isActive ? "border-[hsl(214_82%_51%)]" : "border-[hsl(220_3%_40%)]"
+                  isActive ? "border-primary" : "border-border"
                 )}>
-                  {isActive && <div className="h-2.5 w-2.5 rounded-full bg-[hsl(214_82%_51%)]" />}
+                  {isActive && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={cn("text-sm", isActive ? "text-[hsl(214_82%_65%)]" : "text-[hsl(220_3%_85%)]")}>{opt.label}</p>
-                  <p className="text-xs text-[hsl(220_3%_50%)]">{opt.description}</p>
+                  <p className={cn("text-sm", isActive ? "text-primary" : "text-foreground")}>{opt.label}</p>
+                  <p className="text-xs text-muted-foreground">{opt.description}</p>
                 </div>
                 <div className={cn(
                   "h-9 w-12 rounded-lg flex items-center justify-center shrink-0 transition-colors",
-                  isActive ? "bg-[hsl(214_82%_51%/0.15)]" : "bg-[hsl(220_3%_22%)]"
+                  isActive ? "bg-primary/15" : "bg-card"
                 )}>
-                  <Icon className={cn("h-4 w-4", isActive ? "text-[hsl(214_82%_51%)]" : "text-[hsl(220_3%_50%)]")} />
+                  <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground")} />
                 </div>
               </button>
             );
           })}
         </div>
 
-        <div className="mx-5 border-t border-[hsl(220_3%_25%)]" />
+        <div className="mx-5 border-t border-secondary" />
 
         {/* Max tiles */}
         <div className="px-6 py-4 space-y-3">
           <div>
             <p className="text-sm">Mosaicos</p>
-            <p className="text-xs text-[hsl(220_3%_50%)]">Máximo de mosaicos a mostrar</p>
+            <p className="text-xs text-muted-foreground">Máximo de mosaicos a mostrar</p>
           </div>
           <div className="flex items-center gap-3">
-            <Grid3X3 className="h-4 w-4 text-[hsl(220_3%_50%)] shrink-0" />
+            <Grid3X3 className="h-4 w-4 text-muted-foreground shrink-0" />
             <Slider
               value={[sliderIndex]}
               min={0}
@@ -115,18 +115,18 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
               onValueChange={([idx]) => onSettingsChange({ ...settings, maxTiles: TILE_STEPS[idx] })}
               className="flex-1"
             />
-            <LayoutGrid className="h-4 w-4 text-[hsl(220_3%_50%)] shrink-0" />
+            <LayoutGrid className="h-4 w-4 text-muted-foreground shrink-0" />
           </div>
-          <p className="text-center text-xs font-medium text-[hsl(214_82%_65%)]">
+          <p className="text-center text-xs font-medium text-primary">
             {getTileLabel(settings.maxTiles)} mosaicos
           </p>
         </div>
 
-        <div className="mx-5 border-t border-[hsl(220_3%_25%)]" />
+        <div className="mx-5 border-t border-secondary" />
 
         {/* Hide no video */}
         <div className="px-6 py-4 flex items-center justify-between">
-          <p className="text-sm text-[hsl(220_3%_85%)]">Ocultar mosaicos sin video</p>
+          <p className="text-sm text-foreground">Ocultar mosaicos sin video</p>
           <Switch
             checked={settings.hideNoVideo}
             onCheckedChange={(checked) => onSettingsChange({ ...settings, hideNoVideo: checked })}

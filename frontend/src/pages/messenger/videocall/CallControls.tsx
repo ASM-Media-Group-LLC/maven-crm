@@ -64,14 +64,14 @@ function ControlBtn({
         "relative rounded-full flex items-center justify-center transition-colors",
         compact ? "h-8 w-8" : "h-11 w-11",
         active === false
-          ? "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
-          : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]",
+          ? "bg-destructive text-white hover:bg-destructive/90"
+          : "bg-card text-foreground hover:bg-muted",
         extraClass,
       )}
     >
       <Icon className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
       {badge && (
-        <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[hsl(214_82%_51%)] border-2 border-[hsl(220_3%_14%)]" />
+        <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary border-2 border-background" />
       )}
     </button>
   );
@@ -90,13 +90,13 @@ function PanelBtn({
         "relative rounded-full flex items-center justify-center transition-colors",
         compact ? "h-7 w-7" : "h-9 w-9",
         active
-          ? "text-[hsl(214_82%_65%)] bg-[hsl(214_82%_51%/0.15)]"
-          : "text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_22%)]",
+          ? "text-primary bg-primary/15"
+          : "text-muted-foreground hover:text-foreground hover:bg-card",
       )}
     >
       <Icon className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
       {badge != null && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-[hsl(0_72%_51%)] text-white text-[10px] font-bold flex items-center justify-center px-0.5 border-2 border-[hsl(220_3%_14%)]">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center px-0.5 border-2 border-background">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
@@ -118,14 +118,14 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[hsl(220_3%_22%)] border border-[hsl(220_3%_30%)] text-xs text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors max-w-[200px]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-xs text-foreground hover:bg-secondary transition-colors max-w-[200px]"
       >
-        <Icon className="h-3.5 w-3.5 shrink-0 text-[hsl(220_3%_65%)]" />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{selected?.label || "Seleccionar"}</span>
-        <ChevronDown className={cn("h-3 w-3 shrink-0 text-[hsl(220_3%_55%)] transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       {open && devices.length > 0 && (
-        <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-[hsl(220_3%_20%)] border border-[hsl(220_3%_28%)] shadow-xl p-1 min-w-[220px] max-h-48 overflow-y-auto">
+        <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-card border border-border shadow-xl p-1 min-w-[220px] max-h-48 overflow-y-auto">
           {devices.map((d) => (
             <button
               key={d.deviceId}
@@ -133,8 +133,8 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
               className={cn(
                 "w-full flex items-center gap-2 text-left text-xs px-3 py-2 rounded-md transition-colors",
                 d.deviceId === selectedId
-                  ? "bg-[hsl(214_82%_51%/0.12)] text-[hsl(214_82%_65%)]"
-                  : "text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_28%)]"
+                  ? "bg-primary/10 text-primary"
+                  : "text-foreground hover:bg-muted"
               )}
             >
               <span className="truncate flex-1">{d.label}</span>
@@ -187,7 +187,7 @@ export default function CallControls({
   const iconSize = compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
 
   return (
-    <div className={cn("shrink-0 flex items-center bg-[hsl(220_3%_14%)]", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>
+    <div className={cn("shrink-0 flex items-center bg-background", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>
       {!compact && <div className="flex-1" />}
 
       {/* Center controls */}
@@ -200,8 +200,8 @@ export default function CallControls({
             className={cn(
               btnSize, "rounded-full flex items-center justify-center transition-colors",
               isMicOn
-                ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-                : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+                ? "bg-card text-foreground hover:bg-muted"
+                : "bg-destructive text-white hover:bg-destructive/90"
             )}
           >
             {isMicOn ? <Mic className={iconSize} /> : <MicOff className={iconSize} />}
@@ -213,13 +213,13 @@ export default function CallControls({
                 <button className={cn(
                   "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
                   isMicOn
-                    ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
-                    : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+                    ? "bg-card text-muted-foreground hover:bg-muted border-border"
+                    : "bg-destructive/85 text-white hover:bg-destructive/80 border-destructive/90"
                 )}>
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+              <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
                   <DevicePill icon={Mic} devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} />
                   <DevicePill icon={Volume2} devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} />
@@ -232,8 +232,8 @@ export default function CallControls({
               className={cn(
                 "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
                 isMicOn
-                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-                  : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+                  ? "bg-card text-foreground hover:bg-muted"
+                  : "bg-destructive text-white hover:bg-destructive/90"
               )}
             >
               {isMicOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
@@ -249,8 +249,8 @@ export default function CallControls({
             className={cn(
               btnSize, "rounded-full flex items-center justify-center transition-colors",
               isCamOn
-                ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-                : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+                ? "bg-card text-foreground hover:bg-muted"
+                : "bg-destructive text-white hover:bg-destructive/90"
             )}
           >
             {isCamOn ? <VideoIcon className={iconSize} /> : <VideoOff className={iconSize} />}
@@ -262,13 +262,13 @@ export default function CallControls({
                 <button className={cn(
                   "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
                   isCamOn
-                    ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
-                    : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+                    ? "bg-card text-muted-foreground hover:bg-muted border-border"
+                    : "bg-destructive/85 text-white hover:bg-destructive/80 border-destructive/90"
                 )}>
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+              <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
                   <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
                   <button
@@ -277,8 +277,8 @@ export default function CallControls({
                     className={cn(
                       "h-8 px-3 rounded-full flex items-center gap-1.5 text-xs transition-colors",
                       backgroundEffect === "blur"
-                        ? "bg-[hsl(214_82%_51%/0.18)] text-[hsl(214_82%_70%)] hover:bg-[hsl(214_82%_51%/0.25)]"
-                        : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                        ? "bg-primary/20 text-primary hover:bg-primary/25"
+                        : "bg-card text-foreground hover:bg-muted"
                     )}
                   >
                     <Cloud className="h-3.5 w-3.5" />
@@ -287,7 +287,7 @@ export default function CallControls({
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
                     title="Fondos y efectos"
-                    className="h-8 px-3 rounded-full flex items-center gap-1.5 text-xs bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
+                    className="h-8 px-3 rounded-full flex items-center gap-1.5 text-xs bg-card text-foreground hover:bg-muted transition-colors"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     <span>Fondos y efectos</span>
@@ -301,8 +301,8 @@ export default function CallControls({
               className={cn(
                 "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
                 isCamOn
-                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-                  : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+                  ? "bg-card text-foreground hover:bg-muted"
+                  : "bg-destructive text-white hover:bg-destructive/90"
               )}
             >
               {isCamOn ? <VideoIcon className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
@@ -324,16 +324,16 @@ export default function CallControls({
         <Popover>
           <PopoverTrigger asChild>
             <button title="Reacciones" className={cn(
-              "rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors",
+              "rounded-full flex items-center justify-center bg-card text-foreground hover:bg-muted transition-colors",
               compact ? "h-8 w-8" : "h-11 w-11"
             )}>
               <Smile className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="top" className="w-auto p-2 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
+          <PopoverContent side="top" className="w-auto p-2 bg-card border-border" align="center">
             <div className="flex gap-1">
               {REACTIONS.map((emoji) => (
-                <button key={emoji} onClick={() => onSendReaction(emoji)} className={cn("hover:scale-125 transition-transform rounded-full hover:bg-[hsl(220_3%_28%)]", compact ? "text-base p-1" : "text-xl p-1.5")}>
+                <button key={emoji} onClick={() => onSendReaction(emoji)} className={cn("hover:scale-125 transition-transform rounded-full hover:bg-muted", compact ? "text-base p-1" : "text-xl p-1.5")}>
                   {emoji}
                 </button>
               ))}
@@ -351,7 +351,7 @@ export default function CallControls({
               onClick={onLeave}
               title={leaveLabel || "Colgar"}
               className={cn(
-                "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center justify-center gap-2 font-medium",
+                "rounded-full bg-destructive text-white hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2 font-medium",
                 compact ? "h-8 w-12 text-xs" : "h-11 px-5 text-sm"
               )}
             >

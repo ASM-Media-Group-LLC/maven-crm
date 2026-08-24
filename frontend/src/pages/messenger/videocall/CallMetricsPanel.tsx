@@ -104,34 +104,34 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
   }, [collectStats]);
 
   return (
-    <div className="w-80 flex flex-col bg-[hsl(220_3%_17%)] border-l border-[hsl(220_3%_25%)] rounded-l-xl">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[hsl(220_3%_25%)]">
-        <h3 className="text-sm font-medium text-[hsl(220_3%_85%)] flex items-center gap-2">
+    <div className="w-80 flex flex-col bg-background border-l border-secondary rounded-l-xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
           <BarChart3 className="h-4 w-4" />
           Métricas en tiempo real
         </h3>
-        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-[hsl(220_3%_60%)] hover:bg-[hsl(220_3%_25%)] transition-colors">
+        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="px-4 py-3 border-b border-[hsl(220_3%_22%)]">
+      <div className="px-4 py-3 border-b border-card">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-[hsl(220_3%_50%)]">Participantes</span>
-          <span className="text-xs text-[hsl(220_3%_70%)]">{participants.length}</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Participantes</span>
+          <span className="text-xs text-foreground">{participants.length}</span>
         </div>
       </div>
 
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-3">
           {stats.map((s) => (
-            <div key={s.identity} className="rounded-lg bg-[hsl(220_3%_22%)] p-3 space-y-2">
+            <div key={s.identity} className="rounded-lg bg-card p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-[hsl(220_3%_85%)]">
+                <span className="text-xs font-medium text-foreground">
                   {s.isLocal ? "Tú" : s.name}
                 </span>
                 {s.isLocal && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-[hsl(220_3%_28%)] text-[hsl(220_3%_60%)]">Local</span>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Local</span>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
@@ -153,9 +153,9 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
 function StatRow({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-1">
-      {icon && <span className="text-[hsl(220_3%_45%)]">{icon}</span>}
-      <span className="text-[9px] text-[hsl(220_3%_45%)]">{label}</span>
-      <span className={cn("text-[10px] font-mono ml-auto", value === "—" ? "text-[hsl(220_3%_35%)]" : "text-[hsl(220_3%_75%)]")}>
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-[9px] text-muted-foreground">{label}</span>
+      <span className={cn("text-[10px] font-mono ml-auto", value === "—" ? "text-muted-foreground" : "text-foreground")}>
         {value}
       </span>
     </div>

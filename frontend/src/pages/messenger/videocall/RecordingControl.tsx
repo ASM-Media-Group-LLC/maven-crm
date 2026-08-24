@@ -154,7 +154,7 @@ export default function RecordingControl({ room, roomName, source, title, canCon
           disabled={busy}
           onClick={() => void start()}
           title="Grabar la reunión"
-          className="flex items-center gap-1.5 rounded-full border border-[hsl(220_3%_30%)] bg-[hsl(220_3%_20%/0.9)] px-3 py-1.5 text-xs font-medium text-[hsl(220_3%_75%)] backdrop-blur-sm hover:bg-[hsl(220_3%_26%)] hover:text-white"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-[hsl(220_3%_20%/0.9)] px-3 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm hover:bg-secondary hover:text-white"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Disc className="h-3.5 w-3.5 text-red-400" />}
           {!compact && "Grabar"}

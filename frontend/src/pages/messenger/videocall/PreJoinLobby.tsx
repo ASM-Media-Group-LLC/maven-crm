@@ -397,19 +397,19 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const showBackgroundWarmupOverlay = camOn && isPreparingBackgroundFirstFrame && bgEffect !== "none";
 
   return (
-    <div className="h-screen w-screen bg-[hsl(220_3%_14%)] flex items-center justify-center p-4 md:p-8">
+    <div className="h-screen w-screen bg-background flex items-center justify-center p-4 md:p-8">
       <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-10 max-w-5xl w-full">
 
         {/* ── Left: Camera preview ── */}
         <div className="flex flex-col items-center gap-5 flex-1 w-full max-w-[640px]">
-          <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-[hsl(220_3%_20%)]">
+          <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-card">
             {/* Background template preview fallback */}
             {selectedBackgroundTemplate && (backgroundPreviewUnsupported || showBackgroundWarmupOverlay) && (
               <img src={selectedBackgroundTemplate.src} alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             )}
 
             {showBackgroundWarmupOverlay && !selectedBackgroundTemplate && (
-              <div className="absolute inset-0 bg-[hsl(220_3%_18%)]" />
+              <div className="absolute inset-0 bg-card" />
             )}
 
             {camOn ? (
@@ -422,7 +422,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                 style={{ transform: "scaleX(-1)" }}
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_20%)]">
+              <div className="absolute inset-0 flex items-center justify-center bg-card">
                 <UserAvatar
                   name={displayName}
                   size="xl"
@@ -433,7 +433,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
             {showBackgroundWarmupOverlay && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-[hsl(220_3%_14%/0.45)] backdrop-blur-[2px]">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-[hsl(220_3%_85%)] border border-[hsl(220_3%_28%)]">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-foreground border border-border">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Aplicando fondo…
                 </div>
@@ -452,8 +452,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                 className={cn(
                   "h-11 w-11 rounded-full flex items-center justify-center transition-all",
                   micOn
-                    ? "bg-[hsl(220_3%_30%)] hover:bg-[hsl(220_3%_36%)] text-white"
-                    : "bg-[hsl(0_72%_51%)] hover:bg-[hsl(0_72%_45%)] text-white"
+                    ? "bg-muted hover:bg-muted text-white"
+                    : "bg-destructive hover:bg-destructive/90 text-white"
                 )}
                 title={micOn ? "Desactivar micrófono" : "Activar micrófono"}
               >
@@ -464,8 +464,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                 className={cn(
                   "h-11 w-11 rounded-full flex items-center justify-center transition-all",
                   camOn
-                    ? "bg-[hsl(220_3%_30%)] hover:bg-[hsl(220_3%_36%)] text-white"
-                    : "bg-[hsl(0_72%_51%)] hover:bg-[hsl(0_72%_45%)] text-white"
+                    ? "bg-muted hover:bg-muted text-white"
+                    : "bg-destructive hover:bg-destructive/90 text-white"
                 )}
                 title={camOn ? "Desactivar cámara" : "Activar cámara"}
               >
@@ -475,7 +475,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
             {permissionError && (
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_14%/0.95)] z-20 px-6">
-                <p className="text-sm text-[hsl(0_72%_65%)] text-center">{permissionError}</p>
+                <p className="text-sm text-destructive text-center">{permissionError}</p>
               </div>
             )}
           </div>
@@ -513,12 +513,12 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           </div>
 
           {bgEffect !== "none" && (
-            <p className="text-xs text-[hsl(220_3%_60%)] text-center">
-              Fondo: <span className="text-[hsl(220_3%_80%)]">{selectedBackgroundLabel}</span>
+            <p className="text-xs text-muted-foreground text-center">
+              Fondo: <span className="text-foreground">{selectedBackgroundLabel}</span>
             </p>
           )}
           {backgroundPreviewUnsupported && bgEffect !== "none" && (
-            <p className="text-[11px] text-[hsl(220_3%_55%)] text-center max-w-md">
+            <p className="text-[11px] text-muted-foreground text-center max-w-md">
               Tu navegador no soporta vista previa en tiempo real del fondo, pero se aplicará al entrar en la llamada.
             </p>
           )}
@@ -530,7 +530,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             ¿Listo para unirte?
           </h1>
           {callDisplayName && (
-            <p className="text-sm text-[hsl(220_3%_60%)]">{callDisplayName}</p>
+            <p className="text-sm text-muted-foreground">{callDisplayName}</p>
           )}
 
           <button
@@ -538,7 +538,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             disabled={joining}
             className={cn(
               "w-full max-w-[260px] h-12 rounded-full font-medium text-sm tracking-wide transition-all",
-              "bg-[hsl(214_82%_51%)] text-white hover:bg-[hsl(214_82%_45%)] hover:shadow-lg",
+              "bg-primary text-white hover:bg-primary/90 hover:shadow-lg",
               "disabled:opacity-60 disabled:cursor-not-allowed",
               "flex items-center justify-center gap-2"
             )}
@@ -550,7 +550,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             )}
           </button>
 
-          <p className="text-xs text-[hsl(220_3%_50%)]">
+          <p className="text-xs text-muted-foreground">
             Tu micrófono y cámara se pueden cambiar durante la llamada
           </p>
         </div>
@@ -575,16 +575,16 @@ function DeviceDropdown({
     <div className="relative">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs transition-colors bg-[hsl(220_3%_22%)] text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_28%)] border border-[hsl(220_3%_30%)]"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs transition-colors bg-card text-foreground hover:bg-muted border border-border"
       >
         {icon}
         <span className="max-w-[120px] truncate">{label}</span>
-        <ChevronDown className="h-3 w-3 text-[hsl(220_3%_55%)]" />
+        <ChevronDown className="h-3 w-3 text-muted-foreground" />
       </button>
 
       {isOpen && devices.length > 0 && (
         <div
-          className="absolute bottom-full mb-1 left-0 z-50 min-w-[220px] max-w-[300px] rounded-lg bg-[hsl(220_3%_22%)] border border-[hsl(220_3%_28%)] shadow-xl p-1"
+          className="absolute bottom-full mb-1 left-0 z-50 min-w-[220px] max-w-[300px] rounded-lg bg-card border border-border shadow-xl p-1"
           onClick={(e) => e.stopPropagation()}
         >
           {devices.map((d) => (
@@ -594,8 +594,8 @@ function DeviceDropdown({
               className={cn(
                 "w-full text-left text-xs px-3 py-2 rounded-md transition-colors truncate",
                 d.deviceId === selectedId
-                  ? "bg-[hsl(214_82%_51%/0.15)] text-[hsl(214_82%_65%)] font-medium"
-                  : "text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_28%)]"
+                  ? "bg-primary/15 text-primary font-medium"
+                  : "text-foreground hover:bg-muted"
               )}
             >
               {d.label}

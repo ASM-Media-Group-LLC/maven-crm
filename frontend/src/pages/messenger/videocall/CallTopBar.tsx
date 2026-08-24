@@ -35,20 +35,20 @@ export default function CallTopBar({
   };
 
   return (
-    <div className={cn("shrink-0 flex items-center justify-between bg-[hsl(220_3%_14%)]", compact ? "px-2 py-1" : "px-4 py-2")}>
+    <div className={cn("shrink-0 flex items-center justify-between bg-background", compact ? "px-2 py-1" : "px-4 py-2")}>
       <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
-        <span className={cn("font-medium text-[hsl(220_3%_80%)]", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
+        <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
         {!compact && (
           <>
-            <div className="h-4 w-px bg-[hsl(220_3%_28%)]" />
-            <div className="flex items-center gap-1.5 text-[hsl(220_3%_55%)]">
+            <div className="h-4 w-px bg-muted" />
+            <div className="flex items-center gap-1.5 text-muted-foreground">
               <Clock className="h-3 w-3" />
               <span className="text-xs tabular-nums">{formatTime(elapsed)}</span>
             </div>
           </>
         )}
         {isEncrypted && (
-          <div className="flex items-center gap-1 text-[hsl(145_63%_49%)]">
+          <div className="flex items-center gap-1 text-success">
             <Shield className="h-3 w-3" />
             <span className="text-[10px] font-medium">E2E</span>
           </div>
@@ -56,13 +56,13 @@ export default function CallTopBar({
       </div>
 
       <div className="flex items-center gap-1">
-        <span className={cn("text-[hsl(220_3%_55%)] mr-1", compact ? "text-[10px]" : "text-xs mr-2")}>
+        <span className={cn("text-muted-foreground mr-1", compact ? "text-[10px]" : "text-xs mr-2")}>
           {participantCount} participante{participantCount !== 1 ? "s" : ""}
         </span>
         {!hideShareLink && !compact && (
           <button
             onClick={copyLink}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
           >
             <Link2 className="h-3.5 w-3.5" />
             <span className="hidden md:inline">Copiar enlace</span>
@@ -72,7 +72,7 @@ export default function CallTopBar({
           <button
             onClick={onOpenAdjustView}
             title="Ajustar vista"
-            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
             <span className="hidden md:inline">Ajustar vista</span>

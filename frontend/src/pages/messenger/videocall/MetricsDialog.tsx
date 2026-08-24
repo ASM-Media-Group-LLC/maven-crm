@@ -77,25 +77,25 @@ export default function MetricsDialog({ open, onClose, room, participants }: Met
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-[hsl(220_3%_17%)] border-[hsl(220_3%_25%)] text-[hsl(220_3%_90%)] max-w-sm p-0 gap-0">
+      <DialogContent className="bg-background border-secondary text-foreground max-w-sm p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="text-base font-medium text-white">Métricas</DialogTitle>
         </DialogHeader>
         <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
           {!room ? (
-            <p className="text-xs text-[hsl(220_3%_55%)]">No conectado a la sala</p>
+            <p className="text-xs text-muted-foreground">No conectado a la sala</p>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-[hsl(220_3%_70%)]">
+              <div className="flex items-center gap-2 text-foreground">
                 <BarChart3 className="h-4 w-4" />
                 <span className="text-xs font-medium">Métricas en tiempo real</span>
-                <span className="ml-auto text-[10px] text-[hsl(220_3%_50%)]">{participants?.length || stats.length} participantes</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">{participants?.length || stats.length} participantes</span>
               </div>
               {stats.map((s) => (
-                <div key={s.identity} className="rounded-lg bg-[hsl(220_3%_22%)] p-3 space-y-2">
+                <div key={s.identity} className="rounded-lg bg-card p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-[hsl(220_3%_85%)]">{s.isLocal ? "Tú" : s.name}</span>
-                    {s.isLocal && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[hsl(220_3%_28%)] text-[hsl(220_3%_60%)]">Local</span>}
+                    <span className="text-xs font-medium text-foreground">{s.isLocal ? "Tú" : s.name}</span>
+                    {s.isLocal && <span className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Local</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                     <MetricRow icon={<MonitorIcon className="h-3 w-3" />} label="Resolución" value={s.videoResolution} />
@@ -118,9 +118,9 @@ export default function MetricsDialog({ open, onClose, room, participants }: Met
 function MetricRow({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-1">
-      {icon && <span className="text-[hsl(220_3%_45%)]">{icon}</span>}
-      <span className="text-[9px] text-[hsl(220_3%_45%)]">{label}</span>
-      <span className={cn("text-[10px] font-mono ml-auto", value === "—" ? "text-[hsl(220_3%_35%)]" : "text-[hsl(220_3%_75%)]")}>{value}</span>
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-[9px] text-muted-foreground">{label}</span>
+      <span className={cn("text-[10px] font-mono ml-auto", value === "—" ? "text-muted-foreground" : "text-foreground")}>{value}</span>
     </div>
   );
 }
