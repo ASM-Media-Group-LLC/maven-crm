@@ -22,7 +22,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
-import { formatTime, formatDate } from "../utils";
+import { formatTime, formatDate, safeFileUrl } from "../utils";
 
 import { EMOJIS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
@@ -217,7 +217,7 @@ export default function ThreadPanel({
     if (msg.type === "file" && msg.file_url) {
       const ext = msg.file_name?.split(".").pop()?.toLowerCase() || "";
       return (
-        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+        <a href={safeFileUrl(msg.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
           <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted">
             <File className="h-3.5 w-3.5" />
           </div>

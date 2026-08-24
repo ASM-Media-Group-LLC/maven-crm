@@ -32,7 +32,9 @@ const AppShell = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
+      {/* h-dvh (no h-screen): en mobile el alto dinámico descuenta el teclado virtual y la
+          barra del navegador, así el composer del Messenger no queda tapado. */}
+      <div className="flex h-dvh w-full overflow-hidden">
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />

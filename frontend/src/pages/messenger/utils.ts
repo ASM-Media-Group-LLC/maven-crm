@@ -7,6 +7,13 @@ export function profileName(
   return profile?.full_name?.trim() || profile?.whatsapp_push_name?.trim() || "Usuario";
 }
 
+// href seguro para archivos: solo http(s). Bloquea javascript:/data:/blob: inyectados por la
+// API (un mensaje type='file' con file_url malicioso ejecutaría al clickear = XSS almacenado).
+export function safeFileUrl(url?: string | null): string {
+  if (!url) return "#";
+  return /^https?:\/\//i.test(url.trim()) ? url : "#";
+}
+
 export function getInitials(name?: string | null) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";

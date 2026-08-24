@@ -314,9 +314,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 )}
                 <button
                   onClick={() => removePendingFile(i)}
-                  className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
+                  aria-label={`Quitar ${pf.file.name}`}
+                  className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/file:opacity-100 transition-opacity"
                 >
-                  <X className="h-2.5 w-2.5" />
+                  <X className="h-3 w-3" />
                 </button>
                 <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
                 <p className="text-[7px] text-muted-foreground/70 text-center">{formatFileSize(pf.file.size)}</p>

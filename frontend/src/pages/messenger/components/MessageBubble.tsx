@@ -8,7 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
-import { profileName } from "../utils";
+import { profileName, safeFileUrl } from "../utils";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
 import ReactionPicker from "./ReactionPicker";
@@ -275,7 +275,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     if (message.type === "file") {
       const ext = message.file_name?.split(".").pop()?.toLowerCase() || "";
       return (
-        <a href={message.file_url || "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+        <a href={safeFileUrl(message.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
           <div className={cn("h-8 w-8 rounded-2xl flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-primary/8")}>
             <File className="h-4 w-4" />
           </div>
