@@ -7,6 +7,8 @@ import TicketsFilters from "./TicketsFilters";
 import TicketsList from "./TicketsList";
 import TicketsGrid from "./TicketsGrid";
 import CreateTicketModal from "./CreateTicketModal";
+import NewTicketLauncher from "./NewTicketLauncher";
+import TicketFormsManager from "./TicketFormsManager";
 import ViewTicketModal from "./ViewTicketModal";
 import EditTicketModal from "./EditTicketModal";
 import DeleteTicketDialog from "./DeleteTicketDialog";
@@ -20,9 +22,12 @@ const TicketsContent = () => {
   const canCreate = canAccess("Tickets", "Crear Ticket");
   const canSeeList = canAccess("Tickets", "Lista de Tickets");
   const canSeeCalendar = canAccess("Tickets", "Calendario");
+  // Constructor de plantillas: mismo permiso que lee la RLS de ticket_forms.
+  const canManageForms = canAccess("Tickets", "Gestionar Plantillas");
   const { ticketsQuery } = useTickets();
   const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
+  const [tab, setTab] = useState(canCreate ? "new" : canSeeList ? "list" : "calendar");
 
   const [selectedTicket, setSelectedTicket] = useState<TicketWithCreator | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -86,7 +91,7 @@ const TicketsContent = () => {
           subtitle="Gestión de soporte y escalaciones"
           actions={
             canCreate && (
-              <Button onClick={() => setModalOpen(true)}>
+              <Button onClick={() => setTab("new")}>
                 <Plus className="h-4 w-4 mr-1" />
                 Nuevo Ticket
               </Button>
@@ -96,11 +101,36 @@ const TicketsContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-      <Tabs defaultValue={canSeeList ? "list" : "calendar"}>
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
+          {canCreate && <TabsTrigger value="new">Nuevo Ticket</TabsTrigger>}
           {canSeeList && <TabsTrigger value="list">Lista de Tickets</TabsTrigger>}
           {canSeeCalendar && <TabsTrigger value="calendar">Calendario</TabsTrigger>}
+          {canManageForms && <TabsTrigger value="forms">Plantillas</TabsTrigger>}
         </TabsList>
+
+        {canCreate && (
+        <TabsContent value="new" className="space-y-4">
+          <div>
+            <h2 className="text-sm font-medium">¿Qué tipo de ticket querés levantar?</h2>
+            <p className="text-xs text-muted-foreground">
+              Elegí una plantilla y completá el formulario. El código se asigna solo.
+            </p>
+          </div>
+
+          <NewTicketLauncher canCreate={canCreate} />
+
+          {/* Se conserva el alta libre de siempre, sin plantilla, para no quitar
+              una funcionalidad que ya existía. */}
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+          >
+            O crear un ticket libre, sin plantilla
+          </button>
+        </TabsContent>
+        )}
 
         {canSeeList && (
         <TabsContent value="list" className="space-y-4">
@@ -135,6 +165,12 @@ const TicketsContent = () => {
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <p>Calendario de tickets — próximamente</p>
           </div>
+        </TabsContent>
+        )}
+
+        {canManageForms && (
+        <TabsContent value="forms">
+          <TicketFormsManager />
         </TabsContent>
         )}
       </Tabs>
