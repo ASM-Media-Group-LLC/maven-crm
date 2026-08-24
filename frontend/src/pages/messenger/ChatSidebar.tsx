@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff } from "lucide-react";
+import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -44,7 +44,6 @@ interface ChatSidebarProps {
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onNewGroup: () => void;
-  onOpenVideoRooms: () => void;
   onSelectContact: (userId: string) => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
@@ -81,7 +80,7 @@ function truncate(text: string, max: number) {
 }
 
 export default function ChatSidebar({
-  conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms,
+  conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
   onSelectContact, onDeleteChat, loading, profiles,
   isPinned, onTogglePin, isArchived, onToggleArchive, onToggleMute,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
@@ -114,15 +113,15 @@ export default function ChatSidebar({
 
   const filtered = useMemo(() => {
     return conversations.filter(c => {
-      // Hide archived unless specifically searching
-      if (isArchived(c.id) && tab !== "all") return false;
       const matchesSearch = c.displayName.toLowerCase().includes(search.toLowerCase());
+      // Tab "Archivados": muestra SOLO los archivados.
+      if (tab === "archived") return matchesSearch && isArchived(c.id);
+      // En cualquier otro tab, los archivados viven aparte (en su propio tab).
+      if (isArchived(c.id)) return false;
       if (tab === "unread") return matchesSearch && c.unreadCount > 0;
       if (tab === "groups") return matchesSearch && c.type === "group";
       if (tab === "pinned") return matchesSearch && isPinned(c.id);
       if (tab === "mentions") return matchesSearch && mentionedIds.has(c.id);
-      // In "all" tab, hide archived unless searching
-      if (!search && isArchived(c.id)) return false;
       return matchesSearch;
     });
   }, [conversations, search, tab, isPinned, mentionedIds, isArchived]);
@@ -137,6 +136,7 @@ export default function ChatSidebar({
   }, [filtered, isPinned]);
 
   const unreadTotal = useMemo(() => conversations.reduce((s, c) => s + c.unreadCount, 0), [conversations]);
+  const archivedCount = useMemo(() => conversations.filter(c => isArchived(c.id)).length, [conversations, isArchived]);
 
   const contacts = useMemo(() => {
     return Object.values(profiles)
@@ -178,17 +178,21 @@ export default function ChatSidebar({
           <div className="flex items-center gap-2 min-w-0">
             <StatusPicker />
           </div>
-          <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onOpenVideoRooms} title="Reuniones">
-              <Video className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onNewChat} title="Nuevo chat">
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onNewGroup} title="Nuevo grupo">
-              <MessageSquarePlus className="h-4 w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title="Nuevo">
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl min-w-[180px]">
+              <DropdownMenuItem onClick={onNewChat}>
+                <Pencil className="h-3.5 w-3.5 mr-2" /> Nuevo mensaje
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onNewGroup}>
+                <Users className="h-3.5 w-3.5 mr-2" /> Nuevo grupo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Search — M3 pill */}
@@ -226,6 +230,7 @@ export default function ChatSidebar({
                 { key: "mentions", icon: AtSign, label: "Menciones", badge: mentionedIds.size },
                 { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
                 { key: "groups", icon: Users, label: "Grupos", badge: 0 },
+                { key: "archived", icon: Archive, label: "Archivados", badge: archivedCount },
               ].map(item => {
                 const isActive = tab === item.key;
                 const Icon = item.icon;
@@ -260,7 +265,7 @@ export default function ChatSidebar({
               className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
             >
               {dmExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <span>Mensajes directos</span>
+              <span>{tab === "archived" ? "Archivados" : "Mensajes directos"}</span>
               {sorted.length > 0 && (
                 <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground/70">
                   {sorted.length}
@@ -273,7 +278,7 @@ export default function ChatSidebar({
                 {sorted.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-xs text-muted-foreground">
-                      {search ? "Sin resultados" : "Inicia una conversación"}
+                      {search ? "Sin resultados" : tab === "archived" ? "No tenés chats archivados" : "Inicia una conversación"}
                     </p>
                   </div>
                 ) : (

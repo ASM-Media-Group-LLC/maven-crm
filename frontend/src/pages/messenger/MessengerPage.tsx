@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
-import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
 
 import IncomingCallModal from "./components/IncomingCallModal";
@@ -45,7 +44,6 @@ export default function MessengerPage() {
   const { isAdmin: isSystemAdmin } = useUserRole();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const activeChatIdRef = useRef<string | null>(null);
-  const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
@@ -163,33 +161,28 @@ export default function MessengerPage() {
         "w-full sm:w-[280px] md:w-[320px] lg:w-[340px] shrink-0 transition-all",
         activeChatId ? "hidden sm:flex sm:flex-col" : "flex flex-col"
       )}>
-        {showVideoRooms ? (
-          <VideoRoomsPanel onClose={() => setShowVideoRooms(false)} />
-        ) : (
-            <ChatSidebar
-              conversations={conversations}
-              activeChatId={activeChatId}
-              onSelectChat={selectChat}
-              onNewChat={() => setNewChatOpen(true)}
-              onNewGroup={() => setNewGroupOpen(true)}
-              onOpenVideoRooms={() => setShowVideoRooms(true)}
-              onSelectContact={handleSelectUser}
-              onDeleteChat={handleDeleteChat}
-              loading={loading}
-              profiles={profiles}
-              isPinned={isPinned}
-              onTogglePin={togglePin}
-              isArchived={isArchived}
-              onToggleArchive={toggleArchive}
-              onToggleMute={toggleMute}
-              spaces={spaces}
-              onCreateSpace={createSpace}
-              onDeleteSpace={deleteSpace}
-              onRenameSpace={renameSpace}
-              onAddConversationToSpace={addConversationToSpace}
-              onRemoveConversationFromSpace={removeConversationFromSpace}
-            />
-        )}
+        <ChatSidebar
+          conversations={conversations}
+          activeChatId={activeChatId}
+          onSelectChat={selectChat}
+          onNewChat={() => setNewChatOpen(true)}
+          onNewGroup={() => setNewGroupOpen(true)}
+          onSelectContact={handleSelectUser}
+          onDeleteChat={handleDeleteChat}
+          loading={loading}
+          profiles={profiles}
+          isPinned={isPinned}
+          onTogglePin={togglePin}
+          isArchived={isArchived}
+          onToggleArchive={toggleArchive}
+          onToggleMute={toggleMute}
+          spaces={spaces}
+          onCreateSpace={createSpace}
+          onDeleteSpace={deleteSpace}
+          onRenameSpace={renameSpace}
+          onAddConversationToSpace={addConversationToSpace}
+          onRemoveConversationFromSpace={removeConversationFromSpace}
+        />
       </div>
 
       {/* Chat view */}
