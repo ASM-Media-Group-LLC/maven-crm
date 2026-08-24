@@ -1,4 +1,6 @@
-import { DollarSign, Wallet, Users, TrendingUp, AlertTriangle } from "lucide-react";
+import { DollarSign, Wallet, Users, TrendingUp, AlertTriangle, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NET_FACTOR } from "@/lib/earnings";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
 
 interface Props {
@@ -13,7 +15,17 @@ const fmt = (n: number) =>
 // + icono cuadrado coloreado + hover lift. Todos los clicks abren el
 // modal CardDetailModal, ya no navegan a otras rutas.
 const SalesKPICards = ({ data, onCardClick }: Props) => {
-  const cards = [
+  const cards: Array<{
+    id: string;
+    title: string;
+    value: string;
+    change: number;
+    previousValue: string | null;
+    subtitle: string | null;
+    tooltip?: string;
+    icon: typeof DollarSign;
+    bg: string;
+  }> = [
     {
       id: "gross",
       title: "Ingresos Total",
@@ -26,11 +38,13 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
     },
     {
       id: "net",
-      title: "Net Earnings",
-      value: fmt(data.totalCurrent * 0.8),
+      title: "Net (estimado 80%)",
+      // NET_FACTOR centralizado en @/lib/earnings — estimación, no descuenta contracargos.
+      value: fmt(data.totalCurrent * NET_FACTOR),
       change: data.totalChangePercent,
-      previousValue: fmt(data.totalPrevious * 0.8),
+      previousValue: fmt(data.totalPrevious * NET_FACTOR),
       subtitle: null,
+      tooltip: "Estimación: bruto × 0.80 (payout de OF). No descuenta contracargos ni otros ajustes.",
       icon: Wallet,
       bg: "bg-emerald-500",
     },
@@ -81,7 +95,19 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <card.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{card.title}</p>
+              <p className="flex items-center gap-1 text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+                {card.title}
+                {card.tooltip && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex cursor-help text-muted-foreground" aria-label="Info">
+                        <Info className="h-3 w-3" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-60 text-xs">{card.tooltip}</TooltipContent>
+                  </Tooltip>
+                )}
+              </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">{card.value}</p>
               {card.change !== 0 && (
                 <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-success" : "text-destructive"}`}>

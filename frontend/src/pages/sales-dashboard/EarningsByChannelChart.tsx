@@ -11,6 +11,7 @@ import {
 import { format } from "date-fns";
 import type { EarningsRow } from "../sales-performance/types";
 import type { EarningsMode } from "./DashboardFilters";
+import { NET_FACTOR } from "@/lib/earnings";
 
 interface Props {
   rows: EarningsRow[];
@@ -26,8 +27,6 @@ const CHANNELS = [
 ] as const;
 
 type ChannelKey = (typeof CHANNELS)[number]["key"];
-
-const NET_FACTOR = 0.80;
 
 const buildChannelData = (rows: EarningsRow[], mode: EarningsMode) => {
   const factor = mode === "net" ? NET_FACTOR : 1;

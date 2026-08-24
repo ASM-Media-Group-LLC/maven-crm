@@ -19,7 +19,7 @@ const fmt = (n: number) =>
 
 const TITLES: Record<string, string> = {
   gross: "Desglose de Ingresos Total",
-  net: "Desglose de Net Earnings",
+  net: "Desglose de Net (estimado 80%)",
   creators: "Todas las Creadoras",
   rising: "Creadoras Subiendo",
   at_risk: "Creadoras en Riesgo",

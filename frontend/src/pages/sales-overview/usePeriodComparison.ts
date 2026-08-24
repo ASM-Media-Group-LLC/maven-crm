@@ -1,6 +1,14 @@
 import { useMemo } from "react";
-import { subDays, differenceInDays, startOfDay, endOfDay } from "date-fns";
-import type { EarningsRow } from "../sales-performance/types";
+import {
+  addDays,
+  differenceInDays,
+  isFirstDayOfMonth,
+  isSameMonth,
+  startOfDay,
+  subDays,
+  subMonths,
+} from "date-fns";
+import type { Dash2Summary } from "../sales-performance/useDashboard2Summary";
 
 export interface CreatorComparison {
   creatorKey: string;
@@ -25,43 +33,80 @@ export interface PeriodComparisonResult {
   top10: CreatorComparison[];
 }
 
-const sumByCreator = (rows: EarningsRow[]) => {
+export interface ComparisonRanges {
+  from: Date;
+  /** `to` efectivo: clampeado a HOY cuando el preset se extiende al futuro (ej: "Este mes"). */
+  effTo: Date;
+  prevFrom: Date;
+  prevTo: Date;
+  /** El rango seleccionado incluye el día de hoy → los números de hoy son parciales. */
+  includesToday: boolean;
+  /** Etiqueta visible en el header explicando contra qué se compara. */
+  comparisonLabel: string;
+}
+
+// Comparativa a DÍAS EQUIVALENTES. La versión vieja comparaba mes-parcial vs mes-completo
+// (ej: ago 1-24 vs TODO julio → −43.4% "falso") e inflaba En Riesgo/Bajando. Ahora:
+//  - el `to` efectivo se clampea a hoy cuando el preset se extiende al futuro, y
+//  - el período anterior tiene el MISMO número de días transcurridos:
+//      · rango anclado a mes (día 1, dentro de un mes) → mismo período del mes anterior
+//        (ago 1-24 vs jul 1-24 → −28.0%, cifras de referencia en useSalesTotals.ts);
+//      · cualquier otro rango → ventana equivalente inmediatamente anterior
+//        (semana vs semana pasada, hoy vs ayer, rango custom vs los N días previos).
+export function buildComparisonRanges(rawFrom: Date, rawTo: Date, today: Date): ComparisonRanges {
+  const from = startOfDay(rawFrom);
+  const selectedTo = startOfDay(rawTo);
+  let effTo = selectedTo > today ? today : selectedTo;
+  if (effTo < from) effTo = from; // rango 100% futuro → 1 día vacío, sin romper nada
+  const elapsedDays = differenceInDays(effTo, from) + 1;
+
+  const monthAnchored = isFirstDayOfMonth(from) && isSameMonth(from, selectedTo);
+  let prevFrom: Date;
+  if (monthAnchored) {
+    // "Este mes" (o un mes completo pasado) → mismo período del mes anterior.
+    prevFrom = subMonths(from, 1);
+  } else {
+    // Ventana equivalente inmediatamente anterior, del largo del rango SELECCIONADO
+    // (semana → semana pasada aunque hoy sea lunes; hoy → ayer; custom → N días previos).
+    const selectedSpan = differenceInDays(selectedTo, from) + 1;
+    prevFrom = subDays(from, selectedSpan);
+  }
+  // Mismos días transcurridos; sin invadir el período actual (meses cortos, ej: feb).
+  let prevTo = addDays(prevFrom, elapsedDays - 1);
+  const prevCap = subDays(from, 1);
+  if (prevTo > prevCap) prevTo = prevCap;
+
+  const includesToday = from <= today && today <= selectedTo;
+  const comparisonLabel = monthAnchored
+    ? "vs mismo período del mes anterior"
+    : "vs período anterior equivalente";
+
+  return { from, effTo, prevFrom, prevTo, includesToday, comparisonLabel };
+}
+
+// Agrega el resumen por creadora (ya viene 1 fila por creadora desde el RPC
+// get_dashboard2_creator_summary) a un mapa key → { earnings, name }.
+const toCreatorMap = (rows: Dash2Summary[]) => {
   const map = new Map<string, { earnings: number; name: string | null }>();
   for (const r of rows) {
-    const key = r.creator_id || r.pending_creator || r.id;
-    const existing = map.get(key);
-    const val = r.total_earnings_gross ?? 0;
-    if (existing) {
-      existing.earnings += val;
-    } else {
-      map.set(key, { earnings: val, name: r.artistic_name || r.pending_creator });
-    }
+    map.set(r.group_key, {
+      earnings: r.total,
+      name: r.artistic_name || r.blu_creator_name,
+    });
   }
   return map;
 };
 
+// Opera sobre el resumen POR CREADORA agregado server-side (~80 filas por período),
+// ya no sobre las 40.9k filas crudas del histórico. Los dos períodos llegan de dos
+// llamadas paralelas al RPC con rangos JUSTOS (buildComparisonRanges).
 export const usePeriodComparison = (
-  allRows: EarningsRow[],
-  dateRange: { from: Date; to: Date }
+  currentRows: Dash2Summary[] | undefined,
+  previousRows: Dash2Summary[] | undefined,
 ): PeriodComparisonResult => {
   return useMemo(() => {
-    const from = startOfDay(dateRange.from);
-    const to = endOfDay(dateRange.to);
-    const days = differenceInDays(to, from) + 1;
-    const prevFrom = startOfDay(subDays(from, days));
-    const prevTo = endOfDay(subDays(from, 1));
-
-    const currentRows = allRows.filter((r) => {
-      const d = new Date(r.effective_date + "T12:00:00");
-      return d >= from && d <= to;
-    });
-    const prevRows = allRows.filter((r) => {
-      const d = new Date(r.effective_date + "T12:00:00");
-      return d >= prevFrom && d <= prevTo;
-    });
-
-    const currentMap = sumByCreator(currentRows);
-    const prevMap = sumByCreator(prevRows);
+    const currentMap = toCreatorMap(currentRows ?? []);
+    const prevMap = toCreatorMap(previousRows ?? []);
 
     const allKeys = new Set([...currentMap.keys(), ...prevMap.keys()]);
 
@@ -96,5 +141,5 @@ export const usePeriodComparison = (
     const activeCreators = creators.filter((c) => c.currentEarnings > 0).length;
 
     return { totalCurrent, totalPrevious, totalChangePercent, activeCreators, creators, rising, falling, atRisk, highPotential, top10 };
-  }, [allRows, dateRange]);
+  }, [currentRows, previousRows]);
 };

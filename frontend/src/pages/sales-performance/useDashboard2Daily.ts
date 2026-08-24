@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Filas por-creadora-por-DÍA de creator_daily_earnings para un rango. Solo lo usa el
 // tab "Content ROI" (promo × ingreso), que necesita granularidad diaria para bucketear
 // cada día como con/sin promo. Se jala LAZY (solo cuando ese tab está abierto) y acotado
-// al período seleccionado → unas ~1700 filas/mes, no las 13k del histórico. El resto del
+// al período seleccionado → unas ~1700 filas/mes, no las ~41k del histórico. El resto del
 // dashboard usa el resumen agregado (useDashboard2Summary).
 export interface Dash2DailyRow {
   creator_id: string;

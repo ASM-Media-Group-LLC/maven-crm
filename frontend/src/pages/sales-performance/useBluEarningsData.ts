@@ -7,6 +7,12 @@ import type { EarningsRow } from "./types";
 // Este hook trae la data VIVA de BLU (creator_daily_earnings) y la mapea al MISMO shape
 // EarningsRow, así toda la lógica del dashboard funciona sin reescribirla.
 //
+// ⚠️ Este hook baja el HISTÓRICO COMPLETO (~41k filas y creciendo, ~13MB, ~41 requests).
+// Hoy solo lo usa /salesdashboard (Reportes, que necesita las filas crudas por
+// creadora/día). /sales-overview ya NO lo usa: pasó a RPCs de agregación server-side
+// (get_dashboard2_creator_summary + get_sales_daily_totals + get_sales_monthly_totals).
+// Antes de sumarle otro consumidor, evaluar una RPC acotada como esas.
+//
 // BLU expone: ingreso total + desglose (subs, tips, mensajes, PPV, referidos, streams),
 // subs nuevas/recurrentes, chargebacks, contribución% y —desde fan-reports (Slice A)—
 // active_fans/new_fans por día. Ranking de OF sí queda null (BLU no lo da).
@@ -14,14 +20,14 @@ import type { EarningsRow } from "./types";
 // OJO: PostgREST corta en 1000 filas por request (max-rows del server). Si PAGE_SIZE>1000,
 // data.length nunca llega a PAGE_SIZE → el loop cree que terminó en la 1ª página y solo trae
 // las ~1000 filas más nuevas (≈ últimos días) → meses anteriores salen vacíos. PAGE_SIZE=1000
-// = el cap, así cada página llena devuelve 1000 y la paginación recorre las 11k+ filas.
+// = el cap, así cada página llena devuelve 1000 y la paginación recorre las ~41k filas.
 const PAGE_SIZE = 1000;
 
 const SELECT_COLS =
   "id, date, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, message_gross, tips_gross, contribution_pct, active_fans, new_fans, creator_id, blu_creator_name";
 
 const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
-  // PERF: antes se paginaba SECUENCIAL (~14 requests encadenados sobre 13k+ filas → lento).
+  // PERF: antes se paginaba SECUENCIAL (requests encadenados sobre todo el histórico → lento).
   // Ahora contamos primero (head=true, sin traer filas) y disparamos TODAS las páginas EN PARALELO.
   // Orden estable date+id (tiebreak) para que el .range() no salte/duplique filas entre páginas.
   const { count, error: cErr } = await (supabase as any)

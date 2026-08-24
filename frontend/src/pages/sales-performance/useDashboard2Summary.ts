@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Resumen POR CREADORA de creator_daily_earnings para un rango, agregado SERVER-SIDE
-// por el RPC get_dashboard2_creator_summary. Reemplaza el patrón viejo (bajar 13k+
-// filas crudas en ~14 requests sin caché y agregar en JS): ahora 1 request, ~56 filas.
+// por el RPC get_dashboard2_creator_summary. Reemplaza el patrón viejo (bajar el
+// histórico crudo — hoy ~41k filas — en decenas de requests sin caché y agregar en JS):
+// ahora 1 request, ~80 filas. Lo usan Dashboard 2 y /sales-overview (2 llamadas
+// paralelas: período actual + período anterior equivalente).
 export interface Dash2Summary {
   group_key: string;
   creator_id: string | null;
