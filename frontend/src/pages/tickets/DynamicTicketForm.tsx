@@ -63,8 +63,8 @@ function isBlank(v: AnswerValue): boolean {
 /**
  * Pinta el formulario de una plantilla y crea el ticket.
  *
- * El selector de creadora NO es un campo de la plantilla: lo decide
- * `creator_mode`, y por eso se dibuja aparte y siempre arriba.
+ * La creadora es una PREGUNTA de tipo `creator`, igual que en Google Forms se
+ * elige el tipo de una pregunta. Esa respuesta alimenta tickets.creator_id.
  */
 const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
   const { toast } = useToast();
@@ -73,7 +73,6 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
   const createTicket = useCreateTicketFromForm();
 
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
-  const [creatorId, setCreatorId] = useState("");
   const [touched, setTouched] = useState(false);
 
   // Memoizado: fieldsByForm filtra y ordena en cada llamada, y `fields` es
@@ -105,7 +104,6 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
 
   const reset = () => {
     setAnswers({});
-    setCreatorId("");
     setTouched(false);
   };
 
@@ -116,6 +114,13 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
 
   const setAnswer = (key: string, v: AnswerValue) =>
     setAnswers((prev) => ({ ...prev, [key]: v }));
+
+  /** La pregunta de tipo creadora es la fuente del vinculo con el CRM. */
+  const creatorField = useMemo(
+    () => fields.find((f) => f.field_type === "creator") || null,
+    [fields],
+  );
+  const creatorId = creatorField ? String(answers[creatorField.field_key] || "") : "";
 
   const missing = useMemo(
     () => fields.filter((f) => f.is_required && isBlank(answers[f.field_key] ?? null)),
@@ -146,16 +151,11 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
     });
   }, [creatorId, creatorsQuery.data, fields]);
 
-  const creatorMissing = form?.creator_mode === "required" && !creatorId;
 
   const handleSubmit = async () => {
     if (!form) return;
     setTouched(true);
 
-    if (creatorMissing) {
-      toast({ title: "Falta la creadora", description: "Esta plantilla la exige.", variant: "destructive" });
-      return;
-    }
     if (missing.length) {
       toast({
         title: "Faltan campos obligatorios",
@@ -176,7 +176,9 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
       await createTicket.mutateAsync({
         formId: form.id,
         answers: payload,
-        creatorId: form.creator_mode === "none" ? null : creatorId || null,
+        // El RPC lo deriva de la pregunta tipo creadora; se manda igual por
+        // compatibilidad con plantillas viejas sin esa pregunta.
+        creatorId: creatorId || null,
       });
       close();
     } catch {
@@ -256,6 +258,23 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
             />
             <span className="text-muted-foreground">Sí</span>
           </label>
+        );
+
+      case "creator":
+        return (
+          <>
+            <SearchableSelect
+              value={(v as string) || ""}
+              onValueChange={(nv) => setAnswer(f.field_key, nv)}
+              options={creatorOptions}
+              placeholder="Buscar creadora..."
+              triggerClassName={ring}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {creatorOptions.length} creadoras de la base de Maven — busca por nombre o handle.
+              Queda vinculada al perfil, no es texto libre.
+            </p>
+          </>
         );
 
       case "user":
@@ -385,26 +404,6 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-4">
-            {form.creator_mode !== "none" && (
-              <div className="space-y-1.5">
-                <Label>
-                  Creadora
-                  {form.creator_mode === "required" && <span className="ml-1 text-destructive">*</span>}
-                </Label>
-                <SearchableSelect
-                  value={creatorId}
-                  onValueChange={setCreatorId}
-                  options={creatorOptions}
-                  placeholder="Buscar creadora…"
-                  triggerClassName={touched && creatorMissing ? "border-destructive" : ""}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {creatorOptions.length} creadoras de la base de Maven — escribí para buscar por
-                  nombre o handle. Queda vinculada al perfil, no es texto libre.
-                </p>
-              </div>
-            )}
-
             {fields.length === 0 && (
               <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 Esta plantilla todavía no tiene campos. Agregalos desde Plantillas.

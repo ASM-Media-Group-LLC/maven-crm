@@ -75,7 +75,13 @@ function optLabel(options: unknown, value: string): string {
 }
 
 /** Un valor de respuesta → HTML, según el tipo de campo. */
-function renderValue(f: FormField, raw: unknown): string {
+function renderValue(f: FormField, raw: unknown, creatorName?: string | null): string {
+  // Una pregunta de tipo creadora guarda el UUID. Sin esto el correo mostraba
+  // el uuid crudo en vez del nombre.
+  if (f.field_type === "creator") {
+    return creatorName ? esc(creatorName) : "&mdash;";
+  }
+
   if (raw === null || raw === undefined || raw === "") return "&mdash;";
 
   switch (f.field_type) {
@@ -197,7 +203,7 @@ Deno.serve(async (req) => {
 
     const rows = (fields || [])
       .map((f: FormField) => {
-        const v = renderValue(f, answers[f.field_key]);
+        const v = renderValue(f, answers[f.field_key], creatorName);
         // Los textos largos y las pruebas se leen mejor a lo ancho.
         if (f.field_type === "textarea" || f.field_type === "drive_links") {
           return `<tr><td colspan="2" style="padding:12px 0 4px; font-family:Arial,Helvetica,sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#9AA5B1; font-weight:bold;">${esc(

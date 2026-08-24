@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
  */
 
 export const FIELD_TYPES = [
+  // "creator" es un tipo como cualquier otro: la pregunta se convierte en el
+  // buscador de creadoras de Maven y alimenta tickets.creator_id.
+  { value: "creator", label: "Creadora (vinculada a Maven)" },
   { value: "text", label: "Texto corto" },
   { value: "textarea", label: "Texto largo" },
   { value: "number", label: "Número" },
@@ -44,6 +47,10 @@ export const MAPPABLE_COLUMNS = [
   { value: "creator_notes", label: "Notas de la creadora" },
 ] as const;
 
+/**
+ * DEPRECADO. La creadora ahora es una pregunta de tipo `creator`. Se conserva el
+ * tipo para no romper nada que importe esto, pero el constructor ya no lo usa.
+ */
 export const CREATOR_MODES = [
   { value: "required", label: "Obligatoria", hint: "El ticket no se puede crear sin elegir creadora." },
   { value: "optional", label: "Opcional", hint: "Se puede elegir, pero no es obligatorio." },

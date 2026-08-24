@@ -24,6 +24,7 @@ import {
   Lock,
   Settings2,
   ListOrdered,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,16 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,14 +53,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FORM_COLORS, FORM_ICONS } from "./ticketFormPresentation";
+import { FORM_COLORS, FORM_ICONS, EDITOR_CANVAS } from "./ticketFormPresentation";
 import {
   useTicketForms,
   TYPES_WITH_OPTIONS,
   MAPPABLE_COLUMNS,
-  CREATOR_MODES,
   slugifyFieldKey,
-  type CreatorMode,
   type FieldType,
   type TicketForm,
   type TicketFormField,
@@ -65,6 +74,7 @@ import {
 
 /** Icono por tipo, como el desplegable de Forms. */
 const TYPE_ICONS: Record<FieldType, LucideIcon> = {
+  creator: Sparkles,
   text: Type,
   textarea: AlignLeft,
   number: Hash,
@@ -82,6 +92,7 @@ const TYPE_ICONS: Record<FieldType, LucideIcon> = {
 };
 
 const TYPE_LABELS: Record<FieldType, string> = {
+  creator: "Creadora",
   text: "Respuesta corta",
   textarea: "Parrafo",
   number: "Numero",
@@ -99,6 +110,7 @@ const TYPE_LABELS: Record<FieldType, string> = {
 };
 
 const TYPE_ORDER: FieldType[] = [
+  "creator",
   "text", "textarea", "select", "multiselect", "checkbox",
   "date", "number", "currency", "percent",
   "email", "url", "instagram", "user", "drive_links",
@@ -167,13 +179,16 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
   const [prefix, setPrefix] = useState("");
   const [icon, setIcon] = useState("Ticket");
   const [color, setColor] = useState("slate");
-  const [creatorMode, setCreatorMode] = useState<CreatorMode>("optional");
   const [notifyEnabled, setNotifyEnabled] = useState(true);
   const [emails, setEmails] = useState<string[]>([]);
   const [emailDraft, setEmailDraft] = useState("");
   const [fields, setFields] = useState<DraftField[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
+  // Forms no te grita con un panel de errores mientras escribis: solo al
+  // intentar guardar. Antes estaba siempre visible y era puro ruido.
+  const [showProblems, setShowProblems] = useState(false);
+  const [askRecipients, setAskRecipients] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -184,7 +199,6 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
       setPrefix(form.code_prefix);
       setIcon(form.icon);
       setColor(form.color);
-      setCreatorMode(form.creator_mode);
       setNotifyEnabled(form.notify_enabled);
       setEmails(form.notify_emails || []);
       setPublished(form.is_published);
@@ -195,7 +209,6 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
       setPrefix("");
       setIcon("Ticket");
       setColor("slate");
-      setCreatorMode("optional");
       setNotifyEnabled(true);
       setEmails([]);
       setPublished(false);
@@ -213,18 +226,22 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
       ]);
     }
     setSelected(null);
+    setShowProblems(false);
+    setAskRecipients(false);
     setEmailDraft("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form?.id]);
 
   /**
-   * Pedido explicito: si la plantilla lleva creadora, SIEMPRE tiene que tener
-   * su casilla de Instagram. El renderer la autocompleta con el handle del
-   * perfil al elegir la creadora, asi que nadie la escribe a mano.
+   * Pedido explicito: si la plantilla tiene una pregunta de tipo creadora,
+   * SIEMPRE tiene que tener su casilla de Instagram. El formulario la
+   * autocompleta con el handle del perfil al elegir la creadora, asi que nadie
+   * la escribe a mano.
    */
+  const hasCreatorField = fields.some((f) => f.field_type === "creator");
+
   useEffect(() => {
-    if (!open) return;
-    if (creatorMode === "none") return;
+    if (!open || !hasCreatorField) return;
     setFields((prev) => {
       if (prev.some((f) => f.field_type === "instagram")) return prev;
       return [
@@ -241,7 +258,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         },
       ];
     });
-  }, [creatorMode, open]);
+  }, [hasCreatorField, open]);
 
   const addEmail = () => {
     const e = emailDraft.trim().toLowerCase();
@@ -326,6 +343,9 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
     if (!/^[A-Z][A-Z0-9]{0,7}$/.test(prefix.trim().toUpperCase()))
       out.push("El prefijo debe ser de 1 a 8 caracteres, empezando por letra (ej. TK).");
 
+    if (fields.filter((f) => f.field_type === "creator").length > 1)
+      out.push("Solo puede haber una pregunta de tipo Creadora por plantilla.");
+
     const keys = new Set<string>();
     const maps = new Set<string>();
     fields.forEach((f, i) => {
@@ -359,10 +379,17 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
     return out;
   }, [name, prefix, fields]);
 
-  const handleSave = async (alsoPublish?: boolean) => {
+  const handleSave = async (alsoPublish?: boolean, skipRecipientCheck?: boolean) => {
     if (problems.length) {
+      setShowProblems(true);
       setTab(problems[0].includes("prefijo") ? "settings" : "questions");
       toast({ title: "Revisa el formulario", description: problems[0], variant: "destructive" });
+      return;
+    }
+    // Publicar sin destinatarios deja los tickets sin avisarle a nadie: es el
+    // modo de falla silencioso de todo esto, asi que se recuerda antes.
+    if (alsoPublish && !skipRecipientCheck && notifyEnabled && emails.length === 0) {
+      setAskRecipients(true);
       return;
     }
     try {
@@ -373,7 +400,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         code_prefix: prefix.trim().toUpperCase(),
         icon,
         color,
-        creator_mode: creatorMode,
+        creator_mode: "none",
         notify_enabled: notifyEnabled,
         notify_emails: emails,
         is_published: alsoPublish ?? published,
@@ -478,19 +505,20 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         </div>
 
         {/* ── Cuerpo ─────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto bg-muted/40 px-4 py-6">
-          <div className="mx-auto w-full max-w-[760px] space-y-3">
+        <div className={`flex-1 overflow-y-auto px-4 py-8 ${EDITOR_CANVAS}`}>
+          <div className="mx-auto flex w-full max-w-[832px] items-start gap-3">
+            <div className="min-w-0 flex-1 space-y-3">
             {tab === "questions" ? (
               <>
                 {/* Encabezado del formulario */}
                 <div className="overflow-hidden rounded-lg border bg-card">
-                  <div className={`h-2.5 w-full ${accent.wrap}`} />
-                  <div className="space-y-2 p-5">
+                  <div className={`h-[10px] w-full ${accent.bar}`} />
+                  <div className="space-y-1 p-6">
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Plantilla sin titulo"
-                      className="h-auto border-0 border-b border-transparent bg-transparent px-0 !text-2xl font-normal shadow-none focus-visible:border-b-primary focus-visible:ring-0"
+                      className="h-auto border-0 border-b border-transparent bg-transparent px-0 pb-1 !text-[28px] font-normal leading-tight shadow-none focus-visible:border-b-foreground/40 focus-visible:ring-0"
                     />
                     <Textarea
                       value={description}
@@ -501,31 +529,6 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                     />
                   </div>
                 </div>
-
-                {/* Campo de sistema: la creadora */}
-                {creatorMode !== "none" && (
-                  <div className="rounded-lg border border-dashed bg-card/60 p-4">
-                    <div className="flex items-start gap-3">
-                      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">
-                          Creadora
-                          {creatorMode === "required" && (
-                            <span className="ml-1 text-destructive">*</span>
-                          )}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Buscador vinculado a las creadoras de Maven. No es una pregunta editable:
-                          se controla desde Ajustes. Al elegir una, la casilla de Instagram se
-                          completa sola con el perfil.
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="shrink-0 text-[10px]">
-                        automatico
-                      </Badge>
-                    </div>
-                  </div>
-                )}
 
                 {/* Preguntas */}
                 <DragDropContext onDragEnd={onDragEnd}>
@@ -549,9 +552,11 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
                                   onClick={() => setSelected(f.uid)}
-                                  className={`rounded-lg border bg-card transition ${
-                                    isSel ? "border-l-4 border-l-primary shadow-md" : "cursor-pointer hover:shadow-sm"
-                                  } ${snapshot.isDragging ? "shadow-lg" : ""}`}
+                                  className={`rounded-lg border bg-card transition-shadow ${
+                                    isSel
+                                      ? `border-l-[6px] ${accent.ring} shadow-lg`
+                                      : "cursor-pointer shadow-sm hover:shadow-md"
+                                  } ${snapshot.isDragging ? "shadow-2xl" : ""}`}
                                 >
                                   {/* Asa de arrastre */}
                                   <div
@@ -765,12 +770,16 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   </Droppable>
                 </DragDropContext>
 
-                <Button variant="outline" className="w-full border-dashed" onClick={addField}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-center border-dashed bg-card/60 hover:bg-card"
+                  onClick={addField}
+                >
                   <Plus className="mr-1.5 h-4 w-4" />
                   Anadir pregunta
                 </Button>
 
-                {problems.length > 0 && (
+                {showProblems && problems.length > 0 && (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                     <p className="text-xs font-medium text-destructive">
                       Falta corregir {problems.length}{" "}
@@ -805,28 +814,6 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                         {form
                           ? "No se puede cambiar: los tickets ya emitidos lo usan."
                           : `Los tickets saldran como ${(prefix || "TK").toUpperCase()}-0001, -0002...`}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label>Es sobre una creadora?</Label>
-                      <Select
-                        value={creatorMode}
-                        onValueChange={(v) => setCreatorMode(v as CreatorMode)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CREATOR_MODES.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {CREATOR_MODES.find((m) => m.value === creatorMode)?.hint}
                       </p>
                     </div>
 
@@ -933,8 +920,66 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                 </div>
               </div>
             )}
+            </div>
+
+            {/* Barra flotante de acciones, como la de Forms al costado */}
+            {tab === "questions" && (
+              <div className="sticky top-0 flex flex-col gap-1 rounded-xl border bg-card p-1 shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={addField}
+                  aria-label="Anadir pregunta"
+                  title="Anadir pregunta"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTab("settings")}
+                  aria-label="Ajustes de la plantilla"
+                  title="Ajustes de la plantilla"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Recordatorio de destinatarios al publicar */}
+        <AlertDialog open={askRecipients} onOpenChange={setAskRecipients}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Nadie va a recibir el aviso</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta plantilla no tiene destinatarios de correo. Los tickets se van a crear
+                igual, pero no se le va a avisar a nadie — y ese es el tipo de falla que no se
+                nota hasta que alguien pregunta por un ticket que nadie vio.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setAskRecipients(false);
+                  setTab("settings");
+                }}
+              >
+                Agregar destinatarios
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setAskRecipients(false);
+                  // skip: si no, el propio aviso se vuelve a disparar en bucle.
+                  void handleSave(true, true);
+                }}
+              >
+                Publicar sin correo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
