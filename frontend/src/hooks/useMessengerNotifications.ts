@@ -24,6 +24,30 @@ function previewOf(content: string | null, type: string, fileName: string | null
   return MEDIA_LABEL[type] ?? "Nuevo mensaje";
 }
 
+// No-molestar RESPETANDO el horario. Antes dnd_enabled apagaba TODO 24/7. Sin franja
+// definida = No-molestar permanente; con franja, maneja ventanas que cruzan medianoche.
+function isDndActiveNow(s: { dnd_enabled?: boolean; dnd_start_time?: string | null; dnd_end_time?: string | null }): boolean {
+  if (!s?.dnd_enabled) return false;
+  if (!s.dnd_start_time || !s.dnd_end_time) return true;
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const [sh, sm] = s.dnd_start_time.split(":").map(Number);
+  const [eh, em] = s.dnd_end_time.split(":").map(Number);
+  const start = sh * 60 + (sm || 0);
+  const end = eh * 60 + (em || 0);
+  if (start === end) return false;
+  return start < end ? cur >= start && cur < end : cur >= start || cur < end;
+}
+
+// ¿el mensaje me menciona? Mismo criterio que useMentionedConversations: @fullName o @firstName.
+function mentionsMe(content: string | null, myName: string | null): boolean {
+  if (!content || !myName) return false;
+  const c = content.toLowerCase();
+  const full = myName.toLowerCase();
+  const first = full.split(" ")[0];
+  return c.includes(`@${full}`) || (!!first && c.includes(`@${first}`));
+}
+
 /**
  * Hook GLOBAL del Messenger interno (chat del staff). Montado en AppShell → activo en toda
  * Maven, no solo en /messenger. Reacciona a cada mensaje interno entrante
@@ -63,11 +87,21 @@ export function useMessengerNotifications() {
   navigateRef.current = navigate;
   // Anti-spam del sonido: en ráfagas no disparamos un beep por cada mensaje.
   const lastSoundRef = useRef(0);
+  // Mi nombre, para el modo "Solo @menciones".
+  const myNameRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
 
   useEffect(() => {
     if (!userId) return;
+
+    // Mi nombre (una vez) para detectar menciones en modo 'mentions'.
+    void supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => { myNameRef.current = data?.full_name ?? null; });
 
     // Backfill "entregado" al montar (ignoreDuplicates → no-op para los ya entregados/leídos).
     void (async () => {
@@ -103,18 +137,23 @@ export function useMessengerNotifications() {
           // (1) Entregado — SIEMPRE (independiente de silenciar/ajustes).
           void markMessagesDelivered(userId, [m.id]);
 
-          // (2) Notificación — condicional. Maestro apagado o No-molestar → nada.
+          // (2) Notificación — condicional. Maestro apagado o No-molestar (según horario) → nada.
           const s = settingsRef.current;
-          if (s.notifications_enabled === false || s.dnd_enabled) return;
+          if (s.notifications_enabled === false || isDndActiveNow(s)) return;
 
-          // Mute de la conversación (mi fila) + tipo/nombre de la conversación en 1 query.
+          // Mute + modo de notificación de la conversación (mi fila) + tipo/nombre en 1 query.
           const { data: part } = await supabase
             .from("chat_participants")
-            .select("is_muted, conversation:chat_conversations(type, name)")
+            .select("is_muted, notifications_mode, conversation:chat_conversations(type, name)")
             .eq("conversation_id", m.conversation_id)
             .eq("user_id", userId)
             .maybeSingle();
           if (!part || (part as { is_muted?: boolean }).is_muted) return;
+
+          // Respetar el modo por-conversación: 'none' nunca notifica; 'mentions' solo si me mencionan.
+          const mode = (part as { notifications_mode?: string }).notifications_mode;
+          if (mode === "none") return;
+          if (mode === "mentions" && !mentionsMe(m.content ?? null, myNameRef.current)) return;
 
           const conv = (part as { conversation?: { type?: string; name?: string | null } | null })
             .conversation ?? null;

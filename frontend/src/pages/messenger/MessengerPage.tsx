@@ -79,7 +79,11 @@ export default function MessengerPage() {
     // useMessengerNotifications (montado en AppShell), para que funcionen en toda Maven y
     // respeten el silenciado por conversación. Acá sólo marcamos leída la conversación
     // activa cuando llega un mensaje mientras la estamos mirando.
-    if (activeChatIdRef.current === msg.conversation_id) {
+    // Solo marcar leído si además la ventana está ENFOCADA: si llega un mensaje al chat
+    // abierto mientras estás en otra pestaña/app, no lo des por visto (el badge/menciones
+    // seguirían encendidos hasta que vuelvas — el listener de focus de useMessages hace el
+    // catch-up al volver).
+    if (document.hasFocus() && activeChatIdRef.current === msg.conversation_id) {
       markConversationRead(msg.conversation_id);
     }
   }, [markConversationRead]);

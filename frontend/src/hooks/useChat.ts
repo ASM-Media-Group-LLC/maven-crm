@@ -790,6 +790,10 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   // Ref for loadOlderMessages to avoid stale closure on `messages`
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
+  // Id de la conversación activa AHORA — para descartar respuestas tardías de un load de una
+  // conversación anterior que pisarían los mensajes del chat activo (carrera al cambiar de chat).
+  const currentConvRef = useRef<string | null>(conversationId);
+  currentConvRef.current = conversationId;
   onNewMessageRef.current = onNewMessage;
 
   // Load initial messages
@@ -808,6 +812,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
 
+      // Si cambiaron de conversación mientras cargaba, descartar (no pisar el chat activo).
+      if (conversationId !== currentConvRef.current) return;
       const sorted = ((data as ChatMessage[]) || []).reverse();
       setMessages(sorted);
       setHasMore((data?.length || 0) >= PAGE_SIZE);
@@ -829,7 +835,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
           .then();
       }
     } finally {
-      setLoading(false);
+      // Solo el load de la conversación vigente controla el spinner.
+      if (conversationId === currentConvRef.current) setLoading(false);
     }
   }, [conversationId, user]);
 
@@ -854,6 +861,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
 
+      if (conversationId !== currentConvRef.current) return; // cambió de chat mientras cargaba
       if (data && data.length > 0) {
         const older = (data as ChatMessage[]).reverse();
         setMessages(prev => [...older, ...prev]);
