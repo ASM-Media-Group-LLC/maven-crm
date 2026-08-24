@@ -86,6 +86,7 @@ const Row = ({
 );
 
 const MyAccountTab = () => {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const upload = useUploadUserAvatar();
@@ -95,16 +96,16 @@ const MyAccountTab = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pwOpen, setPwOpen] = useState(false);
 
-  const fullName = user?.user_metadata?.full_name || profileQ.data?.full_name || "Usuario";
+  const fullName = user?.user_metadata?.full_name || profileQ.data?.full_name || t("settings.defaultUser");
   const email = user?.email || "";
   const avatarUrl = profileQ.data?.avatar_url ?? null;
 
   const handleFile = async (file: File) => {
     try {
       await upload.mutateAsync(file);
-      toast.success("Foto de perfil actualizada");
+      toast.success(t("settings.photoUpdated"));
     } catch (e) {
-      toast.error("No se pudo subir", { description: (e as Error).message });
+      toast.error(t("settings.couldNotUpload"), { description: (e as Error).message });
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -113,9 +114,9 @@ const MyAccountTab = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mi cuenta</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("settings.myAccount")}</h1>
         <p className="text-sm text-muted-foreground">
-          Foto de perfil y seguridad de la cuenta.
+          {t("settings.myAccountDesc")}
         </p>
       </div>
       <Card>
@@ -133,17 +134,17 @@ const MyAccountTab = () => {
                 onClick={() => fileRef.current?.click()}
                 disabled={upload.isPending}
                 className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 text-white opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-100"
-                aria-label="Cambiar foto de perfil"
+                aria-label={t("settings.changePhotoAria")}
               >
                 {upload.isPending ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="text-[10px]">Subiendo…</span>
+                    <span className="text-[10px]">{t("settings.uploading")}</span>
                   </>
                 ) : (
                   <>
                     <Camera className="h-5 w-5" />
-                    <span className="text-[10px]">Cambiar</span>
+                    <span className="text-[10px]">{t("settings.change")}</span>
                   </>
                 )}
               </button>
@@ -162,7 +163,7 @@ const MyAccountTab = () => {
               <div className="text-base font-semibold truncate">{fullName}</div>
               <div className="truncate text-sm text-muted-foreground">{email}</div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Pasa el cursor sobre la imagen para subir una nueva foto.
+                {t("settings.hoverToUpload")}
               </p>
               {avatarUrl ? (
                 <Button
@@ -174,13 +175,13 @@ const MyAccountTab = () => {
                   onClick={async () => {
                     try {
                       await removeAvatar.mutateAsync();
-                      toast.success("Foto quitada", { description: "Tu avatar vuelve al muñequito o a las iniciales." });
+                      toast.success(t("settings.photoRemoved"), { description: t("settings.photoRemovedDesc") });
                     } catch (e) {
-                      toast.error("No se pudo quitar", { description: (e as Error).message });
+                      toast.error(t("settings.couldNotRemove"), { description: (e as Error).message });
                     }
                   }}
                 >
-                  Quitar foto
+                  {t("settings.removePhoto")}
                 </Button>
               ) : null}
             </div>
@@ -202,10 +203,9 @@ const MyAccountTab = () => {
               className="shrink-0"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-base font-semibold">Tu muñequito</div>
+              <div className="text-base font-semibold">{t("settings.doodleTitle")}</div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Es tu avatar cuando no tienes foto de perfil. Mezcla hasta
-                encontrar uno que te guste y guárdalo.
+                {t("settings.doodleDesc")}
               </p>
               <div className="mt-3 flex gap-2">
                 <Button
@@ -216,7 +216,7 @@ const MyAccountTab = () => {
                     setSeedDraft(`${user?.id ?? "seed"}:${Math.random().toString(36).slice(2, 8)}`)
                   }
                 >
-                  Mezclar
+                  {t("settings.shuffle")}
                 </Button>
                 <Button
                   type="button"
@@ -227,13 +227,13 @@ const MyAccountTab = () => {
                     try {
                       await saveSeed.mutateAsync(seedDraft);
                       setSeedDraft(null);
-                      toast.success("Muñequito guardado");
+                      toast.success(t("settings.doodleSaved"));
                     } catch (e) {
-                      toast.error("No se pudo guardar", { description: (e as Error).message });
+                      toast.error(t("settings.couldNotSave"), { description: (e as Error).message });
                     }
                   }}
                 >
-                  Guardar este
+                  {t("settings.saveThisOne")}
                 </Button>
               </div>
             </div>
@@ -250,10 +250,10 @@ const MyAccountTab = () => {
 
       <Card>
         <CardContent className="p-6">
-          <div className="mb-3 text-sm font-semibold">Seguridad</div>
+          <div className="mb-3 text-sm font-semibold">{t("settings.security")}</div>
           <Button variant="outline" onClick={() => setPwOpen(true)} className="gap-2">
             <KeyRound className="h-4 w-4" />
-            Cambiar contraseña
+            {t("topbar.changePassword")}
           </Button>
         </CardContent>
       </Card>
@@ -286,6 +286,7 @@ const WhatsappPhoneCard = ({
   pushName: string | null;
   loading: boolean;
 }) => {
+  const { t } = useLanguage();
   // El componente PhoneInput maneja value como "+<code> <number>". Al
   // hidratar desde el backend (que guarda "+573001234567" sin espacio)
   // el parsePhone interno se encarga de separar code de número, así que
@@ -310,17 +311,17 @@ const WhatsappPhoneCard = ({
     if (trimmed === "" || trimmed === "+") {
       try {
         await updateMut.mutateAsync(null);
-        toast.success("Número de WhatsApp removido");
+        toast.success(t("settings.waRemoved"));
         setDirty(false);
       } catch (e) {
-        toast.error("No se pudo guardar", { description: (e as Error).message });
+        toast.error(t("settings.couldNotSave"), { description: (e as Error).message });
       }
       return;
     }
     const normalized = toE164(trimmed);
     if (!/^\+[0-9]{8,16}$/.test(normalized)) {
-      toast.error("Número inválido", {
-        description: "Elige el país y escribe el número completo (sin el código de área internacional, sin 0 inicial).",
+      toast.error(t("settings.waInvalidNumber"), {
+        description: t("settings.waInvalidNumberDesc"),
       });
       return;
     }
@@ -328,21 +329,21 @@ const WhatsappPhoneCard = ({
       await updateMut.mutateAsync(normalized);
       setValue(normalized);
       setDirty(false);
-      toast.success("Número de WhatsApp guardado", {
-        description: "Ahora toca \"Verificar por WhatsApp\" y envíale el código al bot.",
+      toast.success(t("settings.waSaved"), {
+        description: t("settings.waSavedDesc"),
       });
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes("duplicate") || msg.includes("unique")) {
-        toast.error("Ese número ya está en uso por otro usuario", {
-          description: "Si te lo apropiaste recientemente, pediles que se lo saquen primero.",
+        toast.error(t("settings.waDuplicate"), {
+          description: t("settings.waDuplicateDesc"),
         });
       } else if (msg.includes("phone_e164_format") || msg.includes("check")) {
-        toast.error("Formato inválido", {
-          description: "Tiene que ser E.164 (ej. +573001234567 o +5491112345678).",
+        toast.error(t("settings.waBadFormat"), {
+          description: t("settings.waBadFormatDesc"),
         });
       } else {
-        toast.error("No se pudo guardar", { description: msg });
+        toast.error(t("settings.couldNotSave"), { description: msg });
       }
     }
   };
@@ -358,11 +359,11 @@ const WhatsappPhoneCard = ({
       const data = await requestMut.mutateAsync();
       setVerif(data);
       window.open(data.wa_link, "_blank", "noopener,noreferrer");
-      toast.success("Código generado", {
-        description: "Se abrió WhatsApp con el mensaje listo — solo toca enviar.",
+      toast.success(t("settings.waCodeGenerated"), {
+        description: t("settings.waCodeGeneratedDesc"),
       });
     } catch (e) {
-      toast.error("No se pudo generar el código", { description: (e as Error).message });
+      toast.error(t("settings.waCodeError"), { description: (e as Error).message });
     }
   };
 
@@ -374,28 +375,26 @@ const WhatsappPhoneCard = ({
             <MessageCircle className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">Número de WhatsApp</div>
+            <div className="text-sm font-semibold">{t("settings.waTitle")}</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Carga tu número para que el bot (Maven Asistente) te reconozca
-              automáticamente cuando escribas en los grupos del equipo.
-              Elige el país en el dropdown y escribe el resto del número.
+              {t("settings.waDesc")}
             </p>
           </div>
           {isLinked && isVerified && (
             <Badge variant="default" className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-700">
-              <CheckCircle2 className="h-2.5 w-2.5" /> Verificado
+              <CheckCircle2 className="h-2.5 w-2.5" /> {t("settings.waVerified")}
             </Badge>
           )}
           {isLinked && !isVerified && (
             <Badge variant="outline" className="gap-1 text-[10px] border-amber-500 text-amber-600 dark:text-amber-400">
-              <AlertCircle className="h-2.5 w-2.5" /> Pendiente
+              <AlertCircle className="h-2.5 w-2.5" /> {t("settings.waPending")}
             </Badge>
           )}
         </div>
 
         <div className="grid gap-2 max-w-md">
           <Label htmlFor="phone_e164" className="text-xs">
-            Tu número
+            {t("settings.waYourNumber")}
           </Label>
           <div className="flex gap-2">
             <PhoneInput
@@ -415,15 +414,14 @@ const WhatsappPhoneCard = ({
               {updateMut.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Guardar"
+                t("settings.waSave")
               )}
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span>
-              Tu número solo se usa para identificarte en los grupos donde está el bot.
-              No se comparte con nadie más ni se muestra a otros usuarios.
+              {t("settings.waPrivacyNote")}
             </span>
           </p>
         </div>
@@ -438,13 +436,11 @@ const WhatsappPhoneCard = ({
                 <div className="flex items-center gap-2 text-xs">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   <span className="font-medium">
-                    Verificado como <span className="text-emerald-600">{pushName ?? "(sin pushName)"}</span>
+                    {t("settings.waVerifiedAs")} <span className="text-emerald-600">{pushName ?? t("settings.waNoPushName")}</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  El bot ya te reconoce cuando escribes en los grupos. Si cambiaste
-                  el nombre que muestras en WhatsApp, re-verifica: generas un código
-                  nuevo y se lo envías al bot.
+                  {t("settings.waVerifiedHint")}
                 </p>
                 <Button
                   variant="outline"
@@ -454,20 +450,18 @@ const WhatsappPhoneCard = ({
                   className="h-7 text-xs"
                 >
                   {requestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
-                  Re-verificar por WhatsApp
+                  {t("settings.waReverify")}
                 </Button>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-xs">
                   <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <span className="font-medium">Falta verificar tu número</span>
+                  <span className="font-medium">{t("settings.waNeedsVerify")}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Toca el botón: se abre tu WhatsApp con un código listo para enviarle a{" "}
-                  <strong>Maven Asistente</strong>. Cuando lo envíes, el bot te confirma
-                  con un ✅ y quedas vinculado. (El chat lo inicias tú — el bot no te
-                  escribe primero.)
+                  {t("settings.waNeedsVerifyHint1")}{" "}
+                  <strong>{t("settings.waBotName")}</strong>{t("settings.waNeedsVerifyHint2")}
                 </p>
                 <Button
                   size="sm"
@@ -476,24 +470,24 @@ const WhatsappPhoneCard = ({
                   className="h-8 text-xs"
                 >
                   {requestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MessageCircle className="h-3 w-3 mr-1" />}
-                  Verificar por WhatsApp
+                  {t("settings.waVerify")}
                 </Button>
                 {verif && (
                   <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 space-y-1">
                     <p className="text-[11px] text-muted-foreground">
-                      Tu código: <code className="px-1.5 py-0.5 rounded bg-muted font-semibold tracking-widest">{verif.code}</code>
+                      {t("settings.waYourCode")} <code className="px-1.5 py-0.5 rounded bg-muted font-semibold tracking-widest">{verif.code}</code>
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      ¿No se abrió WhatsApp?{" "}
+                      {t("settings.waNotOpened")}{" "}
                       <a
                         href={verif.wa_link}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline text-emerald-600"
                       >
-                        Abrir de nuevo
+                        {t("settings.waOpenAgain")}
                       </a>{" "}
-                      o mándale el código a <code className="px-1 rounded bg-muted">+{verif.bot_phone}</code> a mano.
+                      {t("settings.waSendManually", { phone: `+${verif.bot_phone}` })}
                     </p>
                   </div>
                 )}
@@ -506,12 +500,14 @@ const WhatsappPhoneCard = ({
   );
 };
 
-const ProyectoMPTab = () => (
+const ProyectoMPTab = () => {
+  const { t } = useLanguage();
+  return (
   <div className="space-y-4">
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Proyecto MP</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{t("settings.mpTitle")}</h1>
       <p className="text-sm text-muted-foreground">
-        Pipeline, tareas, contenido y métricas del proyecto MP.
+        {t("settings.mpDesc")}
       </p>
     </div>
     <Card>
@@ -519,20 +515,23 @@ const ProyectoMPTab = () => (
         <Row
           to="/proyectomp"
           icon={Rocket}
-          title="Abrir Proyecto MP"
-          description="Dashboard principal con todas las pestañas."
+          title={t("settings.mpOpen")}
+          description={t("settings.mpOpenDesc")}
         />
       </CardContent>
     </Card>
   </div>
-);
+  );
+};
 
-const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePermissions>["canAccess"]; isAdmin: boolean }) => (
+const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePermissions>["canAccess"]; isAdmin: boolean }) => {
+  const { t } = useLanguage();
+  return (
   <div className="space-y-4">
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Administración</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{t("settings.adminTitle")}</h1>
       <p className="text-sm text-muted-foreground">
-        Usuarios, roles y auditoría de la plataforma.
+        {t("settings.adminDesc")}
       </p>
     </div>
     <Card>
@@ -541,37 +540,38 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
           <Row
             to="/settings?sub=usuarios"
             icon={Shield}
-            title="Usuarios"
-            description="Gestión de usuarios, roles y permisos."
+            title={t("settings.users")}
+            description={t("settings.usersDesc")}
           />
         )}
         {(canAccess("Administración", "Auditoría") || isAdmin) && (
           <Row
             to="/settings?sub=auditoria"
             icon={ClipboardCheck}
-            title="Auditoría"
-            description="Historial de cambios de roles y permisos."
+            title={t("settings.audit")}
+            description={t("settings.auditDesc")}
           />
         )}
         {isAdmin && (
           <Row
             to="/settings?sub=reportes"
             icon={Send}
-            title="Reportes programados"
-            description="Reportes automáticos por email — LLGs, Closers, Chatters."
+            title={t("settings.reports")}
+            description={t("settings.reportsDesc")}
           />
         )}
       </CardContent>
     </Card>
   </div>
-);
+  );
+};
 
 const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
   <div className="space-y-4">
     <div>
       <h1 className="text-2xl font-bold tracking-tight">{t("sidebar.resources") || "Recursos"}</h1>
       <p className="text-sm text-muted-foreground">
-        Documentación, design system y roadmap.
+        {t("settings.resourcesDesc")}
       </p>
     </div>
     <Card>
@@ -580,19 +580,19 @@ const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
           to="/settings?sub=design-system"
           icon={Palette}
           title={t("nav.designSystem") || "Design System"}
-          description="Componentes, paleta y guía de estilo."
+          description={t("settings.designSystemDesc")}
         />
         <Row
           to="/settings?sub=docs"
           icon={FileText}
           title={t("nav.docs") || "Docs"}
-          description="Documentación interna del proyecto."
+          description={t("settings.docsDesc")}
         />
         <Row
           to="/settings?sub=roadmap"
           icon={Map}
           title="Roadmap"
-          description="Seguimiento de funciones planificadas."
+          description={t("settings.roadmapDesc")}
         />
       </CardContent>
     </Card>
@@ -620,9 +620,9 @@ const Settings = () => {
   // Build the tab list dynamically — same canAccess() rules the
   // sidebar used to apply.
   const tabs: TabDef[] = [
-    { key: "account", label: "Mi cuenta", icon: UserIcon },
-    ...(showProyectoMP ? [{ key: "mp" as const, label: "Proyecto MP", icon: Rocket }] : []),
-    ...(showAdmin ? [{ key: "admin" as const, label: "Administración", icon: Shield }] : []),
+    { key: "account", label: t("settings.myAccount"), icon: UserIcon },
+    ...(showProyectoMP ? [{ key: "mp" as const, label: t("settings.mpTitle"), icon: Rocket }] : []),
+    ...(showAdmin ? [{ key: "admin" as const, label: t("settings.adminTitle"), icon: Shield }] : []),
     ...(showResources ? [{ key: "resources" as const, label: t("sidebar.resources") || "Recursos", icon: Palette }] : []),
   ];
 
@@ -634,7 +634,7 @@ const Settings = () => {
     admin: "Admin",
     manager: "Manager",
     agent: "Chatter",
-    employee: "Empleado",
+    employee: t("settings.roleEmployee"),
     closer: "Closer",
     supervisor: "Supervisor",
   };
@@ -651,7 +651,7 @@ const Settings = () => {
               headers de sección del sidebar principal (text-[11px],
               tracking-widest, foreground/70). */}
           <div className="px-2 pb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
-            Conectado como {prettyRole}
+            {t("settings.connectedAs", { role: prettyRole })}
           </div>
           {/* Tabs — mismo lenguaje que la sidebar principal:
               sidebar-glass-hover en reposo + sidebar-glass-active cuando
@@ -686,7 +686,7 @@ const Settings = () => {
               className="group flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             >
               <LogOut className="h-4 w-4 shrink-0 transition-colors group-hover:text-destructive" />
-              <span className="truncate">Cerrar sesión</span>
+              <span className="truncate">{t("topbar.logout")}</span>
             </button>
           </div>
         </div>
@@ -753,9 +753,9 @@ const SettingsRightPane = ({
 
   // Cuáles sub-keys son embeddable. Cualquier otra cosa se ignora.
   const SUB_PAGES: Record<string, { title: string; render: () => JSX.Element }> = {
-    usuarios:        { title: "Usuarios",       render: () => <AdminUsuarios /> },
-    auditoria:       { title: "Auditoría",      render: () => <AuditoriaRoles /> },
-    reportes:        { title: "Reportes",       render: () => <AdminReportes /> },
+    usuarios:        { title: t("settings.users"),        render: () => <AdminUsuarios /> },
+    auditoria:       { title: t("settings.audit"),        render: () => <AuditoriaRoles /> },
+    reportes:        { title: t("settings.reportsShort"), render: () => <AdminReportes /> },
     "design-system": { title: "Design System",  render: () => <DesignSystem /> },
     docs:            { title: "Docs",           render: () => <Docs /> },
     roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
@@ -774,7 +774,7 @@ const SettingsRightPane = ({
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-background/60 px-6 py-3 backdrop-blur-xl">
           <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" />
-            Volver al menú
+            {t("settings.backToMenu")}
           </Button>
           <span className="text-sm font-medium text-muted-foreground">·</span>
           <span className="text-sm font-medium">{activeSub.title}</span>

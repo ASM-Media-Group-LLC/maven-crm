@@ -7,9 +7,11 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
+  const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,7 +53,7 @@ const Login = () => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
-      toast({ title: "Campos requeridos", description: "Por favor completa todos los campos.", variant: "destructive" });
+      toast({ title: t("auth.requiredFields"), description: t("auth.requiredFieldsDesc"), variant: "destructive" });
       return;
     }
 
@@ -60,7 +62,7 @@ const Login = () => {
     setLoading(false);
 
     if (error) {
-      toast({ title: "Error al iniciar sesión", description: error.message, variant: "destructive" });
+      toast({ title: t("auth.loginError"), description: error.message, variant: "destructive" });
     } else {
       navigate(destino);
     }
@@ -70,17 +72,17 @@ const Login = () => {
     <AuthLayout>
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <h2 className="text-2xl font-bold text-white">Iniciar sesión</h2>
-          <p className="text-sm text-white/50">Ingresa tus credenciales para acceder al CRM</p>
+          <h2 className="text-2xl font-bold text-white">{t("auth.loginTitle")}</h2>
+          <p className="text-sm text-white/50">{t("auth.loginSubtitle")}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-white/70">Email</Label>
+            <Label htmlFor="email" className="text-white/70">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
-              placeholder="tu@email.com"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
@@ -88,7 +90,7 @@ const Login = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-white/70">Contraseña</Label>
+            <Label htmlFor="password" className="text-white/70">{t("auth.password")}</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -113,17 +115,17 @@ const Login = () => {
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Iniciar Sesión
+            {t("auth.loginButton")}
           </Button>
         </form>
 
         <div className="flex flex-col items-center gap-2 text-sm">
           <Link to="/forgot-password" className="text-white/60 hover:text-white hover:underline">
-            ¿Olvidaste tu contraseña?
+            {t("auth.forgotPassword")}
           </Link>
           <span className="text-white/40">
-            ¿No tienes cuenta?{" "}
-            <Link to="/register" className="text-white/60 hover:text-white hover:underline">Regístrate</Link>
+            {t("auth.noAccount")}{" "}
+            <Link to="/register" className="text-white/60 hover:text-white hover:underline">{t("auth.registerLink")}</Link>
           </span>
         </div>
       </div>

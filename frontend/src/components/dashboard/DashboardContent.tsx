@@ -34,6 +34,8 @@ import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useWeeklyStats, useOperationalKPIs, useRecentActivity } from "@/hooks/useDashboardData";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { useAnnouncementsByChannel, useUpcomingBirthdays, useRecordAnnouncementView, useRecordAnnouncementOpen, type Announcement } from "@/hooks/useAnnouncements";
 import { useQuery } from "@tanstack/react-query";
 import AnnouncementFeedCard from "./AnnouncementFeedCard";
@@ -113,23 +115,23 @@ const ACTIVITY_CONFIG = {
 
 interface QuickAction {
   id: string;
-  label: string;
+  label: TranslationKey;
   icon: typeof Users;
   url: string;
   module?: string; // for permission filtering
 }
 
 const ALL_ACTIONS: QuickAction[] = [
-  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "Contactos" },
-  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "Creadores" },
-  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "LeadGen" },
-  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "Closers" },
-  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "Tickets" },
-  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "HR" },
-  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "Finanzas" },
-  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "Promolog" },
-  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "Creator Sales" },
-  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
+  { id: "contactos",  label: "dashboard.action.contacts", icon: UserPlus,      url: "/contactos",         module: "Contactos" },
+  { id: "creadores",  label: "dashboard.action.creators", icon: Users,         url: "/creadores",         module: "Creadores" },
+  { id: "leadgen",    label: "dashboard.action.leadgen",  icon: MessageSquare, url: "/leadgen",           module: "LeadGen" },
+  { id: "closers",    label: "dashboard.action.closers",  icon: Phone,         url: "/closers",           module: "Closers" },
+  { id: "tickets",    label: "dashboard.action.tickets",  icon: Ticket,        url: "/tickets",           module: "Tickets" },
+  { id: "hr",         label: "dashboard.action.hr",       icon: Briefcase,     url: "/hr",                module: "HR" },
+  { id: "finanzas",   label: "dashboard.action.finance",  icon: DollarSign,    url: "/finanzas",          module: "Finanzas" },
+  { id: "promolog",   label: "dashboard.action.promolog", icon: Megaphone,     url: "/promolog",          module: "Promolog" },
+  { id: "sales",      label: "dashboard.action.sales",    icon: TrendingUp,    url: "/sales",             module: "Creator Sales" },
+  { id: "admin",      label: "dashboard.action.admin",    icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
 ];
 
 const DEFAULT_ACTION_IDS = ["contactos", "creadores", "tickets"];
@@ -150,6 +152,7 @@ function loadShortcuts(): string[] {
 /* ── Component ────────────────────────────────────── */
 
 const DashboardContent = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccess } = usePermissions();
@@ -253,10 +256,10 @@ const DashboardContent = () => {
   const top5 = useMemo(() => {
     // earningsSummary ya viene agregado por creadora (server-side); solo ordenamos.
     return earningsSummary
-      .map((r) => ({ name: r.artistic_name || r.blu_creator_name || "Sin nombre", total: r.total }))
+      .map((r) => ({ name: r.artistic_name || r.blu_creator_name || t("dashboard.noName"), total: r.total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [earningsSummary]);
+  }, [earningsSummary, t]);
 
   const pipelineData = useMemo(() => {
     if (!leadsData?.pipeline) return [];
@@ -283,38 +286,38 @@ const DashboardContent = () => {
   const kpis = [
     {
       key: "creators" as KpiKey,
-      label: "Total Creators",
+      label: t("dashboard.kpiTotalCreators"),
       value: creatorsLoading ? loading : String(creatorsData?.total ?? 0),
       icon: Users,
       color: "bg-blue-500",
-      subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
+      subtitle: creatorsLoading ? "" : t("dashboard.kpiCreatorsSub", { active: creatorsData?.active ?? 0, inactive: creatorsData?.inactive ?? 0 }),
       show: canAccess("Creadores"),
     },
     {
       key: "tickets" as KpiKey,
-      label: "Active Tickets",
+      label: t("dashboard.kpiActiveTickets"),
       value: ticketsLoading ? loading : String(ticketsData?.active ?? 0),
       icon: Ticket,
       color: "bg-rose-500",
-      subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
+      subtitle: ticketsLoading ? "" : t("dashboard.kpiTicketsSub", { n: ticketsData?.resolved ?? 0 }),
       show: canAccess("Tickets"),
     },
     {
       key: "leads" as KpiKey,
-      label: "New Leads Today",
+      label: t("dashboard.kpiNewLeadsToday"),
       value: leadsLoading ? loading : String(leadsData?.todayCount ?? 0),
       icon: MessageSquare,
       color: "bg-violet-500",
-      subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
+      subtitle: leadsLoading ? "" : t("dashboard.kpiLeadsSub", { n: leadsData?.interestedCount ?? 0 }),
       show: canAccess("LeadGen"),
     },
     {
       key: "employees" as KpiKey,
-      label: "Empleados Activos",
+      label: t("dashboard.kpiActiveEmployees"),
       value: String(opKPIs?.totalEmployees ?? 0),
       icon: Users,
       color: "bg-emerald-500",
-      subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
+      subtitle: t("dashboard.kpiEmployeesSub", { n: opKPIs?.absencesToday ?? 0 }),
       show: canAccess("HR"),
     },
   ].filter((k) => k.show);
@@ -328,13 +331,13 @@ const DashboardContent = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {firstName ? `Buenas, ${firstName}` : "Dashboard"}
+              {firstName ? t("dashboard.greeting", { name: firstName }) : t("dashboard.title")}
             </h1>
-            <p className="text-sm text-muted-foreground">{fechaHoy} · la operación en tiempo real</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.headerSubtitle", { date: fechaHoy })}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
-              <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+              <RefreshCw className="h-3.5 w-3.5" /> {t("dashboard.refresh")}
             </Button>
           </div>
         </div>
@@ -356,11 +359,11 @@ const DashboardContent = () => {
             <UserAvatar name={bestCloserQ.data.name} size="lg" ring />
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
-                Mejor cerrador · {format(new Date(), "MMMM", { locale: es })}
+                {t("dashboard.bestCloser", { month: format(new Date(), "MMMM", { locale: es }) })}
               </div>
               <div className="truncate text-lg font-bold">{bestCloserQ.data.name}</div>
               <div className="text-xs text-muted-foreground">
-                {bestCloserQ.data.closes} {bestCloserQ.data.closes === 1 ? "cierre" : "cierres"} · Calif. QA promedio {Math.round(bestCloserQ.data.avgScore)}/100
+                {bestCloserQ.data.closes} {bestCloserQ.data.closes === 1 ? t("dashboard.closeSingular") : t("dashboard.closePlural")} · {t("dashboard.qaAvg", { score: Math.round(bestCloserQ.data.avgScore) })}
               </div>
             </div>
             <Crown className="h-7 w-7 shrink-0 text-amber-500" />
@@ -388,8 +391,8 @@ const DashboardContent = () => {
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-primary shrink-0" />
                 <div>
-                  <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Accesos directos a los módulos que más utilizas</p>
+                  <p className="text-base font-semibold leading-none">{t("dashboard.quickActions")}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{t("dashboard.quickActionsDesc")}</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
@@ -408,13 +411,13 @@ const DashboardContent = () => {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <action.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <span className="flex-1 text-sm font-medium">{action.label}</span>
+                  <span className="flex-1 text-sm font-medium">{t(action.label)}</span>
                   <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               ))}
               {activeActions.length === 0 && (
                 <p className="col-span-6 text-sm text-muted-foreground text-center py-4">
-                  No hay accesos configurados. Haz clic en el engranaje para agregar.
+                  {t("dashboard.quickActionsEmpty")}
                 </p>
               )}
             </div>
@@ -426,8 +429,8 @@ const DashboardContent = () => {
           {canAccess("LeadGen") && (
             <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
-                <CardDescription>Leads y Deals esta semana (datos reales)</CardDescription>
+                <CardTitle className="text-base">{t("dashboard.weeklyTitle")}</CardTitle>
+                <CardDescription>{t("dashboard.weeklyDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -452,14 +455,14 @@ const DashboardContent = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                Avisos y Celebraciones
+                {t("dashboard.celebrationsTitle")}
               </CardTitle>
-              <CardDescription>Cumpleaños y anuncios internos</CardDescription>
+              <CardDescription>{t("dashboard.celebrationsDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {birthdays.length === 0 && announcements.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground py-8">
-                  Sin avisos por el momento
+                  {t("dashboard.celebrationsEmpty")}
                 </div>
               ) : (
                 <div className="space-y-3 max-h-72 overflow-auto">
@@ -473,12 +476,12 @@ const DashboardContent = () => {
                         <p className="text-sm font-medium">{b.first_name} {b.last_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {b.isToday
-                            ? "🎉 ¡Cumple años hoy!"
-                            : `Cumple el ${format(new Date(b.birth_date + "T12:00:00"), "d 'de' MMMM", { locale: es })}`}
+                            ? t("dashboard.birthdayToday")
+                            : t("dashboard.birthdayOn", { date: format(new Date(b.birth_date + "T12:00:00"), "d 'de' MMMM", { locale: es }) })}
                         </p>
                       </div>
                       {b.isToday && (
-                        <Badge className="bg-warning/10 text-warning hover:bg-warning/20 text-[10px]">Hoy</Badge>
+                        <Badge className="bg-warning/10 text-warning hover:bg-warning/20 text-[10px]">{t("dashboard.today")}</Badge>
                       )}
                     </div>
                   ))}
@@ -500,13 +503,13 @@ const DashboardContent = () => {
         {/* Row 2b: Actividad Reciente */}
         <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Actividad Reciente</CardTitle>
-            <CardDescription>Tickets recientes</CardDescription>
+            <CardTitle className="text-base">{t("dashboard.recentActivityTitle")}</CardTitle>
+            <CardDescription>{t("dashboard.recentActivityDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
               {activityLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando…</p>
+                <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
               ) : recentActivity.length > 0 ? (
                 recentActivity.filter((item) => {
                   if (item.type === "ticket" && !canAccess("Tickets")) return false;
@@ -536,7 +539,7 @@ const DashboardContent = () => {
                   );
                 })
               ) : (
-                <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.recentActivityEmpty")}</p>
               )}
             </div>
           </CardContent>
@@ -551,8 +554,8 @@ const DashboardContent = () => {
           {canAccess("LeadGen") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Distribución Pipeline</CardTitle>
-                <CardDescription>Leads por estado</CardDescription>
+                <CardTitle className="text-base">{t("dashboard.pipelineTitle")}</CardTitle>
+                <CardDescription>{t("dashboard.pipelineDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {pipelineData.length > 0 ? (
@@ -580,7 +583,7 @@ const DashboardContent = () => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Sin datos de pipeline</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">{t("dashboard.pipelineEmpty")}</p>
                 )}
               </CardContent>
             </Card>
@@ -589,12 +592,12 @@ const DashboardContent = () => {
           {canAccess("Creadores") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
-                <CardDescription>Por ingresos totales</CardDescription>
+                <CardTitle className="text-base">{t("dashboard.top5Title")}</CardTitle>
+                <CardDescription>{t("dashboard.top5Desc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {earningsLoading ? (
-                  <p className="text-sm text-muted-foreground">Cargando…</p>
+                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                 ) : top5.length > 0 ? (
                   <div className="space-y-3">
                     {top5.map((c, i) => (
@@ -608,7 +611,7 @@ const DashboardContent = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">{t("dashboard.noData")}</p>
                 )}
               </CardContent>
             </Card>
@@ -629,23 +632,23 @@ const DashboardContent = () => {
               <div className="flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-destructive" />
                 <div>
-                  <CardTitle className="text-base">Customer Service</CardTitle>
-                  <CardDescription>Tickets de soporte</CardDescription>
+                  <CardTitle className="text-base">{t("dashboard.csTitle")}</CardTitle>
+                  <CardDescription>{t("dashboard.csDesc")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Urgentes</span>
+                <span className="text-sm">{t("dashboard.urgent")}</span>
                 <Badge variant="destructive">{ticketsData?.urgent ?? 0}</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Resueltos</span>
+                <span className="text-sm">{t("dashboard.resolved")}</span>
                 <Badge variant="secondary">{ticketsData?.resolved ?? 0}</Badge>
               </div>
               <div className="border-t border-border pt-2">
                 <p className="text-xs text-muted-foreground">
-                  Tasa Resolución:{" "}
+                  {t("dashboard.resolutionRate")}{" "}
                   <span className="font-medium text-foreground">
                     {ticketsData && ticketsData.total > 0
                       ? `${Math.round((ticketsData.resolved / ticketsData.total) * 100)}%`
@@ -662,18 +665,18 @@ const DashboardContent = () => {
                 <div className="flex items-center gap-2">
                   <Phone className="h-5 w-5 text-primary" />
                   <div>
-                    <CardTitle className="text-base">Closers</CardTitle>
-                    <CardDescription>Actividad de ventas</CardDescription>
+                    <CardTitle className="text-base">{t("dashboard.closersTitle")}</CardTitle>
+                    <CardDescription>{t("dashboard.closersDesc")}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Cerrados</span>
+                  <span className="text-sm">{t("dashboard.closed")}</span>
                   <Badge className="bg-success/10 text-success hover:bg-success/20">{leadsData?.closedCount ?? 0}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Pipeline</span>
+                  <span className="text-sm">{t("dashboard.pipeline")}</span>
                   <Badge variant="secondary">{leadsData?.inProgressCount ?? 0}</Badge>
                 </div>
               </CardContent>
@@ -686,18 +689,18 @@ const DashboardContent = () => {
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-accent-foreground" />
                   <div>
-                    <CardTitle className="text-base">Recursos Humanos</CardTitle>
-                    <CardDescription>Resumen operacional</CardDescription>
+                    <CardTitle className="text-base">{t("dashboard.hrTitle")}</CardTitle>
+                    <CardDescription>{t("dashboard.hrDesc")}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Empleados activos</span>
+                  <span className="text-sm">{t("dashboard.activeEmployeesRow")}</span>
                   <Badge className="bg-success/10 text-success hover:bg-success/20">{opKPIs?.totalEmployees ?? 0}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Ausencias hoy</span>
+                  <span className="text-sm">{t("dashboard.absencesToday")}</span>
                   <Badge variant="secondary">{opKPIs?.absencesToday ?? 0}</Badge>
                 </div>
               </CardContent>
@@ -712,9 +715,9 @@ const DashboardContent = () => {
       <Dialog open={configOpen} onOpenChange={setConfigOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configurar Accesos Rápidos</DialogTitle>
+            <DialogTitle>{t("dashboard.configTitle")}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">Selecciona hasta {MAX_SHORTCUTS} módulos para mostrar en el dashboard.</p>
+          <p className="text-sm text-muted-foreground">{t("dashboard.configHint", { n: MAX_SHORTCUTS })}</p>
           <div className="space-y-2 max-h-72 overflow-auto py-2">
             {availableActions.map((action) => {
               const checked = draftIds.includes(action.id);
@@ -732,15 +735,15 @@ const DashboardContent = () => {
                     onCheckedChange={() => toggleDraft(action.id)}
                   />
                   <action.icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{action.label}</span>
+                  <span className="text-sm font-medium">{t(action.label)}</span>
                   {checked && <Check className="h-4 w-4 text-primary ml-auto" />}
                 </label>
               );
             })}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
-            <Button onClick={saveConfig}>Guardar</Button>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>{t("common.cancel")}</Button>
+            <Button onClick={saveConfig}>{t("dashboard.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -759,19 +762,19 @@ const DashboardContent = () => {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "creators": return `Total Creators — ${creatorsData?.total ?? 0}`;
-            case "tickets": return `Active Tickets — ${ticketsData?.active ?? 0}`;
-            case "leads": return `New Leads Today — ${leadsData?.todayCount ?? 0}`;
-            case "employees": return `Empleados Activos — ${opKPIs?.totalEmployees ?? 0}`;
+            case "creators": return `${t("dashboard.kpiTotalCreators")} — ${creatorsData?.total ?? 0}`;
+            case "tickets": return `${t("dashboard.kpiActiveTickets")} — ${ticketsData?.active ?? 0}`;
+            case "leads": return `${t("dashboard.kpiNewLeadsToday")} — ${leadsData?.todayCount ?? 0}`;
+            case "employees": return `${t("dashboard.kpiActiveEmployees")} — ${opKPIs?.totalEmployees ?? 0}`;
             default: return "";
           }
         })()}
         subtitle={(() => {
           switch (kpiPopup) {
-            case "creators": return "Estado de las creadoras del directorio";
-            case "tickets": return "Tickets abiertos vs resueltos";
-            case "leads": return "Leads ingresados hoy";
-            case "employees": return "Headcount activo y ausencias del día";
+            case "creators": return t("dashboard.kpiCreatorsSubtitle");
+            case "tickets": return t("dashboard.kpiTicketsSubtitle");
+            case "leads": return t("dashboard.kpiLeadsSubtitle");
+            case "employees": return t("dashboard.kpiEmployeesSubtitle");
             default: return undefined;
           }
         })()}
@@ -779,27 +782,27 @@ const DashboardContent = () => {
           if (!kpiPopup) return [];
           if (kpiPopup === "creators") {
             return [
-              { primary: "Activas", right: String(creatorsData?.active ?? 0), rightTone: "success" as const },
-              { primary: "Inactivas", right: String(creatorsData?.inactive ?? 0), rightTone: "default" as const },
-              { primary: "Total", right: String(creatorsData?.total ?? 0) },
+              { primary: t("dashboard.rowActive"), right: String(creatorsData?.active ?? 0), rightTone: "success" as const },
+              { primary: t("dashboard.rowInactive"), right: String(creatorsData?.inactive ?? 0), rightTone: "default" as const },
+              { primary: t("dashboard.rowTotal"), right: String(creatorsData?.total ?? 0) },
             ];
           }
           if (kpiPopup === "tickets") {
             return [
-              { primary: "Activos", right: String(ticketsData?.active ?? 0), rightTone: "warning" as const },
-              { primary: "Resueltos", right: String(ticketsData?.resolved ?? 0), rightTone: "success" as const },
+              { primary: t("dashboard.rowActiveM"), right: String(ticketsData?.active ?? 0), rightTone: "warning" as const },
+              { primary: t("dashboard.rowResolved"), right: String(ticketsData?.resolved ?? 0), rightTone: "success" as const },
             ];
           }
           if (kpiPopup === "leads") {
             return [
-              { primary: "Ingresados hoy", right: String(leadsData?.todayCount ?? 0), rightTone: "default" as const },
-              { primary: "Interesados", right: String(leadsData?.interestedCount ?? 0), rightTone: "success" as const },
+              { primary: t("dashboard.rowToday"), right: String(leadsData?.todayCount ?? 0), rightTone: "default" as const },
+              { primary: t("dashboard.rowInterested"), right: String(leadsData?.interestedCount ?? 0), rightTone: "success" as const },
             ];
           }
           if (kpiPopup === "employees") {
             const rows: KpiRow[] = [
-              { primary: "Total empleados activos", right: String(opKPIs?.totalEmployees ?? 0) },
-              { primary: "Ausencias hoy", right: String(opKPIs?.absencesToday ?? 0), rightTone: "warning" as const },
+              { primary: t("dashboard.rowTotalEmployees"), right: String(opKPIs?.totalEmployees ?? 0) },
+              { primary: t("dashboard.rowAbsencesToday"), right: String(opKPIs?.absencesToday ?? 0), rightTone: "warning" as const },
             ];
             return rows;
           }

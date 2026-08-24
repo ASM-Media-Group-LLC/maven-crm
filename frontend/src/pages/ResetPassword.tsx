@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Eye, EyeOff, Loader2, ArrowLeft, Check, X } from "lucide-react";
 
 const ResetPassword = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [password, setPassword] = useState("");
@@ -88,7 +90,7 @@ const ResetPassword = () => {
     e.preventDefault();
 
     if (!isValid) {
-      toast({ title: "Contraseña inválida", description: "Verifica que cumpla todos los requisitos.", variant: "destructive" });
+      toast({ title: t("auth.invalidPassword"), description: t("auth.invalidPasswordDesc"), variant: "destructive" });
       return;
     }
 
@@ -97,10 +99,10 @@ const ResetPassword = () => {
     setLoading(false);
 
     if (error) {
-      toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
+      toast({ title: t("auth.updateError"), description: error.message, variant: "destructive" });
     } else {
       await supabase.auth.signOut();
-      toast({ title: "Contraseña actualizada", description: "Tu contraseña ha sido cambiada exitosamente. Inicia sesión con tu nueva contraseña." });
+      toast({ title: t("auth.passwordUpdated"), description: t("auth.passwordUpdatedDesc") });
       navigate("/login");
     }
   };
@@ -124,23 +126,23 @@ const ResetPassword = () => {
     <AuthLayout>
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <h2 className="text-2xl font-bold text-white">Restablecer contraseña</h2>
+          <h2 className="text-2xl font-bold text-white">{t("auth.resetTitle")}</h2>
         </div>
 
         {!recoveryReady ? (
           <div className="space-y-4 text-center">
-            <p className="text-sm text-red-400 font-medium">El enlace es inválido o ha expirado.</p>
+            <p className="text-sm text-red-400 font-medium">{t("auth.resetLinkInvalid")}</p>
             <p className="text-sm text-white/50">
-              Solicita un nuevo enlace de recuperación para restablecer tu contraseña.
+              {t("auth.resetLinkInvalidHint")}
             </p>
             <Link to="/forgot-password">
-              <Button variant="outline" className="w-full mt-2 border-white/10 text-white hover:bg-white/10">Solicitar nuevo enlace</Button>
+              <Button variant="outline" className="w-full mt-2 border-white/10 text-white hover:bg-white/10">{t("auth.requestNewLink")}</Button>
             </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-white/70">Nueva contraseña</Label>
+              <Label htmlFor="password" className="text-white/70">{t("auth.newPassword")}</Label>
               <div className="relative">
                 <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
                 <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
@@ -150,7 +152,7 @@ const ResetPassword = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm" className="text-white/70">Confirmar contraseña</Label>
+              <Label htmlFor="confirm" className="text-white/70">{t("auth.confirmPassword")}</Label>
               <div className="relative">
                 <Input id="confirm" type={showConfirm ? "text" : "password"} placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
                 <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
@@ -160,15 +162,15 @@ const ResetPassword = () => {
             </div>
 
             <div className="space-y-1.5 pt-1">
-              <RequirementItem met={hasMinLength} label="Mínimo 8 caracteres" />
-              <RequirementItem met={hasUppercase} label="Al menos 1 mayúscula" />
-              <RequirementItem met={hasNumber} label="Al menos 1 número" />
-              <RequirementItem met={passwordsMatch} label="Las contraseñas coinciden" />
+              <RequirementItem met={hasMinLength} label={t("auth.reqMinLength")} />
+              <RequirementItem met={hasUppercase} label={t("auth.reqUppercase")} />
+              <RequirementItem met={hasNumber} label={t("auth.reqNumber")} />
+              <RequirementItem met={passwordsMatch} label={t("auth.reqMatch")} />
             </div>
 
             <Button type="submit" className="w-full" disabled={loading || !isValid}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Actualizar contraseña
+              {t("auth.updatePassword")}
             </Button>
           </form>
         )}
@@ -176,7 +178,7 @@ const ResetPassword = () => {
         <div className="flex flex-col items-center gap-2 text-sm">
           <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
             <ArrowLeft className="h-4 w-4" />
-            Volver a iniciar sesión
+            {t("auth.backToLogin")}
           </Link>
         </div>
       </div>
