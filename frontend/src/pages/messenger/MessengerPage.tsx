@@ -39,7 +39,7 @@ export default function MessengerPage() {
   useNotificationPermission();
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
-  const { isPinned, togglePin } = usePinnedChats();
+  const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();
   const { isAdmin: isSystemAdmin } = useUserRole();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -172,6 +172,8 @@ export default function MessengerPage() {
           profiles={profiles}
           isPinned={isPinned}
           onTogglePin={togglePin}
+          pinnedOrder={pinnedOrder}
+          onReorderPinned={reorderPinned}
           isArchived={isArchived}
           onToggleArchive={toggleArchive}
           onToggleMute={toggleMute}

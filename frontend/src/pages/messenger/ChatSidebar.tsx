@@ -50,6 +50,8 @@ interface ChatSidebarProps {
   profiles: Record<string, import("./types").UserProfile>;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
+  pinnedOrder: string[];
+  onReorderPinned: (orderedIds: string[]) => void;
   isArchived: (id: string) => boolean;
   onToggleArchive: (id: string) => void;
   onToggleMute: (id: string, muted: boolean) => void;
@@ -82,7 +84,7 @@ function truncate(text: string, max: number) {
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
   onSelectContact, onDeleteChat, loading, profiles,
-  isPinned, onTogglePin, isArchived, onToggleArchive, onToggleMute,
+  isPinned, onTogglePin, pinnedOrder, onReorderPinned, isArchived, onToggleArchive, onToggleMute,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
   onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
@@ -127,13 +129,20 @@ export default function ChatSidebar({
   }, [conversations, search, tab, isPinned, mentionedIds, isArchived]);
 
   const sorted = useMemo(() => {
+    const pinRank = (id: string) => {
+      const i = pinnedOrder.indexOf(id);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
     return [...filtered].sort((a, b) => {
       const aPinned = isPinned(a.id) ? 1 : 0;
       const bPinned = isPinned(b.id) ? 1 : 0;
       if (aPinned !== bPinned) return bPinned - aPinned;
+      // Fijados: por el orden manual (position). Normales: se mantiene el orden de
+      // `filtered` (recencia) devolviendo 0 (sort estable).
+      if (aPinned && bPinned) return pinRank(a.id) - pinRank(b.id);
       return 0;
     });
-  }, [filtered, isPinned]);
+  }, [filtered, isPinned, pinnedOrder]);
 
   const unreadTotal = useMemo(() => conversations.reduce((s, c) => s + c.unreadCount, 0), [conversations]);
   const archivedCount = useMemo(() => conversations.filter(c => isArchived(c.id)).length, [conversations, isArchived]);
@@ -168,6 +177,21 @@ export default function ChatSidebar({
 
   const handleDragEnd = () => {
     setDraggingChatId(null);
+  };
+
+  // ¿lo que se está arrastrando es un chat fijado? (habilita el reorden entre fijados)
+  const draggedIsPinned = draggingChatId ? isPinned(draggingChatId) : false;
+
+  // Soltar un fijado sobre otro fijado → mover el arrastrado a la posición del destino.
+  const handleReorderDrop = (targetId: string) => {
+    const dragged = draggingChatId;
+    if (!dragged || dragged === targetId) return;
+    if (!isPinned(dragged) || !isPinned(targetId)) return;
+    const order = pinnedOrder.filter(id => id !== dragged);
+    const to = order.indexOf(targetId);
+    if (to === -1) return;
+    order.splice(to, 0, dragged);
+    onReorderPinned(order);
   };
 
   return (
@@ -296,6 +320,8 @@ export default function ChatSidebar({
                       onToggleMute={onToggleMute}
                       onDragStart={(e) => handleDragStart(e, conv.id)}
                       onDragEnd={handleDragEnd}
+                      canReorderDrop={draggedIsPinned && isPinned(conv.id)}
+                      onReorderDrop={() => handleReorderDrop(conv.id)}
                       spaces={spaces}
                       onAddToSpace={onAddConversationToSpace}
                       isSystemAdmin={isAdmin}
@@ -459,7 +485,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, canReorderDrop, onReorderDrop, spaces, onAddToSpace, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
@@ -471,11 +497,14 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   onToggleMute: (id: string, muted: boolean) => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  canReorderDrop?: boolean;
+  onReorderDrop?: () => void;
   spaces: ChatSpace[];
   onAddToSpace: (spaceId: string, convId: string) => Promise<boolean>;
   isSystemAdmin?: boolean;
 }) {
   const { user } = useAuth();
+  const [reorderOver, setReorderOver] = useState(false);
   const isGroup = conversation.type === "group";
   const { isOnline, getStatus } = useOnlinePresence();
   const isMuted = conversation.participants.find(p => p.user_id === user?.id)?.is_muted ?? false;
@@ -518,14 +547,18 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         <button
           draggable
           onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
+          onDragEnd={() => { setReorderOver(false); onDragEnd(); }}
+          onDragOver={canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(true); } : undefined}
+          onDragLeave={canReorderDrop ? () => setReorderOver(false) : undefined}
+          onDrop={canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(false); onReorderDrop?.(); } : undefined}
           onClick={onClick}
           className={cn(
             "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",
             isActive
               ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
               : "hover:bg-primary/5",
-            hasUnread && !isActive && "bg-primary/[0.04]"
+            hasUnread && !isActive && "bg-primary/[0.04]",
+            reorderOver && "ring-2 ring-primary/60 ring-inset"
           )}
         >
           {/* Drag handle */}
