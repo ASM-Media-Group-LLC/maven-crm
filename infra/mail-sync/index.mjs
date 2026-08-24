@@ -12,7 +12,7 @@
 //
 // TIEMPO REAL: la conexión queda en IDLE sobre INBOX — el servidor EMPUJA
 // un aviso cuando llega correo y acá se baja al instante. Las demás
-// carpetas se barren cada SWEEP_INTERVAL_MS.
+// carpetas se barren cada SWEEP_FULL_MS; INBOX se revisa cada SWEEP_INBOX_MS.
 //
 // Mismo molde que infra/hubstaff-bridge y blu-bridge: un index.mjs, env
 // vars, Dockerfile alpine, endpoint /health para Dokploy.
@@ -30,7 +30,13 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MAIL_CRED_KEY = process.env.MAIL_CRED_KEY;
 
 // Cada cuánto se barren las carpetas que no son INBOX (INBOX es push).
-const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 60_000);
+// Dos cadencias de barrido (el push de Zoho no empuja — ver memoria
+// zoho_imap_rate_limits: probado 23/08). INBOX es donde llega el correo, así
+// que se revisa seguido; las demás carpetas (Enviados, etc.) cambian poco y se
+// barren espaciado — menos comandos contra Zoho por el mismo resultado.
+// SWEEP_INTERVAL_MS se mantiene como piso de compatibilidad para INBOX.
+const SWEEP_INBOX_MS = Number(process.env.SWEEP_INBOX_MS || process.env.SWEEP_INTERVAL_MS || 60_000);
+const SWEEP_FULL_MS = Number(process.env.SWEEP_FULL_MS || 300_000);
 // Cada cuánto se relee mail_credentials (altas/bajas de casillas).
 const CREDS_REFRESH_MS = Number(process.env.CREDS_REFRESH_MS || 300_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
@@ -170,13 +176,24 @@ class CuentaSync {
     this.log("conectada");
 
     try {
-      // Ciclo de vida: barrer todo → quedarse en IDLE sobre INBOX hasta que
-      // haya novedades o toque el próximo barrido → repetir.
-      let proximoBarrido = 0;
+      // Ciclo de vida con DOS relojes:
+      //  · barrido COMPLETO (todas las carpetas) cada SWEEP_FULL_MS;
+      //  · revisión de INBOX sola cada SWEEP_INBOX_MS (mucho más liviano:
+      //    un SELECT/FETCH de una carpeta en vez de abrir todas).
+      // Entre medio, IDLE en INBOX + despertar-en-exists por si el proveedor
+      // algún día empuja. El barrido completo ya incluye INBOX, así que tras
+      // él se reprograma también el reloj de INBOX.
+      let proximoFull = 0;
+      let proximoInbox = 0;
       while (!this.detenida && this.client.usable) {
-        if (Date.now() >= proximoBarrido) {
+        const ahora = Date.now();
+        if (ahora >= proximoFull) {
           await this.barrerTodo();
-          proximoBarrido = Date.now() + SWEEP_INTERVAL_MS;
+          proximoFull = Date.now() + SWEEP_FULL_MS;
+          proximoInbox = Date.now() + SWEEP_INBOX_MS;
+        } else if (ahora >= proximoInbox) {
+          await this.sincronizarCarpeta("INBOX");
+          proximoInbox = Date.now() + SWEEP_INBOX_MS;
         }
 
         await this.client.mailboxOpen("INBOX");
@@ -189,7 +206,7 @@ class CuentaSync {
         //  · `client.idle()`: mantiene la conexión en IDLE para que Zoho
         //    empuje ese EXISTS (algunos servidores además resuelven acá);
         //  · `dormir(restante)`: red de seguridad hasta el próximo barrido.
-        const restante = Math.max(proximoBarrido - Date.now(), 1_000);
+        const restante = Math.max(Math.min(proximoInbox, proximoFull) - Date.now(), 1_000);
         const porEvento = new Promise((res) => { this.despertar = res; });
         try {
           await Promise.race([
