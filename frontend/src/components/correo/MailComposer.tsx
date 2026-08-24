@@ -40,7 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSendMail } from "@/hooks/useMailbox";
+import { useSendMail, useSaveServerDraft, useDeleteServerDraft } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
 import {
@@ -77,6 +77,12 @@ export interface BorradorInicial {
   citar?: { de: string; fecha: string; texto: string };
   inReplyTo?: string;
   references?: string;
+  /** Cuerpo HTML ya armado, para RETOMAR un borrador del servidor (en vez de
+   *  construirlo desde cita/firma). */
+  cuerpoHtml?: string;
+  /** UID del borrador en el servidor que se está retomando: al re-guardar se
+   *  reemplaza y al enviar se borra. */
+  serverDraftUid?: number;
 }
 
 interface Props {
@@ -540,10 +546,17 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
   // cero en cada apertura, así que no hace falta re-leer.
   const firma = firmaContexto(inicial?.inReplyTo);
+  // Al RETOMAR un borrador del servidor (`cuerpoHtml`), no se recupera el
+  // local: el contenido bueno es el que vino del servidor.
   const recuperado = useMemo(
-    () => leerBorrador(remitente, firma),
-    [remitente, firma],
+    () => (inicial?.cuerpoHtml ? null : leerBorrador(remitente, firma)),
+    [remitente, firma, inicial?.cuerpoHtml],
   );
+  // UID del borrador del servidor que se está editando (si se retomó uno): al
+  // re-guardar se reemplaza, al enviar se borra.
+  const serverUid = inicial?.serverDraftUid;
+  const guardarServidor = useSaveServerDraft();
+  const borrarServidor = useDeleteServerDraft();
 
   // Arranca del borrador guardado si lo hay; si no, de lo que traiga `inicial`
   // (una respuesta prellena Para/Asunto/cita).
@@ -618,7 +631,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       FontSize,
       Placeholder.configure({ placeholder: "Escribe tu mensaje…" }),
     ],
-    content: recuperado?.html ?? contenidoInicial,
+    content: recuperado?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
     autofocus: inicial?.citar ? "start" : false,
     editorProps: {
       attributes: {
@@ -665,7 +678,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     cc: fuente?.cc ?? inicial?.cc ?? "",
     bcc: fuente?.bcc ?? "",
     subject: fuente?.subject ?? inicial?.subject ?? "",
-    html: fuente?.html ?? contenidoInicial,
+    html: fuente?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
   };
   const huboCambios =
     to !== base.to ||
@@ -743,6 +756,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       });
       // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
       borrarBorrador(remitente, firma);
+      // Si venía de un borrador del servidor, se saca también de la carpeta.
+      if (serverUid) borrarServidor.mutate({ uid: serverUid });
       toast.success("Correo enviado");
       onCerrar();
     } catch (e) {
@@ -768,11 +783,34 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     onCerrar();
   };
 
-  // Guardar el borrador y cerrar (botón primario del diálogo).
+  // Guardar el borrador y cerrar (botón primario del diálogo). Guarda LOCAL al
+  // instante (no perder) y sube al SERVIDOR en segundo plano (carpeta
+  // Borradores, visible desde otros equipos). Si el servidor falla, el local
+  // ya guardó, así que no se pierde nada.
   const guardarYCerrar = () => {
     guardarRef.current();
     setConfirmarDescarte(false);
-    toast.success("Borrador guardado");
+    if (editor) {
+      guardarServidor.mutate(
+        {
+          to: destinatarios,
+          cc: copias,
+          subject: subject.trim() || "(sin asunto)",
+          html: htmlParaCorreo(editor.getHTML()),
+          text: textoParaCorreo(editor.getHTML()),
+          in_reply_to: inicial?.inReplyTo,
+          references: inicial?.references,
+          uid: serverUid,
+        },
+        {
+          onSuccess: () => toast.success("Borrador guardado"),
+          onError: (e) =>
+            toast.error(`Guardado en este equipo (no en el servidor): ${(e as Error).message}`),
+        },
+      );
+    } else {
+      toast.success("Borrador guardado");
+    }
     onCerrar();
   };
 

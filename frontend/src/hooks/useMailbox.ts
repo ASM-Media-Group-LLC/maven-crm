@@ -548,3 +548,43 @@ export function useMailSearch(folder: string, query: string, enabled: boolean) {
     },
   });
 }
+
+/** Guarda el borrador EN EL SERVIDOR (carpeta Borrador, vía IMAP APPEND), para
+ *  verlo desde otro dispositivo. Devuelve el UID nuevo. Si se pasa `uid`, ese
+ *  borrador viejo se reemplaza. Es aparte del autoguardado local, que sigue. */
+export function useSaveServerDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      d: {
+        to: string[];
+        cc?: string[];
+        subject: string;
+        html?: string;
+        text?: string;
+        in_reply_to?: string;
+        references?: string;
+        /** UID del borrador anterior a reemplazar. */
+        uid?: number;
+        folder?: string;
+      },
+    ) => callMail<{ ok: true; uid: number | null }>({ action: "save_draft", ...d }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mail-messages", "Borrador"] });
+      qc.invalidateQueries({ queryKey: ["mail-folders"] });
+    },
+  });
+}
+
+/** Borra un borrador del servidor por UID (al enviarlo o al reemplazarlo). */
+export function useDeleteServerDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { uid: number; folder?: string }) =>
+      callMail<{ ok: boolean }>({ action: "delete_draft", ...args }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mail-messages", "Borrador"] });
+      qc.invalidateQueries({ queryKey: ["mail-folders"] });
+    },
+  });
+}
