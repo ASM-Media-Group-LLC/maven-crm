@@ -85,6 +85,9 @@ interface Props {
   inicial?: BorradorInicial;
   /** Casilla desde la que sale, solo para mostrarla. */
   remitente: string;
+  /** HTML de la firma a insertar sola al final del cuerpo. Vacío/undefined =
+   *  sin firma (no configurada o desactivada). */
+  firma?: string;
 }
 
 /* ── Tamaño de letra: extensión mínima sobre textStyle ─────────────────── */
@@ -532,7 +535,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
 
 /* ── El compositor ──────────────────────────────────────────────────────── */
 
-export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
+export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: firmaHtml }: Props) {
   // Firma del contexto (nuevo vs. responder a tal hilo) y borrador guardado
   // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
   // cero en cada apertura, así que no hace falta re-leer.
@@ -589,14 +592,21 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
   // La cita del correo original entra AL editor como blockquote editable:
   // igual que Gmail, se puede recortar o borrar antes de mandar.
   const contenidoInicial = useMemo(() => {
-    if (!inicial?.citar) return "";
+    const f = firmaHtml ?? "";
+    if (!inicial?.citar) {
+      // Correo nuevo: una línea para escribir arriba y la firma abajo (si hay).
+      return f ? `<p></p>${f}` : "";
+    }
     const c = inicial.citar;
     const texto = escapar(c.texto).replace(/\n/g, "<br>");
+    // Respuesta: espacio para escribir, la firma, y después la cita — el orden
+    // de Gmail (la firma cierra lo tuyo, antes del hilo citado).
     return (
-      `<p></p><p></p><blockquote><p>El ${escapar(c.fecha)}, ${escapar(c.de)} escribió:</p>` +
+      `<p></p><p></p>${f}` +
+      `<blockquote><p>El ${escapar(c.fecha)}, ${escapar(c.de)} escribió:</p>` +
       `<p>${texto}</p></blockquote>`
     );
-  }, [inicial]);
+  }, [inicial, firmaHtml]);
 
   const editor = useEditor({
     extensions: [

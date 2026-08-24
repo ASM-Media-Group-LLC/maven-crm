@@ -20,6 +20,7 @@ import {
   Reply,
   ReplyAll,
   Send,
+  Signature,
   ShieldAlert,
   Trash2,
   type LucideIcon,
@@ -33,6 +34,7 @@ import { avatarGradient } from "@/lib/avatarColor";
 import { EmptyState } from "@/components/EmptyState";
 import { MailBody } from "@/components/correo/MailBody";
 import { MailComposer, type BorradorInicial } from "@/components/correo/MailComposer";
+import { MailSignatureDialog } from "@/components/correo/MailSignatureDialog";
 import {
   useMailbox,
   useMailFolders,
@@ -42,6 +44,7 @@ import {
   useMarkSeen,
   usePrefetchMailMessage,
   useDownloadAttachment,
+  useMailSignature,
   claveDe,
   correoDe,
   nombreDe,
@@ -120,6 +123,10 @@ export default function CorreoPage() {
   const [carpeta, setCarpeta] = useState("INBOX");
   const [sel, setSel] = useState<MailSummary | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
+  const [firmaAbierta, setFirmaAbierta] = useState(false);
+  const firma = useMailSignature();
+  // La firma que recibe el compositor: solo si está activada y no vacía.
+  const firmaHtml = firma.data?.enabled ? firma.data.html || undefined : undefined;
 
   const carpetas = useMailFolders(hayBuzon);
   const lista = useMailMessages(carpeta, hayBuzon);
@@ -243,6 +250,16 @@ export default function CorreoPage() {
           <h1 className="truncate text-lg font-semibold tracking-tight">Correo</h1>
           <p className="truncate text-xs text-muted-foreground">{buzon.email_address}</p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full hover:bg-primary/8"
+          onClick={() => setFirmaAbierta(true)}
+          aria-label="Editar firma"
+          title="Firma del correo"
+        >
+          <Signature className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -527,8 +544,11 @@ export default function CorreoPage() {
           onCerrar={() => setRedactar(null)}
           inicial={redactar}
           remitente={buzon.email_address}
+          firma={firmaHtml}
         />
       )}
+
+      <MailSignatureDialog abierto={firmaAbierta} onCerrar={() => setFirmaAbierta(false)} />
     </div>
   );
 }
