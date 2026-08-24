@@ -387,6 +387,8 @@ export interface OutgoingMail {
   text?: string;
   in_reply_to?: string;
   references?: string;
+  /** Adjuntos: nombre, tipo y contenido en base64 (sin el prefijo data:). */
+  attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
 }
 
 export function useSendMail() {

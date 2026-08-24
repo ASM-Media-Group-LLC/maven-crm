@@ -315,6 +315,13 @@ function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
 }
 
+export interface OutgoingAttachment {
+  filename: string;
+  contentType: string;
+  /** Contenido en base64 (con o sin saltos: se re-pliega a 76 al armar). */
+  contentBase64: string;
+}
+
 export interface OutgoingMessage {
   from: string;
   fromName?: string;
@@ -326,6 +333,7 @@ export interface OutgoingMessage {
   /** Para responder dentro del hilo. */
   inReplyTo?: string;
   references?: string;
+  attachments?: OutgoingAttachment[];
 }
 
 /** Quoted-printable (RFC 2045): UTF-8 → ASCII de 7 bits con líneas de máximo
@@ -391,9 +399,72 @@ function nombreParaFrom(nombre: string): string {
   return encodeHeader(base);
 }
 
+/** Pliega base64 en líneas de 76 (RFC 2045): el body de un adjunto es una
+ *  tira larguísima y sin plegar pasaría el límite de 998 octetos por línea. */
+function plegarBase64(b64: string): string {
+  return (b64.replace(/\s+/g, "").match(/.{1,76}/g) ?? []).join("\r\n");
+}
+
+/** Content-Type de un adjunto, saneado a `tipo/subtipo` ASCII. El valor viene
+ *  de quien sube el archivo; un `\r\n` acá inyectaría encabezados. */
+function tipoContenidoSeguro(t: string): string {
+  const limpio = (t.split(";")[0] ?? "").trim().toLowerCase();
+  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(limpio)
+    ? limpio
+    : "application/octet-stream";
+}
+
+/** El `filename=` de un adjunto, a prueba de inyección.
+ *
+ *  El nombre lo pone quien sube el archivo. Un `"` o un salto de línea ahí
+ *  cierran el header y cuelan otro — la misma familia de agujero que el
+ *  RCPT TO crudo. ASCII va como quoted-string escapando `"` y `\`; con
+ *  acentos o emojis va por RFC 2231 (`filename*=UTF-8''…` percent-encoded),
+ *  que es como un header ASCII de 7 bits carga un nombre no-ASCII. */
+function dispositionFilename(nombre: string): string {
+  const limpio = (nombre ?? "").replace(/[\r\n\t]/g, " ").replace(/[/\\]/g, "_").trim() ||
+    "adjunto";
+  if (/^[\x20-\x7E]*$/.test(limpio)) {
+    return `filename="${limpio.replace(/(["\\])/g, "\\$1")}"`;
+  }
+  return `filename*=UTF-8''${encodeURIComponent(limpio)}`;
+}
+
+/** El cuerpo (texto y/o HTML) como bloque MIME: su línea de Content-Type + el
+ *  contenido. Sirve de cuerpo top-level y, cuando hay adjuntos, de primera
+ *  parte del multipart/mixed. */
+function parteCuerpo(msg: OutgoingMessage): { header: string; cuerpo: string } {
+  const text = msg.text ?? (msg.html ? htmlToText(msg.html) : "");
+  // Con HTML van las dos versiones: quien no pueda mostrarlo lee el texto.
+  if (msg.html) {
+    const b = boundary();
+    return {
+      header: `Content-Type: multipart/alternative; boundary="${b}"`,
+      cuerpo: [
+        `--${b}`,
+        'Content-Type: text/plain; charset="utf-8"',
+        "Content-Transfer-Encoding: quoted-printable",
+        "",
+        quotedPrintable(text),
+        "",
+        `--${b}`,
+        'Content-Type: text/html; charset="utf-8"',
+        "Content-Transfer-Encoding: quoted-printable",
+        "",
+        quotedPrintable(msg.html),
+        "",
+        `--${b}--`,
+      ].join("\r\n"),
+    };
+  }
+  return {
+    header: 'Content-Type: text/plain; charset="utf-8"\r\nContent-Transfer-Encoding: quoted-printable',
+    cuerpo: quotedPrintable(text),
+  };
+}
+
 /** Arma el RFC 822 listo para mandar. */
 export function buildMessage(msg: OutgoingMessage): string {
-  const b = boundary();
   const fromHeader = msg.fromName ? `${nombreParaFrom(msg.fromName)} <${msg.from}>` : msg.from;
 
   const headers: string[] = [
@@ -412,35 +483,42 @@ export function buildMessage(msg: OutgoingMessage): string {
   }
   headers.push("MIME-Version: 1.0");
 
-  const text = msg.text ?? (msg.html ? htmlToText(msg.html) : "");
+  const cuerpo = parteCuerpo(msg);
+  const adjuntos = msg.attachments ?? [];
 
-  // Si hay HTML mandamos las dos versiones: quien no pueda mostrar HTML
-  // (o lo tenga desactivado) igual lee el mensaje.
-  if (msg.html) {
-    headers.push(`Content-Type: multipart/alternative; boundary="${b}"`);
-    return [
-      headers.join("\r\n"),
-      "",
-      `--${b}`,
-      'Content-Type: text/plain; charset="utf-8"',
-      "Content-Transfer-Encoding: quoted-printable",
-      "",
-      quotedPrintable(text),
-      "",
-      `--${b}`,
-      'Content-Type: text/html; charset="utf-8"',
-      "Content-Transfer-Encoding: quoted-printable",
-      "",
-      quotedPrintable(msg.html),
-      "",
-      `--${b}--`,
-      "",
-    ].join("\r\n");
+  // Sin adjuntos: el cuerpo va directo, con su Content-Type en los headers del
+  // mensaje — idéntico a como era antes de que existieran los adjuntos.
+  if (adjuntos.length === 0) {
+    headers.push(cuerpo.header);
+    return [headers.join("\r\n"), "", cuerpo.cuerpo, ""].join("\r\n");
   }
 
-  headers.push('Content-Type: text/plain; charset="utf-8"');
-  headers.push("Content-Transfer-Encoding: quoted-printable");
-  return [headers.join("\r\n"), "", quotedPrintable(text), ""].join("\r\n");
+  // Con adjuntos: multipart/mixed. Primera parte = el cuerpo (que a su vez
+  // puede ser multipart/alternative); después, cada archivo en base64.
+  const mix = boundary();
+  headers.push(`Content-Type: multipart/mixed; boundary="${mix}"`);
+  const partes = [
+    headers.join("\r\n"),
+    "",
+    `--${mix}`,
+    cuerpo.header,
+    "",
+    cuerpo.cuerpo,
+    "",
+  ];
+  for (const a of adjuntos) {
+    partes.push(
+      `--${mix}`,
+      `Content-Type: ${tipoContenidoSeguro(a.contentType)}`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; ${dispositionFilename(a.filename)}`,
+      "",
+      plegarBase64(a.contentBase64),
+      "",
+    );
+  }
+  partes.push(`--${mix}--`, "");
+  return partes.join("\r\n");
 }
 
 /** Versión en texto de un HTML, para la parte alternativa. */
