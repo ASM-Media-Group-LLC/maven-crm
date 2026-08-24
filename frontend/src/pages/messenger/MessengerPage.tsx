@@ -199,7 +199,10 @@ export default function MessengerPage() {
       )}>
         {activeConv ? (
           <div className="flex-1">
+            {/* key por conversación: remonta ChatView al cambiar de chat para que el borrador,
+                la cita (replyTo) y el hilo abierto NO se fuguen a la conversación equivocada. */}
             <ChatView
+              key={activeConv.id}
               conversation={activeConv}
               messages={messages}
               profiles={profiles}

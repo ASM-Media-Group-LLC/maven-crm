@@ -489,7 +489,12 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
     if (lastMsg.is_deleted) return "🚫 Mensaje eliminado";
     if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
     let body = "";
-    if (lastMsg.type === "file") body = `📎 ${lastMsg.file_name}`;
+    if (lastMsg.type === "file") {
+      const fn = lastMsg.file_name || "";
+      if (/^voice-note/i.test(fn)) body = "🎤 Nota de voz";
+      else if (/\.(webm|mp3|ogg|m4a|wav)(\?|$)/i.test(fn)) body = "🎵 Audio";
+      else body = `📎 ${fn || "Archivo"}`;
+    }
     else if (lastMsg.type === "image") body = "📷 Foto";
     else body = lastMsg.content || "";
     if (isGroup && lastMsg.sender_id) {
