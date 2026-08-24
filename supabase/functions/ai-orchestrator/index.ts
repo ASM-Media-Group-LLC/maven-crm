@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // ai-orchestrator — Clari como ORQUESTADOR cross-CRM.
 //
 // El dueño/management le pregunta cualquier cosa del CRM y Clari usa el CATÁLOGO de
@@ -15,10 +16,7 @@ const SONNET_MODEL = "claude-sonnet-4-6";
 const MAX_ITERATIONS = 6;
 const MAX_WALL_MS = 25_000;
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const cors = (req: Request) => corsFor(req);
 
 const SYSTEM = `Sos *Clari*, la asistente ORQUESTADORA de Maven (CRM de una agencia de creadoras de OnlyFans). El equipo de management/dueño te pregunta cosas de TODO el CRM y vos respondés trayendo datos REALES con las herramientas (nunca inventes).
 - Si una herramienta puede responder la pregunta, usala. Podés usar varias y cruzar resultados.
@@ -26,7 +24,7 @@ const SYSTEM = `Sos *Clari*, la asistente ORQUESTADORA de Maven (CRM de una agen
 - Si no tenés herramienta para algo, decílo con honestidad en vez de inventar.
 - Español rioplatense, tono directo.`;
 
-function sse(text: string): Response {
+function sse(req: Request, text: string): Response {
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
@@ -37,24 +35,24 @@ function sse(text: string): Response {
     },
   });
   return new Response(stream, {
-    headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+    headers: { ...cors(req), "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
   });
 }
 
-function jsonErr(msg: string, status = 400): Response {
+function jsonErr(req: Request, msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
     status,
-    headers: { ...cors, "Content-Type": "application/json" },
+    headers: { ...cors(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_API_KEY) return jsonErr("ANTHROPIC_API_KEY no configurada", 500);
+  if (!ANTHROPIC_API_KEY) return jsonErr(req, "ANTHROPIC_API_KEY no configurada", 500);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -62,19 +60,19 @@ Deno.serve(async (req) => {
 
   // Auth: JWT de staff (admin/owner/manager). El orquestador ve datos cross-CRM.
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return jsonErr("unauthorized", 401);
+  if (!token) return jsonErr(req, "unauthorized", 401);
   const { data: { user }, error: uErr } = await sb.auth.getUser(token);
-  if (uErr || !user) return jsonErr("unauthorized", 401);
+  if (uErr || !user) return jsonErr(req, "unauthorized", 401);
   const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
   const ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
-  if (!ok) return jsonErr("forbidden", 403);
+  if (!ok) return jsonErr(req, "forbidden", 403);
 
   let body: { messages?: Array<{ role: string; content: string }> } = {};
   try { body = await req.json(); } catch { /* ignore */ }
   const convo = (body.messages ?? [])
     .filter((m) => m && m.content)
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content) }));
-  if (!convo.length) return jsonErr("Sin mensajes");
+  if (!convo.length) return jsonErr(req, "Sin mensajes");
 
   const tools = toAnthropicTools(toolsFor({ scopes: ["read"] }));
   // PROMPT CACHING (mismo patrón que whatsapp-agent): el system y SOBRE TODO el catálogo
@@ -159,5 +157,5 @@ Deno.serve(async (req) => {
     messages.push({ role: "user", content: toolResults });
   }
 
-  return sse(answer);
+  return sse(req, answer);
 });

@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // scrape-profile-deep-callback — recibe webhook de Apify cuando termina
 // el run lanzado por scrape-profile-deep.
 //
@@ -18,10 +19,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = (req: Request) => corsFor(req);
 
 const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";
 const LLM_TIMEOUT_MS = 30_000;
@@ -76,10 +74,10 @@ OUTPUT: solo JSON. Sin markdown.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
   if (req.method !== "POST") {
-    return json({ error: "Only POST" }, 405);
+    return json(req, { error: "Only POST" }, 405);
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -89,7 +87,7 @@ Deno.serve(async (req: Request) => {
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
   if (!APIFY_TOKEN || !OPENROUTER_API_KEY) {
-    return json({ error: "APIFY_TOKEN or OPENROUTER_API_KEY not configured" }, 500);
+    return json(req, { error: "APIFY_TOKEN or OPENROUTER_API_KEY not configured" }, 500);
   }
 
   const url = new URL(req.url);
@@ -99,7 +97,7 @@ Deno.serve(async (req: Request) => {
   try {
     payload = await req.json();
   } catch (_) {
-    return json({ error: "Invalid JSON body" }, 400);
+    return json(req, { error: "Invalid JSON body" }, 400);
   }
 
   const jobId = (payload.job_id ?? jobIdFromQuery) as string | null;
@@ -112,7 +110,7 @@ Deno.serve(async (req: Request) => {
   const bodyStatus = String(payload.status ?? "").toUpperCase();
   const bodyDatasetId = payload.defaultDatasetId as string | null;
 
-  if (!jobId) return json({ error: "Missing job_id" }, 400);
+  if (!jobId) return json(req, { error: "Missing job_id" }, 400);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -125,12 +123,12 @@ Deno.serve(async (req: Request) => {
     .eq("id", jobId)
     .maybeSingle();
 
-  if (jErr || !job) return json({ error: "job not found" }, 404);
+  if (jErr || !job) return json(req, { error: "job not found" }, 404);
   if (job.status === "complete" || job.status === "failed") {
-    return json({ ok: true, idempotent: true, status: job.status });
+    return json(req, { ok: true, idempotent: true, status: job.status });
   }
   if (!job.apify_run_id) {
-    return json({ error: "job has no apify_run_id (probably never dispatched correctly)" }, 400);
+    return json(req, { error: "job has no apify_run_id (probably never dispatched correctly)" }, 400);
   }
 
   // ── Detectar placeholders sin sustituir → consultar Apify directamente ──
@@ -148,7 +146,7 @@ Deno.serve(async (req: Request) => {
     if ("error" in apifyData) {
       await markFailed(sb, jobId, `Apify API lookup failed: ${apifyData.error}`);
       await notifyAgent(sb, job, CRON_TOKEN, SUPABASE_URL, "failed");
-      return json({ error: apifyData.error }, 502);
+      return json(req, { error: apifyData.error }, 502);
     }
     status = String(apifyData.status ?? "").toUpperCase();
     datasetId = apifyData.defaultDatasetId ?? null;
@@ -157,7 +155,7 @@ Deno.serve(async (req: Request) => {
     const FINAL_STATUSES = ["SUCCEEDED", "FAILED", "TIMED-OUT", "TIMED_OUT", "ABORTED"];
     if (!FINAL_STATUSES.includes(status)) {
       console.log(`Apify still running for ${job.apify_run_id} (status=${status}), waiting...`);
-      return json({ ok: true, status: "still_running", apify_status: status });
+      return json(req, { ok: true, status: "still_running", apify_status: status });
     }
   } else {
     status = bodyStatus;
@@ -176,13 +174,13 @@ Deno.serve(async (req: Request) => {
       .eq("id", jobId);
     // Notificar al grupo del fallo
     await notifyAgent(sb, job, CRON_TOKEN, SUPABASE_URL, "failed");
-    return json({ ok: true, status });
+    return json(req, { ok: true, status });
   }
 
   if (!datasetId) {
     await markFailed(sb, jobId, "SUCCEEDED but missing defaultDatasetId");
     await notifyAgent(sb, job, CRON_TOKEN, SUPABASE_URL, "failed");
-    return json({ error: "Missing defaultDatasetId" }, 400);
+    return json(req, { error: "Missing defaultDatasetId" }, 400);
   }
 
   // ── Bajar dataset ───────────────────────────────────────────────────────
@@ -191,7 +189,7 @@ Deno.serve(async (req: Request) => {
   if ("error" in items) {
     await markFailed(sb, jobId, `Dataset fetch failed: ${items.error}`);
     await notifyAgent(sb, job, CRON_TOKEN, SUPABASE_URL, "failed");
-    return json({ error: items.error }, 502);
+    return json(req, { error: items.error }, 502);
   }
 
   // ── Extract profile data del primer item ───────────────────────────────
@@ -272,7 +270,7 @@ Deno.serve(async (req: Request) => {
   // ── Notify whatsapp-agent ───────────────────────────────────────────────
   await notifyAgent(sb, job, CRON_TOKEN, SUPABASE_URL, "complete");
 
-  return json({
+  return json(req, {
     ok: true,
     job_id: jobId,
     stories_analyzed: storiesAnalysis.length,
@@ -746,9 +744,9 @@ function formatNum(n: number): string {
   return String(n);
 }
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Self-service "forgot password" — el user pide reset desde
 // /forgot-password. Esta edge function:
 //   1. Genera un recovery link via Supabase admin API
@@ -21,11 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // ⚠️ NO HAY RATE LIMIT PROPIO. Antes había una constante
 // `RATE_LIMIT_PER_HOUR = 5` que no se usaba en ningún lado: el código
@@ -37,7 +34,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
@@ -45,7 +42,7 @@ Deno.serve(async (req) => {
     if (!email || typeof email !== "string") {
       return new Response(JSON.stringify({ error: "email required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -54,7 +51,7 @@ Deno.serve(async (req) => {
     if (!emailRegex.test(normalizedEmail)) {
       return new Response(JSON.stringify({ error: "email inválido" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -83,7 +80,7 @@ Deno.serve(async (req) => {
       );
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -92,7 +89,7 @@ Deno.serve(async (req) => {
       console.error("[forgot-password] no action_link in response");
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -102,7 +99,7 @@ Deno.serve(async (req) => {
       console.error("[forgot-password] RESEND_API_KEY no configurada");
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -224,13 +221,13 @@ Deno.serve(async (req) => {
     // Siempre 200 OK — anti-enumeration.
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("[forgot-password] exception:", (e as Error).message);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

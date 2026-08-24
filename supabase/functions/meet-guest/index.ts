@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Meet — puerta PÚBLICA para invitados sin cuenta en Maven.
 //
 // Es el único endpoint de Meet que atiende a alguien sin sesión, así que acá vive
@@ -19,18 +20,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+function json(req: Request, data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
+function err(req: Request, msg: string, status = 400) {
+  return json(req, { error: msg }, status);
 }
 
 // ── LiveKit token (mismo esquema que livekit-token / cowork-session) ──────
@@ -90,7 +87,7 @@ const MAX_ATTEMPTS_PER_10MIN = 8;   // intentos (acertados o no) por IP
 const MAX_DENIALS_PER_ROOM = 2;     // rechazos antes de cerrarle la puerta
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -111,8 +108,8 @@ serve(async (req) => {
     if (action === "knock") {
       const code = normalizeCode(body.code);
       const rawName = String(body.name ?? "").trim().replace(/\s+/g, " ");
-      if (code.length !== 6) return err("Código inválido");
-      if (rawName.length < 2) return err("Escribe tu nombre para pedir entrar");
+      if (code.length !== 6) return err(req, "Código inválido");
+      if (rawName.length < 2) return err(req, "Escribe tu nombre para pedir entrar");
       const guestName = rawName.slice(0, 40);
 
       const ipHash = await hashIp(clientIp(req), ipSalt);
@@ -124,7 +121,7 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("ip_hash", ipHash).gte("created_at", since);
       if (recentAttempts !== null && recentAttempts >= MAX_ATTEMPTS_PER_10MIN) {
-        return err("Demasiados intentos. Espera unos minutos.", 429);
+        return err(req, "Demasiados intentos. Espera unos minutos.", 429);
       }
 
       const { data: room } = await admin.from("meet_rooms")
@@ -136,15 +133,15 @@ serve(async (req) => {
       await admin.from("meet_guest_attempts")
         .delete().lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-      if (!room) return err("Código inválido", 404);
-      if (room.status !== "active") return err("Esa reunión ya terminó", 410);
+      if (!room) return err(req, "Código inválido", 404);
+      if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
       // Dos rechazos en ESTA reunión y no se puede volver a pedir.
       const { count: denials } = await admin.from("meet_guest_requests")
         .select("*", { count: "exact", head: true })
         .eq("meet_room_id", room.id).eq("ip_hash", ipHash).eq("status", "denied");
       if (denials !== null && denials >= MAX_DENIALS_PER_ROOM) {
-        return err("Tu solicitud fue rechazada. Contacta a quien te invitó.", 403);
+        return err(req, "Tu solicitud fue rechazada. Contacta a quien te invitó.", 403);
       }
 
       const guestToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
@@ -152,9 +149,9 @@ serve(async (req) => {
       const { error: insErr } = await admin.from("meet_guest_requests").insert({
         meet_room_id: room.id, guest_name: guestName, guest_token: guestToken, ip_hash: ipHash,
       });
-      if (insErr) return err(insErr.message, 500);
+      if (insErr) return err(req, insErr.message, 500);
 
-      return json({ guestToken, roomName: room.name, status: "pending" });
+      return json(req, { guestToken, roomName: room.name, status: "pending" });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -162,20 +159,20 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "claim") {
       const guestToken = String(body.guestToken ?? "");
-      if (guestToken.length < 32) return err("Solicitud inválida", 400);
+      if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
 
       const { data: request } = await admin.from("meet_guest_requests")
         .select("id, meet_room_id, guest_name, status")
         .eq("guest_token", guestToken).maybeSingle();
-      if (!request) return err("Solicitud no encontrada", 404);
+      if (!request) return err(req, "Solicitud no encontrada", 404);
 
-      if (request.status === "denied") return json({ status: "denied" });
-      if (request.status === "pending") return json({ status: "pending" });
+      if (request.status === "denied") return json(req, { status: "denied" });
+      if (request.status === "pending") return json(req, { status: "pending" });
 
       const { data: room } = await admin.from("meet_rooms")
         .select("name, livekit_room_name, status").eq("id", request.meet_room_id).maybeSingle();
-      if (!room) return err("Reunión no encontrada", 404);
-      if (room.status !== "active") return json({ status: "ended" });
+      if (!room) return err(req, "Reunión no encontrada", 404);
+      if (room.status !== "active") return json(req, { status: "ended" });
 
       // Identidad propia y marcada, para que en la sala se vea que es un invitado
       // y no se confunda con una cuenta de Maven.
@@ -183,15 +180,15 @@ serve(async (req) => {
         lkKey, lkSecret, `guest_${request.id}`, request.guest_name, room.livekit_room_name,
       );
 
-      return json({
+      return json(req, {
         status: "admitted", token, url: lkUrl,
         room: room.livekit_room_name, roomName: room.name, guestName: request.guest_name,
       });
     }
 
-    return err("Unknown action: " + action);
+    return err(req, "Unknown action: " + action);
   } catch (e) {
     console.error("meet-guest error:", e);
-    return err("Internal server error", 500);
+    return err(req, "Internal server error", 500);
   }
 });

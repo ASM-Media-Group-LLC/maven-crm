@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // telegram-ingest — recibe mensajes entrantes/salientes del telegram-gateway y los
 // guarda en la bandeja (tg_conversations + tg_messages). Espejo de whatsapp-ingest:
 //   · conversación NUEVA → auto-asigna según tg_channels.default_assignees de la línea
@@ -21,32 +22,28 @@ const INGEST_TOKEN = Deno.env.get("TELEGRAM_INGEST_TOKEN") ?? "";
 // da NULL para service_role → sin esto las filas quedan invisibles a la RLS por tenant.
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-telegram-ingest-token",
-};
+const cors = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-telegram-ingest-token" });
 
-function json(body: unknown, status = 200) {
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...cors, "Content-Type": "application/json" },
+    headers: { ...cors(req), "Content-Type": "application/json" },
   });
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const url = new URL(req.url);
   const token =
     req.headers.get("x-telegram-ingest-token") ?? url.searchParams.get("token") ?? "";
-  if (!INGEST_TOKEN || token !== INGEST_TOKEN) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!INGEST_TOKEN || token !== INGEST_TOKEN) return json(req, { ok: false, error: "unauthorized" }, 401);
 
   let payload: any;
-  try { payload = await req.json(); } catch { return json({ ok: false, error: "bad_json" }, 400); }
+  try { payload = await req.json(); } catch { return json(req, { ok: false, error: "bad_json" }, 400); }
 
   const { accountId, peer, message } = payload ?? {};
-  if (!accountId || !peer?.id || !message) return json({ ok: false, error: "missing_fields" }, 400);
+  if (!accountId || !peer?.id || !message) return json(req, { ok: false, error: "missing_fields" }, 400);
 
   const sb = createClient(PROJECT_URL, SERVICE_KEY);
 
@@ -108,7 +105,7 @@ serve(async (req) => {
       })
       .select("id")
       .single();
-    if (cErr || !created) return json({ ok: false, error: "conv_insert: " + (cErr?.message ?? "?") }, 500);
+    if (cErr || !created) return json(req, { ok: false, error: "conv_insert: " + (cErr?.message ?? "?") }, 500);
     conversationId = created.id as string;
 
     if (channelDefaults.length > 0) {
@@ -169,12 +166,12 @@ serve(async (req) => {
       },
       { onConflict: "conversation_id,external_id", ignoreDuplicates: true },
     );
-  if (mErr) return json({ ok: false, error: "msg_upsert: " + mErr.message }, 500);
+  if (mErr) return json(req, { ok: false, error: "msg_upsert: " + mErr.message }, 500);
 
   // 3) Entrante → sube el contador de no-leídos (badge lista + sidebar + filtro).
   if (direction === "in") {
     await sb.rpc("tg_bump_unread", { p_conversation_id: conversationId });
   }
 
-  return json({ ok: true, conversationId });
+  return json(req, { ok: true, conversationId });
 });

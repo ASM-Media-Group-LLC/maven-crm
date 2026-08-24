@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Grabaciones de Meet y Cowork.
 //
 // El circuito: `start` le pide a LiveKit Egress que se una a la sala como
@@ -24,16 +25,12 @@ import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -80,7 +77,7 @@ async function puedeVer(admin: any, userId: string, rec: { id: string; started_b
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const admin = createClient(
@@ -90,16 +87,16 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const { action } = body as { action?: string };
-    if (!action) return json({ error: "action is required" }, 400);
+    if (!action) return json(req, { error: "action is required" }, 400);
 
     // === EXPIRE (cron, sin usuario) ===
     if (action === "expire") {
       const token = req.headers.get("x-cron-token");
       if (!token || token !== Deno.env.get("RECORDINGS_CRON_TOKEN")) {
-        return json({ error: "Unauthorized" }, 401);
+        return json(req, { error: "Unauthorized" }, 401);
       }
       const { data: vencidas, error } = await admin.rpc("expire_meeting_recordings");
-      if (error) return json({ error: error.message }, 500);
+      if (error) return json(req, { error: error.message }, 500);
 
       let borradas = 0;
       const fallas: string[] = [];
@@ -140,26 +137,26 @@ Deno.serve(async (req) => {
         cerradas++;
       }
 
-      return json({ ok: true, borradas, cerradas, fallas });
+      return json(req, { ok: true, borradas, cerradas, fallas });
     }
 
     // === Resto: requiere usuario autenticado ===
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json(req, { error: "Unauthorized" }, 401);
     const authClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: { user } } = await authClient.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (!user?.id) return json({ error: "Unauthorized" }, 401);
+    if (!user?.id) return json(req, { error: "Unauthorized" }, 401);
 
     // === START ===
     if (action === "start") {
       const { room_name, source, title } = body as {
         room_name?: string; source?: string; title?: string;
       };
-      if (!room_name) return json({ error: "room_name es requerido" }, 400);
+      if (!room_name) return json(req, { error: "room_name es requerido" }, 400);
       const src = source === "meet" ? "meet" : "cowork";
 
       // Una grabación activa por sala: dos egress componiendo lo mismo es
@@ -174,7 +171,7 @@ Deno.serve(async (req) => {
         // grabar nunca. Se le pregunta a LiveKit: si el egress ya murió, la
         // fila se cierra acá mismo y este start continúa normal.
         if (await egressActivo(activa.egress_id)) {
-          return json({ error: "Esta reunión ya se está grabando." }, 409);
+          return json(req, { error: "Esta reunión ya se está grabando." }, 409);
         }
         await finalizarHuerfana(admin, activa);
       }
@@ -183,7 +180,7 @@ Deno.serve(async (req) => {
         .from("meeting_recordings")
         .insert({ room_name, source: src, title: title ?? null, started_by: user.id })
         .select("id").single();
-      if (insErr) return json({ error: insErr.message }, 500);
+      if (insErr) return json(req, { error: insErr.message }, 500);
 
       const archivo = `${fila.id}.mp4`;
       try {
@@ -198,14 +195,14 @@ Deno.serve(async (req) => {
           .update({ egress_id: info.egressId, storage_key: archivo })
           .eq("id", fila.id);
 
-        return json({ ok: true, recording_id: fila.id });
+        return json(req, { ok: true, recording_id: fila.id });
       } catch (e) {
         // Si LiveKit no arrancó el egress, la fila no puede quedar
         // aparentando una grabación en curso.
         await admin.from("meeting_recordings")
           .update({ status: "failed", error: (e as Error).message?.slice(0, 300) })
           .eq("id", fila.id);
-        return json({ error: `no se pudo iniciar la grabación: ${(e as Error).message}` }, 502);
+        return json(req, { error: `no se pudo iniciar la grabación: ${(e as Error).message}` }, 502);
       }
     }
 
@@ -215,7 +212,7 @@ Deno.serve(async (req) => {
         recording_id?: string; room_name?: string; recipients?: string[];
       };
       if (!recording_id && !room_name) {
-        return json({ error: "recording_id o room_name es requerido" }, 400);
+        return json(req, { error: "recording_id o room_name es requerido" }, 400);
       }
 
       // Por id (quien la inició lo guardó) o por sala: quien NO la inició no
@@ -229,11 +226,11 @@ Deno.serve(async (req) => {
             .eq("room_name", room_name).eq("status", "recording")
             .is("deleted_at", null).order("started_at", { ascending: false })
             .limit(1).maybeSingle();
-      if (!rec) return json({ error: "grabación no encontrada" }, 404);
+      if (!rec) return json(req, { error: "grabación no encontrada" }, 404);
       // Detener puede cualquiera que esté en la reunión; el frontend solo
       // lo ofrece dentro de la llamada. Restringir al iniciador dejaría
       // grabaciones eternas si esa persona se cae de la llamada.
-      if (rec.status !== "recording") return json({ error: "esta grabación ya no está en curso" }, 409);
+      if (rec.status !== "recording") return json(req, { error: "esta grabación ya no está en curso" }, 409);
 
       await admin.from("meeting_recordings")
         .update({ status: "processing", ended_at: new Date().toISOString() })
@@ -278,57 +275,57 @@ Deno.serve(async (req) => {
       // no se manda y la grabación igual aparece en /grabaciones.
       const enviados = await avisarPorCorreo(admin, rec, destinatarios);
 
-      return json({ ok: true, size_bytes: size, duration_seconds: dur, emails: enviados });
+      return json(req, { ok: true, size_bytes: size, duration_seconds: dur, emails: enviados });
     }
 
     // === DOWNLOAD ===
     if (action === "download") {
       const { recording_id } = body as { recording_id?: string };
-      if (!recording_id) return json({ error: "recording_id es requerido" }, 400);
+      if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);
       const { data: rec } = await admin
         .from("meeting_recordings")
         .select("id, started_by, storage_key, status, deleted_at")
         .eq("id", recording_id).maybeSingle();
       if (!rec || rec.deleted_at || rec.status !== "ready" || !rec.storage_key) {
-        return json({ error: "grabación no disponible" }, 404);
+        return json(req, { error: "grabación no disponible" }, 404);
       }
-      if (!(await puedeVer(admin, user.id, rec))) return json({ error: "Forbidden" }, 403);
+      if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
       // 10 minutos: suficiente para arrancar la descarga, inútil si el
       // link se filtra en un chat.
-      return json({ ok: true, url: await firmarUrl(rec.storage_key, "d", 600) });
+      return json(req, { ok: true, url: await firmarUrl(rec.storage_key, "d", 600) });
     }
 
     // === DELETE (anticipado) ===
     if (action === "delete") {
       const { recording_id } = body as { recording_id?: string };
-      if (!recording_id) return json({ error: "recording_id es requerido" }, 400);
+      if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);
       const { data: rec } = await admin
         .from("meeting_recordings")
         .select("id, started_by, storage_key, deleted_at")
         .eq("id", recording_id).maybeSingle();
-      if (!rec || rec.deleted_at) return json({ error: "grabación no encontrada" }, 404);
+      if (!rec || rec.deleted_at) return json(req, { error: "grabación no encontrada" }, 404);
 
       // Borrar solo quien la inició o un admin (la regla del RLS de UPDATE).
       const { data: rol } = await admin
         .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-      if (rec.started_by !== user.id && !rol) return json({ error: "Forbidden" }, 403);
+      if (rec.started_by !== user.id && !rol) return json(req, { error: "Forbidden" }, 403);
 
       if (rec.storage_key) {
         const r = await fetch(await firmarUrl(rec.storage_key, "f", 60), { method: "DELETE" });
         if (!r.ok && r.status !== 404) {
-          return json({ error: `no se pudo borrar el archivo (rec-server ${r.status})` }, 502);
+          return json(req, { error: `no se pudo borrar el archivo (rec-server ${r.status})` }, 502);
         }
       }
       await admin.from("meeting_recordings")
         .update({ deleted_at: new Date().toISOString(), status: "deleted" })
         .eq("id", rec.id);
-      return json({ ok: true });
+      return json(req, { ok: true });
     }
 
-    return json({ error: `Acción desconocida: ${action}` }, 400);
+    return json(req, { error: `Acción desconocida: ${action}` }, 400);
   } catch (e) {
     console.error("[recordings]", e);
-    return json({ error: (e as Error).message ?? "unexpected error" }, 500);
+    return json(req, { error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });
 

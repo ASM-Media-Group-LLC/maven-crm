@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
@@ -14,11 +15,7 @@ import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/b
 //   - Si viene solo ig_url (one-off lookup), devolvemos el data URL
 //     sin tocar la BD.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
@@ -169,7 +166,7 @@ interface InvokeBody {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const body = (await req.json()) as InvokeBody;
@@ -195,14 +192,14 @@ serve(async (req) => {
       if (!model) {
         return new Response(JSON.stringify({ error: "Modelo no encontrado." }), {
           status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
       // Si ya tiene avatar y no estamos forzando refresh, salimos.
       if (model.avatar_data_url) {
         return new Response(
           JSON.stringify({ ok: true, cached: true, avatar_data_url: model.avatar_data_url }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
         );
       }
       igUrl = (model.ig_url as string) ?? null;
@@ -212,7 +209,7 @@ serve(async (req) => {
     if (!username) {
       return new Response(
         JSON.stringify({ error: "No se pudo extraer username de IG." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
@@ -223,7 +220,7 @@ serve(async (req) => {
           error:
             "No se pudo obtener la foto de perfil. Cuenta privada o IG está bloqueando el scrape.",
         }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 502, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
@@ -237,13 +234,13 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ ok: true, avatar_data_url: dataUrl, username }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("qa-fetch-ig-avatar error:", e);
     return new Response(
       JSON.stringify({ error: (e as Error).message ?? "Error interno." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   }
 });

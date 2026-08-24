@@ -1,14 +1,11 @@
+import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
@@ -17,7 +14,7 @@ Deno.serve(async (req) => {
       console.error("[manage-user-roles] Missing or malformed Authorization header");
       return new Response(JSON.stringify({ error: "Unauthorized", reason: "missing_auth_header" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -34,7 +31,7 @@ Deno.serve(async (req) => {
       console.error("[manage-user-roles] getUser failed:", userError?.message ?? "no user");
       return new Response(JSON.stringify({ error: "Unauthorized", reason: "invalid_token" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -56,7 +53,7 @@ Deno.serve(async (req) => {
     if (!callerRole) {
       return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
         status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -65,7 +62,7 @@ Deno.serve(async (req) => {
     if (!user_id || !action) {
       return new Response(JSON.stringify({ error: "user_id and action are required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -73,7 +70,7 @@ Deno.serve(async (req) => {
       if (!role) {
         return new Response(JSON.stringify({ error: "role is required" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
@@ -88,7 +85,7 @@ Deno.serve(async (req) => {
       if (!validRole) {
         return new Response(JSON.stringify({ error: `Invalid or inactive role: ${role}` }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
@@ -101,12 +98,12 @@ Deno.serve(async (req) => {
       if (insertError) {
         return new Response(JSON.stringify({ error: insertError.message }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
       return new Response(JSON.stringify({ success: true, user_id, role }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -117,7 +114,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: "No puedes removerte tu propio rol de admin" }),
           {
             status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
           }
         );
       }
@@ -130,24 +127,24 @@ Deno.serve(async (req) => {
       if (deleteError) {
         return new Response(JSON.stringify({ error: deleteError.message }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
       return new Response(JSON.stringify({ success: true, user_id }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err: unknown) {
     console.error("[manage-user-roles] Internal error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

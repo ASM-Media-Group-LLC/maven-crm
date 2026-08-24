@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // blu-mp — proxy ON-DEMAND a Messages Pro de BLU (wss://of.unlok.me).
 //
 // El management abre un hilo en Maven → esta fn abre un WS a BLU con el token de sesión
@@ -16,12 +17,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BLU_WS_URL = Deno.env.get("BLU_WS_URL") ?? "wss://of.unlok.me/";
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 
 // Abre WS, autentica, manda `query`, resuelve con el 1er mensaje que matchee `accept`.
@@ -70,7 +68,7 @@ function bluQuery(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -79,14 +77,14 @@ Deno.serve(async (req) => {
   // Auth: service_role (tests internos) o JWT de staff. Permitido: management O rol con permiso
   // a "Mensajes Pro"/"Chatters QA" (can_use_blu_mp) — p.ej. Chatter Supervisor.
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!bearer) return json({ error: "unauthorized" }, 401);
+  if (!bearer) return json(req, { error: "unauthorized" }, 401);
   if (bearer !== SERVICE_KEY) {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
-    if (error || !user) return json({ error: "unauthorized" }, 401);
+    if (error || !user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     let ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
     if (!ok) { const { data: can } = await sb.rpc("can_use_blu_mp", { p_uid: user.id }); ok = can === true; }
-    if (!ok) return json({ error: "forbidden" }, 403);
+    if (!ok) return json(req, { error: "forbidden" }, 403);
   }
 
   let body: Record<string, unknown> = {};
@@ -95,7 +93,7 @@ Deno.serve(async (req) => {
 
   const { data: sess } = await sb.from("blu_session").select("token").eq("id", 1).maybeSingle();
   const token = (sess?.token as string | undefined) ?? Deno.env.get("BLU_JWT");
-  if (!token) return json({ error: "sin token de sesión BLU (blu_session vacío)" }, 500);
+  if (!token) return json(req, { error: "sin token de sesión BLU (blu_session vacío)" }, 500);
 
   // Query EXACTA + cómo reconocer su respuesta (los tipos confirmados en la captura del owner).
   const rid = (p: string) => `${p}:${Date.now()}`;
@@ -109,7 +107,7 @@ Deno.serve(async (req) => {
     case "participants": {
       const modelId = Number(body.modelId);
       const offset = Number(body.offset ?? 0), limit = Number(body.limit ?? 30);
-      if (!modelId) return json({ error: "modelId requerido" }, 400);
+      if (!modelId) return json(req, { error: "modelId requerido" }, 400);
       query = { type: "messages-pro-get-participants", modelId, offset, limit, requestId: rid(`messages-pro-get-participants:${modelId}`) };
       accept = (m) => m.type === "messages-pro-get-participants" && !!m.data;
       break;
@@ -117,14 +115,14 @@ Deno.serve(async (req) => {
     case "messages": {
       const modelId = Number(body.modelId), chatId = Number(body.chatId);
       const limit = Number(body.limit ?? 30), order = String(body.order ?? "desc");
-      if (!modelId || !chatId) return json({ error: "modelId y chatId requeridos" }, 400);
+      if (!modelId || !chatId) return json(req, { error: "modelId y chatId requeridos" }, 400);
       query = { type: "messages-pro-get-messages", modelId, chatId, limit, order, requestId: rid(`mp:messages-pro-get-messages:${modelId}:${chatId}`) };
       accept = (m) => m.type === "messages-pro-get-messages" && !!m.data;
       break;
     }
     case "fan-summary": {
       const modelId = Number(body.modelId), fanId = Number(body.fanId);
-      if (!modelId || !fanId) return json({ error: "modelId y fanId requeridos" }, 400);
+      if (!modelId || !fanId) return json(req, { error: "modelId y fanId requeridos" }, 400);
       query = { type: "fan:get-summary", fanId, modelId, requestId: rid(`${modelId}:${fanId}`) };
       accept = (m) => m.type === "fan:summary" && Number(m.fanId) === fanId;
       break;
@@ -133,14 +131,14 @@ Deno.serve(async (req) => {
     // source:'external', con `queued`=queueId); smart-messages = PRIORITY_MASS de BLU.
     case "of-mass": {
       const modelId = Number(body.modelId);
-      if (!modelId) return json({ error: "modelId requerido" }, 400);
+      if (!modelId) return json(req, { error: "modelId requerido" }, 400);
       query = { type: "agency:messages-pro:of-mass:list", modelId, requestId: rid(`of-mass:${modelId}`) };
       accept = (m) => m.type === "agency:messages-pro:of-mass:list";
       break;
     }
     case "smart-messages": {
       const modelId = Number(body.modelId);
-      if (!modelId) return json({ error: "modelId requerido" }, 400);
+      if (!modelId) return json(req, { error: "modelId requerido" }, 400);
       query = { type: "agency:messages-pro:smart-messages:list", modelId, requestId: rid(`smart:${modelId}`) };
       accept = (m) => m.type === "agency:messages-pro:smart-messages:list";
       break;
@@ -157,7 +155,7 @@ Deno.serve(async (req) => {
       accept = (m) => m.type === "agency:employees:list" && Array.isArray(m.employees);
       break;
     default:
-      return json({ error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees)" }, 400);
+      return json(req, { error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees)" }, 400);
   }
 
   try {
@@ -166,9 +164,9 @@ Deno.serve(async (req) => {
     if (freshToken && freshToken !== token) {
       await sb.from("blu_session").upsert({ id: 1, token: freshToken, refreshed_at: new Date().toISOString() });
     }
-    return json({ ok: true, data: msg });
+    return json(req, { ok: true, data: msg });
   } catch (e) {
     const err = e as Error & { expired?: boolean };
-    return json({ error: err.message, expired: !!err.expired }, err.expired ? 401 : 502);
+    return json(req, { error: err.message, expired: !!err.expired }, err.expired ? 401 : 502);
   }
 });

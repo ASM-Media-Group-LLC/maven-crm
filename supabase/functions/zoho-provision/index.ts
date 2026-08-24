@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Provisión de casillas Zoho — función de verificación y backfill.
 //
 // POR QUÉ EXISTE APARTE de admin-user-actions: la salida de Google es un
@@ -29,29 +30,25 @@ import {
 import { cryptoConfigured } from "../_shared/mail-crypto.ts";
 import { generateMailboxPassword, provisionMailbox } from "../_shared/mail-provision.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Unauthorized", reason: "missing_auth_header" }, 401);
+      return json(req, { error: "Unauthorized", reason: "missing_auth_header" }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
 
@@ -63,7 +60,7 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await authClient.auth.getUser(token);
     if (userError || !user?.id) {
-      return json({ error: "Unauthorized", reason: "invalid_token" }, 401);
+      return json(req, { error: "Unauthorized", reason: "invalid_token" }, 401);
     }
 
     const adminClient = createClient(
@@ -79,7 +76,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!callerRole) {
-      return json({ error: "Forbidden: admin role required" }, 403);
+      return json(req, { error: "Forbidden: admin role required" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -93,21 +90,21 @@ Deno.serve(async (req) => {
       user_id?: string;
     };
 
-    if (!action) return json({ error: "action is required" }, 400);
+    if (!action) return json(req, { error: "action is required" }, 400);
 
     // === STATUS: smoke test de credenciales ===
     // Devuelve solo el conteo y los primeros mails: no volcamos el padrón
     // entero de la organización en una respuesta de diagnóstico.
     if (action === "status") {
       if (!zohoConfigured()) {
-        return json({
+        return json(req, {
           configured: false,
           missing: ["ZOHO_CLIENT_ID", "ZOHO_CLIENT_SECRET", "ZOHO_REFRESH_TOKEN", "ZOHO_ZOID"]
             .filter((k) => !Deno.env.get(k)),
         });
       }
       const res = await listAccounts();
-      return json({
+      return json(req, {
         configured: true,
         reachable: res.ok,
         error: res.error,
@@ -126,26 +123,26 @@ Deno.serve(async (req) => {
     // === CREATE ===
     if (action === "create") {
       if (!email || !first_name || !last_name) {
-        return json({ error: "email, first_name y last_name son requeridos" }, 400);
+        return json(req, { error: "email, first_name y last_name son requeridos" }, 400);
       }
       const password = generateMailboxPassword();
       const res = await createMailbox({ email, firstName: first_name, lastName: last_name, password });
 
-      if (res.skipped) return json({ error: "Zoho no configurado todavía" }, 409);
-      if (!res.ok) return json({ error: res.error, status: res.status }, 502);
+      if (res.skipped) return json(req, { error: "Zoho no configurado todavía" }, 409);
+      if (!res.ok) return json(req, { error: res.error, status: res.status }, 502);
 
       // El password va en la respuesta porque el admin tiene que
       // entregárselo a la persona. No queda persistido en ningún lado.
-      return json({ ok: true, account: res.data, password });
+      return json(req, { ok: true, account: res.data, password });
     }
 
     // === DISABLE ===
     if (action === "disable") {
-      if (!account_id) return json({ error: "account_id es requerido" }, 400);
+      if (!account_id) return json(req, { error: "account_id es requerido" }, 400);
       const res = await disableMailbox(account_id);
-      if (res.skipped) return json({ error: "Zoho no configurado todavía" }, 409);
-      if (!res.ok) return json({ error: res.error, status: res.status }, 502);
-      return json({ ok: true });
+      if (res.skipped) return json(req, { error: "Zoho no configurado todavía" }, 409);
+      if (!res.ok) return json(req, { error: res.error, status: res.status }, 502);
+      return json(req, { ok: true });
     }
 
     // === ENSURE_CREDENTIAL ===
@@ -153,10 +150,10 @@ Deno.serve(async (req) => {
     // usuario de Maven indicado. La persona no participa ni se entera.
     if (action === "ensure_credential") {
       if (!email || !user_id) {
-        return json({ error: "email y user_id son requeridos" }, 400);
+        return json(req, { error: "email y user_id son requeridos" }, 400);
       }
       if (!cryptoConfigured()) {
-        return json({ error: "falta el secret MAIL_CRED_KEY" }, 409);
+        return json(req, { error: "falta el secret MAIL_CRED_KEY" }, 409);
       }
 
       // Delega en el módulo compartido: es EXACTAMENTE lo mismo que corre
@@ -172,15 +169,15 @@ Deno.serve(async (req) => {
         firstName: nombre,
         lastName: apellido,
       });
-      if (!res.ok) return json({ error: res.error }, 502);
+      if (!res.ok) return json(req, { error: res.error }, 502);
 
       // La contraseña NO se devuelve: nadie la necesita, es de máquina.
-      return json({ ok: true, email_address: res.email_address, outcome: res.outcome });
+      return json(req, { ok: true, email_address: res.email_address, outcome: res.outcome });
     }
 
-    return json({ error: `Acción desconocida: ${action}` }, 400);
+    return json(req, { error: `Acción desconocida: ${action}` }, 400);
   } catch (e) {
     console.error("[zoho-provision]", e);
-    return json({ error: (e as Error).message ?? "unexpected error" }, 500);
+    return json(req, { error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });

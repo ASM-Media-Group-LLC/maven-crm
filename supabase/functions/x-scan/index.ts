@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // x-scan — verifica promos por X (Twitter) y las registra en promolog_entries.
 //
 // Equivalente a telegram-scan, pero el "transporte" es Apify (apidojo/tweet-scraper)
@@ -43,13 +44,10 @@ const MAX_CREATORS_PER_RUN = 10;
 const RUN_BUDGET_MS = 100_000;
 const MAX_CHAIN_DEPTH = 8;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
-const json = (obj: unknown, status = 200): Response =>
-  new Response(JSON.stringify(obj, null, 2), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+const json = (req: Request, obj: unknown, status = 200): Response =>
+  new Response(JSON.stringify(obj, null, 2), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 
 // Username pelado, aunque venga como URL (https://x.com/user) o @user — así lee
 // también los handles viejos guardados sucios.
@@ -276,7 +274,7 @@ async function runApify(token: string, handles: string[], start: string, maxItem
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -291,12 +289,12 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const { data: { user } } = await sb.auth.getUser(token);
-    if (!user) return json({ error: "unauthorized" }, 401);
+    if (!user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     const ok = (roles || []).some((r: { role: string }) => r.role === "admin" || r.role === "manager");
-    if (!ok) return json({ error: "forbidden (admin/manager)" }, 403);
+    if (!ok) return json(req, { error: "forbidden (admin/manager)" }, 403);
   }
-  if (!APIFY_TOKEN) return json({ error: "falta APIFY_TOKEN (secreto de la edge function)" }, 500);
+  if (!APIFY_TOKEN) return json(req, { error: "falta APIFY_TOKEN (secreto de la edge function)" }, 500);
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
   const hours = Number(body.hours) || 24;
@@ -314,7 +312,7 @@ Deno.serve(async (req: Request) => {
   //   body: { mode:"ingest", items:[ { creator_id, source_handle?, tweets:[{text, permalink?, date?, imageUrl?}] } ] }
   if (body.mode === "ingest") {
     const items = Array.isArray(body.items) ? body.items as Array<any> : [];
-    if (!items.length) return json({ ok: true, note: "sin items" });
+    if (!items.length) return json(req, { ok: true, note: "sin items" });
     const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
     const nicksByCreator = new Map<string, string[]>();
     if (ids.length) {
@@ -468,7 +466,7 @@ Deno.serve(async (req: Request) => {
         finished_at: new Date().toISOString(),
       });
     }
-    return json({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
+    return json(req, { ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
   }
 
   // ── MODO TARGETS ────────────────────────────────────────────────────────────
@@ -477,7 +475,7 @@ Deno.serve(async (req: Request) => {
   if (body.mode === "targets") {
     const { data: crs } = await sb.from("creators").select("id, name, artistic_name, twitter_handle").eq("status", "active").not("twitter_handle", "is", null).neq("twitter_handle", "");
     const targets = (crs ?? []).map((c: any) => ({ creator_id: c.id, name: c.artistic_name || c.name, handle: String(c.twitter_handle || "").replace(/^@+/, "") }));
-    return json({ ok: true, mode: "targets", count: targets.length, targets });
+    return json(req, { ok: true, mode: "targets", count: targets.length, targets });
   }
 
   let q = sb.from("creators")
@@ -486,7 +484,7 @@ Deno.serve(async (req: Request) => {
     .not("twitter_handle", "is", null).neq("twitter_handle", "");
   if (onlyIds && onlyIds.length) q = q.in("id", onlyIds);
   const { data: creators, error: cErr } = await q;
-  if (cErr) return json({ error: cErr.message }, 500);
+  if (cErr) return json(req, { error: cErr.message }, 500);
 
   let list = creators || [];
 
@@ -767,7 +765,7 @@ Deno.serve(async (req: Request) => {
     try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(next); } catch { /* fire-and-forget */ }
   }
 
-  return json({
+  return json(req, {
     ok: true, start, hours,
     creators: list.length, deferred: deferredIds.length, chained, chain_depth: chainDepth,
     runStats, results,

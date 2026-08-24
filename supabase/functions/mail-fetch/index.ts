@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Lectura del correo del usuario (Zoho detrás).
 //
 // Cada request resuelve la conexión del usuario que llama, pide un access
@@ -25,26 +26,22 @@ import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Unauthorized", reason: "missing_auth_header" }, 401);
+      return json(req, { error: "Unauthorized", reason: "missing_auth_header" }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
 
@@ -55,7 +52,7 @@ Deno.serve(async (req) => {
     );
     const { data: { user }, error: userError } = await authClient.auth.getUser(token);
     if (userError || !user?.id) {
-      return json({ error: "Unauthorized", reason: "invalid_token" }, 401);
+      return json(req, { error: "Unauthorized", reason: "invalid_token" }, 401);
     }
 
     const admin = createClient(
@@ -90,7 +87,7 @@ Deno.serve(async (req) => {
       in_reply_to?: string;
       references?: string;
     };
-    if (!action) return json({ error: "action is required" }, 400);
+    if (!action) return json(req, { error: "action is required" }, 400);
 
     // OJO: la búsqueda de la conexión OAuth va DENTRO de `folders`, no
     // antes del dispatch: `imap_folders` no necesita conexión OAuth, y
@@ -105,11 +102,11 @@ Deno.serve(async (req) => {
 
       if (connErr) {
         console.error("[mail-fetch] lectura de conexión falló:", connErr.message);
-        return json({ error: "no se pudo leer tu conexión de correo" }, 500);
+        return json(req, { error: "no se pudo leer tu conexión de correo" }, 500);
       }
-      if (!conn) return json({ error: "no_connection" }, 409);
+      if (!conn) return json(req, { error: "no_connection" }, 409);
       if (!conn.zoho_account_id) {
-        return json({ error: "la conexión no tiene casilla asociada — reconectá" }, 409);
+        return json(req, { error: "la conexión no tiene casilla asociada — reconectá" }, 409);
       }
 
       const tok = await refreshUserToken(conn.refresh_token as string);
@@ -120,7 +117,7 @@ Deno.serve(async (req) => {
           .from("mail_connections")
           .update({ last_error: tok.error ?? "refresh falló" })
           .eq("id", conn.id);
-        return json({ error: `no se pudo renovar el acceso: ${tok.error}` }, 502);
+        return json(req, { error: `no se pudo renovar el acceso: ${tok.error}` }, 502);
       }
 
       const res = await listFolders(tok.data, conn.zoho_account_id as string);
@@ -129,7 +126,7 @@ Deno.serve(async (req) => {
           .from("mail_connections")
           .update({ last_error: res.error ?? "folders falló" })
           .eq("id", conn.id);
-        return json({ error: res.error, status: res.status }, 502);
+        return json(req, { error: res.error, status: res.status }, 502);
       }
 
       // Éxito: limpiamos el último error y marcamos uso.
@@ -138,7 +135,7 @@ Deno.serve(async (req) => {
         .update({ last_used_at: new Date().toISOString(), last_error: null })
         .eq("id", conn.id);
 
-      return json({
+      return json(req, {
         ok: true,
         email_address: conn.email_address,
         folders: (res.data ?? []).map((f) => ({
@@ -164,9 +161,9 @@ Deno.serve(async (req) => {
 
       if (credErr) {
         console.error("[mail-fetch] lectura de credencial falló:", credErr.message);
-        return json({ error: "no se pudo leer tu credencial de correo" }, 500);
+        return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
       }
-      if (!cred) return json({ error: "no_credential" }, 409);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
 
       const password = await unseal({
         cipher: cred.secret_cipher as string,
@@ -179,7 +176,7 @@ Deno.serve(async (req) => {
         await admin.from("mail_credentials")
           .update({ last_error: "no se pudo descifrar la credencial" })
           .eq("id", cred.id);
-        return json({
+        return json(req, {
           error: "no se pudo descifrar la credencial — hay que re-provisionarla",
         }, 500);
       }
@@ -195,11 +192,11 @@ Deno.serve(async (req) => {
           await admin.from("mail_credentials")
             .update({ last_error: `IMAP login: ${auth.error ?? "rechazado"}` })
             .eq("id", cred.id);
-          return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+          return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
         }
 
         const list = await client.listFolders();
-        if (!list.ok) return json({ error: `IMAP LIST: ${list.error}` }, 502);
+        if (!list.ok) return json(req, { error: `IMAP LIST: ${list.error}` }, 502);
 
         const inbox = await client.selectFolder("INBOX");
 
@@ -207,7 +204,7 @@ Deno.serve(async (req) => {
           .update({ last_used_at: new Date().toISOString(), last_error: null })
           .eq("id", cred.id);
 
-        return json({
+        return json(req, {
           ok: true,
           via: "imap",
           email_address: cred.email_address,
@@ -218,7 +215,7 @@ Deno.serve(async (req) => {
         const msg = (e as Error).message ?? "error de IMAP";
         await admin.from("mail_credentials")
           .update({ last_error: msg }).eq("id", cred.id);
-        return json({ error: msg }, 502);
+        return json(req, { error: msg }, 502);
       } finally {
         // Siempre cerrar: un socket abierto en una edge function que muere
         // deja la conexión colgada del lado del servidor de correo.
@@ -241,9 +238,9 @@ Deno.serve(async (req) => {
 
       if (credErr) {
         console.error("[mail-fetch] lectura de credencial falló:", credErr.message);
-        return json({ error: "no se pudo leer tu credencial de correo" }, 500);
+        return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
       }
-      if (!cred) return json({ error: "no_credential" }, 409);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
 
       const password = await unseal({
         cipher: cred.secret_cipher as string,
@@ -254,7 +251,7 @@ Deno.serve(async (req) => {
         await admin.from("mail_credentials")
           .update({ last_error: "no se pudo descifrar la credencial" })
           .eq("id", cred.id);
-        return json({
+        return json(req, {
           error: "no se pudo descifrar la credencial — hay que re-provisionarla",
         }, 500);
       }
@@ -275,22 +272,22 @@ Deno.serve(async (req) => {
           await admin.from("mail_credentials")
             .update({ last_error: `IMAP login: ${auth.error ?? "rechazado"}` })
             .eq("id", cred.id);
-          return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+          return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
         }
 
         const sel = await client.selectFolder(box);
-        if (!sel.ok) return json({ error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
+        if (!sel.ok) return json(req, { error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
 
         // Carpeta vacía: no hay rango que pedir, y FETCH 0:0 es un error.
         if (sel.exists === 0) {
-          return json({
+          return json(req, {
             ok: true, via: "imap", folder: box, total: 0, messages: [],
           });
         }
 
         const from = Math.max(1, sel.exists - take + 1);
         const list = await client.fetchSummaries(from, sel.exists);
-        if (!list.ok) return json({ error: `IMAP FETCH: ${list.error}` }, 502);
+        if (!list.ok) return json(req, { error: `IMAP FETCH: ${list.error}` }, 502);
 
         await admin.from("mail_credentials")
           .update({ last_used_at: new Date().toISOString(), last_error: null })
@@ -330,7 +327,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        return json({
+        return json(req, {
           ok: true,
           via: "imap",
           folder: box,
@@ -345,7 +342,7 @@ Deno.serve(async (req) => {
         const msg = (e as Error).message ?? "error de IMAP";
         await admin.from("mail_credentials")
           .update({ last_error: msg }).eq("id", cred.id);
-        return json({ error: msg }, 502);
+        return json(req, { error: msg }, 502);
       } finally {
         if (client) {
           await client.logout();
@@ -366,7 +363,7 @@ Deno.serve(async (req) => {
       const porUid = typeof (body as { uid?: number }).uid === "number" &&
         (body as { uid: number }).uid > 0;
       if (!porUid && (!seq || seq < 1)) {
-        return json({ error: "seq o uid es requerido" }, 400);
+        return json(req, { error: "seq o uid es requerido" }, 400);
       }
 
       const { data: cred, error: credErr } = await admin
@@ -375,8 +372,8 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id)
         .is("revoked_at", null)
         .maybeSingle();
-      if (credErr) return json({ error: "no se pudo leer tu credencial de correo" }, 500);
-      if (!cred) return json({ error: "no_credential" }, 409);
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
 
       const password = await unseal({
         cipher: cred.secret_cipher as string,
@@ -384,7 +381,7 @@ Deno.serve(async (req) => {
         keyVersion: cred.key_version as number,
       });
       if (!password) {
-        return json({ error: "no se pudo descifrar la credencial — hay que re-provisionarla" }, 500);
+        return json(req, { error: "no se pudo descifrar la credencial — hay que re-provisionarla" }, 500);
       }
 
       const box = (folder ?? "INBOX").slice(0, 200);
@@ -392,20 +389,20 @@ Deno.serve(async (req) => {
       try {
         client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
         const auth = await client.login(cred.email_address as string, password);
-        if (!auth.ok) return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
         const sel = await client.selectFolder(box);
-        if (!sel.ok) return json({ error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
+        if (!sel.ok) return json(req, { error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
         if (porUid) {
           // Por UID (lo que usa la caché): estable, no requiere validar
           // contra `exists` — un UID inexistente es un no-op inofensivo.
           await client.markSeenUid((body as { uid: number }).uid);
-          return json({ ok: true, folder: box, uid: (body as { uid: number }).uid });
+          return json(req, { ok: true, folder: box, uid: (body as { uid: number }).uid });
         }
-        if ((seq as number) > sel.exists) return json({ error: "ese mensaje no existe en la carpeta" }, 404);
+        if ((seq as number) > sel.exists) return json(req, { error: "ese mensaje no existe en la carpeta" }, 404);
         await client.markSeen(seq as number);
-        return json({ ok: true, folder: box, seq });
+        return json(req, { ok: true, folder: box, seq });
       } catch (e) {
-        return json({ error: (e as Error).message ?? "error de IMAP" }, 502);
+        return json(req, { error: (e as Error).message ?? "error de IMAP" }, 502);
       } finally {
         if (client) {
           await client.logout();
@@ -415,7 +412,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "imap_message") {
-      if (!seq || seq < 1) return json({ error: "seq es requerido" }, 400);
+      if (!seq || seq < 1) return json(req, { error: "seq es requerido" }, 400);
 
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
@@ -424,8 +421,8 @@ Deno.serve(async (req) => {
         .is("revoked_at", null)
         .maybeSingle();
 
-      if (credErr) return json({ error: "no se pudo leer tu credencial de correo" }, 500);
-      if (!cred) return json({ error: "no_credential" }, 409);
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
 
       const password = await unseal({
         cipher: cred.secret_cipher as string,
@@ -433,7 +430,7 @@ Deno.serve(async (req) => {
         keyVersion: cred.key_version as number,
       });
       if (!password) {
-        return json({
+        return json(req, {
           error: "no se pudo descifrar la credencial — hay que re-provisionarla",
         }, 500);
       }
@@ -446,14 +443,14 @@ Deno.serve(async (req) => {
           cred.imap_port as number,
         );
         const auth = await client.login(cred.email_address as string, password);
-        if (!auth.ok) return json({ error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
 
         const sel = await client.selectFolder(box);
-        if (!sel.ok) return json({ error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
-        if (seq > sel.exists) return json({ error: "ese mensaje no existe en la carpeta" }, 404);
+        if (!sel.ok) return json(req, { error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
+        if (seq > sel.exists) return json(req, { error: "ese mensaje no existe en la carpeta" }, 404);
 
         const raw = await client.fetchRawMessage(seq);
-        if (!raw.ok) return json({ error: `IMAP FETCH: ${raw.error}` }, 502);
+        if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
 
         const parsed = parseMessage(raw.raw);
 
@@ -467,7 +464,7 @@ Deno.serve(async (req) => {
           .update({ last_used_at: new Date().toISOString(), last_error: null })
           .eq("id", cred.id);
 
-        return json({
+        return json(req, {
           ok: true,
           via: "imap",
           folder: box,
@@ -489,7 +486,7 @@ Deno.serve(async (req) => {
       } catch (e) {
         const msg = (e as Error).message ?? "error de IMAP";
         await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
-        return json({ error: msg }, 502);
+        return json(req, { error: msg }, 502);
       } finally {
         if (client) {
           await client.logout();
@@ -500,9 +497,9 @@ Deno.serve(async (req) => {
 
     // === SEND ===
     if (action === "send") {
-      if (!to?.length) return json({ error: "hace falta al menos un destinatario" }, 400);
+      if (!to?.length) return json(req, { error: "hace falta al menos un destinatario" }, 400);
       if (!subject && !text && !html) {
-        return json({ error: "el correo está vacío" }, 400);
+        return json(req, { error: "el correo está vacío" }, 400);
       }
 
       const { data: cred, error: credErr } = await admin
@@ -512,8 +509,8 @@ Deno.serve(async (req) => {
         .is("revoked_at", null)
         .maybeSingle();
 
-      if (credErr) return json({ error: "no se pudo leer tu credencial de correo" }, 500);
-      if (!cred) return json({ error: "no_credential" }, 409);
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
 
       const password = await unseal({
         cipher: cred.secret_cipher as string,
@@ -521,7 +518,7 @@ Deno.serve(async (req) => {
         keyVersion: cred.key_version as number,
       });
       if (!password) {
-        return json({
+        return json(req, {
           error: "no se pudo descifrar la credencial — hay que re-provisionarla",
         }, 500);
       }
@@ -561,24 +558,24 @@ Deno.serve(async (req) => {
           await admin.from("mail_credentials")
             .update({ last_error: `SMTP login: ${auth.message}` })
             .eq("id", cred.id);
-          return json({ error: `SMTP rechazó la credencial: ${auth.message}` }, 502);
+          return json(req, { error: `SMTP rechazó la credencial: ${auth.message}` }, 502);
         }
 
         const all = [...to, ...(cc ?? [])];
         const sent = await smtp.sendMessage(fromAddress, all, rfc822);
         if (!sent.ok) {
-          return json({ error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
+          return json(req, { error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
         }
 
         await admin.from("mail_credentials")
           .update({ last_used_at: new Date().toISOString(), last_error: null })
           .eq("id", cred.id);
 
-        return json({ ok: true, from: fromAddress, to, cc: cc ?? [], subject });
+        return json(req, { ok: true, from: fromAddress, to, cc: cc ?? [], subject });
       } catch (e) {
         const msg = (e as Error).message ?? "error de SMTP";
         await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
-        return json({ error: msg }, 502);
+        return json(req, { error: msg }, 502);
       } finally {
         if (smtp) {
           await smtp.quit();
@@ -587,9 +584,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ error: `Acción desconocida: ${action}` }, 400);
+    return json(req, { error: `Acción desconocida: ${action}` }, 400);
   } catch (e) {
     console.error("[mail-fetch]", e);
-    return json({ error: (e as Error).message ?? "unexpected error" }, 500);
+    return json(req, { error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });

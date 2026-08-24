@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // chatter-masivos-analyze — análisis IA de la CALIDAD de los masivos de un modelo.
 // El frontend ya cargó los masivos (of-mass + smart-messages) vía blu-mp y los manda en el body;
 // acá cruzamos copy × performance (enviado/visto/ventas/$) y devolvemos insights con Gemini Flash
@@ -5,8 +6,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const OR_MODEL = "google/gemini-2.5-flash";
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+const json = (req: Request, b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 const stripHtml = (h: string) => String(h || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 
 const SYSTEM_PROMPT = `Sos un evaluador de calidad de MENSAJES MASIVOS (PPV/blasts) de una agencia de OnlyFans. Te paso una lista de masivos con su COPY y su PERFORMANCE real: enviado (sent), veces visto (viewed), ventas (purchased), dinero recaudado (earnings), precio. Analizá la CALIDAD del copy cruzada con el rendimiento: gancho/hook, claridad de la oferta, llamado a la acción (CTA), urgencia/escasez, precio vs conversión, personalización, longitud. Identificá qué patrones de copy convierten y cuáles no.
@@ -23,30 +24,30 @@ Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown ni texto extra) con estas 
 Reglas: español neutro y accionable. Usá SOLO la evidencia (no inventes números). Sé específico: referí ganchos/frases concretas. Considerá la conversión (ventas/visto) y no solo el total de dinero.`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!bearer) return json({ error: "unauthorized" }, 401);
+  if (!bearer) return json(req, { error: "unauthorized" }, 401);
   if (bearer !== SERVICE_KEY) {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
-    if (error || !user) return json({ error: "unauthorized" }, 401);
+    if (error || !user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     let ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
     if (!ok) { const { data: can } = await sb.rpc("can_access_chatters_qa", { p_uid: user.id }); ok = can === true; }
-    if (!ok) return json({ error: "forbidden" }, 403);
+    if (!ok) return json(req, { error: "forbidden" }, 403);
   }
 
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-  if (!OPENROUTER_API_KEY) return json({ error: "OPENROUTER_API_KEY no configurada" }, 500);
+  if (!OPENROUTER_API_KEY) return json(req, { error: "OPENROUTER_API_KEY no configurada" }, 500);
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* */ }
   const masivos = Array.isArray(body.masivos) ? body.masivos as any[] : [];
   const modelName = String(body.modelName ?? "");
-  if (masivos.length === 0) return json({ error: "sin masivos para analizar" }, 400);
+  if (masivos.length === 0) return json(req, { error: "sin masivos para analizar" }, 400);
 
   // Top por envío (los más relevantes), cap para acotar tokens.
   const top = masivos.slice().sort((a, b) => (b.sent || 0) - (a.sent || 0)).slice(0, 50);
@@ -68,14 +69,14 @@ Deno.serve(async (req) => {
     if (!resp.ok) throw new Error(`openrouter ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
     const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
     text = data.choices?.[0]?.message?.content ?? "";
-  } catch (e) { return json({ error: (e as Error).message }, 502); }
+  } catch (e) { return json(req, { error: (e as Error).message }, 502); }
 
   let parsed: any;
   try { parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim()); }
-  catch { return json({ error: "La IA no devolvió JSON válido. Reintenta." }, 502); }
+  catch { return json(req, { error: "La IA no devolvió JSON válido. Reintenta." }, 502); }
 
   const arr = (x: unknown) => (Array.isArray(x) ? x : []);
-  return json({ ok: true, analysis: {
+  return json(req, { ok: true, analysis: {
     resumen: typeof parsed.resumen === "string" ? parsed.resumen : "",
     que_funciona: arr(parsed.que_funciona), que_no_funciona: arr(parsed.que_no_funciona),
     recomendaciones: arr(parsed.recomendaciones), mejores_copies: arr(parsed.mejores_copies), peores_copies: arr(parsed.peores_copies),

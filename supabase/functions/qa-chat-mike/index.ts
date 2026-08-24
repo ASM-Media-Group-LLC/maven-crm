@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
@@ -22,11 +23,7 @@ import { callGeminiOnce } from "../_shared/gemini.ts";
 //      - Bumpea session.updated_at para que la sidebar reordene.
 //  3. Devuelve el assistant message al frontend.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // Tamaño del contexto que le mandamos a Mike por call. Para que Mike
 // pueda dar coaching útil ahora le pasamos la QA ENTERA (summary
@@ -75,7 +72,7 @@ interface QaChatMessageRow {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -85,10 +82,10 @@ serve(async (req) => {
       (GEMINI_API_KEY ? "gemini" : "groq");
 
     if (provider === "gemini" && !GEMINI_API_KEY) {
-      return jsonError("GEMINI_API_KEY no configurada.", 500);
+      return jsonError(req, "GEMINI_API_KEY no configurada.", 500);
     }
     if (provider === "groq" && !GROQ_API_KEY) {
-      return jsonError("GROQ_API_KEY no configurada.", 500);
+      return jsonError(req, "GROQ_API_KEY no configurada.", 500);
     }
     const GEMINI_MODEL =
       Deno.env.get("MIKE_MODEL_GEMINI") || "gemini-2.5-flash";
@@ -98,22 +95,22 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return jsonError("No auth header.", 401);
+      return jsonError(req, "No auth header.", 401);
     }
 
     let body: ChatRequest;
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido. Esperado { session_id }.", 400);
+      return jsonError(req, "JSON inválido. Esperado { session_id }.", 400);
     }
     const sessionId = body.session_id?.trim();
-    if (!sessionId) return jsonError("session_id requerido.", 400);
+    if (!sessionId) return jsonError(req, "session_id requerido.", 400);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return jsonError("Supabase env (URL/anon key) no configurado.", 500);
+      return jsonError(req, "Supabase env (URL/anon key) no configurado.", 500);
     }
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -127,7 +124,7 @@ serve(async (req) => {
       .eq("id", sessionId)
       .maybeSingle();
     if (sessionErr) throw sessionErr;
-    if (!sessionRaw) return jsonError("Sesión no encontrada.", 404);
+    if (!sessionRaw) return jsonError(req, "Sesión no encontrada.", 404);
     const session = sessionRaw as SessionRow;
 
     // Load message history
@@ -141,12 +138,12 @@ serve(async (req) => {
     const history = (historyRaw ?? []) as QaChatMessageRow[];
 
     if (history.length === 0) {
-      return jsonError("Sesión sin mensajes — primero insertá el user message.", 400);
+      return jsonError(req, "Sesión sin mensajes — primero insertá el user message.", 400);
     }
     const last = history[history.length - 1];
     if (last.role === "assistant") {
       // Idempotencia: ya respondido → devolver sin gastar tokens
-      return jsonResponse({ ok: true, alreadyAnswered: true, content: last.content });
+      return jsonResponse(req, { ok: true, alreadyAnswered: true, content: last.content });
     }
 
     // Load QA context — limite distinto según scope para no inflar el
@@ -218,11 +215,11 @@ serve(async (req) => {
         : /401|402|key|cuota|quota|credit/i.test(msg)
           ? 402
           : 502;
-      return jsonError(msg, status);
+      return jsonError(req, msg, status);
     }
 
     if (!responseText.trim()) {
-      return jsonError("Mike no devolvió texto. Prueba reformular la pregunta.", 502);
+      return jsonError(req, "Mike no devolvió texto. Prueba reformular la pregunta.", 502);
     }
 
     const { tokens_in, tokens_out, cached_tokens } = extractTokenCounts(usage);
@@ -247,7 +244,7 @@ serve(async (req) => {
       .update({ updated_at: new Date().toISOString() })
       .eq("id", session.id);
 
-    return jsonResponse({
+    return jsonResponse(req, {
       ok: true,
       message: assistantMsg,
       provider,
@@ -256,21 +253,21 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("qa-chat-mike error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+    return jsonError(req, (e as Error).message ?? "Error interno.", 500);
   }
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-function jsonResponse(obj: unknown): Response {
+function jsonResponse(req: Request, obj: unknown): Response {
   return new Response(JSON.stringify(obj), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
-function jsonError(error: string, status: number): Response {
+function jsonError(req: Request, error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 

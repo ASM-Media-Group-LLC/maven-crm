@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // promolog-story-read — LEE las historias de Instagram DIRECTO de la API móvil de
 // IG con la sesión (i.instagram.com/api/v1/feed/user/<id>/story/), en vez del actor
 // de Apify (`automation-lab/instagram-stories-scraper`) que devolvía datasets vacíos
@@ -23,10 +24,7 @@ import {
   ofNickFromUrl, funnelHost, TENANT_ID, type StoryItem, type CreatorCtx, type RunCtx,
 } from "../_shared/promolog-analyze.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
 const PROFILE_ACTOR = "apify~instagram-profile-scraper";
 const IG_APP_ID = "936619743392459";
@@ -37,8 +35,8 @@ const MAX_READ_ATTEMPTS = 3;       // tope de reintentos/día de una lectura fal
 const MIN_DELAY_MS = 700;          // pausa base entre creadoras (ban-safety)
 const MAX_DELAY_MS = 1800;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 // jitter sin Math.random (no disponible acá): deriva de la hora + índice.
 function jitter(i: number): number {
@@ -101,7 +99,7 @@ function mapReelItem(it: any): StoryItem {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -110,8 +108,8 @@ Deno.serve(async (req: Request) => {
   const IG_SESSION = Deno.env.get("IG_SESSION_COOKIE");
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
 
-  if (!OPENROUTER_API_KEY) return json({ error: "OPENROUTER_API_KEY no configurado" }, 500);
-  if (!IG_SESSION) return json({ error: "IG_SESSION_COOKIE no configurado" }, 500);
+  if (!OPENROUTER_API_KEY) return json(req, { error: "OPENROUTER_API_KEY no configurado" }, 500);
+  if (!IG_SESSION) return json(req, { error: "IG_SESSION_COOKIE no configurado" }, 500);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -122,11 +120,11 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const auth = req.headers.get("authorization") ?? "";
     const token = auth.replace(/^Bearer\s+/i, "");
-    if (!token) return json({ error: "Missing auth" }, 401);
+    if (!token) return json(req, { error: "Missing auth" }, 401);
     const { data: userData, error: uErr } = await sb.auth.getUser(token);
-    if (uErr || !userData?.user) return json({ error: "Invalid token" }, 401);
+    if (uErr || !userData?.user) return json(req, { error: "Invalid token" }, 401);
     const { data: roleRow } = await (sb as any).from("user_roles").select("role").eq("user_id", userData.user.id).maybeSingle();
-    if (!(roleRow?.role && ["admin", "manager", "owner"].includes(roleRow.role))) return json({ error: "Forbidden" }, 403);
+    if (!(roleRow?.role && ["admin", "manager", "owner"].includes(roleRow.role))) return json(req, { error: "Forbidden" }, 403);
     dispatchedBy = userData.user.id;
   }
 
@@ -138,8 +136,8 @@ Deno.serve(async (req: Request) => {
   let q = (sb as any).from("v_promolog_eligible_creators").select("id, instagram_handle, name, artistic_name, onlyfans_url").order("id");
   if (body.only_handles?.length) q = q.in("instagram_handle", body.only_handles);
   const { data: creators, error: cErr } = await q;
-  if (cErr) return json({ error: `Query failed: ${cErr.message}` }, 500);
-  if (!creators?.length) return json({ skipped: true, reason: "No eligible creators" });
+  if (cErr) return json(req, { error: `Query failed: ${cErr.message}` }, 500);
+  if (!creators?.length) return json(req, { skipped: true, reason: "No eligible creators" });
 
   // Fuera de only_handles: saltar las que HOY ya tienen veredicto definitivo (true/false).
   // Las 'pending' de hoy SÍ se re-leen (son justo las que hay que resolver).
@@ -166,7 +164,7 @@ Deno.serve(async (req: Request) => {
   }
   const limit = body.only_handles?.length ? eligible.length : (body.limit ?? (oneChunk ? STAGGER_LIMIT : DEFAULT_LIMIT));
   const batch = eligible.slice(0, limit);
-  if (!batch.length) return json({ done: true, reason: "Nada por leer (todas resueltas hoy)" });
+  if (!batch.length) return json(req, { done: true, reason: "Nada por leer (todas resueltas hoy)" });
 
   // URLs de funnel (onlyfans/piclink) desde `creators` — la vista no trae piclink_url.
   const funnelByCreator = new Map<string, { onlyfans_url: string | null; piclink_url: string | null }>();
@@ -296,7 +294,7 @@ Deno.serve(async (req: Request) => {
     finished_at: new Date().toISOString(),
   }).eq("id", runId);
 
-  return json({
+  return json(req, {
     ok: true, run_id: runId, creators: batch.length, proxied: !!igClient,
     si: promotedCount, no: noCount, pending: pendingCount, entries: entriesTotal, results,
   });

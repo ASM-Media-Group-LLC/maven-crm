@@ -1,11 +1,8 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // ── LiveKit token helpers (reused from livekit-token) ───────────
 function base64UrlEncode(data: Uint8Array): string {
@@ -51,20 +48,20 @@ async function createLKToken(apiKey: string, apiSecret: string, identity: string
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+function json(req: Request, data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
+function err(req: Request, msg: string, status = 400) {
+  return json(req, { error: msg }, status);
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return err("Unauthorized", 401);
+    if (!authHeader?.startsWith("Bearer ")) return err(req, "Unauthorized", 401);
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
@@ -72,7 +69,7 @@ serve(async (req) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: userData, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !userData?.user) return err("Unauthorized", 401);
+    if (authErr || !userData?.user) return err(req, "Unauthorized", 401);
     const userId = userData.user.id;
 
     // Get profile name
@@ -105,21 +102,21 @@ serve(async (req) => {
         _submodule: "Crear sesión",
         _fallback_group: "supervisor_or_above",
       });
-      if (permErr) return err(permErr.message, 500);
+      if (permErr) return err(req, permErr.message, 500);
       if (!canCreate) {
-        return err("Tu rol no permite crear sesiones de Cowork. Pide el enlace de la sala a tu coordinador.", 403);
+        return err(req, "Tu rol no permite crear sesiones de Cowork. Pide el enlace de la sala a tu coordinador.", 403);
       }
 
       const { name, description, roomNames } = body; // roomNames: string[]
-      if (!name || !roomNames?.length) return err("name and roomNames required");
-      if (roomNames.length > 10) return err("Máximo 10 salas por sesión");
+      if (!name || !roomNames?.length) return err(req, "name and roomNames required");
+      if (roomNames.length > 10) return err(req, "Máximo 10 salas por sesión");
 
       // Check active session limit per user
       const { count: activeCount } = await admin.from("cowork_sessions")
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId)
         .eq("status", "active");
-      if (activeCount !== null && activeCount >= 10) return err("Máximo 10 sesiones activas permitidas");
+      if (activeCount !== null && activeCount >= 10) return err(req, "Máximo 10 sesiones activas permitidas");
 
       const sessionId = crypto.randomUUID();
       const hostHubRoom = `cowork_hub_${sessionId.slice(0, 8)}`;
@@ -128,7 +125,7 @@ serve(async (req) => {
       const { error: sessErr } = await admin.from("cowork_sessions").insert({
         id: sessionId, name, description: description || null, host_hub_livekit_room: hostHubRoom, created_by: userId,
       });
-      if (sessErr) return err(sessErr.message, 500);
+      if (sessErr) return err(req, sessErr.message, 500);
 
       // Create rooms
       const rooms = roomNames.map((rn: string, i: number) => ({
@@ -138,15 +135,15 @@ serve(async (req) => {
         sort_order: i,
       }));
       const { data: createdRooms, error: roomErr } = await admin.from("cowork_rooms").insert(rooms).select();
-      if (roomErr) return err(roomErr.message, 500);
+      if (roomErr) return err(req, roomErr.message, 500);
 
       // Creator as host
       const { error: memErr } = await admin.from("cowork_memberships").insert({
         session_id: sessionId, user_id: userId, role: "host",
       });
-      if (memErr) return err(memErr.message, 500);
+      if (memErr) return err(req, memErr.message, 500);
 
-      return json({ sessionId, hostHubRoom, rooms: createdRooms });
+      return json(req, { sessionId, hostHubRoom, rooms: createdRooms });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -154,17 +151,17 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "joinSession") {
       const { sessionId, role, hostCode, roomId } = body;
-      if (!sessionId) return err("sessionId required");
+      if (!sessionId) return err(req, "sessionId required");
 
       // Check session exists and is active
       const { data: session } = await admin.from("cowork_sessions").select("*").eq("id", sessionId).eq("status", "active").single();
-      if (!session) return err("Session not found or ended");
+      if (!session) return err(req, "Session not found or ended");
 
       // Determine requested role
       let memberRole = "participant";
       if (role === "host") {
         if (!hostCode || hostCode !== session.host_invite_code) {
-          return err("Código de host inválido", 403);
+          return err(req, "Código de host inválido", 403);
         }
         memberRole = "host";
       }
@@ -189,7 +186,7 @@ serve(async (req) => {
               }
             }
           }
-          return json({ membership: existing, alreadyJoined: true });
+          return json(req, { membership: existing, alreadyJoined: true });
         }
 
         // Different role → update membership
@@ -198,7 +195,7 @@ serve(async (req) => {
           .eq("id", existing.id)
           .select()
           .single();
-        if (upErr) return err(upErr.message, 500);
+        if (upErr) return err(req, upErr.message, 500);
 
         if (memberRole === "host") {
           // Switching to host: remove active room assignments (hosts use Hub)
@@ -214,14 +211,14 @@ serve(async (req) => {
           }
         }
 
-        return json({ membership: updated, alreadyJoined: true, roleChanged: true });
+        return json(req, { membership: updated, alreadyJoined: true, roleChanged: true });
       }
 
       // New member
       const { data: membership, error: memErr } = await admin.from("cowork_memberships").insert({
         session_id: sessionId, user_id: userId, role: memberRole,
       }).select().single();
-      if (memErr) return err(memErr.message, 500);
+      if (memErr) return err(req, memErr.message, 500);
 
       // Auto-assign participant to room if roomId provided
       if (memberRole === "participant" && roomId) {
@@ -233,7 +230,7 @@ serve(async (req) => {
         }
       }
 
-      return json({ membership, alreadyJoined: false });
+      return json(req, { membership, alreadyJoined: false });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -246,15 +243,15 @@ serve(async (req) => {
     if (action === "joinByCode") {
       // Normalizamos lo que la gente realmente pega: minúsculas, espacios, guiones.
       const code = String(body.code ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (code.length !== 6) return err("El código debe tener 6 caracteres");
+      if (code.length !== 6) return err(req, "El código debe tener 6 caracteres");
 
       const { data: room } = await admin.from("cowork_rooms")
         .select("id, session_id, name").eq("join_code", code).maybeSingle();
-      if (!room) return err("Código inválido. Pedile el código a tu coordinador.", 404);
+      if (!room) return err(req, "Código inválido. Pedile el código a tu coordinador.", 404);
 
       const { data: session } = await admin.from("cowork_sessions")
         .select("id, name, status").eq("id", room.session_id).maybeSingle();
-      if (!session || session.status !== "active") return err("Esa sesión ya finalizó", 410);
+      if (!session || session.status !== "active") return err(req, "Esa sesión ya finalizó", 410);
 
       const { data: existing } = await admin.from("cowork_memberships")
         .select("id, role").eq("session_id", room.session_id).eq("user_id", userId).maybeSingle();
@@ -263,7 +260,7 @@ serve(async (req) => {
         const { error: memErr } = await admin.from("cowork_memberships").insert({
           session_id: room.session_id, user_id: userId, role: "participant",
         });
-        if (memErr) return err(memErr.message, 500);
+        if (memErr) return err(req, memErr.message, 500);
       }
 
       // Un host que canjea un código NO se degrada a participante: los hosts
@@ -277,10 +274,10 @@ serve(async (req) => {
         const { error: asgErr } = await admin.from("cowork_room_assignments").insert({
           session_id: room.session_id, user_id: userId, room_id: room.id, assigned_by: userId,
         });
-        if (asgErr) return err(asgErr.message, 500);
+        if (asgErr) return err(req, asgErr.message, 500);
       }
 
-      return json({
+      return json(req, {
         sessionId: room.session_id, sessionName: session.name,
         roomId: room.id, roomName: room.name, isHost,
       });
@@ -293,7 +290,7 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "leaveRoom") {
       const { sessionId } = body;
-      if (!sessionId) return err("sessionId required");
+      if (!sessionId) return err(req, "sessionId required");
 
       // Idempotent: just deactivate any active assignment for this user in this session.
       // No-op if there isn't one.
@@ -303,7 +300,7 @@ serve(async (req) => {
         .eq("user_id", userId)
         .eq("is_active", true);
 
-      return json({ ok: true });
+      return json(req, { ok: true });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -312,23 +309,23 @@ serve(async (req) => {
     if (action === "issueLiveKitToken") {
       const { sessionId, purpose, roomId } = body;
       // purpose: "join_room" | "join_host_hub"
-      if (!sessionId || !purpose) return err("sessionId and purpose required");
+      if (!sessionId || !purpose) return err(req, "sessionId and purpose required");
 
       const { data: membership } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (!membership) return err("Not a member of this session", 403);
+      if (!membership) return err(req, "Not a member of this session", 403);
 
       const isHost = membership.role === "host";
 
       if (purpose === "join_host_hub") {
-        if (!isHost) return err("Only hosts can join host hub", 403);
+        if (!isHost) return err(req, "Only hosts can join host hub", 403);
         const { data: session } = await admin.from("cowork_sessions").select("host_hub_livekit_room").eq("id", sessionId).single();
-        if (!session) return err("Session not found");
+        if (!session) return err(req, "Session not found");
 
         const identity = userId;
         const token = await createLKToken(lkKey, lkSecret, identity, userName, {
           roomJoin: true, room: session.host_hub_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: true,
         });
-        return json({ token, url: lkUrl, room: session.host_hub_livekit_room });
+        return json(req, { token, url: lkUrl, room: session.host_hub_livekit_room });
       }
 
       if (purpose === "join_room") {
@@ -337,14 +334,14 @@ serve(async (req) => {
         if (!isHost) {
           // Participant: can only join their assigned room
           const { data: assignment } = await admin.from("cowork_room_assignments").select("room_id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).single();
-          if (!assignment) return err("No room assignment found");
+          if (!assignment) return err(req, "No room assignment found");
           targetRoomId = assignment.room_id;
         }
 
-        if (!targetRoomId) return err("roomId required for hosts joining a room");
+        if (!targetRoomId) return err(req, "roomId required for hosts joining a room");
 
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", targetRoomId).single();
-        if (!room) return err("Room not found");
+        if (!room) return err(req, "Room not found");
 
         // TODOS los miembros de la sala pueden compartir pantalla directo (pedido del
         // owner 2026-07-20). Antes el token de participante excluía screen_share
@@ -356,7 +353,7 @@ serve(async (req) => {
         };
 
         const token = await createLKToken(lkKey, lkSecret, identity, userName, grants);
-        return json({ token, url: lkUrl, room: room.livekit_room_name, roomId: targetRoomId });
+        return json(req, { token, url: lkUrl, room: room.livekit_room_name, roomId: targetRoomId });
       }
 
       // PREVIEW: el host se suscribe a una sala en modo SOLO-LECTURA para ver el video en
@@ -364,14 +361,14 @@ serve(async (req) => {
       // OCULTO (hidden:true → no aparece en la lista de participantes de la sala). Identity
       // distinta (`${userId}__preview`) para no colisionar si el host también "Entra" a la sala.
       if (purpose === "preview_room") {
-        if (!isHost) return err("Only hosts can preview rooms", 403);
-        if (!roomId) return err("roomId required");
+        if (!isHost) return err(req, "Only hosts can preview rooms", 403);
+        if (!roomId) return err(req, "roomId required");
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
-        if (!room) return err("Room not found");
+        if (!room) return err(req, "Room not found");
         const token = await createLKToken(lkKey, lkSecret, `${userId}__preview`, userName, {
           roomJoin: true, room: room.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
         }, 3600);
-        return json({ token, url: lkUrl, room: room.livekit_room_name });
+        return json(req, { token, url: lkUrl, room: room.livekit_room_name });
       }
 
       // MONITOR: el host, desde el dashboard, se conecta al audio de una sala para ESCUCHARLA
@@ -380,17 +377,17 @@ serve(async (req) => {
       // publicar micrófono (nunca cámara/pantalla). Identity distinta para no colisionar con
       // "Entrar" a la sala (que usa userId).
       if (purpose === "monitor_room") {
-        if (!isHost) return err("Only hosts can monitor rooms", 403);
-        if (!roomId) return err("roomId required");
+        if (!isHost) return err(req, "Only hosts can monitor rooms", 403);
+        if (!roomId) return err(req, "roomId required");
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
-        if (!room) return err("Room not found");
+        if (!room) return err(req, "Room not found");
         const token = await createLKToken(lkKey, lkSecret, `${userId}__monitor`, `📢 ${userName}`, {
           roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: false, canPublishSources: ["microphone"],
         }, 3600);
-        return json({ token, url: lkUrl, room: room.livekit_room_name });
+        return json(req, { token, url: lkUrl, room: room.livekit_room_name });
       }
 
-      return err("Invalid purpose");
+      return err(req, "Invalid purpose");
     }
 
     // (moveParticipant removed — participants self-join via URL ?room=X)
@@ -400,7 +397,7 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "requestHost") {
       const { sessionId, roomId, message, requestOneOnOne } = body;
-      if (!sessionId || !roomId) return err("sessionId and roomId required");
+      if (!sessionId || !roomId) return err(req, "sessionId and roomId required");
 
       // Check for existing open/acknowledged request from this user
       const { data: existingReq } = await admin.from("cowork_host_requests")
@@ -419,19 +416,19 @@ serve(async (req) => {
             .eq("id", existingReq.id);
           // Fall through to create a new 1:1 request below
         } else {
-          return json({ request: existingReq, oneone_livekit_room: existingReq.oneone_livekit_room });
+          return json(req, { request: existingReq, oneone_livekit_room: existingReq.oneone_livekit_room });
         }
       }
 
       const requestId = crypto.randomUUID();
       const oneoneRoom = requestOneOnOne ? `cowork_1on1_${sessionId.slice(0, 8)}_${requestId.slice(0, 8)}` : null;
 
-      const { data: req, error: reqErr } = await admin.from("cowork_host_requests").insert({
+      const { data: newHostReq, error: reqErr } = await admin.from("cowork_host_requests").insert({
         id: requestId, session_id: sessionId, room_id: roomId, user_id: userId, message: message || null, oneone_livekit_room: oneoneRoom,
       }).select().single();
-      if (reqErr) return err(reqErr.message, 500);
+      if (reqErr) return err(req, reqErr.message, 500);
 
-      return json({ request: req, oneone_livekit_room: oneoneRoom });
+      return json(req, { request: newHostReq, oneone_livekit_room: oneoneRoom });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -439,26 +436,26 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "joinOneOnOne") {
       const { requestId } = body;
-      if (!requestId) return err("requestId required");
+      if (!requestId) return err(req, "requestId required");
 
       const { data: hostReq } = await admin.from("cowork_host_requests").select("*").eq("id", requestId).single();
-      if (!hostReq) return err("Request not found");
-      if (!hostReq.oneone_livekit_room) return err("No 1:1 room for this request");
+      if (!hostReq) return err(req, "Request not found");
+      if (!hostReq.oneone_livekit_room) return err(req, "No 1:1 room for this request");
 
       // Validate: caller must be the requester or a host of the session
       const isRequester = hostReq.user_id === userId;
       const { data: membership } = await admin.from("cowork_memberships").select("role").eq("session_id", hostReq.session_id).eq("user_id", userId).single();
-      if (!membership) return err("Not a member", 403);
+      if (!membership) return err(req, "Not a member", 403);
       const callerIsHost = membership.role === "host";
 
-      if (!isRequester && !callerIsHost) return err("Not authorized to join this 1:1 room", 403);
+      if (!isRequester && !callerIsHost) return err(req, "Not authorized to join this 1:1 room", 403);
 
       const identity = userId;
       const token = await createLKToken(lkKey, lkSecret, identity, userName, {
         roomJoin: true, room: hostReq.oneone_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: callerIsHost,
       }, 3600);
 
-      return json({ token, url: lkUrl, room: hostReq.oneone_livekit_room });
+      return json(req, { token, url: lkUrl, room: hostReq.oneone_livekit_room });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -466,28 +463,28 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "ackHostRequest" || action === "resolveHostRequest") {
       const { requestId } = body;
-      if (!requestId) return err("requestId required");
+      if (!requestId) return err(req, "requestId required");
 
       // Get request to verify session + ownership
       const { data: hostReq } = await admin.from("cowork_host_requests").select("session_id, user_id").eq("id", requestId).single();
-      if (!hostReq) return err("Request not found");
+      if (!hostReq) return err(req, "Request not found");
 
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", hostReq.session_id).eq("user_id", userId).single();
       const isHostMember = hostCheck?.role === "host";
       const isRequester = hostReq.user_id === userId;
       // Ack: solo host. Resolve: host O el que hizo la solicitud (para cerrar su propia 1:1).
-      if (action === "ackHostRequest" && !isHostMember) return err("Only hosts", 403);
-      if (action === "resolveHostRequest" && !isHostMember && !isRequester) return err("Not authorized", 403);
+      if (action === "ackHostRequest" && !isHostMember) return err(req, "Only hosts", 403);
+      if (action === "resolveHostRequest" && !isHostMember && !isRequester) return err(req, "Not authorized", 403);
 
       if (action === "ackHostRequest") {
         const { error: upErr } = await admin.from("cowork_host_requests").update({ status: "acknowledged", acked_by: userId, acked_at: new Date().toISOString() }).eq("id", requestId);
-        if (upErr) return err(upErr.message, 500);
+        if (upErr) return err(req, upErr.message, 500);
       } else {
         const { error: upErr } = await admin.from("cowork_host_requests").update({ status: "resolved", resolved_by: userId, resolved_at: new Date().toISOString() }).eq("id", requestId);
-        if (upErr) return err(upErr.message, 500);
+        if (upErr) return err(req, upErr.message, 500);
       }
 
-      return json({ success: true });
+      return json(req, { success: true });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -495,19 +492,19 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "requestScreenShare") {
       const { sessionId, roomId } = body;
-      if (!sessionId || !roomId) return err("sessionId and roomId required");
+      if (!sessionId || !roomId) return err(req, "sessionId and roomId required");
 
       // Check not already pending
       const { data: existing } = await admin.from("cowork_screenshare_requests").select("id").eq("session_id", sessionId).eq("user_id", userId).eq("status", "pending");
-      if (existing && existing.length > 0) return err("Already have a pending request");
+      if (existing && existing.length > 0) return err(req, "Already have a pending request");
 
       const { data: ssReq, error: ssErr } = await admin.from("cowork_screenshare_requests").insert({
         session_id: sessionId, room_id: roomId, user_id: userId,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10min
       }).select().single();
-      if (ssErr) return err(ssErr.message, 500);
+      if (ssErr) return err(req, ssErr.message, 500);
 
-      return json({ request: ssReq });
+      return json(req, { request: ssReq });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -515,14 +512,14 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "approveScreenShare") {
       const { requestId, approve } = body;
-      if (!requestId || approve === undefined) return err("requestId and approve required");
+      if (!requestId || approve === undefined) return err(req, "requestId and approve required");
 
       const { data: ssReq } = await admin.from("cowork_screenshare_requests").select("*").eq("id", requestId).single();
-      if (!ssReq) return err("Request not found");
+      if (!ssReq) return err(req, "Request not found");
 
       // Verify host
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", ssReq.session_id).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const newStatus = approve ? "approved" : "denied";
       await admin.from("cowork_screenshare_requests").update({
@@ -538,11 +535,11 @@ serve(async (req) => {
           const token = await createLKToken(lkKey, lkSecret, identity, requesterProfile?.full_name || "User", {
             roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
           }, 600); // 10 min token
-          return json({ success: true, status: newStatus, screenshareToken: token, url: lkUrl, room: room.livekit_room_name });
+          return json(req, { success: true, status: newStatus, screenshareToken: token, url: lkUrl, room: room.livekit_room_name });
         }
       }
 
-      return json({ success: true, status: newStatus });
+      return json(req, { success: true, status: newStatus });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -550,12 +547,12 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "claimScreenShareToken") {
       const { requestId } = body;
-      if (!requestId) return err("requestId required");
+      if (!requestId) return err(req, "requestId required");
 
       const { data: ssReq } = await admin.from("cowork_screenshare_requests").select("*").eq("id", requestId).single();
-      if (!ssReq) return err("Request not found");
-      if (ssReq.user_id !== userId) return err("Not your request", 403);
-      if (ssReq.status !== "approved") return err("Request is not approved");
+      if (!ssReq) return err(req, "Request not found");
+      if (ssReq.user_id !== userId) return err(req, "Not your request", 403);
+      if (ssReq.status !== "approved") return err(req, "Request is not approved");
 
       // Marcar como usada para sacarla de la lista activa (fetchData solo trae pending/approved).
       // OJO: el CHECK de la tabla NO permite 'claimed' (solo pending/approved/denied/expired) →
@@ -566,14 +563,14 @@ serve(async (req) => {
 
       // Issue token with full publish permissions (including screen share)
       const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
-      if (!room) return err("Room not found");
+      if (!room) return err(req, "Room not found");
 
       const identity = userId;
       const token = await createLKToken(lkKey, lkSecret, identity, userName, {
         roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
       }, 600); // 10 min token
 
-      return json({ token, url: lkUrl, room: room.livekit_room_name });
+      return json(req, { token, url: lkUrl, room: room.livekit_room_name });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -581,13 +578,13 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "endSession") {
       const { sessionId } = body;
-      if (!sessionId) return err("sessionId required");
+      if (!sessionId) return err(req, "sessionId required");
 
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       await admin.from("cowork_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
-      return json({ success: true });
+      return json(req, { success: true });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -595,15 +592,15 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "getHostCode") {
       const { sessionId } = body;
-      if (!sessionId) return err("sessionId required");
+      if (!sessionId) return err(req, "sessionId required");
 
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts can get the invite code", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts can get the invite code", 403);
 
       const { data: session } = await admin.from("cowork_sessions").select("host_invite_code").eq("id", sessionId).single();
-      if (!session) return err("Session not found");
+      if (!session) return err(req, "Session not found");
 
-      return json({ hostCode: session.host_invite_code });
+      return json(req, { hostCode: session.host_invite_code });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -611,12 +608,12 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "addRoom") {
       const { sessionId, name } = body;
-      if (!sessionId || !name?.trim()) return err("sessionId and name required");
+      if (!sessionId || !name?.trim()) return err(req, "sessionId and name required");
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", sessionId);
-      if (count !== null && count >= 10) return err("Máximo 10 salas por sesión");
+      if (count !== null && count >= 10) return err(req, "Máximo 10 salas por sesión");
 
       const { data: last } = await admin.from("cowork_rooms").select("sort_order").eq("session_id", sessionId).order("sort_order", { ascending: false }).limit(1).maybeSingle();
       const nextOrder = (last?.sort_order ?? -1) + 1;
@@ -626,8 +623,8 @@ serve(async (req) => {
       const { data: room, error: rErr } = await admin.from("cowork_rooms").insert({
         session_id: sessionId, name: String(name).trim().slice(0, 80), livekit_room_name: lkName, sort_order: nextOrder,
       }).select().single();
-      if (rErr) return err(rErr.message, 500);
-      return json({ room });
+      if (rErr) return err(req, rErr.message, 500);
+      return json(req, { room });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -635,20 +632,20 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "updateRoom") {
       const { roomId, name, previewMode } = body;
-      if (!roomId) return err("roomId required");
+      if (!roomId) return err(req, "roomId required");
       const { data: room } = await admin.from("cowork_rooms").select("session_id").eq("id", roomId).single();
-      if (!room) return err("Room not found");
+      if (!room) return err(req, "Room not found");
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", room.session_id).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const patch: Record<string, unknown> = {};
       if (typeof name === "string" && name.trim()) patch.name = name.trim().slice(0, 80);
       if (previewMode === "video" || previewMode === "avatars") patch.preview_mode = previewMode;
-      if (!Object.keys(patch).length) return err("Nothing to update");
+      if (!Object.keys(patch).length) return err(req, "Nothing to update");
 
       const { data: updated, error: uErr } = await admin.from("cowork_rooms").update(patch).eq("id", roomId).select().single();
-      if (uErr) return err(uErr.message, 500);
-      return json({ room: updated });
+      if (uErr) return err(req, uErr.message, 500);
+      return json(req, { room: updated });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -656,25 +653,25 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "closeRoom") {
       const { roomId } = body;
-      if (!roomId) return err("roomId required");
+      if (!roomId) return err(req, "roomId required");
       const { data: room } = await admin.from("cowork_rooms").select("session_id").eq("id", roomId).single();
-      if (!room) return err("Room not found");
+      if (!room) return err(req, "Room not found");
       const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", room.session_id).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", room.session_id);
-      if (count !== null && count <= 1) return err("No podés cerrar la última sala de la sesión");
+      if (count !== null && count <= 1) return err(req, "No podés cerrar la última sala de la sesión");
 
       // Sacar a los participantes asignados (su asignación queda inactiva) y borrar la sala.
       await admin.from("cowork_room_assignments").update({ is_active: false }).eq("room_id", roomId).eq("is_active", true);
       const { error: dErr } = await admin.from("cowork_rooms").delete().eq("id", roomId);
-      if (dErr) return err(dErr.message, 500);
-      return json({ ok: true });
+      if (dErr) return err(req, dErr.message, 500);
+      return json(req, { ok: true });
     }
 
-    return err("Unknown action: " + action);
+    return err(req, "Unknown action: " + action);
   } catch (e) {
     console.error("cowork-session error:", e);
-    return err("Internal server error", 500);
+    return err(req, "Internal server error", 500);
   }
 });

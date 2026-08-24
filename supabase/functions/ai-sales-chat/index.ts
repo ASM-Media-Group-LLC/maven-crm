@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // IA Ventas — chat con datos de creadoras + earnings.
 //
 // Cambios respecto a la versión anterior:
@@ -26,11 +27,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { format } from "https://esm.sh/date-fns@3.6.0";
 import { streamGeminiAsOpenAI } from "../_shared/gemini.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // Mapea registros del cierre de día (00:00–00:55) al día anterior.
 // Mismo helper que el dashboard usa para que los totales coincidan.
@@ -246,7 +243,7 @@ ${compactCreatorsList || "(sin activas)"}`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders(req) });
   }
 
   try {
@@ -255,7 +252,7 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -268,7 +265,7 @@ serve(async (req) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Token inválido o expirado" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
     // ===== END AUTH =====
@@ -279,7 +276,7 @@ serve(async (req) => {
     if (!GEMINI_API_KEY) {
       return new Response(
         JSON.stringify({ error: "GEMINI_API_KEY no configurada en los secrets de Supabase." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
     const geminiModel = Deno.env.get("AI_SALES_GEMINI_MODEL") || "gemini-2.5-flash";
@@ -324,14 +321,14 @@ serve(async (req) => {
       })),
       temperature: 0.4,
       maxOutputTokens: 1200,
-      corsHeaders,
+      corsHeaders: corsHeaders(req),
     });
   } catch (e) {
     console.error("ai-sales-chat error:", e);
     const msg = (e as Error)?.message ?? "Error interno del servidor";
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // profile-analyses-poll — cron job de fallback que destranca jobs de
 // profile_analyses que quedaron en "running" porque Apify no disparó
 // el webhook (o lo disparó mal).
@@ -15,10 +16,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
 // Solo destrancamos jobs que llevan al menos 2 min "running"
 const MIN_RUNNING_MINUTES = 2;
@@ -33,7 +31,7 @@ const HANDLE_CHECK_DEADLINE_MINUTES = 10;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -42,12 +40,12 @@ Deno.serve(async (req: Request) => {
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
 
-  if (!APIFY_TOKEN) return json({ error: "APIFY_TOKEN not configured" }, 500);
+  if (!APIFY_TOKEN) return json(req, { error: "APIFY_TOKEN not configured" }, 500);
 
   // Auth: solo cron interno
   const cronHeader = req.headers.get("x-cron-token");
   if (!CRON_TOKEN || cronHeader !== CRON_TOKEN) {
-    return json({ error: "Forbidden: cron token required" }, 403);
+    return json(req, { error: "Forbidden: cron token required" }, 403);
   }
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -70,9 +68,9 @@ Deno.serve(async (req: Request) => {
     .order("created_at", { ascending: true })
     .limit(MAX_JOBS_PER_TICK);
 
-  if (qErr) return json({ error: `query failed: ${qErr.message}`, handle_checks: hcResults }, 500);
+  if (qErr) return json(req, { error: `query failed: ${qErr.message}`, handle_checks: hcResults }, 500);
   if (!stuckJobs || stuckJobs.length === 0) {
-    return json({ ok: true, processed: 0, message: "No stuck jobs", handle_checks: hcResults });
+    return json(req, { ok: true, processed: 0, message: "No stuck jobs", handle_checks: hcResults });
   }
 
   // Procesar cada job: consultar Apify, si terminó disparar callback
@@ -135,7 +133,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json({ ok: true, processed: results.length, results, handle_checks: hcResults });
+  return json(req, { ok: true, processed: results.length, results, handle_checks: hcResults });
 });
 
 // Barre promolog_handle_check_jobs no terminales:
@@ -225,9 +223,9 @@ async function sweepHandleCheckJobs(
   return out;
 }
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

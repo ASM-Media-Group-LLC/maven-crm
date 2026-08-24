@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Built-in base64 — evita dependencia de deno.land/std (que está caído
@@ -21,11 +22,7 @@ function encodeBase64(buf: Uint8Array): string {
 //     fila más reciente del tenant; útil para fire-and-forget desde el
 //     hook del create).
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -152,7 +149,7 @@ Sé estricto y específico. urgent_improvements deben ser cosas que se pueden ha
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   // Variables del scope outer para que el catch final pueda hacer
@@ -172,7 +169,7 @@ Deno.serve(async (req) => {
     // cambiar a otro modelo más capable.
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) {
-      return jsonError("OPENROUTER_API_KEY no configurada en los secrets de Supabase.", 500);
+      return jsonError(req, "OPENROUTER_API_KEY no configurada en los secrets de Supabase.", 500);
     }
     const SCAN_MODEL = Deno.env.get("SCOUTER_SCAN_MODEL")
       ?? Deno.env.get("PROMOLOG_LLM_MODEL")
@@ -182,7 +179,7 @@ Deno.serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido.", 400);
+      return jsonError(req, "JSON inválido.", 400);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -220,7 +217,7 @@ Deno.serve(async (req) => {
     }
 
     if (!accountRow) {
-      return jsonError("Cuenta no encontrada.", 404);
+      return jsonError(req, "Cuenta no encontrada.", 404);
     }
 
     // Set vars de cleanup para que el catch final pueda recuperar la row.
@@ -307,7 +304,7 @@ Deno.serve(async (req) => {
           account_id: accountRow.id,
           awaiting_screenshot: true,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
@@ -384,7 +381,7 @@ Deno.serve(async (req) => {
           last_scanned_at: new Date().toISOString(),
         })
         .eq("id", accountRow.id);
-      return jsonError("No se pudo fetchear el perfil de IG.", 502);
+      return jsonError(req, "No se pudo fetchear el perfil de IG.", 502);
     }
 
     // Llamar a Sonnet 4.6 con el snapshot.
@@ -401,7 +398,7 @@ Deno.serve(async (req) => {
           last_scanned_at: new Date().toISOString(),
         })
         .eq("id", accountRow.id);
-      return jsonError(msg, 502);
+      return jsonError(req, msg, 502);
     }
 
     // Persistir resultado completo. Importante:
@@ -437,7 +434,7 @@ Deno.serve(async (req) => {
         analysis,
         snapshot,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (e) {
     const errorMsg = (e as Error).message ?? "Error interno.";
@@ -466,14 +463,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    return jsonError(errorMsg, 500);
+    return jsonError(req, errorMsg, 500);
   }
 });
 
-function jsonError(error: string, status: number): Response {
+function jsonError(req: Request, error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 

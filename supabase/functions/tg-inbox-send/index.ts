@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -16,12 +17,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
 const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+function json(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 
 // Envía por el gateway de Telegram. Devuelve el id del mensaje si sale OK.
@@ -49,27 +47,27 @@ async function sendViaGateway(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   // ── Auth: JWT del usuario ──────────────────────────────────────────────────
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ ok: false, error: "missing_auth" }, 401);
+  if (!token) return json(req, { ok: false, error: "missing_auth" }, 401);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: userData, error: uErr } = await sb.auth.getUser(token);
-  if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
+  if (uErr || !userData?.user) return json(req, { ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
   // ── Permiso: Telegram / Bandeja (has_permission ya devuelve true para admin) ──
   const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
     _user_id: userId, _module: "Telegram", _submodule: "Bandeja",
   });
-  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
+  if (pErr || !allowed) return json(req, { ok: false, error: "forbidden" }, 403);
 
   // ── Input ────────────────────────────────────────────────────────────────
   let payload: { conversation_id?: string; body?: string; reply_to_message_id?: string } = {};
@@ -77,7 +75,7 @@ serve(async (req) => {
   const conversationId = payload.conversation_id;
   const text = (payload.body ?? "").trim();
   const replyToMessageId = payload.reply_to_message_id || null;
-  if (!conversationId || !text) return json({ ok: false, error: "missing_conversation_or_body" }, 400);
+  if (!conversationId || !text) return json(req, { ok: false, error: "missing_conversation_or_body" }, 400);
 
   // Cita: resolvemos el id nativo (external_id) del mensaje citado para pasárselo al gateway.
   let replyToExternalId: string | null = null;
@@ -93,19 +91,19 @@ serve(async (req) => {
     .select("id, tenant_id, account_id, peer_id, peer_username, assigned_to")
     .eq("id", conversationId)
     .maybeSingle();
-  if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
+  if (!conv) return json(req, { ok: false, error: "conversation_not_found" }, 404);
 
   // ── Gating por dueño: mismo criterio que la RLS de lectura (supervisor+ o dueño) ─
   if (conv.assigned_to !== userId) {
     const { data: isSup } = await sb.rpc("is_in_role_group", {
       _user_id: userId, _group: "supervisor_or_above",
     });
-    if (!isSup) return json({ ok: false, error: "not_your_conversation" }, 200);
+    if (!isSup) return json(req, { ok: false, error: "not_your_conversation" }, 200);
   }
 
   // Destino: preferimos @username (estable); si no hay, el user id numérico.
   const to = (conv.peer_username as string | null) || (conv.peer_id as string);
-  if (!to) return json({ ok: false, error: "peer_unresolved" }, 422);
+  if (!to) return json(req, { ok: false, error: "peer_unresolved" }, 422);
 
   // ── Enviar por el gateway ───────────────────────────────────────────────────
   const sent = await sendViaGateway(conv.account_id as string, to, text, replyToExternalId);
@@ -122,7 +120,7 @@ serve(async (req) => {
     await sb.from("tg_conversations")
       .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
       .eq("id", conversationId);
-    return json({ ok: false, reason: "send_failed", error: sent.error, to }, 200);
+    return json(req, { ok: false, reason: "send_failed", error: sent.error, to }, 200);
   }
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
@@ -148,11 +146,11 @@ serve(async (req) => {
     }, { onConflict: "conversation_id,external_id" })
     .select("id")
     .single();
-  if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);
+  if (mErr) return json(req, { ok: false, error: "persist_failed: " + mErr.message }, 500);
 
   await sb.from("tg_conversations")
     .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
     .eq("id", conversationId);
 
-  return json({ ok: true, message_id: msg?.id, external_id: sent.externalId ?? null });
+  return json(req, { ok: true, message_id: msg?.id, external_id: sent.externalId ?? null });
 });

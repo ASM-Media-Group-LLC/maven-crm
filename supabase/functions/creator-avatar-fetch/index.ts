@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -22,13 +23,10 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const cors = (req: Request) => corsFor(req);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 
 const norm = (s: string | null | undefined): string =>
@@ -81,7 +79,7 @@ async function fetchIgBytes(handle: string): Promise<{ bytes: Uint8Array; mime: 
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   try {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -92,38 +90,38 @@ serve(async (req) => {
       const form = await req.formData();
       const creatorId = String(form.get("creator_id") ?? "").trim();
       const file = form.get("file");
-      if (!creatorId) return json({ ok: false, error: "creator_id requerido" }, 400);
-      if (!(file instanceof File)) return json({ ok: false, error: "Archivo requerido" }, 400);
+      if (!creatorId) return json(req, { ok: false, error: "creator_id requerido" }, 400);
+      if (!(file instanceof File)) return json(req, { ok: false, error: "Archivo requerido" }, 400);
       const mime = (file.type || "").split(";")[0];
-      if (!ALLOWED_MIME.includes(mime)) return json({ ok: false, error: "Formato no válido (usá JPG, PNG o WebP)" }, 400);
-      if (file.size > MAX_BYTES) return json({ ok: false, error: "La imagen supera los 5 MB" }, 400);
+      if (!ALLOWED_MIME.includes(mime)) return json(req, { ok: false, error: "Formato no válido (usá JPG, PNG o WebP)" }, 400);
+      if (file.size > MAX_BYTES) return json(req, { ok: false, error: "La imagen supera los 5 MB" }, 400);
 
       const bytes = new Uint8Array(await file.arrayBuffer());
       const url = await saveAvatar(sb, creatorId, bytes, mime);
-      if (!url) return json({ ok: false, error: "No se pudo guardar la imagen" }, 502);
-      return json({ ok: true, profile_photo_url: url });
+      if (!url) return json(req, { ok: false, error: "No se pudo guardar la imagen" }, 502);
+      return json(req, { ok: true, profile_photo_url: url });
     }
 
     // ── Modo INSTAGRAM (JSON) ────────────────────────────────────────────────
     const body = await req.json().catch(() => ({})) as { creator_id?: string };
     const creatorId = String(body.creator_id ?? "").trim();
-    if (!creatorId) return json({ ok: false, error: "creator_id requerido" }, 400);
+    if (!creatorId) return json(req, { ok: false, error: "creator_id requerido" }, 400);
 
     const { data: creator, error } = await sb.from("creators")
       .select("id, instagram_handle").eq("id", creatorId).maybeSingle();
-    if (error) return json({ ok: false, error: error.message }, 500);
-    if (!creator) return json({ ok: false, error: "Creadora no encontrada" }, 404);
+    if (error) return json(req, { ok: false, error: error.message }, 500);
+    if (!creator) return json(req, { ok: false, error: "Creadora no encontrada" }, 404);
 
     const handle = norm(creator.instagram_handle);
-    if (!handle) return json({ ok: false, error: "Esta creadora no tiene Instagram configurado" }, 400);
+    if (!handle) return json(req, { ok: false, error: "Esta creadora no tiene Instagram configurado" }, 400);
 
     const ig = await fetchIgBytes(handle);
-    if ("error" in ig) return json({ ok: false, error: ig.error }, ig.status);
+    if ("error" in ig) return json(req, { ok: false, error: ig.error }, ig.status);
 
     const url = await saveAvatar(sb, creatorId, ig.bytes, ig.mime);
-    if (!url) return json({ ok: false, error: "No se pudo guardar la imagen" }, 502);
-    return json({ ok: true, profile_photo_url: url, handle });
+    if (!url) return json(req, { ok: false, error: "No se pudo guardar la imagen" }, 502);
+    return json(req, { ok: true, profile_photo_url: url, handle });
   } catch (e) {
-    return json({ ok: false, error: (e as Error).message ?? "Error interno" }, 500);
+    return json(req, { ok: false, error: (e as Error).message ?? "Error interno" }, 500);
   }
 });

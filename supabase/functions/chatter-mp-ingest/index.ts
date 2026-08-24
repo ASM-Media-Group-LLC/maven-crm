@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // chatter-mp-ingest — ingesta histórica de Mensajes Pro a chatter_conversations (QA-D / Slice 2).
 //
 // Por modelo: pagina participants (offset, ya capturado) → por cada hilo trae la ventana reciente
@@ -13,12 +14,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BLU_WS_URL = Deno.env.get("BLU_WS_URL") ?? "wss://of.unlok.me/";
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 
 type Msg = Record<string, unknown>;
@@ -81,7 +79,7 @@ const rid = (p: string) => `${p}:${Date.now()}:${Math.floor(performance.now())}`
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -89,19 +87,19 @@ Deno.serve(async (req) => {
 
   // Auth: service_role o JWT de staff (admin/owner/manager).
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!bearer) return json({ error: "unauthorized" }, 401);
+  if (!bearer) return json(req, { error: "unauthorized" }, 401);
   if (bearer !== SERVICE_KEY) {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
-    if (error || !user) return json({ error: "unauthorized" }, 401);
+    if (error || !user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     const ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
-    if (!ok) return json({ error: "forbidden" }, 403);
+    if (!ok) return json(req, { error: "forbidden" }, 403);
   }
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* */ }
   const modelId = Number(body.modelId);
-  if (!modelId) return json({ error: "modelId requerido" }, 400);
+  if (!modelId) return json(req, { error: "modelId requerido" }, 400);
   const modelName = body.modelName ? String(body.modelName) : null;
   const startOffset = Math.max(0, Number(body.startOffset ?? 0));
   const maxThreads = Math.min(120, Math.max(1, Number(body.maxThreads ?? 40)));  // tope por llamada (budget)
@@ -110,11 +108,11 @@ Deno.serve(async (req) => {
 
   const { data: sess } = await sb.from("blu_session").select("token").eq("id", 1).maybeSingle();
   const token = (sess?.token as string | undefined) ?? Deno.env.get("BLU_JWT") ?? "";
-  if (!token) return json({ error: "sin token de sesión BLU (blu_session vacío)" }, 500);
+  if (!token) return json(req, { error: "sin token de sesión BLU (blu_session vacío)" }, 500);
 
   let conn: BluConn;
   try { conn = await openConn(token); }
-  catch (e) { const err = e as Error & { expired?: boolean }; return json({ error: err.message, expired: !!err.expired }, err.expired ? 401 : 502); }
+  catch (e) { const err = e as Error & { expired?: boolean }; return json(req, { error: err.message, expired: !!err.expired }, err.expired ? 401 : 502); }
 
   const rows: Record<string, unknown>[] = [];
   let threadsProcessed = 0;
@@ -179,16 +177,16 @@ Deno.serve(async (req) => {
     for (let i = 0; i < valid.length; i += 500) {
       const chunk = valid.slice(i, i + 500);
       const { error } = await sb.from("chatter_conversations").upsert(chunk, { onConflict: "model_id,chat_id,message_id" });
-      if (error) return json({ error: "upsert: " + error.message, threadsProcessed, upserted }, 502);
+      if (error) return json(req, { error: "upsert: " + error.message, threadsProcessed, upserted }, 502);
       upserted += chunk.length;
     }
 
     // nextOffset = offset del próximo participante a procesar (granularidad participante, no página).
     const nextOffset = exhausted ? null : startOffset + threadsProcessed;
-    return json({ ok: true, modelId, threadsProcessed, messagesUpserted: upserted, nextOffset });
+    return json(req, { ok: true, modelId, threadsProcessed, messagesUpserted: upserted, nextOffset });
   } catch (e) {
     try { conn.close(); } catch { /* */ }
     const err = e as Error & { expired?: boolean };
-    return json({ error: err.message, expired: !!err.expired, threadsProcessed }, err.expired ? 401 : 502);
+    return json(req, { error: err.message, expired: !!err.expired, threadsProcessed }, err.expired ? 401 : 502);
   }
 });

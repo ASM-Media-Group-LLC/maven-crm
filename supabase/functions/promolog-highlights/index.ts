@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // promolog-highlights — reportes automáticos de destacados al grupo de Managers.
 //
 //   mode="daily_quality"  (cron 7pm Col)    → mejores promos de HOY (barrita del día 70/30)
@@ -26,12 +27,9 @@ const MANAGERS_GROUP_JID = "120363408785575383@g.us"; // grupo "Managers" (igual
 const TENANT_ID = Deno.env.get("PROMOLOG_TENANT_ID") ?? "30869615-f579-4981-8a1f-dbebc61eae2d";
 const BOG_OFFSET_MS = 5 * 3600 * 1000; // Bogotá = UTC-5 fijo (sin DST)
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
-const json = (b: unknown, s = 200) =>
-  new Response(JSON.stringify(b, null, 2), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
+const json = (req: Request, b: unknown, s = 200) =>
+  new Response(JSON.stringify(b, null, 2), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 
 // ── Fechas Bogotá ─────────────────────────────────────────────────────────────
 const bogNow = () => new Date(Date.now() - BOG_OFFSET_MS);
@@ -261,7 +259,7 @@ async function buildWeekly(sb: any): Promise<string> {
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   const cronHeader = req.headers.get("x-cron-token");
@@ -270,10 +268,10 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const { data: { user } } = await sb.auth.getUser(token);
-    if (!user) return json({ error: "unauthorized" }, 401);
+    if (!user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     if (!(roles || []).some((r: { role: string }) => ["admin", "manager"].includes(r.role))) {
-      return json({ error: "forbidden" }, 403);
+      return json(req, { error: "forbidden" }, 403);
     }
   }
 
@@ -286,24 +284,24 @@ Deno.serve(async (req: Request) => {
     if (mode === "daily_quality") message = await buildDailyQuality(sb);
     else if (mode === "daily_income") message = await buildDailyIncome(sb);
     else if (mode === "weekly") message = await buildWeekly(sb);
-    else return json({ error: "mode inválido (daily_quality | daily_income | weekly)" }, 400);
+    else return json(req, { error: "mode inválido (daily_quality | daily_income | weekly)" }, 400);
   } catch (e) {
-    return json({ error: String((e as Error)?.message || e) }, 500);
+    return json(req, { error: String((e as Error)?.message || e) }, 500);
   }
 
-  if (dryRun) return json({ ok: true, dry_run: true, mode, message });
+  if (dryRun) return json(req, { ok: true, dry_run: true, mode, message });
 
   let groupId = Deno.env.get("PROMOLOG_MANAGER_GROUP_ID") ?? "";
   if (!groupId) {
     const { data: grp } = await sb.from("whatsapp_groups").select("id").eq("external_id", MANAGERS_GROUP_JID).maybeSingle();
     groupId = grp?.id ?? "";
   }
-  if (!groupId) return json({ ok: true, sent: false, reason: "no_manager_group_configured", message });
+  if (!groupId) return json(req, { ok: true, sent: false, reason: "no_manager_group_configured", message });
 
   const resp = await fetch(`${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
     body: JSON.stringify({ group_id: groupId, body: message }),
   });
-  return json({ ok: resp.ok, sent: resp.ok, mode, ...(resp.ok ? {} : { error: `whatsapp-send ${resp.status}` }) });
+  return json(req, { ok: resp.ok, sent: resp.ok, mode, ...(resp.ok ? {} : { error: `whatsapp-send ${resp.status}` }) });
 });

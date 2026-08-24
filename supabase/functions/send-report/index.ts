@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // send-report — corre el SQL del módulo (llg / closers / chatters) para
 // un rango de fechas, arma HTML Maven-branded y manda el email via
 // Resend a cada recipient del schedule.
@@ -12,11 +13,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
 type Module = "llg" | "closers" | "chatters" | "combined";
 type Period = "daily" | "weekly" | "quincenal" | "monthly" | "annual";
@@ -160,7 +157,7 @@ function computeRangeForPeriod(period: Period, now: Date): { from: string; to: s
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   // Auth: aceptamos DOS modos:
   //  · X-Cron-Token (interno desde dispatch-reports y pg_cron)
@@ -175,7 +172,7 @@ Deno.serve(async (req) => {
   if (!hasCronToken && !hasJwt) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -189,7 +186,7 @@ Deno.serve(async (req) => {
     if (!schedule_id) {
       return new Response(
         JSON.stringify({ error: "schedule_id es requerido" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
@@ -209,7 +206,7 @@ Deno.serve(async (req) => {
       console.error("[send-report] schedule not found", schedule_id, sErr?.message);
       return new Response(JSON.stringify({ error: "Schedule no encontrado" }), {
         status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -249,7 +246,7 @@ Deno.serve(async (req) => {
         }),
         {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         },
       );
     }
@@ -326,7 +323,7 @@ Deno.serve(async (req) => {
       const subject = customSubject || `Maven CRM · Reporte ${PERIOD_LABEL[period]} ${MODULE_LABEL[module]}`;
       return new Response(
         JSON.stringify({ ok: true, preview: true, html, subject, from, to, row_count: rowCount }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
@@ -336,7 +333,7 @@ Deno.serve(async (req) => {
       console.error("[send-report] RESEND_API_KEY no configurada");
       return new Response(JSON.stringify({ error: "RESEND_API_KEY missing" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
     const rawFrom = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
@@ -355,7 +352,7 @@ Deno.serve(async (req) => {
       console.error(`[send-report] Resend ${resp.status}: ${body.slice(0, 300)}`);
       return new Response(JSON.stringify({ error: "Resend failed", detail: body }), {
         status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -367,13 +364,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true, sent: emails.length, rows: rowCount }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("[send-report] exception:", (e as Error).message);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

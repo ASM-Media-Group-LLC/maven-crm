@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -23,12 +24,9 @@ const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.
 const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1 mono-tenant)
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+function json(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 const cleanHandle = (s: string) =>
   s.trim().replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "").trim();
@@ -46,25 +44,25 @@ const joinCc = (cc: unknown, phone: unknown): string | null => {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!jwt) return json({ ok: false, error: "missing_auth" }, 401);
+  if (!jwt) return json(req, { ok: false, error: "missing_auth" }, 401);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: userData, error: uErr } = await sb.auth.getUser(jwt);
-  if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
+  if (uErr || !userData?.user) return json(req, { ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
   const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
     _user_id: userId, _module: "Telegram", _submodule: "Bandeja",
   });
-  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
+  if (pErr || !allowed) return json(req, { ok: false, error: "forbidden" }, 403);
 
   let payload: {
     creator_id?: string; contact_id?: string; closer_creator_id?: string;
@@ -112,12 +110,12 @@ serve(async (req) => {
       if (!isSup) {
         const leadOwner = lead.assigned_to ?? null;
         if (!leadOwner) {
-          return json({ ok: false, error: "Este lead no está asignado a ti. Tómalo desde Closers para poder abrir su chat." });
+          return json(req, { ok: false, error: "Este lead no está asignado a ti. Tómalo desde Closers para poder abrir su chat." });
         }
         if (leadOwner !== userId) {
           const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
           const who = owner?.full_name || "otra persona";
-          return json({ ok: false, error: `Este lead ya está asignado a ${who}. No puedes abrir su chat.` });
+          return json(req, { ok: false, error: `Este lead ya está asignado a ${who}. No puedes abrir su chat.` });
         }
       }
       // El contacto origen (closers_contacts) es la FUENTE CONFIABLE: país EXPLÍCITO (country_code)
@@ -173,11 +171,11 @@ serve(async (req) => {
   }
 
   if (!to) {
-    return json({ ok: false, error: "Este contacto no tiene teléfono (ni usuario de Telegram) cargado." }, 200);
+    return json(req, { ok: false, error: "Este contacto no tiene teléfono (ni usuario de Telegram) cargado." }, 200);
   }
 
   // ── Resolver el peer nativo vía el gateway (teléfono→importContacts o @username→getEntity) ──
-  if (!GW_API_KEY) return json({ ok: false, error: "gateway_not_configured" }, 500);
+  if (!GW_API_KEY) return json(req, { ok: false, error: "gateway_not_configured" }, 500);
   let resolved: any = null;
   try {
     const r = await fetch(`${GW_URL}/resolve`, {
@@ -187,16 +185,16 @@ serve(async (req) => {
     });
     resolved = await r.json().catch(() => ({}));
     if (resolved?.error === "rate_limited_new_account") {
-      return json({ ok: false, error: "Esta línea es muy nueva y Telegram todavía limita el contacto en frío. Prueba de nuevo en unas horas, o que la persona escriba primero a esta línea." }, 200);
+      return json(req, { ok: false, error: "Esta línea es muy nueva y Telegram todavía limita el contacto en frío. Prueba de nuevo en unas horas, o que la persona escriba primero a esta línea." }, 200);
     }
     if (resolved?.error === "not_on_telegram") {
-      return json({ ok: false, error: "Este número no está en Telegram (o su privacidad no permite contactarlo)." }, 200);
+      return json(req, { ok: false, error: "Este número no está en Telegram (o su privacidad no permite contactarlo)." }, 200);
     }
     if (!r.ok || !resolved?.ok || !resolved?.peer_id) {
-      return json({ ok: false, error: "No pude abrir el chat de Telegram con este contacto." }, 200);
+      return json(req, { ok: false, error: "No pude abrir el chat de Telegram con este contacto." }, 200);
     }
   } catch (e) {
-    return json({ ok: false, error: "gateway_unreachable: " + (e as Error).message }, 200);
+    return json(req, { ok: false, error: "gateway_unreachable: " + (e as Error).message }, 200);
   }
 
   const accountId = String(resolved.account_id);
@@ -220,7 +218,7 @@ serve(async (req) => {
     if (peerName) patch.peer_name = peerName;
     if (peerUsername) patch.peer_username = peerUsername;
     if (Object.keys(patch).length) await sb.from("tg_conversations").update(patch).eq("id", existing.id);
-    return json({ ok: true, conversation_id: existing.id });
+    return json(req, { ok: true, conversation_id: existing.id });
   }
 
   const { data: created, error: iErr } = await sb
@@ -240,7 +238,7 @@ serve(async (req) => {
     })
     .select("id")
     .single();
-  if (iErr) return json({ ok: false, error: "conversation_create_failed: " + iErr.message }, 500);
+  if (iErr) return json(req, { ok: false, error: "conversation_create_failed: " + iErr.message }, 500);
 
-  return json({ ok: true, conversation_id: created.id });
+  return json(req, { ok: true, conversation_id: created.id });
 });

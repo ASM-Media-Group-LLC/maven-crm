@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,12 +13,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
 const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+function json(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...cors(req), "Content-Type": "application/json" } });
 }
 
 // kind → msg_type canónico que usa la bandeja para renderizar.
@@ -27,23 +25,23 @@ const KIND_TO_TYPE: Record<string, string> = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ ok: false, error: "missing_auth" }, 401);
+  if (!token) return json(req, { ok: false, error: "missing_auth" }, 401);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: userData, error: uErr } = await sb.auth.getUser(token);
-  if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
+  if (uErr || !userData?.user) return json(req, { ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
   const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
     _user_id: userId, _module: "Telegram", _submodule: "Bandeja",
   });
-  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
+  if (pErr || !allowed) return json(req, { ok: false, error: "forbidden" }, 403);
 
   let payload: {
     conversation_id?: string; url?: string; kind?: string;
@@ -55,21 +53,21 @@ serve(async (req) => {
   const kind = (payload.kind ?? "document").toString();
   const caption = (payload.caption ?? "").trim();
   const replyToMessageId = payload.reply_to_message_id || null;
-  if (!conversationId || !url) return json({ ok: false, error: "missing_conversation_or_url" }, 400);
+  if (!conversationId || !url) return json(req, { ok: false, error: "missing_conversation_or_url" }, 400);
 
   const { data: conv } = await (sb as any)
     .from("tg_conversations")
     .select("id, tenant_id, account_id, peer_id, peer_username, assigned_to")
     .eq("id", conversationId).maybeSingle();
-  if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
+  if (!conv) return json(req, { ok: false, error: "conversation_not_found" }, 404);
 
   if (conv.assigned_to !== userId) {
     const { data: isSup } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
-    if (!isSup) return json({ ok: false, error: "not_your_conversation" }, 200);
+    if (!isSup) return json(req, { ok: false, error: "not_your_conversation" }, 200);
   }
 
   const to = (conv.peer_username as string | null) || (conv.peer_id as string);
-  if (!to) return json({ ok: false, error: "peer_unresolved" }, 422);
+  if (!to) return json(req, { ok: false, error: "peer_unresolved" }, 422);
 
   // Cita opcional → external_id nativo.
   let replyToExternalId: string | null = null;
@@ -107,7 +105,7 @@ serve(async (req) => {
       reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
     });
     await sb.from("tg_conversations").update({ last_message_at: nowIso, last_message_preview: preview.slice(0, 120) }).eq("id", conversationId);
-    return json({ ok: false, reason: "send_failed", error: gwErr }, 200);
+    return json(req, { ok: false, reason: "send_failed", error: gwErr }, 200);
   }
 
   // UPSERT por (conversation_id, external_id): dedup con el eco del gateway (queda 'maven').
@@ -117,8 +115,8 @@ serve(async (req) => {
     msg_type: msgType, media_url: url, status: "sent", source: "maven", sent_at: nowIso,
     reply_to_message_id: replyToMessageId, reply_to_external_id: replyToExternalId,
   }, { onConflict: "conversation_id,external_id" }).select("id").single();
-  if (mErr) return json({ ok: false, error: "persist_failed: " + mErr.message }, 500);
+  if (mErr) return json(req, { ok: false, error: "persist_failed: " + mErr.message }, 500);
 
   await sb.from("tg_conversations").update({ last_message_at: nowIso, last_message_preview: preview.slice(0, 120) }).eq("id", conversationId);
-  return json({ ok: true, message_id: msg?.id, external_id: externalId });
+  return json(req, { ok: true, message_id: msg?.id, external_id: externalId });
 });

@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Conectar la casilla de correo de cada usuario a Maven (OAuth con Zoho).
 //
 // FLUJO:
@@ -19,16 +20,12 @@ import {
   oauthConfigured,
 } from "../_shared/zoho-mail.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -98,12 +95,12 @@ async function verifyState(state: string, userId: string): Promise<string | null
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Unauthorized", reason: "missing_auth_header" }, 401);
+      return json(req, { error: "Unauthorized", reason: "missing_auth_header" }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
 
@@ -114,7 +111,7 @@ Deno.serve(async (req) => {
     );
     const { data: { user }, error: userError } = await authClient.auth.getUser(token);
     if (userError || !user?.id) {
-      return json({ error: "Unauthorized", reason: "invalid_token" }, 401);
+      return json(req, { error: "Unauthorized", reason: "invalid_token" }, 401);
     }
 
     // service_role: es el único que puede escribir/leer refresh_token.
@@ -127,10 +124,10 @@ Deno.serve(async (req) => {
     const { action, code, state } = body as {
       action?: string; code?: string; state?: string;
     };
-    if (!action) return json({ error: "action is required" }, 400);
+    if (!action) return json(req, { error: "action is required" }, 400);
 
     if (!oauthConfigured()) {
-      return json({
+      return json(req, {
         error: "OAuth de Zoho no configurado",
         missing: ["ZOHO_OAUTH_CLIENT_ID", "ZOHO_OAUTH_CLIENT_SECRET"]
           .filter((k) => !Deno.env.get(k)),
@@ -141,20 +138,20 @@ Deno.serve(async (req) => {
     if (action === "start") {
       const st = await signState(user.id);
       const url = buildAuthUrl(st, redirectUri());
-      if (!url) return json({ error: "no se pudo construir la URL de autorización" }, 500);
-      return json({ auth_url: url, state: st, redirect_uri: redirectUri() });
+      if (!url) return json(req, { error: "no se pudo construir la URL de autorización" }, 500);
+      return json(req, { auth_url: url, state: st, redirect_uri: redirectUri() });
     }
 
     // === CALLBACK: canje + guardado ===
     if (action === "callback") {
-      if (!code || !state) return json({ error: "code y state son requeridos" }, 400);
+      if (!code || !state) return json(req, { error: "code y state son requeridos" }, 400);
 
       const stateErr = await verifyState(state, user.id);
-      if (stateErr) return json({ error: stateErr }, 400);
+      if (stateErr) return json(req, { error: stateErr }, 400);
 
       const tokens = await exchangeCode(code, redirectUri());
       if (!tokens.ok || !tokens.data) {
-        return json({ error: tokens.error, status: tokens.status }, 502);
+        return json(req, { error: tokens.error, status: tokens.status }, 502);
       }
 
       // Resolvemos el accountId ahora y lo guardamos: todas las llamadas
@@ -162,11 +159,11 @@ Deno.serve(async (req) => {
       // extra a Zoho por cada carga de bandeja.
       const accounts = await getMyAccounts(tokens.data.accessToken);
       if (!accounts.ok) {
-        return json({ error: `no se pudo leer la casilla: ${accounts.error}` }, 502);
+        return json(req, { error: `no se pudo leer la casilla: ${accounts.error}` }, 502);
       }
       const acct = (accounts.data ?? [])[0];
       if (!acct?.accountId || !acct?.primaryEmailAddress) {
-        return json({ error: "Zoho no devolvió ninguna casilla para este usuario" }, 502);
+        return json(req, { error: "Zoho no devolvió ninguna casilla para este usuario" }, 502);
       }
 
       const { error: upsertErr } = await admin
@@ -185,11 +182,11 @@ Deno.serve(async (req) => {
 
       if (upsertErr) {
         console.error("[mail-connect] upsert falló:", upsertErr.message);
-        return json({ error: "no se pudo guardar la conexión" }, 500);
+        return json(req, { error: "no se pudo guardar la conexión" }, 500);
       }
 
       // Nunca devolvemos el token, solo qué casilla quedó conectada.
-      return json({ ok: true, email_address: acct.primaryEmailAddress });
+      return json(req, { ok: true, email_address: acct.primaryEmailAddress });
     }
 
     // === DISCONNECT ===
@@ -201,13 +198,13 @@ Deno.serve(async (req) => {
         .update({ revoked_at: new Date().toISOString(), refresh_token: "" })
         .eq("user_id", user.id)
         .is("revoked_at", null);
-      if (error) return json({ error: "no se pudo desconectar" }, 500);
-      return json({ ok: true });
+      if (error) return json(req, { error: "no se pudo desconectar" }, 500);
+      return json(req, { ok: true });
     }
 
-    return json({ error: `Acción desconocida: ${action}` }, 400);
+    return json(req, { error: `Acción desconocida: ${action}` }, 400);
   } catch (e) {
     console.error("[mail-connect]", e);
-    return json({ error: (e as Error).message ?? "unexpected error" }, 500);
+    return json(req, { error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });

@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,11 +20,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 //  - Storage está dimensionado para archivos grandes, Edge Functions no.
 //  - El audio ya queda persistido para auditoría desde el primer momento.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // ElevenLabs Scribe soporta archivos grandes (hasta 1GB), pero
 // mantenemos un límite práctico para evitar timeouts en el edge function.
@@ -85,29 +82,29 @@ interface AudioMetrics {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
-      return jsonError("ELEVENLABS_API_KEY no configurada en los secrets de Supabase.", 500);
+      return jsonError(req, "ELEVENLABS_API_KEY no configurada en los secrets de Supabase.", 500);
     }
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return jsonError("Supabase env (URL/service role) no configurado.", 500);
+      return jsonError(req, "Supabase env (URL/service role) no configurado.", 500);
     }
 
     let body: TranscribeRequest;
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido. Esperado { audio_path, language? }.", 400);
+      return jsonError(req, "JSON inválido. Esperado { audio_path, language? }.", 400);
     }
 
     const audioPath = body.audio_path?.trim();
     if (!audioPath) {
-      return jsonError("Falta audio_path.", 400);
+      return jsonError(req, "Falta audio_path.", 400);
     }
     const lang = body.language?.trim() || "es";
 
@@ -120,16 +117,16 @@ serve(async (req) => {
       .download(audioPath);
     if (dlErr || !blob) {
       console.error("Storage download error", dlErr);
-      return jsonError(
+      return jsonError(req, 
         `No se pudo bajar el audio de Storage: ${dlErr?.message ?? "desconocido"}`,
         502,
       );
     }
     if (blob.size === 0) {
-      return jsonError("El archivo de audio en Storage está vacío.", 400);
+      return jsonError(req, "El archivo de audio en Storage está vacío.", 400);
     }
     if (blob.size > MAX_AUDIO_BYTES) {
-      return jsonError(
+      return jsonError(req, 
         `Audio demasiado grande. Máx ${(MAX_AUDIO_BYTES / 1024 / 1024).toFixed(0)}MB.`,
         413,
       );
@@ -177,7 +174,7 @@ serve(async (req) => {
       clearTimeout(timeoutId);
       const aborted = (fetchErr as Error).name === "AbortError";
       console.error("ElevenLabs fetch failed", fetchErr);
-      return jsonError(
+      return jsonError(req, 
         aborted
           ? `ElevenLabs Scribe tardó más de ${SCRIBE_TIMEOUT_MS / 1000}s. Prueba de nuevo.`
           : `Error al contactar ElevenLabs: ${(fetchErr as Error).message}`,
@@ -191,21 +188,21 @@ serve(async (req) => {
       const errText = await scribeRes.text().catch(() => "");
       console.error("ElevenLabs Scribe error", status, errText.slice(0, 500));
       if (status === 429) {
-        return jsonError("ElevenLabs: rate limit. Prueba en unos segundos.", 429);
+        return jsonError(req, "ElevenLabs: rate limit. Prueba en unos segundos.", 429);
       }
       if (status === 401) {
-        return jsonError("ElevenLabs: API key inválida.", 402);
+        return jsonError(req, "ElevenLabs: API key inválida.", 402);
       }
       if (status === 422) {
-        return jsonError("ElevenLabs: formato de audio no soportado.", 415);
+        return jsonError(req, "ElevenLabs: formato de audio no soportado.", 415);
       }
-      return jsonError(`ElevenLabs Scribe error ${status}`, 502);
+      return jsonError(req, `ElevenLabs Scribe error ${status}`, 502);
     }
 
     const scribeData = (await scribeRes.json()) as ScribeResponse;
     const rawText = (scribeData?.text ?? "").trim();
     if (!rawText) {
-      return jsonError("Scribe devolvió transcripción vacía. ¿El audio tiene voz?", 502);
+      return jsonError(req, "Scribe devolvió transcripción vacía. ¿El audio tiene voz?", 502);
     }
 
     // Build diarized transcript from word-level data
@@ -238,20 +235,20 @@ serve(async (req) => {
         duration: audioMetrics.total_duration_s,
         audio_metrics: audioMetrics,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("qa-transcribe error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+    return jsonError(req, (e as Error).message ?? "Error interno.", 500);
   }
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-function jsonError(error: string, status: number): Response {
+function jsonError(req: Request, error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 

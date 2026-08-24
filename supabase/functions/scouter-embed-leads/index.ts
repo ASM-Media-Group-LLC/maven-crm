@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // scouter-embed-leads — compute embeddings (Gemini text-embedding-004,
 // 768 dims) para los leads que se le pasen, los guarda en
 // scouter_leads.embedding, y luego computa lookalike_score /
@@ -10,16 +11,12 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-const json = (status: number, body: unknown) =>
+const json = (req: Request, status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 
 const buildEmbeddingText = (lead: {
@@ -54,25 +51,25 @@ const buildEmbeddingText = (lead: {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json(401, { error: "Unauthorized" });
+      return json(req, 401, { error: "Unauthorized" });
     }
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return json(500, { error: "GEMINI_API_KEY no configurada" });
+    if (!geminiKey) return json(req, 500, { error: "GEMINI_API_KEY no configurada" });
 
     const body = (await req.json().catch(() => null)) as
       | { lead_ids?: unknown }
       | null;
-    if (!body) return json(400, { error: "Body inválido" });
+    if (!body) return json(req, 400, { error: "Body inválido" });
     const leadIds = Array.isArray(body.lead_ids)
       ? (body.lead_ids as unknown[]).filter((x): x is string => typeof x === "string")
       : [];
-    if (leadIds.length === 0) return json(400, { error: "lead_ids vacío" });
+    if (leadIds.length === 0) return json(req, 400, { error: "lead_ids vacío" });
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -85,7 +82,7 @@ Deno.serve(async (req) => {
         "id, instagram_handle, name, bio, followers, link_in_bio_platform, country, category, company_id, discovery_source",
       )
       .in("id", leadIds);
-    if (leadsErr) return json(500, { error: leadsErr.message });
+    if (leadsErr) return json(req, 500, { error: leadsErr.message });
     const leads = (leadsData ?? []) as Array<{
       id: string;
       instagram_handle: string;
@@ -98,7 +95,7 @@ Deno.serve(async (req) => {
       company_id: string | null;
       discovery_source: string | null;
     }>;
-    if (leads.length === 0) return json(200, { embedded: 0 });
+    if (leads.length === 0) return json(req, 200, { embedded: 0 });
 
     // Gemini batchEmbedContents soporta hasta 100 inputs por request.
     // Si nos mandan más, los partimos en chunks.
@@ -121,7 +118,7 @@ Deno.serve(async (req) => {
       });
       if (!embResp.ok) {
         const errTxt = await embResp.text().catch(() => "");
-        return json(502, {
+        return json(req, 502, {
           error: `Gemini ${embResp.status}: ${errTxt.slice(0, 300)}`,
         });
       }
@@ -130,7 +127,7 @@ Deno.serve(async (req) => {
       };
       const embeddings = embData.embeddings ?? [];
       if (embeddings.length !== slice.length) {
-        return json(502, {
+        return json(req, 502, {
           error: `Gemini devolvió ${embeddings.length} embeddings para ${slice.length} inputs`,
         });
       }
@@ -185,12 +182,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json(200, {
+    return json(req, 200, {
       embedded: totalEmbedded,
       lookalike_computed: lookalikeComputed,
     });
   } catch (err: unknown) {
     console.error("[scouter-embed-leads] error:", err);
-    return json(500, { error: (err as Error).message ?? "Internal error" });
+    return json(req, 500, { error: (err as Error).message ?? "Internal error" });
   }
 });

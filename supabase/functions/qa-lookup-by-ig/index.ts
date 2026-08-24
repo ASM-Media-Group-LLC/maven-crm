@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -14,11 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Devuelve los matches agrupados por fuente con id + label + extra
 // info por fuente para que el frontend pueda renderizar links útiles.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 interface LookupRequest {
   instagram_input?: string;
@@ -77,7 +74,7 @@ const normalizeHandle = (raw: string): string | null => {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
@@ -85,14 +82,14 @@ serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido.", 400);
+      return jsonError(req, "JSON inválido.", 400);
     }
 
     const handle = normalizeHandle(body.instagram_input ?? "");
     if (!handle) {
       // No handle válido — devolvemos vacío sin error para no romper el
       // flujo del frontend mientras el usuario tipea.
-      return jsonResponse({
+      return jsonResponse(req, {
         ok: true,
         normalized_handle: null,
         matches: {
@@ -173,22 +170,22 @@ serve(async (req) => {
       response.matches.creator_prospects.length +
       response.matches.leadgen_entries.length;
 
-    return jsonResponse(response);
+    return jsonResponse(req, response);
   } catch (e) {
     console.error("qa-lookup-by-ig error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+    return jsonError(req, (e as Error).message ?? "Error interno.", 500);
   }
 });
 
-function jsonError(error: string, status: number): Response {
+function jsonError(req: Request, error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-function jsonResponse<T>(data: T): Response {
+function jsonResponse<T>(req: Request, data: T): Response {
   return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

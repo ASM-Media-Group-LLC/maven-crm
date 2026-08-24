@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // fb-scan — verifica promos por FACEBOOK y las registra en promolog_entries.
 //
 // Igual que x-scan pero el transporte es Apify (apify/facebook-posts-scraper).
@@ -30,12 +31,9 @@ const MAX_CREATORS = 30; // cap defensivo por invocación (FB es por-creadora, r
 const VISION_MODEL = "google/gemini-2.5-flash"; // mismo que el bot de IG (OpenRouter)
 const MAX_VISION_PER_RUN = 80; // cap de llamadas de visión por corrida (cuida el costo)
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
-const json = (obj: unknown, status = 200): Response =>
-  new Response(JSON.stringify(obj, null, 2), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
+const json = (req: Request, obj: unknown, status = 200): Response =>
+  new Response(JSON.stringify(obj, null, 2), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 
 function ofHandleFromUrl(url: string): string {
   const m = String(url || "").match(/onlyfans\.com\/([A-Za-z0-9_.]+)/i);
@@ -245,7 +243,7 @@ async function runApify(token: string, url: string, since: string, limit: number
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -259,10 +257,10 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const { data: { user } } = await sb.auth.getUser(token);
-    if (!user) return json({ error: "unauthorized" }, 401);
+    if (!user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     const ok = (roles || []).some((r: { role: string }) => r.role === "admin" || r.role === "manager");
-    if (!ok) return json({ error: "forbidden (admin/manager)" }, 403);
+    if (!ok) return json(req, { error: "forbidden (admin/manager)" }, 403);
   }
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
 
@@ -284,7 +282,7 @@ Deno.serve(async (req: Request) => {
     const { data: crs, error } = await sb.from("creators")
       .select("id, name, facebook_handle")
       .eq("status", "active").not("facebook_handle", "is", null).neq("facebook_handle", "");
-    if (error) return json({ error: error.message }, 500);
+    if (error) return json(req, { error: error.message }, 500);
     const { data: extra } = await sb.from("creator_social_accounts")
       .select("creator_id, username").eq("network", "facebook").eq("active", true);
     const out: Array<{ creator_id: string; name: string; handle: string; url: string }> = [];
@@ -295,7 +293,7 @@ Deno.serve(async (req: Request) => {
       const c = (crs ?? []).find((x: any) => x.id === a.creator_id);
       if (c && a.username) out.push({ creator_id: c.id, name: c.name, handle: a.username, url: fbUrl(a.username) });
     }
-    return json({ ok: true, targets: out });
+    return json(req, { ok: true, targets: out });
   }
 
   if (modo === "ingest") {
@@ -304,7 +302,7 @@ Deno.serve(async (req: Request) => {
     // Una corrida donde todo salió ilegible tiene 0 items y es justo la que hay que
     // registrar — si no, el peor scan posible es el único que no deja rastro.
     if (!items.length && !(body.final !== false || (Array.isArray(body.unreadable) && body.unreadable.length))) {
-      return json({ ok: true, note: "sin items" });
+      return json(req, { ok: true, note: "sin items" });
     }
     const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
     // Nicks de OF por creadora — mismo insumo que usa el camino de Apify.
@@ -431,10 +429,10 @@ Deno.serve(async (req: Request) => {
         finished_at: new Date().toISOString(),
       });
     }
-    return json({ ok: true, mode: "ingest", source: "local", inserted, promoted: promotedTotal, resumen, results: out });
+    return json(req, { ok: true, mode: "ingest", source: "local", inserted, promoted: promotedTotal, resumen, results: out });
   }
 
-  if (!APIFY_TOKEN) return json({ error: "falta APIFY_TOKEN" }, 500);
+  if (!APIFY_TOKEN) return json(req, { error: "falta APIFY_TOKEN" }, 500);
 
   const hours = Number(body.hours) || 24;
   const onlyIds = Array.isArray(body.only_creator_ids) ? body.only_creator_ids as string[] : null;
@@ -449,7 +447,7 @@ Deno.serve(async (req: Request) => {
     .not("facebook_handle", "is", null).neq("facebook_handle", "");
   if (onlyIds && onlyIds.length) q = q.in("id", onlyIds);
   const { data: creators, error: cErr } = await q;
-  if (cErr) return json({ error: cErr.message }, 500);
+  if (cErr) return json(req, { error: cErr.message }, 500);
 
   let list = creators || [];
 
@@ -623,5 +621,5 @@ Deno.serve(async (req: Request) => {
     results.push(...settled);
   }
 
-  return json({ ok: true, since, hours, creators: list.length, capped, results, ...(dryRun ? { rawSample } : {}) });
+  return json(req, { ok: true, since, hours, creators: list.length, capped, results, ...(dryRun ? { rawSample } : {}) });
 });

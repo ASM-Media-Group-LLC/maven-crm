@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Generic transactional email relay via Resend. Lo usan los flujos de
 // Chatter Evaluator y Agency QA para mandar el reporte por correo desde
 // `noreply@mail.maven-ai.me` en lugar de la dirección personal del owner
@@ -23,28 +24,24 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-const json = (status: number, body: unknown) =>
+const json = (req: Request, status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
     // Auth — exige bearer válido. Igual que admin-user-actions.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json(401, { error: "Unauthorized", reason: "missing_auth_header" });
+      return json(req, 401, { error: "Unauthorized", reason: "missing_auth_header" });
     }
     const token = authHeader.replace("Bearer ", "");
 
@@ -93,7 +90,7 @@ Deno.serve(async (req) => {
         console.warn(
           `[send-notification-email] 401 — token no válido (len=${token.length}, jwt_like=${token.startsWith("ey")}, sb_key_like=${token.startsWith("sb_")}, env_service_key_len=${serviceKey.length})`,
         );
-        return json(401, { error: "Unauthorized", reason: "invalid_token" });
+        return json(req, 401, { error: "Unauthorized", reason: "invalid_token" });
       }
     }
 
@@ -106,7 +103,7 @@ Deno.serve(async (req) => {
           also_include_user_ids?: unknown;
         }
       | null;
-    if (!body) return json(400, { error: "Body inválido (JSON requerido)" });
+    if (!body) return json(req, 400, { error: "Body inválido (JSON requerido)" });
 
     const toList = Array.isArray(body.to)
       ? (body.to as unknown[])
@@ -145,13 +142,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (toList.length === 0) return json(400, { error: "to[] vacío" });
-    if (!subject) return json(400, { error: "subject requerido" });
-    if (!html) return json(400, { error: "html requerido" });
+    if (toList.length === 0) return json(req, 400, { error: "to[] vacío" });
+    if (!subject) return json(req, 400, { error: "subject requerido" });
+    if (!html) return json(req, 400, { error: "html requerido" });
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
     if (!resendKey) {
-      return json(500, { error: "RESEND_API_KEY no configurada" });
+      return json(req, 500, { error: "RESEND_API_KEY no configurada" });
     }
 
     // Normaliza el "from": si el env var viene como email pelado
@@ -180,16 +177,16 @@ Deno.serve(async (req) => {
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
       console.error("[send-notification-email] Resend failed", resp.status, text);
-      return json(502, {
+      return json(req, 502, {
         error: `Resend ${resp.status}`,
         detail: text.slice(0, 400),
       });
     }
 
     const data = await resp.json().catch(() => ({}));
-    return json(200, { success: true, id: data?.id ?? null });
+    return json(req, 200, { success: true, id: data?.id ?? null });
   } catch (err: unknown) {
     console.error("[send-notification-email] Internal error:", err);
-    return json(500, { error: "Internal server error" });
+    return json(req, 500, { error: "Internal server error" });
   }
 });

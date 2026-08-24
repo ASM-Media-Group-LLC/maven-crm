@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -22,11 +23,7 @@ import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPay
 // Soporta re-análisis con feedback humano (with_feedback: true).
 // También carga historial del closer para calibración cruzada.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 const MAX_TRANSCRIPT_CHARS = 200_000;
 // Claude Opus context: 200k tokens → ~600k chars; Sonnet: 200k tokens.
@@ -120,7 +117,7 @@ const isValidAnalysis = (a: unknown): boolean => {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   // Auth: aceptamos DOS modos (mismo patrón que send-report):
   //   · X-Cron-Token (interno desde el cron de retry de QAs stuck)
@@ -134,14 +131,14 @@ serve(async (req) => {
   if (!hasCronToken && !hasJwt) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
   try {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) {
-      return jsonError(
+      return jsonError(req, 
         "ANTHROPIC_API_KEY no configurada en los secrets de Supabase.",
         500,
       );
@@ -168,11 +165,11 @@ serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido.", 400);
+      return jsonError(req, "JSON inválido.", 400);
     }
 
     const callId = body.call_id?.trim();
-    if (!callId) return jsonError("call_id requerido.", 400);
+    if (!callId) return jsonError(req, "call_id requerido.", 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -187,7 +184,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (callErr) throw callErr;
-    if (!call) return jsonError("Call no encontrada.", 404);
+    if (!call) return jsonError(req, "Call no encontrada.", 404);
 
     // ── Modo email_only: reenviar el correo del reporte SIN volver a analizar ──
     // Lo dispara el cron retry_pending_qa_report_emails para los casos en que el
@@ -198,12 +195,12 @@ serve(async (req) => {
       const row = call as Record<string, unknown>;
       const existing = row.claude_analysis as Record<string, unknown> | null;
       if (!existing || Object.keys(existing).length === 0) {
-        return jsonError("La call todavía no tiene análisis; no hay reporte que enviar.", 409);
+        return jsonError(req, "La call todavía no tiene análisis; no hay reporte que enviar.", 409);
       }
       if (row.report_email_sent_at) {
         return new Response(
           JSON.stringify({ ok: true, skipped: "email_already_sent" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
         );
       }
       const savedScore = Number(row.claude_score ?? 0);
@@ -221,19 +218,19 @@ serve(async (req) => {
           .update({ report_email_sent_at: new Date().toISOString(), status: "ready" })
           .eq("id", callId);
         return new Response(JSON.stringify({ ok: true, emailed: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       } catch (mailErr) {
         console.error("qa-analyze email_only: falló el envío:", (mailErr as Error).message);
-        return jsonError(`No se pudo enviar el correo: ${(mailErr as Error).message}`, 502);
+        return jsonError(req, `No se pudo enviar el correo: ${(mailErr as Error).message}`, 502);
       }
     }
 
     const c = call as unknown as CallRow;
     const transcript = (c.transcript ?? "").trim();
-    if (!transcript) return jsonError("Transcript vacío.", 400);
+    if (!transcript) return jsonError(req, "Transcript vacío.", 400);
     if (transcript.length > MAX_TRANSCRIPT_CHARS) {
-      return jsonError(
+      return jsonError(req, 
         `Transcript demasiado largo (máx. ${MAX_TRANSCRIPT_CHARS.toLocaleString("es-ES")} caracteres).`,
         413,
       );
@@ -461,7 +458,7 @@ serve(async (req) => {
         : /key|401|402|cuota|quota|credit/i.test(msg)
           ? 402
           : 502;
-      return jsonError(msg, status);
+      return jsonError(req, msg, status);
     }
 
     let analysis: unknown;
@@ -473,7 +470,7 @@ serve(async (req) => {
         String(parseErr),
         raw.slice(0, 500),
       );
-      return jsonError("Claude devolvió JSON malformado. Reintenta.", 502);
+      return jsonError(req, "Claude devolvió JSON malformado. Reintenta.", 502);
     }
 
     if (!isValidAnalysis(analysis)) {
@@ -481,7 +478,7 @@ serve(async (req) => {
         "Análisis no pasa validación de shape:",
         JSON.stringify(analysis).slice(0, 500),
       );
-      return jsonError("El análisis no tiene la estructura esperada. Reintenta.", 502);
+      return jsonError(req, "El análisis no tiene la estructura esperada. Reintenta.", 502);
     }
 
     // El score TOTAL = CALIDAD DEL PROCESO: el promedio de los criterios
@@ -505,7 +502,7 @@ serve(async (req) => {
     // respuesta en escala 1-10 → guardarla daría una nota ~7/100 sin error visible.
     if (dimScores.length >= 2 && dimScores.every((n) => n <= 10)) {
       console.error(`qa-analyze: dims en escala 1-10 en call ${callId}`, dimScores);
-      return jsonError("El análisis vino en escala 1-10 en vez de 0-100. Reintenta.", 502);
+      return jsonError(req, "El análisis vino en escala 1-10 en vez de 0-100. Reintenta.", 502);
     }
     const clamped = dimScores.map((n) => Math.min(100, Math.max(0, n)));
     const score = clamped.length
@@ -590,11 +587,11 @@ serve(async (req) => {
         usage: usage ?? null,
         updated,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("qa-analyze error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+    return jsonError(req, (e as Error).message ?? "Error interno.", 500);
   }
 });
 
@@ -703,10 +700,10 @@ async function sendQaReportEmail(
   }
 }
 
-function jsonError(error: string, status: number): Response {
+function jsonError(req: Request, error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 

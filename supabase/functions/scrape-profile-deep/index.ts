@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // scrape-profile-deep — análisis deep on-demand de un perfil de Instagram.
 //
 // Llamado por la tool analyze_profile_deep del whatsapp-agent cuando un
@@ -21,10 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
 // Mismo actor que promolog. Para "deep analysis" pedimos stories + posts
 // del handle, pero por ahora hacemos solo stories (la promo de OF se ve
@@ -47,10 +45,10 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
   if (req.method !== "POST") {
-    return json({ error: "Only POST" }, 405);
+    return json(req, { error: "Only POST" }, 405);
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -59,7 +57,7 @@ Deno.serve(async (req: Request) => {
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
 
   if (!APIFY_TOKEN) {
-    return json({ error: "APIFY_TOKEN not configured" }, 500);
+    return json(req, { error: "APIFY_TOKEN not configured" }, 500);
   }
 
   // ── Auth: solo X-Cron-Token (lo invoca whatsapp-agent) o JWT admin ──
@@ -73,15 +71,15 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const auth = req.headers.get("authorization") ?? "";
     const token = auth.replace(/^Bearer\s+/i, "");
-    if (!token) return json({ error: "Missing auth" }, 401);
+    if (!token) return json(req, { error: "Missing auth" }, 401);
 
     const { data: userData, error: uErr } = await sb.auth.getUser(token);
-    if (uErr || !userData?.user) return json({ error: "Invalid token" }, 401);
+    if (uErr || !userData?.user) return json(req, { error: "Invalid token" }, 401);
 
     const { data: roleRow } = await (sb as any)
       .from("user_roles").select("role").eq("user_id", userData.user.id).maybeSingle();
     const isAdmin = roleRow?.role && ["admin", "manager", "owner"].includes(roleRow.role);
-    if (!isAdmin) return json({ error: "Forbidden: admin/owner only" }, 403);
+    if (!isAdmin) return json(req, { error: "Forbidden: admin/owner only" }, 403);
   }
 
   // ── Parse body ────────────────────────────────────────────────────────
@@ -98,14 +96,14 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json();
   } catch (_) {
-    return json({ error: "Invalid JSON body" }, 400);
+    return json(req, { error: "Invalid JSON body" }, 400);
   }
 
   const rawHandle = body.instagram_handle?.trim();
-  if (!rawHandle) return json({ error: "Missing instagram_handle" }, 400);
+  if (!rawHandle) return json(req, { error: "Missing instagram_handle" }, 400);
 
   const handle = normalizeHandle(rawHandle);
-  if (!handle || handle.length < 2) return json({ error: "Invalid handle" }, 400);
+  if (!handle || handle.length < 2) return json(req, { error: "Invalid handle" }, 400);
 
   // ── Cache: ¿hay análisis reciente complete? ─────────────────────────────
   // El cache matchea también la PERSPECTIVA (17/08): la estrategia cacheada es
@@ -130,7 +128,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (cached) {
-      return json({
+      return json(req, {
         ok: true,
         status: "cached",
         job_id: cached.id,
@@ -165,7 +163,7 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
 
   if (inFlight) {
-    return json({
+    return json(req, {
       ok: true,
       status: "in_flight",
       job_id: inFlight.id,
@@ -193,7 +191,7 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (cErr || !created) {
-    return json({ error: `Insert profile_analysis failed: ${cErr?.message}` }, 500);
+    return json(req, { error: `Insert profile_analysis failed: ${cErr?.message}` }, 500);
   }
 
   const jobId = created.id as string;
@@ -269,7 +267,7 @@ Deno.serve(async (req: Request) => {
         completed_at: new Date().toISOString(),
       })
       .eq("id", jobId);
-    return json({ error: apifyErr, job_id: jobId }, 502);
+    return json(req, { error: apifyErr, job_id: jobId }, 502);
   }
 
   await (sb as any)
@@ -278,7 +276,7 @@ Deno.serve(async (req: Request) => {
     .eq("id", jobId);
 
   // ETA aproximado: Apify suele tardar 30-90s para 1 perfil con 20 stories.
-  return json({
+  return json(req, {
     ok: true,
     status: "queued",
     job_id: jobId,
@@ -296,9 +294,9 @@ function normalizeHandle(h: string): string {
   return raw.replace(/\/$/, "").toLowerCase();
 }
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

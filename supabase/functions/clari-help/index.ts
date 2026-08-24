@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MAVEN_GUIDE } from "./maven-guide.ts";
@@ -18,11 +19,7 @@ import { streamGeminiAsOpenAI } from "../_shared/gemini.ts";
 // El frontend espera SSE en shape OpenAI; el helper de Gemini traduce
 // el stream para que el cliente no se entere del cambio.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = (req: Request) => corsFor(req);
 
 interface UserContext {
   role?: string | null;
@@ -108,7 +105,7 @@ ${MAVEN_GUIDE}`;
 // parsea \`data: {...}\\n\` con \`choices[0].delta.content\`).
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   try {
@@ -117,7 +114,7 @@ serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -134,7 +131,7 @@ serve(async (req) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -146,7 +143,7 @@ serve(async (req) => {
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "Sin mensajes" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -163,7 +160,7 @@ serve(async (req) => {
           JSON.stringify({ error: "GEMINI_API_KEY no configurada." }),
           {
             status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
           },
         );
       }
@@ -176,7 +173,7 @@ serve(async (req) => {
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
         temperature: 0.7,
         maxOutputTokens: 1024,
-        corsHeaders,
+        corsHeaders: corsHeaders(req),
       });
     }
 
@@ -187,7 +184,7 @@ serve(async (req) => {
         JSON.stringify({ error: "Ni GEMINI_API_KEY ni GROQ_API_KEY configurada." }),
         {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         },
       );
     }
@@ -224,7 +221,7 @@ serve(async (req) => {
           }),
           {
             status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
           },
         );
       }
@@ -233,13 +230,13 @@ serve(async (req) => {
           JSON.stringify({ error: "Cuota agotada o key inválida." }),
           {
             status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
           },
         );
       }
       return new Response(JSON.stringify({ error: "Error en el proveedor IA" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -247,13 +244,13 @@ serve(async (req) => {
     // (data: {choices:[{delta:{content:""}}]}\\n) que el frontend
     // ClariAiChat consume tal cual.
     return new Response(groqResp.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: { ...corsHeaders(req), "Content-Type": "text/event-stream" },
     });
   } catch (e) {
     console.error("clari-help error:", e);
     return new Response(JSON.stringify({ error: "Error interno" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

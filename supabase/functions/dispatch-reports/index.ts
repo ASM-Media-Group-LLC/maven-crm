@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // dispatch-reports — corre diario 8am Miami via pg_cron. Mira los
 // report_schedules ACTIVOS y decide cuáles disparar HOY según su period:
 //   · daily   → todos los días
@@ -10,10 +11,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = (req: Request) => corsFor(req);
 
 const MIAMI_TZ = "America/New_York";
 
@@ -170,7 +168,7 @@ function shouldDispatchNow(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   // Auth via X-Cron-Token (pg_cron lo pasa desde vault; frontend admin
   // future-uso lo pasaría por edge function privada).
@@ -180,7 +178,7 @@ Deno.serve(async (req) => {
     console.warn("[dispatch-reports] invalid or missing X-Cron-Token");
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -240,13 +238,13 @@ Deno.serve(async (req) => {
         dispatched: due.length,
         results,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: { ...corsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("[dispatch-reports] exception:", (e as Error).message);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

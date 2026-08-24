@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // chatter-qa-analyze — borrador IA del QA cualitativo de chatters (QA-B / Slice 4).
 //
 // Lee la fila chatter_qa_reports (creada en status='processing' por el frontend), MUESTREA
@@ -19,11 +20,8 @@ const MAX_THREADS = 6;          // hilos (del chatter elegido) a INCLUIR por mod
 const SCAN_LIMIT = 15;          // fans a escanear por modelo buscando los hilos del chatter
 const MAX_MSGS = 40;            // ventana por hilo (query del owner)
 const MSG_CHARS = 240;          // truncado por mensaje
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req);
+const json = (req: Request, b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 const stripHtml = (h: string) => String(h || "").replace(/<\/p>/gi, " ").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 const num = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
 // Atribución de masivos al chatter por NOMBRE (of-mass/smart-messages traen senderName, no id).
@@ -94,38 +92,38 @@ Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de l
 const VEREDICTOS = ["excelente", "bueno", "requiere_mejora", "critico"];
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!bearer) return json({ error: "unauthorized" }, 401);
+  if (!bearer) return json(req, { error: "unauthorized" }, 401);
   if (bearer !== SERVICE_KEY) {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
-    if (error || !user) return json({ error: "unauthorized" }, 401);
+    if (error || !user) return json(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     let ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
     if (!ok) { const { data: can } = await sb.rpc("can_access_chatters_qa", { p_uid: user.id }); ok = can === true; }
-    if (!ok) return json({ error: "forbidden" }, 403);
+    if (!ok) return json(req, { error: "forbidden" }, 403);
   }
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* */ }
   const reportId = String(body.report_id ?? "");
   const withFeedback = !!body.with_feedback;
-  if (!reportId) return json({ error: "report_id requerido" }, 400);
+  if (!reportId) return json(req, { error: "report_id requerido" }, 400);
 
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-  if (!OPENROUTER_API_KEY) return json({ error: "OPENROUTER_API_KEY no configurada" }, 500);
+  if (!OPENROUTER_API_KEY) return json(req, { error: "OPENROUTER_API_KEY no configurada" }, 500);
 
   const { data: report, error: rErr } = await sb.from("chatter_qa_reports").select("*").eq("id", reportId).maybeSingle();
-  if (rErr || !report) return json({ error: "reporte no encontrado" }, 404);
+  if (rErr || !report) return json(req, { error: "reporte no encontrado" }, 404);
   const allModels = (report.evaluated_models ?? []) as Array<{ model_id: number; model_name: string }>;
   if (allModels.length === 0) {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Agregá al menos una modelo evaluada antes de generar el borrador IA." }).eq("id", reportId);
-    return json({ error: "sin modelos evaluadas" }, 400);
+    return json(req, { error: "sin modelos evaluadas" }, 400);
   }
   // Cap de modelos: cada modelo = ~15 lecturas WS de hilos + 2 de masivos. Con muchas (un chatter
   // puede estar asignado a 17) el edge se pasaba del presupuesto de ~150s y nunca devolvía.
@@ -135,12 +133,12 @@ Deno.serve(async (req) => {
 
   const { data: sess } = await sb.from("blu_session").select("token").eq("id", 1).maybeSingle();
   const token = (sess?.token as string | undefined) ?? Deno.env.get("BLU_JWT") ?? "";
-  if (!token) { await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Sin token de sesión BLU" }).eq("id", reportId); return json({ error: "sin token BLU" }, 500); }
+  if (!token) { await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Sin token de sesión BLU" }).eq("id", reportId); return json(req, { error: "sin token BLU" }, 500); }
 
   // ── Sampler: por modelo, N hilos × ventana de mensajes (un WS para todo) ──
   let conn;
   try { conn = await openConn(token); }
-  catch (e) { const err = e as Error & { expired?: boolean }; await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "BLU: " + err.message }).eq("id", reportId); return json({ error: err.message, expired: !!err.expired }, err.expired ? 401 : 502); }
+  catch (e) { const err = e as Error & { expired?: boolean }; await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "BLU: " + err.message }).eq("id", reportId); return json(req, { error: err.message, expired: !!err.expired }, err.expired ? 401 : 502); }
 
   let threadsSampled = 0, messagesRead = 0;
   const blocks: string[] = [];
@@ -226,7 +224,7 @@ Deno.serve(async (req) => {
     emptyModels = evModels.filter((m) => (coverage[m.model_name] ?? 0) === 0).map((m) => m.model_name);
     const fresh = conn.freshToken(); conn.close();
     if (fresh && fresh !== token) await sb.from("blu_session").upsert({ id: 1, token: fresh, refreshed_at: new Date().toISOString() });
-  } catch (e) { try { conn.close(); } catch { /* */ } await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Sampler: " + (e as Error).message }).eq("id", reportId); return json({ error: (e as Error).message }, 502); }
+  } catch (e) { try { conn.close(); } catch { /* */ } await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Sampler: " + (e as Error).message }).eq("id", reportId); return json(req, { error: (e as Error).message }, 502); }
 
   if (blocks.length === 0) {
     // El chatter elegido no tomó chats 1-a-1 en NINGUNA de las modelos evaluadas
@@ -237,7 +235,7 @@ Deno.serve(async (req) => {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: msg }).eq("id", reportId);
     // 200 a propósito: condición de negocio (no error HTTP) → supabase-js deja el body en `data`
     // y el frontend muestra el mensaje amable (un 4xx daría data=null + error genérico "non-2xx").
-    return json({ error: msg, code: "no_chats", empty_models: emptyModels, models_skipped: modelsSkipped });
+    return json(req, { error: msg, code: "no_chats", empty_models: emptyModels, models_skipped: modelsSkipped });
   }
 
   // Feedback humano previo (re-análisis con correcciones).
@@ -289,7 +287,7 @@ Deno.serve(async (req) => {
     usage = { prompt_tokens: data.usage?.prompt_tokens ?? 0, completion_tokens: data.usage?.completion_tokens ?? 0 };
   } catch (e) {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "IA: " + (e as Error).message }).eq("id", reportId);
-    return json({ error: (e as Error).message }, 502);
+    return json(req, { error: (e as Error).message }, 502);
   }
 
   // Parse + validación de shape (json_object ya devuelve JSON; limpiamos backticks por las dudas).
@@ -298,11 +296,11 @@ Deno.serve(async (req) => {
     parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim());
   } catch {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA no devolvió JSON válido. Reintenta." }).eq("id", reportId);
-    return json({ error: "JSON inválido de la IA" }, 502);
+    return json(req, { error: "JSON inválido de la IA" }, 502);
   }
   if (!parsed || !VEREDICTOS.includes(parsed.veredicto)) {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA devolvió un veredicto inválido. Reintenta." }).eq("id", reportId);
-    return json({ error: "veredicto inválido" }, 502);
+    return json(req, { error: "veredicto inválido" }, 502);
   }
   const arr = (x: unknown) => (Array.isArray(x) ? x : []);
   const reportBody = {
@@ -330,9 +328,9 @@ Deno.serve(async (req) => {
   const { error: uErr } = await sb.from("chatter_qa_reports").update({
     report: reportBody, veredicto: parsed.veredicto, sampling, status: "ready", source: "ai_draft", error_message: null, evaluator_name: "Claude AI",
   }).eq("id", reportId);
-  if (uErr) return json({ error: "update: " + uErr.message }, 502);
+  if (uErr) return json(req, { error: "update: " + uErr.message }, 502);
 
   await logGeminiUsage({ operation: "chatter-qa-analyze", model: OR_MODEL, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, context: { reportId, chatter: report.chatter_name, provider: "openrouter" } });
 
-  return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling, empty_models: emptyModels, models_skipped: modelsSkipped });
+  return json(req, { ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling, empty_models: emptyModels, models_skipped: modelsSkipped });
 });

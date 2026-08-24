@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // @supabase-functions-cron-schedule: 0 6 * * *
 // scouter-generate-tasks — genera 50 asignaciones diarias por spammer usando Claude Haiku.
 //
@@ -20,11 +21,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildSystemPrompt, buildUserMessage, type LeadForPrompt, type SpammerAccount } from "./prompt.ts";
 import { callGeminiOnce } from "../_shared/gemini.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 // Migrado de Groq → Gemini 2.5 Flash. Free tier de Gemini = 5 RPM /
 // 250K TPM — el RPM (5 calls/min) es el cuello de botella, así que
@@ -83,7 +80,7 @@ interface AiLeadResult {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     // ─── Auth check ──────────────────────────────────────────────────────────
@@ -105,7 +102,7 @@ serve(async (req) => {
     const cronInternalToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
     if (!geminiKey) {
-      return jsonError("GEMINI_API_KEY no configurada en los secrets de Supabase.", 500);
+      return jsonError(req, "GEMINI_API_KEY no configurada en los secrets de Supabase.", 500);
     }
 
     // Usamos service role para bypasear RLS en queries cross-spammer.
@@ -115,7 +112,7 @@ serve(async (req) => {
       !!cronInternalToken && cronTokenHeader === cronInternalToken;
 
     if (!authHeader && !cronTokenValid) {
-      return jsonError("Authorization header requerido.", 401);
+      return jsonError(req, "Authorization header requerido.", 401);
     }
 
     // ─── Parse body ──────────────────────────────────────────────────────────
@@ -123,11 +120,11 @@ serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return jsonError("JSON inválido.", 400);
+      return jsonError(req, "JSON inválido.", 400);
     }
 
     if (!body.tenant_id?.trim()) {
-      return jsonError("tenant_id requerido.", 400);
+      return jsonError(req, "tenant_id requerido.", 400);
     }
 
     const tenantId = body.tenant_id.trim();
@@ -152,7 +149,7 @@ serve(async (req) => {
     }
 
     if (spammerIds.length === 0) {
-      return jsonOk({ message: "No hay spammers activos en este tenant.", assignments_created: 0 });
+      return jsonOk(req, { message: "No hay spammers activos en este tenant.", assignments_created: 0 });
     }
 
     // ─── Process each spammer ────────────────────────────────────────────────
@@ -180,7 +177,7 @@ serve(async (req) => {
       }
     }
 
-    return jsonOk({
+    return jsonOk(req, {
       ok: true,
       spammers_processed: spammerIds.length,
       assignments_created: totalAssignments,
@@ -189,7 +186,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("scouter-generate-tasks error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+    return jsonError(req, (e as Error).message ?? "Error interno.", 500);
   }
 });
 
@@ -784,16 +781,16 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-function jsonError(message: string, status: number): Response {
+function jsonError(req: Request, message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-function jsonOk(data: unknown): Response {
+function jsonOk(req: Request, data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

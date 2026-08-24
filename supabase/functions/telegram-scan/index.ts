@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // telegram-scan — verifica promos por TELEGRAM y las registra en promolog_entries.
 //
 // Es el equivalente de promolog-dispatch+webhook (IG) pero para Telegram:
@@ -38,10 +39,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const THROTTLE_MS = 400;        // pausa base entre canales (+ jitter 0-400ms)
 const GW_RETRY_PAUSE_MS = 2500; // espera antes del único reintento en 502
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
 // Deriva el handle de OF desde la URL (https://onlyfans.com/anadevinvip → "anadevinvip").
 function ofHandleFromUrl(url: string): string {
@@ -152,15 +150,15 @@ async function llmSecondOpinion(text: string, ofHandles: string[], apiKey: strin
   }
 }
 
-function jsonResponse(obj: unknown, status = 200): Response {
+function jsonResponse(req: Request, obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -175,10 +173,10 @@ Deno.serve(async (req: Request) => {
   if (!isCron) {
     const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const { data: { user } } = await sb.auth.getUser(token);
-    if (!user) return jsonResponse({ error: "unauthorized" }, 401);
+    if (!user) return jsonResponse(req, { error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
     const ok = (roles || []).some((r: { role: string }) => r.role === "admin" || r.role === "manager");
-    if (!ok) return jsonResponse({ error: "forbidden (admin/manager)" }, 403);
+    if (!ok) return jsonResponse(req, { error: "forbidden (admin/manager)" }, 403);
   }
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -196,7 +194,7 @@ Deno.serve(async (req: Request) => {
   //   body: { mode:"ingest", items:[ { creator_id, source_handle?, posts:[{text, permalink?, date?}] } ] }
   if (body.mode === "ingest") {
     const items = Array.isArray(body.items) ? body.items as Array<any> : [];
-    if (!items.length) return jsonResponse({ ok: true, note: "sin items" });
+    if (!items.length) return jsonResponse(req, { ok: true, note: "sin items" });
     const OPENROUTER = Deno.env.get("OPENROUTER_API_KEY") || "";
     const ids = [...new Set(items.map((it) => it.creator_id).filter(Boolean))];
     // OF nicks por creadora (para la clasificación), igual que el path normal.
@@ -411,7 +409,7 @@ Deno.serve(async (req: Request) => {
         finished_at: new Date().toISOString(),
       });
     }
-    return jsonResponse({ ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
+    return jsonResponse(req, { ok: true, mode: "ingest", source: "local", items: items.length, inserted, promoted: promotedTotal, resumen, ...(dryRun ? { dry_run: true } : {}), results: out });
   }
 
   // ── MODO TARGETS ────────────────────────────────────────────────────────────
@@ -430,10 +428,10 @@ Deno.serve(async (req: Request) => {
       targets.push({ creator_id: c.id, name: c.artistic_name || c.name, handle: c.telegram_handle });
       for (const u of extraByCreator.get(c.id) ?? []) targets.push({ creator_id: c.id, name: c.artistic_name || c.name, handle: u });
     }
-    return jsonResponse({ ok: true, mode: "targets", count: targets.length, targets });
+    return jsonResponse(req, { ok: true, mode: "targets", count: targets.length, targets });
   }
 
-  if (!GW_API_KEY) return jsonResponse({ error: "falta TELEGRAM_GW_API_KEY (secreto de la edge function)" }, 500);
+  if (!GW_API_KEY) return jsonResponse(req, { error: "falta TELEGRAM_GW_API_KEY (secreto de la edge function)" }, 500);
 
   // Creadoras con Telegram (la principal vive en creators.telegram_handle).
   let q = sb.from("creators")
@@ -443,7 +441,7 @@ Deno.serve(async (req: Request) => {
     .neq("telegram_handle", "");
   if (onlyIds && onlyIds.length) q = q.in("id", onlyIds);
   const { data: creators, error: cErr } = await q;
-  if (cErr) return jsonResponse({ error: cErr.message }, 500);
+  if (cErr) return jsonResponse(req, { error: cErr.message }, 500);
 
   // Multi-cuenta: nicknames de OF por creadora (principal onlyfans_url + secundarias)
   // → señal of_handle; y canales TELEGRAM extra (también se escanean). Una sola query
@@ -694,6 +692,6 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return jsonResponse({ ok: true, scan_date: scanDate, hours, creators: creators?.length || 0,
+  return jsonResponse(req, { ok: true, scan_date: scanDate, hours, creators: creators?.length || 0,
     targets_run: targets.length, skipped_por_cap, results });
 });

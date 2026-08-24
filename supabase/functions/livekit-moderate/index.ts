@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Moderación REAL de llamadas: mutear, expulsar, quitar la palabra y terminar.
 //
 // POR QUÉ EXISTE: antes esto se hacía publicando un mensaje por el canal de datos
@@ -14,18 +15,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+function json(req: Request, data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
 
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
+function err(req: Request, msg: string, status = 400) {
+  return json(req, { error: msg }, status);
 }
 
 function base64UrlEncode(data: Uint8Array): string {
@@ -97,11 +94,11 @@ function userIdFromIdentity(identity: string): string | null {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return err("Unauthorized", 401);
+    if (!authHeader?.startsWith("Bearer ")) return err(req, "Unauthorized", 401);
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
@@ -109,13 +106,13 @@ serve(async (req) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: userData, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !userData?.user) return err("Unauthorized", 401);
+    if (authErr || !userData?.user) return err(req, "Unauthorized", 401);
     const userId = userData.user.id;
 
     const body = await req.json();
     const action = String(body.action ?? "");
     const room = String(body.room ?? "").trim();
-    if (!room) return err("room required");
+    if (!room) return err(req, "room required");
 
     const lkUrl = Deno.env.get("LIVEKIT_URL")!;
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
@@ -125,8 +122,8 @@ serve(async (req) => {
     const { data: canModerate, error: permErr } = await admin.rpc("can_moderate_livekit_room", {
       _user_id: userId, _room: room,
     });
-    if (permErr) return err(permErr.message, 500);
-    if (!canModerate) return err("No eres anfitrión de esta llamada", 403);
+    if (permErr) return err(req, permErr.message, 500);
+    if (!canModerate) return err(req, "No eres anfitrión de esta llamada", 403);
 
     // Un co-anfitrión no puede tocar al anfitrión ORIGINAL (regla de Google).
     const protectTarget = async (targetIdentity: string): Promise<string | null> => {
@@ -168,16 +165,16 @@ serve(async (req) => {
     // ═══ MUTE a una persona ═══
     if (action === "muteParticipant") {
       const identity = String(body.identity ?? "");
-      if (!identity) return err("identity required");
+      if (!identity) return err(req, "identity required");
       const blocked = await protectTarget(identity);
-      if (blocked) return err(blocked, 403);
+      if (blocked) return err(req, blocked, 403);
 
       const participants = await listParticipants();
       const target = participants.find((p) => p.identity === identity);
-      if (!target) return err("Esa persona ya no está en la llamada", 404);
+      if (!target) return err(req, "Esa persona ya no está en la llamada", 404);
 
       const muted = await muteAudioOf(target);
-      return json({ ok: true, muted });
+      return json(req, { ok: true, muted });
     }
 
     // ═══ MUTE a todos (menos quien lo pide y menos otros anfitriones) ═══
@@ -195,22 +192,22 @@ serve(async (req) => {
         }
         muted += await muteAudioOf(p);
       }
-      return json({ ok: true, muted });
+      return json(req, { ok: true, muted });
     }
 
     // ═══ QUITAR / DEVOLVER LA PALABRA (el "solo ver" de Google) ═══
     if (action === "setCanPublish") {
       const identity = String(body.identity ?? "");
       const canPublish = body.canPublish === true;
-      if (!identity) return err("identity required");
+      if (!identity) return err(req, "identity required");
       const blocked = await protectTarget(identity);
-      if (blocked) return err(blocked, 403);
+      if (blocked) return err(req, blocked, 403);
 
       const res = await twirp(lkUrl, lkKey, lkSecret, room, "UpdateParticipant", {
         room, identity,
         permission: { can_subscribe: true, can_publish: canPublish, can_publish_data: true },
       });
-      if (!res.ok) return err(`LiveKit UpdateParticipant ${res.status}`, 502);
+      if (!res.ok) return err(req, `LiveKit UpdateParticipant ${res.status}`, 502);
 
       // Quitar la palabra no apaga lo que ya está publicando: hay que mutearlo.
       if (!canPublish) {
@@ -218,19 +215,19 @@ serve(async (req) => {
         const target = participants.find((p) => p.identity === identity);
         if (target) await muteAudioOf(target);
       }
-      return json({ ok: true, canPublish });
+      return json(req, { ok: true, canPublish });
     }
 
     // ═══ EXPULSAR ═══
     if (action === "removeParticipant") {
       const identity = String(body.identity ?? "");
-      if (!identity) return err("identity required");
+      if (!identity) return err(req, "identity required");
       const blocked = await protectTarget(identity);
-      if (blocked) return err(blocked, 403);
+      if (blocked) return err(req, blocked, 403);
 
       const res = await twirp(lkUrl, lkKey, lkSecret, room, "RemoveParticipant", { room, identity });
-      if (!res.ok) return err(`LiveKit RemoveParticipant ${res.status}`, 502);
-      return json({ ok: true });
+      if (!res.ok) return err(req, `LiveKit RemoveParticipant ${res.status}`, 502);
+      return json(req, { ok: true });
     }
 
     // ═══ TERMINAR PARA TODOS ═══
@@ -246,7 +243,7 @@ serve(async (req) => {
       // alcanza con poder moderar (ya validado arriba).
       const coworkHost = room.startsWith("cowork_");
       if (!callerIsOwner && !isMavenAdmin && !coworkHost) {
-        return err("Solo el anfitrión puede terminar la llamada para todos", 403);
+        return err(req, "Solo el anfitrión puede terminar la llamada para todos", 403);
       }
 
       const res = await twirp(lkUrl, lkKey, lkSecret, room, "DeleteRoom", { room });
@@ -254,7 +251,7 @@ serve(async (req) => {
       // vacía, DeleteRoom devuelve 404 y "terminar" tiene que funcionar igual.
       // Cualquier otro error sí es un problema.
       if (!res.ok && res.status !== 404) {
-        return err(`LiveKit DeleteRoom ${res.status}`, 502);
+        return err(req, `LiveKit DeleteRoom ${res.status}`, 502);
       }
 
       // Una reunión de Meet además se marca terminada: su código deja de servir.
@@ -263,15 +260,15 @@ serve(async (req) => {
           .update({ status: "ended", ended_at: new Date().toISOString() })
           .eq("livekit_room_name", room).eq("status", "active");
       }
-      return json({ ok: true, livekitRoomExisted: res.ok });
+      return json(req, { ok: true, livekitRoomExisted: res.ok });
     }
 
     // ═══ CO-ANFITRIONES (solo Meet, solo el creador) ═══
     if (action === "setCohost") {
-      if (!room.startsWith("meet_")) return err("Los co-anfitriones son de las reuniones de Meet");
+      if (!room.startsWith("meet_")) return err(req, "Los co-anfitriones son de las reuniones de Meet");
       const identity = String(body.identity ?? "");
       const targetUserId = userIdFromIdentity(identity);
-      if (!targetUserId) return err("Un invitado sin cuenta no puede ser co-anfitrión");
+      if (!targetUserId) return err(req, "Un invitado sin cuenta no puede ser co-anfitrión");
 
       const { data: callerIsOwner } = await admin.rpc("is_livekit_room_owner", {
         _user_id: userId, _room: room,
@@ -280,30 +277,30 @@ serve(async (req) => {
         _user_id: userId, _group: "admin",
       });
       if (!callerIsOwner && !isMavenAdmin) {
-        return err("Solo el anfitrión puede dar controles de anfitrión", 403);
+        return err(req, "Solo el anfitrión puede dar controles de anfitrión", 403);
       }
 
       const { data: meetRoom } = await admin.from("meet_rooms")
         .select("id, created_by").eq("livekit_room_name", room).maybeSingle();
-      if (!meetRoom) return err("Reunión no encontrada", 404);
-      if (meetRoom.created_by === targetUserId) return err("Ya es el anfitrión");
+      if (!meetRoom) return err(req, "Reunión no encontrada", 404);
+      if (meetRoom.created_by === targetUserId) return err(req, "Ya es el anfitrión");
 
       if (body.isCohost === true) {
         const { error: insErr } = await admin.from("meet_room_cohosts")
           .upsert({ meet_room_id: meetRoom.id, user_id: targetUserId, granted_by: userId },
                   { onConflict: "meet_room_id,user_id" });
-        if (insErr) return err(insErr.message, 500);
+        if (insErr) return err(req, insErr.message, 500);
       } else {
         const { error: delErr } = await admin.from("meet_room_cohosts")
           .delete().eq("meet_room_id", meetRoom.id).eq("user_id", targetUserId);
-        if (delErr) return err(delErr.message, 500);
+        if (delErr) return err(req, delErr.message, 500);
       }
-      return json({ ok: true, isCohost: body.isCohost === true });
+      return json(req, { ok: true, isCohost: body.isCohost === true });
     }
 
-    return err("Unknown action: " + action);
+    return err(req, "Unknown action: " + action);
   } catch (e) {
     console.error("livekit-moderate error:", e);
-    return err("Internal server error", 500);
+    return err(req, "Internal server error", 500);
   }
 });

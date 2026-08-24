@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // promolog-ig-apify-dispatch — escaneo de historias de IG SERVER-SIDE por Apify,
 // sin navegador ni cuenta scanner (Plan B a la extensión, que depende de una sesión
 // de IG que IG puede soft-bloquear). Usa el MISMO actor que analyze_profile_deep
@@ -23,11 +24,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
-};
-const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+const cors = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
+const json = (req: Request, b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 
 const APIFY_ACTOR = "apify~instagram-scraper";
 const RESULTS_LIMIT = 20;          // historias por perfil (la mayoría sube 5-15/día)
@@ -36,14 +34,14 @@ const norm = (s: unknown) =>
   String(s ?? "").toLowerCase().replace(/.*instagram\.com\//i, "").replace(/[@/\s]/g, "").replace(/[/?#].*$/, "").trim();
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
   const CRON = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
   const cronHeader = req.headers.get("x-cron-token") ?? "";
-  if (!CRON || cronHeader !== CRON) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!CRON || cronHeader !== CRON) return json(req, { ok: false, error: "unauthorized" }, 401);
 
   const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN");
-  if (!APIFY_TOKEN) return json({ ok: false, error: "APIFY_TOKEN no configurado" }, 500);
+  if (!APIFY_TOKEN) return json(req, { ok: false, error: "APIFY_TOKEN no configurado" }, 500);
   const SB_URL = Deno.env.get("SUPABASE_URL")!;
   const sb = createClient(SB_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
@@ -70,7 +68,7 @@ Deno.serve(async (req) => {
     const { data: cached } = await sb.from("promolog_ig_identity").select("creator_id, handle").in("creator_id", ids);
     const cachedKey = new Set((cached ?? []).map((r: any) => `${r.creator_id}:${norm(r.handle)}`));
     const faltan = [...targets.entries()].filter(([h, cid]) => !cachedKey.has(`${cid}:${h}`));
-    if (!faltan.length) return json({ ok: true, resolve_ids: true, faltan: 0 });
+    if (!faltan.length) return json(req, { ok: true, resolve_ids: true, faltan: 0 });
     const wanted = faltan.map(([h]) => h);
     let items: any[] = [];
     try {
@@ -79,7 +77,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ usernames: wanted, resultsType: "details", resultsLimit: 1, proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] } }),
       });
       if (resp.ok) items = await resp.json().catch(() => []);
-    } catch (e) { return json({ ok: false, error: `apify_resolve: ${(e as Error).message}` }, 502); }
+    } catch (e) { return json(req, { ok: false, error: `apify_resolve: ${(e as Error).message}` }, 502); }
     const idByU = new Map<string, string>();
     for (const it of (Array.isArray(items) ? items : [])) {
       const u = norm(it?.username ?? it?.inputUrl ?? it?.url ?? "");
@@ -91,10 +89,10 @@ Deno.serve(async (req) => {
     let seeded = 0;
     if (upserts.length) {
       const { error: upErr } = await sb.from("promolog_ig_identity").upsert(upserts, { onConflict: "creator_id,handle" });
-      if (upErr) return json({ ok: false, error: `upsert: ${upErr.message}`, resueltos: upserts.length }, 500);
+      if (upErr) return json(req, { ok: false, error: `upsert: ${upErr.message}`, resueltos: upserts.length }, 500);
       seeded = upserts.length;
     }
-    return json({ ok: true, resolve_ids: true, faltaban: faltan.length, resueltos_apify: idByU.size, sembrados: seeded, no_resueltos: wanted.filter((h) => !idByU.has(h)) });
+    return json(req, { ok: true, resolve_ids: true, faltaban: faltan.length, resueltos_apify: idByU.size, sembrados: seeded, no_resueltos: wanted.filter((h) => !idByU.has(h)) });
   }
 
   // ── Resolver targets: username → creator_id (principal + extras) ──────────
@@ -105,7 +103,7 @@ Deno.serve(async (req) => {
   } else {
     const { data: princ, error } = await sb
       .from("v_promolog_eligible_creators").select("id, instagram_handle");
-    if (error) return json({ ok: false, error: error.message }, 500);
+    if (error) return json(req, { ok: false, error: error.message }, 500);
     for (const c of (princ ?? []) as any[]) { const u = norm(c.instagram_handle); if (u) targetByUser.set(u, c.id); }
     const ids = (princ ?? []).map((c: any) => c.id);
     if (ids.length) {
@@ -116,7 +114,7 @@ Deno.serve(async (req) => {
     }
   }
   const usernames = [...targetByUser.keys()];
-  if (!usernames.length) return json({ ok: false, error: "sin_targets" }, 400);
+  if (!usernames.length) return json(req, { ok: false, error: "sin_targets" }, 400);
 
   const directUrls = usernames.map((u) => `https://www.instagram.com/${u}/`);
 
@@ -142,7 +140,7 @@ Deno.serve(async (req) => {
       });
       const runIdHeader = runResp.headers.get("x-apify-run-id");
       runId = runIdHeader ?? null;
-      if (!runResp.ok) return json({ ok: false, error: `apify_${runResp.status}: ${(await runResp.text()).slice(0, 300)}` }, 502);
+      if (!runResp.ok) return json(req, { ok: false, error: `apify_${runResp.status}: ${(await runResp.text()).slice(0, 300)}` }, 502);
       const items = await runResp.json().catch(() => []) as any[];
       // usageTotalUsd: consultar el run object (run-sync-get-dataset-items no lo trae)
       let usageUsd: number | null = null;
@@ -158,7 +156,7 @@ Deno.serve(async (req) => {
         const u = norm(it?.ownerUsername ?? it?.username ?? it?.inputUrl ?? "");
         if (u) byU.set(u, (byU.get(u) ?? 0) + 1);
       }
-      return json({
+      return json(req, {
         ok: true, measure: true, run_id: runId,
         handles_pedidos: usernames.length, items_totales: Array.isArray(items) ? items.length : 0,
         stories_por_handle: Object.fromEntries(byU),
@@ -166,7 +164,7 @@ Deno.serve(async (req) => {
         muestra_item_crudo: (Array.isArray(items) ? items : []).slice(0, 2),
       });
     } catch (e) {
-      return json({ ok: false, error: `measure_falló: ${(e as Error).message}`, run_id: runId }, 502);
+      return json(req, { ok: false, error: `measure_falló: ${(e as Error).message}`, run_id: runId }, 502);
     }
   }
 
@@ -200,8 +198,8 @@ Deno.serve(async (req) => {
 
   if (launchErr) {
     await sb.from("promolog_dispatch_runs").update({ status: "failed", error: launchErr, finished_at: new Date().toISOString() }).eq("id", jobId);
-    return json({ ok: false, error: launchErr, job_id: jobId }, 502);
+    return json(req, { ok: false, error: launchErr, job_id: jobId }, 502);
   }
   await sb.from("promolog_dispatch_runs").update({ apify_run_id: apifyRunId }).eq("id", jobId);
-  return json({ ok: true, job_id: jobId, apify_run_id: apifyRunId, targets: usernames.length });
+  return json(req, { ok: true, job_id: jobId, apify_run_id: apifyRunId, targets: usernames.length });
 });

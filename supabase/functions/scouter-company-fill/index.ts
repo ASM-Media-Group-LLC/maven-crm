@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiOnce } from "../_shared/gemini.ts";
@@ -15,11 +16,7 @@ import { SYSTEM_PROMPT } from "./prompt.ts";
 //
 // Auth: requiere JWT del user (RLS protege scouter_companies).
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
 interface FillRequest {
   name?: string;
@@ -37,14 +34,14 @@ interface AssistantResponse {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") {
-    return jsonError("Use POST", 405);
+    return jsonError(req, "Use POST", 405);
   }
 
   // Auth
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return jsonError("Falta Authorization", 401);
+  if (!authHeader) return jsonError(req, "Falta Authorization", 401);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -52,14 +49,14 @@ serve(async (req) => {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) return jsonError("No autenticado", 401);
+  if (!userData?.user) return jsonError(req, "No autenticado", 401);
 
   // Parse input
   let body: FillRequest;
   try {
     body = (await req.json()) as FillRequest;
   } catch {
-    return jsonError("JSON inválido", 400);
+    return jsonError(req, "JSON inválido", 400);
   }
   const name = (body.name || "").trim();
   const description = (body.description || "").trim();
@@ -67,12 +64,12 @@ serve(async (req) => {
   const messages = Array.isArray(body.messages) ? body.messages : [];
 
   if (!name && !description && messages.length === 0) {
-    return jsonError("Falta name/description o conversation history", 400);
+    return jsonError(req, "Falta name/description o conversation history", 400);
   }
 
   // API key
   const geminiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
-  if (!geminiKey) return jsonError("GEMINI_API_KEY no configurada", 500);
+  if (!geminiKey) return jsonError(req, "GEMINI_API_KEY no configurada", 500);
 
   // Build the user message: form state + (last user reply if conversational)
   const formStateBlock = `[FORM STATE]
@@ -118,7 +115,7 @@ ${JSON.stringify(currentConfig, null, 2)}`;
       : /key|401|403/i.test(msg)
         ? 402
         : 502;
-    return jsonError(msg, status);
+    return jsonError(req, msg, status);
   }
 
   // Parse JSON response (Gemini sometimes wraps in ```json blocks).
@@ -134,22 +131,22 @@ ${JSON.stringify(currentConfig, null, 2)}`;
     parsed = JSON.parse(cleaned) as AssistantResponse;
   } catch (e) {
     console.error("Gemini returned non-JSON:", cleaned.slice(0, 500));
-    return jsonError("La IA devolvió una respuesta inválida. Prueba de nuevo.", 502);
+    return jsonError(req, "La IA devolvió una respuesta inválida. Prueba de nuevo.", 502);
   }
 
   if (typeof parsed.ready !== "boolean") {
-    return jsonError("Respuesta de IA sin campo 'ready'", 502);
+    return jsonError(req, "Respuesta de IA sin campo 'ready'", 502);
   }
 
   return new Response(JSON.stringify(parsed), {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 });
 
-function jsonError(message: string, status: number): Response {
+function jsonError(req: Request, message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }

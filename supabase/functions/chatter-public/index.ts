@@ -1,3 +1,4 @@
+import { corsFor } from "../_shared/cors.ts";
 // Public-facing chatter API. Anyone with a session URL hits this — no Maven
 // auth required. The function uses the service role internally so it can
 // validate state and write messages, but only exposes a tightly-scoped
@@ -14,11 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.105.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
 
 type Body = {
   action:
@@ -47,23 +44,23 @@ type Body = {
   messageId?: string;
 };
 
-const json = (status: number, payload: unknown) =>
+const json = (req: Request, status: number, payload: unknown) =>
   new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { ok: false, error: "method not allowed" });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
+  if (req.method !== "POST") return json(req, 405, { ok: false, error: "method not allowed" });
 
   let body: Body;
   try {
     body = await req.json();
   } catch {
-    return json(400, { ok: false, error: "invalid JSON" });
+    return json(req, 400, { ok: false, error: "invalid JSON" });
   }
-  if (!body.sessionId) return json(400, { ok: false, error: "sessionId required" });
+  if (!body.sessionId) return json(req, 400, { ok: false, error: "sessionId required" });
 
   const supa = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -77,9 +74,9 @@ Deno.serve(async (req) => {
     .select("*")
     .eq("id", body.sessionId)
     .maybeSingle();
-  if (sErr) return json(500, { ok: false, error: sErr.message });
-  if (!session) return json(404, { ok: false, error: "session not found" });
-  if (session.status === "ended") return json(403, { ok: false, error: "session ended" });
+  if (sErr) return json(req, 500, { ok: false, error: sErr.message });
+  if (!session) return json(req, 404, { ok: false, error: "session not found" });
+  if (session.status === "ended") return json(req, 403, { ok: false, error: "session ended" });
 
   // Defense in depth: si la sesión está en active pero el tiempo expiró,
   // la marcamos ended antes de aceptar cualquier acción. El pg_cron job
@@ -97,7 +94,7 @@ Deno.serve(async (req) => {
         .from("chatter_sessions")
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", body.sessionId);
-      return json(403, { ok: false, error: "session_expired" });
+      return json(req, 403, { ok: false, error: "session_expired" });
     }
   }
 
@@ -106,7 +103,7 @@ Deno.serve(async (req) => {
       const content = (body.content ?? "").trim();
       const images = body.images ?? [];
       if (!content && images.length === 0) {
-        return json(400, { ok: false, error: "content or images required" });
+        return json(req, 400, { ok: false, error: "content or images required" });
       }
       // The chatter always sends a regular `message` — even when a price is
       // attached. The `purchase` msg_type is reserved for the system-side
@@ -131,7 +128,7 @@ Deno.serve(async (req) => {
         })
         .select("*")
         .single();
-      if (error) return json(500, { ok: false, error: error.message });
+      if (error) return json(req, 500, { ok: false, error: error.message });
 
       // Auto-flip status to 'active' on first chatter message
       if (session.status === "waiting") {
@@ -140,11 +137,11 @@ Deno.serve(async (req) => {
           .update({ status: "active", started_at: new Date().toISOString() })
           .eq("id", body.sessionId);
       }
-      return json(200, { ok: true, message: data });
+      return json(req, 200, { ok: true, message: data });
     }
 
     case "claim-device": {
-      if (!body.deviceId) return json(400, { ok: false, error: "deviceId required" });
+      if (!body.deviceId) return json(req, 400, { ok: false, error: "deviceId required" });
       // Strict single-device lock — matches the original Roleplaychatters
       // (index.html line 2309 "DEVICE LOCK (strict: one device per session,
       // no takeover)"). Once a device has claimed the session, every other
@@ -153,7 +150,7 @@ Deno.serve(async (req) => {
       const isOtherDevice =
         session.active_device_id && session.active_device_id !== body.deviceId;
       if (isOtherDevice) {
-        return json(409, {
+        return json(req, 409, {
           ok: false,
           error: "session_locked",
           message: "Otro dispositivo está activo en esta sesión.",
@@ -166,7 +163,7 @@ Deno.serve(async (req) => {
           active_device_claimed_at: new Date().toISOString(),
         })
         .eq("id", body.sessionId);
-      return json(200, { ok: true });
+      return json(req, 200, { ok: true });
     }
 
     case "set-typing": {
@@ -177,7 +174,7 @@ Deno.serve(async (req) => {
           typing_chatter_at: body.typing ? new Date().toISOString() : null,
         })
         .eq("id", body.sessionId);
-      return json(200, { ok: true });
+      return json(req, 200, { ok: true });
     }
 
     case "mark-read": {
@@ -185,7 +182,7 @@ Deno.serve(async (req) => {
         .from("chatter_sessions")
         .update({ read_by_chatter_at: new Date().toISOString() })
         .eq("id", body.sessionId);
-      return json(200, { ok: true });
+      return json(req, 200, { ok: true });
     }
 
     case "delete-message": {
@@ -194,44 +191,44 @@ Deno.serve(async (req) => {
       // the message is hidden from the chatter's own view but the examiner
       // still sees it as "(mensaje eliminado por el chatter)" in red. The
       // chatter can only soft-delete their OWN messages.
-      if (!body.messageId) return json(400, { ok: false, error: "messageId required" });
+      if (!body.messageId) return json(req, 400, { ok: false, error: "messageId required" });
       const { data: msg, error: mErr } = await supa
         .from("chatter_messages")
         .select("id, session_id, role, deleted")
         .eq("id", body.messageId)
         .maybeSingle();
-      if (mErr) return json(500, { ok: false, error: mErr.message });
-      if (!msg) return json(404, { ok: false, error: "message not found" });
+      if (mErr) return json(req, 500, { ok: false, error: mErr.message });
+      if (!msg) return json(req, 404, { ok: false, error: "message not found" });
       if (msg.session_id !== body.sessionId) {
-        return json(403, { ok: false, error: "wrong session" });
+        return json(req, 403, { ok: false, error: "wrong session" });
       }
       if (msg.role !== "chatter") {
-        return json(403, { ok: false, error: "not your message" });
+        return json(req, 403, { ok: false, error: "not your message" });
       }
       // 'full' wins over 'chatter' if the examiner already nuked it.
-      if (msg.deleted === "full") return json(200, { ok: true });
+      if (msg.deleted === "full") return json(req, 200, { ok: true });
       const { error: uErr } = await supa
         .from("chatter_messages")
         .update({ deleted: "chatter" })
         .eq("id", body.messageId);
-      if (uErr) return json(500, { ok: false, error: uErr.message });
-      return json(200, { ok: true });
+      if (uErr) return json(req, 500, { ok: false, error: uErr.message });
+      return json(req, 200, { ok: true });
     }
 
     case "upload-image": {
       if (!body.base64 || !body.fileName) {
-        return json(400, { ok: false, error: "base64 and fileName required" });
+        return json(req, 400, { ok: false, error: "base64 and fileName required" });
       }
       const ct = body.contentType ?? "image/jpeg";
       if (!ct.startsWith("image/") && !ct.startsWith("video/")) {
-        return json(400, { ok: false, error: "only image/* or video/* supported" });
+        return json(req, 400, { ok: false, error: "only image/* or video/* supported" });
       }
       // Decode base64 → bytes. Hard cap at 8 MB (post-decode) to keep edge
       // function payload reasonable; the frontend should refuse larger files
       // before encoding.
       const bin = Uint8Array.from(atob(body.base64), (c) => c.charCodeAt(0));
       if (bin.length > 8 * 1024 * 1024) {
-        return json(413, { ok: false, error: "file too large (max 8 MB)" });
+        return json(req, 413, { ok: false, error: "file too large (max 8 MB)" });
       }
       const safeName = (body.fileName || "upload")
         .toLowerCase()
@@ -242,14 +239,14 @@ Deno.serve(async (req) => {
       const { error: upErr } = await supa.storage
         .from("chatter-vault")
         .upload(path, bin, { upsert: false, contentType: ct });
-      if (upErr) return json(500, { ok: false, error: upErr.message });
+      if (upErr) return json(req, 500, { ok: false, error: upErr.message });
       const { data: pub } = supa.storage
         .from("chatter-vault")
         .getPublicUrl(path);
-      return json(200, { ok: true, url: pub.publicUrl, path });
+      return json(req, 200, { ok: true, url: pub.publicUrl, path });
     }
 
     default:
-      return json(400, { ok: false, error: "unknown action" });
+      return json(req, 400, { ok: false, error: "unknown action" });
   }
 });
