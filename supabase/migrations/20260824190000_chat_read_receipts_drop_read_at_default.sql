@@ -1,0 +1,14 @@
+-- Bug: la columna read_at de chat_read_receipts tenía DEFAULT now(). Como
+-- markMessagesDelivered inserta la fila del recibo poniendo SOLO delivered_at (sin
+-- read_at), el default llenaba read_at = now() → TODO mensaje quedaba marcado como
+-- "leído" en el mismo instante en que se entregaba, sin que el receptor lo viera
+-- (el remitente veía el doble-check de "leído" al toque).
+--
+-- Una fila de recibo entregado debe nacer con read_at = NULL; read_at solo se setea
+-- cuando el receptor realmente abre el chat (markAsRead). Quitamos el default.
+--
+-- Nota: la data histórica corrupta (read_at puesto por el default) se limpió una sola
+-- vez por separado, reseteando a NULL las filas con read_at <= delivered_at + 5s
+-- (entregado y "leído" simultáneos = no fue lectura humana), preservando las lecturas
+-- genuinas (read_at claramente posterior a delivered_at).
+ALTER TABLE public.chat_read_receipts ALTER COLUMN read_at DROP DEFAULT;
