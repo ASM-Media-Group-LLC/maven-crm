@@ -29,6 +29,12 @@ export function useVideoCall() {
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [calling, setCalling] = useState(false);
   const ringingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Espejo de activeCall para leerlo dentro del callback de realtime sin
+  // re-suscribir el canal (sus deps son [user]).
+  const activeCallRef = useRef<Call | null>(null);
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   // ── Cleanup ringing timer helper ────────────────────────────────
   const clearRingingTimer = useCallback(() => {
@@ -46,6 +52,51 @@ export function useVideoCall() {
 
       const roomId = `call-${conversationId}`;
 
+      // ── Anti-"glare" ────────────────────────────────────────────────
+      // Si los dos se llaman casi a la vez, NO creamos dos llamadas para la
+      // misma sala (room_id es determinístico por conversación). Buscamos una
+      // llamada viva (últimos 40s) en esta conversación.
+      const since = new Date(Date.now() - 40_000).toISOString();
+      const { data: liveRows } = await (supabase.from("calls") as any)
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .in("call_status", ["ringing", "accepted"])
+        .gte("created_at", since)
+        .order("created_at", { ascending: false });
+      const live = (liveRows ?? []) as Call[];
+
+      // (a) El OTRO ya me está llamando → me UNO a su llamada (no creo otra).
+      const fromOther = live.find(
+        (c) => c.receiver_id === user.id && c.caller_id === receiverId,
+      );
+      if (fromOther) {
+        clearRingingTimer();
+        await (supabase.from("calls") as any)
+          .update({ call_status: "accepted", start_time: new Date().toISOString() })
+          .eq("id", fromOther.id)
+          .eq("call_status", "ringing");
+        await (supabase.from("call_participants") as any)
+          .update({ status: "accepted" })
+          .eq("call_id", fromOther.id)
+          .eq("user_id", user.id);
+        setIncomingCall(null);
+        setActiveCall({ ...fromOther, call_status: "accepted" });
+        setCalling(false);
+        window.open(`/call/${encodeURIComponent(roomId)}`, `call-${roomId}`, "noopener");
+        return;
+      }
+
+      // (b) Yo ya tengo una llamada viva en esta conversación → solo reabro la
+      // sala, no duplico.
+      const mine = live.find((c) => c.caller_id === user.id);
+      if (mine) {
+        setActiveCall(mine);
+        setCalling(false);
+        window.open(`/call/${encodeURIComponent(roomId)}?admin=1`, `call-${roomId}`, "noopener");
+        return;
+      }
+
+      // (c) Normal: creo la llamada.
       const { data: call, error } = await (supabase
         .from("calls") as any)
         .insert({
@@ -206,6 +257,19 @@ export function useVideoCall() {
         async (payload) => {
           const call = payload.new as Call;
           if (call.call_status !== "ringing") return;
+
+          // Glare simultáneo (sub-segundo, cuando el query de initiateCall corrió
+          // antes de ver la fila del otro): si YO también estoy llamando en esta
+          // misma conversación, ya compartimos la sala determinística. No muestro
+          // otro modal y marco mi llamada como aceptada para cortar el auto-corte.
+          const mineActive = activeCallRef.current;
+          if (mineActive && mineActive.conversation_id === call.conversation_id) {
+            void (supabase.from("calls") as any)
+              .update({ call_status: "accepted", start_time: new Date().toISOString() })
+              .eq("id", mineActive.id)
+              .eq("call_status", "ringing");
+            return;
+          }
 
           const { data: profile } = await supabase
             .from("profiles")
