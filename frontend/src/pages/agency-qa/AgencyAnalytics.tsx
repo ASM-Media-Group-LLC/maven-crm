@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Trophy, Users, BarChart3, TrendingUp } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import {
   BarChart,
@@ -80,10 +80,10 @@ const Kpi = ({
   value: string | number;
   hint?: string;
   color: string;
-  icon: typeof BarChart3;
+  icon: ReactNode;
   onClick?: () => void;
 }) => (
-  <KpiCard label={label} value={value} icon={icon} color={color} subtitle={hint} onClick={onClick} />
+  <StatChip label={label} value={value} icon={icon} color={color} hint={hint} onClick={onClick} />
 );
 
 // ─── Main ──────────────────────────────────────────────────────────────
@@ -168,8 +168,8 @@ const AgencyAnalytics = () => {
               label="Análisis totales"
               value={data.total_calls}
               hint={`en ${WINDOW_OPTIONS.find((w) => w.value === data.window)?.label.toLowerCase()}`}
-              color="bg-blue-500"
-              icon={BarChart3}
+              color="bg-primary"
+              icon={<BarChart3 className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("totales")}
             />
             <Kpi
@@ -177,7 +177,7 @@ const AgencyAnalytics = () => {
               value={formatPct(data.close_rate)}
               hint={`${data.cerro} cerros`}
               color="bg-success"
-              icon={Trophy}
+              icon={<Trophy className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("close_rate")}
             />
             <Kpi
@@ -185,15 +185,15 @@ const AgencyAnalytics = () => {
               value={data.avg_score}
               hint={`/ 100`}
               color={data.avg_score >= 70 ? "bg-success" : data.avg_score >= 50 ? "bg-warning" : "bg-destructive"}
-              icon={TrendingUp}
+              icon={<TrendingUp className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("score")}
             />
             <Kpi
               label="Closers activos"
               value={data.active_closers}
               hint={`${data.active_models} modelos con calls`}
-              color="bg-violet-500"
-              icon={Users}
+              color="bg-primary"
+              icon={<Users className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("closers")}
             />
           </div>

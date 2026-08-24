@@ -4,7 +4,7 @@ import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, X 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
@@ -59,9 +59,9 @@ const OnboardingContent = () => {
   };
 
   const kpiCards = [
-    { label: "Total", value: total, icon: Users, filter: "Todas", color: "bg-blue-500" },
+    { label: "Total", value: total, icon: Users, filter: "Todas", color: "bg-primary" },
     { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "bg-warning" },
-    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-violet-500" },
+    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-primary" },
     { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-success" },
   ];
 
@@ -86,11 +86,11 @@ const OnboardingContent = () => {
         {/* KPI Cards — click filtra la lista (no abre modal porque la lista vive abajo) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {kpiCards.map((kpi) => (
-            <KpiCard
+            <StatChip
               key={kpi.label}
               label={kpi.label}
               value={String(kpi.value)}
-              icon={kpi.icon}
+              icon={<kpi.icon className="h-3.5 w-3.5" />}
               color={kpi.color}
               onClick={() => setStatusFilter(kpi.filter)}
               className={statusFilter === kpi.filter ? "ring-2 ring-primary" : undefined}

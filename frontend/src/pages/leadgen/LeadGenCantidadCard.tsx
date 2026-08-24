@@ -1,5 +1,5 @@
 import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall, Trophy, Phone } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatCompact } from "@/lib/format";
 
@@ -32,11 +32,11 @@ interface Props {
 // Cards de categorías de leads — patrón estándar KpiCard. Click toggles
 // el filtro activo (no abre modal — la lista filtrada vive abajo).
 const categoryConfig = [
-  { key: "a+", label: "A+", icon: Star, color: "bg-blue-500" },
-  { key: "a", label: "A", icon: TrendingUp, color: "bg-emerald-500" },
-  { key: "b+", label: "B+", icon: ArrowUpRight, color: "bg-amber-500" },
-  { key: "b", label: "B", icon: ArrowRight, color: "bg-amber-600" },
-  { key: "c", label: "C", icon: ArrowDownRight, color: "bg-slate-500" },
+  { key: "a+", label: "A+", icon: Star, color: "bg-primary" },
+  { key: "a", label: "A", icon: TrendingUp, color: "bg-success" },
+  { key: "b+", label: "B+", icon: ArrowUpRight, color: "bg-warning" },
+  { key: "b", label: "B", icon: ArrowRight, color: "bg-warning" },
+  { key: "c", label: "C", icon: ArrowDownRight, color: "bg-muted-foreground" },
 ];
 
 // Helper para iniciales del avatar — máximo 2 chars en uppercase.
@@ -108,19 +108,19 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange, mejorLlg, ra
       {/* Row 1 lg: Mejor LLG (span 3) + Total + QA */}
       <MejorLlgCard data={mejorLlg ?? null} rangeLabel={rangeLabel} />
 
-      <KpiCard label="Total" value={formatCompact(total)} icon={Users} color="bg-violet-500" />
-      <KpiCard label="QA" value={formatCompact(qa)} icon={PhoneCall} color="bg-blue-500" />
+      <StatChip label="Total" value={formatCompact(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" />
+      <StatChip label="QA" value={formatCompact(qa)} icon={<PhoneCall className="h-3.5 w-3.5" />} color="bg-primary" />
 
       {/* Row 2 lg: 5 categorías ocupan toda la fila */}
       {categoryConfig.map((cat) => {
         const count = byQuality[cat.key] ?? 0;
         const isActive = activeFilter?.type === "categoria" && activeFilter.value === cat.key;
         return (
-          <KpiCard
+          <StatChip
             key={cat.key}
             label={`Cat. ${cat.label}`}
             value={formatCompact(count)}
-            icon={cat.icon}
+            icon={<cat.icon className="h-3.5 w-3.5" />}
             color={cat.color}
             onClick={() => handleClick(cat.key)}
             className={isActive ? "ring-2 ring-primary" : undefined}

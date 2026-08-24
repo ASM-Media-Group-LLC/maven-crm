@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle, MessageSquare, XCircle, ImageIcon } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
@@ -104,11 +104,11 @@ const PersonalizadosPage = () => {
 
         <div className="flex-1 overflow-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-              <KpiCard label="Total Solicitudes" value={String(total)} icon={FileText} color="bg-blue-500" subtitle="Todas las solicitudes" onClick={() => setStatusFilter("all")} />
-              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" subtitle="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
-              <KpiCard label="En Progreso" value={String(enProgreso)} icon={Loader} color="bg-violet-500" subtitle="En proceso" onClick={() => setStatusFilter("en_progreso")} />
-              <KpiCard label="Completadas" value={String(completadas)} icon={CheckCircle2} color="bg-success" subtitle="Finalizadas" onClick={() => setStatusFilter("completada")} />
-              <KpiCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} color="bg-destructive" subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} />
+              <StatChip label="Total Solicitudes" value={String(total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="Todas las solicitudes" onClick={() => setStatusFilter("all")} />
+              <StatChip label="Pendientes" value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
+              <StatChip label="En Progreso" value={String(enProgreso)} icon={<Loader className="h-3.5 w-3.5" />} color="bg-primary" hint="En proceso" onClick={() => setStatusFilter("en_progreso")} />
+              <StatChip label="Completadas" value={String(completadas)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Finalizadas" onClick={() => setStatusFilter("completada")} />
+              <StatChip label="Alertas Críticas" value={String(alertas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} />
             </div>
 
             <div className="flex flex-wrap gap-3">

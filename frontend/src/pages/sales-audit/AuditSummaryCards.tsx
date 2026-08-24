@@ -1,5 +1,5 @@
 import { FileSpreadsheet, AlertTriangle, CheckCircle } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 
 interface Props {
   totalExcel: number;
@@ -14,13 +14,13 @@ const AuditSummaryCards = ({ totalExcel, totalSystem, matchCount, diffCount }: P
   const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <KpiCard label="Total Excel (Gross)" value={fmt(totalExcel)} icon={FileSpreadsheet} color="bg-blue-500" />
-      <KpiCard label="Total Sistema (Gross)" value={fmt(totalSystem)} icon={FileSpreadsheet} color="bg-violet-500" />
-      <KpiCard label="Coinciden" value={String(matchCount)} icon={CheckCircle} color="bg-success" />
-      <KpiCard
+      <StatChip label="Total Excel (Gross)" value={fmt(totalExcel)} icon={<FileSpreadsheet className="h-3.5 w-3.5" />} color="bg-primary" />
+      <StatChip label="Total Sistema (Gross)" value={fmt(totalSystem)} icon={<FileSpreadsheet className="h-3.5 w-3.5" />} color="bg-primary" />
+      <StatChip label="Coinciden" value={String(matchCount)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" />
+      <StatChip
         label="Diferencias"
         value={String(diffCount)}
-        icon={diffCount > 0 ? AlertTriangle : CheckCircle}
+        icon={diffCount > 0 ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
         color={diffCount > 0 ? "bg-destructive" : "bg-success"}
       />
     </div>

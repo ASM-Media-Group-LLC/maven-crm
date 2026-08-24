@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { PhoneInput } from "@/components/ui/phone-input";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import StartOnboardingModal from "./StartOnboardingModal";
 import {
   useProspectos, useAddProspect, useUpdateProspect, useDeleteProspect,
@@ -132,10 +132,10 @@ export default function ProspectosPage() {
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
-                <KpiCard label="Total Casting" value={String(prospects.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" />
-                <KpiCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} color="bg-warning" subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
-                <KpiCard label="En Negociación" value={String(totalNegociando)} icon={Target} color="bg-violet-500" subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
-                <KpiCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-success" subtitle={`${totalConvertidos} convertidos`} />
+                <StatChip label="Total Casting" value={String(prospects.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" />
+                <StatChip label="Pendientes de Contacto" value={String(totalLeads)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
+                <StatChip label="En Negociación" value={String(totalNegociando)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
+                <StatChip label="Tasa de Conversión" value={`${conversionRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={`${totalConvertidos} convertidos`} />
               </>
             )}
           </div>

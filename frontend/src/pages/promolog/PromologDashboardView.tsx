@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -376,13 +376,13 @@ const PromologDashboardView = ({
     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
       {/* ═══ Row 1: KPI cards ═══════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
+        <StatChip
           label="Creadores Escaneados"
           value={String(creatorsScannedCount)}
-          icon={Users}
-          color="bg-blue-500"
+          icon={<Users className="h-3.5 w-3.5" />}
+          color="bg-primary"
           onClick={() => onOpenKpiModal("creadores_escaneados")}
-          footer={
+          hint={
             <div className="space-y-1">
               {activeCreatorsCount ? (
                 <p className={`text-[10px] ${coverGap > 0 ? "text-warning" : "text-muted-foreground"}`}>
@@ -402,32 +402,32 @@ const PromologDashboardView = ({
             </div>
           }
         />
-        <KpiCard
+        <StatChip
           label="Tasa de éxito"
           value={`${successRate}%`}
-          icon={TrendingUp}
+          icon={<TrendingUp className="h-3.5 w-3.5" />}
           color="bg-success"
           onClick={() => onOpenKpiModal("completadas")}
-          footer={
+          hint={
             <span className="text-[10px] text-muted-foreground">
               promos ÷ escaneadas{prevMetrics ? <> · <DeltaSpan diff={successRate - prevMetrics.successRate} suffix="pp" /> vs ant.</> : null}
             </span>
           }
         />
-        <KpiCard
+        <StatChip
           label="Sin revisar"
           value={String(pendingCount)}
-          icon={AlertTriangle}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
           color="bg-destructive"
           onClick={() => onOpenKpiModal("no_chequeadas")}
         />
-        <KpiCard
+        <StatChip
           label="Promos (Sí)"
           value={String(promosCount)}
-          icon={Table2}
-          color="bg-violet-500"
+          icon={<Table2 className="h-3.5 w-3.5" />}
+          color="bg-primary"
           onClick={() => onOpenKpiModal("ingresados")}
-          footer={
+          hint={
             <span className="text-[10px] text-muted-foreground">
               de {totalEntries} escaneadas{prevMetrics ? <> · <DeltaSpan diff={promosCount - prevMetrics.promos} /> vs ant.</> : null}
             </span>

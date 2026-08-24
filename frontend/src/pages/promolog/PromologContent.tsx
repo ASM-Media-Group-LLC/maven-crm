@@ -44,7 +44,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components/dashboard/DateRangePresets";
 import PromologDashboardView from "./PromologDashboardView";

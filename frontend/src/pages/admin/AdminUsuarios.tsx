@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
 import UsersGrid from "./UsersGrid";
@@ -77,10 +77,10 @@ const AdminUsuarios = () => {
   };
 
   const kpis = [
-    { label: "Total", value: String(stats.total), icon: Users, color: "bg-blue-500" },
-    { label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-rose-500" },
-    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-amber-500" },
-    { label: "Employees", value: String(stats.employees), icon: User, color: "bg-violet-500" },
+    { label: "Total", value: String(stats.total), icon: Users, color: "bg-primary" },
+    { label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-destructive" },
+    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-warning" },
+    { label: "Employees", value: String(stats.employees), icon: User, color: "bg-primary" },
   ];
 
   // El tab "Roles" (CRUD de roles + permisos) se gatea con el permiso "Roles".
@@ -128,7 +128,7 @@ const AdminUsuarios = () => {
               {/* KPIs — estáticas (la tabla detallada vive abajo) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {kpis.map((kpi) => (
-                  <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} color={kpi.color} />
+                  <StatChip key={kpi.label} label={kpi.label} value={kpi.value} icon={<kpi.icon className="h-3.5 w-3.5" />} color={kpi.color} />
                 ))}
               </div>
 

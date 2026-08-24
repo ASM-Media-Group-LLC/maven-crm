@@ -64,6 +64,7 @@ import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
 import WhatsappAgentTab from "./panel-de-control/WhatsappAgentTab";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
+import StatChip from "@/components/StatChip";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -87,50 +88,14 @@ const KpiCard = ({
   loading,
   onClick,
 }: KpiCardProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={loading}
-    className={cn(
-      "group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left",
-      "transition-all duration-200 ease-out",
-      "hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)]",
-      "active:scale-[0.99]",
-      "disabled:cursor-not-allowed disabled:opacity-70",
-    )}
-  >
-    {/* Gradient corner accent */}
-    <div
-      className={cn(
-        "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
-        "transition-opacity group-hover:opacity-50",
-        gradient,
-      )}
-    />
-
-    <div className="relative space-y-3">
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
-          {label}
-        </p>
-        {loading ? (
-          <Skeleton className="mt-1 h-9 w-24" />
-        ) : (
-          <p className="text-3xl font-bold tabular-nums leading-tight">
-            {value.toLocaleString("es")}
-          </p>
-        )}
-        {hint && (
-          <div className="text-[10px] text-muted-foreground mt-1">
-            {hint}
-          </div>
-        )}
-      </div>
-    </div>
-  </button>
+  <StatChip
+    label={label}
+    value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString("es")}
+    hint={hint}
+    color={gradient}
+    icon={icon}
+    onClick={loading ? undefined : onClick}
+  />
 );
 
 // ─── Detail dialog ─────────────────────────────────────────────────────
@@ -923,8 +888,8 @@ const PanelDeControl = () => {
       key: "totalLeads",
       label: "Modelos contactadas",
       value: k.totalLeads,
-      icon: <Users className="h-5 w-5 text-white" />,
-      gradient: "bg-blue-500",
+      icon: <Users className="h-3.5 w-3.5" />,
+      gradient: "bg-primary",
       hint: (
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300 tabular-nums">
@@ -946,7 +911,7 @@ const PanelDeControl = () => {
       key: "numbersObtained",
       label: "Números obtenidos",
       value: k.numbersObtained,
-      icon: <Phone className="h-5 w-5 text-white" />,
+      icon: <Phone className="h-3.5 w-3.5" />,
       gradient: "bg-cyan-500",
       hint: "Capturas únicas (leadgen + closer + creator) sin duplicados",
     },
@@ -954,32 +919,32 @@ const PanelDeControl = () => {
       key: "closerCalls",
       label: "Llamadas para cierre",
       value: k.closerCalls,
-      icon: <PhoneCall className="h-5 w-5 text-white" />,
-      gradient: "bg-violet-500",
+      icon: <PhoneCall className="h-3.5 w-3.5" />,
+      gradient: "bg-primary",
       hint: "Audios subidos al Company QA",
     },
     {
       key: "closes",
       label: "Cierres",
       value: k.closes,
-      icon: <CheckCircle2 className="h-5 w-5 text-white" />,
-      gradient: "bg-emerald-500",
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      gradient: "bg-success",
       hint: "IA marcó la llamada como cerro",
     },
     {
       key: "onHold",
       label: "En espera",
       value: k.onHold,
-      icon: <Clock className="h-5 w-5 text-white" />,
-      gradient: "bg-amber-500",
+      icon: <Clock className="h-3.5 w-3.5" />,
+      gradient: "bg-warning",
       hint: "Modelos pensándolo / no decidieron",
     },
     {
       key: "rejections",
       label: "Rechazos",
       value: k.rejections,
-      icon: <XCircle className="h-5 w-5 text-white" />,
-      gradient: "bg-rose-500",
+      icon: <XCircle className="h-3.5 w-3.5" />,
+      gradient: "bg-destructive",
       hint: "IA marcó la llamada como no_cerro",
     },
   ];

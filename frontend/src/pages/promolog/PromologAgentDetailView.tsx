@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -288,10 +288,10 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           {/* KPI Cards — clickeables, abren modal con detalle */}
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[240px] opacity-100 pb-2"}`}>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard label="Total" value={String(totalEntries)} icon={Table2} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Sí" value={String(siCount)} icon={Check} color="bg-success" onClick={() => setKpiPopup("si")} />
-              <KpiCard label="No" value={String(noCount)} icon={X} color="bg-destructive" onClick={() => setKpiPopup("no")} />
-              <KpiCard label="Éxito" value={`${successRate}%`} icon={TrendingUp} color="bg-violet-500" onClick={() => setKpiPopup("exito")} />
+              <StatChip label="Total" value={String(totalEntries)} icon={<Table2 className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+              <StatChip label="Sí" value={String(siCount)} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("si")} />
+              <StatChip label="No" value={String(noCount)} icon={<X className="h-3.5 w-3.5" />} color="bg-destructive" onClick={() => setKpiPopup("no")} />
+              <StatChip label="Éxito" value={`${successRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("exito")} />
             </div>
           </div>
 
@@ -364,10 +364,10 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
           {/* Summary KPIs — clickeables */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Total Promos" value={String(totalEntries)} icon={Table2} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-            <KpiCard label="Promedio/Día" value={String(avgPerDay)} icon={TrendingUp} color="bg-violet-500" onClick={() => setKpiPopup("avg")} />
-            <KpiCard label="Tasa de Éxito" value={`${successRate}%`} icon={Check} color="bg-success" onClick={() => setKpiPopup("exito")} />
-            <KpiCard label="Hoy" value={String(rawEntries.filter((e: any) => isToday(new Date(e.date))).length)} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("hoy")} />
+            <StatChip label="Total Promos" value={String(totalEntries)} icon={<Table2 className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+            <StatChip label="Promedio/Día" value={String(avgPerDay)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("avg")} />
+            <StatChip label="Tasa de Éxito" value={`${successRate}%`} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("exito")} />
+            <StatChip label="Hoy" value={String(rawEntries.filter((e: any) => isToday(new Date(e.date))).length)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("hoy")} />
           </div>
 
           {/* Charts row 1: Promos por Día + Promos por Hora */}

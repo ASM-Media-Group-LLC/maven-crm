@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, UserPlus, MessageCircle, UserCheck, Instagram } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { useSuperContacts } from "./useSuperContacts";
 import { getCountryDisplay } from "@/lib/country-utils";
@@ -72,10 +72,10 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const kpis = [
-    { key: "total" as KpiKey, label: "Total", value: counts.total, icon: Users, color: "bg-blue-500" },
-    { key: "nuevo" as KpiKey, label: "Nuevos", value: counts.nuevo, icon: UserPlus, color: "bg-violet-500" },
-    { key: "contactado" as KpiKey, label: "Contactados", value: counts.contactado, icon: MessageCircle, color: "bg-amber-500" },
-    { key: "convertido" as KpiKey, label: "Convertidos", value: counts.convertido, icon: UserCheck, color: "bg-emerald-500" },
+    { key: "total" as KpiKey, label: "Total", value: counts.total, icon: Users, color: "bg-primary" },
+    { key: "nuevo" as KpiKey, label: "Nuevos", value: counts.nuevo, icon: UserPlus, color: "bg-primary" },
+    { key: "contactado" as KpiKey, label: "Contactados", value: counts.contactado, icon: MessageCircle, color: "bg-warning" },
+    { key: "convertido" as KpiKey, label: "Convertidos", value: counts.convertido, icon: UserCheck, color: "bg-success" },
   ];
 
   return (
@@ -83,11 +83,11 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
       {/* KPIs — clickeables, abren modal */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map((k) => (
-          <KpiCard
+          <StatChip
             key={k.label}
             label={k.label}
             value={k.value}
-            icon={k.icon}
+            icon={<k.icon className="h-3.5 w-3.5" />}
             color={k.color}
             onClick={() => setKpiPopup(k.key)}
           />

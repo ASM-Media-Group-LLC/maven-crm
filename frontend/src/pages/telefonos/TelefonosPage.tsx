@@ -12,7 +12,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -460,12 +460,12 @@ export default function TelefonosPage() {
   const Dashboard = (
     <div className="space-y-4">
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Teléfonos" value={phones.length} icon={Smartphone} color="bg-blue-500"
-          subtitle="Total disponibles" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
-        <KpiCard label="En uso ahora" value={inUseCount} icon={Activity} color="bg-emerald-500"
-          subtitle="Prendidos en este momento" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
-        <KpiCard label="Minutos" value={totalMin} icon={Clock} color="bg-violet-500" subtitle="Últimos 30 días" />
-        <KpiCard label="Sesiones" value={totalSessions} icon={ListChecks} color="bg-amber-500" subtitle="Últimos 30 días" />
+        <StatChip label="Teléfonos" value={phones.length} icon={<Smartphone className="h-3.5 w-3.5" />} color="bg-primary"
+          hint="Total disponibles" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <StatChip label="En uso ahora" value={inUseCount} icon={<Activity className="h-3.5 w-3.5" />} color="bg-success"
+          hint="Prendidos en este momento" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <StatChip label="Minutos" value={totalMin} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint="Últimos 30 días" />
+        <StatChip label="Sesiones" value={totalSessions} icon={<ListChecks className="h-3.5 w-3.5" />} color="bg-warning" hint="Últimos 30 días" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card><CardContent className="p-4">

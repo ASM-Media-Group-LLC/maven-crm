@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
@@ -101,15 +101,15 @@ const StatCard = ({
   icon,
   label,
   value,
-  color = "bg-blue-500",
+  color = "bg-primary",
   onClick,
 }: {
-  icon: typeof ImageIcon;
+  icon: ReactNode;
   label: string;
   value: string | number;
   color?: string;
   onClick?: () => void;
-}) => <KpiCard label={label} value={value} icon={icon as any} color={color} onClick={onClick} />;
+}) => <StatChip label={label} value={value} icon={icon} color={color} onClick={onClick} />;
 
 const ChatterEvaluatorContent = () => {
   const profilesQ = useChatterProfiles();
@@ -161,31 +161,31 @@ const ChatterEvaluatorContent = () => {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
-              icon={Users}
+              icon={<Users className="h-3.5 w-3.5" />}
               label="Personas evaluadas"
               value={statsQ.isLoading ? "…" : (counters?.total ?? 0)}
-              color="bg-blue-500"
+              color="bg-primary"
               onClick={() => setKpiPopup("total")}
             />
             <StatCard
-              icon={CheckCircle2}
+              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
               label="Aprobados"
               value={statsQ.isLoading ? "…" : (counters?.approved ?? 0)}
-              color="bg-emerald-500"
+              color="bg-success"
               onClick={() => setKpiPopup("approved")}
             />
             <StatCard
-              icon={XCircle}
+              icon={<XCircle className="h-3.5 w-3.5" />}
               label="Reprobados"
               value={statsQ.isLoading ? "…" : (counters?.rejected ?? 0)}
-              color="bg-rose-500"
+              color="bg-destructive"
               onClick={() => setKpiPopup("rejected")}
             />
             <StatCard
-              icon={Percent}
+              icon={<Percent className="h-3.5 w-3.5" />}
               label="Promedio de éxito"
               value={statsQ.isLoading ? "…" : `${counters?.successRatePct ?? 0}%`}
-              color="bg-violet-500"
+              color="bg-primary"
               onClick={() => setKpiPopup("rate")}
             />
           </div>

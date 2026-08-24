@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import KpiCard from "@/components/dashboard/KpiCard";
+import StatChip from "@/components/StatChip";
 import { cn } from "@/lib/utils";
 import {
   useCloserActivity, useCloserActivityDetail,
@@ -161,10 +161,10 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
 
       {/* KPIs de supervisión */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Contactos" value={totals.contacts} icon={Activity} color="bg-blue-500" subtitle="Registrados en el rango" />
-        <KpiCard label="Leads tocados" value={totals.touched} icon={Users} color="bg-violet-500" subtitle="Leads distintos contactados" />
-        <KpiCard label="Leads vencidos" value={totals.overdue} icon={AlertTriangle} color="bg-rose-500" subtitle="Contacto fuera de cadencia" />
-        <KpiCard label="Closers sin gestión" value={totals.sinGestion} icon={UserX} color="bg-amber-500" subtitle="Todos sus leads vencidos" />
+        <StatChip label="Contactos" value={totals.contacts} icon={<Activity className="h-3.5 w-3.5" />} color="bg-primary" hint="Registrados en el rango" />
+        <StatChip label="Leads tocados" value={totals.touched} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Leads distintos contactados" />
+        <StatChip label="Leads vencidos" value={totals.overdue} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Contacto fuera de cadencia" />
+        <StatChip label="Closers sin gestión" value={totals.sinGestion} icon={<UserX className="h-3.5 w-3.5" />} color="bg-warning" hint="Todos sus leads vencidos" />
       </div>
 
       {/* Leyenda */}

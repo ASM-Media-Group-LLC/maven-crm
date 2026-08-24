@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import StatChip from "@/components/StatChip";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -51,42 +52,14 @@ interface KpiCardProps {
 }
 
 const KpiCard = ({ label, value, icon, gradient, hint, loading, onClick }: KpiCardProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={loading}
-    className={cn(
-      "group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left",
-      "transition-all duration-200 ease-out",
-      "hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)]",
-      "active:scale-[0.99]",
-      "disabled:cursor-not-allowed disabled:opacity-70",
-    )}
-  >
-    <div
-      className={cn(
-        "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
-        "transition-opacity group-hover:opacity-50",
-        gradient,
-      )}
-    />
-    <div className="relative space-y-3">
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
-        {loading ? (
-          <Skeleton className="mt-1 h-9 w-24" />
-        ) : (
-          <p className="text-3xl font-bold tabular-nums leading-tight">{value.toLocaleString("es")}</p>
-        )}
-        {hint && (
-          <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{hint}</p>
-        )}
-      </div>
-    </div>
-  </button>
+  <StatChip
+    label={label}
+    value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString("es")}
+    hint={hint}
+    color={gradient}
+    icon={icon}
+    onClick={loading ? undefined : onClick}
+  />
 );
 
 // ─── Funnel step indicator (igual al tab modelos) ──────────────────────
@@ -223,7 +196,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
       key: "total",
       label: "Sesiones creadas",
       value: k.total,
-      icon: <Users className="h-5 w-5 text-white" />,
+      icon: <Users className="h-3.5 w-3.5" />,
       gradient: "bg-indigo-500",
       hint: "Invitaciones generadas por examiners",
     },
@@ -231,15 +204,15 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
       key: "claimed",
       label: "Reclamadas",
       value: k.claimed,
-      icon: <UserCheck className="h-5 w-5 text-white" />,
-      gradient: "bg-blue-500",
+      icon: <UserCheck className="h-3.5 w-3.5" />,
+      gradient: "bg-primary",
       hint: "Candidato abrió el link y comenzó la sesión",
     },
     {
       key: "ended",
       label: "Completadas",
       value: k.ended,
-      icon: <MessageSquare className="h-5 w-5 text-white" />,
+      icon: <MessageSquare className="h-3.5 w-3.5" />,
       gradient: "bg-cyan-500",
       hint: "Sesiones terminadas (status='ended')",
     },
@@ -247,24 +220,24 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
       key: "evaluated",
       label: "Evaluadas",
       value: k.evaluated,
-      icon: <ClipboardCheck className="h-5 w-5 text-white" />,
-      gradient: "bg-violet-500",
+      icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+      gradient: "bg-primary",
       hint: "El examiner cerró el veredicto",
     },
     {
       key: "apto",
       label: "Aprobados",
       value: k.apto,
-      icon: <CheckCircle2 className="h-5 w-5 text-white" />,
-      gradient: "bg-emerald-500",
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      gradient: "bg-success",
       hint: "Verdict = apto",
     },
     {
       key: "noApto",
       label: "Rechazados",
       value: k.noApto,
-      icon: <XCircle className="h-5 w-5 text-white" />,
-      gradient: "bg-rose-500",
+      icon: <XCircle className="h-3.5 w-3.5" />,
+      gradient: "bg-destructive",
       hint: "Verdict = no_apto",
     },
   ];
