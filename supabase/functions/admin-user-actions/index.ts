@@ -1,4 +1,5 @@
 import { corsFor } from "../_shared/cors.ts";
+import { assertCanManage } from "../_shared/user-hierarchy.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   DOMINIO_CASILLA,
@@ -67,15 +68,13 @@ Deno.serve(async (req) => {
     );
 
     // Verify caller is admin
-    const { data: callerRole } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", callerId)
-      .eq("role", "admin")
-      .maybeSingle();
+    // Gate de ENTRADA: permiso de GESTIONAR USUARIOS, ya no el literal role='admin'.
+    // La jerarquía por acción se valida abajo, rama por rama, con assertCanManage.
+    const { data: canManage, error: gateErr } = await adminClient
+      .rpc("can_manage_users", { _user_id: callerId });
 
-    if (!callerRole) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+    if (gateErr || !canManage) {
+      return new Response(JSON.stringify({ error: "Forbidden: sin permiso de gestión de usuarios" }), {
         status: 403,
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
@@ -127,6 +126,13 @@ Deno.serve(async (req) => {
 
     // === CREATE USER ===
     if (action === "create_user") {
+      const gCreate = await assertCanManage(adminClient, callerId, null, "create_user", role ?? null);
+      if (!gCreate.ok) {
+        return new Response(JSON.stringify(gCreate.body), {
+          status: gCreate.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       if (!first_name || !last_name) {
         return new Response(JSON.stringify({ error: "first_name y last_name son requeridos" }), {
           status: 400,
@@ -453,6 +459,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "reset_password") {
+      const gReset = await assertCanManage(adminClient, callerId, user_id, "reset_password");
+      if (!gReset.ok) {
+        return new Response(JSON.stringify(gReset.body), {
+          status: gReset.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       const tempPassword = generateTempPassword();
 
       const { error: resetError } = await adminClient.auth.admin.updateUserById(user_id, {
@@ -571,6 +584,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "remove_role") {
+      const gRemove = await assertCanManage(adminClient, callerId, user_id, "remove_role");
+      if (!gRemove.ok) {
+        return new Response(JSON.stringify(gRemove.body), {
+          status: gRemove.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       if (user_id === callerId) {
         return new Response(JSON.stringify({ error: "No puedes quitarte tu propio rol" }), {
           status: 400,
@@ -596,6 +616,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "delete_user") {
+      const gDelete = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+      if (!gDelete.ok) {
+        return new Response(JSON.stringify(gDelete.body), {
+          status: gDelete.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       console.log(`[delete_user] Starting deletion for user_id=${user_id}`);
 
       // 1. Limpia TODAS las refs en public.* a este user_id usando la
@@ -683,6 +710,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "update_profile") {
+      const gUpdate = await assertCanManage(adminClient, callerId, user_id, "update_profile", role ?? null);
+      if (!gUpdate.ok) {
+        return new Response(JSON.stringify(gUpdate.body), {
+          status: gUpdate.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       const newFullName = first_name && last_name
         ? `${first_name} ${last_name}`
         : full_name;
@@ -709,6 +743,23 @@ Deno.serve(async (req) => {
       }
 
       if (role) {
+        // Este camino escribía el rol SIN validarlo contra roles_config (el otro
+        // endpoint sí lo hace). Se valida igual acá: si no existe o está inactivo,
+        // no se escribe. La jerarquía ya la chequeó gUpdate arriba.
+        const { data: validRoleUp } = await adminClient
+          .from("roles_config")
+          .select("id")
+          .eq("name", role)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!validRoleUp) {
+          return new Response(JSON.stringify({ error: `Rol inválido o inactivo: ${role}` }), {
+            status: 400,
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+          });
+        }
+
         const { error: roleError } = await adminClient
           .from("user_roles")
           .update({ role })

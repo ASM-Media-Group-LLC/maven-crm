@@ -46,15 +46,21 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRem
                     <DropdownMenuItem onClick={() => onEdit(user)}>
                       <Pencil className="h-4 w-4 mr-2" /> Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onEditRole(user)}>
-                      <UserCog className="h-4 w-4 mr-2" /> Asignar rol
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onResetPassword(user)}>
-                      <KeyRound className="h-4 w-4 mr-2" /> Reset contraseña
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
-                      <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                    </DropdownMenuItem>
+                    {/* Jerarquía (24/08): solo sobre cuentas gestionables. UX; el
+                        candado real vive en las edge functions. */}
+                    {user.manageable && (
+                      <>
+                        <DropdownMenuItem onClick={() => onEditRole(user)}>
+                          <UserCog className="h-4 w-4 mr-2" /> Asignar rol
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onResetPassword(user)}>
+                          <KeyRound className="h-4 w-4 mr-2" /> Reset contraseña
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

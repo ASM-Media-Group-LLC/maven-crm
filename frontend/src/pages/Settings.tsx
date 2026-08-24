@@ -760,7 +760,20 @@ const SettingsRightPane = ({
     docs:            { title: "Docs",           render: () => <Docs /> },
     roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
   };
-  const activeSub = sub && SUB_PAGES[sub] ? SUB_PAGES[sub] : null;
+  // ⚠️ GUARD (24/08): antes esto renderizaba la sub-página SOLO por el ?sub= de la
+  // URL y retornaba ANTES del gate `showAdmin` de más abajo. Es decir: cualquier
+  // usuario autenticado escribía /settings?sub=usuarios y obtenía la pantalla de
+  // Usuarios completa (el link estaba escondido, la ruta de render no). Las páginas
+  // de administración ahora exigen el mismo permiso que su entrada del menú.
+  const SUB_PAGE_ALLOWED: Record<string, boolean> = {
+    usuarios: showAdmin,
+    auditoria: showAdmin,
+    reportes: showAdmin,
+    "design-system": true,
+    docs: true,
+    roadmap: true,
+  };
+  const activeSub = sub && SUB_PAGES[sub] && SUB_PAGE_ALLOWED[sub] ? SUB_PAGES[sub] : null;
 
   if (activeSub) {
     const goBack = () => {
