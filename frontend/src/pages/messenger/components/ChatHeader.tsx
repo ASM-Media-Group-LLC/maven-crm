@@ -124,6 +124,7 @@ export default function ChatHeader({
           ) : !isGroup ? (
             <AvatarUpload
               currentUrl={avatarUrl}
+              seed={otherProfile?.avatar_seed}
               displayName={conversation.displayName}
               onAvatarChanged={handleProfileAvatarChange}
               size="sm"

@@ -6,10 +6,14 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { dicebearUri } from "@/lib/avatar";
 
 interface AvatarUploadProps {
   /** Current avatar URL */
   currentUrl?: string | null;
+  /** avatar_seed elegido en Settings: si no hay foto subida, se dibuja el muñequito DiceBear
+   *  (en vez de caer a iniciales), igual que <UserAvatar>. */
+  seed?: string | null;
   /** Display name for initials fallback */
   displayName: string;
   /** Called with new URL after successful upload */
@@ -39,7 +43,7 @@ function getInitials(name: string) {
 }
 
 export default function AvatarUpload({
-  currentUrl, displayName, onAvatarChanged, size = "md", editable = true, isGroup = false,
+  currentUrl, seed, displayName, onAvatarChanged, size = "md", editable = true, isGroup = false,
 }: AvatarUploadProps) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
@@ -88,13 +92,19 @@ export default function AvatarUpload({
     <div className="relative group inline-block">
       <Avatar className={cn(sizeMap[size], "ring-2 ring-border")}>
         {currentUrl && <AvatarImage src={currentUrl} alt={displayName} className="object-cover" />}
-        <AvatarFallback className={cn(
-          "font-semibold",
-          isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary",
-          size === "lg" ? "text-xl" : size === "md" ? "text-sm" : "text-xs"
-        )}>
-          {getInitials(displayName)}
-        </AvatarFallback>
+        {!currentUrl && seed ? (
+          <AvatarFallback className="bg-secondary p-0">
+            <img src={dicebearUri(seed)} alt={displayName} className="h-full w-full" draggable={false} />
+          </AvatarFallback>
+        ) : (
+          <AvatarFallback className={cn(
+            "font-semibold",
+            isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary",
+            size === "lg" ? "text-xl" : size === "md" ? "text-sm" : "text-xs"
+          )}>
+            {getInitials(displayName)}
+          </AvatarFallback>
+        )}
       </Avatar>
 
       {editable && (
