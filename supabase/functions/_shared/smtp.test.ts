@@ -216,3 +216,96 @@ Deno.test("el display-name con acentos no se parte a mitad de palabra", () => {
   });
   assert(trozos.join("") === nombre, `roundtrip roto: ${trozos.join("")}`);
 });
+
+/* ── Adjuntos: multipart/mixed ───────────────────────────────────────────── */
+
+Deno.test("sin adjuntos NO aparece multipart/mixed (nada cambió)", () => {
+  const conHtml = buildMessage({ from: "a@b.com", to: ["c@d.com"], subject: "s", html: "<p>x</p>" });
+  assert(!/multipart\/mixed/.test(conHtml), "no debería haber mixed");
+  assert(/multipart\/alternative/.test(conHtml), "el HTML debería seguir yendo como alternative");
+  const soloText = buildMessage({ from: "a@b.com", to: ["c@d.com"], subject: "s", text: "hola" });
+  assert(!/multipart/.test(soloText), "un texto solo no lleva multipart");
+});
+
+Deno.test("con adjunto: multipart/mixed con el cuerpo Y el archivo en base64", () => {
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", html: "<p>hola</p>",
+    attachments: [{ filename: "d.bin", contentType: "application/octet-stream", contentBase64: btoa("hola") }],
+  });
+  assert(/Content-Type: multipart\/mixed/.test(rfc), "no es multipart/mixed");
+  assert(/Content-Type: multipart\/alternative/.test(rfc), "perdió el cuerpo alternative adentro");
+  assert(/Content-Disposition: attachment; filename="d.bin"/.test(rfc), "sin Content-Disposition del adjunto");
+  assert(/Content-Transfer-Encoding: base64/.test(rfc), "el adjunto no va en base64");
+  for (const l of rfc.split("\r\n")) assert(l.length <= 998, `línea de ${l.length}`);
+});
+
+Deno.test("el base64 del adjunto se pliega a 76", () => {
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", text: "t",
+    attachments: [{ filename: "g.bin", contentType: "application/octet-stream", contentBase64: btoa("A".repeat(1000)) }],
+  });
+  for (const l of rfc.split("\r\n")) {
+    if (/^[A-Za-z0-9+/]+=*$/.test(l) && l.length > 20) {
+      assert(l.length <= 76, `línea base64 de ${l.length}`);
+    }
+  }
+});
+
+Deno.test("roundtrip: los bytes del adjunto sobreviven al armado", () => {
+  const original = new Uint8Array(300).map((_, i) => (i * 7) % 256);
+  let bin = "";
+  for (const x of original) bin += String.fromCharCode(x);
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", text: "t",
+    attachments: [{ filename: "r.bin", contentType: "application/octet-stream", contentBase64: btoa(bin) }],
+  });
+  // El bloque base64 va tras la línea en blanco que sigue al Content-Disposition.
+  const m = rfc.match(/Content-Disposition: attachment[^\r\n]*\r\n\r\n([\s\S]*?)\r\n--/);
+  assert(m !== null, "no encontró el bloque del adjunto");
+  const rec = atob(m![1].replace(/\r\n/g, ""));
+  assert(rec.length === original.length, `largo distinto: ${rec.length}`);
+  for (let i = 0; i < original.length; i++) {
+    assert(rec.charCodeAt(i) === original[i], `byte ${i} distinto`);
+  }
+});
+
+Deno.test("un filename con acentos usa RFC 2231 y el header queda en ASCII", () => {
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", text: "t",
+    attachments: [{ filename: "árbol ñoño.pdf", contentType: "application/pdf", contentBase64: btoa("x") }],
+  });
+  assert(/filename\*=UTF-8''/.test(rfc), "no usó RFC 2231 para el nombre no-ASCII");
+  const disp = rfc.split("\r\n").find((l) => l.startsWith("Content-Disposition:"))!;
+  for (let i = 0; i < disp.length; i++) {
+    assert(disp.charCodeAt(i) <= 126, `byte no-ASCII en el header: ${disp}`);
+  }
+});
+
+Deno.test("un filename con comillas o CRLF NO inyecta encabezados", () => {
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", text: "t",
+    attachments: [{
+      filename: 'factura".pdf\r\nBcc: hacker@evil.com',
+      contentType: "application/pdf",
+      contentBase64: btoa("x"),
+    }],
+  });
+  for (const l of rfc.split("\r\n")) {
+    assert(!/^Bcc:/i.test(l), `encabezado inyectado desde el filename: ${l}`);
+  }
+});
+
+Deno.test("un Content-Type malicioso cae al octet-stream (no inyecta)", () => {
+  const rfc = buildMessage({
+    from: "a@b.com", to: ["c@d.com"], subject: "s", text: "t",
+    attachments: [{
+      filename: "a.bin",
+      contentType: "application/pdf\r\nBcc: x@y.com",
+      contentBase64: btoa("x"),
+    }],
+  });
+  for (const l of rfc.split("\r\n")) {
+    assert(!/^Bcc:/i.test(l), `inyección por content-type: ${l}`);
+  }
+  assert(/Content-Type: application\/octet-stream/.test(rfc), "no cayó al tipo seguro");
+});

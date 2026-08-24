@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +26,7 @@ import {
   ListOrdered,
   Loader2,
   Palette,
+  Paperclip,
   Redo2,
   RemoveFormatting,
   Send,
@@ -136,6 +137,24 @@ function partirDirecciones(v: string): string[] {
 }
 
 const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Tope total de adjuntos por correo. Coincide con el que valida la edge; el
+ *  base64 pesa ~4/3, así que 15 MB de archivo son ~20 MB en el request. */
+const TOPE_ADJUNTOS = 15 * 1024 * 1024;
+
+/** Lee un archivo a base64 SIN el prefijo `data:<tipo>;base64,`. */
+function leerBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const res = String(fr.result);
+      const coma = res.indexOf(",");
+      resolve(coma >= 0 ? res.slice(coma + 1) : res);
+    };
+    fr.onerror = () => reject(new Error("no se pudo leer el archivo"));
+    fr.readAsDataURL(file);
+  });
+}
 
 /* ── Paleta y emojis (sin dependencias) ─────────────────────────────────── */
 
@@ -514,7 +533,38 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
   const [verCc, setVerCc] = useState(!!inicial?.cc);
   const [verBcc, setVerBcc] = useState(false);
   const [subject, setSubject] = useState(inicial?.subject ?? "");
+  const [adjuntos, setAdjuntos] = useState<
+    Array<{ filename: string; contentType: string; sizeBytes: number; contentBase64: string }>
+  >([]);
+  const inputArchivo = useRef<HTMLInputElement>(null);
   const enviar = useSendMail();
+
+  // Suma los archivos elegidos, leídos a base64. Se valida el tamaño ANTES de
+  // leer: un archivo gigante colgaría el navegador cargándolo a memoria solo
+  // para rechazarlo después.
+  const agregarArchivos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const elegidos = Array.from(files);
+    const yaHay = adjuntos.reduce((n, a) => n + a.sizeBytes, 0);
+    const total = yaHay + elegidos.reduce((n, f) => n + f.size, 0);
+    if (total > TOPE_ADJUNTOS) {
+      toast.error("Los adjuntos superan el límite de 15 MB.");
+      return;
+    }
+    try {
+      const nuevos = await Promise.all(
+        elegidos.map(async (f) => ({
+          filename: f.name,
+          contentType: f.type || "application/octet-stream",
+          sizeBytes: f.size,
+          contentBase64: await leerBase64(f),
+        })),
+      );
+      setAdjuntos((prev) => [...prev, ...nuevos]);
+    } catch {
+      toast.error("No se pudo leer alguno de los archivos.");
+    }
+  };
 
   // La cita del correo original entra AL editor como blockquote editable:
   // igual que Gmail, se puede recortar o borrar antes de mandar.
@@ -570,7 +620,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
   const puedeEnviar =
     destinatarios.length > 0 &&
     invalidos.length === 0 &&
-    (!cuerpoVacio || subject.trim().length > 0) &&
+    // Un correo con solo un adjunto (sin cuerpo ni asunto) es válido.
+    (!cuerpoVacio || subject.trim().length > 0 || adjuntos.length > 0) &&
     !enviar.isPending;
 
   const handleEnviar = async () => {
@@ -585,6 +636,11 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
         text: textoParaCorreo(editor.getHTML()),
         in_reply_to: inicial?.inReplyTo,
         references: inicial?.references,
+        attachments: adjuntos.map(({ filename, contentType, contentBase64 }) => ({
+          filename,
+          contentType,
+          contentBase64,
+        })),
       });
       toast.success("Correo enviado");
       onCerrar();
@@ -610,6 +666,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
       cc !== (inicial?.cc ?? "") ||
       bcc !== "" ||
       subject !== (inicial?.subject ?? "") ||
+      adjuntos.length > 0 ||
       // Con el editor vacío TipTap devuelve "<p></p>", que no es igual al
       // contenidoInicial "" de un correo nuevo: comparar strings a secas
       // preguntaba al cerrar un compositor en el que no se tocó nada.
@@ -765,6 +822,32 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
           </div>
         </div>
 
+        {adjuntos.length > 0 && (
+          <div className="flex flex-wrap gap-2 border-t border-border/60 px-5 py-2">
+            {adjuntos.map((a, i) => (
+              <span
+                key={i}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1.5 text-xs"
+              >
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{a.filename}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
+                </span>
+                <button
+                  type="button"
+                  title="Quitar adjunto"
+                  aria-label={`Quitar ${a.filename}`}
+                  onClick={() => setAdjuntos((prev) => prev.filter((_, j) => j !== i))}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Pie estilo Gmail. En pantalla chica la barra de formato baja a su
             propia fila: compitiendo con Enviar (~110px) y la papelera dejaba
             ~130px para 16 herramientas, o sea 4 visibles y el resto detrás de
@@ -790,6 +873,28 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente }: Props) {
               )}
               Enviar
             </Button>
+
+            <input
+              ref={inputArchivo}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                agregarArchivos(e.target.files);
+                // Permite volver a elegir el mismo archivo.
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              title="Adjuntar archivo"
+              aria-label="Adjuntar archivo"
+              onClick={() => inputArchivo.current?.click()}
+              disabled={enviar.isPending}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
 
             <button
               type="button"

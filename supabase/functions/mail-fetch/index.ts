@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const {
       action, folder, limit, seq, mark_read, with_bodies, uid, attachment_index,
-      to, cc, bcc, subject, text, html, in_reply_to, references,
+      to, cc, bcc, subject, text, html, in_reply_to, references, attachments,
     } = body as {
       action?: string;
       folder?: string;
@@ -91,6 +91,8 @@ Deno.serve(async (req) => {
       /** Message-ID al que se responde, para que el hilo no se corte. */
       in_reply_to?: string;
       references?: string;
+      /** Adjuntos a enviar: nombre, tipo y contenido en base64. */
+      attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
     };
     if (!action) return json(req, { error: "action is required" }, 400);
 
@@ -605,6 +607,27 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
+      // Adjuntos: forma correcta y tamaño total acotado. El saneo del nombre y
+      // del tipo (contra inyección de encabezados) lo hace buildMessage.
+      const adjuntos = Array.isArray(attachments) ? attachments : [];
+      for (const a of adjuntos) {
+        if (
+          !a || typeof a.filename !== "string" ||
+          typeof a.contentType !== "string" || typeof a.contentBase64 !== "string"
+        ) {
+          return json(req, { error: "un adjunto viene con formato inválido" }, 400);
+        }
+      }
+      // El base64 pesa ~4/3 del archivo; se acota el ARCHIVO a 15 MB (igual que
+      // la descarga). De más, revienta la memoria/límite de la edge.
+      const bytesAdjuntos = adjuntos.reduce(
+        (n, a) => n + Math.floor((a.contentBase64.replace(/\s/g, "").length * 3) / 4),
+        0,
+      );
+      if (bytesAdjuntos > 15 * 1024 * 1024) {
+        return json(req, { error: "los adjuntos superan el límite de 15 MB" }, 413);
+      }
+
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
         .select("id, email_address, secret_cipher, secret_nonce, key_version, smtp_host, smtp_port")
@@ -648,6 +671,7 @@ Deno.serve(async (req) => {
         html,
         inReplyTo: in_reply_to,
         references,
+        attachments: adjuntos,
       });
 
       let smtp: SmtpClient | null = null;
