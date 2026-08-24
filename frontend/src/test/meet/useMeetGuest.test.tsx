@@ -101,7 +101,7 @@ describe("useMeetGuest", () => {
   });
 
   it("propaga el mensaje del servidor cuando frena por rate limit", async () => {
-    mockFetchOnce({ error: "Demasiados intentos. Esperá unos minutos." }, false, 429);
+    mockFetchOnce({ error: "Demasiados intentos. Espera unos minutos." }, false, 429);
 
     const { result } = renderHook(() => useMeetGuest(CODE));
     await act(async () => { await result.current.knock("Ana"); });

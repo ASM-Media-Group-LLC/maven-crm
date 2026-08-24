@@ -112,12 +112,12 @@ serve(async (req) => {
       if (!isSup) {
         const leadOwner = lead.assigned_to ?? null;
         if (!leadOwner) {
-          return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." });
+          return json({ ok: false, error: "Este lead no está asignado a ti. Tómalo desde Closers para poder abrir su chat." });
         }
         if (leadOwner !== userId) {
           const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
           const who = owner?.full_name || "otra persona";
-          return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
+          return json({ ok: false, error: `Este lead ya está asignado a ${who}. No puedes abrir su chat.` });
         }
       }
       // El contacto origen (closers_contacts) es la FUENTE CONFIABLE: país EXPLÍCITO (country_code)
@@ -187,7 +187,7 @@ serve(async (req) => {
     });
     resolved = await r.json().catch(() => ({}));
     if (resolved?.error === "rate_limited_new_account") {
-      return json({ ok: false, error: "Esta línea es muy nueva y Telegram todavía limita el contacto en frío. Probá de nuevo en unas horas, o que la persona escriba primero a esta línea." }, 200);
+      return json({ ok: false, error: "Esta línea es muy nueva y Telegram todavía limita el contacto en frío. Prueba de nuevo en unas horas, o que la persona escriba primero a esta línea." }, 200);
     }
     if (resolved?.error === "not_on_telegram") {
       return json({ ok: false, error: "Este número no está en Telegram (o su privacidad no permite contactarlo)." }, 200);

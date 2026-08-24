@@ -134,7 +134,7 @@ ${JSON.stringify(currentConfig, null, 2)}`;
     parsed = JSON.parse(cleaned) as AssistantResponse;
   } catch (e) {
     console.error("Gemini returned non-JSON:", cleaned.slice(0, 500));
-    return jsonError("La IA devolvió una respuesta inválida. Probá de nuevo.", 502);
+    return jsonError("La IA devolvió una respuesta inválida. Prueba de nuevo.", 502);
   }
 
   if (typeof parsed.ready !== "boolean") {

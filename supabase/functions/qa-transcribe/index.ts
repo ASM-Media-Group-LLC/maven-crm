@@ -179,7 +179,7 @@ serve(async (req) => {
       console.error("ElevenLabs fetch failed", fetchErr);
       return jsonError(
         aborted
-          ? `ElevenLabs Scribe tardó más de ${SCRIBE_TIMEOUT_MS / 1000}s. Probá de nuevo.`
+          ? `ElevenLabs Scribe tardó más de ${SCRIBE_TIMEOUT_MS / 1000}s. Prueba de nuevo.`
           : `Error al contactar ElevenLabs: ${(fetchErr as Error).message}`,
         504,
       );
@@ -191,7 +191,7 @@ serve(async (req) => {
       const errText = await scribeRes.text().catch(() => "");
       console.error("ElevenLabs Scribe error", status, errText.slice(0, 500));
       if (status === 429) {
-        return jsonError("ElevenLabs: rate limit. Probá en unos segundos.", 429);
+        return jsonError("ElevenLabs: rate limit. Prueba en unos segundos.", 429);
       }
       if (status === 401) {
         return jsonError("ElevenLabs: API key inválida.", 402);

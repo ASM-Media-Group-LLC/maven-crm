@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
 
   let parsed: any;
   try { parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim()); }
-  catch { return json({ error: "La IA no devolvió JSON válido. Reintentá." }, 502); }
+  catch { return json({ error: "La IA no devolvió JSON válido. Reintenta." }, 502); }
 
   const arr = (x: unknown) => (Array.isArray(x) ? x : []);
   return json({ ok: true, analysis: {

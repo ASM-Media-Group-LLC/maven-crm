@@ -118,7 +118,7 @@ serve(async (req) => {
         // front muestre un mensaje amable (lee res.error), en vez del genérico "non-2xx" tras el cuelgue.
         return json({
           ok: false,
-          error: "El gateway de teléfonos no respondió (puede estar reiniciando). Reintentá en un momento.",
+          error: "El gateway de teléfonos no respondió (puede estar reiniciando). Reintenta en un momento.",
           gateway_timeout: true,
         });
       }

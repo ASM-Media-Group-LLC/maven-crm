@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
           scan_status: "awaiting_screenshot",
           is_restricted: false,
           scan_error:
-            "No pudimos leer el perfil automáticamente (cuenta muy nueva o IG bloqueó la lectura). Reintentá el scan o subí un screenshot del perfil.",
+            "No pudimos leer el perfil automáticamente (cuenta muy nueva o IG bloqueó la lectura). Reintenta el scan o sube un screenshot del perfil.",
           last_scanned_at: new Date().toISOString(),
         })
         .eq("id", accountRow.id);

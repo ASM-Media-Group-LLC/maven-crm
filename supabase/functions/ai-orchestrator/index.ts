@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ model: SONNET_MODEL, max_tokens: 1500, system: systemWithCache, tools: toolsWithCache, messages }),
     });
     if (!resp.ok) {
-      answer = `No pude consultar la IA (${resp.status}). Probá de nuevo.`;
+      answer = `No pude consultar la IA (${resp.status}). Prueba de nuevo.`;
       break;
     }
     const data = await resp.json() as { content: Array<Record<string, unknown>>; usage?: Record<string, number> };

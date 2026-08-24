@@ -118,7 +118,7 @@ export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiRes
       }
       // No es retriable o ya agoté el budget → re-throw con mensaje claro.
       if (is429) {
-        throw new Error("Gemini está saturado por rate limit. Esperá ~15 segundos y volvé a intentar.");
+        throw new Error("Gemini está saturado por rate limit. Espera ~15 segundos y vuelve a intentar.");
       }
       throw e;
     }
@@ -169,7 +169,7 @@ async function callGeminiOnceInner(opts: GeminiCallOptions): Promise<GeminiResul
     const status = res.status;
     const errText = await res.text().catch(() => "");
     console.error("Gemini error", status, errText.slice(0, 500));
-    if (status === 429) throw new Error("Gemini: rate limit. Probá en unos segundos.");
+    if (status === 429) throw new Error("Gemini: rate limit. Prueba en unos segundos.");
     if (status === 401 || status === 403) throw new Error("Gemini: API key inválida o sin permisos.");
     if (status === 503) {
       // Mensaje específico para que el retry loop arriba lo agarre.

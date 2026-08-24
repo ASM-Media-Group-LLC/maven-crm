@@ -169,12 +169,12 @@ Deno.serve(async (req) => {
     const { data: isSup } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
     if (!isSup) {
       if (!leadOwner) {
-        return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." });
+        return json({ ok: false, error: "Este lead no está asignado a ti. Tómalo desde Closers para poder abrir su chat." });
       }
       if (leadOwner !== userId) {
         const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
         const who = owner?.full_name || "otra persona";
-        return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
+        return json({ ok: false, error: `Este lead ya está asignado a ${who}. No puedes abrir su chat.` });
       }
     }
   }
@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
         const { data: owner } = await (sb as any)
           .from("profiles").select("full_name").eq("id", assignedTo).maybeSingle();
         const who = owner?.full_name || "otra persona";
-        return json({ ok: false, error: `Esta conversación ya está asignada a ${who}. No podés abrirla.` });
+        return json({ ok: false, error: `Esta conversación ya está asignada a ${who}. No puedes abrirla.` });
       }
     }
   } else {

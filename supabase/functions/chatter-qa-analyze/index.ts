@@ -297,11 +297,11 @@ Deno.serve(async (req) => {
   try {
     parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim());
   } catch {
-    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA no devolvió JSON válido. Reintentá." }).eq("id", reportId);
+    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA no devolvió JSON válido. Reintenta." }).eq("id", reportId);
     return json({ error: "JSON inválido de la IA" }, 502);
   }
   if (!parsed || !VEREDICTOS.includes(parsed.veredicto)) {
-    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA devolvió un veredicto inválido. Reintentá." }).eq("id", reportId);
+    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA devolvió un veredicto inválido. Reintenta." }).eq("id", reportId);
     return json({ error: "veredicto inválido" }, 502);
   }
   const arr = (x: unknown) => (Array.isArray(x) ? x : []);

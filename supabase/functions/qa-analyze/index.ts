@@ -473,7 +473,7 @@ serve(async (req) => {
         String(parseErr),
         raw.slice(0, 500),
       );
-      return jsonError("Claude devolvió JSON malformado. Reintentá.", 502);
+      return jsonError("Claude devolvió JSON malformado. Reintenta.", 502);
     }
 
     if (!isValidAnalysis(analysis)) {
@@ -481,7 +481,7 @@ serve(async (req) => {
         "Análisis no pasa validación de shape:",
         JSON.stringify(analysis).slice(0, 500),
       );
-      return jsonError("El análisis no tiene la estructura esperada. Reintentá.", 502);
+      return jsonError("El análisis no tiene la estructura esperada. Reintenta.", 502);
     }
 
     // El score TOTAL = CALIDAD DEL PROCESO: el promedio de los criterios
@@ -505,7 +505,7 @@ serve(async (req) => {
     // respuesta en escala 1-10 → guardarla daría una nota ~7/100 sin error visible.
     if (dimScores.length >= 2 && dimScores.every((n) => n <= 10)) {
       console.error(`qa-analyze: dims en escala 1-10 en call ${callId}`, dimScores);
-      return jsonError("El análisis vino en escala 1-10 en vez de 0-100. Reintentá.", 502);
+      return jsonError("El análisis vino en escala 1-10 en vez de 0-100. Reintenta.", 502);
     }
     const clamped = dimScores.map((n) => Math.min(100, Math.max(0, n)));
     const score = clamped.length
@@ -761,7 +761,7 @@ async function callClaude(
     const aborted = (fetchErr as Error).name === "AbortError";
     throw new Error(
       aborted
-        ? `Claude tardó más de ${CLAUDE_TIMEOUT_MS / 1000}s. Probá de nuevo.`
+        ? `Claude tardó más de ${CLAUDE_TIMEOUT_MS / 1000}s. Prueba de nuevo.`
         : `Error al contactar Anthropic: ${(fetchErr as Error).message}`,
     );
   }
@@ -771,12 +771,12 @@ async function callClaude(
     const status = res.status;
     const errText = await res.text().catch(() => "");
     console.error("Claude API error", status, errText.slice(0, 500));
-    if (status === 429) throw new Error("Claude: rate limit. Probá en unos segundos.");
+    if (status === 429) throw new Error("Claude: rate limit. Prueba en unos segundos.");
     if (status === 401) throw new Error("Claude: API key inválida.");
     if (status === 402 || status === 403) {
       throw new Error("Claude: crédito agotado o sin permisos.");
     }
-    if (status === 529) throw new Error("Claude: API sobrecargada. Probá en unos segundos.");
+    if (status === 529) throw new Error("Claude: API sobrecargada. Prueba en unos segundos.");
     throw new Error(`Claude API error ${status}`);
   }
 

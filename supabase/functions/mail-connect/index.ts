@@ -93,7 +93,7 @@ async function verifyState(state: string, userId: string): Promise<string | null
 
   const [stateUser, ts] = payload.split(".");
   if (stateUser !== userId) return "el state pertenece a otro usuario";
-  if (Date.now() - Number(ts) > STATE_TTL_MS) return "el state expiró, volvé a empezar";
+  if (Date.now() - Number(ts) > STATE_TTL_MS) return "el state expiró, vuelve a empezar";
   return null;
 }
 

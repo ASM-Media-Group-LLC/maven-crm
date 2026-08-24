@@ -126,7 +126,7 @@ serve(async (req) => {
       _user_id: userId, _room: room,
     });
     if (permErr) return err(permErr.message, 500);
-    if (!canModerate) return err("No sos anfitrión de esta llamada", 403);
+    if (!canModerate) return err("No eres anfitrión de esta llamada", 403);
 
     // Un co-anfitrión no puede tocar al anfitrión ORIGINAL (regla de Google).
     const protectTarget = async (targetIdentity: string): Promise<string | null> => {
@@ -139,7 +139,7 @@ serve(async (req) => {
       const { data: callerIsOwner } = await admin.rpc("is_livekit_room_owner", {
         _user_id: userId, _room: room,
       });
-      return callerIsOwner ? null : "No podés moderar al anfitrión de la reunión";
+      return callerIsOwner ? null : "No puedes moderar al anfitrión de la reunión";
     };
 
     const listParticipants = async (): Promise<LkParticipant[]> => {

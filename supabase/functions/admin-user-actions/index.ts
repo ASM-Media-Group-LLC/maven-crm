@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
         } else if (/invalid email/i.test(raw)) {
           friendly = "Email inválido.";
         } else if (/rate limit/i.test(raw)) {
-          friendly = "Demasiados intentos seguidos, esperá un minuto y volvé a intentar.";
+          friendly = "Demasiados intentos seguidos, espera un minuto y vuelve a intentar.";
         }
         return new Response(JSON.stringify({ error: friendly, raw }), {
           status: 400,

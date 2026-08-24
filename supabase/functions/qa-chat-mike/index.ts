@@ -222,7 +222,7 @@ serve(async (req) => {
     }
 
     if (!responseText.trim()) {
-      return jsonError("Mike no devolvió texto. Probá reformular la pregunta.", 502);
+      return jsonError("Mike no devolvió texto. Prueba reformular la pregunta.", 502);
     }
 
     const { tokens_in, tokens_out, cached_tokens } = extractTokenCounts(usage);
@@ -406,7 +406,7 @@ async function callGroq(
     const status = res.status;
     const errText = await res.text().catch(() => "");
     console.error("Groq API error", status, errText.slice(0, 500));
-    if (status === 429) throw new Error("Groq: rate limit. Probá en unos segundos.");
+    if (status === 429) throw new Error("Groq: rate limit. Prueba en unos segundos.");
     if (status === 401) throw new Error("Groq: API key inválida.");
     if (status === 402 || status === 403) {
       throw new Error("Groq: crédito agotado o sin permisos.");
