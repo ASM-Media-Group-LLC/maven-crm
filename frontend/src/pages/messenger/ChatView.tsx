@@ -11,7 +11,7 @@ import SearchResultsPanel from "./components/SearchResultsPanel";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
-import { Upload } from "lucide-react";
+import { Upload, Megaphone } from "lucide-react";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
@@ -49,6 +49,9 @@ export default function ChatView({
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatViewProps) {
   const { user } = useAuth();
+  // Grupo "anuncios": solo admins escriben. Un no-admin ve un aviso en vez del composer.
+  const amAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
+  const announcementLocked = conversation.type === "group" && conversation.msg_permission === "admins" && !amAdmin;
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -221,16 +224,24 @@ export default function ChatView({
         onLoadMore={onLoadMore}
       />
 
-      <MessageInput
-        ref={messageInputRef}
-        onSendMessage={onSendMessage}
-        onSendTyping={onSendTyping}
-        replyTo={replyTo}
-        profiles={profiles}
-        onCancelReply={() => setReplyTo(null)}
-        participants={conversation.participants}
-        chatType={conversation.type}
-      />
+      {announcementLocked ? (
+        <div className="shrink-0 px-4 py-3.5 border-t border-border bg-muted/20">
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
+            <Megaphone className="h-3.5 w-3.5 shrink-0" /> Solo los administradores pueden enviar mensajes
+          </p>
+        </div>
+      ) : (
+        <MessageInput
+          ref={messageInputRef}
+          onSendMessage={onSendMessage}
+          onSendTyping={onSendTyping}
+          replyTo={replyTo}
+          profiles={profiles}
+          onCancelReply={() => setReplyTo(null)}
+          participants={conversation.participants}
+          chatType={conversation.type}
+        />
+      )}
 
       {/* Side panel overlay — all panels render as absolute overlays */}
       {hasSidePanel && (

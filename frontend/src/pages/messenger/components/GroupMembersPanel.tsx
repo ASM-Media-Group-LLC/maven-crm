@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -40,6 +40,22 @@ export default function GroupMembersPanel({
 
   const isAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const memberIds = new Set(conversation.participants.map(p => p.user_id));
+
+  // Configuración del grupo (permisos estilo WhatsApp). Solo admins la ven/cambian.
+  const msgPerm = conversation.msg_permission ?? "all";
+  const membersVis = conversation.members_visibility ?? "all";
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const updateSetting = async (field: "msg_permission" | "members_visibility", value: "all" | "admins") => {
+    setSavingKey(field);
+    const { data, error } = await supabase
+      .from("chat_conversations")
+      .update({ [field]: value })
+      .eq("id", conversation.id)
+      .select("id");
+    if (error || !data || data.length === 0) toast.error("No se pudo cambiar la configuración");
+    else onMembersChanged();
+    setSavingKey(null);
+  };
 
   // Load all users when add panel opens
   useEffect(() => {
@@ -193,6 +209,40 @@ export default function GroupMembersPanel({
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Configuración del grupo (permisos) — solo admins */}
+      {isAdmin && (
+        <div className="px-4 py-3 border-b border-border space-y-3">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Configuración del grupo</p>
+          {([
+            { field: "msg_permission" as const, value: msgPerm, icon: Megaphone, label: "Enviar mensajes", hint: 'Solo admins = grupo "anuncios"' },
+            { field: "members_visibility" as const, value: membersVis, icon: Eye, label: "Ver miembros", hint: "Quién ve esta lista" },
+          ]).map(({ field, value, icon: Icon, label, hint }) => (
+            <div key={field} className="flex items-center gap-2.5">
+              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] leading-tight">{label}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">{hint}</p>
+              </div>
+              <div className="flex items-center rounded-full border border-border overflow-hidden text-[11px] shrink-0">
+                {(["all", "admins"] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => value !== opt && updateSetting(field, opt)}
+                    disabled={savingKey === field}
+                    className={cn(
+                      "px-2.5 py-1 transition-colors disabled:opacity-60",
+                      value === opt ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {opt === "all" ? "Todos" : "Solo admins"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add member button */}
       {isAdmin && !showAddPanel && (

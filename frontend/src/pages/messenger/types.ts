@@ -7,6 +7,10 @@ export interface ChatConversation {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // Permisos de grupo estilo WhatsApp (solo aplican a type='group'). Opcionales por
+  // compatibilidad con objetos optimistas; ausente = 'all'.
+  msg_permission?: "all" | "admins";        // quién puede enviar mensajes
+  members_visibility?: "all" | "admins";    // quién puede ver la lista de miembros
 }
 
 export interface ChatParticipant {

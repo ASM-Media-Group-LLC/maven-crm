@@ -50,6 +50,8 @@ export default function ChatHeader({
   const isAdmin = isGroup && conversation.participants.some(
     p => p.user_id === user?.id && p.role === "admin"
   );
+  // "Ver miembros solo admins": a un no-admin le ocultamos la lista y el conteo.
+  const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
@@ -70,7 +72,7 @@ export default function ChatHeader({
   const subtitle = typingNames
     ? `${typingNames} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
     : isGroup
-      ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}`
+      ? (canSeeMembers ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}` : "Grupo")
       : online
         ? getStatusLabel(status, online)
         : "Desconectado";
@@ -194,7 +196,7 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
-              {isGroup && onOpenGroupMembers && (
+              {isGroup && canSeeMembers && onOpenGroupMembers && (
                 <DropdownMenuItem onClick={onOpenGroupMembers}>
                   <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
                 </DropdownMenuItem>
