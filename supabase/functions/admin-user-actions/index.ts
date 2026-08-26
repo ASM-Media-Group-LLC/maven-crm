@@ -669,6 +669,15 @@ Deno.serve(async (req) => {
           .eq("user_id", user_id)
           .maybeSingle();
         zohoMailbox = (cred as { email_address?: string } | null)?.email_address ?? null;
+        // Fallback: si no hay fila en mail_credentials (buzón creado fuera del flujo
+        // de Maven o credencial nunca guardada — el caso de brenda), usamos el email
+        // de LOGIN: para los @maven-ai.me la identidad ES la casilla. liberarPuestoZoho
+        // solo borra si ese email matchea una cuenta REAL en Zoho, así que un usuario
+        // con correo externo no se ve afectado.
+        if (!zohoMailbox) {
+          const { data: au } = await adminClient.auth.admin.getUserById(user_id);
+          zohoMailbox = (au?.user?.email as string | undefined) ?? null;
+        }
       } catch { /* noop */ }
 
       // Da de baja (ELIMINA) la casilla en Zoho para liberar el puesto. Best-effort
@@ -678,12 +687,14 @@ Deno.serve(async (req) => {
       const liberarPuestoZoho = async (): Promise<string | null> => {
         if (!zohoMailbox || !zohoConfigured()) return null;
         try {
+          // Confirmamos que ese email existe como cuenta en Zoho (así un usuario
+          // con correo EXTERNO no dispara nada). Después borramos POR EMAIL.
           const cuentas = await listAccounts();
-          const cuenta = (cuentas.data ?? []).find(
+          const existe = (cuentas.data ?? []).some(
             (a) => (a.primaryEmailAddress ?? "").toLowerCase() === zohoMailbox!.toLowerCase(),
           );
-          if (!cuenta?.accountId) return null;
-          const del = await deleteMailbox(cuenta.accountId);
+          if (!existe) return null;
+          const del = await deleteMailbox(zohoMailbox);
           if (!del.ok) { console.error("[delete_user] no pude borrar la casilla Zoho:", del.error); return null; }
           console.log(`[delete_user] casilla Zoho liberada: ${zohoMailbox}`);
           return zohoMailbox;
