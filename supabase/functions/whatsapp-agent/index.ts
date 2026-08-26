@@ -3258,7 +3258,9 @@ async function executeTool(
           // Daniel ya lo hubiera cargado: no era desmemoria del modelo, era un dato
           // que nunca le llegaba. Y es justo el eje con el que Álvaro quiere decidir
           // en qué cuentas concentrar el outreach.
-          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, last_contact_date, created_at, notes, lead_source, deal_type, source_contact_id, source_account")
+          // created_by: hace falta para decidir si quien pregunta puede ver las
+          // capturas adjuntas al lead (misma regla que el RLS de closer_lead_files).
+          .select("id, instagram_handle, stage, category, rejection_reason, no_interesada_date, estimated_monetization, monthly_monetization, agency_commission, assigned_to, created_by, last_contact_date, created_at, notes, lead_source, deal_type, source_contact_id, source_account")
           .ilike("instagram_handle", ilike)
           .order("created_at", { ascending: false })
           .limit(5),
@@ -3297,6 +3299,39 @@ async function executeTool(
           .order("contact_date", { ascending: false })
           .limit(10);
         history = (hist ?? []) as Array<Record<string, unknown>>;
+      }
+
+      // Capturas que el closer adjuntó a la nota del lead (closer_lead_files). El bot
+      // NUNCA ve la imagen: lee el texto que dejó closers-analyze-screenshot.
+      //
+      // ⚠️ `sb` es service_role y BYPASSA RLS, así que la visibilidad "cada uno ve lo
+      // suyo" que definen las políticas de la tabla NO aplica acá — hay que filtrarla a
+      // mano o el bot le contaría a un closer las capturas de los leads de otro en un
+      // grupo compartido. Mismo criterio que el RLS: dueño del lead, o privilegiado.
+      let capturas: Array<Record<string, unknown>> = [];
+      const idsVisibles = ctx.privileged
+        ? ccIds
+        : (closerCreatorsRes.data ?? [])
+            .filter((c) => ctx.senderUserId &&
+              (c.assigned_to === ctx.senderUserId || c.created_by === ctx.senderUserId))
+            .map((c) => c.id);
+
+      if (idsVisibles.length > 0) {
+        const { data: caps } = await sb
+          .from("closer_lead_files")
+          .select("creator_id, file_name, created_at, vision_text, analyzed_at")
+          .in("creator_id", idsVisibles)
+          .order("created_at", { ascending: false })
+          .limit(12);
+        capturas = (caps ?? []).map((c) => ({
+          creator_id: c.creator_id,
+          adjuntada_at: c.created_at,
+          // Si todavía no pasó el análisis, decimos eso — nunca "no hay nada".
+          // Antipatrón conocido: "no lo encontré" ≠ "no existe".
+          contenido: c.analyzed_at
+            ? c.vision_text
+            : "(captura adjunta, todavía sin analizar — reintentá en un minuto)",
+        }));
       }
 
       // Heurística de status global (qué decirle al closer ante el lead):
@@ -3476,6 +3511,9 @@ async function executeTool(
         closer_creators: cc,
         creators,
         contact_history: history,
+        // Capturas que el closer adjuntó a la nota, ya convertidas a texto. Solo van
+        // las de los leads que quien pregunta puede ver (ver filtro más arriba).
+        ...(capturas.length > 0 ? { capturas } : {}),
         scouter_leads: scouter,
       };
     }

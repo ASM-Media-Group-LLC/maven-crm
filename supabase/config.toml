@@ -78,6 +78,9 @@ verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Trans
 [functions.wa-inbox-analyze-image]
 verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Analiza imágenes de la bandeja (Gemini/OpenRouter).
 
+[functions.closers-analyze-screenshot]
+verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Analiza las capturas que los closers adjuntan a un lead (Gemini/OpenRouter) para que el bot pueda leerlas.
+
 [functions.wa-conversation-summarize]
 verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Rolling summary de conversaciones (Haiku).
 
