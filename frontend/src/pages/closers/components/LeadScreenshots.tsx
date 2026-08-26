@@ -118,18 +118,31 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
         // ahí el bucket no existe y todos los uploads fallan mudos desde hace meses.
         if (upErr) throw upErr;
 
-        const { error: insErr } = await supabase.from(TABLA).insert({
-          creator_id: leadId,
-          storage_path: path,
-          file_name: f.name || `captura.${EXT[f.type]}`,
-          mime_type: f.type,
-          size_bytes: f.size,
-          uploaded_by: uid,
-        } as never);
+        const { data: insertada, error: insErr } = await supabase
+          .from(TABLA)
+          .insert({
+            creator_id: leadId,
+            storage_path: path,
+            file_name: f.name || `captura.${EXT[f.type]}`,
+            mime_type: f.type,
+            size_bytes: f.size,
+            uploaded_by: uid,
+          } as never)
+          .select("id")
+          .single<{ id: string }>();
         if (insErr) {
           // Si la fila no entró, el objeto queda huérfano en el bucket: lo sacamos.
           await supabase.storage.from(BUCKET).remove([path]);
           throw insErr;
+        }
+
+        // Dispara el análisis de visión ya, sin esperar al cron de cada 5 min: la
+        // captura queda legible para el bot en segundos. Fire-and-forget a propósito
+        // — si falla, el barrido periódico la levanta igual (analyzed_at sigue NULL).
+        if (insertada?.id) {
+          void supabase.functions
+            .invoke("closers-analyze-screenshot", { body: { file_id: insertada.id } })
+            .catch(() => {});
         }
       }
     },
