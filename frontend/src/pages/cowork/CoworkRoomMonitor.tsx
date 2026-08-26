@@ -240,7 +240,8 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
             const clone = micBaseTrack.clone();
             publishedCloneRef.current = clone;
             await room.localParticipant.publishTrack(clone, { source: Track.Source.Microphone });
-          } catch {
+          } catch (e) {
+            console.error("[cowork monitor] no pude publicar tu micro en la sala:", e);
             publishedCloneRef.current = null;
           }
         }
