@@ -37,7 +37,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
             <TableHead>Rol</TableHead>
             <TableHead>Ficha HR</TableHead>
             <TableHead>Fecha de registro</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -88,7 +88,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
               <TableCell className="text-muted-foreground">
                 {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">
                 <TooltipProvider>
                   <div className="flex justify-end gap-1">
                     <Tooltip>
