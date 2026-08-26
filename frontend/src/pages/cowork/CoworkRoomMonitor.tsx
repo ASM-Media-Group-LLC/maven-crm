@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { VideoOff, Loader2 } from "lucide-react";
+import { VideoOff, Loader2, Monitor, Video } from "lucide-react";
 
 interface Props {
   roomId: string;
@@ -22,6 +22,14 @@ interface Props {
   onSharersChange?: (names: string[]) => void;
 }
 
+// Video por participante: su cámara y su pantalla (cualquiera puede faltar).
+interface PartVideo {
+  identity: string;
+  name: string;
+  camera: any | null;
+  screen: any | null;
+}
+
 // Adjunta un track de video remoto a un <video>.
 function VideoTile({ track }: { track: any }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -31,6 +39,48 @@ function VideoTile({ track }: { track: any }) {
     return () => { try { track?.detach(); } catch { /* noop */ } };
   }, [track]);
   return <video ref={ref} autoPlay playsInline muted className="w-full h-full object-cover bg-black" />;
+}
+
+// Miniatura de un participante con botón de SWAP cámara ↔ pantalla. Por defecto muestra la
+// cámara; si comparte pantalla, el botón deja alternar. Si NO comparte, el botón va
+// deshabilitado. Solo se ADJUNTA (y por ende streamea) el track que se está viendo — el otro
+// queda pausado por adaptiveStream, así ver la pantalla no cuesta ancho de banda hasta pedirlo.
+function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void }) {
+  const canSwap = !!pv.screen;
+  const activeTrack = viewingScreen && pv.screen ? pv.screen : pv.camera;
+  return (
+    <div className="relative overflow-hidden rounded-lg bg-black min-h-0">
+      {activeTrack ? (
+        <VideoTile track={activeTrack} />
+      ) : (
+        <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
+          <VideoOff className="h-4 w-4" />
+          <span className="text-[9px]">Cámara apagada</span>
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={!canSwap}
+        onClick={onSwap}
+        title={
+          !canSwap
+            ? "No está compartiendo pantalla"
+            : viewingScreen
+              ? "Ver cámara"
+              : "Ver pantalla compartida"
+        }
+        aria-label={viewingScreen ? "Ver cámara" : "Ver pantalla compartida"}
+        className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
+      </button>
+      {(pv.name || viewingScreen) && (
+        <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] text-white/90">
+          {pv.name}{viewingScreen ? " · pantalla" : ""}
+        </span>
+      )}
+    </div>
+  );
 }
 
 // Adjunta un track de audio remoto a un <audio> oculto. `muted` corta la reproducción sin
@@ -51,8 +101,10 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
 export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange }: Props) {
-  const [videoTracks, setVideoTracks] = useState<Array<{ sid: string; track: any }>>([]);
+  const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
+  // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
+  const [screenView, setScreenView] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<"connecting" | "ready" | "error">("connecting");
   const roomRef = useRef<Room | null>(null);
   const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
@@ -72,16 +124,42 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
-    const addTrack = (track: any, pub: any) => {
-      if (track?.kind === Track.Kind.Video && ((pub?.source ?? track?.source) === Track.Source.Camera)) {
-        setVideoTracks((prev) => (prev.some((t) => t.sid === track.sid) ? prev : [...prev, { sid: track.sid, track }]));
-      } else if (track?.kind === Track.Kind.Audio) {
-        setAudioTracks((prev) => (prev.some((t) => t.sid === track.sid) ? prev : [...prev, { sid: track.sid, track }]));
-      }
+    // Guarda la cámara o la pantalla de un participante en su casillero.
+    const addVideo = (participant: any, pub: any, track: any) => {
+      const source = pub?.source ?? track?.source;
+      const isCam = source === Track.Source.Camera;
+      const isScreen = source === Track.Source.ScreenShare;
+      if (!isCam && !isScreen) return;
+      const identity = participant?.identity ?? track?.sid ?? "?";
+      const name = participant?.name || participant?.identity || "Alguien";
+      setPartVideos((prev) => {
+        const i = prev.findIndex((p) => p.identity === identity);
+        if (i === -1) {
+          return [...prev, { identity, name, camera: isCam ? track : null, screen: isScreen ? track : null }];
+        }
+        const next = [...prev];
+        next[i] = {
+          ...next[i],
+          name,
+          camera: isCam ? track : next[i].camera,
+          screen: isScreen ? track : next[i].screen,
+        };
+        return next;
+      });
     };
-    const rmTrack = (track: any) => {
-      setVideoTracks((prev) => prev.filter((t) => t.sid !== track.sid));
-      setAudioTracks((prev) => prev.filter((t) => t.sid !== track.sid));
+    const addAudio = (track: any) => {
+      setAudioTracks((prev) => (prev.some((t) => t.sid === track.sid) ? prev : [...prev, { sid: track.sid, track }]));
+    };
+    const removeVideoBySid = (sid: string) => {
+      setPartVideos((prev) =>
+        prev
+          .map((p) => ({
+            ...p,
+            camera: p.camera?.sid === sid ? null : p.camera,
+            screen: p.screen?.sid === sid ? null : p.screen,
+          }))
+          .filter((p) => p.camera || p.screen),
+      );
     };
 
     // Verdad de LiveKit: escanea las publicaciones de la sala y reporta quién comparte
@@ -99,8 +177,16 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
     };
 
     room
-      .on(RoomEvent.TrackSubscribed, (t: any, p: any) => { addTrack(t, p); recomputeSharers(); })
-      .on(RoomEvent.TrackUnsubscribed, (t: any) => { rmTrack(t); recomputeSharers(); })
+      .on(RoomEvent.TrackSubscribed, (t: any, pub: any, participant: any) => {
+        if (t?.kind === Track.Kind.Video) addVideo(participant, pub, t);
+        else if (t?.kind === Track.Kind.Audio) addAudio(t);
+        recomputeSharers();
+      })
+      .on(RoomEvent.TrackUnsubscribed, (t: any) => {
+        if (t?.kind === Track.Kind.Video) removeVideoBySid(t.sid);
+        else setAudioTracks((prev) => prev.filter((x) => x.sid !== t.sid));
+        recomputeSharers();
+      })
       .on(RoomEvent.TrackPublished, () => recomputeSharers())
       .on(RoomEvent.TrackUnpublished, () => recomputeSharers())
       .on(RoomEvent.ParticipantConnected, () => recomputeSharers())
@@ -115,7 +201,11 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
         if (cancelled) { room.disconnect(); return; }
         setStatus("ready");
         room.remoteParticipants.forEach((p: any) => {
-          p.trackPublications.forEach((pub: any) => { if (pub.track && pub.isSubscribed) addTrack(pub.track, pub); });
+          p.trackPublications.forEach((pub: any) => {
+            if (!pub.track || !pub.isSubscribed) return;
+            if (pub.kind === Track.Kind.Video) addVideo(p, pub, pub.track);
+            else if (pub.kind === Track.Kind.Audio) addAudio(pub.track);
+          });
         });
         recomputeSharers();
       } catch {
@@ -126,7 +216,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
     return () => {
       cancelled = true;
       onSharersRef.current?.([]);
-      setVideoTracks([]);
+      setPartVideos([]);
       setAudioTracks([]);
       const clone = publishedCloneRef.current;
       if (clone) {
@@ -176,15 +266,20 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
           <div className="flex items-center justify-center h-full text-muted-foreground/60"><Loader2 className="h-4 w-4 animate-spin" /></div>
         ) : status === "error" ? (
           <div className="flex items-center justify-center h-full text-[11px] text-muted-foreground/50 italic">Preview no disponible</div>
-        ) : videoTracks.length === 0 ? (
+        ) : partVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
             <VideoOff className="h-4 w-4" />
             <span className="text-[10px]">Cámaras apagadas</span>
           </div>
         ) : (
-          <div className={`grid ${videoTracks.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-1 h-full auto-rows-fr`}>
-            {videoTracks.map((t) => (
-              <div key={t.sid} className="relative overflow-hidden rounded-lg bg-black min-h-0"><VideoTile track={t.track} /></div>
+          <div className={`grid ${partVideos.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-1 h-full auto-rows-fr`}>
+            {partVideos.map((pv) => (
+              <MonitorTile
+                key={pv.identity}
+                pv={pv}
+                viewingScreen={!!screenView[pv.identity] && !!pv.screen}
+                onSwap={() => setScreenView((m) => ({ ...m, [pv.identity]: !m[pv.identity] }))}
+              />
             ))}
           </div>
         )
