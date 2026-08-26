@@ -247,7 +247,11 @@ const AdminUsuarios = () => {
                       if (selectedUser) {
                         adminAction.mutate(
                           { action: "delete_user", user_id: selectedUser.id },
-                          { onSuccess: () => { setDeleteOpen(false); toast({ title: "Usuario eliminado" }); } }
+                          { onSuccess: (res) => {
+                            setDeleteOpen(false);
+                            const freed = (res as { mailbox_removed?: string | null } | undefined)?.mailbox_removed;
+                            toast({ title: "Usuario eliminado", description: freed ? `Se liberó el puesto de correo (${freed}).` : undefined });
+                          } }
                         );
                       }
                     }}
