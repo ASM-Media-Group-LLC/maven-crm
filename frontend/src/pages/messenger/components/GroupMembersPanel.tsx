@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -44,8 +44,15 @@ export default function GroupMembersPanel({
   // Configuración del grupo (permisos estilo WhatsApp). Solo admins la ven/cambian.
   const msgPerm = conversation.msg_permission ?? "all";
   const membersVis = conversation.members_visibility ?? "all";
+  const infoPerm = conversation.info_permission ?? "admins";
+  const addPerm = conversation.add_permission ?? "admins";
+  // Puede agregar miembros: admin, o cualquier participante si add_permission='all'.
+  const canAddMembers = isAdmin || addPerm === "all";
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const updateSetting = async (field: "msg_permission" | "members_visibility", value: "all" | "admins") => {
+  const updateSetting = async (
+    field: "msg_permission" | "members_visibility" | "info_permission" | "add_permission",
+    value: "all" | "admins",
+  ) => {
     setSavingKey(field);
     const { data, error } = await supabase
       .from("chat_conversations")
@@ -217,6 +224,8 @@ export default function GroupMembersPanel({
           {([
             { field: "msg_permission" as const, value: msgPerm, icon: Megaphone, label: "Enviar mensajes", hint: 'Solo admins = grupo "anuncios"' },
             { field: "members_visibility" as const, value: membersVis, icon: Eye, label: "Ver miembros", hint: "Quién ve esta lista" },
+            { field: "info_permission" as const, value: infoPerm, icon: Pencil, label: "Editar info", hint: "Nombre, foto y descripción" },
+            { field: "add_permission" as const, value: addPerm, icon: UserPlus, label: "Agregar miembros", hint: "Quién puede sumar gente" },
           ]).map(({ field, value, icon: Icon, label, hint }) => (
             <div key={field} className="flex items-center gap-2.5">
               <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -245,7 +254,7 @@ export default function GroupMembersPanel({
       )}
 
       {/* Add member button */}
-      {isAdmin && !showAddPanel && (
+      {canAddMembers && !showAddPanel && (
         <div className="px-4 py-2">
           <Button
             variant="outline"

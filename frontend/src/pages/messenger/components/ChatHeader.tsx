@@ -52,6 +52,8 @@ export default function ChatHeader({
   );
   // "Ver miembros solo admins": a un no-admin le ocultamos la lista y el conteo.
   const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
+  // "Editar info solo admins": quién puede cambiar la foto del grupo (default 'admins').
+  const canEditInfo = isAdmin || (conversation.info_permission ?? "admins") === "all";
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
@@ -114,7 +116,7 @@ export default function ChatHeader({
         </Button>
 
         <div className="relative">
-          {isGroup && isAdmin ? (
+          {isGroup && canEditInfo ? (
             <AvatarUpload
               currentUrl={avatarUrl}
               displayName={conversation.displayName}

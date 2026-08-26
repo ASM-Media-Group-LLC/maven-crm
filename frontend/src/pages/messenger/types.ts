@@ -8,9 +8,11 @@ export interface ChatConversation {
   created_at: string;
   updated_at: string;
   // Permisos de grupo estilo WhatsApp (solo aplican a type='group'). Opcionales por
-  // compatibilidad con objetos optimistas; ausente = 'all'.
-  msg_permission?: "all" | "admins";        // quién puede enviar mensajes
-  members_visibility?: "all" | "admins";    // quién puede ver la lista de miembros
+  // compatibilidad con objetos optimistas.
+  msg_permission?: "all" | "admins";        // quién puede enviar mensajes (ausente = 'all')
+  members_visibility?: "all" | "admins";    // quién puede ver la lista de miembros (ausente = 'all')
+  info_permission?: "all" | "admins";       // quién puede editar nombre/foto/desc (ausente = 'admins')
+  add_permission?: "all" | "admins";        // quién puede agregar miembros (ausente = 'admins')
 }
 
 export interface ChatParticipant {
