@@ -1,6 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import {
   Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
-  Pin, PinOff, Archive, Trash2, Settings,
+  Pin, PinOff, Archive, Trash2, Settings, Pencil, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,8 +53,32 @@ export default function ChatHeader({
   );
   // "Ver miembros solo admins": a un no-admin le ocultamos la lista y el conteo.
   const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
-  // "Editar info solo admins": quién puede cambiar la foto del grupo (default 'admins').
+  // "Editar info solo admins": quién puede cambiar nombre/foto del grupo (default 'admins').
   const canEditInfo = isAdmin || (conversation.info_permission ?? "admins") === "all";
+
+  // Renombrar el grupo desde el encabezado (lápiz al lado del nombre).
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const doneRef = useRef(false);
+  const startRename = () => { setNameValue(conversation.name || conversation.displayName); doneRef.current = false; setEditingName(true); };
+  const cancelRename = () => { doneRef.current = true; setEditingName(false); };
+  const saveRename = async () => {
+    if (doneRef.current) return; // evita doble-guardado (blur tras Enter/click)
+    doneRef.current = true;
+    setEditingName(false);
+    const v = nameValue.trim();
+    if (!v || v === (conversation.name || conversation.displayName)) return;
+    const { data, error } = await supabase
+      .from("chat_conversations").update({ name: v }).eq("id", conversation.id).select("id");
+    if (error || !data || data.length === 0) { toast.error("No se pudo cambiar el nombre"); return; }
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversation.id, sender_id: user!.id, type: "system",
+      content: `${profiles[user?.id ?? ""]?.full_name || "Alguien"} cambió el nombre del grupo a "${v}"`,
+    });
+    onAvatarChanged?.();
+  };
+  useEffect(() => { if (editingName) { nameInputRef.current?.focus(); nameInputRef.current?.select(); } }, [editingName]);
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
@@ -152,9 +177,40 @@ export default function ChatHeader({
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-foreground truncate leading-tight">
-            {conversation.displayName}
-          </p>
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={nameInputRef}
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); saveRename(); }
+                  if (e.key === "Escape") { e.preventDefault(); cancelRename(); }
+                }}
+                onBlur={saveRename}
+                maxLength={60}
+                className="flex-1 min-w-0 bg-transparent border-b border-primary/50 text-sm font-semibold text-foreground outline-none py-0.5"
+              />
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveRename} className="shrink-0 text-primary hover:opacity-80" aria-label="Guardar nombre">
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p
+                className={cn("font-semibold text-sm text-foreground truncate leading-tight", isGroup && onOpenGroupMembers && "cursor-pointer hover:underline")}
+                onClick={isGroup && onOpenGroupMembers ? onOpenGroupMembers : undefined}
+                title={isGroup && onOpenGroupMembers ? "Ver configuración del grupo" : undefined}
+              >
+                {conversation.displayName}
+              </p>
+              {isGroup && canEditInfo && (
+                <button type="button" onClick={startRename} className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title="Editar nombre" aria-label="Editar nombre del grupo">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           {subtitle && (
             <p className={cn(
               "text-[11px] leading-tight mt-0.5",
