@@ -217,11 +217,15 @@ export function enableMailbox(accountId: string): Promise<ZohoResult> {
   });
 }
 
-/** Borra la casilla y su contenido. Irreversible — preferir disableMailbox. */
-export function deleteMailbox(accountId: string): Promise<ZohoResult> {
+/** Borra la casilla (y da de baja al usuario de la org) POR EMAIL. Zoho espera
+ *  `emailList` (o `accountList` de zuids) en el body — mandar `{accountId}` no
+ *  hacía nada. Es la misma operación que "Eliminar usuario" del panel de Zoho,
+ *  que libera el puesto. Irreversible — preferir disableMailbox si solo se
+ *  quiere suspender. */
+export function deleteMailbox(email: string): Promise<ZohoResult> {
   return zohoFetch(`/accounts`, {
     method: "DELETE",
-    body: JSON.stringify({ accountId }),
+    body: JSON.stringify({ emailList: [email] }),
   });
 }
 
