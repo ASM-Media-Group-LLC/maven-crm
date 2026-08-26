@@ -5,9 +5,10 @@ import {
   DOMINIO_CASILLA,
   direccionSugerida,
   provisionMailbox,
+  provisioningConfigured,
   type ProvisionResult,
 } from "../_shared/mail-provision.ts";
-import { listAccounts, zohoConfigured } from "../_shared/zoho.ts";
+import { deleteMailbox, listAccounts, zohoConfigured } from "../_shared/zoho.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -138,6 +139,34 @@ Deno.serve(async (req) => {
           status: 400,
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
+      }
+
+      // === Guarda de cupos de correo (Zoho) ===
+      // Si este alta va a CREAR una casilla nueva y ya no quedan puestos en
+      // Zoho, frenamos ACÁ con un mensaje claro — en vez de crear un usuario a
+      // medias (sin correo). Fail-open: si Zoho no responde, no bloqueamos el
+      // alta (un hiccup del proveedor no puede impedir dar de alta a nadie).
+      // Límite configurable con ZOHO_SEAT_LIMIT (default 10 = plan actual).
+      {
+        const seatLimit = Number(Deno.env.get("ZOHO_SEAT_LIMIT") ?? "10");
+        const explicitMailbox = (mailbox_email as string | undefined)?.trim().toLowerCase() || "";
+        // Se crea casilla cuando hay mailbox_email explícito, o cuando el login
+        // se genera del nombre (sin `email`) → identidad = casilla.
+        const creaCasilla = provisioningConfigured() && (!!explicitMailbox || !email);
+        if (creaCasilla && seatLimit > 0) {
+          const cuentas = await listAccounts();
+          if (cuentas.ok && cuentas.data) {
+            const usados = cuentas.data.length;
+            const reusa = !!explicitMailbox &&
+              cuentas.data.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
+            if (!reusa && usados >= seatLimit) {
+              return new Response(JSON.stringify({
+                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Liberá uno borrando un usuario de Maven —ahora eso también da de baja su casilla y libera el puesto— o desde el panel de Zoho, o amplía el plan.`,
+                reason: "zoho_seats_full",
+              }), { status: 409, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+            }
+          }
+        }
       }
 
       const fullName = `${first_name} ${last_name}`;
@@ -625,6 +654,40 @@ Deno.serve(async (req) => {
       }
       console.log(`[delete_user] Starting deletion for user_id=${user_id}`);
 
+      // Antes de purgar (app_purge_user_refs borra mail_credentials): averiguar
+      // la casilla Zoho de este usuario para darla de baja y LIBERAR el puesto.
+      let zohoMailbox: string | null = null;
+      try {
+        const { data: cred } = await adminClient
+          .from("mail_credentials")
+          .select("email_address")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        zohoMailbox = (cred as { email_address?: string } | null)?.email_address ?? null;
+      } catch { /* noop */ }
+
+      // Da de baja (ELIMINA) la casilla en Zoho para liberar el puesto. Best-effort
+      // y se llama recién con el usuario ya borrado OK: si el borrado falla, no
+      // dejamos una casilla huérfana. deleteMailbox es irreversible (borra el
+      // buzón) — que es justo lo que libera el cupo del plan.
+      const liberarPuestoZoho = async (): Promise<string | null> => {
+        if (!zohoMailbox || !zohoConfigured()) return null;
+        try {
+          const cuentas = await listAccounts();
+          const cuenta = (cuentas.data ?? []).find(
+            (a) => (a.primaryEmailAddress ?? "").toLowerCase() === zohoMailbox!.toLowerCase(),
+          );
+          if (!cuenta?.accountId) return null;
+          const del = await deleteMailbox(cuenta.accountId);
+          if (!del.ok) { console.error("[delete_user] no pude borrar la casilla Zoho:", del.error); return null; }
+          console.log(`[delete_user] casilla Zoho liberada: ${zohoMailbox}`);
+          return zohoMailbox;
+        } catch (e) {
+          console.error("[delete_user] baja de casilla explotó:", (e as Error).message);
+          return null;
+        }
+      };
+
       // 1. Limpia TODAS las refs en public.* a este user_id usando la
       // función SQL app_purge_user_refs. Antes esto era una lista
       // hardcoded de 6 tablas (employees, project_members,
@@ -681,7 +744,8 @@ Deno.serve(async (req) => {
             // El DELETE directo funcionó — gotrue habrá fallado por
             // razones de su propio side (sesiones colgadas, etc.).
             console.log(`[delete_user] Successfully deleted via direct DELETE for user_id=${user_id}`);
-            return new Response(JSON.stringify({ success: true }), {
+            const mbRemovedDirect = await liberarPuestoZoho();
+            return new Response(JSON.stringify({ success: true, mailbox_removed: mbRemovedDirect }), {
               headers: { ...corsHeaders(req), "Content-Type": "application/json" },
             });
           }
@@ -704,7 +768,8 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[delete_user] Successfully deleted user_id=${user_id}`);
-      return new Response(JSON.stringify({ success: true }), {
+      const mbRemoved = await liberarPuestoZoho();
+      return new Response(JSON.stringify({ success: true, mailbox_removed: mbRemoved }), {
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }

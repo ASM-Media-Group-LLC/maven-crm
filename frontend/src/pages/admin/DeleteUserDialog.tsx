@@ -14,7 +14,7 @@ const DeleteUserDialog = ({ open, onOpenChange, userName, onConfirm, isLoading }
       <AlertDialogHeader>
         <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
         <AlertDialogDescription>
-          Esta acción eliminará permanentemente al usuario <strong>{userName}</strong> y todos sus datos asociados. Esta acción no se puede deshacer.
+          Esta acción eliminará permanentemente al usuario <strong>{userName}</strong> y todos sus datos asociados. Si tiene casilla de correo de Maven, también se elimina y se libera su puesto en Zoho. Esta acción no se puede deshacer.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
