@@ -185,7 +185,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [roomMic, setRoomMic] = useState<Record<string, boolean>>({});
   const [micBaseTrack, setMicBaseTrack] = useState<MediaStreamTrack | null>(null);
   const hearFor = (roomId: string) => roomHear[roomId] ?? true;   // por defecto se escuchan todas
-  const broadcastFor = (roomId: string) => globalMic && (roomMic[roomId] ?? false); // hablar = master && sala
+  // "Hablar a todas" (globalMic) le habla a TODAS las salas a la vez; el 🎤 de cada
+  // sala le habla SOLO a esa. Aditivos: una sala te oye si hablás a todas O tiene su 🎤.
+  const broadcastFor = (roomId: string) => globalMic || (roomMic[roomId] ?? false);
+  // El micro se captura si le hablás a alguien: a todas, o al menos a una sala.
+  const micArmed = globalMic || Object.values(roomMic).some(Boolean);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -210,11 +214,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   }, [profileLoaded, cowork.session?.host_hub_livekit_room]);
 
   // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
-  // UNA vez al activar el master y cada sala publica un clon (CoworkRoomMonitor). El Coordinador
-  // Hub queda INDEPENDIENTE (no se corta al togglear el micro global): su mic está apagado por
-  // defecto, así que no hay conflicto de captura ni doble publicación de tu voz.
+  // cuando le hablás a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
+  // sala publica un clon (CoworkRoomMonitor). El Coordinador Hub queda INDEPENDIENTE (su mic está
+  // apagado por defecto, así que no hay conflicto de captura ni doble publicación de tu voz).
   useEffect(() => {
-    if (!globalMic) return;
+    if (!micArmed) return;
     let cancelled = false;
     let track: MediaStreamTrack | null = null;
     (async () => {
@@ -226,7 +230,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         if (cancelled) { track?.stop(); return; }
         setMicBaseTrack(track);
       } catch {
-        if (!cancelled) { toast.error("No pude acceder al micrófono"); setGlobalMic(false); }
+        // Sin micro no podés hablarle a nadie → desarmamos todo.
+        if (!cancelled) { toast.error("No pude acceder al micrófono"); setGlobalMic(false); setRoomMic({}); }
       }
     })();
     return () => {
@@ -234,7 +239,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setMicBaseTrack(null);
       try { track?.stop(); } catch { /* noop */ }
     };
-  }, [globalMic]);
+  }, [micArmed]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
@@ -568,11 +573,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="sm"
                   variant={globalMic ? "default" : "outline"}
                   className={`gap-1.5 rounded-full h-8 ${globalMic ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
-                  title={globalMic ? "Micrófono activo: tu voz va a las salas que tengan el 🎤 encendido. Toca para silenciar todo." : "Activa tu micrófono para poder hablarle a las salas (después elige a cuáles con el 🎤 de cada sala)."}
+                  title={globalMic ? "Tu voz va a TODAS las salas a la vez. Toca para dejar de hablarles." : "Habla a TODAS las salas al mismo tiempo (para una sola, usa el 🎤 de esa sala)."}
                   onClick={() => setGlobalMic((v) => !v)}
                 >
                   {globalMic ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  {globalMic ? "Micrófono activo" : "Mi micrófono"}
+                  {globalMic ? "Hablando a todas" : "Hablar a todas"}
                 </Button>
                 <Button
                   size="sm"
@@ -708,17 +713,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${broadcastFor(room.id) ? "text-success" : "text-muted-foreground/50"}`}
-                              title={broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle a esta sala."}
-                              onClick={() => {
-                                const turningOn = !(roomMic[room.id] ?? false);
-                                // "Hablar" prende tu micro solo: si el master está apagado lo
-                                // activamos (captura el micro) además de encender esta sala.
-                                // Antes había que prender "Mi micrófono" arriba primero, y sin
-                                // eso el botón no hacía nada (dead-click) → parecía roto.
-                                if (turningOn && !globalMic) setGlobalMic(true);
-                                setRoomMic((m) => ({ ...m, [room.id]: turningOn }));
-                              }}
+                              className={`h-7 flex-1 text-[11px] gap-1 rounded-lg font-medium ${broadcastFor(room.id) ? "bg-success text-white hover:bg-success/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
+                              disabled={globalMic}
+                              title={globalMic
+                                ? "Ya estás hablando a TODAS las salas (apaga 'Hablar a todas' para elegir una)."
+                                : broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle solo a esta sala."}
+                              onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
                             >
                               {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                               {broadcastFor(room.id) ? "Hablando" : "Hablar"}
