@@ -13,6 +13,7 @@ export interface ChatConversation {
   members_visibility?: "all" | "admins";    // quién puede ver la lista de miembros (ausente = 'all')
   info_permission?: "all" | "admins";       // quién puede editar nombre/foto/desc (ausente = 'admins')
   add_permission?: "all" | "admins";        // quién puede agregar miembros (ausente = 'admins')
+  require_approval?: boolean;               // un admin debe aprobar a los que agrega un no-admin
 }
 
 export interface ChatParticipant {

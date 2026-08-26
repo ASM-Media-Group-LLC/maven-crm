@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye, Pencil } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye, Pencil, Check, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -64,6 +64,77 @@ export default function GroupMembersPanel({
     setSavingKey(null);
   };
 
+  // Aprobar nuevos miembros: si está activo y un no-admin agrega a alguien, va a una cola de
+  // solicitudes (chat_join_requests) que un admin aprueba/rechaza.
+  const requireApproval = conversation.require_approval ?? false;
+  const toggleApproval = async (value: boolean) => {
+    setSavingKey("require_approval");
+    const { data, error } = await supabase
+      .from("chat_conversations")
+      .update({ require_approval: value })
+      .eq("id", conversation.id)
+      .select("id");
+    if (error || !data || data.length === 0) toast.error("No se pudo cambiar la configuración");
+    else onMembersChanged();
+    setSavingKey(null);
+  };
+
+  const [pendingReqs, setPendingReqs] = useState<{ id: string; user_id: string; requested_by: string }[]>([]);
+  const [reqProfiles, setReqProfiles] = useState<Record<string, UserProfile>>({});
+  const [reqActing, setReqActing] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("chat_join_requests")
+        .select("id, user_id, requested_by")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: true });
+      const reqs = (data as { id: string; user_id: string; requested_by: string }[]) || [];
+      setPendingReqs(reqs);
+      const ids = [...new Set(reqs.flatMap(r => [r.user_id, r.requested_by]))];
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids);
+        setReqProfiles(Object.fromEntries(((profs as UserProfile[]) || []).map(p => [p.id, p])));
+      }
+    };
+    load();
+    const ch = supabase
+      .channel(`join-reqs-${conversation.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_join_requests", filter: `conversation_id=eq.${conversation.id}` }, () => void load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [isAdmin, conversation.id]);
+
+  const reqName = (uid: string) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || "Usuario";
+
+  const approveRequest = async (req: { id: string; user_id: string }) => {
+    setReqActing(req.id);
+    const { error } = await supabase.from("chat_participants").insert({ conversation_id: conversation.id, user_id: req.user_id, role: "member" });
+    if (error) {
+      toast.error("No se pudo aprobar");
+    } else {
+      await supabase.from("chat_join_requests").delete().eq("id", req.id);
+      await supabase.from("chat_messages").insert({
+        conversation_id: conversation.id, sender_id: user!.id, type: "system",
+        content: `${profiles[user!.id]?.full_name || "Admin"} aceptó a ${reqName(req.user_id)} en el grupo`,
+      });
+      setPendingReqs(prev => prev.filter(r => r.id !== req.id));
+      onMembersChanged();
+      toast.success("Solicitud aprobada");
+    }
+    setReqActing(null);
+  };
+
+  const rejectRequest = async (req: { id: string }) => {
+    setReqActing(req.id);
+    const { error } = await supabase.from("chat_join_requests").delete().eq("id", req.id);
+    if (error) toast.error("No se pudo rechazar");
+    else { setPendingReqs(prev => prev.filter(r => r.id !== req.id)); toast.success("Solicitud rechazada"); }
+    setReqActing(null);
+  };
+
   // Load all users when add panel opens
   useEffect(() => {
     if (!showAddPanel) return;
@@ -87,6 +158,19 @@ export default function GroupMembersPanel({
 
   const handleAddMember = async (userId: string) => {
     setAddingUserId(userId);
+    const name = allUsers.find(u => u.id === userId)?.full_name || "Usuario";
+
+    // Un no-admin en un grupo con aprobación activada NO suma directo: crea una solicitud.
+    if (!isAdmin && requireApproval) {
+      const { error } = await supabase.from("chat_join_requests").insert({
+        conversation_id: conversation.id, user_id: userId, requested_by: user!.id,
+      });
+      if (error) toast.error("No se pudo enviar la solicitud");
+      else toast.success(`Solicitud enviada · un admin debe aprobar a ${name}`);
+      setAddingUserId(null);
+      return;
+    }
+
     const { error } = await supabase.from("chat_participants").insert({
       conversation_id: conversation.id,
       user_id: userId,
@@ -95,7 +179,6 @@ export default function GroupMembersPanel({
     if (error) {
       toast.error("Error al agregar miembro");
     } else {
-      const name = allUsers.find(u => u.id === userId)?.full_name || "Usuario";
       toast.success(`${name} agregado al grupo`);
       // Send system message
       await supabase.from("chat_messages").insert({
@@ -250,6 +333,55 @@ export default function GroupMembersPanel({
               </div>
             </div>
           ))}
+          {/* Aprobar nuevos miembros (booleano Sí/No) */}
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] leading-tight">Aprobar nuevos miembros</p>
+              <p className="text-[11px] text-muted-foreground leading-tight">Un admin acepta a los que agrega un no-admin</p>
+            </div>
+            <div className="flex items-center rounded-full border border-border overflow-hidden text-[11px] shrink-0">
+              {([true, false] as const).map(opt => (
+                <button
+                  key={String(opt)}
+                  onClick={() => requireApproval !== opt && toggleApproval(opt)}
+                  disabled={savingKey === "require_approval"}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors disabled:opacity-60",
+                    requireApproval === opt ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {opt ? "Sí" : "No"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Solicitudes pendientes de aprobación — solo admins */}
+      {isAdmin && pendingReqs.length > 0 && (
+        <div className="px-4 py-3 border-b border-border">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Solicitudes pendientes ({pendingReqs.length})
+          </p>
+          <div className="space-y-1.5">
+            {pendingReqs.map(req => (
+              <div key={req.id} className="flex items-center gap-2.5">
+                <UserAvatar name={reqName(req.user_id)} src={reqProfiles[req.user_id]?.avatar_url} seed={reqProfiles[req.user_id]?.avatar_seed} size="sm" className="h-7 w-7 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] truncate leading-tight">{reqName(req.user_id)}</p>
+                  <p className="text-[11px] text-muted-foreground truncate leading-tight">Propuesto por {reqName(req.requested_by)}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-green-600 hover:text-green-700 hover:bg-green-500/10" onClick={() => approveRequest(req)} disabled={reqActing === req.id} title="Aprobar" aria-label={`Aprobar a ${reqName(req.user_id)}`}>
+                  {reqActing === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-4 w-4" />}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => rejectRequest(req)} disabled={reqActing === req.id} title="Rechazar" aria-label={`Rechazar a ${reqName(req.user_id)}`}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
