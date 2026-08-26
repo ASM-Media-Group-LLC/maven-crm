@@ -102,22 +102,33 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
         .single();
       if (intError) throw intError;
 
-      // Upload files if any
+      // Upload files if any.
+      //
+      // Esto subía al bucket "contact-files", que NO EXISTE en este proyecto, y se
+      // tragaba el error con `if (!uploadError)`: todos los adjuntos venían fallando
+      // en silencio (contact_interaction_files tiene 1 sola fila en toda su vida) y
+      // el usuario veía "Interacción registrada" igual. Además getPublicUrl sobre un
+      // bucket privado devuelve una URL que da 400.
+      //
+      // Ahora usa el mismo camino que el modal hermano (AddContactoModal →
+      // uploadContactEvidence): bucket creator-files, uuid en el path para que dos
+      // archivos con el mismo nombre no se pisen, URL firmada, y falla fuerte.
       if (archivos.length > 0 && interaction) {
         for (const file of archivos) {
-          const path = `interactions/${interaction.id}/${file.name}`;
+          const path = `interactions/${interaction.id}/${crypto.randomUUID()}-${file.name}`;
           const { error: uploadError } = await supabase.storage
-            .from("contact-files")
+            .from("creator-files")
             .upload(path, file);
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from("contact-files").getPublicUrl(path);
-            await supabase.from("contact_interaction_files").insert({
-              interaction_id: interaction.id,
-              file_name: file.name,
-              file_type: file.type,
-              file_url: urlData.publicUrl,
-            });
-          }
+          if (uploadError) throw uploadError;
+          const { data: signed } = await supabase.storage
+            .from("creator-files")
+            .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 año, igual que el hermano
+          await supabase.from("contact_interaction_files").insert({
+            interaction_id: interaction.id,
+            file_name: file.name,
+            file_type: file.type,
+            file_url: signed?.signedUrl || path,
+          });
         }
       }
 
