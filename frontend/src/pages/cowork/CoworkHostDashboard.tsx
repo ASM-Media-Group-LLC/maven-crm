@@ -136,6 +136,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+
+  // La posición del Hub se guarda en localStorage. Si se arrastró en una pantalla
+  // grande y después se abre en una más chica (o se achica la ventana), esas
+  // coordenadas quedaban FUERA del viewport y la ventana "desaparecía". Re-clampea
+  // al montar y en cada resize para que siempre quede visible.
+  useEffect(() => {
+    const clampIntoView = () => {
+      setHubPos((prev) => {
+        if (!prev) return prev;
+        const panel = hubPanelRef.current;
+        const w = panel?.offsetWidth ?? hubSize?.w ?? 480;
+        const h = panel?.offsetHeight ?? hubSize?.h ?? 380;
+        const maxX = Math.max(8, window.innerWidth - w - 8);
+        const maxY = Math.max(8, window.innerHeight - h - 8);
+        const x = Math.min(Math.max(8, prev.x), maxX);
+        const y = Math.min(Math.max(8, prev.y), maxY);
+        if (x === prev.x && y === prev.y) return prev;
+        try { localStorage.setItem("cowork.hub.pos", JSON.stringify({ x, y })); } catch { /* noop */ }
+        return { x, y };
+      });
+    };
+    clampIntoView();
+    window.addEventListener("resize", clampIntoView);
+    return () => window.removeEventListener("resize", clampIntoView);
+  }, [hubSize]);
+
   // 1:1 state
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
@@ -683,8 +709,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               variant="ghost"
                               size="sm"
                               className={`h-7 flex-1 text-[11px] gap-1 rounded-lg ${broadcastFor(room.id) ? "text-success" : "text-muted-foreground/50"}`}
-                              title={globalMic ? (broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle a esta sala.") : "Activa 'Mi micrófono' arriba para poder hablarle a las salas."}
-                              onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+                              title={broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle a esta sala."}
+                              onClick={() => {
+                                const turningOn = !(roomMic[room.id] ?? false);
+                                // "Hablar" prende tu micro solo: si el master está apagado lo
+                                // activamos (captura el micro) además de encender esta sala.
+                                // Antes había que prender "Mi micrófono" arriba primero, y sin
+                                // eso el botón no hacía nada (dead-click) → parecía roto.
+                                if (turningOn && !globalMic) setGlobalMic(true);
+                                setRoomMic((m) => ({ ...m, [room.id]: turningOn }));
+                              }}
                             >
                               {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                               {broadcastFor(room.id) ? "Hablando" : "Hablar"}
