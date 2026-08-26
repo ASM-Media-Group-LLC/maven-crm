@@ -1,6 +1,6 @@
 import {
   Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
-  Pin, PinOff, Archive, Trash2,
+  Pin, PinOff, Archive, Trash2, Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -198,6 +198,11 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
+              {isGroup && isAdmin && onOpenGroupMembers && (
+                <DropdownMenuItem onClick={onOpenGroupMembers}>
+                  <Settings className="h-3.5 w-3.5 mr-2" /> Configuración del grupo
+                </DropdownMenuItem>
+              )}
               {isGroup && canSeeMembers && onOpenGroupMembers && (
                 <DropdownMenuItem onClick={onOpenGroupMembers}>
                   <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
