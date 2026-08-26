@@ -156,7 +156,12 @@ Deno.serve(async (req) => {
         if (creaCasilla && seatLimit > 0) {
           const cuentas = await listAccounts();
           if (cuentas.ok && cuentas.data) {
-            const usados = cuentas.data.length;
+            // Contamos solo BUZONES REALES: la cuenta super-admin de la org
+            // (ej. corp@unlok.me) figura en /accounts pero SIN accountId — no
+            // tiene buzón ("Crear cuenta de correo") y Zoho NO la cobra. Contarla
+            // nos frenaba un buzón antes de tiempo (Maven decía 10/10 cuando Zoho
+            // mostraba 9/10). Filtrar por accountId iguala el conteo al de Zoho.
+            const usados = cuentas.data.filter((a) => a.accountId).length;
             const reusa = !!explicitMailbox &&
               cuentas.data.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
             if (!reusa && usados >= seatLimit) {
