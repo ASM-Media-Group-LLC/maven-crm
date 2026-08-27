@@ -99,6 +99,7 @@ import LeadGenBaseDatos from "./pages/LeadGenBaseDatos";
 import Closers from "./pages/Closers";
 import Tickets from "./pages/Tickets";
 import Promolog from "./pages/Promolog";
+import Parrilla from "./pages/Parrilla";
 import ChatterEvaluator from "./pages/ChatterEvaluator";
 import ScouterAssist from "./pages/scouter/ScouterAssist";
 import AgencyQA from "./pages/agency-qa/AgencyQA";
@@ -283,6 +284,7 @@ const App = () => (
                 <Route path="/oportunidades" element={<Navigate to="/closers" replace />} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
+                <Route path="/parrilla" element={<PermissionRoute module="Parrilla"><Parrilla /></PermissionRoute>} />
                 <Route path="/telefonos" element={<PermissionRoute module="Telefonos"><TelefonosPage /></PermissionRoute>} />
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />

@@ -32,8 +32,7 @@ import {
   ClipboardCheck, Map, Search, Headphones, Video, Users2, MessageCircle,
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
-  CalendarDays, Building2, Briefcase, History, Rocket,
-} from "lucide-react";
+  CalendarDays, Building2, Briefcase, History, Rocket, CalendarRange } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -93,6 +92,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
 
   // ── Operaciones ───────────────────────────────────────────────────────
   { title: "Promolog", i18nKey: "nav.promolog", url: "/promolog", icon: Megaphone, module: "Promolog", section: "Operaciones", keywords: ["promos", "historias"] },
+  { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", section: "Operaciones", keywords: ["parrilla de contenido", "plan semanal", "promocion"] },
   { title: "LeadGen", i18nKey: "nav.leadgen", url: "/leadgen", icon: Activity, module: "LeadGen", section: "Operaciones", keywords: ["leads"] },
   { title: "LeadGen · Base de datos", url: "/leadgen/base-datos", icon: Database, module: "LeadGen", section: "Operaciones" },
   { title: "Closers", i18nKey: "nav.closers", url: "/closers", icon: Phone, module: "Closers", section: "Operaciones", keywords: ["pipeline", "operaciones"] },

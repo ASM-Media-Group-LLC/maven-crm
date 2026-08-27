@@ -150,6 +150,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // === Operaciones ===
   // Promolog: Promos (tabla) + Promobot (control del pipeline, gateado por rol).
   def("Operaciones", "Promolog", ["Promos", "Promobot"]),
+  // Parrilla de contenido: plan semanal de promoción de las creadoras (editor visual
+  // + banco de referencias). Default: manager y HHRR (seed en migración 20260827160000).
+  def("Operaciones", "Parrilla", ["Parrilla", "Referencias"], ["Editar", "Enviar al grupo"]),
   // LeadGen: vistas internas + acciones de crear/eliminar entradas.
   def("Operaciones", "LeadGen", ["Dashboard", "Lista", "Agentes", "Supervisores", "Rendimiento"], ["Crear Entrada", "Eliminar Entradas"]),
   // Closers: subtabs de navegación (Dashboard / Actividad / Operaciones / Oportunidades) + acciones.

@@ -3,8 +3,7 @@ import {
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
-  Volume2, VolumeX, Mail, Clapperboard,
-} from "lucide-react";
+  Volume2, VolumeX, Mail, Clapperboard, CalendarRange } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -158,6 +157,7 @@ const DashboardSidebar = () => {
 
   const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined; muteChannel?: MuteChannel }[] = [
     { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined },
+    { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", submodule: undefined },
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
