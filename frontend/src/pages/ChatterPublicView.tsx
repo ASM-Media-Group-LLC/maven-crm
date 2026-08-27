@@ -852,8 +852,26 @@ const ChatterPublicView = () => {
   // sigue por postgres_changes en un canal aparte porque no está en el
   // hot path del bug (la inestabilidad apareció bajo carga de inserts
   // de mensajes).
+  // Reconexión resiliente: .subscribe() no tenía callback de status → si el websocket se caía
+  // (sleep, blip de red, pestaña en background), el canal quedaba MUERTO y el chatter dejaba de
+  // recibir mensajes hasta refrescar. Nombre de canal FIJO (matchea el topic del broadcast);
+  // la re-suscripción se fuerza con rtVersion en las deps.
+  const [rtVersion, setRtVersion] = useState(0);
+  const rtReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rtRetryRef = useRef(0);
   useEffect(() => {
     if (!sessionId || !claimed) return;
+    const scheduleReconnect = () => {
+      if (rtReconnectTimerRef.current) return;
+      rtRetryRef.current += 1;
+      const delay = Math.min(1000 * 2 ** rtRetryRef.current, 15000);
+      rtReconnectTimerRef.current = setTimeout(() => {
+        rtReconnectTimerRef.current = null;
+        qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+        qc.invalidateQueries({ queryKey: ["chatter-public-session", sessionId] });
+        setRtVersion((v) => v + 1);
+      }, delay);
+    };
     const channel = supabaseAnon
       .channel(`chatter-session:${sessionId}`)
       .on(
@@ -871,11 +889,27 @@ const ChatterPublicView = () => {
         },
         () => qc.invalidateQueries({ queryKey: ["chatter-public-session", sessionId] }),
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          rtRetryRef.current = 0;
+          if (rtReconnectTimerRef.current) {
+            clearTimeout(rtReconnectTimerRef.current);
+            rtReconnectTimerRef.current = null;
+          }
+          qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          scheduleReconnect();
+        }
+      });
     return () => {
+      if (rtReconnectTimerRef.current) {
+        clearTimeout(rtReconnectTimerRef.current);
+        rtReconnectTimerRef.current = null;
+      }
       supabaseAnon.removeChannel(channel);
     };
-  }, [sessionId, claimed, qc]);
+  }, [sessionId, claimed, qc, rtVersion]);
 
   // Auto-scroll to bottom + ping on new fan messages
   useEffect(() => {

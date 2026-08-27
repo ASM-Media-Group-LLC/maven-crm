@@ -889,22 +889,59 @@ export const ChatPanel = ({ session }: Props) => {
   // topic = 'chatter-session:{session_id}' y event = 'new_message'. Acá nos
   // suscribimos a ese mismo topic y, al recibir el evento, invalidamos la
   // query — el refetch trae el mensaje completo con RLS aplicado.
+  // Reconexión resiliente del Broadcast: si el websocket se cae (sleep, blip de red, refresh
+  // de token ~1h, pestaña en background), la suscripción quedaba MUERTA para siempre porque
+  // .subscribe() no tenía callback de status → nadie re-suscribía → "los mensajes no llegan,
+  // hay que refrescar". Portamos el patrón resiliente de useChat.ts. OJO: el NOMBRE del canal
+  // debe quedar FIJO (matchea el topic del realtime.send del trigger) → la re-suscripción se
+  // fuerza con rtVersion en las DEPS, no en el nombre.
+  const [rtVersion, setRtVersion] = useState(0);
+  const rtReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rtRetryRef = useRef(0);
   useEffect(() => {
     if (!session?.id) return;
+    const sid = session.id;
+    const scheduleReconnect = () => {
+      if (rtReconnectTimerRef.current) return;
+      rtRetryRef.current += 1;
+      const delay = Math.min(1000 * 2 ** rtRetryRef.current, 15000);
+      rtReconnectTimerRef.current = setTimeout(() => {
+        rtReconnectTimerRef.current = null;
+        qc.invalidateQueries({ queryKey: ["chatter-messages", sid] });
+        setRtVersion((v) => v + 1);
+      }, delay);
+    };
     const channel = supabase
-      .channel(`chatter-session:${session.id}`)
+      .channel(`chatter-session:${sid}`)
       .on(
         "broadcast",
         { event: "new_message" },
         () => {
-          qc.invalidateQueries({ queryKey: ["chatter-messages", session.id] });
+          qc.invalidateQueries({ queryKey: ["chatter-messages", sid] });
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          rtRetryRef.current = 0;
+          if (rtReconnectTimerRef.current) {
+            clearTimeout(rtReconnectTimerRef.current);
+            rtReconnectTimerRef.current = null;
+          }
+          // al (re)conectar, refetch por si se perdieron mensajes mientras estaba caído
+          qc.invalidateQueries({ queryKey: ["chatter-messages", sid] });
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          scheduleReconnect();
+        }
+      });
     return () => {
+      if (rtReconnectTimerRef.current) {
+        clearTimeout(rtReconnectTimerRef.current);
+        rtReconnectTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [session?.id, qc]);
+  }, [session?.id, qc, rtVersion]);
 
   const profile = useMemo(() => {
     if (!session) return null;
