@@ -7,8 +7,11 @@
 // (ver useParrilla.ts) → de cada guardado se derivan las tareas esperadas que
 // Promolog usará para medir cumplimiento (fase futura).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Sparkles, Trash2 } from "lucide-react";
+import { type DateRange } from "react-day-picker";
+import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   type ContentGrid, type GridDay, type ExtraType, type GridTheme,
-  DEFAULT_THEME, EXTRA_TYPE_META, useCreateNextWeek, useGridDays, useGridList, useSaveGrid, weekdayLabel,
+  DEFAULT_THEME, EXTRA_TYPE_META, proximoCiclo, useCreateWeek, useGenerateParrilla, useGridDays, useGridList, useSaveGrid, weekdayLabel,
 } from "./useParrilla";
 
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -284,7 +287,55 @@ export default function ParrillaPage() {
   }, [grid?.id, daysLoading]);
 
   const save = useSaveGrid();
-  const createWeek = useCreateNextWeek();
+  const createWeek = useCreateWeek();
+  const genIA = useGenerateParrilla();
+
+  // Picker de "Nueva semana": rango elegido en el calendario (default: el
+  // ciclo estándar lunes → lunes que sigue a la última parrilla).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [range, setRange] = useState<DateRange | undefined>();
+  const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const nDias = range?.from && range?.to ? Math.round((range.to.getTime() - range.from.getTime()) / 86400000) + 1 : 0;
+  const rangoValido = nDias >= 2 && nDias <= 10;
+
+  const abrirPicker = (open: boolean) => {
+    if (open && dirtyRef.current) {
+      toast.warning("Guardá los cambios de esta parrilla antes de crear una nueva");
+      return;
+    }
+    if (open) {
+      const { start, end } = proximoCiclo(grids[0] ?? null);
+      setRange({ from: new Date(start + "T00:00:00"), to: new Date(end + "T00:00:00") });
+    }
+    setPickerOpen(open);
+  };
+
+  const crearSemana = () => {
+    if (!range?.from || !range?.to) return;
+    createWeek.mutate(
+      { start: isoLocal(range.from), end: isoLocal(range.to), from: grid && days.length ? { grid, days } : null },
+      {
+        onSuccess: (id) => { setPickerOpen(false); setSelectedId(id); toast.success("Parrilla nueva creada (borrador)"); },
+        onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Ya existe una parrilla que empieza ese día" : `No se pudo crear: ${e.message}`),
+      },
+    );
+  };
+
+  const generarConIA = () => {
+    if (!grid) return;
+    if (dirtyRef.current) { toast.warning("Guardá tus cambios antes de generar con IA"); return; }
+    toast("La IA va a reescribir los textos de este borrador", {
+      description: "Formato, franjas y referencias se conservan. Tarda ~30-60 segundos.",
+      duration: 10000,
+      action: {
+        label: "Generar",
+        onClick: () => genIA.mutate(grid.id, {
+          onSuccess: (d) => toast.success(`Parrilla redactada por IA (${d.dias} días) — revisala y dale el toque humano ✍️`),
+          onError: (e: any) => toast.error(`No se pudo generar: ${e.message}`),
+        }),
+      },
+    });
+  };
 
   const handleSave = (status?: ContentGrid["status"]) => {
     if (!grid) return;
@@ -405,19 +456,40 @@ export default function ParrillaPage() {
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="mr-1 h-4 w-4" /> PDF
           </Button>
-          <Button variant="outline" size="sm" disabled={createWeek.isPending}
-            onClick={() => {
-              if (dirtyRef.current) {
-                toast.warning("Guardá los cambios de esta parrilla antes de crear la semana nueva");
-                return;
-              }
-              createWeek.mutate(grid && days.length ? { grid, days } : null, {
-                onSuccess: (id) => { setSelectedId(id); toast.success("Semana nueva creada (borrador)"); },
-                onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Ya existe la parrilla de esa semana" : `No se pudo crear: ${e.message}`),
-              });
-            }}>
-            <Plus className="mr-1 h-4 w-4" /> Nueva semana
-          </Button>
+          {grid?.status === "borrador" && (
+            <Button variant="outline" size="sm" disabled={genIA.isPending} onClick={generarConIA}>
+              {genIA.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />} Generar con IA
+            </Button>
+          )}
+          <Popover open={pickerOpen} onOpenChange={abrirPicker}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" disabled={createWeek.isPending}>
+                <Plus className="mr-1 h-4 w-4" /> Nueva semana
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3" align="end">
+              <p className="text-xs font-semibold">Elegí los días de la parrilla</p>
+              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es lunes → lunes (8 días); podés elegir otro rango.</p>
+              <Calendar
+                mode="range"
+                selected={range}
+                onSelect={setRange}
+                defaultMonth={range?.from}
+                weekStartsOn={1}
+                locale={es}
+              />
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-muted-foreground">
+                  {range?.from && range?.to
+                    ? `${nDias} días · ${fmtDia(isoLocal(range.from))} → ${fmtDia(isoLocal(range.to))}${rangoValido ? "" : " (elegí de 2 a 10 días)"}`
+                    : "Elegí inicio y fin"}
+                </span>
+                <Button size="sm" disabled={!rangoValido || createWeek.isPending} onClick={crearSemana}>
+                  {createWeek.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Crear
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid}>
             {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
           </Button>
@@ -431,7 +503,7 @@ export default function ParrillaPage() {
         ) : !grid ? (
           <div className="py-16 text-center">
             <p className="text-sm text-muted-foreground">Todavía no hay parrillas.</p>
-            <Button className="mt-3" size="sm" disabled={createWeek.isPending} onClick={() => createWeek.mutate(null, {
+            <Button className="mt-3" size="sm" disabled={createWeek.isPending} onClick={() => createWeek.mutate({ ...proximoCiclo(null), from: null }, {
               onSuccess: (id) => setSelectedId(id),
               onError: (e: any) => toast.error(`No se pudo crear: ${e.message}`),
             })}>

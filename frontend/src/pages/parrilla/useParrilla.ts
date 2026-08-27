@@ -174,36 +174,46 @@ const emptyDay = (dayIndex: number): Omit<GridDay, "grid_id" | "date"> => ({
   refs: [],
 });
 
-// Nueva semana: duplica la parrilla más reciente corrida al próximo lunes (borrador).
-// Sin plantilla (estreno del módulo) siembra 8 días en blanco — nunca un tablero vacío.
-export function useCreateNextWeek() {
+// Ciclo estándar siguiente: la parrilla previa + 7 días de calendario (fallback:
+// el próximo lunes en día Bogotá, igual que el cron de F2). Es el DEFAULT del
+// picker de "Nueva semana" — la manager puede elegir otro rango en el calendario.
+export function proximoCiclo(prev?: Pick<ContentGrid, "week_start"> | null): { start: string; end: string } {
+  const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const now = new Date(hoyBogota + "T12:00:00Z");
+  const dow = now.getUTCDay(); // 0=dom
+  const delta = dow === 1 ? 0 : (8 - dow) % 7;
+  const proxLunes = new Date(now); proxLunes.setUTCDate(proxLunes.getUTCDate() + delta);
+  let monday = proxLunes;
+  if (prev?.week_start) {
+    const siguiente = new Date(prev.week_start + "T12:00:00Z");
+    siguiente.setUTCDate(siguiente.getUTCDate() + 7);
+    if (siguiente > proxLunes) monday = siguiente;
+  }
+  const end = new Date(monday); end.setUTCDate(end.getUTCDate() + 7);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: iso(monday), end: iso(end) };
+}
+
+// Nueva parrilla para el rango elegido en el calendario (borrador). La plantilla
+// se mapea POR DÍA DE SEMANA (el copy de "Viernes de iniciar el día…" solo puede
+// caer en un viernes); si el último día repite un día de semana ya usado (el
+// lunes de cierre del ciclo estándar), recibe el día de CIERRE de la plantilla.
+// Sin plantilla, días en blanco — nunca un tablero vacío.
+export function useCreateWeek() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (from: { grid: ContentGrid; days: GridDay[] } | null) => {
-      // El ciclo sigue el CALENDARIO: la semana nueva es la parrilla previa + 7
-      // días. Sin plantilla (o si esa fecha ya pasó), el próximo lunes en día
-      // Bogotá — igual que el cron de F2 (week_start es unique y siempre lunes).
-      const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-      const now = new Date(hoyBogota + "T12:00:00Z");
-      const dow = now.getUTCDay(); // 0=dom
-      const delta = dow === 1 ? 0 : (8 - dow) % 7;
-      const proxLunes = new Date(now); proxLunes.setUTCDate(proxLunes.getUTCDate() + delta);
-      let monday = proxLunes;
-      if (from?.grid.week_start) {
-        const siguiente = new Date(from.grid.week_start + "T12:00:00Z");
-        siguiente.setUTCDate(siguiente.getUTCDate() + 7);
-        if (siguiente > proxLunes) monday = siguiente;
-      }
-      const iso = (d: Date) => d.toISOString().slice(0, 10);
-      const weekStart = iso(monday);
-      // 8 días: el último cae en lunes+7 — week_end debe coincidir con él.
-      const end = new Date(monday); end.setUTCDate(end.getUTCDate() + 7);
+    mutationFn: async (args: { start: string; end: string; from: { grid: ContentGrid; days: GridDay[] } | null }) => {
+      const { start, end, from } = args;
+      const startD = new Date(start + "T12:00:00Z");
+      const endD = new Date(end + "T12:00:00Z");
+      const nDias = Math.round((endD.getTime() - startD.getTime()) / 86400000) + 1;
+      if (nDias < 2 || nDias > 10) throw new Error("Elegí un rango de 2 a 10 días");
 
       const { data: userData } = await supabase.auth.getUser();
       const { data: g, error } = await (supabase as any)
         .from("content_grids")
         .insert({
-          week_start: weekStart, week_end: iso(end), status: "borrador",
+          week_start: start, week_end: end, status: "borrador",
           title: from?.grid.title ?? "Parrilla de promoción",
           theme: from?.grid.theme ?? DEFAULT_THEME,
           created_by: userData?.user?.id ?? null,
@@ -212,13 +222,29 @@ export function useCreateNextWeek() {
         .single();
       if (error) throw error;
 
-      const template = from?.days?.length
-        ? from.days
-        : Array.from({ length: 8 }, (_, i) => emptyDay(i + 1) as GridDay);
-      const days = template.map((d, i) => {
-        const date = new Date(monday); date.setUTCDate(date.getUTCDate() + i);
-        const { id: _id, grid_id: _g, ...rest } = d as GridDay & { grid_id?: string };
-        return { ...rest, grid_id: g.id, day_index: i + 1, date: iso(date) };
+      // Mapeo de la plantilla: la APERTURA (día 1, dinámica de lanzamiento) va al
+      // primer día del rango y el CIERRE (último día) al último — son posiciones
+      // del ciclo, no días de semana. Los del medio se casan por día de semana.
+      const tpl = from?.days ?? [];
+      const apertura = tpl[0] ?? null;
+      const cierre = tpl.length > 1 ? tpl[tpl.length - 1] : null;
+      const porWeekday = new Map<number, GridDay>();
+      for (const d of tpl.slice(1, Math.max(tpl.length - 1, 1))) {
+        const w = new Date(d.date + "T12:00:00Z").getUTCDay();
+        if (!porWeekday.has(w)) porWeekday.set(w, d);
+      }
+
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      const days = Array.from({ length: nDias }, (_, i) => {
+        const date = new Date(startD); date.setUTCDate(date.getUTCDate() + i);
+        const w = date.getUTCDay();
+        const source = i === 0
+          ? apertura
+          : (i === nDias - 1 ? (cierre ?? porWeekday.get(w) ?? null) : porWeekday.get(w) ?? null);
+        const base = source
+          ? (({ id: _id, grid_id: _g, ...rest }) => rest)(source as GridDay & { grid_id?: string })
+          : emptyDay(i + 1);
+        return { ...base, grid_id: g.id, day_index: i + 1, date: iso(date) };
       });
       const { error: dErr } = await (supabase as any).from("content_grid_days").insert(days);
       if (dErr) throw dErr;
@@ -229,5 +255,31 @@ export function useCreateNextWeek() {
       return g.id as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-grids"] }),
+  });
+}
+
+// "Generar con IA": el edge parrilla-generate redacta los textos del borrador
+// (idea/copy/acción extra) aprendiendo de las parrillas y feedback anteriores.
+// La estructura (formato, franjas, tipos, referencias) no se toca.
+export function useGenerateParrilla() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (gridId: string) => {
+      const { data, error } = await supabase.functions.invoke("parrilla-generate", { body: { grid_id: gridId } });
+      if (error) {
+        let msg = (error as Error).message;
+        try {
+          const ctx = await (error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch { /* cuerpo no-JSON: queda el mensaje genérico */ }
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: boolean; dias: number };
+    },
+    onSuccess: (_d, gridId) => {
+      qc.invalidateQueries({ queryKey: ["content-grids"] });
+      qc.invalidateQueries({ queryKey: ["content-grid-days", gridId] });
+    },
   });
 }

@@ -195,6 +195,9 @@ verify_jwt = false  # lectura de stories; auth propia
 [functions.qa-analyze]
 verify_jwt = false  # análisis QA; auth propia
 
+[functions.parrilla-generate]
+verify_jwt = false  # redacción IA de la parrilla; auth propia (JWT del caller + RLS)
+
 [functions.qa-chat-mike]
 verify_jwt = false  # chat QA (Mike); auth propia
 
