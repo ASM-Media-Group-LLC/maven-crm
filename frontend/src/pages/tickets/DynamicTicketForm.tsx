@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/hooks/use-toast";
-import { useTickets, TEAM_MEMBERS } from "./useTickets";
+import { useTickets } from "./useTickets";
+import { useMavenUsers } from "./useMavenUsers";
 import {
   useTicketForms,
   useCreateTicketFromForm,
@@ -70,6 +71,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
   const { toast } = useToast();
   const { fieldsByForm, fieldsQuery } = useTicketForms({ includeUnpublished: true });
   const { creatorsQuery } = useTickets();
+  const { options: mavenUsers } = useMavenUsers();
   const createTicket = useCreateTicketFromForm();
 
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
@@ -282,8 +284,8 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
           <SearchableSelect
             value={(v as string) || ""}
             onValueChange={(nv) => setAnswer(f.field_key, nv)}
-            options={TEAM_MEMBERS}
-            placeholder="Elegir miembro del equipo…"
+            options={mavenUsers}
+            placeholder="Buscar empleado de Maven…"
             triggerClassName={ring}
           />
         );

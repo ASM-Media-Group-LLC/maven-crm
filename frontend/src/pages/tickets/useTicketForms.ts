@@ -25,7 +25,7 @@ export const FIELD_TYPES = [
   { value: "email", label: "Correo" },
   { value: "url", label: "Enlace" },
   { value: "instagram", label: "Instagram" },
-  { value: "user", label: "Miembro del equipo" },
+  { value: "user", label: "Empleado de Maven" },
   { value: "drive_links", label: "Enlaces de Drive (pruebas)" },
 ] as const;
 

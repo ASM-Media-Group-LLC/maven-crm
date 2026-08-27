@@ -105,7 +105,7 @@ const TYPE_LABELS: Record<FieldType, string> = {
   email: "Correo",
   url: "Enlace",
   instagram: "Instagram",
-  user: "Miembro del equipo",
+  user: "Empleado de Maven",
   drive_links: "Archivos de Drive",
 };
 

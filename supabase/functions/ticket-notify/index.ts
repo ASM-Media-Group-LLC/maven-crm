@@ -75,7 +75,21 @@ function optLabel(options: unknown, value: string): string {
 }
 
 /** Un valor de respuesta → HTML, según el tipo de campo. */
-function renderValue(f: FormField, raw: unknown, creatorName?: string | null): string {
+function renderValue(
+  f: FormField,
+  raw: unknown,
+  creatorName?: string | null,
+  userNames?: Map<string, string>,
+): string {
+  // Un campo "Empleado de Maven" guarda el id del profile. Sin resolverlo el
+  // correo mostraria un uuid. Si el id no resuelve (valor viejo, de cuando la
+  // lista estaba hardcodeada), se muestra el valor crudo en vez de nada.
+  if (f.field_type === "user") {
+    const id = String(raw ?? "").trim();
+    if (!id) return "&mdash;";
+    return esc(userNames?.get(id) ?? id);
+  }
+
   // Una pregunta de tipo creadora guarda el UUID. Sin esto el correo mostraba
   // el uuid crudo en vez del nombre.
   if (f.field_type === "creator") {
@@ -190,6 +204,22 @@ Deno.serve(async (req) => {
       .order("position");
 
     const answers = (ticket.answers || {}) as Record<string, unknown>;
+
+    // Nombres de los empleados referenciados, en una sola consulta.
+    const userIds = (fields || [])
+      .filter((f: FormField) => f.field_type === "user")
+      .map((f: FormField) => String(answers[f.field_key] ?? "").trim())
+      .filter((v) => /^[0-9a-f-]{36}$/i.test(v));
+    const userNames = new Map<string, string>();
+    if (userIds.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      for (const p of profs || []) {
+        if (p.full_name) userNames.set(p.id, p.full_name);
+      }
+    }
     const creatorName =
       ticket.creators?.artistic_name || ticket.creators?.name || null;
     const prioKey = String(ticket.priority || "medium");
@@ -203,7 +233,7 @@ Deno.serve(async (req) => {
 
     const rows = (fields || [])
       .map((f: FormField) => {
-        const v = renderValue(f, answers[f.field_key], creatorName);
+        const v = renderValue(f, answers[f.field_key], creatorName, userNames);
         // Los textos largos y las pruebas se leen mejor a lo ancho.
         if (f.field_type === "textarea" || f.field_type === "drive_links") {
           return `<tr><td colspan="2" style="padding:12px 0 4px; font-family:Arial,Helvetica,sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#9AA5B1; font-weight:bold;">${esc(
