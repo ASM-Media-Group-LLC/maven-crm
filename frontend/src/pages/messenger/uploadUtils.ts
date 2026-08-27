@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export const MAX_FILES = 20;
 export const MAX_FILE_SIZE_MB = 350;
@@ -31,14 +31,16 @@ export async function uploadFileWithTUS(
 ): Promise<{ error: string | null }> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
+  // Usamos la config del cliente (con fallback hardcodeado) en vez de import.meta.env.VITE_*
+  // suelto: VITE_SUPABASE_PROJECT_ID no estaba definido en el runtime de prod (y VITE_
+  // publishable podía quedar como placeholder __RUNTIME_*), así que el TUS fallaba antes de
+  // subir → los archivos >5MB (p.ej. mp3 de canciones/grabaciones) "no se dejaban compartir".
+  const apikey = SUPABASE_PUBLISHABLE_KEY;
 
   if (!token) return { error: "No auth session" };
   if (!apikey) return { error: "Missing Supabase publishable key" };
-  if (!projectId) return { error: "Missing Supabase project id" };
 
-  const tusEndpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
+  const tusEndpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`;
   const b64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
   const uploadMetadata = [
     `bucketName ${b64("chat-files")}`,

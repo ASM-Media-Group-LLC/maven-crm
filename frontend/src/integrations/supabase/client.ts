@@ -22,8 +22,11 @@ const isPlaceholder = (v: string | undefined): boolean =>
 const rawUrl = import.meta.env.VITE_SUPABASE_URL;
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const SUPABASE_URL = isPlaceholder(rawUrl) ? PROD_URL : rawUrl;
-const SUPABASE_PUBLISHABLE_KEY = isPlaceholder(rawKey) ? PROD_PUBLISHABLE_KEY : rawKey;
+// Exportados para que otros módulos (p.ej. uploadUtils/TUS) usen la MISMA config con
+// fallback, en vez de leer import.meta.env.VITE_* suelto (que en prod puede quedar como
+// placeholder __RUNTIME_* sin reemplazar → rompía la subida de archivos >5MB).
+export const SUPABASE_URL = isPlaceholder(rawUrl) ? PROD_URL : rawUrl;
+export const SUPABASE_PUBLISHABLE_KEY = isPlaceholder(rawKey) ? PROD_PUBLISHABLE_KEY : rawKey;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
