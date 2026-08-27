@@ -29,6 +29,11 @@ const corsHeaders = (req: Request) =>
 
 const CLAUDE_TIMEOUT_MS = 110_000;
 
+// Tope de generaciones por DÍA (día-pared Bogotá), pedido de Jhon: cuenta TODA
+// llamada que llegó a Anthropic (api_usage_log op parrilla_generate), exitosa o
+// no — lo que protege es el gasto. Override sin redeploy: PARRILLA_IA_MAX_DIA.
+const MAX_GENERACIONES_DIA = Number(Deno.env.get("PARRILLA_IA_MAX_DIA") ?? "5");
+
 interface DiaGenerado {
   day_index: number;
   idea: string;
@@ -115,6 +120,27 @@ serve(async (req) => {
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userData?.user) {
       return new Response(JSON.stringify({ error: "Sesión inválida" }), { status: 401, headers });
+    }
+
+    // Candado diario: el conteo se lee con service role (api_usage_log no es
+    // visible para usuarios), pero SOLO se usa para contar — nada se escribe.
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    // Bogotá es UTC-5 fijo (sin horario de verano).
+    const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+    const { count: usosHoy, error: cErr } = await admin
+      .from("api_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("operation", "parrilla_generate")
+      .gte("occurred_at", `${hoyBogota}T00:00:00-05:00`);
+    if (cErr) throw cErr;
+    if ((usosHoy ?? 0) >= MAX_GENERACIONES_DIA) {
+      return new Response(
+        JSON.stringify({ error: `Límite diario alcanzado: ${MAX_GENERACIONES_DIA} generaciones con IA por día. Volvé a intentar mañana.` }),
+        { status: 429, headers },
+      );
     }
 
     // La parrilla objetivo + sus días (el esqueleto que se respeta).
@@ -288,7 +314,8 @@ serve(async (req) => {
     const { error: tErr } = await supabase.rpc("parrilla_derive_tasks", { p_grid_id: grid_id });
     if (tErr) throw tErr;
 
-    return new Response(JSON.stringify({ ok: true, dias: actualizados, model }), { headers });
+    const usosRestantes = Math.max(0, MAX_GENERACIONES_DIA - ((usosHoy ?? 0) + 1));
+    return new Response(JSON.stringify({ ok: true, dias: actualizados, model, usos_restantes: usosRestantes }), { headers });
   } catch (e) {
     console.error("parrilla-generate error", e);
     const aborted = (e as Error)?.name === "AbortError";

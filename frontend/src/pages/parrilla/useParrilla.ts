@@ -275,7 +275,7 @@ export function useGenerateParrilla() {
         throw new Error(msg);
       }
       if ((data as any)?.error) throw new Error((data as any).error);
-      return data as { ok: boolean; dias: number };
+      return data as { ok: boolean; dias: number; usos_restantes?: number };
     },
     onSuccess: (_d, gridId) => {
       qc.invalidateQueries({ queryKey: ["content-grids"] });

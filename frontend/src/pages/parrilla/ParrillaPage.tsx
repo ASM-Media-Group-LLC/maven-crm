@@ -330,7 +330,9 @@ export default function ParrillaPage() {
       action: {
         label: "Generar",
         onClick: () => genIA.mutate(grid.id, {
-          onSuccess: (d) => toast.success(`Parrilla redactada por IA (${d.dias} días) — revisala y dale el toque humano ✍️`),
+          onSuccess: (d) => toast.success(`Parrilla redactada por IA (${d.dias} días) — revisala y dale el toque humano ✍️`, {
+            description: typeof d.usos_restantes === "number" ? `Te quedan ${d.usos_restantes} generaciones con IA hoy.` : undefined,
+          }),
           onError: (e: any) => toast.error(`No se pudo generar: ${e.message}`),
         }),
       },
