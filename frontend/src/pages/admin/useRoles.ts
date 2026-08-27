@@ -122,6 +122,11 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Menú", "Dashboard"),
   // Panel de control: dashboard ejecutivo con tabs internos.
   def("Menú", "Panel de control", ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto", "Bot WhatsApp"]),
+  // Correo: la bandeja que reemplaza a Gmail. Igual que Messenger/Cowork/Meet está en
+  // UNIVERSAL_MODULES (usePermissions), o sea que se ve por default — pero tiene que
+  // figurar acá para que un admin pueda apagárselo a un rol. Sin esta línea la pantalla
+  // de roles nunca lo lista y la fila can_access:false no hay forma de crearla.
+  def("Menú", "Correo"),
   // Messenger: chat interno. (El borrado de conversación es por dueño/admin del grupo,
   // no por permiso — por eso ya no se declara un submódulo que no gateaba nada.)
   def("Menú", "Messenger"),
@@ -132,6 +137,10 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Meet: reuniones ad-hoc. Crear la puede cualquiera por default (a diferencia de
   // Cowork), pero queda acá para poder quitárselo a un rol desde la UI.
   def("Menú", "Meet", [], ["Crear reunión", "Terminar reunión"]),
+  // Grabaciones: las grabaciones de Meet/Cowork. Módulo plano, sin subtabs. También es
+  // universal, así que se ve por default; está acá por lo mismo que Correo — es material
+  // sensible (conversaciones grabadas del equipo) y tiene que poder quitársele a un rol.
+  def("Menú", "Grabaciones"),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.

@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ChevronDown, ChevronRight, Copy, Menu as MenuIcon, MousePointerClick, Database } from "lucide-react";
 import { toast } from "sonner";
 import { useRolePermissions, useRoles, MODULES_CONFIG, moduleLabel, type RolePermission } from "./useRoles";
+import { UNIVERSAL_MODULES } from "@/hooks/usePermissions";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -66,9 +67,13 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
       // that the source didn't have explicit rows for.
       const next: PermState = {};
       MODULES_CONFIG.forEach((m) => {
-        next[getKey(m.module, null)] = { can_access: false, data_scope: "all" };
+        // Mismo criterio que el init: si el rol origen no tiene fila para un módulo
+        // universal, es porque lo tiene ENCENDIDO por default — copiarlo como apagado
+        // sería copiar algo que en el origen no pasa.
+        const universalOn = UNIVERSAL_MODULES.includes(m.module);
+        next[getKey(m.module, null)] = { can_access: universalOn, data_scope: "all" };
         m.submodules.forEach((sub) => {
-          next[getKey(m.module, sub)] = { can_access: false, data_scope: "all" };
+          next[getKey(m.module, sub)] = { can_access: universalOn, data_scope: "all" };
         });
       });
       (data ?? []).forEach((p) => {
@@ -107,9 +112,15 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     // If admin and no saved permissions, default everything to enabled
     const defaultOn = isAdminRole && permissions.length === 0;
     MODULES_CONFIG.forEach((m) => {
-      s[getKey(m.module, null)] = { can_access: defaultOn, data_scope: "all" };
+      // Un módulo UNIVERSAL sin fila guardada se muestra ENCENDIDO, porque es como se
+      // comporta de verdad (canAccess lo deja pasar). Si arrancara apagado, abrir un rol
+      // y guardar escribiría can_access:false y le QUITARÍA un acceso que hoy tiene —
+      // justo lo que pasaría al sumar Correo y Grabaciones a MODULES_CONFIG.
+      // El overlay de `permissions` de abajo sigue ganando: un false explícito manda.
+      const universalOn = UNIVERSAL_MODULES.includes(m.module);
+      s[getKey(m.module, null)] = { can_access: defaultOn || universalOn, data_scope: "all" };
       m.submodules.forEach((sub) => {
-        s[getKey(m.module, sub)] = { can_access: defaultOn, data_scope: "all" };
+        s[getKey(m.module, sub)] = { can_access: defaultOn || universalOn, data_scope: "all" };
       });
     });
     permissions.forEach((p) => {
