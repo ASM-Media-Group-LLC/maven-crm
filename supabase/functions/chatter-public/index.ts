@@ -26,8 +26,6 @@ type Body = {
     | "upload-image"
     | "delete-message";
   sessionId: string;
-  // claim-device: tomar la sesión aunque otro dispositivo la tenga (botón "usar aquí")
-  force?: boolean;
   // send
   content?: string;
   images?: string[];
@@ -144,26 +142,33 @@ Deno.serve(async (req) => {
 
     case "claim-device": {
       if (!body.deviceId) return json(req, 400, { ok: false, error: "deviceId required" });
-      // Lock de un-dispositivo, pero con TAKEOVER cuando el lock quedó abandonado. El cliente
-      // refresca active_device_claimed_at ~cada 20s (latido); si no hubo latido en >STALE_MS
-      // (dispositivo cerrado / preview de WhatsApp / incógnito que no persiste su deviceId), o
-      // si llega force=true (botón "usar en este dispositivo"), dejamos que otro tome la sesión.
-      // Antes el lock era PERMANENTE → si un intruso la agarraba primero, el chatter real
-      // quedaba bloqueado para siempre ("creamos 3 links y ninguno sirvió").
+      // Lock de un-dispositivo. ANTI-TRAMPA: la idea es que no puedan pasarle el link a otra
+      // persona para que rinda por ellos. Por eso el takeover está MUY acotado:
+      //   · Solo se permite tomar un lock ABANDONADO (sin latido en >STALE_MS; el cliente lo
+      //     refresca cada ~20s) Y de una sesión que NUNCA ARRANCÓ (started_at null).
+      //   · Una vez que el examen arrancó (el chatter mandó su 1er mensaje → started_at set),
+      //     el lock es PERMANENTE a ESE dispositivo: ningún otro puede tomarlo, ni siquiera si
+      //     queda stale. Eso es lo que impide el handoff a mitad de examen.
+      // El bug del incidente era un lock de INTRUSO (preview de WhatsApp / examinador probando
+      // el link / incógnito que no persiste su deviceId) sobre una sesión SIN ARRANCAR: eso
+      // ahora se auto-cura y la chica real entra; un examen en curso queda protegido.
       const STALE_MS = 45_000;
       const claimedAtMs = session.active_device_claimed_at
         ? new Date(session.active_device_claimed_at).getTime()
         : 0;
       const lockStale = Date.now() - claimedAtMs > STALE_MS;
+      const canTakeover = lockStale && !session.started_at;
       const isOtherDevice =
         session.active_device_id && session.active_device_id !== body.deviceId;
-      if (isOtherDevice && !lockStale && !body.force) {
-        // Ocupado por otro dispositivo con lock VIGENTE → 200 con ok:false (NO 409: supabase-js
-        // envuelve el 409 en un error genérico que el front no sabe leer → spinner infinito).
+      if (isOtherDevice && !canTakeover) {
+        // Ocupado por otro dispositivo → 200 con ok:false (NO 409: supabase-js envuelve el 409
+        // en un error genérico que el front no sabe leer → spinner infinito).
         return json(req, 200, {
           ok: false,
           error: "session_locked",
-          message: "Otro dispositivo está activo en esta sesión.",
+          message: session.started_at
+            ? "Este examen ya está en curso en otro dispositivo. No se puede continuar desde acá."
+            : "Otro dispositivo está activo en esta sesión.",
         });
       }
       await supa

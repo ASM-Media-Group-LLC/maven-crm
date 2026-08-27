@@ -560,22 +560,23 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
   );
 };
 
-const LockedScreen = ({ onTakeover, busy }: { onTakeover: () => void; busy: boolean }) => (
+const LockedScreen = ({ onRetry, busy }: { onRetry: () => void; busy: boolean }) => (
   <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
     <Lock className="h-12 w-12 text-amber-500" />
     <h1 className="text-xl font-bold">Sesión en uso</h1>
     <p className="max-w-sm text-sm text-muted-foreground">
-      Otro dispositivo está activo en esta sesión. Solo un dispositivo puede chatear a la vez.
+      Esta sesión ya está activa en otro dispositivo. Solo un dispositivo puede rendir el examen.
     </p>
     <button
-      onClick={onTakeover}
+      onClick={onRetry}
       disabled={busy}
       className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
     >
-      {busy ? "Tomando la sesión…" : "Usar en este dispositivo"}
+      {busy ? "Reintentando…" : "Reintentar"}
     </button>
     <p className="max-w-sm text-[11px] text-muted-foreground/70">
-      Si abriste el link en otro lado (o una vista previa), tocá el botón para chatear desde acá.
+      Si abriste el link solo como vista previa (WhatsApp/incógnito) y no llegaste a chatear, en un
+      momento se libera y podés entrar desde tu dispositivo.
     </p>
   </div>
 );
@@ -651,17 +652,21 @@ const ChatterPublicView = () => {
   const [locked, setLocked] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [takingOver, setTakingOver] = useState(false);
-  // Botón "usar en este dispositivo" de LockedScreen: fuerza el takeover del lock (force:true)
-  // para no esperar a que expire solo (~45s). El claim normal igual reintenta cada 20s.
-  const takeOverDevice = async () => {
+  // Botón "Reintentar" de LockedScreen: re-corre el claim NORMAL (sin force). Solo entra si el
+  // candado quedó abandonado (intruso/preview que nunca arrancó el examen); un examen en curso
+  // en otro dispositivo sigue bloqueado (anti-trampa). No hay takeover manual a propósito.
+  const retryClaim = async () => {
     if (!sessionId) return;
     setTakingOver(true);
     try {
-      await callChatterApi("claim-device", { sessionId, deviceId: getDeviceId(), force: true });
-      setClaimed(true);
-      setLocked(false);
+      const res = await callChatterApi("claim-device", { sessionId, deviceId: getDeviceId() });
+      if (res?.ok) { setClaimed(true); setLocked(false); }
     } catch (e) {
-      toast.error("No se pudo tomar la sesión", { description: (e as Error).message });
+      const msg = (e as Error).message;
+      if (!(msg.includes("session_locked") || msg.includes("Otro dispositivo") || msg.includes("en curso"))) {
+        toast.error("No se pudo entrar", { description: msg });
+      }
+      // sigue bloqueado: el candado todavía está vigente
     } finally {
       setTakingOver(false);
     }
@@ -1273,7 +1278,7 @@ const ChatterPublicView = () => {
 
   if (!session) return <NotFoundScreen reason="Esta sesión no existe o fue eliminada." />;
   if (session.status === "ended") return <NotFoundScreen reason="Esta sesión ya fue cerrada por el examinador." />;
-  if (locked) return <LockedScreen onTakeover={takeOverDevice} busy={takingOver} />;
+  if (locked) return <LockedScreen onRetry={retryClaim} busy={takingOver} />;
   if (tabState === "blocked") return <TabLockedScreen />;
   if (tabState === "prompt") {
     return (
