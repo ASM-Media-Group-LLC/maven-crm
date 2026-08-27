@@ -42,9 +42,9 @@ const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 const GrabacionesPage = lazy(() => import("./pages/grabaciones/GrabacionesPage"));
-// Correo (Zoho detrás). El módulo "Correo" todavía no está en
-// UNIVERSAL_MODULES, así que hoy solo lo alcanzan los admin — a propósito,
-// mientras la bandeja se construye.
+// Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
+// se ve por default como Messenger/Cowork/Meet; un admin puede apagárselo a un rol
+// desde Administración → Roles, donde ahora figura (MODULES_CONFIG en useRoles.ts).
 const CorreoPage = lazy(() => import("./pages/correo/CorreoPage"));
 const CorreoConectarPage = lazy(() => import("./pages/correo/CorreoConectarPage"));
 const InboxPage = lazy(() => import("./pages/inbox/InboxPage"));

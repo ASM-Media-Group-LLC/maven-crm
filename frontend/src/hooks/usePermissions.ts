@@ -9,6 +9,12 @@ interface Permission {
   data_scope: string;
 }
 
+// Modules everyone can reach unless an admin explicitly turned them off in the role
+// config. Exportada porque SetPermissionsModal la necesita: un modulo universal SIN
+// fila guardada tiene que mostrarse ENCENDIDO, que es como se comporta de verdad.
+// Si arrancara apagado, abrir un rol y guardar le quitaria un acceso que hoy tiene.
+export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones"];
+
 export const usePermissions = () => {
   const { role, isAdmin, isLoading: roleLoading } = useUserRole();
 
@@ -49,7 +55,6 @@ export const usePermissions = () => {
   // pestaña tiene que estar ahí sin que nadie configure permisos. Quien no
   // tenga casilla ve un estado vacío que se lo explica, y un admin puede
   // apagarlo por rol con can_access: false, que siempre gana.
-  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones"];
 
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access
