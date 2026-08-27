@@ -55,6 +55,9 @@ export default function ChatHeader({
   const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
   // "Editar info solo admins": quién puede cambiar nombre/foto del grupo (default 'admins').
   const canEditInfo = isAdmin || (conversation.info_permission ?? "admins") === "all";
+  // Click en el nombre abre el panel SOLO si podés verlo (admin siempre; no-admin solo si
+  // members_visibility='all'). Antes se colaba el panel de miembros ignorando el candado.
+  const nameOpensPanel = isGroup && !!onOpenGroupMembers && canSeeMembers;
 
   // Renombrar el grupo desde el encabezado (lápiz al lado del nombre).
   const [editingName, setEditingName] = useState(false);
@@ -198,9 +201,9 @@ export default function ChatHeader({
           ) : (
             <div className="flex items-center gap-1.5 min-w-0">
               <p
-                className={cn("font-semibold text-sm text-foreground truncate leading-tight", isGroup && onOpenGroupMembers && "cursor-pointer hover:underline")}
-                onClick={isGroup && onOpenGroupMembers ? onOpenGroupMembers : undefined}
-                title={isGroup && onOpenGroupMembers ? "Ver configuración del grupo" : undefined}
+                className={cn("font-semibold text-sm text-foreground truncate leading-tight", nameOpensPanel && "cursor-pointer hover:underline")}
+                onClick={nameOpensPanel ? onOpenGroupMembers : undefined}
+                title={nameOpensPanel ? "Ver configuración del grupo" : undefined}
               >
                 {conversation.displayName}
               </p>

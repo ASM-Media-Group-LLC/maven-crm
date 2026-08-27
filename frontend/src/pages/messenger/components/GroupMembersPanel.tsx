@@ -48,6 +48,9 @@ export default function GroupMembersPanel({
   const addPerm = conversation.add_permission ?? "admins";
   // Puede agregar miembros: admin, o cualquier participante si add_permission='all'.
   const canAddMembers = isAdmin || addPerm === "all";
+  // Puede ver la lista de miembros: admin, o cualquiera si members_visibility='all'.
+  // (Guarda extra: normalmente un no-admin sin permiso ni llega a abrir el panel.)
+  const canViewMembers = isAdmin || membersVis !== "admins";
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const updateSetting = async (
     field: "msg_permission" | "members_visibility" | "info_permission" | "add_permission",
@@ -460,7 +463,12 @@ export default function GroupMembersPanel({
       {/* Current members */}
       <ScrollArea className="flex-1">
         <div className="py-2">
-          {conversation.participants.map(p => {
+          {!canViewMembers ? (
+            <div className="flex flex-col items-center justify-center text-center gap-2 py-10 px-6">
+              <Eye className="h-6 w-6 text-muted-foreground/50" />
+              <p className="text-xs text-muted-foreground">Solo los administradores pueden ver los miembros de este grupo.</p>
+            </div>
+          ) : conversation.participants.map(p => {
             const profile = profiles[p.user_id];
             const name = profile?.full_name || "Usuario";
             const online = isOnline(p.user_id);
