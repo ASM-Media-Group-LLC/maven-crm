@@ -180,13 +180,20 @@ export function useCreateNextWeek() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (from: { grid: ContentGrid; days: GridDay[] } | null) => {
-      // Próximo lunes (hoy si es lunes) en día-pared Bogotá, para coincidir con
-      // la semana que generará el cron de F2 (week_start es unique).
+      // El ciclo sigue el CALENDARIO: la semana nueva es la parrilla previa + 7
+      // días. Sin plantilla (o si esa fecha ya pasó), el próximo lunes en día
+      // Bogotá — igual que el cron de F2 (week_start es unique y siempre lunes).
       const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
       const now = new Date(hoyBogota + "T12:00:00Z");
       const dow = now.getUTCDay(); // 0=dom
       const delta = dow === 1 ? 0 : (8 - dow) % 7;
-      const monday = new Date(now); monday.setUTCDate(monday.getUTCDate() + delta);
+      const proxLunes = new Date(now); proxLunes.setUTCDate(proxLunes.getUTCDate() + delta);
+      let monday = proxLunes;
+      if (from?.grid.week_start) {
+        const siguiente = new Date(from.grid.week_start + "T12:00:00Z");
+        siguiente.setUTCDate(siguiente.getUTCDate() + 7);
+        if (siguiente > proxLunes) monday = siguiente;
+      }
       const iso = (d: Date) => d.toISOString().slice(0, 10);
       const weekStart = iso(monday);
       // 8 días: el último cae en lunes+7 — week_end debe coincidir con él.
