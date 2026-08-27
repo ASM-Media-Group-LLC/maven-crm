@@ -64,6 +64,8 @@ export interface ContentGrid {
   feedback: string | null;
   pdf_url: string | null;
   sent_at: string | null;
+  // Para detectar ediciones concurrentes al guardar (parrilla_save_grid).
+  updated_at: string;
 }
 
 export const EXTRA_TYPE_META: Record<ExtraType, { label: string; colorKey: keyof GridTheme }> = {
@@ -78,43 +80,8 @@ export const EXTRA_TYPE_META: Record<ExtraType, { label: string; colorKey: keyof
 const WEEKDAYS = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
 export const weekdayLabel = (iso: string) => WEEKDAYS[new Date(iso + "T12:00:00Z").getUTCDay()];
 
-// ── Tareas esperadas: derivación (espejo conceptual del compliance F4) ─────────
-// De cada día tipado salen las tareas máquina-legibles. Las de tipo 'custom' NO
-// generan tarea automática (pueden ser internas, p.ej. contenido para chatters).
-function deriveTasks(gridId: string, days: GridDay[]) {
-  const tasks: Array<{
-    grid_id: string; day_date: string; network: string; task_type: string;
-    qty: number; franja: string | null; verificable: boolean; detalle: string | null;
-  }> = [];
-  for (const d of days) {
-    // Publicación diaria de IG (arriba del tablero: flyer/foto o video corto).
-    tasks.push({
-      grid_id: gridId, day_date: d.date, network: "instagram",
-      task_type: d.format_badge === "video_corto" ? "reel" : "publicacion",
-      qty: 1, franja: d.franja || null, verificable: true,
-      detalle: d.idea ? d.idea.slice(0, 200) : null,
-    });
-    switch (d.extra_type) {
-      case "reel":
-        tasks.push({ grid_id: gridId, day_date: d.date, network: "instagram", task_type: "reel", qty: 1, franja: null, verificable: true, detalle: "Reel del día (referencias en la parrilla)" });
-        break;
-      case "tg_3pub":
-        tasks.push({ grid_id: gridId, day_date: d.date, network: "telegram", task_type: "tg_publicacion", qty: Math.max(d.extra_items.length, 3), franja: null, verificable: true, detalle: d.extra_title || "Publicaciones del día en Telegram" });
-        break;
-      case "tg_audio":
-        tasks.push({ grid_id: gridId, day_date: d.date, network: "telegram", task_type: "tg_audio", qty: 1, franja: null, verificable: true, detalle: "Audio de buenos días (15-30s)" });
-        break;
-      case "dinamica_lanzamiento":
-      case "dinamica_cierre":
-        tasks.push({ grid_id: gridId, day_date: d.date, network: "x", task_type: "urgencia", qty: 1, franja: null, verificable: true, detalle: d.extra_title || null });
-        tasks.push({ grid_id: gridId, day_date: d.date, network: "telegram", task_type: "urgencia", qty: 1, franja: null, verificable: true, detalle: d.extra_title || null });
-        break;
-      default:
-        break; // custom → sin tarea automática (puede ser interna)
-    }
-  }
-  return tasks;
-}
+// Las tareas esperadas se derivan en SQL (parrilla_derive_tasks, fuente ÚNICA —
+// la invocan parrilla_save_grid y el cron de F2). Acá ya no hay copia espejo.
 
 export function useGridList() {
   return useQuery({
@@ -122,7 +89,7 @@ export function useGridList() {
     queryFn: async (): Promise<ContentGrid[]> => {
       const { data, error } = await (supabase as any)
         .from("content_grids")
-        .select("id, week_start, week_end, title, status, theme, feedback, pdf_url, sent_at")
+        .select("id, week_start, week_end, title, status, theme, feedback, pdf_url, sent_at, updated_at")
         .order("week_start", { ascending: false })
         .limit(30);
       if (error) throw error;
@@ -154,36 +121,37 @@ export function useGridDays(gridId: string | null) {
 export function useSaveGrid() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (args: { grid: Partial<ContentGrid> & { id: string }; days: GridDay[] }) => {
-      const { grid, days } = args;
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData?.user?.id ?? null;
-
-      const { error: gErr } = await (supabase as any)
-        .from("content_grids")
-        .update({
-          title: grid.title, status: grid.status, theme: grid.theme,
-          feedback: grid.feedback ?? null,
-          ...(grid.feedback ? { feedback_by: uid, feedback_at: new Date().toISOString() } : {}),
-          updated_at: new Date().toISOString(), updated_by: uid,
-        })
-        .eq("id", grid.id);
-      if (gErr) throw gErr;
-
-      // Días: upsert por (grid_id, day_index).
-      const { error: dErr } = await (supabase as any)
-        .from("content_grid_days")
-        .upsert(days.map((d) => ({ ...d, grid_id: grid.id })), { onConflict: "grid_id,day_index" });
-      if (dErr) throw dErr;
-
-      // Tareas esperadas: regenerar (fuente = los días tipados recién guardados).
-      const { error: delErr } = await (supabase as any).from("content_grid_tasks").delete().eq("grid_id", grid.id);
-      if (delErr) throw delErr;
-      const tasks = deriveTasks(grid.id, days);
-      if (tasks.length) {
-        const { error: tErr } = await (supabase as any).from("content_grid_tasks").insert(tasks);
-        if (tErr) throw tErr;
-      }
+    // Guardado transaccional: grid + días + regeneración de tareas en una sola RPC.
+    // expectedUpdatedAt detecta ediciones concurrentes (error 'conflict: …').
+    mutationFn: async (args: {
+      grid: Partial<ContentGrid> & { id: string };
+      days: GridDay[];
+      expectedUpdatedAt: string | null;
+    }) => {
+      const { grid, days, expectedUpdatedAt } = args;
+      const { data, error } = await (supabase as any).rpc("parrilla_save_grid", {
+        p_grid_id: grid.id,
+        p_expected_updated_at: expectedUpdatedAt,
+        p_title: grid.title ?? null,
+        p_status: grid.status ?? null,
+        p_theme: grid.theme ?? null,
+        p_feedback: grid.feedback ?? "",
+        p_days: days.map((d) => ({
+          day_index: d.day_index,
+          date: d.date,
+          format_badge: d.format_badge,
+          idea: d.idea,
+          copy_sugerido: d.copy_sugerido,
+          franja: d.franja,
+          extra_type: d.extra_type,
+          extra_title: d.extra_title,
+          extra_desc: d.extra_desc,
+          extra_items: d.extra_items,
+          refs: d.refs,
+        })),
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: (_r, args) => {
       qc.invalidateQueries({ queryKey: ["content-grids"] });
@@ -192,20 +160,37 @@ export function useSaveGrid() {
   });
 }
 
+// Día en blanco para estrenar una parrilla sin plantilla previa.
+const emptyDay = (dayIndex: number): Omit<GridDay, "grid_id" | "date"> => ({
+  day_index: dayIndex,
+  format_badge: "flyer_foto",
+  idea: "",
+  copy_sugerido: "",
+  franja: "11:00 - 13:00",
+  extra_type: "custom",
+  extra_title: "",
+  extra_desc: "",
+  extra_items: [],
+  refs: [],
+});
+
 // Nueva semana: duplica la parrilla más reciente corrida al próximo lunes (borrador).
+// Sin plantilla (estreno del módulo) siembra 8 días en blanco — nunca un tablero vacío.
 export function useCreateNextWeek() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (from: { grid: ContentGrid; days: GridDay[] } | null) => {
-      const now = new Date();
-      // Próximo lunes (hoy si es lunes) en fecha local del navegador.
-      const dow = now.getDay(); // 0=dom
+      // Próximo lunes (hoy si es lunes) en día-pared Bogotá, para coincidir con
+      // la semana que generará el cron de F2 (week_start es unique).
+      const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+      const now = new Date(hoyBogota + "T12:00:00Z");
+      const dow = now.getUTCDay(); // 0=dom
       const delta = dow === 1 ? 0 : (8 - dow) % 7;
-      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + delta);
-      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const monday = new Date(now); monday.setUTCDate(monday.getUTCDate() + delta);
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
       const weekStart = iso(monday);
       // 8 días: el último cae en lunes+7 — week_end debe coincidir con él.
-      const end = new Date(monday); end.setDate(end.getDate() + 7);
+      const end = new Date(monday); end.setUTCDate(end.getUTCDate() + 7);
 
       const { data: userData } = await supabase.auth.getUser();
       const { data: g, error } = await (supabase as any)
@@ -220,15 +205,20 @@ export function useCreateNextWeek() {
         .single();
       if (error) throw error;
 
-      if (from?.days?.length) {
-        const days = from.days.map((d, i) => {
-          const date = new Date(monday); date.setDate(date.getDate() + i);
-          const { id: _id, ...rest } = d;
-          return { ...rest, grid_id: g.id, day_index: i + 1, date: iso(date) };
-        });
-        const { error: dErr } = await (supabase as any).from("content_grid_days").insert(days);
-        if (dErr) throw dErr;
-      }
+      const template = from?.days?.length
+        ? from.days
+        : Array.from({ length: 8 }, (_, i) => emptyDay(i + 1) as GridDay);
+      const days = template.map((d, i) => {
+        const date = new Date(monday); date.setUTCDate(date.getUTCDate() + i);
+        const { id: _id, grid_id: _g, ...rest } = d as GridDay & { grid_id?: string };
+        return { ...rest, grid_id: g.id, day_index: i + 1, date: iso(date) };
+      });
+      const { error: dErr } = await (supabase as any).from("content_grid_days").insert(days);
+      if (dErr) throw dErr;
+
+      // Deriva las tareas esperadas de la semana nueva (misma fuente SQL del save).
+      const { error: tErr } = await (supabase as any).rpc("parrilla_derive_tasks", { p_grid_id: g.id });
+      if (tErr) throw tErr;
       return g.id as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-grids"] }),
