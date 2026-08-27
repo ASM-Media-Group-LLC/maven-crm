@@ -49,13 +49,51 @@ REGLAS DURAS (no negociables):
 
 Vas a recibir el ESQUELETO de la semana (día por día: fecha, día de semana, formato, franja, tipo de acción extra y cuántas burbujas de copy espera), las parrillas ANTERIORES, el FEEDBACK de las managers y, si existe, el DIFF entre lo que generó la IA y lo que las managers corrigieron a mano (eso te dice qué NO les gustó — no repitas esos patrones).
 
-Respondé SOLO con un JSON válido (sin markdown, sin comentarios): un array donde cada elemento es
-{"day_index": n, "idea": "...", "copy_sugerido": "\\"...\\"", "extra_title": "...", "extra_desc": "...", "extra_items": [{"momento": "mañana|tarde|noche u omitido", "label": "...", "copy": "..."}]}
+Entregá el resultado LLAMANDO a la tool entregar_parrilla:
 - "idea" = idea de material del día (concreta y filmable/fotografiable).
-- "copy_sugerido" va ENTRE COMILLAS dentro del string, como en el material.
+- "copy_sugerido" va ENTRE COMILLAS dentro del string, como en el material de referencia.
 - "extra_items" debe tener EXACTAMENTE la cantidad de burbujas que indica el esqueleto para ese día (respetá los momentos mañana/tarde/noche si el esqueleto los trae).
 - Mantené "extra_title" muy parecido al actual (es el nombre de la sección).
 - Un elemento por CADA día del esqueleto, en orden.`;
+
+// Salida estructurada por tool_use: la API garantiza el JSON contra este schema
+// (la primera versión pedía "respondé solo JSON" y parseaba texto: se rompía).
+const TOOL_ENTREGAR = {
+  name: "entregar_parrilla",
+  description: "Entrega los días redactados de la parrilla",
+  input_schema: {
+    type: "object",
+    required: ["dias"],
+    properties: {
+      dias: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["day_index", "idea", "copy_sugerido", "extra_desc", "extra_items"],
+          properties: {
+            day_index: { type: "integer" },
+            idea: { type: "string" },
+            copy_sugerido: { type: "string" },
+            extra_title: { type: "string" },
+            extra_desc: { type: "string" },
+            extra_items: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["label", "copy"],
+                properties: {
+                  momento: { type: "string", enum: ["mañana", "tarde", "noche"] },
+                  label: { type: "string" },
+                  copy: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 serve(async (req) => {
   const headers = { ...corsHeaders(req), "Content-Type": "application/json" };
@@ -168,6 +206,8 @@ serve(async (req) => {
           model,
           max_tokens: 8000,
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          tools: [TOOL_ENTREGAR],
+          tool_choice: { type: "tool", name: "entregar_parrilla" },
           messages: [{ role: "user", content: userMessage }],
         }),
       });
@@ -180,7 +220,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: `Claude respondió ${res.status}` }), { status: 502, headers });
     }
     const payload = await res.json();
-    const raw: string = payload?.content?.[0]?.text ?? "";
     void logAnthropicUsage({
       operation: "parrilla_generate",
       model,
@@ -188,17 +227,11 @@ serve(async (req) => {
       context: { grid_id, week_start: grid.week_start },
     });
 
-    // Parseo tolerante: Claude a veces envuelve en ```json.
-    const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-    let generados: DiaGenerado[];
-    try {
-      generados = JSON.parse(jsonText);
-    } catch {
-      console.error("JSON inválido de Claude:", raw.slice(0, 400));
-      return new Response(JSON.stringify({ error: "La IA devolvió un formato inválido, reintentá" }), { status: 502, headers });
-    }
+    const toolUse = (payload?.content ?? []).find((c: any) => c.type === "tool_use");
+    const generados: DiaGenerado[] = toolUse?.input?.dias ?? [];
     if (!Array.isArray(generados) || !generados.length) {
-      return new Response(JSON.stringify({ error: "La IA no devolvió días" }), { status: 502, headers });
+      console.error("sin tool_use utilizable; stop_reason:", payload?.stop_reason, "content:", JSON.stringify(payload?.content).slice(0, 400));
+      return new Response(JSON.stringify({ error: "La IA no devolvió días, reintentá" }), { status: 502, headers });
     }
 
     // Aplicar SOLO textos, día por día, con el JWT del caller (RLS decide).
