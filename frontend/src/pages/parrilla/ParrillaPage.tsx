@@ -102,11 +102,12 @@ function DayColumn({ day, theme, onChange }: {
             </SelectContent>
           </Select>
         </div>
-        <Input
+        <Textarea
           value={day.extra_title}
           onChange={(e) => set({ extra_title: e.target.value })}
           placeholder={meta.label}
-          className="mt-1 h-7 border-none bg-transparent px-0 text-sm font-black uppercase"
+          rows={1}
+          className="mt-1 min-h-0 resize-none border-none bg-transparent px-0 py-0.5 text-sm font-black uppercase leading-tight"
         />
         <Textarea
           value={day.extra_desc}
@@ -124,7 +125,7 @@ function DayColumn({ day, theme, onChange }: {
                   onChange={(e) => {
                     const items = [...day.extra_items]; items[i] = { ...it, label: e.target.value }; set({ extra_items: items });
                   }}
-                  placeholder="MAÑANA · AUDIO DE BUENOS DÍAS"
+                  placeholder="etiqueta… (COPY X, MAÑANA, etc.)"
                   className="h-5 flex-1 border-none bg-transparent px-0 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
                 />
                 <button type="button" className="print-hide text-muted-foreground hover:text-destructive" onClick={() => set({ extra_items: day.extra_items.filter((_, j) => j !== i) })}>
@@ -155,6 +156,13 @@ function DayColumn({ day, theme, onChange }: {
                   onChange={(e) => { const refs = [...day.refs]; refs[i] = { ...r, url: e.target.value }; set({ refs }); }}
                   placeholder="https://instagram.com/reel/…"
                   className="h-5 flex-1 border-none bg-transparent px-0 text-[10px]"
+                />
+                <Input
+                  value={r.nicho ?? ""}
+                  onChange={(e) => { const refs = [...day.refs]; refs[i] = { ...r, nicho: e.target.value }; set({ refs }); }}
+                  placeholder="nicho"
+                  className="h-5 w-14 shrink-0 border-none bg-transparent px-0 text-center text-[9px] font-bold uppercase"
+                  style={{ color: extraColor }}
                 />
                 <a href={r.url || "#"} target="_blank" rel="noreferrer" className="shrink-0 text-[9px] font-bold uppercase" style={{ color: extraColor }}>
                   Ver reel →
@@ -200,7 +208,10 @@ export default function ParrillaPage() {
     save.mutate(
       { grid: { id: grid.id, title: grid.title, status: status ?? grid.status, theme, feedback }, days },
       {
-        onSuccess: () => { setDirty(false); toast.success(status === "lista" ? "Parrilla marcada como lista ✅" : "Parrilla guardada"); },
+        onSuccess: () => {
+          setDirty(false);
+          toast.success(status === "lista" ? "Parrilla marcada como lista ✅" : status === "borrador" ? "Parrilla devuelta a borrador" : "Parrilla guardada");
+        },
         onError: (e: any) => toast.error(`No se pudo guardar: ${e.message}`),
       },
     );
@@ -214,8 +225,19 @@ export default function ParrillaPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Print: solo el tablero, apaisado */}
+      {/* El tablero es un DOCUMENTO: paleta clara propia (tokens light fijados acá)
+          aunque la app esté en dark mode — igual en pantalla, impresión y Gotenberg. */}
       <style>{`
+        .parrilla-print-area {
+          --background: 0 0% 100%; --foreground: 240 10% 4%;
+          --card: 0 0% 100%; --card-foreground: 240 10% 4%;
+          --muted: 240 5% 96%; --muted-foreground: 240 4% 46%;
+          --secondary: 240 5% 96%; --secondary-foreground: 240 6% 10%;
+          --border: 240 6% 90%; --input: 240 6% 90%;
+          color: hsl(240 10% 4%);
+        }
+        /* Los textos crecen con su contenido (nada queda recortado en pantalla ni en el PDF). */
+        .parrilla-print-area textarea { field-sizing: content; overflow: hidden; }
         @media print {
           @page { size: A3 landscape; margin: 8mm; }
           body * { visibility: hidden !important; }
@@ -330,9 +352,15 @@ export default function ParrillaPage() {
                 <p className="text-[11px] text-muted-foreground">
                   {dirty ? "Cambios sin guardar" : "Sin cambios pendientes"} · el envío al grupo exige feedback (se activa en la fase de automatización)
                 </p>
-                <Button size="sm" variant="secondary" disabled={save.isPending || !feedback.trim()} onClick={() => handleSave("lista")}>
-                  Marcar como lista ✓
-                </Button>
+                {grid.status === "borrador" ? (
+                  <Button size="sm" variant="secondary" disabled={save.isPending || !feedback.trim()} onClick={() => handleSave("lista")}>
+                    Marcar como lista ✓
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => handleSave("borrador")}>
+                    Volver a borrador
+                  </Button>
+                )}
               </div>
             </div>
           </>

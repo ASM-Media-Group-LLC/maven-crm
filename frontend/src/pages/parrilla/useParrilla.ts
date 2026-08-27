@@ -204,7 +204,8 @@ export function useCreateNextWeek() {
       const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + delta);
       const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const weekStart = iso(monday);
-      const end = new Date(monday); end.setDate(end.getDate() + 6);
+      // 8 días: el último cae en lunes+7 — week_end debe coincidir con él.
+      const end = new Date(monday); end.setDate(end.getDate() + 7);
 
       const { data: userData } = await supabase.auth.getUser();
       const { data: g, error } = await (supabase as any)
