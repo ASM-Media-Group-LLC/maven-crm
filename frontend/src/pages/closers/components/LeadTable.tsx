@@ -1,4 +1,6 @@
-import { useState, memo, useMemo, useCallback, type ReactNode } from "react";
+import { useState, useRef, memo, useMemo, useCallback, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { soloImagenes, uploadLeadScreenshots } from "../leadScreenshots";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +27,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, ExternalLink, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus, ImagePlus, X } from "lucide-react";
 import { CloserCreatorRow, ContactNote, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -349,30 +351,58 @@ InlineStageSelect.displayName = "InlineStageSelect";
 const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; count: number; isContact?: boolean }) => {
   const [open, setOpen] = useState(false);
   const { history, isLoading, addContact, maxReached } = useContactHistory(open ? creatorId : null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [channel, setChannel] = useState("");
   const [result, setResult] = useState("");
   const [notes, setNotes] = useState("");
+  // Capturas: subida DIFERIDA. Para un contacto del directorio (Agencias/Ex-creadores)
+  // el lead todavía no existe al abrir el form — nace al guardar (auto-promoción). Así
+  // que juntamos los File acá y los subimos DESPUÉS del guardado, cuando ya tenemos el
+  // id del lead. Las capturas se atan al lead (closer_lead_files) → el bot las ve solo.
+  const [shots, setShots] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = () => {
-    if (!channel) return;
-    addContact.mutate(
-      {
+  const addShots = (fl: Iterable<File> | null | undefined) => {
+    if (!fl) return;
+    const imgs = soloImagenes(fl);
+    if (imgs.length) setShots((prev) => [...prev, ...imgs]);
+  };
+
+  const resetForm = () => {
+    setChannel(""); setResult(""); setNotes(""); setShots([]);
+  };
+
+  const handleSubmit = async () => {
+    if (!channel || addContact.isPending || uploading) return;
+    try {
+      // 1) registrar el contacto → devuelve el id del LEAD (ya promovido si era directorio)
+      const leadId = await addContact.mutateAsync({
         creator_id: creatorId,
         channel,
         result: result || undefined,
         notes: notes || undefined,
-        // Fila del directorio (Agencias/Ex-creadores): promover a lead antes de
-        // anotar (ver useContactHistory). Para un lead real no se manda y anota directo.
         ...(isContact ? { promoteContactId: creatorId } : {}),
-      },
-      {
-        onSuccess: () => {
-          setChannel("");
-          setResult("");
-          setNotes("");
-        },
+      });
+      // 2) subir las capturas al lead (si hay). Si esto falla, el contacto YA quedó
+      //    registrado — avisamos pero no lo revertimos.
+      if (shots.length && leadId) {
+        setUploading(true);
+        try {
+          await uploadLeadScreenshots(leadId, shots);
+          toast({ description: `Contacto registrado · ${shots.length} captura${shots.length > 1 ? "s" : ""} adjunta${shots.length > 1 ? "s" : ""}` });
+          qc.invalidateQueries({ queryKey: ["lead-screenshots", leadId] });
+        } catch (e) {
+          toast({ variant: "destructive", title: "Contacto guardado, pero una captura falló", description: (e as Error).message });
+        } finally {
+          setUploading(false);
+        }
       }
-    );
+      resetForm();
+    } catch {
+      // addContact ya muestra su propio toast de error; no reseteamos para no perder lo escrito.
+    }
   };
 
   return (
@@ -436,11 +466,56 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                 </div>
                 <div>
                   <Label className="text-xs">Notas</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="text-sm" />
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    onPaste={(e) => {
+                      const imgs = Array.from(e.clipboardData?.items ?? [])
+                        .filter((it) => it.type.startsWith("image/"))
+                        .map((it) => it.getAsFile())
+                        .filter((f): f is File => !!f);
+                      if (imgs.length) { e.preventDefault(); addShots(imgs); }
+                    }}
+                    rows={2}
+                    className="text-sm"
+                    placeholder="Notas… (podés pegar capturas con ⌘/Ctrl+V)"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Capturas</Label>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    hidden
+                    onChange={(e) => { addShots(e.target.files); e.target.value = ""; }}
+                  />
+                  {shots.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-1.5">
+                      {shots.map((f, i) => (
+                        <div key={i} className="relative h-12 w-12 rounded border border-border overflow-hidden group">
+                          <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setShots((prev) => prev.filter((_, j) => j !== i))}
+                            className="absolute -top-1 -right-1 rounded-full bg-background border border-border p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Quitar"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => fileRef.current?.click()}>
+                    <ImagePlus className="h-3.5 w-3.5" /> Adjuntar captura
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground mt-1">Quedan en el lead; el bot puede leerlas.</p>
                 </div>
                 <div className="flex justify-end">
-                  <Button size="sm" onClick={handleSubmit} disabled={!channel || addContact.isPending}>
-                    {addContact.isPending ? "..." : "Guardar"}
+                  <Button size="sm" onClick={handleSubmit} disabled={!channel || addContact.isPending || uploading}>
+                    {addContact.isPending || uploading ? "..." : "Guardar"}
                   </Button>
                 </div>
               </div>

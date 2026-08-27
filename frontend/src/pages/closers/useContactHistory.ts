@@ -66,6 +66,9 @@ export const useContactHistory = (creatorId: string | null) => {
         }
         throw error;
       }
+      // Devolvemos el id del LEAD (ya promovido si era un contacto del directorio):
+      // el formulario lo usa para adjuntar las capturas al lead correcto.
+      return targetId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-contact-history", creatorId] });

@@ -24,15 +24,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ImagePlus, Loader2, Trash2, X } from "lucide-react";
-
-const BUCKET = "closer-evidence";
-const MAX_BYTES = 5 * 1024 * 1024; // igual que el file_size_limit del bucket
-const MIMES = ["image/png", "image/jpeg", "image/webp"];
-const EXT: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
+import { SCREENSHOT_BUCKET as BUCKET, uploadLeadScreenshots } from "../leadScreenshots";
 
 interface LeadFile {
   id: string;
@@ -49,13 +41,6 @@ interface LeadFile {
 // esta feature. Mismo patrón que EvidenceViewer: se aísla el cast acá y el resto del
 // componente trabaja contra LeadFile.
 const TABLA = "closer_lead_files" as never;
-
-/** Rechaza lo que el bucket rechazaría, pero antes de gastar la subida. */
-const validar = (f: File): string | null => {
-  if (!MIMES.includes(f.type)) return `${f.name}: solo PNG, JPG o WEBP`;
-  if (f.size > MAX_BYTES) return `${f.name}: pesa más de 5 MB`;
-  return null;
-};
 
 const LeadScreenshots = ({ leadId }: { leadId: string }) => {
   const { toast } = useToast();
@@ -101,51 +86,9 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
   const urls = urlsQ.data ?? {};
 
   const subir = useMutation({
-    mutationFn: async (files: File[]) => {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (!uid) throw new Error("Sesión expirada, volvé a entrar");
-
-      for (const f of files) {
-        const problema = validar(f);
-        if (problema) throw new Error(problema);
-
-        const path = `${leadId}/${crypto.randomUUID()}.${EXT[f.type]}`;
-        const { error: upErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, f, { contentType: f.type, upsert: false });
-        // No se traga el error como hace ViewContactoModal con contact-files:
-        // ahí el bucket no existe y todos los uploads fallan mudos desde hace meses.
-        if (upErr) throw upErr;
-
-        const { data: insertada, error: insErr } = await supabase
-          .from(TABLA)
-          .insert({
-            creator_id: leadId,
-            storage_path: path,
-            file_name: f.name || `captura.${EXT[f.type]}`,
-            mime_type: f.type,
-            size_bytes: f.size,
-            uploaded_by: uid,
-          } as never)
-          .select("id")
-          .single<{ id: string }>();
-        if (insErr) {
-          // Si la fila no entró, el objeto queda huérfano en el bucket: lo sacamos.
-          await supabase.storage.from(BUCKET).remove([path]);
-          throw insErr;
-        }
-
-        // Dispara el análisis de visión ya, sin esperar al cron de cada 5 min: la
-        // captura queda legible para el bot en segundos. Fire-and-forget a propósito
-        // — si falla, el barrido periódico la levanta igual (analyzed_at sigue NULL).
-        if (insertada?.id) {
-          void supabase.functions
-            .invoke("closers-analyze-screenshot", { body: { file_id: insertada.id } })
-            .catch(() => {});
-        }
-      }
-    },
+    // Lógica compartida con el formulario de "registrar contacto" (SeguimientoCell):
+    // valida, sube a closer-evidence, inserta en closer_lead_files y dispara el análisis.
+    mutationFn: (files: File[]) => uploadLeadScreenshots(leadId, files),
     onSuccess: (_d, files) => {
       qc.invalidateQueries({ queryKey: ["lead-screenshots", leadId] });
       toast({ description: `${files.length} captura${files.length > 1 ? "s" : ""} adjunta${files.length > 1 ? "s" : ""}` });
