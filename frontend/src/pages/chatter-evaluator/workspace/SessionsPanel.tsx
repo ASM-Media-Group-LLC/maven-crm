@@ -293,18 +293,32 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   // de unread counts y el sonido de notificación cross-session se
   // re-implementan después con un mecanismo que no compita.
   useEffect(() => {
+    // chatter_sessions se ESCRIBE muy seguido (indicadores de "escribiendo…", recibos de
+    // lectura, latido del claim de dispositivo cada 20s). Esta suscripción es sin filtro, así
+    // que un evento de CUALQUIER examinador en CUALQUIER sesión disparaba un invalidate →
+    // refetch acá, en TODOS los clientes. Con varios examinadores en roleplay a la vez eso se
+    // volvía un storm N×N (decenas de refetch/seg → 503 y lentitud). Fix: DEBOUNCE — juntar la
+    // ráfaga en un solo refetch cada ~1.5s. No cambia la semántica (la lista sigue fresca en
+    // ≤1.5s; el sonido cross-session ya se apoya en el poll de 2s del unread).
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const invalidateDebounced = () => {
+      if (timer) return; // ya hay un refetch encolado → coalesce la ráfaga
+      timer = setTimeout(() => {
+        timer = null;
+        qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
+        qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
+      }, 1_500);
+    };
     const channel = supabase
       .channel("chatter-sessions-list")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chatter_sessions" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
-          qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
-        },
+        invalidateDebounced,
       )
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [qc]);
