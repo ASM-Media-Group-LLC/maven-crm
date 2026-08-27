@@ -26,6 +26,8 @@ type Body = {
     | "upload-image"
     | "delete-message";
   sessionId: string;
+  // claim-device: tomar la sesión aunque otro dispositivo la tenga (botón "usar aquí")
+  force?: boolean;
   // send
   content?: string;
   images?: string[];
@@ -142,15 +144,23 @@ Deno.serve(async (req) => {
 
     case "claim-device": {
       if (!body.deviceId) return json(req, 400, { ok: false, error: "deviceId required" });
-      // Strict single-device lock — matches the original Roleplaychatters
-      // (index.html line 2309 "DEVICE LOCK (strict: one device per session,
-      // no takeover)"). Once a device has claimed the session, every other
-      // device is rejected forever. The original device can always
-      // re-claim/refresh because its id matches.
+      // Lock de un-dispositivo, pero con TAKEOVER cuando el lock quedó abandonado. El cliente
+      // refresca active_device_claimed_at ~cada 20s (latido); si no hubo latido en >STALE_MS
+      // (dispositivo cerrado / preview de WhatsApp / incógnito que no persiste su deviceId), o
+      // si llega force=true (botón "usar en este dispositivo"), dejamos que otro tome la sesión.
+      // Antes el lock era PERMANENTE → si un intruso la agarraba primero, el chatter real
+      // quedaba bloqueado para siempre ("creamos 3 links y ninguno sirvió").
+      const STALE_MS = 45_000;
+      const claimedAtMs = session.active_device_claimed_at
+        ? new Date(session.active_device_claimed_at).getTime()
+        : 0;
+      const lockStale = Date.now() - claimedAtMs > STALE_MS;
       const isOtherDevice =
         session.active_device_id && session.active_device_id !== body.deviceId;
-      if (isOtherDevice) {
-        return json(req, 409, {
+      if (isOtherDevice && !lockStale && !body.force) {
+        // Ocupado por otro dispositivo con lock VIGENTE → 200 con ok:false (NO 409: supabase-js
+        // envuelve el 409 en un error genérico que el front no sabe leer → spinner infinito).
+        return json(req, 200, {
           ok: false,
           error: "session_locked",
           message: "Otro dispositivo está activo en esta sesión.",

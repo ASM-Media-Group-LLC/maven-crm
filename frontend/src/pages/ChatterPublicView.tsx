@@ -154,10 +154,11 @@ const callChatterApi = async (action: string, payload: Record<string, unknown>) 
 const isSessionEndedError = (e: unknown): boolean => {
   if (e instanceof SessionEndedError) return true;
   const msg = e instanceof Error ? e.message : "";
-  // FunctionsHttpError wraps the response — Supabase doesn't expose the
-  // status cleanly across versions, so match by message. Also catches the
-  // generic "Edge Function returned a non-2xx status code" the user saw.
-  return /session ended|session not found|non-2xx status/i.test(msg);
+  // Solo "ended"/"not found" reales. NO matchear el genérico "non-2xx status": eso
+  // enmascaraba el lock de dispositivo (que llegaba como 409) y colgaba el spinner para
+  // siempre. Ahora el edge devuelve el lock como 200 {ok:false, error:'session_locked'},
+  // que el caller maneja explícito (setLocked → LockedScreen).
+  return /session ended|session not found/i.test(msg);
 };
 
 // MediaThumb — preview clickeable. Si la URL apunta a un video,
@@ -559,12 +560,22 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
   );
 };
 
-const LockedScreen = () => (
+const LockedScreen = ({ onTakeover, busy }: { onTakeover: () => void; busy: boolean }) => (
   <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
     <Lock className="h-12 w-12 text-amber-500" />
     <h1 className="text-xl font-bold">Sesión en uso</h1>
     <p className="max-w-sm text-sm text-muted-foreground">
       Otro dispositivo está activo en esta sesión. Solo un dispositivo puede chatear a la vez.
+    </p>
+    <button
+      onClick={onTakeover}
+      disabled={busy}
+      className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+    >
+      {busy ? "Tomando la sesión…" : "Usar en este dispositivo"}
+    </button>
+    <p className="max-w-sm text-[11px] text-muted-foreground/70">
+      Si abriste el link en otro lado (o una vista previa), tocá el botón para chatear desde acá.
     </p>
   </div>
 );
@@ -639,6 +650,22 @@ const ChatterPublicView = () => {
   const [replyTo, setReplyTo] = useState<ChatterMessage | null>(null);
   const [locked, setLocked] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  const [takingOver, setTakingOver] = useState(false);
+  // Botón "usar en este dispositivo" de LockedScreen: fuerza el takeover del lock (force:true)
+  // para no esperar a que expire solo (~45s). El claim normal igual reintenta cada 20s.
+  const takeOverDevice = async () => {
+    if (!sessionId) return;
+    setTakingOver(true);
+    try {
+      await callChatterApi("claim-device", { sessionId, deviceId: getDeviceId(), force: true });
+      setClaimed(true);
+      setLocked(false);
+    } catch (e) {
+      toast.error("No se pudo tomar la sesión", { description: (e as Error).message });
+    } finally {
+      setTakingOver(false);
+    }
+  };
   // Tab-lock state. "checking" while we read localStorage, "prompt" if a
   // live claim from another tab exists (user picks Use here / Cancel),
   // "active" once we own the claim, "blocked" after taking over the loser
@@ -1246,7 +1273,7 @@ const ChatterPublicView = () => {
 
   if (!session) return <NotFoundScreen reason="Esta sesión no existe o fue eliminada." />;
   if (session.status === "ended") return <NotFoundScreen reason="Esta sesión ya fue cerrada por el examinador." />;
-  if (locked) return <LockedScreen />;
+  if (locked) return <LockedScreen onTakeover={takeOverDevice} busy={takingOver} />;
   if (tabState === "blocked") return <TabLockedScreen />;
   if (tabState === "prompt") {
     return (
