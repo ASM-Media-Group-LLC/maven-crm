@@ -27,6 +27,7 @@ interface MessageBubbleProps {
   profiles: Record<string, UserProfile>;
   highlight: string;
   onReply: () => void;
+  onOpenProfile?: (userId: string) => void;
   onCopy: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
@@ -49,7 +50,7 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
-  message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete, onRetry,
+  message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, onCopy, onEdit, onDelete, onRetry,
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
@@ -372,13 +373,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         {!isMe && (
           <div className="w-8 shrink-0 flex justify-center">
             {showAvatar ? (
-              <UserAvatar
-                name={senderName}
-                src={profiles[message.sender_id]?.avatar_url}
-                seed={profiles[message.sender_id]?.avatar_seed}
-                size="sm"
-                className="h-7 w-7"
-              />
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.(message.sender_id)}
+                title="Ver ficha"
+                className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <UserAvatar
+                  name={senderName}
+                  src={profiles[message.sender_id]?.avatar_url}
+                  seed={profiles[message.sender_id]?.avatar_seed}
+                  size="sm"
+                  className="h-7 w-7"
+                />
+              </button>
             ) : null}
           </div>
         )}

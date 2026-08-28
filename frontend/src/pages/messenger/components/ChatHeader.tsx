@@ -26,6 +26,7 @@ interface ChatHeaderProps {
   onSearchToggle: () => void;
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
+  onOpenProfile?: (userId: string) => void;
   onOpenNotificationSettings: () => void;
   onOpenSharedFiles: () => void;
   onOpenGroupMembers?: () => void;
@@ -39,7 +40,7 @@ interface ChatHeaderProps {
 
 export default function ChatHeader({
   conversation, profiles, typingUsers,
-  onSearchToggle, onBack, onStartVideoCall,
+  onSearchToggle, onBack, onStartVideoCall, onOpenProfile,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
   onAvatarChanged,
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
@@ -153,6 +154,23 @@ export default function ChatHeader({
               isGroup
               editable
             />
+          ) : !isGroup && otherUserId && otherUserId !== user?.id ? (
+            // Avatar de la otra persona: click → abre su ficha de Karma Points.
+            <button
+              type="button"
+              onClick={() => onOpenProfile?.(otherUserId)}
+              title="Ver ficha"
+              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <AvatarUpload
+                currentUrl={avatarUrl}
+                seed={otherProfile?.avatar_seed}
+                displayName={conversation.displayName}
+                onAvatarChanged={handleProfileAvatarChange}
+                size="sm"
+                editable={false}
+              />
+            </button>
           ) : !isGroup ? (
             <AvatarUpload
               currentUrl={avatarUrl}

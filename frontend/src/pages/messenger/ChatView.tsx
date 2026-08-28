@@ -11,6 +11,7 @@ import SearchResultsPanel from "./components/SearchResultsPanel";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
+import ProfileCard from "./components/ProfileCard";
 import { Upload, Megaphone } from "lucide-react";
 
 interface ChatViewProps {
@@ -60,6 +61,7 @@ export default function ChatView({
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const messageInputRef = useRef<MessageInputHandle>(null);
@@ -187,6 +189,7 @@ export default function ChatView({
         }}
         onBack={onBack}
         onStartVideoCall={onStartVideoCall}
+        onOpenProfile={setProfileUserId}
         onOpenNotificationSettings={() => setShowNotifSettings(true)}
         onOpenSharedFiles={() => { closeSidePanels("files"); setShowSharedFiles(true); }}
         onOpenGroupMembers={() => { closeSidePanels("members"); setShowGroupMembers(true); }}
@@ -206,6 +209,7 @@ export default function ChatView({
         searchQuery={searchQuery}
         loading={loading}
         onReply={setReplyTo}
+        onOpenProfile={setProfileUserId}
         onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
         onEdit={onEditMessage}
         onDelete={onDeleteMessage}
@@ -308,6 +312,8 @@ export default function ChatView({
           />
         </div>
       )}
+
+      <ProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </div>
   );
 }

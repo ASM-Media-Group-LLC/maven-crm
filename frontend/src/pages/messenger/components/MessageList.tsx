@@ -13,6 +13,7 @@ interface MessageListProps {
   searchQuery: string;
   loading: boolean;
   onReply: (msg: ChatMessage) => void;
+  onOpenProfile?: (userId: string) => void;
   onCopy: (content: string) => void;
   onEdit: (id: string, content: string) => void;
   onDelete: (id: string) => void;
@@ -62,7 +63,7 @@ function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onCopy, onEdit, onDelete, onRetry,
+  loading, onReply, onOpenProfile, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
@@ -295,6 +296,7 @@ export default function MessageList({
                       profiles={profiles}
                       highlight={searchQuery.toLowerCase()}
                       onReply={() => onReply(msg)}
+                      onOpenProfile={onOpenProfile}
                       onCopy={() => onCopy(msg.content || "")}
                       onEdit={(content) => onEdit(msg.id, content)}
                       onDelete={() => onDelete(msg.id)}
