@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
         { path: "/employees", scope: "employees:read" },
         { path: "/sales", scope: "sales:read" },
         { path: "/sales/chatters", scope: "sales:chatters" },
+        { path: "/promolog", scope: "promolog:read" },
       ],
     });
   }
@@ -302,6 +303,22 @@ Deno.serve(async (req) => {
       };
     });
     return json(req, { object: "list", resource: "sales", count: count ?? data.length, limit, offset, data });
+  }
+
+  // ===== /promolog =====
+  if (resource === "promolog") {
+    if (!need("promolog:read")) return json(req, { error: "forbidden", message: "Falta el scope promolog:read" }, 403);
+    const { limit, offset } = pageParams(url);
+    const { data, error } = await admin.rpc("api_promolog_daily", {
+      _from: url.searchParams.get("from"),
+      _to: url.searchParams.get("to"),
+      _creator_id: url.searchParams.get("creator_id"),
+      _network: url.searchParams.get("network"),
+      _limit: limit,
+      _offset: offset,
+    });
+    if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    return json(req, { object: "list", resource: "promolog", count: (data ?? []).length, limit, offset, data: data ?? [] });
   }
 
   return json(req, { error: "not_found", message: `Recurso desconocido: ${resource}` }, 404);

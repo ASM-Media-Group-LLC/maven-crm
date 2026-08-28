@@ -40,8 +40,9 @@ const FALLBACK_CATALOG: ScopeDef[] = [
   { key: "employees:read", group: "Empleados", label: "Roster del equipo", description: "Nombre y rol de los empleados." },
   { key: "sales:read", group: "Ventas", label: "Ganancias por creadora (diario)", description: "Ganancias brutas diarias por creadora." },
   { key: "sales:chatters", group: "Ventas", label: "Ventas por chatter (diario)", description: "Ventas diarias por chatter." },
+  { key: "promolog:read", group: "Promolog", label: "Promoción diaria", description: "Si cada creadora promocionó cada día, por red." },
 ];
-const FALLBACK_GROUPS = ["Creadoras", "Empleados", "Ventas"];
+const FALLBACK_GROUPS = ["Creadoras", "Empleados", "Ventas", "Promolog"];
 
 const API_BASE =
   `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
@@ -419,6 +420,7 @@ const AdminApiKeys = () => {
                   { m: "GET", p: "/employees", s: "employees:read", d: "Roster del equipo (nombre, rol). Filtro: role." },
                   { m: "GET", p: "/sales", s: "sales:read", d: "Ganancias diarias por creadora + desglose. Filtros: from, to, creator_id." },
                   { m: "GET", p: "/sales/chatters", s: "sales:chatters", d: "Ventas diarias por chatter. Filtros: from, to." },
+                  { m: "GET", p: "/promolog", s: "promolog:read", d: "Promoción diaria por creadora y red (promovió sí/no, historias). Filtros: from, to, creator_id, network." },
                 ].map((e) => (
                   <div key={e.p} className="rounded-md border border-border/60 p-2.5">
                     <div className="flex flex-wrap items-center gap-2">

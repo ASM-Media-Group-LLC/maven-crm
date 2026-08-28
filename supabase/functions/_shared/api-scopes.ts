@@ -6,7 +6,7 @@
 // scopes exponen datos de Maven (creadoras, empleados, ventas), no data de fans.
 export type ScopeDef = { key: string; group: string; label: string; description: string };
 
-export const SCOPE_GROUPS = ["Creadoras", "Empleados", "Ventas"] as const;
+export const SCOPE_GROUPS = ["Creadoras", "Empleados", "Ventas", "Promolog"] as const;
 
 export const SCOPE_CATALOG: ScopeDef[] = [
   {
@@ -36,6 +36,13 @@ export const SCOPE_CATALOG: ScopeDef[] = [
     label: "Ventas por chatter (diario)",
     description:
       "Ventas diarias por chatter: total vendido, mensajes vendidos y fans chateados.",
+  },
+  {
+    key: "promolog:read",
+    group: "Promolog",
+    label: "Promoción diaria",
+    description:
+      "Estado diario de promoción por creadora y red: si promocionó ese día, cuántas historias se escanearon y cuántas contaron como promo. Filtros por fecha, creadora y red.",
   },
 ];
 
