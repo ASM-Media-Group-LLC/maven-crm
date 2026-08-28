@@ -34,6 +34,14 @@ interface Ctx {
   /** La página registra su hueco; al desmontarse, la llamada se va a flotante. */
   registerOutlet: (el: HTMLElement | null) => void;
   activeKey: string | null;
+  /** Saca la llamada a una ventana del sistema (movible a otro monitor).
+   *  La ofrece el provider y no cada página para que sea la MISMA llamada la
+   *  que se muda: montar una segunda la reconectaría. Solo funciona dentro de
+   *  un clic del usuario — el navegador no la abre de otra forma. */
+  abrirVentanaDelSistema: (medidas?: { width: number; height: number }) => Promise<boolean>;
+  cerrarVentanaDelSistema: () => void;
+  ventanaDelSistemaAbierta: boolean;
+  ventanaDelSistemaSoportada: boolean;
 }
 
 const PersistentCallContext = createContext<Ctx | null>(null);
@@ -134,8 +142,14 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   }, [pos, floatEl]);
 
   const ctx = useMemo<Ctx>(
-    () => ({ startCall, endCall, registerOutlet, activeKey: config?.key ?? null }),
-    [startCall, endCall, registerOutlet, config?.key],
+    () => ({
+      startCall, endCall, registerOutlet, activeKey: config?.key ?? null,
+      abrirVentanaDelSistema: (medidas) => openPip(medidas ?? { width: 420, height: 300 }),
+      cerrarVentanaDelSistema: closePip,
+      ventanaDelSistemaAbierta: !!pipWindow,
+      ventanaDelSistemaSoportada: docPipSupported(),
+    }),
+    [startCall, endCall, registerOutlet, config?.key, openPip, closePip, pipWindow],
   );
 
   // Dónde se dibuja la llamada, por orden de prioridad: la ventana del sistema

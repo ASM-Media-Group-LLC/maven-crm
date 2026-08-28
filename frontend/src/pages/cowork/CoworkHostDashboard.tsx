@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
 import { formatBreak } from "./CoworkParticipantView";
-import { usePipWindow } from "./usePipWindow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -47,6 +47,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
+  const {
+    startCall, endCall,
+    abrirVentanaDelSistema, cerrarVentanaDelSistema,
+    ventanaDelSistemaAbierta, ventanaDelSistemaSoportada,
+  } = usePersistentCall();
   const [hubConnected, setHubConnected] = useState(false);
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -67,7 +72,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   });
   // Ventana FLOTANTE del SO (Document PiP): always-on-top real + mover a otro monitor +
   // resize nativo. El botón pin la abre; si el navegador no la soporta, cae al pin z-index.
-  const hubPip = usePipWindow();
 
   const toggleHubPinned = () => {
     setHubPinned(p => {
@@ -77,11 +81,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     });
   };
 
-  // Abre el Hub como ventana flotante del SO (pop-out). Fallback: toggle z-index.
+  // Saca el Hub a una ventana del sistema, movible a otro monitor. La abre el
+  // PROVIDER y no esta pagina: asi se muda la misma llamada en vez de montar
+  // otra, que era lo que pasaba antes — sacarlo del navegador reconectaba.
+  // Sin soporte del navegador queda el fallback de fijar al frente.
   const popOutHub = async () => {
-    if (hubPip.pipWindow) { hubPip.closePip(); return; }
-    if (hubPip.supported) {
-      const ok = await hubPip.openPip({ width: hubSize?.w ?? 480, height: hubSize?.h ?? 420 });
+    if (ventanaDelSistemaAbierta) { cerrarVentanaDelSistema(); return; }
+    if (ventanaDelSistemaSoportada) {
+      const ok = await abrirVentanaDelSistema({ width: hubSize?.w ?? 480, height: hubSize?.h ?? 420 });
       if (!ok) { toast.error("No pude abrir la ventana flotante"); toggleHubPinned(); }
     } else {
       toast.info("Tu navegador no soporta ventana flotante multi-monitor (usa Chrome/Edge). Fijo al frente dentro de Maven.");
@@ -335,6 +342,40 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const result = await cowork.issueLiveKitToken("join_host_hub");
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken]);
+
+  // El Hub vive en el PersistentCallProvider, por encima del router.
+  //
+  // Mientras el coordinador está en Cowork se dibuja dentro de su ventanita de
+  // siempre —arrastrable, redimensionable, anclable— y si navega a otra sección
+  // pasa sola a la flotante del provider en vez de cortarse.
+  //
+  // De paso arregla algo que ya estaba mal: antes había DOS LiveKitCallView del
+  // Hub (uno para la ventana del sistema, otro para el panel), así que sacarlo
+  // del navegador desmontaba uno y montaba el otro — o sea, reconectaba la
+  // llamada. Ahora es el mismo componente movido por portal.
+  useEffect(() => {
+    const sala = cowork.session?.host_hub_livekit_room;
+    if (!hubConnected || !sala) return;
+    startCall({
+      key: `cowork-hub-${sala}`,
+      roomName: sala,
+      displayName,
+      callDisplayName: "Coordinador Hub",
+      isAdmin: true,
+      onLeave: () => { setHubConnected(false); setHubMaximized(false); },
+      hideShareLink: true,
+      hideLeaveButton: true,
+      suppressLeaveToast: true,
+      initialMicOn: false,
+      initialCamOn: false,
+      getToken: getHubToken,
+    });
+  }, [hubConnected, cowork.session?.host_hub_livekit_room, displayName, getHubToken, startCall]);
+
+  // Colgar el Hub lo saca también de la ventanita flotante.
+  useEffect(() => {
+    if (!hubConnected) endCall();
+  }, [hubConnected, endCall]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = await cowork.issueLiveKitToken("join_room", activeRoomId!);
@@ -1196,40 +1237,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
       {/* HUB EN VENTANA FLOTANTE DEL SO (Document PiP): always-on-top real, movible a
           cualquier monitor, resize nativo. Portalizamos el call view a esa ventana. */}
-      {hubConnected && cowork.session?.host_hub_livekit_room && hubPip.pipWindow && createPortal(
-        <div className="w-full h-screen flex flex-col bg-card text-foreground">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
-            <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium">
-              <Headphones className="h-3 w-3" /> Coordinador Hub
-            </div>
-            <div className="flex gap-1">
-              <Button variant="secondary" size="sm" className="h-6 gap-1 rounded-full px-2.5 text-[11px]" onClick={hubPip.closePip} title="Traer de vuelta a Maven">
-                <ArrowLeft className="h-3 w-3" /> A Maven
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive/80" onClick={() => { hubPip.closePip(); setHubConnected(false); }} title="Colgar llamada">
-                <PhoneOff className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-          <div className="flex-1 min-h-0">
-            <LiveKitCallView
-              roomName={cowork.session.host_hub_livekit_room}
-              displayName={displayName}
-              callDisplayName="Coordinador Hub"
-              isAdmin={true}
-              onLeave={() => { hubPip.closePip(); setHubConnected(false); }}
-              hideShareLink hideLeaveButton suppressLeaveToast
-              initialMicOn={false} initialCamOn={false}
-              getToken={getHubToken}
-            />
-          </div>
-        </div>,
-        hubPip.pipWindow.document.body,
-      )}
 
       {/* Ventanita del Hub DENTRO de Maven (cuando NO está en ventana flotante).
           Arrastrable, redimensionable por la esquina, y con pop-out a ventana del SO. */}
-      {hubConnected && cowork.session?.host_hub_livekit_room && !hubPip.pipWindow && (
+      {hubConnected && cowork.session?.host_hub_livekit_room && (
         <div
           className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${
             hubPos && !hubMaximized ? "" : "bottom-4 right-4"
@@ -1271,13 +1282,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubPinned && !hubPip.supported ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-5 w-5 ${hubPinned && !ventanaDelSistemaSoportada ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={popOutHub}
-                  title={hubPip.supported
-                    ? "Ventana flotante: siempre al frente y movible a otro monitor"
+                  title={ventanaDelSistemaSoportada
+                    ? (ventanaDelSistemaAbierta
+                        ? "Traer el Hub de vuelta a Maven"
+                        : "Ventana flotante: siempre al frente y movible a otro monitor")
                     : (hubPinned ? "Fijado al frente (click para soltar)" : "Fijar al frente")}
                 >
-                  {hubPip.supported ? <PictureInPicture2 className="h-3 w-3" /> : (hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />)}
+                  {ventanaDelSistemaSoportada ? <PictureInPicture2 className="h-3 w-3" /> : (hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />)}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1309,20 +1322,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               </div>
             </div>
             <div className="flex-1 min-h-0">
-              <LiveKitCallView
-                roomName={cowork.session.host_hub_livekit_room}
-                displayName={displayName}
-                callDisplayName="Coordinador Hub"
-                isAdmin={true}
-                onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
-                hideShareLink
-                hideLeaveButton
-                suppressLeaveToast
-                initialMicOn={false}
-                initialCamOn={false}
-                getToken={getHubToken}
-                compact={!hubMaximized}
-              />
+              <CallOutlet className="w-full h-full" />
             </div>
             {/* Handle de resize (esquina inferior derecha), solo en modo ventanita. */}
             {!hubMaximized && (
