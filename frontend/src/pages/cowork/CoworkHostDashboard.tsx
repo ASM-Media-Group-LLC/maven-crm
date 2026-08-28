@@ -822,7 +822,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="outline"
                   className={`gap-1.5 rounded-full h-8 ${globalHear ? "" : "text-destructive border-destructive/40"}`}
                   title={globalHear
-                    ? "Estás escuchando todas las salas. Toca para silenciarlas (solo para vos)."
+                    ? "Estás escuchando todas las salas. Toca para silenciarlas (solo para ti)."
                     : "Tenés todas las salas en silencio. Toca para volver a escucharlas."}
                   onClick={() => setGlobalHear((v) => !v)}
                 >

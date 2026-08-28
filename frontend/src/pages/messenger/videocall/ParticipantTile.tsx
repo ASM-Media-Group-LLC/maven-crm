@@ -414,8 +414,8 @@ const ParticipantTile = memo(function ParticipantTile({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Silenciar a {participant.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Deja de escucharse para toda la sala, no solo para vos. Se le avisa que lo
-              silenciaron y puede volver a activar su micrófono cuando quiera — vos no podés
+              Deja de escucharse para toda la sala, no solo para ti. Se le avisa que lo
+              silenciaron y puede volver a activar su micrófono cuando quiera — tú no puedes
               hacerlo por él.
             </AlertDialogDescription>
           </AlertDialogHeader>
