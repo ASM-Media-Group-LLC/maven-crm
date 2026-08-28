@@ -130,6 +130,57 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --chart-5: 271 91% 54%;  /* violeta */
     --chart-6: 340 78% 59%;  /* pink */
   }
+
+  /* ---- Skins de acento por usuario (Settings → Mi cuenta → Apariencia) ----
+     El skin elegido vive como data-skin en <html> (hooks/useSkin.ts) y SOLO
+     redefine primary / accent / ring / sidebar-primary / sidebar-ring — nunca
+     fondos, cards ni los tokens --chart-* (el mini-sistema dataviz queda
+     intacto). Sin atributo o data-skin="maven" = los valores de arriba.
+
+     Especificidad: :root[data-skin] (0,2,0) gana sobre .dark (0,1,0) porque
+     ambos viven en el MISMO <html>, y los pasos son iguales en claro y oscuro
+     (igual que maven), así que un solo bloque por skin cubre los dos temas.
+
+     A11y: blanco sobre primary ≥ 4.5:1 en todos los skins. Los matices
+     pedidos venían más claros (2.6–3.6:1); se bajó la L de cada primary hasta
+     cumplir (bajar L sube contraste — mismo fix que success/warning light):
+       atardecer  25 95% 53% → 39% (4.61:1)
+       esmeralda 160 84% 39% → 28% (4.74:1)
+       orquídea  290 84% 60% → 49% (4.61:1)
+       medianoche 217 91% 60% → 53% (4.59:1)
+     Si cambias un paso acá, sincroniza el literal del swatch en
+     hooks/useSkin.ts (SKINS). */
+  :root[data-skin="atardecer"] {
+    --primary: 25 95% 39%;
+    --accent: 340 82% 59%;
+    --ring: 25 95% 39%;
+    --sidebar-primary: 25 95% 39%;
+    --sidebar-ring: 25 95% 39%;
+  }
+
+  :root[data-skin="esmeralda"] {
+    --primary: 160 84% 28%;
+    --accent: 190 90% 45%;
+    --ring: 160 84% 28%;
+    --sidebar-primary: 160 84% 28%;
+    --sidebar-ring: 160 84% 28%;
+  }
+
+  :root[data-skin="orquidea"] {
+    --primary: 290 84% 49%;
+    --accent: 320 85% 55%;
+    --ring: 290 84% 49%;
+    --sidebar-primary: 290 84% 49%;
+    --sidebar-ring: 290 84% 49%;
+  }
+
+  :root[data-skin="medianoche"] {
+    --primary: 217 91% 53%;
+    --accent: 217 91% 53%;
+    --ring: 217 91% 53%;
+    --sidebar-primary: 217 91% 53%;
+    --sidebar-ring: 217 91% 53%;
+  }
 }
 
 @layer base {

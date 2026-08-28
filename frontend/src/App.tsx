@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useSkinSync } from "@/hooks/useSkin";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -220,13 +221,25 @@ const LoadingFallback = () => (
   </>
 );
 
+// Render nulo, solo efectos: aplica el skin guardado (localStorage) al montar
+// y, cuando la sesión resuelve, sincroniza con profiles.ui_skin para que el
+// skin elegido siga al usuario en cualquier dispositivo/pantalla.
+const SkinBoot = () => {
+  useSkinSync();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+    {/* enableSystem: la card Apariencia de Settings ofrece "Sistema" además de
+        Oscuro/Claro. El default sigue siendo dark y el toggle del sidebar
+        sigue funcionando igual (dark ⇄ light). */}
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <TooltipProvider>
         <LanguageProvider>
         <AuthProvider>
         <OnlinePresenceProvider>
+          <SkinBoot />
           <Toaster />
           <Sonner />
           <BrowserRouter>

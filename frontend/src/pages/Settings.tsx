@@ -22,7 +22,12 @@ import {
   MessageCircle,
   CheckCircle2,
   AlertCircle,
+  Moon,
+  Sun,
+  Monitor,
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useSkin, SKINS } from "@/hooks/useSkin";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -241,6 +246,8 @@ const MyAccountTab = () => {
         </CardContent>
       </Card>
 
+      <AppearanceCard />
+
       <WhatsappPhoneCard
         currentValue={profileQ.data?.phone_e164 ?? null}
         verifiedAt={profileQ.data?.whatsapp_verified_at ?? null}
@@ -260,6 +267,110 @@ const MyAccountTab = () => {
 
       <ChangePasswordModal open={pwOpen} onOpenChange={setPwOpen} />
     </div>
+  );
+};
+
+// Card "Apariencia" — dentro de "Mi cuenta", después de "Tu muñequito".
+// (a) Tema: Oscuro/Claro/Sistema vía next-themes (el toggle rápido del
+//     sidebar sigue existiendo; esto lo formaliza y suma "Sistema").
+// (b) Skin: 5 presets de ACENTO (hooks/useSkin.ts + bloques [data-skin] en
+//     index.css). Elegir aplica al instante, guarda en localStorage y
+//     persiste en profiles.ui_skin para seguir al usuario entre dispositivos.
+const AppearanceCard = () => {
+  const { t } = useLanguage();
+  const { theme, setTheme } = useTheme();
+  const { skin, setSkin } = useSkin();
+
+  const themeOptions = [
+    { value: "dark", label: t("settings.themeDark"), icon: Moon },
+    { value: "light", label: t("settings.themeLight"), icon: Sun },
+    { value: "system", label: t("settings.themeSystem"), icon: Monitor },
+  ] as const;
+
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Palette className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{t("settings.appearanceTitle")}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t("settings.appearanceDesc")}
+            </p>
+          </div>
+        </div>
+
+        {/* Fila Tema — control segmentado de 3 opciones. */}
+        <div className="space-y-2">
+          <Label className="text-xs">{t("settings.themeLabel")}</Label>
+          <div className="flex w-fit rounded-lg border border-border bg-muted/40 p-1">
+            {themeOptions.map(({ value, label, icon: Icon }) => {
+              const isActive = theme === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTheme(value)}
+                  aria-pressed={isActive}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isActive
+                      ? "bg-background font-medium text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Fila Skin — swatches con el gradiente primary→accent LITERAL de
+            cada preset (no var(--primary): eso mostraría el skin activo en
+            los 5 circulitos). El activo lleva anillo. */}
+        <div className="space-y-2">
+          <Label className="text-xs">{t("settings.skinLabel")}</Label>
+          <p className="text-[11px] text-muted-foreground">{t("settings.skinDesc")}</p>
+          <div className="flex flex-wrap gap-4 pt-1">
+            {SKINS.map((s) => {
+              const isActive = skin === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    if (isActive) return;
+                    setSkin(s.id);
+                    toast.success(t("settings.skinApplied"), { description: s.label });
+                  }}
+                  aria-pressed={isActive}
+                  className="group flex w-16 flex-col items-center gap-1.5 focus:outline-none"
+                >
+                  <span
+                    className={`h-10 w-10 rounded-full transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background ${
+                      isActive
+                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "ring-1 ring-border"
+                    }`}
+                    style={{ background: `linear-gradient(135deg, ${s.primary}, ${s.accent})` }}
+                  />
+                  <span
+                    className={`text-[11px] ${
+                      isActive ? "font-medium text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
