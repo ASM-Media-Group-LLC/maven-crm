@@ -191,6 +191,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [roomBusy, setRoomBusy] = useState(false);
   // Central de audio del coordinador: master del micro + escuchar/hablar por sala + micro compartido.
   const [roomHear, setRoomHear] = useState<Record<string, boolean>>({});
+  // Tic de un segundo: los contadores de pausa y las alertas de encuadre se
+  // calculan contra este reloj, así avanzan solos sin depender de que llegue un
+  // evento de presence.
+  //
+  // Va ARRIBA de todo lo que lo usa. Como const, leerlo antes de su línea lanza;
+  // hoy solo se lee dentro de funciones que corren al renderizar —así que no
+  // rompe— pero es el mismo patrón que tumbó esta pantalla dos veces, y basta
+  // que alguien lo mueva a un arreglo de dependencias para que vuelva a pasar.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Límites por tipo de pausa (tabla, no constantes). Si no cargan, no se pinta
   // nada de rojo: mejor sin señal que marcando a alguien por un dato que falta.
   const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
@@ -415,11 +429,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
   // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
   // avanzan solos sin depender de que llegue un evento de presence.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
