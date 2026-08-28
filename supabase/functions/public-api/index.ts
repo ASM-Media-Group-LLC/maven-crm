@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/employees", scope: "employees:read" },
+        { path: "/hubstaff", scope: "hubstaff:read" },
         { path: "/sales", scope: "sales:read" },
         { path: "/sales/chatters", scope: "sales:chatters" },
         { path: "/promolog", scope: "promolog:read" },
@@ -303,6 +304,21 @@ Deno.serve(async (req) => {
       };
     });
     return json(req, { object: "list", resource: "sales", count: count ?? data.length, limit, offset, data });
+  }
+
+  // ===== /hubstaff =====
+  if (resource === "hubstaff") {
+    if (!need("hubstaff:read")) return json(req, { error: "forbidden", message: "Falta el scope hubstaff:read" }, 403);
+    const { limit, offset } = pageParams(url);
+    const { data, error } = await admin.rpc("api_hubstaff_daily", {
+      _from: url.searchParams.get("from"),
+      _to: url.searchParams.get("to"),
+      _profile_id: url.searchParams.get("profile_id"),
+      _limit: limit,
+      _offset: offset,
+    });
+    if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    return json(req, { object: "list", resource: "hubstaff", count: (data ?? []).length, limit, offset, data: data ?? [] });
   }
 
   // ===== /promolog =====

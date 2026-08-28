@@ -24,6 +24,13 @@ export const SCOPE_CATALOG: ScopeDef[] = [
       "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
   },
   {
+    key: "hubstaff:read",
+    group: "Empleados",
+    label: "Horas de Hubstaff (diario)",
+    description:
+      "Horas trabajadas por día según Hubstaff: tiempo trackeado (horas), actividad general y proyecto, por empleado. Filtros por fecha y empleado.",
+  },
+  {
     key: "sales:read",
     group: "Ventas",
     label: "Ganancias por creadora (diario)",
