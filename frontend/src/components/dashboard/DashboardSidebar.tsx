@@ -165,6 +165,7 @@ const DashboardSidebar = () => {
     { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined, muteChannel: "tg" },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
+    { title: "Chatters · Rendimiento", url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
   ];

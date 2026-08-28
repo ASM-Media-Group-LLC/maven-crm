@@ -352,8 +352,17 @@ serve(async (req: Request) => {
 
     // ── MASIVOS ───────────────────────────────────────────────────────────
     if (action === "all" || action === "masivos") {
+      // Cada modelo son DOS consultas (of-mass + smart-messages), asi que
+      // recorrerlas todas de una se pasa del limite de la edge function. El que
+      // llama puede mandar un lote de modelIds; sin lote, las trae todas.
+      const soloEstos: number[] = Array.isArray(body.modelIds)
+        ? body.modelIds.map(Number).filter(Number.isFinite) : [];
       const data = await blu("models");
-      const modelos: any[] = data?.models ?? data?.rows ?? [];
+      let modelos: any[] = data?.models ?? data?.rows ?? [];
+      if (soloEstos.length) {
+        const set = new Set(soloEstos);
+        modelos = modelos.filter((m: any) => set.has(Number(m?.id ?? m?.modelId)));
+      }
       const num = (v: unknown) => Number(v) || 0;
 
       // Para atribuir cada masivo a una persona: BLU lo firma con un NOMBRE.

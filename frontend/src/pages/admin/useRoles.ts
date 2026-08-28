@@ -184,7 +184,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // (venía del split del repo). Las filas viejas en role_permissions quedan
   // huérfanas y sin efecto; no hace falta borrarlas.
   def("Operaciones", "Tickets", ["Lista de Tickets", "Plantillas"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket", "Gestionar Plantillas"]),
-  def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),
+  def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin", "Rendimiento"], ["Borrar Historial"]),
   // Scouter Assist: 8 subtabs navegables + 3 acciones dentro de Settings (gastan créditos / disparan RPCs).
   def("Operaciones", "Scouter Assist",
     ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings"],

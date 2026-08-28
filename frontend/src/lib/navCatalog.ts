@@ -108,6 +108,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Chatter Evaluator · Historial", url: "/chatter-evaluator/history", icon: History, module: "Chatters", submodule: "Evaluator", section: "Operaciones" },
   { title: "Chatter Evaluator · Admin", url: "/chatter-evaluator/admin", icon: UserCog, module: "Chatters", submodule: "Admin", section: "Operaciones" },
   { title: "Chatter Workspace", url: "/chatter-evaluator/workspace", icon: Briefcase, module: "Chatters", submodule: "Workspace", section: "Operaciones" },
+  { title: "Chatters · Rendimiento", url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento", section: "Operaciones", keywords: ["nota", "ventas", "masivos", "blu"] },
   { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", section: "Operaciones" },
   { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", section: "Operaciones", keywords: ["llamadas", "calidad"] },
 
