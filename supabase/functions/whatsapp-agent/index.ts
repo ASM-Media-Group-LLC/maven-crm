@@ -3709,10 +3709,29 @@ async function executeTool(
         .select("id, user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, cerradas, videos_creados, fotos_creadas, cuentas_creadas, posts_subidos")
         .single();
       if (error) return { error: error.message };
+
+      // VALIDACIÓN AUTOMÁTICA CONTRA MAVEN — no depende de que el modelo la pida.
+      // El prompt ordena llamar validate_report_vs_maven en TRES lugares y no pasa:
+      // AI WARMING registró 157 reportes en agosto y validó UNA vez; Marketing/Ventas
+      // registró 2 en todo el mes. Es el mismo antipatrón del ack fantasma — la regla
+      // en prosa no alcanza — y además es el detector de la divergencia grupo↔Maven
+      // que ya habíamos medido en 20-25%. Ahora el gap viaja DENTRO de este resultado.
+      const validacion = await validarReporteVsMaven(sb, ctx, {
+        display_name: displayName,
+        role_kind: roleKind,
+        report_date: reportDate,
+        claimed_numeros: payload.numeros_obtenidos ?? undefined,
+        claimed_contactados: payload.contactados ?? undefined,
+        claimed_respuestas: payload.respuestas ?? undefined,
+        claimed_confirmadas: payload.confirmadas ?? undefined,
+        claimed_cerradas: payload.cerradas ?? undefined,
+      }).catch((e) => ({ error: `validacion_fallo: ${(e as Error).message}` }));
+
       return {
         ok: true,
         registered: data,
         member_name: member.display_name,
+        validacion_vs_maven: validacion,
         ...(prevRow
           ? {
             acumulado: true,
@@ -5478,138 +5497,7 @@ async function executeTool(
     }
 
     case "validate_report_vs_maven": {
-      const displayName = String(input.display_name ?? "").trim();
-      if (!displayName) return { error: "missing_display_name" };
-      const roleKind = String(input.role_kind ?? "llg").toLowerCase();
-      // Fecha objetivo: report_date input o hoy en Bogotá.
-      const reportDate = String(input.report_date ?? "").trim()
-        || new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
-      // Resolver user_id via helper (busca en wpp + full_name).
-      const members = await resolveMembersByName(sb, ctx.groupId, displayName, 3);
-      const member = members.find((m) => m.user_id);
-      if (!member?.user_id) {
-        return {
-          error: "user_not_linked",
-          display_name: displayName,
-          hint: "Este miembro no está vinculado a un user de Maven. Pedile que verifique su número en Settings.",
-        };
-      }
-
-      const gaps: Array<{
-        metric: string;
-        claimed: number;
-        actual: number;
-        gap: number;
-        update_hint: string;
-      }> = [];
-      const maven: Record<string, number> = {};
-      const claimed: Record<string, number | null> = {};
-
-      if (roleKind === "llg") {
-        // LLG: leads cargados y respuestas salen de leadgen_entries. PERO los
-        // "números" se cargan en closers_contacts.phone (*Agregar Contactos*),
-        // NO en leadgen_entries.phone_e164 (columna muerta → antes daba 0 y el
-        // bot le decía al LLG que su número no estaba). Contamos números aparte
-        // contra closers_contacts del LLG en la fecha del reporte.
-        const { data: entries } = await sb
-          .from("leadgen_entries")
-          .select("id, model_handle, status, entry_date")
-          .eq("lg_user_id", member.user_id)
-          .eq("entry_date", reportDate);
-        const rows = entries ?? [];
-        const actualContactados = rows.length;
-        const { count: numerosCount } = await sb
-          .from("closers_contacts").select("id", { count: "exact", head: true })
-          .eq("created_by", member.user_id)
-          .gte("created_at", `${reportDate}T00:00:00`)
-          .lte("created_at", `${reportDate}T23:59:59.999`)
-          .not("phone", "is", null);
-        const actualNumeros = numerosCount ?? 0;
-        const actualRespuestas = rows.filter((r) =>
-          ["replied", "interested", "meeting_set", "contactado"].includes(String(r.status))
-        ).length;
-        maven.contactados = actualContactados;
-        maven.numeros = actualNumeros;
-        maven.respuestas = actualRespuestas;
-        const cN = typeof input.claimed_numeros === "number" ? input.claimed_numeros : null;
-        const cC = typeof input.claimed_contactados === "number" ? input.claimed_contactados : null;
-        const cR = typeof input.claimed_respuestas === "number" ? input.claimed_respuestas : null;
-        claimed.contactados = cC;
-        claimed.numeros = cN;
-        claimed.respuestas = cR;
-        if (cN != null && cN > actualNumeros) {
-          gaps.push({
-            metric: "numeros",
-            claimed: cN, actual: actualNumeros, gap: cN - actualNumeros,
-            update_hint: "ve a *LeadGen → Agregar Contactos* y carga los teléfonos faltantes para que queden en el sistema",
-          });
-        }
-        if (cC != null && cC > actualContactados) {
-          gaps.push({
-            metric: "contactados",
-            claimed: cC, actual: actualContactados, gap: cC - actualContactados,
-            update_hint: "ve a *LeadGen → Agregar Lead* y registra los contactos faltantes",
-          });
-        }
-        // NO generamos gap por "respuestas": en la app NO hay forma de marcar
-        // que un lead respondió — la UI de LeadGen no expone control de status y
-        // 'respondio' no lo escribe ningún flujo. El hint viejo ("actualiza el
-        // status en LeadGen") mandaba al LLG a hacer algo imposible y el bot lo
-        // repetía. maven.respuestas queda solo como dato informativo, sin acción.
-      } else {
-        // CLOSER: comparar contra closer_creators stage transitions del día.
-        const dayStart = `${reportDate}T00:00:00-05:00`;
-        const dayEnd = `${reportDate}T23:59:59-05:00`;
-        const [confirmedRows, completedRows, rejectedRows] = await Promise.all([
-          sb.from("closer_creators")
-            .select("id, instagram_handle, stage")
-            .eq("assigned_to", member.user_id)
-            .gte("confirmed_date", dayStart).lte("confirmed_date", dayEnd),
-          sb.from("closer_creators")
-            .select("id, instagram_handle, stage")
-            .eq("assigned_to", member.user_id)
-            .eq("stage", "Completada")
-            .gte("completed_date", dayStart).lte("completed_date", dayEnd),
-          sb.from("closer_creators")
-            .select("id, instagram_handle, stage")
-            .eq("assigned_to", member.user_id)
-            .gte("no_interesada_date", dayStart).lte("no_interesada_date", dayEnd),
-        ]);
-        const actualConfirmadas = (confirmedRows.data ?? []).length;
-        const actualCerradas = (completedRows.data ?? []).length;
-        const actualRechazadas = (rejectedRows.data ?? []).length;
-        maven.confirmadas = actualConfirmadas;
-        maven.cerradas_completadas = actualCerradas;
-        maven.rechazadas = actualRechazadas;
-        const cConf = typeof input.claimed_confirmadas === "number" ? input.claimed_confirmadas : null;
-        const cCer = typeof input.claimed_cerradas === "number" ? input.claimed_cerradas : null;
-        claimed.confirmadas = cConf;
-        claimed.cerradas = cCer;
-        if (cConf != null && cConf > actualConfirmadas) {
-          gaps.push({
-            metric: "confirmadas",
-            claimed: cConf, actual: actualConfirmadas, gap: cConf - actualConfirmadas,
-            update_hint: "ve a *Closers → @handle* y marca la lead como *Confirmada* (registra confirmed_date)",
-          });
-        }
-        if (cCer != null && cCer > actualCerradas) {
-          gaps.push({
-            metric: "cerradas",
-            claimed: cCer, actual: actualCerradas, gap: cCer - actualCerradas,
-            update_hint: "ve a *Closers → @handle* y marca la lead como *Completada* (firmó). Eso la convierte automáticamente en creator activo",
-          });
-        }
-      }
-
-      return {
-        member: { id: member.id, user_id: member.user_id, display_name: member.display_name },
-        role_kind: roleKind,
-        report_date: reportDate,
-        maven,
-        claimed,
-        gaps,
-        matched: gaps.length === 0,
-      };
+      return await validarReporteVsMaven(sb, ctx, input);
     }
 
     case "mark_lead_stage": {
@@ -6238,6 +6126,157 @@ async function executeTool(
 // Load active persistent rules for a group. Excluye expiradas.
 // El resultado se inyecta en el system prompt del agent en cada invocación.
 // ----------------------------------------------------------------------------
+// ── VALIDACIÓN REPORTE vs MAVEN ─────────────────────────────────────────────
+// Extraída del case de la tool para poder llamarla TAMBIÉN desde
+// register_daily_report. Motivo: el prompt ordena validar en TRES lugares y el
+// modelo no lo hace. Medido en agosto: AI WARMING registró 157 reportes y validó
+// UNA vez (32 de esos registros fueron después de las 18:00, que es la condición
+// documentada). En Marketing/Ventas la cadena ni siquiera arranca: los closers
+// reportan a diario en el chat y register_daily_report se llamó 2 veces en el mes.
+//
+// Misma lección que la guarda del ack fantasma: si algo importa, no puede depender
+// de que el modelo se acuerde de llamar una segunda tool. Acá el resultado viaja
+// DENTRO del resultado de la primera.
+async function validarReporteVsMaven(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  ctx: { groupId: string; tenantId: string },
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const displayName = String(input.display_name ?? "").trim();
+  if (!displayName) return { error: "missing_display_name" };
+  const roleKind = String(input.role_kind ?? "llg").toLowerCase();
+  // Fecha objetivo: report_date input o hoy en Bogotá.
+  const reportDate = String(input.report_date ?? "").trim()
+    || new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+  // Resolver user_id via helper (busca en wpp + full_name).
+  const members = await resolveMembersByName(sb, ctx.groupId, displayName, 3);
+  const member = members.find((m) => m.user_id);
+  if (!member?.user_id) {
+    return {
+      error: "user_not_linked",
+      display_name: displayName,
+      hint: "Este miembro no está vinculado a un user de Maven. Pedile que verifique su número en Settings.",
+    };
+  }
+
+  const gaps: Array<{
+    metric: string;
+    claimed: number;
+    actual: number;
+    gap: number;
+    update_hint: string;
+  }> = [];
+  const maven: Record<string, number> = {};
+  const claimed: Record<string, number | null> = {};
+
+  if (roleKind === "llg") {
+    // LLG: leads cargados y respuestas salen de leadgen_entries. PERO los
+    // "números" se cargan en closers_contacts.phone (*Agregar Contactos*),
+    // NO en leadgen_entries.phone_e164 (columna muerta → antes daba 0 y el
+    // bot le decía al LLG que su número no estaba). Contamos números aparte
+    // contra closers_contacts del LLG en la fecha del reporte.
+    const { data: entries } = await sb
+      .from("leadgen_entries")
+      .select("id, model_handle, status, entry_date")
+      .eq("lg_user_id", member.user_id)
+      .eq("entry_date", reportDate);
+    const rows = entries ?? [];
+    const actualContactados = rows.length;
+    const { count: numerosCount } = await sb
+      .from("closers_contacts").select("id", { count: "exact", head: true })
+      .eq("created_by", member.user_id)
+      .gte("created_at", `${reportDate}T00:00:00`)
+      .lte("created_at", `${reportDate}T23:59:59.999`)
+      .not("phone", "is", null);
+    const actualNumeros = numerosCount ?? 0;
+    const actualRespuestas = rows.filter((r: { status?: unknown }) =>
+      ["replied", "interested", "meeting_set", "contactado"].includes(String(r.status))
+    ).length;
+    maven.contactados = actualContactados;
+    maven.numeros = actualNumeros;
+    maven.respuestas = actualRespuestas;
+    const cN = typeof input.claimed_numeros === "number" ? input.claimed_numeros : null;
+    const cC = typeof input.claimed_contactados === "number" ? input.claimed_contactados : null;
+    const cR = typeof input.claimed_respuestas === "number" ? input.claimed_respuestas : null;
+    claimed.contactados = cC;
+    claimed.numeros = cN;
+    claimed.respuestas = cR;
+    if (cN != null && cN > actualNumeros) {
+      gaps.push({
+        metric: "numeros",
+        claimed: cN, actual: actualNumeros, gap: cN - actualNumeros,
+        update_hint: "ve a *LeadGen → Agregar Contactos* y carga los teléfonos faltantes para que queden en el sistema",
+      });
+    }
+    if (cC != null && cC > actualContactados) {
+      gaps.push({
+        metric: "contactados",
+        claimed: cC, actual: actualContactados, gap: cC - actualContactados,
+        update_hint: "ve a *LeadGen → Agregar Lead* y registra los contactos faltantes",
+      });
+    }
+    // NO generamos gap por "respuestas": en la app NO hay forma de marcar
+    // que un lead respondió — la UI de LeadGen no expone control de status y
+    // 'respondio' no lo escribe ningún flujo. El hint viejo ("actualiza el
+    // status en LeadGen") mandaba al LLG a hacer algo imposible y el bot lo
+    // repetía. maven.respuestas queda solo como dato informativo, sin acción.
+  } else {
+    // CLOSER: comparar contra closer_creators stage transitions del día.
+    const dayStart = `${reportDate}T00:00:00-05:00`;
+    const dayEnd = `${reportDate}T23:59:59-05:00`;
+    const [confirmedRows, completedRows, rejectedRows] = await Promise.all([
+      sb.from("closer_creators")
+        .select("id, instagram_handle, stage")
+        .eq("assigned_to", member.user_id)
+        .gte("confirmed_date", dayStart).lte("confirmed_date", dayEnd),
+      sb.from("closer_creators")
+        .select("id, instagram_handle, stage")
+        .eq("assigned_to", member.user_id)
+        .eq("stage", "Completada")
+        .gte("completed_date", dayStart).lte("completed_date", dayEnd),
+      sb.from("closer_creators")
+        .select("id, instagram_handle, stage")
+        .eq("assigned_to", member.user_id)
+        .gte("no_interesada_date", dayStart).lte("no_interesada_date", dayEnd),
+    ]);
+    const actualConfirmadas = (confirmedRows.data ?? []).length;
+    const actualCerradas = (completedRows.data ?? []).length;
+    const actualRechazadas = (rejectedRows.data ?? []).length;
+    maven.confirmadas = actualConfirmadas;
+    maven.cerradas_completadas = actualCerradas;
+    maven.rechazadas = actualRechazadas;
+    const cConf = typeof input.claimed_confirmadas === "number" ? input.claimed_confirmadas : null;
+    const cCer = typeof input.claimed_cerradas === "number" ? input.claimed_cerradas : null;
+    claimed.confirmadas = cConf;
+    claimed.cerradas = cCer;
+    if (cConf != null && cConf > actualConfirmadas) {
+      gaps.push({
+        metric: "confirmadas",
+        claimed: cConf, actual: actualConfirmadas, gap: cConf - actualConfirmadas,
+        update_hint: "ve a *Closers → @handle* y marca la lead como *Confirmada* (registra confirmed_date)",
+      });
+    }
+    if (cCer != null && cCer > actualCerradas) {
+      gaps.push({
+        metric: "cerradas",
+        claimed: cCer, actual: actualCerradas, gap: cCer - actualCerradas,
+        update_hint: "ve a *Closers → @handle* y marca la lead como *Completada* (firmó). Eso la convierte automáticamente en creator activo",
+      });
+    }
+  }
+
+  return {
+    member: { id: member.id, user_id: member.user_id, display_name: member.display_name },
+    role_kind: roleKind,
+    report_date: reportDate,
+    maven,
+    claimed,
+    gaps,
+    matched: gaps.length === 0,
+  };
+}
+
 async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rule_text: string }>> {
   const sb = adminClient();
   const nowIso = new Date().toISOString();
