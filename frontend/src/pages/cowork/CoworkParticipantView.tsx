@@ -133,8 +133,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // La config de la llamada se arma UNA vez por sala. Los callbacks se leen por
   // ref: si fueran dependencias, cualquier cambio de estado del componente
   // reiniciaría la videollamada.
-  const cbRef = useRef({ getToken, handleMediaStateChange, handleFaceStateChange, handleLeaveRoom });
-  cbRef.current = { getToken, handleMediaStateChange, handleFaceStateChange, handleLeaveRoom };
 
   // El encuadre lo calcula LiveKitCallView sobre el video local y lo reporta acá;
   // nosotros solo lo republicamos por presence para que lo vea el coordinador.
