@@ -484,6 +484,62 @@ Deno.serve(async (req) => {
       );
     }
 
+    // === MIGRATE EMAIL (cambiar dominio del login + provisionar buzón) ===
+    // Pasa una cuenta de, ej., @unlok.me a @maven-ai.me SIN borrar/recrear: mantiene
+    // el MISMO user_id → todo lo linkeado por id queda intacto. Y si se conserva el
+    // LOCAL (juan.perez@unlok.me → juan.perez@maven-ai.me), la `chatter_identity`
+    // (indexada por email_local) y sus vínculos de Hubstaff/BLU se preservan. Además
+    // provisiona el buzón Zoho en la nueva dirección. `email` = la NUEVA dirección.
+    if (action === "migrate_email") {
+      const gMig = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+      if (!gMig.ok) {
+        return new Response(JSON.stringify(gMig.body), {
+          status: gMig.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+      const nuevo = (email as string | undefined)?.trim().toLowerCase();
+      if (!nuevo) {
+        return new Response(JSON.stringify({ error: "email (la nueva dirección) es requerido" }), {
+          status: 400,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      // Nombre para el display de la casilla.
+      const { data: prof } = await adminClient
+        .from("profiles").select("full_name").eq("id", user_id).maybeSingle();
+      const partes = String((prof as { full_name?: string } | null)?.full_name || "Usuario Maven")
+        .trim().split(/\s+/);
+      const first = partes[0] || "Usuario";
+      const last = partes.slice(1).join(" ") || "Maven";
+
+      // 1) Cambiar el email de LOGIN (gotrue). email_confirm:true → sin mail de verificación.
+      const { error: mailErr } = await adminClient.auth.admin.updateUserById(user_id as string, {
+        email: nuevo,
+        email_confirm: true,
+      });
+      if (mailErr) {
+        return new Response(JSON.stringify({ error: `no pude cambiar el email de login: ${mailErr.message}` }), {
+          status: 400,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      // 2) Provisionar el buzón Zoho en la nueva dirección (crea + guarda credencial cifrada).
+      const mailboxResult = await provisionMailbox({
+        adminClient,
+        userId: user_id as string,
+        email: nuevo,
+        firstName: first,
+        lastName: last,
+      });
+
+      return new Response(JSON.stringify({ success: true, email: nuevo, mailbox: mailboxResult }), {
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
     // Prevent self-destructive actions
     if (action === "delete_user" && user_id === callerId) {
       return new Response(JSON.stringify({ error: "No puedes eliminarte a ti mismo" }), {
