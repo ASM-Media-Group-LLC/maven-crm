@@ -4,6 +4,10 @@ import { useCoworkSession } from "@/hooks/useCoworkSession";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import CoworkCreateDialog from "./CoworkCreateDialog";
 import CoworkLobby from "./CoworkLobby";
 import CoworkHostDashboard from "./CoworkHostDashboard";
@@ -60,14 +64,27 @@ export default function CoworkPage() {
     return () => { alive = false; };
   }, [sessionId, cowork.listMyActiveSessions]);
 
-  const handleEndFromList = async (sid: string) => {
-    if (!window.confirm("¿Finalizar esta sesión para todos los participantes?")) return;
+  // Finalizar saca a TODOS de sus salas y no se puede deshacer, asi que se
+  // confirma nombrando la sesion y cuanta gente hay adentro: "¿finalizar esta
+  // sesion?" no dice que del otro lado hay veintitres personas trabajando.
+  //
+  // Con AlertDialog y no window.confirm: el nativo congela la pestaña mientras
+  // esta abierto — con una llamada de LiveKit corriendo detras, eso se nota.
+  const [porFinalizar, setPorFinalizar] = useState<{ id: string; name: string; members: number } | null>(null);
+  const [finalizando, setFinalizando] = useState(false);
+
+  const confirmarFinalizar = async () => {
+    if (!porFinalizar) return;
+    setFinalizando(true);
     try {
-      await cowork.endSessionById(sid);
-      setMySessions((prev) => prev.filter((s) => s.id !== sid));
+      await cowork.endSessionById(porFinalizar.id);
+      setMySessions((prev) => prev.filter((s) => s.id !== porFinalizar.id));
       toast.success("Sesión finalizada");
+      setPorFinalizar(null);
     } catch {
       toast.error("No se pudo finalizar la sesión");
+    } finally {
+      setFinalizando(false);
     }
   };
 
@@ -153,7 +170,7 @@ export default function CoworkPage() {
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive rounded-full"
-                    onClick={() => handleEndFromList(s.id)}
+                    onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
                   >
                     Finalizar
                   </Button>
@@ -312,5 +329,29 @@ function CoworkSessionEndedRedirect() {
         </Button>
       </div>
     </div>
+
+      <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Finalizar «{porFinalizar?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {porFinalizar && porFinalizar.members > 0
+                ? `Se cierra para las ${porFinalizar.members} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
+                : "Se cierra la sesión para todos los participantes."}
+              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={finalizando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={finalizando}
+              onClick={(e) => { e.preventDefault(); void confirmarFinalizar(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {finalizando ? "Finalizando…" : "Finalizar sesión"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
   );
 }

@@ -271,36 +271,22 @@ export function useCoworkSession(sessionId: string | null) {
   // Puro cliente: el RLS `is_cowork_member` permite leer las propias membresías y sus
   // sesiones. El conteo de miembros es exacto (los miembros ven toda la membresía de su
   // sesión); NO devolvemos conteo de salas porque un participante solo ve su sala por RLS.
+  // Un solo viaje de red. Antes eran seis encadenados —getUser, mis membresías,
+  // las sesiones, todas las membresías para contar, y mis asignaciones— y cada
+  // uno esperaba al anterior. En la base cada consulta tarda ~2 ms: lo que se
+  // sentía era la ida y vuelta, no el trabajo. El RPC es SECURITY INVOKER, así
+  // que sigue respetando las RLS de cada tabla.
   const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null }>> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-    const { data: mems } = await supabase.from("cowork_memberships").select("session_id, role").eq("user_id", user.id);
-    const roleBy = new Map<string, string>();
-    (mems as Array<{ session_id: string; role: string }> | null)?.forEach((m) => roleBy.set(m.session_id, m.role));
-    const ids = [...roleBy.keys()];
-    if (!ids.length) return [];
-    const { data: sess } = await supabase.from("cowork_sessions")
-      .select("id, name, description, created_at")
-      .in("id", ids).eq("status", "active").order("created_at", { ascending: false });
-    if (!sess?.length) return [];
-    const sessIds = (sess as Array<{ id: string }>).map((s) => s.id);
-    const { data: allMems } = await supabase.from("cowork_memberships").select("session_id").in("session_id", sessIds);
-    const memCount = new Map<string, number>();
-    (allMems as Array<{ session_id: string }> | null)?.forEach((m) => memCount.set(m.session_id, (memCount.get(m.session_id) || 0) + 1));
-
-    // Última sala del usuario por sesión (activa o no) para que "Volver" retome la
-    // sala en vez de dejarlo sin asignación esperando a nadie. Ordenado ASC y
-    // sobreescribiendo, así queda la más reciente por sesión.
-    const { data: myAssigns } = await supabase.from("cowork_room_assignments")
-      .select("session_id, room_id, assigned_at")
-      .eq("user_id", user.id).in("session_id", sessIds)
-      .order("assigned_at", { ascending: true });
-    const lastRoom = new Map<string, string>();
-    (myAssigns as Array<{ session_id: string; room_id: string }> | null)?.forEach((a) => lastRoom.set(a.session_id, a.room_id));
-
-    return (sess as Array<{ id: string; name: string; description: string | null; created_at: string }>).map((s) => ({
-      ...s, role: roleBy.get(s.id) || "participant", members: memCount.get(s.id) || 1,
-      lastRoomId: lastRoom.get(s.id) ?? null,
+    const { data, error } = await supabase.rpc("cowork_mis_sesiones_activas");
+    if (error) throw error;
+    return (data ?? []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      role: s.role,
+      members: s.members ?? 0,
+      created_at: s.created_at,
+      lastRoomId: s.last_room_id ?? null,
     }));
   }, []);
 
