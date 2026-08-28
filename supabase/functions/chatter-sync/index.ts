@@ -200,15 +200,22 @@ serve(async (req: Request) => {
     // antes de construir encima. No escribe nada.
     if (action === "probe") {
       const data = await blu("employee-reports", {
-        startDate: elDia, endDate: elDia,
+        startDate: body.startDate ?? elDia,
+        endDate: body.endDate ?? elDia,
         creatorIds: body.creatorIds ?? [],
       });
       const emps: any[] = data?.employees ?? [];
+      const activo = emps.find((e) => (e?.metrics?.totalSales ?? 0) > 0);
       return json(req, {
-        ok: true, dia: elDia, total: emps.length,
+        ok: true, rango: [body.startDate ?? elDia, body.endDate ?? elDia],
+        total: emps.length,
+        // Crudo, para ver si el rango viene desglosado por dia o agregado.
+        clavesTop: activo ? Object.keys(activo) : [],
+        ejemplo: activo ? { name: activo.name, metrics: activo.metrics, otros: Object.fromEntries(
+          Object.entries(activo).filter(([k]) => !["name","metrics","deltas","email","avatar","roles"].includes(k))) } : null,
         activos: emps
-          .filter((e) => (e?.metrics?.totalSales ?? 0) > 0 || (e?.metrics?.fansChatted ?? 0) > 0)
-          .map((e) => [e.name, e.metrics?.totalSales ?? 0, e.metrics?.creatorsCount ?? 0, e.metrics?.fansChatted ?? 0]),
+          .filter((e) => (e?.metrics?.totalSales ?? 0) > 0)
+          .map((e) => [e.name, e.metrics?.totalSales ?? 0]),
       });
     }
 
@@ -282,6 +289,64 @@ serve(async (req: Request) => {
       return json(req, {
         ok: true, dia: elDia, modelos: modelIds.length,
         cubiertos: cobertura.length, fallidos, filas: filas.length, sinIdentidad,
+      });
+    }
+
+    // ── VENTANA LARGA POR MODELO ──────────────────────────────────────────
+    // Una consulta por modelo con un RANGO de fechas. BLU devuelve el total
+    // agregado de cada chatter en esa modelo durante la ventana. Es lo que hace
+    // falta para la vara, y baja el costo de ~990 consultas (33 modelos x 30
+    // dias) a 33.
+    if (action === "model-window") {
+      const modelIds: number[] = Array.isArray(body.modelIds)
+        ? body.modelIds.map(Number).filter(Number.isFinite) : [];
+      const desde = String(body.startDate ?? "");
+      const hasta = String(body.endDate ?? "");
+      if (!modelIds.length) return json(req, { error: "modelIds requerido" }, 400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+        return json(req, { error: "startDate y endDate requeridos (YYYY-MM-DD)" }, 400);
+      }
+
+      const { data: links } = await admin.from("chatter_identity_link")
+        .select("identity_id, external_id").eq("source", "blu").is("valid_to", null);
+      const porBluId = new Map<string, string>();
+      for (const l of links ?? []) porBluId.set(String(l.external_id), l.identity_id);
+
+      const filas: any[] = [];
+      const fallidos: number[] = [];
+      let sinIdentidad = 0;
+
+      for (const modelId of modelIds) {
+        let emps: any[];
+        try {
+          const data = await blu("employee-reports", {
+            startDate: desde, endDate: hasta, creatorIds: [modelId],
+          });
+          emps = data?.employees ?? [];
+        } catch { fallidos.push(modelId); continue; }
+
+        for (const e of emps) {
+          const m = e?.metrics ?? {};
+          const ventas = Number(m.totalSales) || 0;
+          const fans = Number(m.fansChatted) || 0;
+          if (ventas === 0 && fans === 0) continue;
+          const idn = porBluId.get(String(e.id));
+          if (!idn) { sinIdentidad++; continue; }
+          filas.push({
+            ventana_desde: desde, ventana_hasta: hasta,
+            identity_id: idn, blu_model_id: modelId,
+            sales: ventas, fans_chatted: fans,
+          });
+        }
+      }
+
+      if (filas.length) {
+        await admin.from("chatter_model_window")
+          .upsert(filas, { onConflict: "ventana_desde,ventana_hasta,identity_id,blu_model_id" });
+      }
+      return json(req, {
+        ok: true, ventana: [desde, hasta], modelos: modelIds.length,
+        fallidos, filas: filas.length, sinIdentidad,
       });
     }
 
