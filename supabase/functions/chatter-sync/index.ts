@@ -38,6 +38,9 @@ async function blu(action: string, extra: Record<string, unknown> = {}): Promise
 // En BLU una misma persona se registra en Massive y en Plus con un solo correo
 // usando `nombre+1@...`: sin quitar ese sufijo quedaria como dos personas y su
 // dia se partiria en dos notas, ninguna de las cuales lo describe.
+/** Dominio destino de la migracion de correos del equipo. */
+const DOMINIO_NUEVO = "maven-ai.me";
+
 const localPart = (email: string | null | undefined): string | null => {
   const e = String(email ?? "").trim().toLowerCase();
   const i = e.indexOf("@");
@@ -96,12 +99,16 @@ serve(async (req: Request) => {
       const { data: usuarios } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const porEmail = new Map<string, string>();
       const porLocal = new Map<string, string>();
+      // Cuentas que ya estan en el dominio destino, indexadas por parte local.
+      const porLocalNuevo = new Map<string, string>();
       for (const u of usuarios?.users ?? []) {
         const e = (u.email ?? "").toLowerCase();
         if (!e) continue;
         porEmail.set(e, u.id);
         const lp = localPart(e);
-        if (lp && !porLocal.has(lp)) porLocal.set(lp, u.id);
+        if (!lp) continue;
+        if (!porLocal.has(lp)) porLocal.set(lp, u.id);
+        if (e.endsWith("@" + DOMINIO_NUEVO)) porLocalNuevo.set(lp, u.id);
       }
 
       let creadas = 0, revinculadas = 0, sinCuenta = 0;
@@ -112,8 +119,16 @@ serve(async (req: Request) => {
         const bluId = String(e.id);
         const email = (e.email ?? "").toLowerCase().trim() || null;
         const lp = localPart(email);
-        const mavenId = (email && porEmail.get(email)) || (lp && porLocal.get(lp)) || null;
-        const matchedBy = email && porEmail.get(email) ? "email" : (mavenId ? "email_local" : null);
+        // La cuenta del DOMINIO NUEVO gana incluso sobre el correo exacto.
+        // Durante la migracion hay gente con las dos cuentas en Maven, y BLU
+        // todavia trae la vieja: engancharse al correo exacto ata la identidad
+        // a la cuenta que van a borrar, y el dia que desaparece queda huerfana
+        // y la persona se cae del dashboard (paso con Manuela Zapata).
+        const nueva = lp ? porLocalNuevo.get(lp) : null;
+        const mavenId = nueva || (email && porEmail.get(email)) || (lp && porLocal.get(lp)) || null;
+        const matchedBy = nueva
+          ? "email_local"
+          : (email && porEmail.get(email) ? "email" : (mavenId ? "email_local" : null));
 
         // ¿Ya conocemos esta cuenta de BLU?
         const { data: link } = await admin.from("chatter_identity_link")
