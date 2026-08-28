@@ -14,7 +14,8 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const cors = (req: Request) => corsFor(req);
+const cors = (req: Request) =>
+  corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 const json = (req: Request, b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 
@@ -49,14 +50,20 @@ serve(async (req: Request) => {
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // La función corre con service_role y escribe identidades y notas del equipo:
-    // sin este control, con verify_jwt=false la podría disparar cualquiera.
-    // Se acepta el service_role (para el cron) o un JWT de supervisor o superior.
+    // La función corre con service_role y escribe identidades y notas de todo el
+    // equipo: sin este control, con verify_jwt=false la podría disparar
+    // cualquiera con la URL. Dos puertas, como el resto del proyecto:
+    //   · el cron entra con X-Cron-Token (así no viaja una llave de service_role)
+    //   · una persona entra con su JWT, y tiene que ser supervisor o superior
+    const cronToken = req.headers.get("x-cron-token");
+    const cronEsperado = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+    const esCron = !!cronToken && !!cronEsperado && cronToken === cronEsperado;
+
     const auth = req.headers.get("Authorization") ?? "";
     const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!bearer) return json(req, { error: "Unauthorized" }, 401);
+    if (!esCron && !bearer) return json(req, { error: "Unauthorized" }, 401);
 
-    if (bearer !== SERVICE_KEY) {
+    if (!esCron && bearer !== SERVICE_KEY) {
       const asUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: auth } },
       });

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useAutoGrowTextarea, MAX_TEXTAREA_PX } from "@/hooks/useAutoGrowTextarea";
 import { X, Send } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LKChatMessage } from "@/hooks/useLiveKit";
@@ -13,6 +14,10 @@ interface CallChatSidebarProps {
 export default function CallChatSidebar({ messages, onSend, onClose, localIdentity }: CallChatSidebarProps) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Mismo auto-grow que Messenger: el cajón crece con el texto en vez de dejar
+  // el mensaje corriendo en una sola línea invisible.
+  useAutoGrowTextarea(inputRef, input, MAX_TEXTAREA_PX);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -22,6 +27,14 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
     if (!input.trim()) return;
     onSend(input.trim());
     setInput("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Enter envía, Shift+Enter hace renglón — igual que Messenger.
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   return (
@@ -50,7 +63,7 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
                   <span className="text-[10px] text-muted-foreground mb-0.5">{msg.senderName}</span>
                 )}
                 <div
-                  className={`rounded-2xl px-3 py-1.5 max-w-[85%] text-sm ${
+                  className={`rounded-2xl px-3 py-1.5 max-w-[85%] text-sm whitespace-pre-wrap break-words ${
                     isMe
                       ? "bg-primary text-white rounded-br-md"
                       : "bg-secondary text-foreground rounded-bl-md"
@@ -70,13 +83,15 @@ export default function CallChatSidebar({ messages, onSend, onClose, localIdenti
 
       {/* Input */}
       <div className="p-3 border-t border-secondary">
-        <div className="flex gap-2">
-          <input
+        <div className="flex gap-2 items-end">
+          <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={handleKeyDown}
+            rows={1}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-card border border-border rounded-full px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="flex-1 min-h-[36px] max-h-[160px] resize-none overflow-y-auto bg-card border border-border rounded-2xl px-3.5 py-2 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             onClick={handleSend}

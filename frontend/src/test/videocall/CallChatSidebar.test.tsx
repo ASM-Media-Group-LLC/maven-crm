@@ -78,6 +78,38 @@ describe("CallChatSidebar", () => {
     expect(input.value).toBe("");
   });
 
+  it("Shift+Enter hace un renglon en vez de enviar", () => {
+    render(<CallChatSidebar {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Escribe un mensaje...");
+    fireEvent.change(input, { target: { value: "primera linea" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    expect(mockOnSend).not.toHaveBeenCalled();
+  });
+
+  it("el cajon crece con el texto en vez de dejarlo en una linea", () => {
+    render(<CallChatSidebar {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Escribe un mensaje...") as HTMLTextAreaElement;
+    // Es un <textarea>, no un <input>: un <input> no puede crecer, y era la causa
+    // de que un mensaje largo corriera fuera de vista.
+    expect(input.tagName).toBe("TEXTAREA");
+
+    // jsdom no hace layout, asi que scrollHeight es siempre 0 y no se puede medir
+    // el alto real. Lo que si se puede verificar es que el auto-grow LO ESCRIBE:
+    // sin el hook, el style.height queda vacio.
+    fireEvent.change(input, { target: { value: "linea\n".repeat(8) } });
+    expect(input.style.height).not.toBe("");
+  });
+
+  it("respeta los saltos de linea de los mensajes recibidos", () => {
+    const messages = [
+      { id: "1", sender: "otro", senderName: "Otro", content: "uno\ndos", timestamp: Date.now() },
+    ];
+    render(<CallChatSidebar {...defaultProps} messages={messages} />);
+    const burbuja = screen.getByText((_, el) => el?.textContent === "uno\ndos" && el.className.includes("rounded-2xl"));
+    expect(burbuja.className).toContain("whitespace-pre-wrap");
+    expect(burbuja.className).toContain("break-words");
+  });
+
   it("disables send button when input is empty", () => {
     render(<CallChatSidebar {...defaultProps} />);
     const sendBtn = screen.getAllByRole("button").find(b => b.querySelector("svg"));
