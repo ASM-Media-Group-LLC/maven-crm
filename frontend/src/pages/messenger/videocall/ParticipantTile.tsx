@@ -1,8 +1,12 @@
-import { useEffect, useRef, memo, useCallback } from "react";
+import { useEffect, useRef, memo, useCallback, useState } from "react";
 import { Track, Room } from "livekit-client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX, ZoomIn, ZoomOut, Minimize2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 import { useVideoZoom } from "./useVideoZoom";
@@ -99,6 +103,7 @@ const ParticipantTile = memo(function ParticipantTile({
   // Zoom estilo Google Meet: solo sobre pantallas compartidas, que es donde hay
   // texto que leer. Sobre una cámara no aporta.
   const zoom = useVideoZoom(participant.isScreenSharing);
+  const [confirmarSilencio, setConfirmarSilencio] = useState(false);
 
   // ── Robust audio attachment helper ─────────────────────────────
   const attachAudioTrack = useCallback(() => {
@@ -366,15 +371,6 @@ const ParticipantTile = memo(function ParticipantTile({
               {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
             </button>
           )}
-          {!participant.isLocal && onMuteParticipant && !participant.isMuted && (
-            <button
-              onClick={() => onMuteParticipant(participant.identity)}
-              className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
-              title="Silenciar"
-            >
-              <MicOff className="h-4 w-4" />
-            </button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -391,10 +387,14 @@ const ParticipantTile = memo(function ParticipantTile({
                   {isPinned ? "Desanclar" : "Anclar en pantalla"}
                 </DropdownMenuItem>
               )}
-              {/* Silenciar: cualquiera en la llamada, como en Google. */}
+              {/* Silenciar a otro: cualquiera en la llamada, como en Google.
+                  PIDE CONFIRMACION y dice "para todos" a proposito. Antes era un
+                  boton de un click pegado al de anclar, y en un empalme alguien
+                  lo apretaba creyendo que se silenciaba a si mismo — dejaba al
+                  otro mudo para toda la sala sin que ninguno entendiera por que. */}
               {!participant.isLocal && onMuteParticipant && !participant.isMuted && (
-                <DropdownMenuItem onClick={() => onMuteParticipant(participant.identity)} className="text-foreground focus:bg-muted">
-                  <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
+                <DropdownMenuItem onClick={() => setConfirmarSilencio(true)} className="text-foreground focus:bg-muted">
+                  <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar para todos
                 </DropdownMenuItem>
               )}
               {isAdmin && !participant.isLocal && onRemoveParticipant && (
@@ -406,6 +406,27 @@ const ParticipantTile = memo(function ParticipantTile({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Silenciar a otro es irreversible desde acá: solo esa persona puede
+          volver a prender su micro. Por eso se confirma y se dice quién es. */}
+      <AlertDialog open={confirmarSilencio} onOpenChange={setConfirmarSilencio}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Silenciar a {participant.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deja de escucharse para toda la sala, no solo para vos. Se le avisa que lo
+              silenciaron y puede volver a activar su micrófono cuando quiera — vos no podés
+              hacerlo por él.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => onMuteParticipant?.(participant.identity)}>
+              Silenciar para todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Reactions */}
       {participant.reactions.length > 0 && (

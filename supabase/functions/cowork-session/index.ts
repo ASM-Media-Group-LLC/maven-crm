@@ -634,13 +634,13 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     if (action === "updateSession") {
       const { sessionId, name } = body;
-      if (!sessionId) return err("sessionId required");
+      if (!sessionId) return err(req, "sessionId required");
       const clean = String(name ?? "").trim();
-      if (!clean) return err("Escribe un nombre para la sesión");
+      if (!clean) return err(req, "Escribe un nombre para la sesión");
 
       const { data: hostCheck } = await admin.from("cowork_memberships")
         .select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const { data: updated, error: upErr } = await admin.from("cowork_sessions")
         .update({ name: clean.slice(0, 80), updated_at: new Date().toISOString() })
@@ -648,7 +648,7 @@ serve(async (req) => {
         .select("id, name")
         .single();
       if (upErr) return err(upErr.message, 500);
-      return json({ session: updated });
+      return json(req, { session: updated });
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -10,6 +10,7 @@ import {
   RoomOptions,
 } from "livekit-client";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
@@ -998,6 +999,17 @@ export function useLiveKit() {
         debouncedRefresh();
       });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
+      // Alguien mas me silencio: avisarlo. El micro se puede volver a prender
+      // cuando uno quiera — el silencio de LiveKit no lo deja bloqueado.
+      room.on(RoomEvent.TrackMuted, (pub: any, participant: any) => {
+        if (!participant?.isLocal) return;
+        if (pub?.source !== Track.Source.Microphone) return;
+        if (Date.now() - meSilencieYoRef.current < 1500) return; // fui yo
+        toast.info("Alguien silenció tu micrófono", {
+          description: "Podés volver a activarlo cuando quieras.",
+          duration: 8000,
+        });
+      });
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         debouncedRefresh();
@@ -1225,11 +1237,18 @@ export function useLiveKit() {
   }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
   // ── Mic toggle ────────────────────────────────────────────────
+  // Cuando el silencio lo pide otra persona, LiveKit lo aplica en el servidor y
+  // acá llega el mismo evento que cuando uno se mutea solo. Se marca el momento
+  // del muteo propio para poder distinguirlos: sin eso, a quien lo silencian se
+  // le corta el micro sin ninguna explicacion y sigue hablando al vacio.
+  const meSilencieYoRef = useRef(0);
+
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
     try {
       const shouldEnable = !room.localParticipant.isMicrophoneEnabled;
+      if (!shouldEnable) meSilencieYoRef.current = Date.now();
       await room.localParticipant.setMicrophoneEnabled(
         shouldEnable,
         shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
