@@ -48,6 +48,26 @@ serve(async (req: Request) => {
 
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // La función corre con service_role y escribe identidades y notas del equipo:
+    // sin este control, con verify_jwt=false la podría disparar cualquiera.
+    // Se acepta el service_role (para el cron) o un JWT de supervisor o superior.
+    const auth = req.headers.get("Authorization") ?? "";
+    const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!bearer) return json(req, { error: "Unauthorized" }, 401);
+
+    if (bearer !== SERVICE_KEY) {
+      const asUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: auth } },
+      });
+      const { data: u } = await asUser.auth.getUser();
+      if (!u?.user) return json(req, { error: "Unauthorized" }, 401);
+      const { data: puede } = await admin.rpc("is_in_role_group", {
+        _user_id: u.user.id, _group: "supervisor_or_above",
+      });
+      if (!puede) return json(req, { error: "Solo supervisores pueden sincronizar" }, 403);
+    }
+
     const { action = "all", dia } = await req.json().catch(() => ({}));
     const elDia: string = dia || hoyBogota();
     const resultado: Record<string, unknown> = { dia: elDia };
