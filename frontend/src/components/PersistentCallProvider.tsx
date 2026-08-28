@@ -60,7 +60,14 @@ export function CallOutlet({ className }: { className?: string }) {
 
 const POS_KEY = "maven.call.float.pos";
 
+import { useCoworkRequestAlerts } from "@/hooks/useCoworkRequestAlerts";
+
 export function PersistentCallProvider({ children }: { children: React.ReactNode }) {
+  // Las manos levantadas de Cowork suenan desde acá y no desde la pagina del
+  // coordinador: si vivieran ahi, navegar a otra seccion lo dejaria sordo justo
+  // cuando alguien esta pidiendo ayuda.
+  useCoworkRequestAlerts();
+
   const [config, setConfig] = useState<CallConfig | null>(null);
   const [outlet, setOutlet] = useState<HTMLElement | null>(null);
   const [minimizada, setMinimizada] = useState(false);

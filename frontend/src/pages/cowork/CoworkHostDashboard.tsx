@@ -15,8 +15,6 @@ import {
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
-import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
-import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { formatBreak } from "./CoworkParticipantView";
 import { usePipWindow } from "./usePipWindow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -41,7 +39,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
   const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
-  const { notify } = useBrowserNotifications();
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
@@ -396,38 +393,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     return () => window.clearInterval(id);
   }, []);
 
-  // Aviso sonoro cuando alguien levanta la mano. Guardamos los ids ya vistos para
-  // que suene UNA vez por solicitud: el hook refetchea con cada evento de realtime
-  // y sin esto sonaría en cada refresco. La primera carga tampoco suena (si no,
-  // abrir el dashboard con solicitudes viejas dispararía una ráfaga).
-  const seenRequestIds = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const openIds = cowork.hostRequests.filter((r) => r.status === "open").map((r) => r.id);
-    if (seenRequestIds.current === null) {
-      seenRequestIds.current = new Set(openIds);
-      return;
-    }
-    const nuevas = openIds.filter((id) => !seenRequestIds.current!.has(id));
-    seenRequestIds.current = new Set(openIds);
-    if (!nuevas.length) return;
-
-    playCoordinatorRequestSound();
-
-    // Con el dashboard abierto pero la PESTAÑA de fondo (mirando otra cosa en el
-    // navegador), el sonido suena y no se ve nada. El globito del sistema avisa
-    // quién pidió y de qué sala, y al tocarlo trae la pestaña al frente.
-    if (document.hidden) {
-      const req = cowork.hostRequests.find((r) => r.id === nuevas[0]);
-      const quien = req ? (cowork.profiles[req.user_id] || "Alguien") : "Alguien";
-      const sala = cowork.rooms.find((r) => r.id === req?.room_id)?.name;
-      notify(
-        nuevas.length > 1 ? `${nuevas.length} personas piden coordinador` : `${quien} pide coordinador`,
-        sala ? `Sala ${sala}` : "Cowork",
-        () => window.focus(),
-        false, // el sonido ya lo tocamos arriba; este es el de mensajes y sería otro
-      );
-    }
-  }, [cowork.hostRequests, cowork.profiles, cowork.rooms, notify]);
+  // El aviso de manos levantadas (sonido + globito del sistema) se mudó a
+  // useCoworkRequestAlerts, montado por encima del router: acá solo sonaba
+  // mientras esta página estuviera abierta, y el coordinador que navegaba a otra
+  // sección dejaba de enterarse. Si se dejara también acá, sonaría dos veces.
 
   // Quién comparte pantalla en cada sala — VERDAD de LiveKit reportada por cada
   // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
@@ -515,6 +484,43 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           >
             <PanelLeftOpen className="h-4 w-4" />
           </Button>
+          {/* Con el panel plegado, una mano levantada quedaria invisible: el
+              unico lugar donde se listan es adentro. El contador lo trae de
+              vuelta y al tocarlo abre el panel en el que estan. */}
+          {openHostRequests.length > 0 && (
+            <button
+              onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
+              title={`${openHostRequests.length} ${openHostRequests.length === 1 ? "persona pide" : "personas piden"} coordinador`}
+              className="mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 transition-colors animate-pulse"
+            >
+              <Hand className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[10px] font-semibold text-black flex items-center justify-center">
+                {openHostRequests.length > 9 ? "9+" : openHostRequests.length}
+              </span>
+            </button>
+          )}
+          {/* Lo mismo con las pausas: si alguien se paso del limite, se ve. */}
+          {(() => {
+            const excedidas = Object.keys(mediaStates).filter((uid) => pausaDe(uid)?.excedida).length;
+            const enPausa = Object.keys(mediaStates).filter((uid) => pausaDe(uid)).length;
+            if (!enPausa) return null;
+            return (
+              <button
+                onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
+                title={excedidas ? `${excedidas} pasado(s) del límite` : `${enPausa} en pausa`}
+                className={`mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+                  excedidas ? "bg-destructive/20 text-destructive animate-pulse" : "bg-success/15 text-success hover:bg-success/25"
+                }`}
+              >
+                <Coffee className="h-4 w-4" />
+                <span className={`absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center ${
+                  excedidas ? "bg-destructive text-white" : "bg-success text-black"
+                }`}>
+                  {enPausa}
+                </span>
+              </button>
+            );
+          })()}
         </div>
       )}
 
