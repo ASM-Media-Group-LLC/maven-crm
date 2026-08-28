@@ -27,6 +27,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { hablar } from "@/lib/voz";
+import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
@@ -371,9 +373,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     }
   };
 
-  // Cuánto tiene que durar el problema de encuadre antes de mostrarlo. Sin esto,
-  // agacharse a buscar algo o tomar agua encendería la alarma.
+  // DOS UMBRALES, a propósito.
+  //
+  // Al minuto aparece la etiqueta en la tarjeta: si el coordinador está mirando,
+  // lo ve; si no, no lo interrumpe nada. Agacharse a buscar algo o tomar agua no
+  // tiene por qué sonarle a nadie.
+  //
+  // El sonido y la voz esperan a los 3 minutos, que es cuando el supervisor ya
+  // le avisó DOS VECES a la persona y no corrigió. Antes sonaba al minuto —
+  // antes incluso de que el chatter viera su primer aviso— y eso rompía justo lo
+  // que se buscaba: que un descuido se resuelva solo sin interrumpir a nadie.
   const FACE_ALERT_MS = 60_000;
+  const FACE_SONIDO_MS = AVISAR_COORDINADOR_MS;
   const faceIssue = (ms: MediaState | undefined): string | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
@@ -403,12 +414,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   useEffect(() => {
     for (const [uid, st] of Object.entries(mediaStates)) {
       const problema = faceIssue(st);
-      if (problema && !yaAvisado.current.has(uid)) {
+      const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
+      if (bastante && !yaAvisado.current.has(uid)) {
         yaAvisado.current.add(uid);
-        playCoordinatorRequestSound();
         const quien = cowork.profiles[uid] || "Alguien";
+        playCoordinatorRequestSound();
+        // Se lo dice en voz alta y CON EL NOMBRE. Es lo que la voz del propio
+        // chatter no puede darle al coordinador: saber a quién mirar sin tener
+        // que buscar cuál de las nueve salas parpadea.
+        const nombre = quien.split(" ")[0];
+        hablar(
+          problema === "Sin luz" ? `${nombre} no tiene luz suficiente.`
+          : problema === "Fuera de cuadro" ? `${nombre} está fuera de cuadro.`
+          : `${nombre} no está frente a la cámara.`,
+          { volumen: 0.85 },
+        );
         toast.warning(`${quien}: ${problema.toLowerCase()}`, {
-          description: "Lleva más de un minuto así y ya se le avisó a él.",
+          description: "Lleva más de tres minutos así y ya se le avisó dos veces.",
           duration: 8000,
         });
       } else if (!problema) {

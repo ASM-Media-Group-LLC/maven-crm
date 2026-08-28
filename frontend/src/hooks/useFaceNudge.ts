@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { playMessageNotification } from "@/lib/notificationSound";
+import { hablar } from "@/lib/voz";
 
 // Avisarle a la PROPIA PERSONA que no se le ve la cara.
 //
@@ -63,21 +64,6 @@ function siguienteFrase(estado: string, indice: { current: number }): string {
   return frase;
 }
 
-function hablar(texto: string) {
-  try {
-    const sintesis = window.speechSynthesis;
-    if (!sintesis) return;
-    // Si ya venia hablando, se corta: mejor una frase clara que dos encimadas.
-    sintesis.cancel();
-    const u = new SpeechSynthesisUtterance(texto);
-    u.lang = "es-419";
-    u.rate = 0.95;
-    u.volume = 0.9;
-    const voz = sintesis.getVoices().find((v) => v.lang?.toLowerCase().startsWith("es"));
-    if (voz) u.voice = voz;
-    sintesis.speak(u);
-  } catch { /* sin voz, queda el aviso escrito */ }
-}
 /** Tras cuánto tiempo fuera de cuadro se considera que hay que avisarle a alguien más. */
 export const AVISAR_COORDINADOR_MS = 180_000;
 
