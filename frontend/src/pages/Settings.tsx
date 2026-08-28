@@ -41,6 +41,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AuditoriaRoles from "@/pages/admin/AuditoriaRoles";
 import AdminReportes from "@/pages/admin/AdminReportes";
+import AdminApiKeys from "@/pages/admin/AdminApiKeys";
 import DesignSystem from "@/pages/DesignSystem";
 import Docs from "@/pages/Docs";
 import Roadmap from "@/pages/Roadmap";
@@ -835,6 +836,14 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             description={t("settings.reportsDesc")}
           />
         )}
+        {isAdmin && (
+          <Row
+            to="/settings?sub=api-keys"
+            icon={KeyRound}
+            title="API keys"
+            description="Acceso programático de solo-lectura (creadoras y sus redes)."
+          />
+        )}
       </CardContent>
     </Card>
   </div>
@@ -1031,6 +1040,7 @@ const SettingsRightPane = ({
     usuarios:        { title: t("settings.users"),        render: () => <AdminUsuarios /> },
     auditoria:       { title: t("settings.audit"),        render: () => <AuditoriaRoles /> },
     reportes:        { title: t("settings.reportsShort"), render: () => <AdminReportes /> },
+    "api-keys":      { title: "API keys",       render: () => <AdminApiKeys /> },
     "design-system": { title: "Design System",  render: () => <DesignSystem /> },
     docs:            { title: "Docs",           render: () => <Docs /> },
     roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
@@ -1044,6 +1054,9 @@ const SettingsRightPane = ({
     usuarios: showAdmin,
     auditoria: showAdmin,
     reportes: showAdmin,
+    // API keys: gate ESTRICTO a admin (no basta canAccess Administración). El
+    // edge tambien exige role='admin', esto solo evita mostrar la pantalla.
+    "api-keys": isAdmin,
     "design-system": true,
     docs: true,
     roadmap: true,
