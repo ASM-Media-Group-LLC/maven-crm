@@ -12,7 +12,16 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
-const BLU_WS_URL = Deno.env.get("BLU_WS_URL") ?? "wss://of.unlok.me/";
+// El dominio de BLU migró: `of.unlok.me` está MUERTO (no responde nada) y todo
+// vive en `of.blu.luxe`. El bridge se corrigió en su momento (#1208, "no era el
+// token, era el dominio") pero estas funciones quedaron con el viejo, así que
+// fallaban con "WS error" mientras el bridge andaba perfecto.
+//
+// Se ignora el valor del entorno si apunta al dominio muerto: no existe un caso
+// donde quieras usarlo, y así el arreglo no depende de acordarse de un secreto.
+const BLU_WS_DEFAULT = "wss://of.blu.luxe/";
+const BLU_WS_ENV = Deno.env.get("BLU_WS_URL");
+const BLU_WS_URL = BLU_WS_ENV && !/of\.unlok\.me/i.test(BLU_WS_ENV) ? BLU_WS_ENV : BLU_WS_DEFAULT;
 // Gemini 2.5 Flash vía OpenRouter (ruta paga, OpenAI-compatible) → sin los 503 del
 // free tier de Gemini directo, y response_format json_object fuerza JSON limpio.
 const OR_MODEL = "google/gemini-2.5-flash";
