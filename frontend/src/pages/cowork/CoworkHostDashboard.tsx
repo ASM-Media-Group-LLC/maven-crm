@@ -196,6 +196,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // que Alvaro se silencie no deja sorda a Yoselin. No se persiste a proposito —
   // al recargar se vuelve a escuchar, que es el estado seguro para coordinar.
   const [globalHear, setGlobalHear] = useState(true);
+  // Límites por tipo de pausa (tabla, no constantes). Si no cargan, no se pinta
+  // nada de rojo: mejor sin señal que marcando a alguien por un dato que falta.
+  const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
+  useEffect(() => {
+    supabase.from("cowork_break_limits").select("kind, minutos").then(({ data }) => {
+      if (data) setLimitesPausa(Object.fromEntries(data.map((l: any) => [l.kind, l.minutos])));
+    });
+  }, []);
+  // Segundos que lleva alguien en pausa, o null si no está en una.
+  const pausaDe = (uid: string) => {
+    const st = mediaStates[uid];
+    if (!st?.onBreak || !st.breakStartedAt) return null;
+    const segundos = Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000));
+    const kind = (st as any).breakKind === "break" ? "break" : "bano";
+    const limite = limitesPausa[kind];
+    return {
+      segundos, kind,
+      etiqueta: kind === "break" ? "Break" : "Baño",
+      excedida: limite != null && segundos > limite * 60,
+    };
+  };
   // Barra lateral plegada, como el menu de Maven. Se recuerda porque es una
   // preferencia de espacio en pantalla, no un estado de la operacion.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -844,6 +865,34 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           </Button>
                         </div>
                       </div>
+                      {/* Quién de esta sala está en pausa y hace cuánto. Verde
+                          mientras esté dentro del límite; rojo y parpadeando si
+                          se pasó — es lo que el coordinador tiene que ver sin
+                          leer, de un vistazo sobre la miniatura. */}
+                      {(() => {
+                        const enPausa = participants
+                          .map((p) => ({ p, pausa: pausaDe(p.user_id) }))
+                          .filter((x) => x.pausa);
+                        if (!enPausa.length) return null;
+                        return (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {enPausa.map(({ p, pausa }) => (
+                              <span
+                                key={p.user_id}
+                                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${
+                                  pausa!.excedida
+                                    ? "bg-destructive/20 text-destructive animate-pulse"
+                                    : "bg-success/15 text-success"
+                                }`}
+                                title={`${cowork.profiles[p.user_id] || "Alguien"} · ${pausa!.etiqueta}${pausa!.excedida ? " · pasado del límite" : ""}`}
+                              >
+                                <Coffee className="h-2.5 w-2.5" />
+                                {(cowork.profiles[p.user_id] || "Alguien").split(" ")[0]} {formatBreak(pausa!.segundos)}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {/* Estado de pantalla compartida de la sala, con quién comparte. */}
                       <div className="mt-1 flex items-center gap-1.5">
                         {sharers.length > 0 ? (

@@ -91,13 +91,30 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return () => window.clearInterval(id);
   }, [breakStartedAt]);
 
-  const toggleBreak = useCallback(() => {
-    const startedAt = breakStartedAt ? null : Date.now();
-    setBreakStartedAt(startedAt);
-    trackMediaState({
-      ...lastMediaRef.current, onBreak: !!startedAt, breakStartedAt: startedAt, ...faceRef.current,
-    });
-  }, [breakStartedAt, trackMediaState]);
+  const [breakKind, setBreakKind] = useState<"bano" | "break" | null>(null);
+  const [breakLimite, setBreakLimite] = useState<number | null>(null);
+
+  // La pausa la abre y la cierra el SERVIDOR: el reloj no puede ser el del
+  // navegador de quien está siendo medido. Lo que viaja por presence sigue
+  // siendo el arranque, para que el coordinador lo vea en vivo, pero el
+  // registro real y el tiempo que cuenta son los de la base.
+  const toggleBreak = useCallback(async (kind: "bano" | "break" = "bano") => {
+    const cerrando = !!breakStartedAt;
+    try {
+      const r = await cowork.setBreak?.(cerrando ? null : kind);
+      const inicio = cerrando ? null : (r?.startedAt ?? Date.now());
+      setBreakStartedAt(inicio);
+      setBreakKind(cerrando ? null : kind);
+      setBreakLimite(cerrando ? null : (r?.limiteMinutos ?? null));
+      trackMediaState({
+        ...lastMediaRef.current,
+        onBreak: !cerrando, breakStartedAt: inicio, breakKind: cerrando ? null : kind,
+        ...faceRef.current,
+      });
+    } catch (e) {
+      toast.error("No se pudo registrar la pausa", { description: (e as Error).message });
+    }
+  }, [breakStartedAt, trackMediaState, cowork]);
 
   const { startCall, endCall } = usePersistentCall();
 
@@ -455,11 +472,33 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             variant="ghost"
             size="sm"
             className={`gap-1.5 rounded-full ${breakStartedAt ? "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            onClick={toggleBreak}
+            onClick={breakStartedAt ? () => toggleBreak() : undefined}
             title={breakStartedAt ? "Avisar que volviste" : "Avisar que te ausentás un momento"}
+            asChild={!breakStartedAt}
           >
-            <Coffee className="h-4 w-4" />
-            {breakStartedAt ? `En pausa · ${formatBreak(breakElapsed)}` : "Ir al baño"}
+            {breakStartedAt ? (
+              <>
+                <Coffee className="h-4 w-4" />
+                {`${breakKind === "break" ? "Break" : "Baño"} · ${formatBreak(breakElapsed)}`}
+                {breakLimite != null && breakElapsed > breakLimite * 60 && (
+                  <span className="text-destructive">· pasado</span>
+                )}
+              </>
+            ) : (
+              <span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <span className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <Coffee className="h-4 w-4" /> Pausa
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => toggleBreak("bano")}>Baño</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleBreak("break")}>Break (30 min)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+            )}
           </Button>
           {/* Compartir pantalla ahora es DIRECTO desde los controles de la llamada
               (abajo), sin pedir permiso — el token de sala lo habilita para todos. */}
@@ -487,10 +526,21 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <Phone className="h-4 w-4 mr-2" />
                 {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleBreak}>
-                <Coffee className="h-4 w-4 mr-2" />
-                {breakStartedAt ? `En pausa · ${formatBreak(breakElapsed)}` : "Ir al baño"}
-              </DropdownMenuItem>
+              {breakStartedAt ? (
+                <DropdownMenuItem onClick={() => toggleBreak()}>
+                  <Coffee className="h-4 w-4 mr-2" />
+                  {`${breakKind === "break" ? "Break" : "Baño"} · ${formatBreak(breakElapsed)}`}
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={() => toggleBreak("bano")}>
+                    <Coffee className="h-4 w-4 mr-2" /> Baño
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleBreak("break")}>
+                    <Coffee className="h-4 w-4 mr-2" /> Break (30 min)
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -632,6 +632,49 @@ serve(async (req) => {
     // El nombre se elegía al crear y no se podía tocar; con sesiones que duran
     // semanas ("Chatters mañana") eso obligaba a cerrar y rehacer todo.
     // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // PAUSAS (baño / break)
+    //
+    // Los tiempos los pone el SERVIDOR con now(). Antes la pausa solo vivia en
+    // el navegador de quien la tomaba: el reloj arrancaba con un Date.now()
+    // suyo y nada quedaba guardado. Medir a alguien con el cronometro que el
+    // mismo maneja no mide nada, y sin registro no hay historial que revisar.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "startBreak") {
+      const kind = body.kind === "break" ? "break" : "bano";
+      const { data: asignacion } = await admin.from("cowork_room_assignments")
+        .select("session_id, room_id").eq("user_id", userId).eq("is_active", true)
+        .order("assigned_at", { ascending: false }).limit(1).maybeSingle();
+      if (!asignacion?.session_id) return err(req, "No estás en una sala");
+
+      // Si ya habia una abierta, se cierra antes: el indice unico solo permite
+      // una por persona, y quedarse trabado sin poder volver seria peor.
+      await admin.from("cowork_breaks")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("user_id", userId).is("ended_at", null);
+
+      const { data: pausa, error: insErr } = await admin.from("cowork_breaks")
+        .insert({
+          session_id: asignacion.session_id, room_id: asignacion.room_id,
+          user_id: userId, kind,
+        })
+        .select("id, kind, started_at").single();
+      if (insErr) return err(req, insErr.message, 500);
+
+      const { data: limite } = await admin.from("cowork_break_limits")
+        .select("minutos, label").eq("kind", kind).maybeSingle();
+      return json(req, { break: pausa, limiteMinutos: limite?.minutos ?? null, label: limite?.label ?? kind });
+    }
+
+    if (action === "endBreak") {
+      const { data: cerrada, error: upErr } = await admin.from("cowork_breaks")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("user_id", userId).is("ended_at", null)
+        .select("id, kind, started_at, ended_at, duration_seconds").maybeSingle();
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { break: cerrada });
+    }
+
     if (action === "updateSession") {
       const { sessionId, name } = body;
       if (!sessionId) return err(req, "sessionId required");
