@@ -7008,7 +7008,19 @@ async function buildInitialUserMessage(args: {
             "(grupo vs grupo vs DM) y el owner difundió promedios que no cuadraban. PROHIBIDO ajustar, " +
             "redondear o inventar una nota; si algo cualitativo no se refleja, dilo en la RAZÓN sin " +
             "tocar el número. 'sin_metricas_tabla' = su rol no deja rastro en tablas: explica su día " +
-            "por lo que contó en el grupo, la nota sigue siendo la de acá.",
+            "por lo que contó en el grupo, la nota sigue siendo la de acá.\n" +
+            "CADA PERSONA SE JUZGA SOLO POR SU 'objetivo' — viene en sus insumos: numeros | contenido | " +
+            "cierres | promo | ninguna. JAMÁS le reproches una métrica que no es la suya: una closer NO " +
+            "trae números (su resultado es firmar), una manager NO trae números (el suyo es que su roster " +
+            "promocione), y quien hace contenido NO cierra ventas. Si una métrica no aparece en sus " +
+            "insumos es porque NO le corresponde: no la menciones ni la eches en falta. Este error ya se " +
+            "cometió tres veces el 27/08 — con Miguel, con las managers y con María — y es el mismo de " +
+            "cuando se acusó a un closer de no cargar leads siendo trabajo de LLG.\n" +
+            "Un bloqueo externo (cuenta caída, herramienta rota) SE EXPLICA en la razón, pero NO sube la " +
+            "nota: si no salió el resultado principal, el número lo refleja igual.\n" +
+            "'numeros_auto_reportados' aparece cuando la persona reportó MÁS números de los que hay " +
+            "cargados en Maven. Si está, la nota ya usó el dato real: no repitas la cifra que dijo en el " +
+            "chat como si fuera un logro, y pedile que los cargue.",
         );
         lines.push(JSON.stringify(prepObj.personas));
         lines.push("");
