@@ -21,6 +21,27 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Leer un const/let antes de su declaracion NO es un error de tipos: tsc
+      // lo deja pasar y el bundle se arma. Revienta en el navegador, y como el
+      // fallo es al montar el componente, lo que se ve es una pantalla en negro
+      // sin ninguna pista. Nos costo un dia entero de produccion dos veces en
+      // la misma jornada — una en la vista del chatter, otra en la del
+      // coordinador.
+      //
+      // El caso tipico no es una llamada directa sino el ARREGLO DE
+      // DEPENDENCIAS de un useEffect, que se evalua al renderizar:
+      //   useEffect(() => {...}, [now]);   // ← revienta
+      //   const [now] = useState(...);     //   si `now` se declara aca abajo
+      //
+      // Las funciones quedan permitidas (se izan y el uso es diferido), que es
+      // el patron normal de handlers declarados abajo del JSX.
+      "no-use-before-define": "off",
+      "@typescript-eslint/no-use-before-define": ["error", {
+        functions: false,
+        classes: false,
+        variables: true,
+        allowNamedExports: true,
+      }],
     },
   },
 );

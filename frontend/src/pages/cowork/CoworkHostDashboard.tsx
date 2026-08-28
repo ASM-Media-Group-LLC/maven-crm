@@ -386,6 +386,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       : null;
   };
 
+
+  // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
+  // avanzan solos sin depender de que llegue un evento de presence.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
   // mirando otra sala, no se enteraba. Suena UNA vez por persona y por episodio
@@ -407,14 +416,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       }
     }
   }, [mediaStates, now, cowork.profiles]);
-
-  // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
-  // avanzan solos sin depender de que llegue un evento de presence.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   // El aviso de manos levantadas (sonido + globito del sistema) se mudó a
   // useCoworkRequestAlerts, montado por encima del router: acá solo sonaba
