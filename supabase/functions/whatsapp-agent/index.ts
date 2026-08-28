@@ -6250,11 +6250,26 @@ async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rul
     // para todos los grupos — con scope solo-grupo quedaban guardadas pero inertes.
     .or(`group_id.eq.${groupId},group_id.is.null`)
     .eq("active", true)
-    .order("created_at", { ascending: true })
+    // ⚠️ El filtro de vencidas va en el SERVIDOR, y el orden es DESC.
+    //
+    // Antes: .order(created_at ASC).limit(50) y recién después se filtraba expires_at
+    // en JS. Con más de 50 reglas activas eso deja entrar las 50 MÁS VIEJAS y descarta
+    // las nuevas en silencio. Medido el 28/08 en Marketing/Ventas: 62 reglas activas →
+    // 12 descartadas, TODAS las que Álvaro dictó entre el 21 y el 26/08. Guardadas e
+    // inertes: el mismo patrón de "el feedback del dueño se evapora" que ya arreglamos
+    // en el camino de escritura, ahora del lado de la lectura.
+    //
+    // Y filtrar vencidas en JS *después* del limit hacía que una regla vencida gastara
+    // cupo de las 50 (hoy no había ninguna, pero es una bomba de tiempo).
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .order("created_at", { ascending: false })
     .limit(50);
   if (error) return [];
+  // Se vuelven a ordenar viejas→nuevas para presentarlas: el orden estable importa
+  // para el caché del prefijo (ver el segundo breakpoint en buildBody).
   return (data ?? [])
-    .filter((r) => !r.expires_at || r.expires_at > nowIso)
+    .slice()
+    .reverse()
     .map((r) => ({ id: r.id, rule_text: r.rule_text }));
 }
 
@@ -7705,17 +7720,37 @@ async function runAgent(req: AgentRequest): Promise<{
   const systemPromptBase = group.bot_persona
     ? `${enginePrompt}\n\nPersonalización del grupo:\n${group.bot_persona}`
     : enginePrompt;
-  let systemPrompt = activeRules.length > 0
-    ? `${systemPromptBase}\n\nREGLAS PERSISTENTES DEL OWNER (este grupo):\n${
+  // ── DOS BLOQUES DE CACHÉ, NO UNO ────────────────────────────────────────────
+  // `systemPromptBase` (MOTOR + MANUAL + persona) es ESTABLE entre llamadas: solo
+  // cambia con un deploy o editando bot_persona a mano. Las reglas y los hechos, en
+  // cambio, los escriben las PROPIAS tools del bot (add_persistent_rule,
+  // remember_fact) en medio de la conversación.
+  //
+  // Hasta acá todo iba en UN solo bloque cacheado, así que cada regla o hecho nuevo
+  // invalidaba el prefijo ENTERO. Medido en agosto: de las escrituras de caché que
+  // ocurrieron con el caché todavía vivo (hueco < 55 min), 238 de 238 tenían el
+  // prefijo de un tamaño distinto al de la llamada anterior — CERO reescribieron con
+  // el mismo tamaño. No era el TTL venciendo: era el prompt mutando debajo. El 21/08
+  // el system de Marketing/Ventas se reescribió 12 veces en un día, creciendo de
+  // 80.681 a 84.689 tokens: ~$5,90 en un solo grupo, en un solo día.
+  //
+  // Partiéndolo en dos, una regla nueva solo invalida el bloque chico (~6.500 tok)
+  // y los ~91.000 del bloque grande siguen leyéndose a 0,1x. Anthropic admite hasta
+  // 4 breakpoints; usamos 3 (estático, dinámico, tools).
+  const systemPromptDinamico = [
+    activeRules.length > 0
+      ? `REGLAS PERSISTENTES DEL OWNER (este grupo):\n${
         activeRules.map((r, i) => `${i + 1}. [id=${r.id}] ${r.rule_text}`).join("\n")
       }\n\nAplicálas estrictamente. Si en algún momento entran en conflicto con tus reglas generales, las del owner ganan. Si vas a violarlas, no lo hagas — pregunta al owner.`
-    : systemPromptBase;
+      : "",
+  ].filter(Boolean).join("\n\n");
+  let bloqueDinamico = systemPromptDinamico;
   // Memoria por-persona: hechos durables que el equipo le contó al bot. Se inyectan
   // acá para que los recuerde más allá de la ventana de 30 mensajes (ej. "María no
   // maneja IG"). Si alguien dice algo estable sobre cómo trabaja, o corrige uno,
   // el bot usa remember_fact / forget_fact.
   if (personFacts.length > 0) {
-    systemPrompt += `\n\nLO QUE EL EQUIPO TE CONTÓ (recordalo y RESPETALO; por persona):\n${
+    bloqueDinamico += `\n\nLO QUE EL EQUIPO TE CONTÓ (recordalo y RESPETALO; por persona):\n${
       personFacts.map((f) => `- ${f.name}: ${f.fact}`).join("\n")
     }\n\nSi alguien te dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer, guárdalo con remember_fact. Si te corrigen un hecho de acá, usa forget_fact. NUNCA contradigas estos hechos (ej. si dice que no maneja IG, no lo mandes a IG).`;
   }
@@ -7999,12 +8034,31 @@ async function runAgent(req: AgentRequest): Promise<{
   // loadActiveRules corre al inicio de cada corrida— pero enterrada al final de un
   // system prompt de ~5K tokens y compitiendo con todo el manual de ventas. Acá quedan
   // pegadas al mensaje que el modelo está por contestar, que es donde más atiende.
-  const recordatorioReglas = activeRules.length > 0
+  const pideMensajes = /\b(opener|openers|pitch|pitches|escenarios?|mensajes? para|qu[ée] le (escribo|digo|mando)|c[óo]mo le entro|estrategia de (venta|entrada)|romper el hielo)\b/i
+    .test(initialUser.slice(-4000));
+
+  // ⚠️ Esta copia de las reglas iba SIEMPRE y COMPLETA dentro del mensaje de usuario,
+  // que no lleva cache_control: se re-mandaba entera en cada iteración a precio de
+  // input fresco ($3/MTok) cuando el mismo texto ya viajaba cacheado a $0,30. Medido
+  // en agosto: ~$46/mes en los cinco grupos, y en Ventas eran 4.700 tokens por llamada
+  // sobre 1.928 llamadas.
+  //
+  // No se borra del todo: el comentario de abajo documenta POR QUÉ existe — el 03/08
+  // el bot mandó 4 pitches plantilla con la regla enterrada al final del prompt, y
+  // pegarla al mensaje la hizo ganar. Ese fallo fue con PITCHES, así que la copia se
+  // conserva exactamente ahí (`pideMensajes`), que es donde está probado que importa.
+  // En el resto de las llamadas va un puntero: desde el segundo breakpoint de caché
+  // las reglas son lo ÚLTIMO del system, o sea ya no compiten con 91.000 tokens por
+  // delante — que era la razón original de duplicarlas.
+  const recordatorioReglas = activeRules.length === 0
+    ? ""
+    : pideMensajes
     ? `\n\n⚠️ REGLAS DEL OWNER VIGENTES — aplícalas a CUALQUIER mensaje de venta, pitch u ` +
       `opener que redactes en este turno, aunque nadie te las recuerde:\n` +
       activeRules.map((r, i) => `${i + 1}. ${r.rule_text}`).join("\n") +
       `\nSi lo que ibas a escribir no las cumple, reescríbelo antes de mandarlo.`
-    : "";
+    : `\n\n⚠️ Tenés ${activeRules.length} REGLAS DEL OWNER vigentes al final del system prompt, ` +
+      `numeradas 1-${activeRules.length}. Antes de mandar cualquier cosa, verificá que se cumplen.`;
 
   // ⚠️ PITCHES GENÉRICOS. La regla "PROHIBIDO una estrategia que serviría para
   // cualquier modelo" ya está en el manual de ventas del system prompt… y el 03/08 el
@@ -8015,8 +8069,6 @@ async function runAgent(req: AgentRequest): Promise<{
   // La diferencia no fue la regla: fue que en un caso buscó datos y en el otro no.
   // Enterrada al final de ~5K tokens la regla compite con todo; pegada al mensaje que
   // está por contestar, gana (mismo hallazgo que las reglas del owner, arriba).
-  const pideMensajes = /\b(opener|openers|pitch|pitches|escenarios?|mensajes? para|qu[ée] le (escribo|digo|mando)|c[óo]mo le entro|estrategia de (venta|entrada)|romper el hielo)\b/i
-    .test(initialUser.slice(-4000));
   const recordatorioPersonalizacion = pideMensajes
     ? `\n\n⚠️ TE ESTÁN PIDIENDO MENSAJES/OPENERS.\n` +
       `1) PRIMERO corre las tools de esa lead (lookup_lead_history / analyze_profile_deep / `+
@@ -8082,8 +8134,15 @@ async function runAgent(req: AgentRequest): Promise<{
     //
     // Como el bot recibe varios mensajes por minuto en horas activas, el
     // hit ratio es alto. Esperamos ahorro ~70-80% del input total.
+    // Bloque 1 = ESTÁTICO (MOTOR + MANUAL + persona). Bloque 2 = DINÁMICO (reglas y
+    // hechos, que escriben las tools del bot). Cada uno con su propio breakpoint: así
+    // una regla nueva invalida solo el segundo y el primero se sigue leyendo a 0,1x.
+    // Si el dinámico está vacío no se manda: un bloque vacío gasta un breakpoint.
     const systemWithCache = [
-      { type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
+      { type: "text", text: systemPromptBase, cache_control: { type: "ephemeral", ttl: "1h" } },
+      ...(bloqueDinamico.trim()
+        ? [{ type: "text", text: bloqueDinamico, cache_control: { type: "ephemeral", ttl: "1h" } }]
+        : []),
     ];
     const toolsWithCache = activeTools.length > 0
       ? [
