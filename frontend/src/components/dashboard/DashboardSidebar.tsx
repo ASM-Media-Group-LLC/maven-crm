@@ -390,6 +390,12 @@ const DashboardSidebar = () => {
   const isOperationsActive = operationsMenu.some(
     (i) => pathname === i.url || pathname.startsWith(i.url + "/")
   );
+  // Gana la coincidencia MAS ESPECIFICA — mismo criterio que RRHH. Sin esto,
+  // /chatter-evaluator/rendimiento encendia tambien a "Chatter Evaluator",
+  // porque NavLink marca por prefijo. Poner `end` no alcanzaba: dejaria al
+  // padre apagado en sus propias subpaginas que no estan en el menu
+  // (historial, admin, workspace).
+  const operationsActiveUrl = pickActiveUrl(operationsMenu.map((i) => i.url), pathname);
 
   return (
     <Sidebar collapsible="icon">
@@ -461,7 +467,7 @@ const DashboardSidebar = () => {
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                    <NavLink to={item.url} className={cn(item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
