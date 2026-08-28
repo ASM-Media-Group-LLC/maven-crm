@@ -181,6 +181,25 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-primary: 217 91% 53%;
     --sidebar-ring: 217 91% 53%;
   }
+
+  /* Dorado corporativo: oro profundo (5.2:1 con texto blanco) + bronce. */
+  :root[data-skin="dorado"] {
+    --primary: 43 80% 30%;
+    --accent: 30 85% 45%;
+    --ring: 43 80% 30%;
+    --sidebar-primary: 43 80% 30%;
+    --sidebar-ring: 43 80% 30%;
+  }
+
+  /* Rojo Kash: carmesí de marca (6.1:1), hue 350 para no confundirse con
+     --destructive (0 84% 60%) de los botones de borrar. */
+  :root[data-skin="kash"] {
+    --primary: 350 80% 42%;
+    --accent: 15 90% 50%;
+    --ring: 350 80% 42%;
+    --sidebar-primary: 350 80% 42%;
+    --sidebar-ring: 350 80% 42%;
+  }
 }
 
 @layer base {

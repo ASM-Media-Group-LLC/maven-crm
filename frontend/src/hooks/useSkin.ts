@@ -12,7 +12,7 @@ import { useSaveSkin } from "@/hooks/useUserProfile";
 //   - profiles.ui_skin (el skin te sigue en cualquier dispositivo; al
 //     resolver la sesión, el perfil gana si difiere — ver useSkinSync).
 
-export type SkinId = "maven" | "atardecer" | "esmeralda" | "orquidea" | "medianoche";
+export type SkinId = "maven" | "atardecer" | "esmeralda" | "orquidea" | "medianoche" | "dorado" | "kash";
 
 export interface SkinDef {
   id: SkinId;
@@ -30,6 +30,8 @@ export const SKINS: SkinDef[] = [
   { id: "esmeralda", label: "Esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" },
   { id: "orquidea", label: "Orquídea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" },
   { id: "medianoche", label: "Medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" },
+  { id: "dorado", label: "Dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" },
+  { id: "kash", label: "Rojo Kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" },
 ];
 
 const STORAGE_KEY = "maven-skin";
