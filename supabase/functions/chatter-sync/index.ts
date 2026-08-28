@@ -34,10 +34,15 @@ async function blu(action: string, extra: Record<string, unknown> = {}): Promise
   return j?.data ?? j;
 }
 
+// Parte del correo antes de la arroba, SIN el sufijo +N.
+// En BLU una misma persona se registra en Massive y en Plus con un solo correo
+// usando `nombre+1@...`: sin quitar ese sufijo quedaria como dos personas y su
+// dia se partiria en dos notas, ninguna de las cuales lo describe.
 const localPart = (email: string | null | undefined): string | null => {
   const e = String(email ?? "").trim().toLowerCase();
   const i = e.indexOf("@");
-  return i > 0 ? e.slice(0, i) : null;
+  if (i <= 0) return null;
+  return e.slice(0, i).split("+")[0] || null;
 };
 
 const hoyBogota = () =>
