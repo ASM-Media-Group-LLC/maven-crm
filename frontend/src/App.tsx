@@ -14,6 +14,7 @@ import PermissionRoute from "@/components/PermissionRoute";
 import AdminRoute from "./components/AdminRoute";
 import AppShell from "@/components/dashboard/AppShell";
 import { CallProvider } from "@/components/CallProvider";
+import { PersistentCallProvider } from "@/components/PersistentCallProvider";
 import Logo from "@/components/Logo";
 
 // All sidebar-reachable pages are imported eagerly so the FIRST nav to
@@ -265,7 +266,7 @@ const App = () => (
                   Topbar mount once and persist across nav between these
                   routes. Only ProyectoMP (its own MP-specific layout)
                   and the full-screen video pages stay outside. */}
-              <Route element={<ProtectedRoute><CallProvider><AppShell /></CallProvider></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><CallProvider><PersistentCallProvider><AppShell /></PersistentCallProvider></CallProvider></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
                 <Route path="/panel-de-control" element={<PermissionRoute module="Panel de control"><PanelDeControl /></PermissionRoute>} />

@@ -6,6 +6,7 @@ import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/c
 import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
@@ -97,6 +98,49 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       ...lastMediaRef.current, onBreak: !!startedAt, breakStartedAt: startedAt, ...faceRef.current,
     });
   }, [breakStartedAt, trackMediaState]);
+
+  const { startCall, endCall } = usePersistentCall();
+
+  // Salir de la sala: libera la asignación del lado del servidor (para que el
+  // dashboard del coordinador se entere) y saca al chatter de Cowork.
+  const handleLeaveRoom = useCallback(async () => {
+    setConnectedLkRoom(null);
+    setManuallyLeft(true);
+    endCall();
+    try { await cowork.leaveRoom?.(); } catch { /* best-effort */ }
+    toast.success("Saliste de la sala");
+    navigate("/dashboard");
+  }, [cowork, navigate, endCall]);
+
+  // La config de la llamada se arma UNA vez por sala. Los callbacks se leen por
+  // ref: si fueran dependencias, cualquier cambio de estado del componente
+  // reiniciaría la videollamada.
+  const cbRef = useRef({ getToken, handleMediaStateChange, handleFaceStateChange, handleLeaveRoom });
+  cbRef.current = { getToken, handleMediaStateChange, handleFaceStateChange, handleLeaveRoom };
+
+  useEffect(() => {
+    // La 1:1 con el coordinador sigue montándose en la página: es efímera y su
+    // ciclo de vida ya está atado a la solicitud.
+    if (!connectedLkRoom || oneOnOneRoom) return;
+    startCall({
+      key: `cowork-room-${connectedLkRoom}`,
+      roomName: connectedLkRoom,
+      displayName,
+      callDisplayName: myRoom?.name,
+      isAdmin: false,
+      recording: { source: "cowork", title: myRoom?.name || undefined },
+      onLeave: () => { void cbRef.current.handleLeaveRoom(); },
+      hideShareLink: true,
+      suppressLeaveToast: true,
+      initialMicOn: false,
+      initialCamOn: false,
+      getToken: () => cbRef.current.getToken(),
+      onMediaStateChange: (st) => cbRef.current.handleMediaStateChange(st),
+      onFaceStateChange: (w) => cbRef.current.handleFaceStateChange(w),
+      leaveLabel: "Salir y volver al dashboard",
+      leaveIcon: LogOut,
+    });
+  }, [connectedLkRoom, oneOnOneRoom, displayName, myRoom?.name, startCall]);
 
   // El encuadre lo calcula LiveKitCallView sobre el video local y lo reporta acá;
   // nosotros solo lo republicamos por presence para que lo vea el coordinador.
@@ -479,36 +523,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             leaveIcon={ArrowLeft}
           />
         ) : connectedLkRoom ? (
-          <LiveKitCallView
-            key={`room-${connectedLkRoom}`}
-            roomName={connectedLkRoom}
-            displayName={displayName}
-            callDisplayName={myRoom?.name}
-            isAdmin={false}
-            recording={{ source: "cowork", title: myRoom?.name || undefined }}
-            onLeave={async () => {
-              setConnectedLkRoom(null);
-              setManuallyLeft(true);
-              // Release the assignment server-side so the host dashboard updates,
-              // then navigate out of Cowork to prevent the auto-rejoin effect.
-              try {
-                await cowork.leaveRoom?.();
-              } catch {
-                // best-effort
-              }
-              toast.success("Saliste de la sala");
-              navigate("/dashboard");
-            }}
-            hideShareLink
-            suppressLeaveToast
-            initialMicOn={false}
-            initialCamOn={false}
-            getToken={getToken}
-            onMediaStateChange={handleMediaStateChange}
-            onFaceStateChange={handleFaceStateChange}
-            leaveLabel="Salir y volver al dashboard"
-            leaveIcon={LogOut}
-          />
+          // La llamada NO se monta acá: vive en el PersistentCallProvider, por
+          // encima del router. Esto es solo el hueco donde se dibuja mientras el
+          // chatter está en Cowork; si navega a otra sección, el hueco
+          // desaparece y la llamada pasa sola a la ventanita flotante en vez de
+          // cortarse.
+          <CallOutlet />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary/60" />

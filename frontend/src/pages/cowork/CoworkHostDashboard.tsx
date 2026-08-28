@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { formatBreak } from "./CoworkParticipantView";
 import { usePipWindow } from "./usePipWindow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -40,6 +41,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
   const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
+  const { notify } = useBrowserNotifications();
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
@@ -386,8 +388,25 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     }
     const nuevas = openIds.filter((id) => !seenRequestIds.current!.has(id));
     seenRequestIds.current = new Set(openIds);
-    if (nuevas.length) playCoordinatorRequestSound();
-  }, [cowork.hostRequests]);
+    if (!nuevas.length) return;
+
+    playCoordinatorRequestSound();
+
+    // Con el dashboard abierto pero la PESTAÑA de fondo (mirando otra cosa en el
+    // navegador), el sonido suena y no se ve nada. El globito del sistema avisa
+    // quién pidió y de qué sala, y al tocarlo trae la pestaña al frente.
+    if (document.hidden) {
+      const req = cowork.hostRequests.find((r) => r.id === nuevas[0]);
+      const quien = req ? (cowork.profiles[req.user_id] || "Alguien") : "Alguien";
+      const sala = cowork.rooms.find((r) => r.id === req?.room_id)?.name;
+      notify(
+        nuevas.length > 1 ? `${nuevas.length} personas piden coordinador` : `${quien} pide coordinador`,
+        sala ? `Sala ${sala}` : "Cowork",
+        () => window.focus(),
+        false, // el sonido ya lo tocamos arriba; este es el de mensajes y sería otro
+      );
+    }
+  }, [cowork.hostRequests, cowork.profiles, cowork.rooms, notify]);
 
   // Quién comparte pantalla en cada sala — VERDAD de LiveKit reportada por cada
   // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
