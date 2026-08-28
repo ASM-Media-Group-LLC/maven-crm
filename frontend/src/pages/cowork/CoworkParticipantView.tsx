@@ -288,6 +288,40 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return { token: result.token, url: result.url };
   }, [cowork.joinOneOnOne, oneOnOneRequestId]);
 
+  // La llamada de la sala vive en el PersistentCallProvider, por encima del
+  // router: mientras el chatter está en Cowork se dibuja en el hueco que ofrece
+  // esta página, y si navega a otra sección pasa sola a una ventanita flotante
+  // en vez de cortarse.
+  //
+  // La 1:1 con el coordinador NO: es efímera y su ciclo de vida ya está atado a
+  // la solicitud, así que se sigue montando acá.
+  //
+  // Este efecto va DEBAJO de getToken a propósito. Su arreglo de dependencias se
+  // evalúa al renderizar, y referenciar desde ahí un const declarado más abajo
+  // tumba la página entera — es exactamente lo que pasó hoy con cbRef.
+  useEffect(() => {
+    if (!connectedLkRoom || oneOnOneRoom) return;
+    startCall({
+      key: `cowork-room-${connectedLkRoom}`,
+      roomName: connectedLkRoom,
+      displayName,
+      callDisplayName: myRoom?.name,
+      isAdmin: false,
+      recording: { source: "cowork", title: myRoom?.name || undefined },
+      onLeave: handleLeaveRoom,
+      hideShareLink: true,
+      suppressLeaveToast: true,
+      initialMicOn: false,
+      initialCamOn: false,
+      getToken,
+      onMediaStateChange: handleMediaStateChange,
+      onFaceStateChange: handleFaceStateChange,
+      leaveLabel: "Salir y volver al dashboard",
+      leaveIcon: LogOut,
+    });
+  }, [connectedLkRoom, oneOnOneRoom, displayName, myRoom?.name, startCall,
+      getToken, handleLeaveRoom, handleMediaStateChange, handleFaceStateChange]);
+
   if (!myAssignment) {
     // ANTES: un spinner con "Esperando asignación de sala por el coordinador…".
     // Era una espera IMPOSIBLE: `assignToRoom` se eliminó al pasar a self-join por
@@ -554,35 +588,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             leaveIcon={ArrowLeft}
           />
         ) : connectedLkRoom ? (
-          // VUELTA ATRÁS a montar la llamada acá mismo.
-          //
-          // Se había movido al PersistentCallProvider para que sobreviviera al
-          // navegar a otra sección, pero desde ese cambio a varias chatters se
-          // les quedaba la pantalla en negro al entrar. Intenté arreglarlo por
-          // el lado del portal (el <video> se pausa al salir del documento) y no
-          // alcanzó. Con gente sin poder trabajar, la llamada vuelve a donde
-          // funcionaba y la ventanita se retoma cuando se pueda probar en vivo.
-          //
-          // El provider queda montado: no molesta si nadie lo usa, y el Hub del
-          // coordinador va a necesitarlo.
-          <LiveKitCallView
-            key={`room-${connectedLkRoom}`}
-            roomName={connectedLkRoom}
-            displayName={displayName}
-            callDisplayName={myRoom?.name}
-            isAdmin={false}
-            recording={{ source: "cowork", title: myRoom?.name || undefined }}
-            onLeave={handleLeaveRoom}
-            hideShareLink
-            suppressLeaveToast
-            initialMicOn={false}
-            initialCamOn={false}
-            getToken={getToken}
-            onMediaStateChange={handleMediaStateChange}
-            onFaceStateChange={handleFaceStateChange}
-            leaveLabel="Salir y volver al dashboard"
-            leaveIcon={LogOut}
-          />
+          // Solo el HUECO donde se dibuja la llamada mientras el chatter está
+          // en Cowork. Si navega a otra sección el hueco desaparece y la llamada
+          // pasa a la ventanita flotante — no se reinicia: es el mismo componente
+          // movido por portal.
+          <CallOutlet />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
