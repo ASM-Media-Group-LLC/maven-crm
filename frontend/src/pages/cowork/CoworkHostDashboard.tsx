@@ -190,12 +190,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [closeTarget, setCloseTarget] = useState<CoworkRoom | null>(null);
   const [roomBusy, setRoomBusy] = useState(false);
   // Central de audio del coordinador: master del micro + escuchar/hablar por sala + micro compartido.
-  const [globalMic, setGlobalMic] = useState(false);
   const [roomHear, setRoomHear] = useState<Record<string, boolean>>({});
-  // Corta el audio de TODAS las salas de una. Es del navegador de cada quien:
-  // que Alvaro se silencie no deja sorda a Yoselin. No se persiste a proposito —
-  // al recargar se vuelve a escuchar, que es el estado seguro para coordinar.
-  const [globalHear, setGlobalHear] = useState(true);
   // Límites por tipo de pausa (tabla, no constantes). Si no cargan, no se pinta
   // nada de rojo: mejor sin señal que marcando a alguien por un dato que falta.
   const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
@@ -227,12 +222,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Se escucha una sala si el master global esta activo Y esa sala no fue
   // silenciada aparte. Apagar el global no borra las elecciones por sala: al
   // volver a prenderlo, cada una queda como estaba.
-  const hearFor = (roomId: string) => globalHear && (roomHear[roomId] ?? true);
-  // "Hablar a todas" (globalMic) le habla a TODAS las salas a la vez; el 🎤 de cada
-  // sala le habla SOLO a esa. Aditivos: una sala te oye si hablás a todas O tiene su 🎤.
-  const broadcastFor = (roomId: string) => globalMic || (roomMic[roomId] ?? false);
+  // El estado de cada sala es la VERDAD; el botón global no es un candado que
+  // bloquee las miniaturas, es una acción que las fija todas de un golpe.
+  //
+  // Antes el global mandaba (`globalHear && ...`), así que con todo silenciado
+  // destildar una sala no hacía nada: había que volver a "escuchar todas" para
+  // recuperar el control, y eso obligaba a oír las nueve para poder oír una.
+  const hearFor = (roomId: string) => roomHear[roomId] ?? true;
+
+  // Estado del botón global. "Todas encendidas" solo cuando de verdad lo están:
+  // si hay una sola apagada, el botón ofrece encender el resto en vez de
+  // apagarlas — que es lo que se quiere cuando se viene de silenciar todo y se
+  // fue rescatando salas de a una.
+  const todasEscuchando = cowork.rooms.every((r) => hearFor(r.id));
+  const fijarEscuchaDeTodas = (encendido: boolean) =>
+    setRoomHear(Object.fromEntries(cowork.rooms.map((r) => [r.id, encendido])));
+  // El 🎤 de cada sala le habla SOLO a esa; "Hablar a todas" enciende todos de
+  // una. Mismo modelo que la escucha, y por el mismo motivo: antes el global
+  // DESHABILITABA los botones por sala, así que para hablarle a una había que
+  // apagar el global primero. Todo vive en el navegador de cada coordinador:
+  // que Álvaro se silencie no deja sorda a Yoselin.
+  const broadcastFor = (roomId: string) => roomMic[roomId] ?? false;
+  const hablandoATodas = cowork.rooms.length > 0 && cowork.rooms.every((r) => broadcastFor(r.id));
+  const fijarMicDeTodas = (encendido: boolean) =>
+    setRoomMic(Object.fromEntries(cowork.rooms.map((r) => [r.id, encendido])));
   // El micro se captura si le hablás a alguien: a todas, o al menos a una sala.
-  const micArmed = globalMic || Object.values(roomMic).some(Boolean);
+  const micArmed = Object.values(roomMic).some(Boolean);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -843,24 +858,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`gap-1.5 rounded-full h-8 ${globalHear ? "" : "text-destructive border-destructive/40"}`}
-                  title={globalHear
+                  className={`gap-1.5 rounded-full h-8 ${todasEscuchando ? "" : "text-destructive border-destructive/40"}`}
+                  title={todasEscuchando
                     ? "Estás escuchando todas las salas. Toca para silenciarlas (solo para ti)."
-                    : "Tenés todas las salas en silencio. Toca para volver a escucharlas."}
-                  onClick={() => setGlobalHear((v) => !v)}
+                    : "Toca para escuchar todas. Las que ya tenías activadas se quedan como están."}
+                  onClick={() => fijarEscuchaDeTodas(!todasEscuchando)}
                 >
-                  {globalHear ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  {globalHear ? "Escuchando todas" : "Silenciadas"}
+                  {todasEscuchando ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  {todasEscuchando ? "Escuchando todas" : "Escuchar todas"}
                 </Button>
                 <Button
                   size="sm"
-                  variant={globalMic ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${globalMic ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
-                  title={globalMic ? "Tu voz va a TODAS las salas a la vez. Toca para dejar de hablarles." : "Habla a TODAS las salas al mismo tiempo (para una sola, usa el 🎤 de esa sala)."}
-                  onClick={() => setGlobalMic((v) => !v)}
+                  variant={hablandoATodas ? "default" : "outline"}
+                  className={`gap-1.5 rounded-full h-8 ${hablandoATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  title={hablandoATodas
+                    ? "Tu voz va a TODAS las salas. Toca para dejar de hablarles."
+                    : "Habla a todas a la vez. Las que ya tenías activadas se quedan como están."}
+                  onClick={() => fijarMicDeTodas(!hablandoATodas)}
                 >
-                  {globalMic ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  {globalMic ? "Hablando a todas" : "Hablar a todas"}
+                  {hablandoATodas ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  {hablandoATodas ? "Hablando a todas" : "Hablar a todas"}
                 </Button>
                 <Button
                   size="sm"
@@ -1054,10 +1071,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               variant="ghost"
                               size="sm"
                               className={`h-7 flex-1 text-[11px] gap-1 rounded-lg font-medium ${broadcastFor(room.id) ? "bg-success text-white hover:bg-success/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
-                              disabled={globalMic}
-                              title={globalMic
-                                ? "Ya estás hablando a TODAS las salas (apaga 'Hablar a todas' para elegir una)."
-                                : broadcastFor(room.id) ? "Tu voz va a esta sala. Toca para dejar de hablarle." : "Toca para hablarle solo a esta sala."}
+                              title={broadcastFor(room.id)
+                                ? "Tu voz va a esta sala. Toca para dejar de hablarle."
+                                : "Toca para hablarle solo a esta sala."}
                               onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
                             >
                               {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
