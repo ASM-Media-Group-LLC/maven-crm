@@ -29,7 +29,7 @@ function AvisoCobertura({ dias, diasConDatos }: { dias: number; diasConDatos: nu
       <p className="text-xs leading-relaxed text-foreground/90">
         <span className="font-medium">Notas provisionales.</span>{" "}
         Del periodo elegido ({dias} {dias === 1 ? "día" : "días"}) hay registro en {diasConDatos}. La agencia está migrando
-        de Infloww a BLU, así que la vara sale de las personas que ya se mudaron y va a
+        de Infloww a BLU, así que lo esperado se calcula con las personas que ya se mudaron y va a
         moverse cuando entren las demás. Sirve para ver la operación; todavía no para
         evaluar a nadie.
       </p>
@@ -88,7 +88,7 @@ function TiraDeDias({
                   </p>
                 ) : (
                   <div className="text-xs mt-1 space-y-0.5">
-                    <p>Ventas {money(d.ventas)} · vara {money(d.ventas_esperadas)}</p>
+                    <p>Vendió {money(d.ventas)} · se esperaba {money(d.ventas_esperadas)}</p>
                     {d.horas != null && <p>Horas {d.horas.toFixed(1)}</p>}
                     {faltan.length > 0 && (
                       <p className="text-warning">
@@ -284,7 +284,7 @@ export default function ChatterRendimiento() {
                   <th className="py-2.5 pl-4 pr-3 text-left font-medium">Chatter</th>
                   <th className="py-2.5 pr-3 text-left font-medium">Nota</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Ventas</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Vara</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">Esperado</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Horas</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Modelos</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Masivos</th>
@@ -348,10 +348,12 @@ export default function ChatterRendimiento() {
       <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
         <span>
-          La vara de cada día es la suma, sobre las modelos que esa persona atendió, de lo que
-          suele producir un chatter en cada una — el total de la modelo repartido entre quienes
-          la cubren, porque son tres turnos. Un componente sin dato no cuenta como cero: se
-          reparte el peso entre los que sí hay, y si faltan todos el día queda «Sin datos».
+          <strong className="font-medium text-foreground">Esperado</strong> es cuánto debería
+          vender esa persona ese día: se suman las modelos que atendió, y de cada una se toma lo
+          que suele producir <em>un</em> chatter — el total de la modelo repartido entre quienes
+          la cubren, porque son tres turnos. Así 400 puede ser mucho para uno y poco para otro.
+          Un componente sin dato no cuenta como cero: se reparte el peso entre los que sí hay, y
+          si faltan todos, el día queda «Sin datos».
         </span>
       </p>
     </div>

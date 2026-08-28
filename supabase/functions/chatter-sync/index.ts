@@ -391,14 +391,29 @@ serve(async (req: Request) => {
       for (const m of modelos) {
         const modelId = Number(m?.id ?? m?.modelId);
         if (!Number.isFinite(modelId)) continue;
-        const nombreModelo = m?.name ?? m?.username ?? null;
+        // BLU nombra a la modelo en `internalName` (como la llama el equipo) y
+        // trae el perfil de OF en `aboutMe`. No hay `name` ni `username` arriba.
+        const nombreModelo = m?.internalName ?? m?.aboutMe?.name ?? m?.aboutMe?.username ?? null;
 
-        const filas: any[] = [];
+        // of-mass y smart-messages son DOS VISTAS DEL MISMO MENSAJE, no dos
+        // mensajes: comparten el id. Una muestra la cola (sent en 0 hasta que
+        // sale) y la otra el envio ya hecho. Prefijar el id con el endpoint los
+        // duplicaba y las filas encoladas metian ceros en los totales.
+        //
+        // Se juntan por id y gana la version con mas envios, que es la real.
+        const porId = new Map<string, any>();
+        const juntar = (f: any) => {
+          const previo = porId.get(f.blu_id);
+          if (!previo || f.sent > previo.sent) porId.set(f.blu_id, { ...previo, ...f });
+        };
+
         try {
           const ofm = await blu("of-mass", { modelId });
           for (const r of (ofm?.rows ?? [])) {
-            filas.push({
-              blu_id: `ofm-${r.id ?? r.queueId}`, kind: "of-mass",
+            const id = r.id ?? r.queueId;
+            if (id == null) continue;
+            juntar({
+              blu_id: String(id), kind: "of-mass",
               copy: r.message ?? null, sender: r.senderName ?? null,
               price: num(r.price), sent: num(r.sent), viewed: num(r.viewed),
               purchased: num(r.purchased), earnings: num(r.earnings), sentAt: r.sentAt ?? null,
@@ -408,8 +423,9 @@ serve(async (req: Request) => {
         try {
           const sm = await blu("smart-messages", { modelId });
           for (const r of (sm?.messages ?? [])) {
-            filas.push({
-              blu_id: `pri-${r.id}`, kind: "priority",
+            if (r.id == null) continue;
+            juntar({
+              blu_id: String(r.id), kind: "priority",
               copy: r.name ?? r.textPreview ?? null, sender: r.senderName ?? null,
               price: num(r.price), sent: num(r.sent ?? r.sentCount), viewed: num(r.viewed ?? r.viewedCount),
               purchased: num(r.purchased ?? r.purchasedCount), earnings: num(r.earnings),
@@ -418,6 +434,7 @@ serve(async (req: Request) => {
           }
         } catch { /* idem */ }
 
+        const filas = [...porId.values()];
         const rows = filas.map((f) => {
           const idn = f.sender ? porNombre.get(String(f.sender).trim().toLowerCase()) ?? null : null;
           if (!idn) sinAtribuir++;
