@@ -50,10 +50,13 @@ export function usePersistentCall(): Ctx {
  */
 export function CallOutlet({ className }: { className?: string }) {
   const { registerOutlet } = usePersistentCall();
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    registerOutlet(ref.current);
-    return () => registerOutlet(null);
+  // Callback ref y NO useEffect: se ejecuta durante el commit, antes de que la
+  // pagina dispare su efecto de arrancar la llamada. Con useEffect existia una
+  // ventana de un render donde el hueco todavia no estaba: la llamada se montaba
+  // en la ventanita flotante y enseguida se MOVIA al hueco, y mover un <video>
+  // de lugar en el DOM lo deja pausado en varios navegadores — pantalla negra.
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    registerOutlet(el);
   }, [registerOutlet]);
   return <div ref={ref} className={className ?? "w-full h-full"} />;
 }
@@ -138,7 +141,37 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   // Dónde se dibuja la llamada, por orden de prioridad: la ventana del sistema
   // (si la abrió a mano), el hueco de la página, o la ventanita flotante.
   const destino = pipWindow?.document?.body ?? outlet ?? floatSlot;
-  const enFlotante = !pipWindow && !outlet;
+  // Antes de decidir que "no hay hueco" se espera un frame. Sin esto, arrancar
+  // una llamada en una pagina que SI tiene hueco podia dibujarla un instante en
+  // la ventanita y mudarla despues, dejando el video pausado en negro.
+  const [puedeFlotar, setPuedeFlotar] = useState(false);
+  useEffect(() => {
+    if (outlet || !config) { setPuedeFlotar(false); return; }
+    const id = window.setTimeout(() => setPuedeFlotar(true), 250);
+    return () => window.clearTimeout(id);
+  }, [outlet, config]);
+  const enFlotante = !pipWindow && !outlet && puedeFlotar;
+
+  // Red de seguridad: mover la llamada de contenedor la saca del documento un
+  // instante, y el navegador PAUSA todo <video>/<audio> que sale del documento
+  // (esta en la spec). Al reinsertarlo no vuelve solo: queda negro y mudo. Esto
+  // pasa en cada mudanza — al hueco, a la ventanita y a la ventana del sistema —
+  // asi que se reanuda despues de cada una en vez de arreglar solo un camino.
+  useEffect(() => {
+    if (!destino || !config) return;
+    let intentos = 0;
+    const reanudar = () => {
+      destino.querySelectorAll("video, audio").forEach((el) => {
+        const m = el as HTMLMediaElement;
+        if (m.paused) m.play().catch(() => { /* sin gesto del usuario, se reintenta */ });
+      });
+      // Los tracks tardan en re-adjuntarse; unos pocos reintentos cubren el hueco
+      // sin dejar un intervalo corriendo para siempre.
+      if (++intentos < 6) window.setTimeout(reanudar, 250);
+    };
+    const id = window.setTimeout(reanudar, 60);
+    return () => window.clearTimeout(id);
+  }, [destino, config]);
 
   return (
     <PersistentCallContext.Provider value={ctx}>
