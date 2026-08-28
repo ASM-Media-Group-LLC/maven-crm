@@ -518,6 +518,12 @@ const AppearanceCard = () => {
             checked={prefs.contrast === true}
             onCheckedChange={(v) => setPrefs({ contrast: v })}
           />
+          <ToggleRow
+            label={t("settings.densityLabel")}
+            description={t("settings.densityDesc")}
+            checked={prefs.density === "compact"}
+            onCheckedChange={(v) => setPrefs({ density: v ? "compact" : undefined })}
+          />
           {season && (
             <ToggleRow
               label={t("settings.seasonLabel")}

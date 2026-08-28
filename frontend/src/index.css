@@ -829,3 +829,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 @media (prefers-reduced-motion:reduce){
   .kp-legend::before, .kp-star.special::before, .kp-star.filled .kp-star-fill{ animation:none !important; }
 }
+
+/* Densidad compacta (Settings → Apariencia): menos aire vertical para ver más
+   filas por pantalla. Selector atributo+elemento (0,1,1) le gana a las
+   utilities de padding (0,1,0) sin !important. Solo afecta contenedores de
+   datos (tablas y filas de lista marcadas); cards y formularios no cambian. */
+[data-density="compact"] table td,
+[data-density="compact"] table th {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+[data-density="compact"] table td {
+  font-size: 0.8125rem;
+}

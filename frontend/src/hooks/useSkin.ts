@@ -105,6 +105,8 @@ export type UiPrefs = {
   customHue?: number | null;
   /** true = el usuario eligió quedarse con su skin durante las temporadas. */
   seasonalOptOut?: boolean;
+  /** Densidad compacta: menos padding en tablas y listas (data-density). */
+  density?: "compact";
 };
 
 const PREFS_KEY = "maven-ui-prefs";
@@ -126,6 +128,7 @@ export const sanitizeUiPrefs = (raw: unknown): UiPrefs => {
     prefs.customHue = Math.min(360, Math.max(0, Math.round(o.customHue)));
   }
   if (typeof o.seasonalOptOut === "boolean") prefs.seasonalOptOut = o.seasonalOptOut;
+  if (o.density === "compact") prefs.density = "compact";
   return prefs;
 };
 
@@ -229,6 +232,8 @@ export const applyAppearancePrefs = () => {
   else delete root.dataset.oled;
   if (prefs.contrast) root.dataset.contrast = "high";
   else delete root.dataset.contrast;
+  if (prefs.density === "compact") root.dataset.density = "compact";
+  else delete root.dataset.density;
   const season = activeSeason();
   const seasonOn = !!season && prefs.seasonalOptOut !== true;
   if (seasonOn && season) root.dataset.season = season.id;

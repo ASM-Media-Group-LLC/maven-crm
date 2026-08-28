@@ -289,6 +289,8 @@ const translations = {
   "settings.skinCustomDesc": { es: "Elige cualquier tono: la intensidad se ajusta sola para que el texto siga legible.", en: "Pick any hue: intensity adjusts itself so text stays readable." },
   "settings.oledLabel": { es: "Negro puro (OLED)", en: "True black (OLED)" },
   "settings.oledDesc": { es: "En tema oscuro usa fondo negro absoluto: en pantallas OLED los píxeles negros se apagan y la batería dura más.", en: "Uses an absolute black background in dark theme: on OLED screens black pixels turn off and the battery lasts longer." },
+  "settings.densityLabel": { es: "Densidad compacta", en: "Compact density" },
+  "settings.densityDesc": { es: "Menos espacio entre filas: más leads y conversaciones por pantalla.", en: "Tighter rows: more leads and conversations per screen." },
   "settings.contrastLabel": { es: "Alto contraste", en: "High contrast" },
   "settings.contrastDesc": { es: "Sube el contraste de textos y bordes y hace más visible el foco del teclado.", en: "Raises text and border contrast and makes keyboard focus more visible." },
   "settings.seasonLabel": { es: "Skin de temporada", en: "Seasonal skin" },
