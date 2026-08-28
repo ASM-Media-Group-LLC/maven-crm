@@ -31,8 +31,10 @@ interface Ctx {
   startCall: (config: CallConfig) => void;
   /** Cuelga y la saca de la pantalla. */
   endCall: () => void;
-  /** La página registra su hueco; al desmontarse, la llamada se va a flotante. */
-  registerOutlet: (el: HTMLElement | null) => void;
+  /** La página registra su hueco; al desmontarse, la llamada se va a flotante.
+   *  En la baja va `el: null` + el nodo que se está yendo, para poder ignorarla
+   *  si otra página ya registró el suyo. */
+  registerOutlet: (el: HTMLElement | null, saliente?: HTMLElement | null) => void;
   activeKey: string | null;
   /** Saca la llamada a una ventana del sistema (movible a otro monitor).
    *  La ofrece el provider y no cada página para que sea la MISMA llamada la
@@ -63,8 +65,14 @@ export function CallOutlet({ className }: { className?: string }) {
   // ventana de un render donde el hueco todavia no estaba: la llamada se montaba
   // en la ventanita flotante y enseguida se MOVIA al hueco, y mover un <video>
   // de lugar en el DOM lo deja pausado en varios navegadores — pantalla negra.
+  // Se recuerda el propio nodo para poder DARSE DE BAJA por identidad: en la
+  // baja React solo manda `null`, y sin saber cuál se fue no se puede distinguir
+  // "se desmontó el hueco" de "otra página ya registró el suyo".
+  const mio = useRef<HTMLDivElement | null>(null);
   const ref = useCallback((el: HTMLDivElement | null) => {
-    registerOutlet(el);
+    if (el) { mio.current = el; registerOutlet(el); return; }
+    registerOutlet(null, mio.current);
+    mio.current = null;
   }, [registerOutlet]);
   return <div ref={ref} className={className ?? "w-full h-full"} />;
 }
@@ -106,13 +114,19 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     closePip();
   }, [closePip]);
 
-  const registerOutlet = useCallback((el: HTMLElement | null) => {
-    // Al navegar entre dos páginas que ofrecen hueco, el nuevo se registra antes
-    // de que el viejo se limpie. Si el que quedó guardado ya salió del documento,
-    // no sirve: eso es exactamente "me fui de la página" y toca ir a flotante.
+  const registerOutlet = useCallback((el: HTMLElement | null, saliente?: HTMLElement | null) => {
+    // La baja se resuelve por IDENTIDAD, no preguntando si el nodo sigue en el
+    // documento: React llama a la ref con null ANTES de sacarlo del DOM (está
+    // pineado en refDetachOrden.test.tsx), así que `document.contains` siempre
+    // decía "sigue vivo" y el hueco no se limpiaba nunca. La llamada quedaba
+    // dibujada dentro de un div huérfano: invisible, muda y sin ventanita.
+    //
+    // Solo se limpia si el que se va es el que está puesto. Si al navegar entre
+    // dos páginas con hueco el nuevo llegara primero, la baja del viejo no lo
+    // pisa.
     setOutlet((prev) => {
       if (el) return el;
-      return prev && document.contains(prev) ? prev : null;
+      return prev === saliente ? null : prev;
     });
   }, []);
 
@@ -166,6 +180,34 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   }, [outlet, config]);
   const enFlotante = !pipWindow && !outlet && puedeFlotar;
 
+  // LA CAJA: el contenedor real de la llamada. Se crea UNA vez y se muda a mano
+  // con appendChild.
+  //
+  // Por qué no simplemente `createPortal(…, destino)` cambiando el destino: al
+  // cambiarle el container a un portal, React DESMONTA el subárbol y lo vuelve a
+  // montar. O sea, cada mudanza reconectaba la llamada — se caía el audio unos
+  // segundos y para los demás la persona salía y volvía a entrar. Con la caja
+  // fija, React nunca se entera de la mudanza: solo se mueve un nodo del DOM y
+  // el objeto Room de LiveKit sigue siendo el mismo.
+  const [caja] = useState(() => {
+    const d = document.createElement("div");
+    d.style.width = "100%";
+    d.style.height = "100%";
+    return d;
+  });
+
+  // La caja se muda al destino que toque. No se limpia al desmontar: sacarla del
+  // DOM aunque sea un instante pausa el video, y el próximo destino la va a
+  // reclamar de todas formas (appendChild mueve, no copia).
+  useEffect(() => {
+    if (destino && caja.parentNode !== destino) destino.appendChild(caja);
+  }, [destino, caja]);
+
+  // Sin llamada, la caja no cuelga de ningún lado.
+  useEffect(() => {
+    if (!config) caja.remove();
+  }, [config, caja]);
+
   // Red de seguridad: mover la llamada de contenedor la saca del documento un
   // instante, y el navegador PAUSA todo <video>/<audio> que sale del documento
   // (esta en la spec). Al reinsertarlo no vuelve solo: queda negro y mudo. Esto
@@ -175,7 +217,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     if (!destino || !config) return;
     let intentos = 0;
     const reanudar = () => {
-      destino.querySelectorAll("video, audio").forEach((el) => {
+      caja.querySelectorAll("video, audio").forEach((el) => {
         const m = el as HTMLMediaElement;
         if (m.paused) m.play().catch(() => { /* sin gesto del usuario, se reintenta */ });
       });
@@ -185,7 +227,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     };
     const id = window.setTimeout(reanudar, 60);
     return () => window.clearTimeout(id);
-  }, [destino, config]);
+  }, [destino, config, caja]);
 
   return (
     <PersistentCallContext.Provider value={ctx}>
@@ -242,13 +284,12 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
         </div>
       )}
 
-      {/* La llamada se monta UNA sola vez y se porta al destino que corresponda:
-          así cambiar de página mueve el video, no lo reinicia. */}
-      {config && destino && createPortal(
-        <div className="w-full h-full">
-          <LiveKitCallView {...config} compact={enFlotante || !!pipWindow} />
-        </div>,
-        destino,
+      {/* La llamada se monta UNA sola vez, siempre dentro de la MISMA caja: así
+          cambiar de página mueve el video, no lo reinicia. La caja es la que
+          viaja al hueco / a la ventanita / a la ventana del sistema. */}
+      {config && createPortal(
+        <LiveKitCallView {...config} compact={enFlotante || !!pipWindow} />,
+        caja,
       )}
     </PersistentCallContext.Provider>
   );

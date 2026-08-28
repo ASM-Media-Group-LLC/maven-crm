@@ -48,11 +48,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
   const {
-    startCall, endCall,
+    startCall, endCall, activeKey,
     abrirVentanaDelSistema, cerrarVentanaDelSistema,
     ventanaDelSistemaAbierta, ventanaDelSistemaSoportada,
   } = usePersistentCall();
-  const [hubConnected, setHubConnected] = useState(false);
+  // "El Hub está conectado" NO es estado de esta página: la llamada vive en el
+  // provider, que está por encima del router. Guardarlo acá significaba que al
+  // volver de otra sección arrancaba en false y colgaba la llamada que seguía
+  // viva. Se lee de la única fuente que sobrevive a navegar.
+  const hubRoom = cowork.session?.host_hub_livekit_room ?? null;
+  const hubKey = hubRoom ? `cowork-hub-${hubRoom}` : null;
+  const hubConnected = !!hubKey && activeKey === hubKey;
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -286,12 +292,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     }
   }, [cowork.session?.id]);
 
-  useEffect(() => {
-    if (profileLoaded && cowork.session?.host_hub_livekit_room) {
-      setHubConnected(true);
-    }
-  }, [profileLoaded, cowork.session?.host_hub_livekit_room]);
-
   // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
   // cuando le hablás a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
   // sala publica un clon (CoworkRoomMonitor). El Coordinador Hub queda INDEPENDIENTE (su mic está
@@ -353,16 +353,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Hub (uno para la ventana del sistema, otro para el panel), así que sacarlo
   // del navegador desmontaba uno y montaba el otro — o sea, reconectaba la
   // llamada. Ahora es el mismo componente movido por portal.
-  useEffect(() => {
-    const sala = cowork.session?.host_hub_livekit_room;
-    if (!hubConnected || !sala) return;
+  const colgarHub = useCallback(() => {
+    setHubMaximized(false);
+    endCall();
+  }, [endCall]);
+
+  const conectarHub = useCallback(() => {
+    if (!hubRoom || !hubKey) return;
     startCall({
-      key: `cowork-hub-${sala}`,
-      roomName: sala,
+      key: hubKey,
+      roomName: hubRoom,
       displayName,
       callDisplayName: "Coordinador Hub",
       isAdmin: true,
-      onLeave: () => { setHubConnected(false); setHubMaximized(false); },
+      onLeave: colgarHub,
       hideShareLink: true,
       hideLeaveButton: true,
       suppressLeaveToast: true,
@@ -370,12 +374,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       initialCamOn: false,
       getToken: getHubToken,
     });
-  }, [hubConnected, cowork.session?.host_hub_livekit_room, displayName, getHubToken, startCall]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall]);
 
-  // Colgar el Hub lo saca también de la ventanita flotante.
+  // Entrar al Hub al abrir la sesión. UNA sola vez: sin el candado, colgar el
+  // Hub lo volvería a conectar en el mismo instante.
+  //
+  // Si ya venía sonando de otra sección se ADOPTA la llamada viva en vez de
+  // arrancar una nueva: reconectar corta el audio de las salas unos segundos.
+  const yaEntroAlHub = useRef(false);
   useEffect(() => {
-    if (!hubConnected) endCall();
-  }, [hubConnected, endCall]);
+    if (!profileLoaded || !hubRoom || yaEntroAlHub.current) return;
+    yaEntroAlHub.current = true;
+    if (activeKey !== hubKey) conectarHub();
+  }, [profileLoaded, hubRoom, hubKey, activeKey, conectarHub]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = await cowork.issueLiveKitToken("join_room", activeRoomId!);
@@ -692,7 +703,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   setActiveRoomLk(null);
                   setActiveRoomId(null);
                   setActiveRoomName(null);
-                  setHubConnected(false);
+                  colgarHub();
                   await cowork.endSession();
                   toast.success("Sesión finalizada");
                   navigate("/cowork");
@@ -724,7 +735,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="ghost"
                   size="sm"
                   className="h-5 text-[10px] text-amber-500 hover:text-amber-400 px-1.5"
-                  onClick={() => setHubConnected(true)}
+                  onClick={conectarHub}
                 >
                   Reconectar
                 </Button>
@@ -1314,7 +1325,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="ghost"
                   size="icon"
                   className="h-5 w-5 text-destructive hover:text-destructive/80"
-                  onClick={() => { setHubConnected(false); setHubMaximized(false); }}
+                  onClick={colgarHub}
                   title="Colgar llamada"
                 >
                   <PhoneOff className="h-3 w-3" />
