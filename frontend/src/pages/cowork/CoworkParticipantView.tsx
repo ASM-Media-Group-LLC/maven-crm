@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
 import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee } from "lucide-react";
 import { toast } from "sonner";
+import { useFaceNudge } from "@/hooks/useFaceNudge";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -161,8 +162,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // El encuadre lo calcula LiveKitCallView sobre el video local y lo reporta acá;
   // nosotros solo lo republicamos por presence para que lo vea el coordinador.
+  // Lo que ve la propia persona. Hasta ahora el encuadre solo viajaba al
+  // coordinador: quien estaba fuera de cuadro no se enteraba y se quedaba así.
+  const [faceWatch, setFaceWatch] = useState<{ state: string; since: number } | null>(null);
+  useFaceNudge(faceWatch as never, !!breakStartedAt);
+
   const handleFaceStateChange = useCallback(
     (watch: { state: string; since: number }) => {
+      setFaceWatch(watch);
       faceRef.current = { faceState: watch.state, faceSince: watch.since };
       trackMediaState({
         ...lastMediaRef.current,
