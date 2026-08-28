@@ -92,7 +92,10 @@ export default function AvatarUpload({
     <div className="relative group inline-block">
       <Avatar className={cn(sizeMap[size], "ring-2 ring-border")}>
         {currentUrl && <AvatarImage src={currentUrl} alt={displayName} className="object-cover" />}
-        {!currentUrl && seed ? (
+        {/* El fallback se elige por `seed` (NO por `!currentUrl`): si hay foto pero
+            falla al cargar (URL rota / archivo borrado), Radix muestra este fallback
+            y debe caer al muñequito, no a iniciales — igual que <UserAvatar>. */}
+        {seed ? (
           <AvatarFallback className="bg-secondary p-0">
             <img src={dicebearUri(seed)} alt={displayName} className="h-full w-full" draggable={false} />
           </AvatarFallback>
