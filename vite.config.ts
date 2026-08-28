@@ -52,15 +52,40 @@ export default defineConfig(({ mode }) => ({
         // Handlers de Web Push (llamada entrante con Maven cerrado). Se importan
         // al SW generado en vez de reescribirlo. El archivo vive en public/.
         importScripts: ["sw-push.js"],
-        // Bumped from 5 MB to 12 MB so the main bundle can include the
-        // eager-loaded sidebar pages without blowing past the precache
-        // limit. Workbox refuses to precache anything larger than this
-        // value and aborts the build, hence the deploy error.
         maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
+        // SOLO EL ARMAZÓN, no la app entera.
+        //
+        // Antes era "**/*.js", así que el service worker se descargaba los 245
+        // chunks —8,8 MB— en segundo plano apenas alguien abría Maven, y cada
+        // deploy lo invalidaba entero. Con treinta personas y varios deploys por
+        // día, eso es una cantidad enorme de tráfico saliendo del servidor, que
+        // encima compite con el video de LiveKit por el mismo uplink.
+        //
+        // Ahora se precachea lo que hace falta para arrancar —el entry, los
+        // vendors compartidos, estilos, fuentes e íconos— y las páginas se
+        // cachean cuando alguien realmente las abre (regla de abajo). Los
+        // nombres llevan hash, así que una versión cacheada nunca queda vieja:
+        // un deploy genera nombres nuevos.
+        globPatterns: [
+          "**/*.{css,ico,png,svg,woff2}",
+          "assets/index-*.js",
+          "assets/vendor-*.js",
+        ],
         navigateFallback: undefined,
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
+          {
+            // Los chunks de página: se guardan la primera vez que alguien entra
+            // a esa sección y de ahí en adelante salen de la caché. El hash en
+            // el nombre hace que StaleWhileRevalidate sea seguro — el contenido
+            // de un nombre dado no cambia nunca.
+            urlPattern: /\/assets\/.*\.js$/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "chunks-cache",
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
           {
             urlPattern: /\/$/,
             handler: "NetworkFirst",
@@ -138,11 +163,15 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-toggle",
             "@radix-ui/react-toggle-group",
           ],
-          "vendor-charts": ["recharts"],
           "vendor-date": ["date-fns"],
           "vendor-icons": ["lucide-react"],
-          "vendor-dnd": ["@hello-pangea/dnd"],
-          "vendor-pdf": ["jspdf", "jspdf-autotable"],
+          // recharts, jspdf y dnd NO se listan a proposito. Nombrarlos aca los
+          // convierte en parte del grafo inicial: Vite les pone un
+          // <link rel="modulepreload"> en el index.html y se descargan al abrir
+          // el login, donde nadie ve un grafico ni genera un PDF. Sin listarlos,
+          // Vite los reparte con las paginas que si los usan y llegan cuando
+          // alguien entra a esa seccion. Son 846 KB que dejan de viajar en cada
+          // primera carga.
         },
       },
     },
