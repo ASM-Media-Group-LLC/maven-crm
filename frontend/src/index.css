@@ -200,6 +200,92 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-primary: 350 80% 42%;
     --sidebar-ring: 350 80% 42%;
   }
+
+  /* ---- Skins de LÍNEA de negocio (grupo "Líneas" del picker) ----
+     Colores de marca de cada línea como preset de acento (Kash ya tiene su
+     preset propio arriba, "Rojo Kash"). Misma regla A11y que los presets de
+     arriba — blanco sobre primary ≥ 4.5:1, verificado con el script WCAG
+     (lib/wcag.ts usa el mismo cálculo):
+       unlimited 150 56% → L 33% (4.70:1; a 47% daba 2.2:1)
+       unlok     211 100% → L 45% (4.77:1; el azul maven a 50% da 3.97:1) */
+  :root[data-skin="unlimited"] {
+    --primary: 150 56% 33%;
+    --accent: 190 90% 45%;
+    --ring: 150 56% 33%;
+    --sidebar-primary: 150 56% 33%;
+    --sidebar-ring: 150 56% 33%;
+  }
+
+  :root[data-skin="unlok"] {
+    --primary: 211 100% 45%;
+    --accent: 199 90% 48%;
+    --ring: 211 100% 45%;
+    --sidebar-primary: 211 100% 45%;
+    --sidebar-ring: 211 100% 45%;
+  }
+
+  /* ---- Skins de TEMPORADA (data-season en <html>) ----
+     Overlay temporal: NO pisa el ui_skin guardado — hooks/useSkin.ts pone
+     data-season cuando la fecha cae en rango y el usuario no optó por
+     quedarse con su skin (ui_prefs.seasonalOptOut). Van DESPUÉS de los
+     bloques [data-skin] a propósito: misma especificidad (0,2,0), el orden
+     resuelve el empate a favor de la temporada. El skin Personalizado
+     (vars inline) le ganaría al overlay, así que el applier lo suprime
+     mientras la temporada está activa. A11y primary vs blanco:
+       halloween 25 95% 39% = 4.61:1 · navidad 350 80% 42% = 6.14:1 */
+  :root[data-season="halloween"] {
+    --primary: 25 95% 39%;
+    --accent: 271 91% 50%;
+    --ring: 25 95% 39%;
+    --sidebar-primary: 25 95% 39%;
+    --sidebar-ring: 25 95% 39%;
+  }
+
+  :root[data-season="navidad"] {
+    --primary: 350 80% 42%;
+    --accent: 43 80% 34%;
+    --ring: 350 80% 42%;
+    --sidebar-primary: 350 80% 42%;
+    --sidebar-ring: 350 80% 42%;
+  }
+
+  /* ---- Modo OLED (data-oled en <html>) — SOLO en tema oscuro ----
+     Negro puro de fondo (en pantallas OLED los píxeles negros se apagan →
+     batería). Cards/popovers quedan apenas por encima del negro para no
+     perder la jerarquía de superficies, y el borde sube un paso (17→22%)
+     porque sobre negro absoluto el 17% casi no se ve. Los glows del
+     .dark body::before se quedan (spec). En tema claro el atributo no
+     matchea nada: cero efecto. .dark[data-oled] (0,2,0) gana sobre
+     .dark (0,1,0). */
+  .dark[data-oled] {
+    --background: 0 0% 0%;
+    --card: 228 20% 4%;
+    --popover: 228 20% 4%;
+    --sidebar-background: 0 0% 0%;
+    --border: 225 26% 22%;
+  }
+
+  /* ---- Alto contraste (data-contrast="high" en <html>) ----
+     Combinable con cualquier skin/temporada (tokens disjuntos) y con OLED
+     (mismo peso 0,2,0 en dark: este bloque va DESPUÉS, así su --border 30%
+     le gana al 22% de OLED). --input sube junto con --border para que los
+     bordes de inputs queden más marcados (shadcn los pinta con border-input).
+     El spec define los valores para dark; el tema claro lleva el espejo
+     equivalente (foreground negro puro, muted/border más oscuros) para que
+     el modo también funcione en claro sin volver el texto invisible. */
+  :root[data-contrast="high"]:not(.dark) {
+    --foreground: 0 0% 0%;
+    --muted-foreground: 240 5% 30%;
+    --border: 240 6% 62%;
+    --input: 240 6% 62%;
+  }
+
+  .dark[data-contrast="high"] {
+    --foreground: 0 0% 100%;
+    --muted-foreground: 225 15% 74%;
+    --border: 225 26% 30%;
+    --input: 225 26% 30%;
+  }
 }
 
 @layer base {
@@ -252,6 +338,15 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
+}
+
+/* Alto contraste: anillo de foco global más grueso. El !important le gana al
+   `focus-visible:outline-none` de los componentes shadcn (que confían solo en
+   el ring); con el modo activo TODO foco de teclado se marca con outline de
+   2px además del ring que ya tuviera. Solo aplica con data-contrast="high". */
+:root[data-contrast="high"] :focus-visible {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 2px;
 }
 
 /* Hero gradient background */

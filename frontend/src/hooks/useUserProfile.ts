@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+// Solo el TIPO (import type = sin ciclo en runtime; useSkin.ts importa de acá).
+import type { UiPrefs } from "@/hooks/useSkin";
 
 // Helpers for the signed-in user's own profile row in `profiles`. The
 // existing useAdminUsers hook covers admin-side fetching of every user;
@@ -19,6 +22,9 @@ export interface MyProfile {
   avatar_seed: string | null;
   phone_e164: string | null;
   ui_skin: string | null;
+  /** jsonb — {oled, contrast, customHue, seasonalOptOut}; validar con
+      sanitizeUiPrefs (hooks/useSkin.ts) antes de usar. */
+  ui_prefs: Json | null;
   whatsapp_push_name: string | null;
   whatsapp_verified_at: string | null;
 }
@@ -32,7 +38,7 @@ export const useMyProfile = () =>
       if (!uid) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, avatar_seed, phone_e164, ui_skin, whatsapp_push_name, whatsapp_verified_at")
+        .select("id, full_name, avatar_url, avatar_seed, phone_e164, ui_skin, ui_prefs, whatsapp_push_name, whatsapp_verified_at")
         .eq("id", uid)
         .maybeSingle();
       if (error) throw error;
@@ -111,6 +117,33 @@ export const useSaveSkin = () => {
         .eq("id", uid);
       if (error) throw error;
     },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
+};
+
+// Persiste las preferencias de apariencia (OLED/contraste/tono/temporada) en
+// profiles.ui_prefs. Función SUELTA (no hook) a propósito: la usan también
+// caminos sin contexto de mutación — el toast de temporada y el clear del
+// tono custom al elegir un preset (hooks/useSkin.ts). Fire-and-forget salvo
+// que el caller quiera el error.
+export const saveUiPrefsRemote = async (prefs: UiPrefs): Promise<void> => {
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) return; // sin sesión no hay dónde persistir; lo local ya quedó
+  await supabase
+    .from("profiles")
+    .update({ ui_prefs: prefs as Json })
+    .eq("id", uid);
+};
+
+// Espejo de useSaveSkin para ui_prefs (card Apariencia). La aplicación
+// visual instantánea la hace useUiPrefs (hooks/useSkin.ts).
+export const useSaveUiPrefs = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: saveUiPrefsRemote,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["my-profile"] });
     },

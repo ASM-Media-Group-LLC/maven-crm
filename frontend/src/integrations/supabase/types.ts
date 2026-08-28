@@ -10227,6 +10227,7 @@ export type Database = {
           id: string
           is_owner: boolean
           phone_e164: string | null
+          ui_prefs: Json | null
           ui_skin: string | null
           whatsapp_lid: string | null
           whatsapp_push_name: string | null
@@ -10242,6 +10243,7 @@ export type Database = {
           id: string
           is_owner?: boolean
           phone_e164?: string | null
+          ui_prefs?: Json | null
           ui_skin?: string | null
           whatsapp_lid?: string | null
           whatsapp_push_name?: string | null
@@ -10257,6 +10259,7 @@ export type Database = {
           id?: string
           is_owner?: boolean
           phone_e164?: string | null
+          ui_prefs?: Json | null
           ui_skin?: string | null
           whatsapp_lid?: string | null
           whatsapp_push_name?: string | null

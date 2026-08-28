@@ -1,13 +1,16 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { applyStoredSkin } from "./hooks/useSkin";
+import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 
 // Skin de acento del usuario (Settings → Apariencia): aplicado ANTES del
 // primer render para que la app no parpadee con el acento default. La
 // sincronización con profiles.ui_skin llega después (useSkinSync en App);
-// mientras tanto manda lo guardado en localStorage.
+// mientras tanto manda lo guardado en localStorage. applyStoredAppearance
+// suma OLED/alto contraste/tono personalizado y el overlay de temporada
+// (ui_prefs) — mismo contrato: local primero, el perfil sincroniza después.
 applyStoredSkin();
+applyStoredAppearance();
 
 // --- PWA / Service Worker guard ---
 // In iframes (preview hosts, embedded contexts) we disable the service
