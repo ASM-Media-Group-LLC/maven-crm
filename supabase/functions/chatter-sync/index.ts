@@ -254,6 +254,19 @@ serve(async (req: Request) => {
       const porBluId = new Map<string, string>();
       for (const l of links ?? []) porBluId.set(String(l.external_id), l.identity_id);
 
+      // Nombre de cada modelo, para no guardar filas anonimas. BLU lo trae en
+      // `internalName` (como la llama el equipo), con el perfil de OF anidado
+      // en `aboutMe` como respaldo.
+      const nombreDeModelo = new Map<number, string>();
+      try {
+        const md = await blu("models");
+        for (const m of (md?.models ?? md?.rows ?? [])) {
+          const id = Number(m?.id);
+          const nombre = m?.internalName ?? m?.aboutMe?.name ?? m?.aboutMe?.username ?? null;
+          if (Number.isFinite(id) && nombre) nombreDeModelo.set(id, String(nombre));
+        }
+      } catch { /* sin nombres la ingesta sigue: el id igual identifica la modelo */ }
+
       const filas: any[] = [];
       const cobertura: any[] = [];
       let sinIdentidad = 0;
@@ -285,6 +298,7 @@ serve(async (req: Request) => {
           if (!idn) { sinIdentidad++; continue; }
           filas.push({
             dia: elDia, identity_id: idn, blu_model_id: modelId,
+            model_name: nombreDeModelo.get(modelId) ?? null,
             sales: ventas, fans_chatted: fans,
             sold_messages: Number(m.soldMessages) || 0,
           });
