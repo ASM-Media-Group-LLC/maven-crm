@@ -94,6 +94,31 @@ serve(async (req) => {
       console.warn(`corte ${hora} ya reclamado para ${g.nombre} — no se duplica`);
       continue;
     }
+    // Grupo sin actividad → no gastamos un corte para decir "sin novedades".
+    //
+    // Medido en agosto: 38 de las 76 corridas de corte_2h en MANAGERS cayeron sobre
+    // una ventana con CERO mensajes humanos ($13 tirados). El agente no corta solo —
+    // el prompt le dice "publica el corte igual: 'sin novedades en el grupo esta
+    // tanda'" — y cada una de esas corridas paga el prefijo entero (~50k tokens que
+    // se re-escriben a 2x porque el TTL del caché es 1h y los cortes están a 2h).
+    // Managers promedia 10,9 mensajes/día contra 57 de Ventas y 70,5 de Warming.
+    //
+    // El CIERRE se dispara siempre: lleva las notas 1-10 del día, que tienen que
+    // publicarse aunque el grupo haya estado callado.
+    if (invokedBy === "corte_2h") {
+      const desde = new Date(Date.now() - 140 * 60 * 1000).toISOString();
+      const { count: humanos } = await sb
+        .from("whatsapp_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", g.id)
+        .eq("is_from_bot", false)
+        .gte("sent_at", desde);
+      if (!humanos) {
+        console.log(`corte ${hora}: ${g.nombre} sin mensajes humanos en la ventana — no se dispara`);
+        continue;
+      }
+    }
+
     const { data: ultimo } = await sb
       .from("whatsapp_messages")
       .select("id")
@@ -107,7 +132,11 @@ serve(async (req) => {
     await new Promise((r) => setTimeout(r, 2000));
   }
   if (disparados.length === 0) {
-    return Response.json({ ok: true, modo: invokedBy, skip: "todos los grupos ya tenían corte reclamado en esta franja" });
+    return Response.json({
+      ok: true,
+      modo: invokedBy,
+      skip: "ningún grupo se disparó: o ya tenían el corte reclamado en esta franja, o no hubo mensajes humanos en la ventana",
+    });
   }
 
   // 2. Esperar los cortes publicados (uno por grupo) hasta POLL_MAX_MS.
