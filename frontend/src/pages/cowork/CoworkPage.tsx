@@ -193,6 +193,31 @@ export default function CoworkPage() {
           </div>
         )}
 
+
+      <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Finalizar «{porFinalizar?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {porFinalizar && porFinalizar.members > 0
+                ? `Se cierra para las ${porFinalizar.members} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
+                : "Se cierra la sesión para todos los participantes."}
+              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={finalizando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={finalizando}
+              onClick={(e) => { e.preventDefault(); void confirmarFinalizar(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {finalizando ? "Finalizando…" : "Finalizar sesión"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
         <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12 max-w-lg w-full">
           <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
             <Users2 className="h-8 w-8 md:h-10 md:w-10 text-primary" />
@@ -329,29 +354,5 @@ function CoworkSessionEndedRedirect() {
         </Button>
       </div>
     </div>
-
-      <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Finalizar «{porFinalizar?.name}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {porFinalizar && porFinalizar.members > 0
-                ? `Se cierra para las ${porFinalizar.members} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
-                : "Se cierra la sesión para todos los participantes."}
-              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={finalizando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={finalizando}
-              onClick={(e) => { e.preventDefault(); void confirmarFinalizar(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {finalizando ? "Finalizando…" : "Finalizar sesión"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
   );
 }
