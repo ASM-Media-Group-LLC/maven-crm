@@ -64,13 +64,18 @@ export function useVideoZoom(enabled: boolean): VideoZoom {
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!enabled || scale === 1) return;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    // El elemento se guarda AHORA, en una variable. React pone currentTarget en
+    // null apenas termina de despachar el evento, asi que leerlo desde el
+    // listener de pointermove —que corre despues— tiraba y el arrastre no movia
+    // nada: el zoom funcionaba y la manito no.
+    const contenedor = e.currentTarget as HTMLElement;
+    contenedor.setPointerCapture?.(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
 
     const mover = (ev: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const rect = contenedor.getBoundingClientRect();
       // El desplazamiento se guarda en % del contenedor para que el encuadre no
       // se descoloque cuando la ventana cambia de tamaño (o pasa a flotante).
       const dx = ((ev.clientX - d.x) / Math.max(1, rect.width)) * 100;
