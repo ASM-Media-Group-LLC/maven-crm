@@ -48,6 +48,7 @@ export const SKINS: SkinDef[] = [
   { id: "medianoche", label: "Medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" },
   { id: "dorado", label: "Dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" },
   { id: "kash", label: "Rojo Kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" },
+  { id: "diva", label: "Diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" },
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
   { id: "unlimited", label: "Unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" },

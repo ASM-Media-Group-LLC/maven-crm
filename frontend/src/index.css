@@ -201,6 +201,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-ring: 350 80% 42%;
   }
 
+  /* Diva: fucsia glam (4.55:1 con blanco) + rosa vivo. Distinto de Orquídea,
+     que tira a violeta (290°); Diva vive en 330°. */
+  :root[data-skin="diva"] {
+    --primary: 330 85% 48%;
+    --accent: 350 90% 60%;
+    --ring: 330 85% 48%;
+    --sidebar-primary: 330 85% 48%;
+    --sidebar-ring: 330 85% 48%;
+  }
+
   /* ---- Skins de LÍNEA de negocio (grupo "Líneas" del picker) ----
      Colores de marca de cada línea como preset de acento (Kash ya tiene su
      preset propio arriba, "Rojo Kash"). Misma regla A11y que los presets de
