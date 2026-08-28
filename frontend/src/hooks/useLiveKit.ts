@@ -41,7 +41,7 @@ export interface LKChatMessage {
 }
 
 interface DataMessage {
-  type: "chat" | "hand" | "reaction" | "moderation";
+  type: "chat" | "hand" | "reaction" | "moderation" | "chat-history";
   payload: any;
 }
 
@@ -298,6 +298,11 @@ export function useLiveKit() {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [participants, setParticipants] = useState<LKParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<LKChatMessage[]>([]);
+  // Espejo en ref: el listener de LiveKit se registra una sola vez y capturaria
+  // el arreglo vacio del primer render. Sin esto, al entrar alguien se le
+  // mandaria un historial siempre vacio.
+  const chatMessagesRef = useRef<LKChatMessage[]>([]);
+  useEffect(() => { chatMessagesRef.current = chatMessages; }, [chatMessages]);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
@@ -971,6 +976,34 @@ export function useLiveKit() {
         console.info("[LiveKit] Participant connected:", p.identity, p.name);
         if (avisaEntradasYSalidas(room.name)) playJoinSound();
         refreshParticipants();
+
+        // El chat de LiveKit es EFIMERO: solo llega a quien esta conectado en
+        // ese momento, asi que el que entra despues ve la conversacion vacia
+        // aunque haya diez mensajes. Quien ya estaba se los pasa.
+        //
+        // Responde UNO SOLO —el de identity mas baja entre los que ya
+        // estabamos— para no mandar N copias del mismo historial. Es una regla
+        // deterministica: todos calculan el mismo ganador sin coordinarse.
+        const yo = room.localParticipant.identity;
+        const presentes = [yo, ...Array.from(room.remoteParticipants.values())
+          .map((rp) => rp.identity).filter((id) => id !== p.identity)];
+        if (presentes.sort()[0] !== yo) return;
+
+        const historia = chatMessagesRef.current;
+        if (!historia.length) return;
+        // Un respiro para que el que entra termine de suscribirse: si se manda
+        // en el mismo instante, puede no tener el handler listo todavia.
+        window.setTimeout(() => {
+          try {
+            room.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify({
+                type: "chat-history",
+                payload: { messages: historia.slice(-MAX_CHAT_MESSAGES) },
+              })),
+              { reliable: true, destinationIdentities: [p.identity] },
+            );
+          } catch { /* si falla, el que entro simplemente ve el chat vacio */ }
+        }, 800);
       });
       room.on(RoomEvent.ParticipantDisconnected, (p) => {
         console.info("[LiveKit] Participant disconnected:", p.identity, p.name);
@@ -1063,11 +1096,13 @@ export function useLiveKit() {
               const newMessages = [
                 ...prev,
                 {
-                  id: `${Date.now()}-${participant?.identity}`,
+                  // El id viaja con el mensaje; el respaldo es solo para
+                  // clientes viejos que todavia no lo mandan.
+                  id: msg.payload.id ?? `${Date.now()}-${participant?.identity}`,
                   sender: participant?.identity || "unknown",
                   senderName: participant?.name || participant?.identity || "Unknown",
                   content: msg.payload.text,
-                  timestamp: Date.now(),
+                  timestamp: msg.payload.ts ?? Date.now(),
                 },
               ];
               if (newMessages.length > MAX_CHAT_MESSAGES) {
@@ -1077,6 +1112,22 @@ export function useLiveKit() {
             });
             setUnreadChatCount((c) => c + 1);
             playChatMessageSound();
+          } else if (msg.type === "chat-history") {
+            // Alguien que ya estaba me pasa lo que se dijo antes de que entrara.
+            // Se fusiona por id y se ordena por hora: si llegan dos historiales
+            // (o uno mientras entran mensajes nuevos), no se duplica nada.
+            const historia: LKChatMessage[] = Array.isArray(msg.payload?.messages)
+              ? msg.payload.messages : [];
+            if (!historia.length) return;
+            setChatMessages((prev) => {
+              const porId = new Map(prev.map((m) => [m.id, m]));
+              for (const m of historia) if (m?.id && !porId.has(m.id)) porId.set(m.id, m);
+              const todos = [...porId.values()].sort((a, b) => a.timestamp - b.timestamp);
+              return todos.length > MAX_CHAT_MESSAGES
+                ? todos.slice(todos.length - MAX_CHAT_MESSAGES) : todos;
+            });
+            // NO suena ni cuenta como no leido: es lo que ya se habia dicho, no
+            // algo nuevo dirigido a quien acaba de entrar.
           } else if (msg.type === "hand") {
             handRaisedMap.current[participant?.identity || ""] = msg.payload.raised;
             if (msg.payload.raised) playHandRaisedSound();
@@ -1452,7 +1503,13 @@ export function useLiveKit() {
   const sendChatMessage = useCallback((text: string) => {
     const room = roomRef.current;
     if (!room || !text.trim()) return;
-    const msg: DataMessage = { type: "chat", payload: { text } };
+    // El id y la hora los pone QUIEN ESCRIBE y viajan con el mensaje. Antes cada
+    // receptor se inventaba el suyo al recibir, asi que el mismo mensaje tenia
+    // un id distinto en cada pantalla — imposible fusionar historiales sin
+    // duplicar todo.
+    const id = `${room.localParticipant.identity}-${Date.now()}-${Math.round(performance.now())}`;
+    const ts = Date.now();
+    const msg: DataMessage = { type: "chat", payload: { text, id, ts } };
     room.localParticipant.publishData(
       new TextEncoder().encode(JSON.stringify(msg)),
       { reliable: true }
@@ -1461,11 +1518,11 @@ export function useLiveKit() {
       const newMessages = [
         ...prev,
         {
-          id: `${Date.now()}-local`,
+          id,
           sender: room.localParticipant.identity,
           senderName: room.localParticipant.name || "Tú",
           content: text,
-          timestamp: Date.now(),
+          timestamp: ts,
         },
       ];
       if (newMessages.length > MAX_CHAT_MESSAGES) {

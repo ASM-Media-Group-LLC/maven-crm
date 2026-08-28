@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
@@ -384,6 +385,28 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       : ms.faceState === "too_dark" ? "Sin luz"
       : null;
   };
+
+  // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
+  // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
+  // mirando otra sala, no se enteraba. Suena UNA vez por persona y por episodio
+  // — se rearma solo cuando esa persona vuelve a cuadro.
+  const yaAvisado = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const [uid, st] of Object.entries(mediaStates)) {
+      const problema = faceIssue(st);
+      if (problema && !yaAvisado.current.has(uid)) {
+        yaAvisado.current.add(uid);
+        playCoordinatorRequestSound();
+        const quien = cowork.profiles[uid] || "Alguien";
+        toast.warning(`${quien}: ${problema.toLowerCase()}`, {
+          description: "Lleva más de un minuto así y ya se le avisó a él.",
+          duration: 8000,
+        });
+      } else if (!problema) {
+        yaAvisado.current.delete(uid);
+      }
+    }
+  }, [mediaStates, now, cowork.profiles]);
 
   // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
   // avanzan solos sin depender de que llegue un evento de presence.

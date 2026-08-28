@@ -22,6 +22,35 @@ import { playMessageNotification } from "@/lib/notificationSound";
 
 const PRIMER_AVISO_MS = 90_000;
 const REPETIR_CADA_MS = 90_000;
+
+// "Maven supervisor": la voz que le pide a la persona que se acomode.
+//
+// Habla desde SU PROPIA maquina (Web Speech), no como un participante mas de la
+// sala. Es lo mismo desde donde se escucha —cada sala de Cowork tiene una sola
+// persona— pero sin montar un bot que se conecte a N salas, sin gastar ancho de
+// banda y sin que la voz quede grabada en la sesion. Si el navegador no tiene
+// sintesis de voz, la escalera sigue funcionando con el aviso escrito.
+const FRASES: Record<string, string> = {
+  no_face: "Por favor, acomodate frente a la cámara.",
+  too_small: "Por favor, acercate un poco a la cámara.",
+  too_dark: "Hay muy poca luz. Por favor, mejorá la iluminación.",
+};
+
+function hablar(texto: string) {
+  try {
+    const sintesis = window.speechSynthesis;
+    if (!sintesis) return;
+    // Si ya venia hablando, se corta: mejor una frase clara que dos encimadas.
+    sintesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = "es-419";
+    u.rate = 0.95;
+    u.volume = 0.9;
+    const voz = sintesis.getVoices().find((v) => v.lang?.toLowerCase().startsWith("es"));
+    if (voz) u.voice = voz;
+    sintesis.speak(u);
+  } catch { /* sin voz, queda el aviso escrito */ }
+}
 /** Tras cuánto tiempo fuera de cuadro se considera que hay que avisarle a alguien más. */
 export const AVISAR_COORDINADOR_MS = 180_000;
 
@@ -60,8 +89,13 @@ export function useFaceNudge(
           id: "encuadre", // uno solo: no apilar avisos del mismo problema
         });
         // El primero es silencioso a proposito: un descuido de un minuto no
-        // amerita un ruido. Si sigue, ya no es un descuido.
-        if (conSonido) playMessageNotification(0.5);
+        // amerita un ruido. Si sigue, ya no es un descuido: suena y ademas se
+        // lo dice en voz alta, que es lo que de verdad interrumpe a alguien que
+        // esta mirando otra pantalla.
+        if (conSonido) {
+          playMessageNotification(0.5);
+          hablar(FRASES[watch.state] ?? "Por favor, acomodate frente a la cámara.");
+        }
         ultimoAviso.current = ahora;
       }
 
