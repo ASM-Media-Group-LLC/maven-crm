@@ -753,6 +753,8 @@ REGLAS DE ESTILO PARA EL EOD:
 - NUNCA mencionar problemas técnicos del bot, ni decir "no tengo info de X". Si te falta data, omite la sección.
 - Si el día fue un día libre del equipo entero o muy poca actividad, manda un mensaje corto: "📊 Día calmado en Marketing/Ventas. Sin reportes de cierre — descanse el equipo."
 
+REGISTRAR LO QUE PASÓ (antes de validar nada): cada vez que un closer cuente que habló, escribió, llamó o se reunió con una lead y diga en qué quedó — "le escribí a @x y no contestó", "hablé con @y, quedó de pensarlo", "tuve la llamada con @z" — llamá registrar_contacto con el canal, el resultado y la nota TEXTUAL. Es lo que mueve last_contact_date, o sea lo que apaga el "vencido" y ordena la cadencia. Sin eso el trabajo del closer existe en el chat y no en Maven: en agosto hubo 45 mensajes de llamadas y reuniones en este grupo y CERO quedaron registrados como contacto. NO cambies el stage por haber contactado (contactar no es avanzar) ni uses set_agenda_item para algo que ya pasó — esa es para una cita futura.
+
 VALIDACIÓN CONTRA MAVEN (TU TRABAJO PRINCIPAL DE SUPERVISIÓN):
 
 Este es uno de los aportes más valiosos del bot: cuando el equipo reporta métricas en el grupo de WhatsApp, tú chequeas si esa info también está cargada en Maven. Si NO está, **PIDE QUE LA ACTUALICEN** — con respeto pero firme, con instrucciones concretas de a dónde ir en Maven.
@@ -2037,6 +2039,21 @@ const TOOLS: Array<{
         note: { type: "string", description: "contexto breve y REAL (ej. 'argentina, 2 cuentas, dato de Julieth')" },
       },
       required: ["handle", "monthly_usd"],
+    },
+  },
+  {
+    name: "registrar_contacto",
+    description:
+      "Registra en Maven UN CONTACTO HECHO con una lead del pipeline de Closers: qué canal se usó, qué resultado dio y la nota. Úsala CADA VEZ que un closer cuenta en el grupo que habló, escribió, llamó o se reunió con alguien y dice en qué quedó — 'le escribí a @x y no contestó', 'hablé con @y, quedó de pensarlo', 'tuve la llamada con @z, pide precios'. NO cambia el stage (contactar NO es avanzar el embudo: para eso está mark_lead_stage) y NO sirve para agendar una cita futura (para eso set_agenda_item). Es lo que mueve last_contact_date, o sea lo que apaga el badge de 'vencido' y alimenta la cadencia de seguimiento (día 1-3-5-8-15-29). Si el handle todavía es un contacto del directorio (agencia o ex-creadora) y no un lead, se promueve solo y queda asignado a quien reporta. Tope de 6 contactos por lead: si se llegó, lo dice y no rompe.",
+    input_schema: {
+      type: "object",
+      properties: {
+        handle: { type: "string", description: "handle de IG sin @, o el nombre de la agencia tal como figura en Maven" },
+        channel: { type: "string", description: "canal usado: 'whatsapp' | 'instagram' | 'llamada' | 'correo' | 'telegram' | 'otro'" },
+        result: { type: "string", description: "en qué quedó, en pocas palabras: 'no contestó' | 'respondió' | 'agendó llamada' | 'pidió precios' | 'no le interesa' | 'quedó de pensarlo'" },
+        notes: { type: "string", description: "la nota textual de lo que pasó, con lo que dijo la lead. Sin esto el registro sirve para contar pero no para entender." },
+      },
+      required: ["handle", "channel"],
     },
   },
   {
@@ -5496,6 +5513,107 @@ async function executeTool(
       };
     }
 
+    case "registrar_contacto": {
+      // El evento MAS COMUN del dia en el grupo de Ventas — "le escribi y no
+      // contesto", "hable con X y quedo en Y" — no tenia donde caer: el bot podia
+      // cambiar de stage y agendar, pero NO escribir closer_contact_history (cero
+      // inserts en toda la edge function; el unico writer era el frontend).
+      // Medido en agosto: 45 mensajes de llamadas/reuniones en Ventas, 18 quedaron
+      // como cita y CERO como contacto. Es la mitad de la divergencia grupo↔Maven.
+      if (!ctx.senderUserId) {
+        return { error: "sender_no_vinculado", hint: "No puedo registrar a nombre de alguien que no esta vinculado a un usuario de Maven." };
+      }
+      const raw = String(input.handle ?? "").trim();
+      if (!raw) return { error: "missing_handle" };
+      const handle = parseInstagramHandle(raw) ?? raw.replace(/^@/, "");
+      const channel = String(input.channel ?? "otro").trim().toLowerCase();
+      const result = String(input.result ?? "").trim() || null;
+      const notes = String(input.notes ?? "").trim() || null;
+
+      // 1) Buscar el lead. Solo filas ABIERTAS y preferimos la del que reporta: sin
+      // esto se puede escribir sobre la fila cerrada mas nueva del mismo handle
+      // (el problema que ya tiene mark_lead_stage, index.ts ~5630).
+      const { data: leads } = await sb
+        .from("closer_creators")
+        .select("id, instagram_handle, stage, assigned_to")
+        .ilike("instagram_handle", handle)
+        .in("stage", ["Nuevo", "Asignada", "Confirmada"])
+        .order("created_at", { ascending: false })
+        .limit(5);
+      let leadId = (leads ?? []).find((l) => l.assigned_to === ctx.senderUserId)?.id
+        ?? (leads ?? [])[0]?.id
+        ?? null;
+      let promovido = false;
+
+      // 2) Si no es lead todavia, puede ser un CONTACTO del directorio (agencia /
+      // ex-creadora). closer_contact_history.creator_id tiene FK a closer_creators,
+      // asi que insertar contra un closers_contacts.id explota. Se promueve con el
+      // MISMO RPC que usa el boton "Tomar" en la app.
+      if (!leadId) {
+        const { data: contacto } = await sb
+          .from("closers_contacts")
+          .select("id, name, handle")
+          .or(`handle.ilike.${handle},name.ilike.%${handle}%`)
+          .limit(1)
+          .maybeSingle();
+        if (!contacto) {
+          return {
+            error: "no_encontrada",
+            handle,
+            hint: "No hay lead abierta ni contacto con ese handle. NO afirmes que lo registraste: pedi el handle exacto como figura en Maven.",
+          };
+        }
+        const { data: nuevoId, error: promoErr } = await sb.rpc("assign_closer_to_contact", {
+          p_contact_id: contacto.id,
+          p_closer_id: ctx.senderUserId,
+        });
+        if (promoErr || !nuevoId) {
+          return { error: "no_se_pudo_promover", detalle: promoErr?.message ?? "sin id", handle };
+        }
+        leadId = nuevoId as string;
+        promovido = true;
+      }
+
+      // 3) Registrar. El tope de 6 por lead lo impone un trigger: se traduce en vez
+      // de devolver el texto crudo de Postgres.
+      const { error: insErr } = await sb.from("closer_contact_history").insert({
+        creator_id: leadId,
+        channel,
+        result,
+        notes,
+        created_by: ctx.senderUserId,
+        contact_date: new Date().toISOString(),
+      });
+      if (insErr) {
+        if (String(insErr.message).includes("Maximum of 6")) {
+          return {
+            error: "tope_de_contactos",
+            handle,
+            hint: "Esta lead ya tiene los 6 seguimientos que permite Maven. Si sigue viva, hay que cerrarla o avanzarla de stage, no seguir anotando.",
+          };
+        }
+        return { error: insErr.message };
+      }
+
+      // 4) Devolver el ESTADO RESULTANTE, no solo ok. Misma leccion que
+      // register_daily_report: si la tool devuelve un ok pelado el modelo no tiene
+      // con que ser concreto, y termina diciendo "anotado" sin decir de que.
+      const { count: totalContactos } = await sb
+        .from("closer_contact_history")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", leadId);
+      return {
+        ok: true,
+        handle,
+        lead_id: leadId,
+        contactos_registrados: totalContactos ?? null,
+        restantes_antes_del_tope: Math.max(0, 6 - (totalContactos ?? 0)),
+        ...(promovido
+          ? { promovido: true, nota: "No era una lead todavia: se tomo del directorio y quedo asignada a quien reporta." }
+          : {}),
+      };
+    }
+
     case "validate_report_vs_maven": {
       return await validarReporteVsMaven(sb, ctx, input);
     }
@@ -7805,6 +7923,7 @@ async function runAgent(req: AgentRequest): Promise<{
   const TOOLS_DE_ESCRITURA = new Set([
     "register_daily_report", "register_day_off", "create_reminder", "cancel_reminder", "set_lead_value",
     "mark_lead_stage", "remember_fact", "forget_fact", "add_persistent_rule", "post_to_group",
+    "registrar_contacto",
     "record_milestone", "set_member_schedule", "tomar_lead", "set_scan_note",
   ]);
   // Patrones del ack falso: viven en _shared/agent-output-guards.ts con su batería de
