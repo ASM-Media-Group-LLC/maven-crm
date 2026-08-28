@@ -640,3 +640,78 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   pointer-events: none;
   height: 0;
 }
+
+/* ───────────────── Karma Points — ficha de perfil del Messenger ───────────────── */
+.kp-card{
+  --kp-gold:#f6b93b; --kp-gold-hi:#ffdd82; --kp-gold-lo:#e59321;
+  --kp-info:#5b8cff; --kp-cyan:#43d6e6;
+  position:relative;
+  background:linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / .82));
+  border:1px solid hsl(var(--border));
+  border-radius:26px;
+  box-shadow:0 24px 60px -18px rgba(0,0,0,.55), 0 4px 16px -6px rgba(0,0,0,.4);
+}
+.kp-banner{
+  height:74px; border-radius:26px 26px 0 0;
+  background:
+    radial-gradient(120% 160% at 20% 0%, hsl(var(--primary) / .5), transparent 60%),
+    radial-gradient(120% 160% at 90% 0%, hsl(var(--accent) / .42), transparent 60%),
+    linear-gradient(180deg, hsl(var(--muted)), hsl(var(--card)));
+  border-bottom:1px solid hsl(var(--border) / .6);
+}
+.kp-name{ color:hsl(var(--foreground)); }
+.kp-defs{ position:absolute; width:0; height:0; }
+
+.kp-star{ position:relative; width:34px; height:34px; }
+.kp-star svg.kp-glyph{ width:100%; height:100%; display:block; position:absolute; inset:0; }
+.kp-star-empty{ color:hsl(var(--muted-foreground) / .32); }
+.kp-star.filled .kp-star-fill{ filter:drop-shadow(0 3px 8px rgba(246,185,59,.45)); animation:kp-pop .45s cubic-bezier(.2,.8,.2,1) both; }
+.kp-star .kp-tip{
+  position:absolute; bottom:calc(100% + 9px); left:50%; transform:translateX(-50%) translateY(4px);
+  background:hsl(var(--card)); color:hsl(var(--foreground));
+  border:1px solid hsl(var(--border)); border-radius:10px; padding:7px 10px; width:172px;
+  font-size:11px; line-height:1.35; text-align:center; opacity:0; pointer-events:none;
+  transition:opacity .16s, transform .16s; z-index:20; box-shadow:0 12px 30px -10px rgba(0,0,0,.6);
+}
+.kp-star .kp-tip b{ color:var(--kp-gold-lo); display:block; margin-bottom:1px; }
+.kp-star:hover .kp-tip, .kp-star:focus-visible .kp-tip{ opacity:1; transform:translateX(-50%) translateY(0); }
+.kp-star.special{ width:40px; height:40px; }
+.kp-star.special::before{
+  content:""; position:absolute; inset:-8px; border-radius:50%;
+  background:radial-gradient(closest-side, rgba(246,185,59,.4), transparent 72%);
+  animation:kp-halo 2.6s ease-in-out infinite;
+}
+.kp-sep{ width:1px; height:26px; background:hsl(var(--border)); margin:0 3px; }
+
+.kp-track{ height:8px; border-radius:999px; background:hsl(var(--muted)); overflow:hidden; position:relative; }
+.kp-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, var(--kp-info), hsl(var(--accent)), var(--kp-gold)); transition:width .6s cubic-bezier(.2,.8,.2,1); }
+.kp-goal{ position:absolute; top:-3px; bottom:-3px; left:70%; width:2px; background:var(--kp-gold-hi); box-shadow:0 0 8px var(--kp-gold); }
+
+/* Leyenda: marco dorado aurora (SOLO con las 6 estrellas). */
+.kp-legend{ border-color:transparent; box-shadow:0 0 0 1px rgba(246,185,59,.15), 0 26px 70px -20px rgba(246,185,59,.4), 0 24px 60px -18px rgba(0,0,0,.55); }
+.kp-legend::before{
+  content:""; position:absolute; inset:-1.5px; border-radius:27px; z-index:0;
+  background:conic-gradient(from 0deg, var(--kp-gold), #ff6ec7, var(--kp-cyan), hsl(var(--primary)), var(--kp-gold));
+  animation:kp-spin 7s linear infinite;
+}
+.kp-legend > *{ position:relative; z-index:1; }
+.kp-legend .kp-name{ background:linear-gradient(96deg, #fff, var(--kp-gold-hi) 70%, var(--kp-gold)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.kp-ribbon{
+  position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:4;
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#3a2600;
+  background:linear-gradient(180deg, var(--kp-gold-hi), var(--kp-gold)); padding:5px 12px; border-radius:999px;
+  box-shadow:0 6px 16px -6px rgba(246,185,59,.8); white-space:nowrap;
+}
+
+/* Vista admin: azul/cyan (distinto del dorado). No se aplica si es leyenda. */
+.kp-admin{ border-color:rgba(91,140,255,.5); box-shadow:0 0 0 1px rgba(91,140,255,.22), 0 22px 60px -22px rgba(91,140,255,.42), 0 24px 60px -18px rgba(0,0,0,.55); }
+.kp-admin .kp-banner{ background:radial-gradient(120% 160% at 18% 0%, rgba(91,140,255,.5), transparent 60%), radial-gradient(120% 160% at 92% 0%, rgba(67,214,230,.4), transparent 62%), linear-gradient(180deg, hsl(var(--muted)), hsl(var(--card))); }
+.kp-admin .kp-name{ background:linear-gradient(96deg, hsl(var(--foreground)), #bcd0ff 68%, var(--kp-info)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+@keyframes kp-spin{ to{ transform:rotate(360deg); } }
+@keyframes kp-halo{ 0%,100%{ opacity:.55; transform:scale(1);} 50%{ opacity:1; transform:scale(1.12);} }
+@keyframes kp-pop{ 0%{ transform:scale(.4); opacity:0;} 70%{ transform:scale(1.12);} 100%{ transform:scale(1); opacity:1;} }
+@media (prefers-reduced-motion:reduce){
+  .kp-legend::before, .kp-star.special::before, .kp-star.filled .kp-star-fill{ animation:none !important; }
+}
