@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.meet-room]
 verify_jwt = false
 
+[functions.chatter-sync]
+verify_jwt = false
+
 [functions.livekit-moderate]
 verify_jwt = false
 
