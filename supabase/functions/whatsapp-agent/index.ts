@@ -7497,7 +7497,7 @@ async function runAgent(req: AgentRequest): Promise<{
 
   const { data: group } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona, wa_bot_id, is_direct")
+    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona, wa_bot_id, is_direct, model")
     .eq("id", groupId)
     .single();
 
@@ -7830,8 +7830,15 @@ async function runAgent(req: AgentRequest): Promise<{
   let iter = 0;
   const totalUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
-  // Modelo: el del bot si lo define; si no, el router por defecto.
-  const modelToUse = botCfg?.model ?? pickModel(req.invoked_by, !!req.report_kind);
+  // Modelo: override del GRUPO si lo tiene, si no el del bot, si no el router.
+  // El override por grupo existe porque un mismo bot puede atender varios grupos con
+  // perfiles de costo muy distintos: "Clari (privado)" (opus) cubre los tres DMs, y el
+  // de Grace es casi todo un recordatorio que solo transcribe datos ya calculados —
+  // pagaba $0.53 por llamada contra $0.088 en Ventas. Bajar ese grupo solo requeria
+  // esto; cambiar wa_bots.model habria movido tambien el DM de Alvaro.
+  const modelToUse = (group as { model?: string | null }).model
+    ?? botCfg?.model
+    ?? pickModel(req.invoked_by, !!req.report_kind);
 
   // LLAVERO: el modelo solo "ve" las tools que le mandamos → filtrar acá es la
   // garantía estructural de acceso. Sin bot o sin allowlist, van todas; la
