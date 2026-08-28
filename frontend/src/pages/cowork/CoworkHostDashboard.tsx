@@ -9,6 +9,7 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
+  PanelLeftClose, PanelLeftOpen,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -189,9 +190,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Central de audio del coordinador: master del micro + escuchar/hablar por sala + micro compartido.
   const [globalMic, setGlobalMic] = useState(false);
   const [roomHear, setRoomHear] = useState<Record<string, boolean>>({});
+  // Corta el audio de TODAS las salas de una. Es del navegador de cada quien:
+  // que Alvaro se silencie no deja sorda a Yoselin. No se persiste a proposito —
+  // al recargar se vuelve a escuchar, que es el estado seguro para coordinar.
+  const [globalHear, setGlobalHear] = useState(true);
+  // Barra lateral plegada, como el menu de Maven. Se recuerda porque es una
+  // preferencia de espacio en pantalla, no un estado de la operacion.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("maven.cowork.sidebar.collapsed") === "1",
+  );
   const [roomMic, setRoomMic] = useState<Record<string, boolean>>({});
   const [micBaseTrack, setMicBaseTrack] = useState<MediaStreamTrack | null>(null);
-  const hearFor = (roomId: string) => roomHear[roomId] ?? true;   // por defecto se escuchan todas
+  // Se escucha una sala si el master global esta activo Y esa sala no fue
+  // silenciada aparte. Apagar el global no borra las elecciones por sala: al
+  // volver a prenderlo, cada una queda como estaba.
+  const hearFor = (roomId: string) => globalHear && (roomHear[roomId] ?? true);
   // "Hablar a todas" (globalMic) le habla a TODAS las salas a la vez; el 🎤 de cada
   // sala le habla SOLO a esa. Aditivos: una sala te oye si hablás a todas O tiene su 🎤.
   const broadcastFor = (roomId: string) => globalMic || (roomMic[roomId] ?? false);
@@ -450,11 +463,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       )}
 
       {/* Left sidebar */}
+      {/* Plegada queda una tira angosta con el boton para volver a abrirla: si
+          desapareciera del todo no habria como traerla de vuelta. */}
+      {sidebarCollapsed && (
+        <div className="hidden md:flex w-10 h-full border-r border-border bg-card flex-col items-center pt-3 shrink-0">
+          <Button
+            variant="ghost" size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            title="Mostrar el panel de solicitudes y pantallas"
+            onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       <div className={`
         fixed md:relative z-40 md:z-auto
         w-72 md:w-80 h-full
         border-r border-border flex flex-col bg-card
         transition-transform duration-200 ease-in-out
+        ${sidebarCollapsed ? "md:hidden" : ""}
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
         <div className="p-4 border-b border-border">
@@ -475,6 +504,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <p className="text-xs text-muted-foreground">Coordinador Dashboard</p>
             </div>
             <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:inline-flex h-7 w-7 text-muted-foreground hover:text-foreground"
+                title="Ocultar este panel"
+                onClick={() => { setSidebarCollapsed(true); localStorage.setItem("maven.cowork.sidebar.collapsed", "1"); }}
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -710,6 +748,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Seleccione sala para ingresar</h3>
               <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`gap-1.5 rounded-full h-8 ${globalHear ? "" : "text-destructive border-destructive/40"}`}
+                  title={globalHear
+                    ? "Estás escuchando todas las salas. Toca para silenciarlas (solo para vos)."
+                    : "Tenés todas las salas en silencio. Toca para volver a escucharlas."}
+                  onClick={() => setGlobalHear((v) => !v)}
+                >
+                  {globalHear ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  {globalHear ? "Escuchando todas" : "Silenciadas"}
+                </Button>
                 <Button
                   size="sm"
                   variant={globalMic ? "default" : "outline"}

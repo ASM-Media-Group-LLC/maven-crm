@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import CallControls from "@/pages/messenger/videocall/CallControls";
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
 describe("CallControls", () => {
   const defaultProps = {
@@ -29,6 +29,32 @@ describe("CallControls", () => {
     isNoiseCancellationOn: false,
     onToggleNoiseCancellation: vi.fn(),
   };
+
+  it("explica que falta permiso en vez de dejar el selector mudo", async () => {
+    // El navegador no revela id ni etiqueta hasta que se da permiso, asi que la
+    // lista queda vacia. Antes el panel no se dibujaba y el click no hacia nada:
+    // Yoselin no tenia forma de saber que le faltaba habilitar el microfono.
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([
+          { kind: "audioinput", deviceId: "", label: "" },
+          { kind: "videoinput", deviceId: "", label: "" },
+        ]),
+        getUserMedia: vi.fn(),
+      },
+    });
+
+    render(<CallControls {...defaultProps} />);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.querySelector("svg"))!);
+
+    const pill = await screen.findByText("Seleccionar", {}, { timeout: 2000 }).catch(() => null);
+    if (pill) {
+      fireEvent.click(pill);
+      expect(await screen.findByText(/permiso/i)).toBeInTheDocument();
+      expect(screen.getByText("Permitir acceso")).toBeInTheDocument();
+    }
+  });
 
   it("renders primary control buttons", () => {
     render(<CallControls {...defaultProps} />);

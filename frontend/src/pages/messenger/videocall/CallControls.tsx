@@ -6,6 +6,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { BackgroundEffect } from "./BackgroundSelector";
 
@@ -105,11 +106,14 @@ function PanelBtn({
 }
 
 /** Pill-shaped device selector like Google Meet */
-function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
+function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso, pidiendo, tipo }: {
   icon: any;
   devices: DeviceInfo[];
   selectedId: string;
   onSelect: (id: string) => void;
+  onPedirPermiso?: () => void;
+  pidiendo?: boolean;
+  tipo: "micrófono" | "altavoz" | "cámara";
 }) {
   const [open, setOpen] = useState(false);
   const selected = devices.find((d) => d.deviceId === selectedId);
@@ -124,6 +128,24 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
         <span className="truncate">{selected?.label || "Seleccionar"}</span>
         <ChevronDown className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
+      {/* Se abre aunque la lista este vacia: un control que no responde no le
+          dice a nadie que falta dar permiso. */}
+      {open && devices.length === 0 && (
+        <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-card border border-border shadow-xl p-3 w-[240px]">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            El navegador no muestra tu {tipo} hasta que le des permiso.
+          </p>
+          {onPedirPermiso && (
+            <button
+              onClick={() => onPedirPermiso()}
+              disabled={pidiendo}
+              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pidiendo ? "Pidiendo permiso…" : "Permitir acceso"}
+            </button>
+          )}
+        </div>
+      )}
       {open && devices.length > 0 && (
         <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-card border border-border shadow-xl p-1 min-w-[220px] max-h-48 overflow-y-auto">
           {devices.map((d) => (
@@ -148,10 +170,17 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
 }
 
 /** Hook to enumerate media devices */
+//
+// El navegador NO entrega ni el id ni la etiqueta de un dispositivo hasta que la
+// persona dio permiso de micro o camara. Quien entro a la llamada con los dos
+// apagados —o los rechazo— ve una lista vacia, y antes eso dejaba el selector
+// mudo: hacia click y no pasaba nada, sin ninguna explicacion. Por eso el hook
+// ademas expone como PEDIR el permiso.
 function useDevices(open: boolean) {
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
+  const [pidiendo, setPidiendo] = useState(false);
 
   const enumerate = useCallback(async () => {
     try {
@@ -162,11 +191,31 @@ function useDevices(open: boolean) {
     } catch {}
   }, []);
 
+  // Un getUserMedia basta para que el navegador revele los dispositivos. El
+  // track se corta enseguida: solo se queria el permiso, no capturar nada.
+  const pedirPermiso = useCallback(async (tipo: "audio" | "video") => {
+    setPidiendo(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(
+        tipo === "audio" ? { audio: true } : { video: true },
+      );
+      stream.getTracks().forEach((t) => t.stop());
+      await enumerate();
+    } catch {
+      toast.error("El navegador bloqueó el acceso", {
+        description: "Hay que habilitarlo desde el candado de la barra de direcciones.",
+        duration: 8000,
+      });
+    } finally {
+      setPidiendo(false);
+    }
+  }, [enumerate]);
+
   useEffect(() => {
     if (open) enumerate();
   }, [open, enumerate]);
 
-  return { audioInputs, audioOutputs, videoInputs };
+  return { audioInputs, audioOutputs, videoInputs, pedirPermiso, pidiendo };
 }
 
 export default function CallControls({
@@ -221,8 +270,8 @@ export default function CallControls({
               </PopoverTrigger>
               <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
-                  <DevicePill icon={Mic} devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} />
-                  <DevicePill icon={Volume2} devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} />
+                  <DevicePill icon={Mic} tipo="micrófono" devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
+                  <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
               </PopoverContent>
             </Popover>
@@ -270,7 +319,7 @@ export default function CallControls({
               </PopoverTrigger>
               <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
-                  <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
+                  <DevicePill icon={VideoIcon} tipo="cámara" devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} onPedirPermiso={() => devices.pedirPermiso("video")} pidiendo={devices.pidiendo} />
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onToggleBlurBackground?.(); }}
                     title="Difuminar fondo"
