@@ -163,8 +163,32 @@ Deno.serve(async (req) => {
       query = { type: "agency:employees:list" };
       accept = (m) => m.type === "agency:employees:list" && Array.isArray(m.employees);
       break;
+    // Ventas por empleado en un rango, opcionalmente ACOTADAS A UNAS MODELOS.
+    // Con creatorIds = [una modelo] y startDate == endDate, la respuesta dice
+    // cuanto vendio cada chatter EN ESA MODELO ESE DIA: es el cruce
+    // chatter-modelo-dia que no existe en ninguna tabla de Maven, y sin el la
+    // vara de la nota no puede distinguir a un chatter de otro.
+    //
+    // startDate == endDate a proposito: el rango de BLU es INCLUSIVO y ademas
+    // arrastra el dia siguiente adentro de la fila (#737, verificado al dolar).
+    case "employee-reports": {
+      const startDate = String(body.startDate ?? "");
+      const endDate = String(body.endDate ?? startDate);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        return json(req, { error: "startDate requerido (YYYY-MM-DD)" }, 400);
+      }
+      const creatorIds = Array.isArray(body.creatorIds) ? body.creatorIds.map(Number).filter(Number.isFinite) : [];
+      query = {
+        type: "agency:analytics:employee-reports",
+        startDate, endDate, groupBy: "day", ranking: "descending",
+        chatterOnly: false, creatorIds, employeeIds: [], groupIds: [],
+        employeeFilterMode: "or", assignment: "all", recordsLimit: 5000,
+      };
+      accept = (m) => m.type === "agency:analytics:employee-reports" && Array.isArray(m.employees);
+      break;
+    }
     default:
-      return json(req, { error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees)" }, 400);
+      return json(req, { error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees|employee-reports)" }, 400);
   }
 
   try {

@@ -75,7 +75,8 @@ serve(async (req: Request) => {
       if (!puede) return json(req, { error: "Solo supervisores pueden sincronizar" }, 403);
     }
 
-    const { action = "all", dia } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({} as any));
+    const { action = "all", dia } = body;
     const elDia: string = dia || hoyBogota();
     const resultado: Record<string, unknown> = { dia: elDia };
 
@@ -187,6 +188,96 @@ serve(async (req: Request) => {
 
       resultado.identidades = { empleados: empleados.length, creadas, revinculadas, sinCuentaMaven: sinCuenta };
       resultado.asignaciones = asignaciones.length;
+    }
+
+    // ── SONDEO (diagnostico) ──────────────────────────────────────────────
+    // Devuelve crudo lo que responde BLU, para poder mirar la forma del dato
+    // antes de construir encima. No escribe nada.
+    if (action === "probe") {
+      const data = await blu("employee-reports", {
+        startDate: elDia, endDate: elDia,
+        creatorIds: body.creatorIds ?? [],
+      });
+      const emps: any[] = data?.employees ?? [];
+      return json(req, {
+        ok: true, dia: elDia, total: emps.length,
+        activos: emps
+          .filter((e) => (e?.metrics?.totalSales ?? 0) > 0 || (e?.metrics?.fansChatted ?? 0) > 0)
+          .map((e) => [e.name, e.metrics?.totalSales ?? 0, e.metrics?.creatorsCount ?? 0, e.metrics?.fansChatted ?? 0]),
+      });
+    }
+
+    // ── MODELOS POR CHATTER Y DIA ─────────────────────────────────────────
+    // Una consulta por modelo: filtrando employee-reports por creatorIds, BLU
+    // devuelve solo a quienes la atendieron ese dia y cuanto vendieron. Es el
+    // unico lugar donde existe el cruce chatter-modelo-dia.
+    //
+    // Va por LOTES porque son ~70 modelos por dia a ~10s cada una: en una sola
+    // invocacion se pasaria del limite de la edge function. El que llama manda
+    // el lote y reintenta con el siguiente.
+    if (action === "model-day") {
+      const modelIds: number[] = Array.isArray(body.modelIds)
+        ? body.modelIds.map(Number).filter(Number.isFinite)
+        : [];
+      if (!modelIds.length) return json(req, { error: "modelIds requerido" }, 400);
+
+      // Mapa cuenta-de-BLU → persona, por el vinculo vigente.
+      const { data: links } = await admin.from("chatter_identity_link")
+        .select("identity_id, external_id").eq("source", "blu").is("valid_to", null);
+      const porBluId = new Map<string, string>();
+      for (const l of links ?? []) porBluId.set(String(l.external_id), l.identity_id);
+
+      const filas: any[] = [];
+      const cobertura: any[] = [];
+      let sinIdentidad = 0;
+      const fallidos: number[] = [];
+
+      for (const modelId of modelIds) {
+        let emps: any[];
+        try {
+          const data = await blu("employee-reports", {
+            startDate: elDia, endDate: elDia, creatorIds: [modelId],
+          });
+          emps = data?.employees ?? [];
+        } catch {
+          // Un modelo que falla NO se marca como cubierto: si se marcara, un dia
+          // incompleto pasaria por completo y la nota saldria con menos modelos
+          // de las reales.
+          fallidos.push(modelId);
+          continue;
+        }
+
+        let conActividad = 0;
+        for (const e of emps) {
+          const m = e?.metrics ?? {};
+          const ventas = Number(m.totalSales) || 0;
+          const fans = Number(m.fansChatted) || 0;
+          if (ventas === 0 && fans === 0) continue; // no la atendio ese dia
+          conActividad++;
+          const idn = porBluId.get(String(e.id));
+          if (!idn) { sinIdentidad++; continue; }
+          filas.push({
+            dia: elDia, identity_id: idn, blu_model_id: modelId,
+            sales: ventas, fans_chatted: fans,
+            sold_messages: Number(m.soldMessages) || 0,
+          });
+        }
+        cobertura.push({ dia: elDia, blu_model_id: modelId, chatters: conActividad });
+      }
+
+      if (filas.length) {
+        await admin.from("chatter_model_daily")
+          .upsert(filas, { onConflict: "dia,identity_id,blu_model_id" });
+      }
+      if (cobertura.length) {
+        await admin.from("chatter_model_daily_sync")
+          .upsert(cobertura, { onConflict: "dia,blu_model_id" });
+      }
+
+      return json(req, {
+        ok: true, dia: elDia, modelos: modelIds.length,
+        cubiertos: cobertura.length, fallidos, filas: filas.length, sinIdentidad,
+      });
     }
 
     // ── MASIVOS ───────────────────────────────────────────────────────────
