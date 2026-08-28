@@ -27,6 +27,14 @@ function normalizeCode(raw: unknown): string {
   return String(raw ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 }
 
+// Sumar la reunión a la lista de alguien. Se llama al crear y al entrar por
+// código o link: así una reunión que te pasaron te queda a mano, con el nombre
+// que le puso el anfitrión.
+async function rememberMembership(admin: any, meetRoomId: string, userId: string) {
+  await admin.from("meet_room_members")
+    .upsert({ meet_room_id: meetRoomId, user_id: userId }, { onConflict: "meet_room_id,user_id", ignoreDuplicates: true });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
@@ -80,6 +88,7 @@ serve(async (req) => {
         .single();
       if (insErr) return err(req, insErr.message, 500);
 
+      await rememberMembership(admin, room.id, userId);
       return json(req, { room });
     }
 
@@ -96,6 +105,7 @@ serve(async (req) => {
       if (!room) return err(req, "Código inválido", 404);
       if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
+      await rememberMembership(admin, room.id, userId);
       return json(req, {
         room: {
           id: room.id, code: room.code, name: room.name,
@@ -119,6 +129,7 @@ serve(async (req) => {
       if (!room) return err(req, "Reunión no encontrada", 404);
       if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
+      await rememberMembership(admin, room.id, userId);
       return json(req, {
         room: {
           id: room.id, code: room.code, name: room.name,
@@ -126,6 +137,59 @@ serve(async (req) => {
           isHost: room.created_by === userId,
         },
       });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENAME — ponerle nombre a la reunión
+    // El nombre vive en meet_rooms, así que el cambio lo ven TODOS los que la
+    // tienen en su lista, no solo quien lo escribió.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "rename") {
+      const id = String(body.id ?? "");
+      const clean = String(body.name ?? "").trim();
+      if (!id) return err(req, "id required");
+      if (!clean) return err(req, "Escribe un nombre para la reunión");
+
+      const { data: room } = await admin.from("meet_rooms")
+        .select("id, livekit_room_name").eq("id", id).maybeSingle();
+      if (!room) return err(req, "Reunión no encontrada", 404);
+
+      // Anfitrión, co-anfitrión o admin: la misma regla que para moderar.
+      const { data: puede } = await admin.rpc("can_moderate_livekit_room", {
+        _user_id: userId, _room: room.livekit_room_name,
+      });
+      if (!puede) return err(req, "Solo el anfitrión puede cambiarle el nombre", 403);
+
+      const { data: updated, error: upErr } = await admin.from("meet_rooms")
+        .update({ name: clean.slice(0, 80) }).eq("id", id)
+        .select("id, name").single();
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { room: updated });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PIN y ORDEN — preferencias de MI lista, no de la reunión
+    // Se escriben solo sobre mis propias filas: nadie reordena la lista ajena.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "setPinned") {
+      const id = String(body.id ?? "");
+      if (!id) return err(req, "id required");
+      const { error: upErr } = await admin.from("meet_room_members")
+        .update({ pinned: body.pinned === true })
+        .eq("meet_room_id", id).eq("user_id", userId);
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { ok: true });
+    }
+
+    if (action === "reorder") {
+      const ids: string[] = Array.isArray(body.orderedIds) ? body.orderedIds : [];
+      if (!ids.length) return err(req, "orderedIds required");
+      for (let i = 0; i < ids.length; i++) {
+        await admin.from("meet_room_members")
+          .update({ sort_order: i })
+          .eq("meet_room_id", ids[i]).eq("user_id", userId);
+      }
+      return json(req, { ok: true });
     }
 
     // ═══════════════════════════════════════════════════════════════

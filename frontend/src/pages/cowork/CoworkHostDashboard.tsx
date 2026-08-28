@@ -9,11 +9,13 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
+import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { formatBreak } from "./CoworkParticipantView";
 import { usePipWindow } from "./usePipWindow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -25,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
-import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
+import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -172,6 +174,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // del Coordinador Hub (pedido del owner) — los videos de las salas ya se ven en
   // vivo en las cards del dashboard.
   // Gestión de salas (añadir / editar / cerrar)
+  // Renombrar la sesión desde el header (antes el nombre quedaba fijo desde que
+  // se creaba; una sesión que dura semanas se quedaba con el nombre del primer día).
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [sessionName, setSessionName] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
   const [editRoom, setEditRoom] = useState<CoworkRoom | null>(null);
@@ -314,10 +321,68 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     r => r.status !== "resolved" && r.id !== oneOnOneRequestId
   );
 
+  const doRenameSession = async () => {
+    const nombre = sessionName.trim();
+    if (!nombre) return;
+    setRenaming(true);
+    try {
+      await cowork.renameSession(nombre);
+      cowork.refetch();
+      setRenameOpen(false);
+      toast.success("Nombre actualizado");
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo cambiar el nombre");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  // Cuánto tiene que durar el problema de encuadre antes de mostrarlo. Sin esto,
+  // agacharse a buscar algo o tomar agua encendería la alarma.
+  const FACE_ALERT_MS = 60_000;
+  const faceIssue = (ms: MediaState | undefined): string | null => {
+    if (!ms || !ms.faceState || !ms.faceSince) return null;
+    if (ms.onBreak) return null;                   // ya sabemos que no está
+    if (ms.faceState === "ok" || ms.faceState === "cam_off") return null;
+    if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo
+    if (now - ms.faceSince < FACE_ALERT_MS) return null;
+    return ms.faceState === "no_face" ? "Sin rostro"
+      : ms.faceState === "too_small" ? "Fuera de cuadro"
+      : ms.faceState === "too_dark" ? "Sin luz"
+      : null;
+  };
+
+  // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
+  // avanzan solos sin depender de que llegue un evento de presence.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Aviso sonoro cuando alguien levanta la mano. Guardamos los ids ya vistos para
+  // que suene UNA vez por solicitud: el hook refetchea con cada evento de realtime
+  // y sin esto sonaría en cada refresco. La primera carga tampoco suena (si no,
+  // abrir el dashboard con solicitudes viejas dispararía una ráfaga).
+  const seenRequestIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const openIds = cowork.hostRequests.filter((r) => r.status === "open").map((r) => r.id);
+    if (seenRequestIds.current === null) {
+      seenRequestIds.current = new Set(openIds);
+      return;
+    }
+    const nuevas = openIds.filter((id) => !seenRequestIds.current!.has(id));
+    seenRequestIds.current = new Set(openIds);
+    if (nuevas.length) playCoordinatorRequestSound();
+  }, [cowork.hostRequests]);
+
   // Quién comparte pantalla en cada sala — VERDAD de LiveKit reportada por cada
   // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
   // mostraba "nadie comparte" aunque alguien lo estuviera haciendo).
   const [roomSharers, setRoomSharers] = useState<Record<string, string[]>>({});
+  // Quién está HABLANDO en cada sala (ActiveSpeakersChanged de LiveKit), para
+  // pintar la card en verde mientras alguien habla.
+  const [roomSpeakers, setRoomSpeakers] = useState<Record<string, string[]>>({});
   const getRoomSharers = (roomId: string) => roomSharers[roomId] ?? [];
 
   const handleAddRoom = async () => {
@@ -394,8 +459,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       `}>
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">{cowork.session?.name}</h2>
+            <div className="min-w-0">
+              <button
+                type="button"
+                className="group flex items-center gap-1.5 text-left"
+                title="Cambiar el nombre de la sesión"
+                onClick={() => {
+                  setSessionName(cowork.session?.name || "");
+                  setRenameOpen(true);
+                }}
+              >
+                <h2 className="text-sm font-semibold text-foreground truncate">{cowork.session?.name}</h2>
+                <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              </button>
               <p className="text-xs text-muted-foreground">Coordinador Dashboard</p>
             </div>
             <div className="flex gap-1">
@@ -498,7 +574,28 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             await cowork.resolveHostRequest(req.id);
                           }
                         }}>
-                          Atender
+                          {is1on1 ? "Atender" : "Ir a la sala"}
+                        </Button>
+                      )}
+                      {/* Marcar como atendida SIN entrar a la sala: muchas veces el
+                          coordinador ya resolvió por otro lado (le habló por el 🎤,
+                          pasó por su puesto) y solo necesita sacarla de la lista.
+                          Antes la única salida era "Atender", que te metía a la sala. */}
+                      {!is1on1 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 text-[10px] text-muted-foreground hover:text-foreground rounded-full"
+                          title="Sacarla de la lista sin entrar a la sala"
+                          onClick={async () => {
+                            try {
+                              await cowork.resolveHostRequest(req.id);
+                            } catch {
+                              toast.error("No se pudo marcar como atendida");
+                            }
+                          }}
+                        >
+                          <Check className="h-3 w-3 mr-0.5" /> Listo
                         </Button>
                       )}
                       {req.status === "acknowledged" && is1on1 && (
@@ -517,6 +614,50 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               })
             )}
           </div>
+
+          {/* En pausa (baño). Amarillo y con el tiempo corriendo, para ver de un
+              vistazo quién se levantó y hace cuánto. El estado vive en presence:
+              no queda registro de las idas al baño de nadie. */}
+          {(() => {
+            const enPausa = Object.entries(mediaStates)
+              .filter(([, st]) => st.onBreak && st.breakStartedAt)
+              .map(([uid, st]) => {
+                const sala = cowork.assignments.find((a) => a.user_id === uid && a.is_active);
+                return {
+                  uid,
+                  nombre: cowork.profiles[uid] || "User",
+                  segundos: Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000)),
+                  sala: cowork.rooms.find((r) => r.id === sala?.room_id)?.name,
+                };
+              })
+              .sort((a, b) => b.segundos - a.segundos);
+            if (!enPausa.length) return null;
+            return (
+              <div className="p-3 border-t border-border/50 space-y-2">
+                <h3 className="text-xs font-medium text-amber-500 uppercase tracking-wider flex items-center gap-1">
+                  <Coffee className="h-3 w-3" /> En pausa ({enPausa.length})
+                </h3>
+                {enPausa.map((p) => (
+                  <div key={p.uid} className="bg-amber-500/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <Coffee className="h-3 w-3 text-amber-500 shrink-0" />
+                      <span className="text-xs text-foreground/80 truncate">{p.nombre}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {p.sala && (
+                        <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500 rounded-full">
+                          {p.sala}
+                        </Badge>
+                      )}
+                      <span className="text-[11px] font-mono text-amber-500 tabular-nums">
+                        {formatBreak(p.segundos)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Pantallas compartidas EN VIVO por sala (ya no hay aprobaciones: compartir
               es directo para todos; acá solo se ve quién está compartiendo y dónde). */}
@@ -593,8 +734,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               {cowork.rooms.map((room) => {
                 const participants = getRoomParticipants(room.id);
                 const sharers = getRoomSharers(room.id);
+                const speakers = roomSpeakers[room.id] ?? [];
                 return (
-                  <div key={room.id} className={`bg-card border rounded-2xl overflow-hidden ${sharers.length ? "border-primary/50" : "border-border"}`}>
+                  <div
+                    key={room.id}
+                    className={`bg-card border rounded-2xl overflow-hidden transition-colors ${
+                      // Verde manda sobre azul: que alguien esté HABLANDO ahora es
+                      // más urgente de ver que que esté compartiendo pantalla.
+                      speakers.length
+                        ? "border-success"
+                        : sharers.length
+                          ? "border-primary/50"
+                          : "border-border"
+                    }`}
+                  >
                     <div className="p-4 pb-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{room.name}</span>
@@ -664,6 +817,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                             {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
                                             {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
                                             {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
+                                            {faceIssue(ms) && (
+                                              <span
+                                                className="flex items-center gap-0.5 text-[10px] text-amber-500"
+                                                title={`${faceIssue(ms)} desde hace ${formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}`}
+                                              >
+                                                <EyeOff className="h-3 w-3" />
+                                                {formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}
+                                              </span>
+                                            )}
+                                            {ms.onBreak && ms.breakStartedAt && (
+                                              <span className="flex items-center gap-0.5 text-[10px] text-amber-500 font-mono tabular-nums">
+                                                <Coffee className="h-3 w-3" />
+                                                {formatBreak(Math.max(0, Math.floor((now - ms.breakStartedAt) / 1000)))}
+                                              </span>
+                                            )}
                                           </div>
                                         );
                                       })()}
@@ -681,6 +849,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 micBaseTrack={micBaseTrack}
                                 enabled={activeRoomId !== room.id}
                                 onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
+                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
                               />
                             </>
                           ) : (
@@ -694,6 +863,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 micBaseTrack={micBaseTrack}
                                 enabled={activeRoomId !== room.id}
                                 onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
+                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
                               />
                             </div>
                           )}
@@ -973,6 +1143,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       )}
 
       {/* Añadir sala */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Nombre de la sesión</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="cowork-session-name">Cómo se llama esta sesión</Label>
+            <Input
+              id="cowork-session-name"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value.slice(0, 80))}
+              onKeyDown={(e) => { if (e.key === "Enter" && sessionName.trim()) void doRenameSession(); }}
+              placeholder="Ej: Chatters mañana"
+              autoFocus
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Lo ven todos los participantes de la sesión.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameOpen(false)}>Cancelar</Button>
+            <Button onClick={() => void doRenameSession()} disabled={!sessionName.trim() || renaming}>
+              {renaming ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>Añadir sala</DialogTitle></DialogHeader>

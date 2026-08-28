@@ -141,6 +141,14 @@ function playLeaveSound() {
   setTimeout(() => playTone(440, 0.18, 0.08), 170);
 }
 
+// En qué salas avisamos que entró o salió alguien. Decisión de Jhon (27/08):
+// SÍ en las reuniones de Meet, donde saber que llegó la otra persona es útil;
+// NO en Cowork ni en las llamadas del chat, donde el coordinador entra y sale de
+// las salas todo el día y la campanita era ruido constante para los chatters.
+function avisaEntradasYSalidas(roomName: string | undefined): boolean {
+  return !!roomName && roomName.startsWith("meet_");
+}
+
 function playHandRaisedSound() {
   playTone(880, 0.2, 0.25);
   setTimeout(() => playTone(1174.66, 0.18, 0.2), 200);
@@ -960,12 +968,12 @@ export function useLiveKit() {
       // Participant & track events
       room.on(RoomEvent.ParticipantConnected, (p) => {
         console.info("[LiveKit] Participant connected:", p.identity, p.name);
-        playJoinSound();
+        if (avisaEntradasYSalidas(room.name)) playJoinSound();
         refreshParticipants();
       });
       room.on(RoomEvent.ParticipantDisconnected, (p) => {
         console.info("[LiveKit] Participant disconnected:", p.identity, p.name);
-        playLeaveSound();
+        if (avisaEntradasYSalidas(room.name)) playLeaveSound();
         refreshParticipants();
       });
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
@@ -1172,7 +1180,7 @@ export function useLiveKit() {
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       setIsCamOn(hasActiveCameraPublication(room));
-      playJoinSound();
+      // Sin sonido al entrar UNO MISMO (pedido de Jhon): ya se ve que entraste.
       refreshParticipants();
 
       clearSyncInterval();
@@ -1367,7 +1375,15 @@ export function useLiveKit() {
     if (!room) return;
     try {
       const newState = !isScreenSharingRef.current;
-      await room.localParticipant.setScreenShareEnabled(newState);
+      // `audio: true` = además del video, capturar el AUDIO de lo compartido
+      // (el de la pestaña o el del sistema). Sin esto, mostrar un video o poner
+      // música se veía pero no se oía.
+      //
+      // Depende del navegador y del sistema, y no podemos forzarlo: quien
+      // comparte tiene que marcar la casilla de compartir audio en el diálogo
+      // de Chrome. En macOS, Chrome solo captura el audio de una PESTAÑA, no el
+      // de la pantalla completa. Si no hay audio, el video se comparte igual.
+      await room.localParticipant.setScreenShareEnabled(newState, { audio: newState });
       setIsScreenSharing(newState);
       debouncedRefresh();
     } catch (err) {

@@ -115,14 +115,14 @@ const DashboardSidebar = () => {
   const { canAccess } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
-  const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount } = useSidebarBadges();
+  const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount } = useSidebarBadges();
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
     { title: "Correo", url: "/correo", icon: Mail, module: "Correo" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
-    { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
+    { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
     { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },

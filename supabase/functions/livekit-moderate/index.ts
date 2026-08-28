@@ -118,12 +118,33 @@ serve(async (req) => {
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const lkSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 
-    // ── Autorización: una sola pregunta a la base ────────────────────────
+    // ── Autorización ────────────────────────────────────────────────────
+    // Silenciar a alguien lo puede hacer CUALQUIERA que esté en la llamada, como
+    // en Google Meet: si a un compañero se le quedó el micrófono abierto, no hay
+    // que buscar al anfitrión. Lo que nadie puede es DES-silenciar a otro — esa
+    // acción no existe acá, solo la persona reactiva su propio micrófono.
+    //
+    // Todo lo demás (expulsar, dejar como oyente, terminar, co-anfitriones)
+    // sigue siendo del anfitrión.
+    const ACCIONES_DE_CUALQUIER_PARTICIPANTE = new Set(["muteParticipant"]);
+
     const { data: canModerate, error: permErr } = await admin.rpc("can_moderate_livekit_room", {
       _user_id: userId, _room: room,
     });
     if (permErr) return err(req, permErr.message, 500);
-    if (!canModerate) return err(req, "No eres anfitrión de esta llamada", 403);
+
+    if (!canModerate) {
+      if (!ACCIONES_DE_CUALQUIER_PARTICIPANTE.has(action)) {
+        return err(req, "No eres anfitrión de esta llamada", 403);
+      }
+      // "Estar en la llamada" se comprueba contra LiveKit, no contra lo que diga
+      // el cliente: solo silencia quien realmente está adentro en este momento.
+      const enSala = await twirp(lkUrl, lkKey, lkSecret, room, "ListParticipants", { room });
+      if (!enSala.ok) return err(req, `LiveKit ListParticipants ${enSala.status}`, 502);
+      const estoyAdentro = ((enSala.data?.participants ?? []) as LkParticipant[])
+        .some((p) => userIdFromIdentity(p.identity) === userId);
+      if (!estoyAdentro) return err(req, "Tenés que estar en la llamada para silenciar a alguien", 403);
+    }
 
     // Un co-anfitrión no puede tocar al anfitrión ORIGINAL (regla de Google).
     const protectTarget = async (targetIdentity: string): Promise<string | null> => {
@@ -166,8 +187,9 @@ serve(async (req) => {
     if (action === "muteParticipant") {
       const identity = String(body.identity ?? "");
       if (!identity) return err(req, "identity required");
-      const blocked = await protectTarget(identity);
-      if (blocked) return err(req, blocked, 403);
+      // A diferencia de expulsar, silenciar SÍ alcanza al anfitrión: en Google
+      // cualquiera puede silenciar a cualquiera, y el afectado reactiva su
+      // micrófono cuando quiera. Por eso acá no corre protectTarget.
 
       const participants = await listParticipants();
       const target = participants.find((p) => p.identity === identity);

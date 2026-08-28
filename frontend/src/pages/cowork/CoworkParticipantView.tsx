@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen } from "lucide-react";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -20,6 +20,17 @@ import {
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
+}
+
+// mm:ss mientras dura poco; hh:mm:ss si la pausa se estira.
+export function formatBreak(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const sec = totalSeconds % 60;
+  const dosDigitos = (n: number) => String(n).padStart(2, "0");
+  return h > 0
+    ? `${h}:${dosDigitos(m)}:${dosDigitos(sec)}`
+    : `${dosDigitos(m)}:${dosDigitos(sec)}`;
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
@@ -59,13 +70,58 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [cowork.session?.id, myAssignment, cowork.getMyLastRoomId]);
 
   const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
+
+  // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
+  // por presence, así el coordinador lo ve en vivo aunque recargue su dashboard.
+  const [breakStartedAt, setBreakStartedAt] = useState<number | null>(null);
+  const [breakElapsed, setBreakElapsed] = useState(0);
+  const lastMediaRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean }>({
+    micOn: false, camOn: false, screenShareOn: false,
+  });
+  const faceRef = useRef<{ faceState: string | null; faceSince: number | null }>({
+    faceState: null, faceSince: null,
+  });
+
+  useEffect(() => {
+    if (!breakStartedAt) { setBreakElapsed(0); return; }
+    const tick = () => setBreakElapsed(Math.floor((Date.now() - breakStartedAt) / 1000));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [breakStartedAt]);
+
+  const toggleBreak = useCallback(() => {
+    const startedAt = breakStartedAt ? null : Date.now();
+    setBreakStartedAt(startedAt);
+    trackMediaState({
+      ...lastMediaRef.current, onBreak: !!startedAt, breakStartedAt: startedAt, ...faceRef.current,
+    });
+  }, [breakStartedAt, trackMediaState]);
+
+  // El encuadre lo calcula LiveKitCallView sobre el video local y lo reporta acá;
+  // nosotros solo lo republicamos por presence para que lo vea el coordinador.
+  const handleFaceStateChange = useCallback(
+    (watch: { state: string; since: number }) => {
+      faceRef.current = { faceState: watch.state, faceSince: watch.since };
+      trackMediaState({
+        ...lastMediaRef.current,
+        onBreak: !!breakStartedAt,
+        breakStartedAt,
+        ...faceRef.current,
+      });
+    },
+    [breakStartedAt, trackMediaState]
+  );
   // Compartir pantalla ya es DIRECTO (el token de sala lo permite para todos) —
   // acá solo reportamos el estado de media para que el dashboard lo muestre.
   const handleMediaStateChange = useCallback(
     (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
-      trackMediaState(state);
+      // Guardamos el último estado de media para poder re-publicarlo junto con la
+      // pausa: presence reemplaza el payload entero en cada track().
+      lastMediaRef.current = state;
+      trackMediaState({ ...state, onBreak: !!breakStartedAt, breakStartedAt, ...faceRef.current });
     },
-    [trackMediaState]
+    [trackMediaState, breakStartedAt]
   );
 
   const reconnectToMainRoom = useCallback(() => {
@@ -351,6 +407,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
             <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada coordinador"}
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`gap-1.5 rounded-full ${breakStartedAt ? "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+            onClick={toggleBreak}
+            title={breakStartedAt ? "Avisar que volviste" : "Avisar que te ausentás un momento"}
+          >
+            <Coffee className="h-4 w-4" />
+            {breakStartedAt ? `En pausa · ${formatBreak(breakElapsed)}` : "Ir al baño"}
+          </Button>
           {/* Compartir pantalla ahora es DIRECTO desde los controles de la llamada
               (abajo), sin pedir permiso — el token de sala lo habilita para todos. */}
         </div>
@@ -376,6 +442,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
                 {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleBreak}>
+                <Coffee className="h-4 w-4 mr-2" />
+                {breakStartedAt ? `En pausa · ${formatBreak(breakElapsed)}` : "Ir al baño"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -435,6 +505,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialCamOn={false}
             getToken={getToken}
             onMediaStateChange={handleMediaStateChange}
+            onFaceStateChange={handleFaceStateChange}
             leaveLabel="Salir y volver al dashboard"
             leaveIcon={LogOut}
           />

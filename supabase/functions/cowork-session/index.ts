@@ -628,6 +628,30 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // UPDATE SESSION (renombrar la sesión) — host only
+    // El nombre se elegía al crear y no se podía tocar; con sesiones que duran
+    // semanas ("Chatters mañana") eso obligaba a cerrar y rehacer todo.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "updateSession") {
+      const { sessionId, name } = body;
+      if (!sessionId) return err("sessionId required");
+      const clean = String(name ?? "").trim();
+      if (!clean) return err("Escribe un nombre para la sesión");
+
+      const { data: hostCheck } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts", 403);
+
+      const { data: updated, error: upErr } = await admin.from("cowork_sessions")
+        .update({ name: clean.slice(0, 80), updated_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .select("id, name")
+        .single();
+      if (upErr) return err(upErr.message, 500);
+      return json({ session: updated });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // UPDATE ROOM (renombrar y/o cambiar preview_mode) — host only
     // ═══════════════════════════════════════════════════════════════
     if (action === "updateRoom") {

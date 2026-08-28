@@ -67,9 +67,29 @@ export function useRecordings() {
         .limit(200),
       supabase.from("v_recordings_usage").select("*").maybeSingle(),
     ]);
-    setRows((lista.data as RecordingRow[] | null) ?? []);
+    const filas = (lista.data as RecordingRow[] | null) ?? [];
+    setRows(filas);
     setUsage((uso.data as RecordingsUsage | null) ?? null);
     setLoading(false);
+
+    // El peso no se conoce al terminar de grabar: el egress todavía está
+    // cerrando el MP4, así que el `stat` de ese momento no encuentra el archivo.
+    // Se completa acá, al abrir la lista, y de paso recupera las viejas que
+    // quedaron sin dato.
+    if (filas.some((r) => r.status === "ready" && r.size_bytes == null)) {
+      try {
+        const res = await invokeRecordings("syncSizes", {});
+        if (res?.actualizadas) {
+          const { data } = await supabase
+            .from("meeting_recordings")
+            .select("id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at")
+            .is("deleted_at", null)
+            .order("started_at", { ascending: false })
+            .limit(200);
+          setRows((data as RecordingRow[] | null) ?? filas);
+        }
+      } catch { /* si no se puede, la lista igual funciona sin el peso */ }
+    }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);

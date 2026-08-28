@@ -20,6 +20,9 @@ interface Props {
   enabled?: boolean;
   // Reporta quién está compartiendo pantalla en esta sala (verdad de LiveKit, no presence).
   onSharersChange?: (names: string[]) => void;
+  // Reporta quién está HABLANDO ahora (ActiveSpeakersChanged). El dashboard lo usa
+  // para pintar la card en verde: se ve de un vistazo dónde hay conversación.
+  onSpeakingChange?: (names: string[]) => void;
 }
 
 // Video por participante: su cámara y su pantalla (cualquiera puede faltar).
@@ -100,7 +103,7 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange }: Props) {
+export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange, onSpeakingChange }: Props) {
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -110,6 +113,8 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
   const onSharersRef = useRef(onSharersChange);
   onSharersRef.current = onSharersChange;
+  const onSpeakingRef = useRef(onSpeakingChange);
+  onSpeakingRef.current = onSpeakingChange;
 
   const getToken = useCallback(async () => {
     const r = await issueToken("monitor_room", roomId);
@@ -119,7 +124,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   // Conexión (una sola vez por sala). Si el coordinador entró a esta sala, NO conectamos
   // el monitor (evita la doble presencia 📢-monitor + participante real).
   useEffect(() => {
-    if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); return; }
+    if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); onSpeakingRef.current?.([]); return; }
     let cancelled = false;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
@@ -191,6 +196,15 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
       .on(RoomEvent.TrackUnpublished, () => recomputeSharers())
       .on(RoomEvent.ParticipantConnected, () => recomputeSharers())
       .on(RoomEvent.ParticipantDisconnected, () => recomputeSharers())
+      // Quién habla AHORA. Excluimos al participante local: cuando el coordinador
+      // le habla a la sala publica su micro acá, y su propia voz no debe pintar la
+      // card como si estuvieran hablando los chatters.
+      .on(RoomEvent.ActiveSpeakersChanged, (speakers: any[]) => {
+        const remotos = (speakers || [])
+          .filter((sp) => sp?.identity !== roomRef.current?.localParticipant?.identity)
+          .map((sp) => sp?.name || sp?.identity || "Alguien");
+        onSpeakingRef.current?.(remotos);
+      })
       .on(RoomEvent.Disconnected, () => { if (!cancelled) setStatus("error"); });
 
     (async () => {
@@ -216,6 +230,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
     return () => {
       cancelled = true;
       onSharersRef.current?.([]);
+      onSpeakingRef.current?.([]);
       setPartVideos([]);
       setAudioTracks([]);
       const clone = publishedCloneRef.current;

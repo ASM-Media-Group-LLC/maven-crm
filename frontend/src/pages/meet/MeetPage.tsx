@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Video, Plus, KeyRound, Loader2, Copy, Link2, PhoneOff, ArrowRight } from "lucide-react";
+import { Video, Plus, KeyRound, Loader2, Copy, Link2, PhoneOff, ArrowRight, Pencil, Pin, PinOff, GripVertical } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useMeetRooms, MeetRoom } from "@/hooks/useMeetRooms";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -29,7 +32,13 @@ function openCall(room: MeetRoom) {
 }
 
 export default function MeetPage() {
-  const { myRooms, loading, createRoom, joinByCode, resolveByLivekitRoom, endRoom } = useMeetRooms();
+  const {
+    myRooms, setMyRooms, loading,
+    createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom,
+  } = useMeetRooms();
+  const [renameTarget, setRenameTarget] = useState<MeetRoom | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const { explicitPermission } = usePermissions();
   const [creating, setCreating] = useState(false);
   const [joinInput, setJoinInput] = useState("");
@@ -83,6 +92,43 @@ export default function MeetPage() {
   const copyCode = (room: MeetRoom) => {
     navigator.clipboard.writeText(room.code);
     toast.success(`Código copiado: ${room.code}`);
+  };
+
+  const doRename = async () => {
+    if (!renameTarget || !renameValue.trim()) return;
+    setRenaming(true);
+    try {
+      await renameRoom(renameTarget.id, renameValue.trim());
+      setRenameTarget(null);
+      toast.success("Nombre actualizado");
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo cambiar el nombre");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const togglePin = async (room: MeetRoom) => {
+    try {
+      await setPinned(room.id, !room.pinned);
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo fijar la reunión");
+    }
+  };
+
+  // Se reordena en pantalla primero y se guarda después: arrastrar y ver el
+  // ítem volver a su lugar mientras responde el servidor se siente roto.
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    const next = [...myRooms];
+    const [movida] = next.splice(result.source.index, 1);
+    next.splice(result.destination.index, 0, movida);
+    setMyRooms(next);
+    try {
+      await reorder(next.map((r) => r.id));
+    } catch {
+      toast.error("No se pudo guardar el orden");
+    }
   };
 
   const handleEnd = async (room: MeetRoom) => {
@@ -145,49 +191,140 @@ export default function MeetPage() {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
             Tus reuniones abiertas
           </h2>
-          {myRooms.map((room) => (
-            <div key={room.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3">
-              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
-                <Video className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-foreground truncate">{room.name}</div>
-                <button
-                  type="button"
-                  onClick={() => copyCode(room)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                  title="Copiar código"
+          {/* Con muchas reuniones la lista scrollea sola en vez de estirar la
+              página. Las fijadas van arriba (el orden lo pone el hook). */}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId="meet-rooms">
+              {(dropProvided) => (
+                <div
+                  ref={dropProvided.innerRef}
+                  {...dropProvided.droppableProps}
+                  className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1"
                 >
-                  <KeyRound className="h-3 w-3" />
-                  <span className="font-mono tracking-[0.2em]">{room.code}</span>
-                  <Copy className="h-2.5 w-2.5 opacity-60" />
-                </button>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
-                title="Copiar link"
-                onClick={() => copyLink(room)}
-              >
-                <Link2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
-                title="Terminar reunión"
-                onClick={() => handleEnd(room)}
-              >
-                <PhoneOff className="h-4 w-4" />
-              </Button>
-              <Button size="sm" className="rounded-full gap-1 shrink-0" onClick={() => openCall(room)}>
-                Entrar <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                  {myRooms.map((room, index) => (
+                    <Draggable key={room.id} draggableId={room.id} index={index}>
+                      {(dragProvided, snapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className={`flex items-center gap-2 bg-card border rounded-2xl px-3 py-3 ${
+                            snapshot.isDragging ? "border-primary shadow-lg" : "border-border"
+                          }`}
+                        >
+                          <span
+                            {...dragProvided.dragHandleProps}
+                            className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+                            title="Arrastrar para reordenar"
+                            aria-label="Reordenar"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </span>
+
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
+                            <Video className="h-5 w-5 text-primary" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-semibold text-foreground truncate">{room.name}</span>
+                              {/* Solo el anfitrión puede renombrar: el nombre lo ven
+                                  todos los que tienen la reunión en su lista. */}
+                              {room.isHost && (
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
+                                  title="Cambiar el nombre de la reunión"
+                                  aria-label="Cambiar el nombre"
+                                  onClick={() => { setRenameTarget(room); setRenameValue(room.name); }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyCode(room)}
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                              title="Copiar código"
+                            >
+                              <KeyRound className="h-3 w-3" />
+                              <span className="font-mono tracking-[0.2em]">{room.code}</span>
+                              <Copy className="h-2.5 w-2.5 opacity-60" />
+                            </button>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 rounded-full ${room.pinned ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                            title={room.pinned ? "Dejar de fijar" : "Fijar arriba"}
+                            onClick={() => togglePin(room)}
+                          >
+                            {room.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
+                            title="Copiar link de invitación"
+                            onClick={() => copyLink(room)}
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </Button>
+                          {/* Terminar la reunión es del anfitrión; el resto solo la
+                              tiene en su lista. */}
+                          {room.isHost && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
+                              title="Terminar reunión"
+                              onClick={() => handleEnd(room)}
+                            >
+                              <PhoneOff className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" className="rounded-full gap-1 shrink-0" onClick={() => openCall(room)}>
+                            Entrar <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {dropProvided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       )}
+
+      <Dialog open={!!renameTarget} onOpenChange={(v) => { if (!v) setRenameTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Nombre de la reunión</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="meet-room-name">Cómo se llama esta reunión</Label>
+            <Input
+              id="meet-room-name"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
+              onKeyDown={(e) => { if (e.key === "Enter" && renameValue.trim()) void doRename(); }}
+              placeholder="Ej: Oficina"
+              autoFocus
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Lo ven todos los que tengan la reunión en su lista.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameTarget(null)}>Cancelar</Button>
+            <Button onClick={() => void doRename()} disabled={!renameValue.trim() || renaming}>
+              {renaming ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

@@ -5,6 +5,18 @@ export interface MediaState {
   micOn: boolean;
   camOn: boolean;
   screenShareOn: boolean;
+  // Pausa (baño). `breakStartedAt` es epoch ms para que el coordinador calcule
+  // cuánto lleva, y lo mantiene el cliente de quien está en pausa: si el
+  // coordinador recarga el dashboard, el presence se re-sincroniza y el contador
+  // sigue bien. NO se guarda en la base a propósito — no queremos un historial
+  // de idas al baño por persona, solo el estado de ahora.
+  onBreak?: boolean;
+  breakStartedAt?: number | null;
+  // Encuadre: lo reporta el navegador de cada persona sobre su PROPIO video
+  // (ver hooks/useFaceWatch). `faceSince` es el epoch del último cambio, para
+  // poder decir "sin rostro hace 2 min" en vez de alarmar al primer frame.
+  faceState?: string | null;
+  faceSince?: number | null;
 }
 
 interface UseCoworkMediaPresenceResult {
@@ -38,6 +50,10 @@ export function useCoworkMediaPresence(
             micOn: !!latest.micOn,
             camOn: !!latest.camOn,
             screenShareOn: !!latest.screenShareOn,
+            onBreak: !!latest.onBreak,
+            breakStartedAt: latest.breakStartedAt ?? null,
+            faceState: latest.faceState ?? null,
+            faceSince: latest.faceSince ?? null,
           };
         }
       });
@@ -66,6 +82,10 @@ export function useCoworkMediaPresence(
           micOn: state.micOn,
           camOn: state.camOn,
           screenShareOn: state.screenShareOn,
+          onBreak: !!state.onBreak,
+          breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
+          faceState: state.faceState ?? null,
+          faceSince: state.faceSince ?? null,
         });
       }
     },

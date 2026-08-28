@@ -79,9 +79,10 @@ export default function CallParticipantsSidebar({
                   </div>
                 )}
 
-                {/* Sin ser anfitrión el menú quedaría VACÍO (todas sus acciones
-                    son de moderación), así que no se muestra el botón. */}
-                {!p.isLocal && isAdmin && (
+                {/* Silenciar lo puede hacer cualquiera (como en Google), así que
+                    el menú tiene sentido para todos; el resto de las acciones
+                    siguen siendo del anfitrión y se ocultan más abajo. */}
+                {!p.isLocal && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
@@ -89,10 +90,11 @@ export default function CallParticipantsSidebar({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-card border-border">
-                      {/* Silenciar ya NO se ofrece a cualquiera: antes el mute
-                          era un mensaje por el canal de datos sin ninguna
-                          validación ("Any participant can mute others"). */}
-                      {isAdmin && !p.isMuted && (
+                      {/* Cualquiera puede silenciar a quien dejó el micrófono
+                          abierto — el servidor lo ejecuta de verdad y verifica
+                          que quien lo pide esté en la llamada. Nadie puede
+                          DES-silenciar a otro: eso solo lo hace su dueño. */}
+                      {!p.isMuted && (
                         <DropdownMenuItem onClick={() => onMuteParticipant(p.identity)} className="text-foreground focus:bg-muted">
                           <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
                         </DropdownMenuItem>

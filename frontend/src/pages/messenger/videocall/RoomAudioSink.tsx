@@ -30,7 +30,10 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
     if (!container) return;
 
     const attach = (track: RemoteTrack, participant: RemoteParticipant) => {
-      if (track.source !== Track.Source.Microphone) return;
+      // Micrófono Y audio de pantalla compartida. El segundo faltaba: aunque
+      // alguien compartiera un video con sonido, acá se descartaba y nadie lo
+      // oía. Lo demás (si algún día hay otra fuente) se sigue ignorando.
+      if (track.source !== Track.Source.Microphone && track.source !== Track.Source.ScreenShareAudio) return;
       const key = `${participant.sid}-${track.sid}`;
       if (attachedRef.current.has(key)) return;
       const el = document.createElement("audio");

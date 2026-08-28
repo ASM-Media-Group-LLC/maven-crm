@@ -178,6 +178,8 @@ export function useCoworkSession(sessionId: string | null) {
   }, []);
 
   // Gestión de salas (host): añadir, renombrar / cambiar modo de preview, cerrar.
+  const renameSession = useCallback(async (name: string) =>
+    invokeCowork("updateSession", { sessionId, name }), [sessionId]);
   const addRoom = useCallback(async (name: string) => invokeCowork("addRoom", { sessionId, name }), [sessionId]);
   const updateRoom = useCallback(async (roomId: string, patch: { name?: string; previewMode?: "video" | "avatars" }) =>
     invokeCowork("updateRoom", { roomId, ...patch }), []);
@@ -294,7 +296,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
-    createSession, joinSession, joinByCode, getMyLastRoomId, addRoom, updateRoom, closeRoom,
+    createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
     listMyActiveSessions, endSessionById,

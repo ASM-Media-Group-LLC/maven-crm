@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { ConnectionState } from "livekit-client";
+import { ConnectionState, Track } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
@@ -16,6 +16,7 @@ import { useAutoPiP } from "./useAutoPiP";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { BackgroundEffect } from "./BackgroundSelector";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -48,6 +49,12 @@ interface LiveKitCallViewProps {
   getToken?: () => Promise<{ token: string; url: string }>;
   /** Fires whenever the local participant's media state changes */
   onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
+  /**
+   * Opt-in de la vigilancia de encuadre (¿se le ve la cara?). Solo se activa si
+   * el contenedor pasa este callback: una llamada 1:1 del chat no lo necesita.
+   * Corre sobre el video LOCAL, en el navegador de la propia persona.
+   */
+  onFaceStateChange?: (watch: FaceWatch) => void;
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
@@ -59,7 +66,7 @@ interface LiveKitCallViewProps {
   shareLink?: string;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
@@ -220,6 +227,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const localScreenShare = localP ? localP.isScreenSharing : false;
   const onMediaStateChangeRef = useRef(onMediaStateChange);
   onMediaStateChangeRef.current = onMediaStateChange;
+  // Vigilancia de encuadre sobre la cámara local. El track sale del room de
+  // LiveKit, así no capturamos la cámara una segunda vez.
+  const localCameraTrack = useMemo(() => {
+    const room = lk.getRoom();
+    const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.Camera);
+    return (pub?.track?.mediaStreamTrack as MediaStreamTrack | undefined) ?? null;
+  }, [lk, localCamOn, lk.connectionState]);
+  const faceWatch = useFaceWatch(localCameraTrack, !!onFaceStateChange && localCamOn);
+  const onFaceStateChangeRef = useRef(onFaceStateChange);
+  onFaceStateChangeRef.current = onFaceStateChange;
+  useEffect(() => {
+    onFaceStateChangeRef.current?.(faceWatch);
+  }, [faceWatch]);
+
   useEffect(() => {
     onMediaStateChangeRef.current?.({ micOn: localMicOn, camOn: localCamOn, screenShareOn: localScreenShare });
   }, [localMicOn, localCamOn, localScreenShare]);
@@ -325,7 +346,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         </div>
 
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
-        {participantsOpen && (
+        {/* El aviso de encuadre se le muestra a la PROPIA persona: si el sistema
+          detecta que no se le ve, que se entere y se acomode. Es una ayuda, no
+          una cámara de vigilancia silenciosa. */}
+      {onFaceStateChange && faceStateLabel(faceWatch.state) && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 backdrop-blur-sm">
+          <span className="text-[11px] text-amber-500">{faceStateLabel(faceWatch.state)}</span>
+        </div>
+      )}
+
+      {participantsOpen && (
           <CallParticipantsSidebar
             participants={lk.participants}
             isAdmin={isAdmin}

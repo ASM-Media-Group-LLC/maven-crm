@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -6,6 +7,21 @@ import { usePermissions } from "@/hooks/usePermissions";
 export function useSidebarBadges() {
   const { user } = useAuth();
   const { canAccess, dataScope, isLoading: permsLoading } = usePermissions();
+  const queryClient = useQueryClient();
+
+  // Las manos levantadas de Cowork van por realtime: si esperáramos el refetch
+  // de 60s, el badge quedaría encendido un minuto después de que alguien ya
+  // atendió, y apagado un minuto después de que alguien pidió ayuda.
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase
+      .channel(`sidebar-cowork-requests-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, queryClient]);
 
   const { data } = useQuery({
     queryKey: ["sidebar-badges", user?.id, permsLoading],
@@ -96,7 +112,29 @@ export function useSidebarBadges() {
           (sum: number, c: { unread_count: number | null }) => sum + (c.unread_count || 0), 0);
       }
 
-      return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount };
+      // --- Cowork: manos levantadas sin atender ---
+      // Solo le aparece a quien PUEDE atenderlas (host de una sesión activa). Un
+      // participante ve sus propias solicitudes por RLS, pero no tiene nada que
+      // hacer con ellas, así que no le ponemos badge.
+      let coworkRequestsCount = 0;
+      if (canAccess("Cowork")) {
+        const { data: misSesiones } = await supabase
+          .from("cowork_memberships")
+          .select("session_id, cowork_sessions!inner(status)")
+          .eq("user_id", userId).eq("role", "host")
+          .eq("cowork_sessions.status", "active");
+        const ids = (misSesiones ?? []).map((m: { session_id: string }) => m.session_id);
+        if (ids.length) {
+          const { count } = await supabase
+            .from("cowork_host_requests")
+            .select("id", { count: "exact", head: true })
+            .in("session_id", ids)
+            .neq("status", "resolved");
+          coworkRequestsCount = count ?? 0;
+        }
+      }
+
+      return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount };
     },
     enabled: !!user && !permsLoading,
     staleTime: 60_000,
@@ -109,5 +147,6 @@ export function useSidebarBadges() {
     closersCount: data?.closersCount || 0,
     waInboxCount: data?.waInboxCount || 0,
     tgInboxCount: data?.tgInboxCount || 0,
+    coworkRequestsCount: data?.coworkRequestsCount || 0,
   };
 }

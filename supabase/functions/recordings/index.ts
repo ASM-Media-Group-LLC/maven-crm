@@ -252,11 +252,22 @@ Deno.serve(async (req) => {
         // el tamaño directo del archivo.
         console.warn("[recordings] stopEgress:", (e as Error).message);
       }
+      // El MP4 no está cerrado en el instante del stop: el egress todavía lo está
+      // terminando de escribir, así que preguntar el tamaño acá mismo devolvía
+      // 404 y `size_bytes` quedaba en null SIEMPRE. Se le da un respiro corto y
+      // se reintenta; lo que igual falle lo completa `syncSizes` cuando alguien
+      // abre la lista de grabaciones.
       if (size === null && rec.storage_key) {
-        try {
-          const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
-          if (r.ok) size = (await r.json()).size ?? null;
-        } catch { /* sin tamaño; no bloquea */ }
+        for (const esperaMs of [1200, 2500]) {
+          await new Promise((r) => setTimeout(r, esperaMs));
+          try {
+            const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
+            if (r.ok) {
+              size = (await r.json()).size ?? null;
+              if (size) break;
+            }
+          } catch { /* sin tamaño; no bloquea */ }
+        }
       }
 
       await admin.from("meeting_recordings")
@@ -279,6 +290,34 @@ Deno.serve(async (req) => {
     }
 
     // === DOWNLOAD ===
+    // === SYNC SIZES ===
+    // Completa el peso de las grabaciones que quedaron sin él. La lista lo llama
+    // al abrirse: barato, y recupera también las viejas.
+    if (action === "syncSizes") {
+      const { data: pendientes } = await admin
+        .from("meeting_recordings")
+        .select("id, started_by, storage_key")
+        .eq("status", "ready").is("size_bytes", null).is("deleted_at", null)
+        .not("storage_key", "is", null)
+        .order("started_at", { ascending: false })
+        .limit(20);
+
+      let actualizadas = 0;
+      for (const rec of (pendientes ?? []) as Array<{ id: string; started_by: string; storage_key: string }>) {
+        // Solo las que esta persona puede ver: la misma regla que el resto.
+        if (!(await puedeVer(admin, user.id, rec))) continue;
+        try {
+          const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
+          if (!r.ok) continue;
+          const size = (await r.json()).size ?? null;
+          if (!size) continue;
+          await admin.from("meeting_recordings").update({ size_bytes: size }).eq("id", rec.id);
+          actualizadas++;
+        } catch { /* una que falle no corta las demás */ }
+      }
+      return json(req, { ok: true, actualizadas });
+    }
+
     if (action === "download") {
       const { recording_id } = body as { recording_id?: string };
       if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);

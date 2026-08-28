@@ -8,6 +8,7 @@ export interface MeetRoom {
   livekit_room_name: string;
   created_at?: string;
   isHost?: boolean;
+  pinned?: boolean;
 }
 
 async function invokeMeet(action: string, payload: Record<string, unknown> = {}) {
@@ -35,17 +36,38 @@ export function useMeetRooms() {
   const [myRooms, setMyRooms] = useState<MeetRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Las propias se leen directo por RLS ("Creator sees own meet rooms"), sin
-  // pasar por la edge: es una lectura simple y así la lista refresca sola.
+  // La lista sale de MIS membresías (meet_room_members), no de lo que yo creé:
+  // una reunión que me pasaron por código también me queda a mano, con el nombre
+  // que le puso su anfitrión. Orden: primero las fijadas, después el orden que
+  // yo haya armado, y al final las más nuevas.
   const refresh = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setMyRooms([]); setLoading(false); return; }
+
     const { data } = await supabase
-      .from("meet_rooms")
-      .select("id, code, name, livekit_room_name, created_at")
-      .eq("created_by", user.id).eq("status", "active")
-      .order("created_at", { ascending: false });
-    setMyRooms(((data as MeetRoom[]) || []).map((r) => ({ ...r, isHost: true })));
+      .from("meet_room_members")
+      .select("pinned, sort_order, joined_at, meet_rooms!inner(id, code, name, livekit_room_name, created_at, created_by, status)")
+      .eq("user_id", user.id)
+      .eq("meet_rooms.status", "active");
+
+    const filas = (data as any[]) || [];
+    filas.sort((a, b) => {
+      if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+      const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return String(b.joined_at).localeCompare(String(a.joined_at));
+    });
+
+    setMyRooms(filas.map((f) => ({
+      id: f.meet_rooms.id,
+      code: f.meet_rooms.code,
+      name: f.meet_rooms.name,
+      livekit_room_name: f.meet_rooms.livekit_room_name,
+      created_at: f.meet_rooms.created_at,
+      isHost: f.meet_rooms.created_by === user.id,
+      pinned: !!f.pinned,
+    })));
     setLoading(false);
   }, []);
 
@@ -67,10 +89,29 @@ export function useMeetRooms() {
     return res.room;
   }, []);
 
+  const renameRoom = useCallback(async (id: string, name: string) => {
+    await invokeMeet("rename", { id, name });
+    await refresh();
+  }, [refresh]);
+
+  const setPinned = useCallback(async (id: string, pinned: boolean) => {
+    await invokeMeet("setPinned", { id, pinned });
+    await refresh();
+  }, [refresh]);
+
+  // Guarda el orden que armó el usuario arrastrando. Se manda la lista completa:
+  // el índice ES el orden, así no hay que reconciliar posiciones sueltas.
+  const reorder = useCallback(async (orderedIds: string[]) => {
+    await invokeMeet("reorder", { orderedIds });
+  }, []);
+
   const endRoom = useCallback(async (id: string) => {
     await invokeMeet("end", { id });
     await refresh();
   }, [refresh]);
 
-  return { myRooms, loading, createRoom, joinByCode, resolveByLivekitRoom, endRoom, refresh };
+  return {
+    myRooms, setMyRooms, loading,
+    createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom, refresh,
+  };
 }

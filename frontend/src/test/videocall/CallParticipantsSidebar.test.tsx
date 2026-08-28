@@ -36,11 +36,17 @@ describe("CallParticipantsSidebar", () => {
     expect(screen.getByText("María López")).toBeInTheDocument();
   });
 
-  it("does not show moderation menu when not admin", () => {
+  it("sin ser anfitrión el menú existe, pero SOLO con silenciar", () => {
+    // Cambió la regla (27/08): silenciar lo puede hacer cualquiera, como en
+    // Google, porque el servidor ejecuta la orden de verdad y verifica que
+    // quien la pide esté en la llamada. Expulsar y el resto siguen siendo del
+    // anfitrión. Antes el menú se ocultaba entero porque quedaba vacío.
     render(<CallParticipantsSidebar {...defaultProps} isAdmin={false} />);
-    const buttons = screen.getAllByRole("button");
-    // Only the close button should exist
-    expect(buttons).toHaveLength(1);
+    // Cerrar + un menú por cada participante remoto (2). Antes era 1: el menú
+    // se ocultaba entero. El CONTENIDO del menú no se puede afirmar acá porque
+    // Radix lo monta en un portal al abrirlo y jsdom no dispara esa apertura con
+    // un click simple; lo que sí garantiza el test es que el acceso existe.
+    expect(screen.getAllByRole("button")).toHaveLength(3);
   });
 
   it("shows moderation menu when admin", () => {

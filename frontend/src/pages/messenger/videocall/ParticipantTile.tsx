@@ -1,10 +1,11 @@
 import { useEffect, useRef, memo, useCallback } from "react";
 import { Track, Room } from "livekit-client";
 import { UserAvatar } from "@/components/UserAvatar";
-import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX, ZoomIn, ZoomOut, Minimize2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
+import { useVideoZoom } from "./useVideoZoom";
 
 interface ParticipantTileProps {
   participant: LKParticipant;
@@ -94,6 +95,10 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedAudioTrackRef = useRef<any>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
+
+  // Zoom estilo Google Meet: solo sobre pantallas compartidas, que es donde hay
+  // texto que leer. Sobre una cámara no aporta.
+  const zoom = useVideoZoom(participant.isScreenSharing);
 
   // ── Robust audio attachment helper ─────────────────────────────
   const attachAudioTrack = useCallback(() => {
@@ -276,15 +281,62 @@ const ParticipantTile = memo(function ParticipantTile({
       )}
       style={{ background: "hsl(220 3% 20%)" }}
     >
+      {participant.isScreenSharing && showVideo && (
+        <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 backdrop-blur-sm opacity-0 hover:opacity-100 focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={zoom.zoomOut}
+            disabled={zoom.scale <= 1}
+            title="Alejar"
+            aria-label="Alejar"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15 disabled:opacity-30"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <span className="min-w-[2.2rem] text-center text-[10px] tabular-nums text-white/80">
+            {Math.round(zoom.scale * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={zoom.zoomIn}
+            title="Acercar"
+            aria-label="Acercar"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </button>
+          {zoom.isZoomed && (
+            <button
+              type="button"
+              onClick={zoom.reset}
+              title="Ver completa"
+              aria-label="Ver completa"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+            >
+              <Minimize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {showVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={participant.isLocal}
-          className={cn("absolute inset-0 w-full h-full z-[1]", participant.isScreenSharing ? "object-contain bg-black" : "object-cover")}
-          style={{ transform: participant.isLocal && !participant.isScreenSharing ? "scaleX(-1)" : undefined }}
-        />
+        <div
+          className="absolute inset-0 z-[1] overflow-hidden"
+          {...(participant.isScreenSharing ? zoom.handlers : {})}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={participant.isLocal}
+            className={cn("absolute inset-0 w-full h-full", participant.isScreenSharing ? "object-contain bg-black" : "object-cover")}
+            style={
+              participant.isScreenSharing
+                ? zoom.style
+                : { transform: participant.isLocal ? "scaleX(-1)" : undefined }
+            }
+          />
+        </div>
       ) : (
         <UserAvatar
           name={participant.name}
@@ -339,9 +391,8 @@ const ParticipantTile = memo(function ParticipantTile({
                   {isPinned ? "Desanclar" : "Anclar en pantalla"}
                 </DropdownMenuItem>
               )}
-              {/* Silenciar es acción de anfitrión: el servidor rechaza al resto,
-                  así que ofrecerlo a todos era prometer algo que no pasa. */}
-              {isAdmin && !participant.isLocal && onMuteParticipant && !participant.isMuted && (
+              {/* Silenciar: cualquiera en la llamada, como en Google. */}
+              {!participant.isLocal && onMuteParticipant && !participant.isMuted && (
                 <DropdownMenuItem onClick={() => onMuteParticipant(participant.identity)} className="text-foreground focus:bg-muted">
                   <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
                 </DropdownMenuItem>
