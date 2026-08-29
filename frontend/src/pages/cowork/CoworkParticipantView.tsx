@@ -207,7 +207,19 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     salirDePresencia();
     try { await cowork.leaveRoom?.(); } catch { /* best-effort */ }
     toast.success("Saliste de la sala");
-    navigate("/dashboard");
+    // Solo se lo lleva a otro lado si esta MIRANDO Cowork: ahi la pantalla se
+    // queda sin contenido y hay que mandarlo a alguna parte.
+    //
+    // Si colgo desde la ventanita flotante mientras trabajaba en otra seccion
+    // —Messenger, Contactos, lo que sea— sacarlo de donde estaba es perderle el
+    // trabajo: el formulario a medio llenar, la conversacion abierta, el scroll.
+    // Colgar una llamada no es pedir que te muevan de pantalla.
+    //
+    // Se lee `window.location` en el momento y no `useLocation()` a proposito:
+    // esta funcion viaja dentro de la config de la llamada, que se arma UNA vez
+    // por sala. Meterle la ruta como dependencia reiniciaria la videollamada en
+    // cada navegacion, que es exactamente el bug que estamos evitando.
+    if (window.location.pathname.startsWith("/cowork")) navigate("/dashboard");
   }, [cowork, navigate, endCall]);
 
   // La config de la llamada se arma UNA vez por sala. Los callbacks se leen por
