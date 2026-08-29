@@ -233,10 +233,30 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   onMediaStateChangeRef.current = onMediaStateChange;
   // Vigilancia de encuadre sobre la cámara local. El track sale del room de
   // LiveKit, así no capturamos la cámara una segunda vez.
-  const localCameraTrack = useMemo(() => {
-    const room = lk.getRoom();
-    const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.Camera);
-    return (pub?.track?.mediaStreamTrack as MediaStreamTrack | undefined) ?? null;
+  //
+  // SE BUSCA EN UN TIC, NO EN UN useMemo, y esto no es un detalle de estilo:
+  // LiveKit publica la cámara de forma ASÍNCRONA. `localCamOn` se pone en true
+  // apenas se pide la cámara, pero la publicación aparece unos instantes
+  // después. Con un useMemo dependiente de `localCamOn`, el cálculo corría
+  // justo en ese hueco, devolvía null, y NADA lo volvía a disparar: el
+  // supervisor se quedaba con "no hay cámara" para siempre y le reclamaba a
+  // alguien que estaba perfectamente encuadrado. Le pasó a Jhon probando, y
+  // sobrevivía a recargar porque la carrera se repite en cada arranque.
+  //
+  // Un tic de un segundo cierra la carrera venga la publicación cuando venga,
+  // y cuesta nada: es leer una propiedad de un objeto que ya está en memoria.
+  const [localCameraTrack, setLocalCameraTrack] = useState<MediaStreamTrack | null>(null);
+  useEffect(() => {
+    const buscar = () => {
+      const room = lk.getRoom();
+      const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.Camera);
+      const t = (pub?.track?.mediaStreamTrack as MediaStreamTrack | undefined) ?? null;
+      // Solo se avisa si CAMBIÓ: si no, cada segundo re-dispararía el detector.
+      setLocalCameraTrack((antes) => (antes === t ? antes : t));
+    };
+    buscar();
+    const id = window.setInterval(buscar, 1000);
+    return () => window.clearInterval(id);
   }, [lk, localCamOn, lk.connectionState]);
   // `enabled` NO incluye localCamOn: con la cámara apagada queremos que reporte
   // `cam_off`, no que se congele en el último estado.

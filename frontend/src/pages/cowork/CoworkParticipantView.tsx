@@ -233,8 +233,22 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     window.addEventListener("pagehide", handlePageHide);
     return () => {
       window.removeEventListener("pagehide", handlePageHide);
-      // SPA navigation away → release the slot too.
-      sendLeaveBeacon();
+      // ACÁ YA NO SE LIBERA LA SALA, y este es EL bug que Jhon venía
+      // reportando toda la noche: "me voy a otra sección de Maven y al
+      // coordinador le aparece como si me hubiera salido".
+      //
+      // Este cleanup decía "SPA navigation away → release the slot too", y era
+      // correcto cuando se escribió: entonces navegar SÍ significaba irse de
+      // Cowork. Hoy no: la llamada vive por encima del router y se muda a la
+      // ventanita flotante, o sea que la persona sigue adentro trabajando.
+      // Soltar el cupo acá borraba su asignación de la BASE DE DATOS, y por eso
+      // la sala aparecía "Sin participantes" aunque la miniatura siguiera
+      // mostrando su video.
+      //
+      // Los dos caminos reales de salida siguen cubiertos: `pagehide` (cerrar
+      // la pestaña o el navegador) y el botón de salir, que llama a leaveRoom
+      // explícitamente. Si alguien navega y no vuelve, el cupo queda ocupado —
+      // que es lo correcto, porque sigue en la llamada.
     };
   }, [cowork.session?.id]);
 
