@@ -189,13 +189,46 @@ export function useFaceNudge(
 const SIN_PANTALLA_MS = 120_000;
 const REPETIR_SIN_PANTALLA_MS = 120_000;
 
+/** Cuánto tiene que llevar alguien sin compartir para que se le avise al
+ *  SUPERVISOR. Cinco minutos, no dos: a los dos minutos la persona recién
+ *  recibe su primer aviso, y a los cuatro el segundo. Avisarle al supervisor
+ *  antes de eso es interrumpirlo por algo que la persona todavía no tuvo
+ *  chance de corregir — y un supervisor que mira nueve salas aprende rápido a
+ *  ignorar los avisos que llegan demasiado pronto. */
+export const AVISAR_SUPERVISOR_SIN_PANTALLA_MS = 300_000;
+
+/** ¿Hay que avisarle al SUPERVISOR de que esta persona no comparte pantalla?
+ *
+ *  Vive acá y no dentro del dashboard para que sea una sola regla y se pueda
+ *  testear: la de encuadre ya vivía repartida y costó darse cuenta de que en
+ *  pausa no debía avisar. */
+export function debeAvisarSinPantalla(
+  ms: { screenShareOn?: boolean; onBreak?: boolean; screenShareSince?: number | null } | undefined,
+  ahora: number,
+): boolean {
+  if (!ms || ms.screenShareOn) return false;
+  // Marcó pausa: avisó que se iba, y reclamarle sería castigarla por haber
+  // usado bien el botón. Misma regla que el encuadre.
+  if (ms.onBreak) return false;
+  // Sin sello no se puede afirmar nada. Antes de tenerlo, "no comparte" y
+  // "acabo de entrar" se ven exactamente igual, y acusar por eso sería
+  // inventar un dato que no tenemos.
+  if (!ms.screenShareSince) return false;
+  return ahora - ms.screenShareSince >= AVISAR_SUPERVISOR_SIN_PANTALLA_MS;
+}
+
+// Las frases ROTAN, pero todas dicen lo mismo: que se comparta AHORA. Compartir
+// pantalla es norma de la empresa durante el turno, no un favor — así que
+// ninguna puede sonar a sugerencia. "Hazlo cuando puedas" decía exactamente lo
+// contrario de la norma y le daba permiso a cualquiera para dejarlo para nunca.
+// Educado sí; opcional no.
 const FRASES_SIN_PANTALLA = [
-  "No estás compartiendo pantalla. Por favor, vuelve a compartirla.",
-  "Recuerda compartir tu pantalla para que se vea tu trabajo.",
-  "Tu pantalla dejó de compartirse. Actívala de nuevo, por favor.",
+  "No estás compartiendo pantalla. Por favor, actívala ahora.",
+  "Recuerda que compartir pantalla es obligatorio durante tu turno.",
+  "Tu pantalla dejó de compartirse. Vuelve a activarla, por favor.",
   "Por favor, comparte tu pantalla: sin ella no se ve en qué estás trabajando.",
-  "Sigues sin compartir pantalla. Por favor, actívala.",
-  "Falta que compartas tu pantalla. Hazlo cuando puedas, por favor.",
+  "Sigues sin compartir pantalla. Actívala, por favor.",
+  "Falta que compartas tu pantalla. Actívala ahora, por favor.",
 ];
 
 let idxSinPantalla = 0;
@@ -220,7 +253,7 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       playMessageNotification(0.5);
       hablar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length]);
       toast.warning("No estás compartiendo pantalla", {
-        description: "Comparte tu pantalla para que se vea tu trabajo.",
+        description: "Compartir pantalla es obligatorio durante tu turno.",
         duration: 10_000,
         id: "sin-pantalla",
       });

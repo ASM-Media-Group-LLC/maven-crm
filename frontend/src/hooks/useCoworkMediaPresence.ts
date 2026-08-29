@@ -5,6 +5,11 @@ export interface MediaState {
   micOn: boolean;
   camOn: boolean;
   screenShareOn: boolean;
+  /** Epoch del último cambio de `screenShareOn`. Sin esto el supervisor sabe
+   *  QUÉ pasa pero no DESDE CUÁNDO, y no se puede distinguir a quien acaba de
+   *  cerrar una ventana de quien lleva media hora sin compartir. Es el mismo
+   *  papel que cumple `faceSince` para el encuadre. */
+  screenShareSince?: number | null;
   // Pausa (baño). `breakStartedAt` es epoch ms para que el coordinador calcule
   // cuánto lleva, y lo mantiene el cliente de quien está en pausa: si el
   // coordinador recarga el dashboard, el presence se re-sincroniza y el contador
@@ -97,6 +102,7 @@ function leerEstados(canal: CanalRealtime) {
       micOn: !!ultima.micOn,
       camOn: !!ultima.camOn,
       screenShareOn: !!ultima.screenShareOn,
+      screenShareSince: ultima.screenShareSince ?? null,
       onBreak: !!ultima.onBreak,
       breakStartedAt: ultima.breakStartedAt ?? null,
       breakKind: ultima.breakKind ?? null,
@@ -108,13 +114,33 @@ function leerEstados(canal: CanalRealtime) {
   return resultado;
 }
 
+// Desde cuándo está (o no está) compartiendo pantalla.
+//
+// Vive FUERA del canal a propósito. Si viviera en la entrada del canal, cada
+// reconexión —que rehace el canal— reiniciaría el contador, y alguien que lleva
+// cinco minutos sin compartir volvería a cero cada vez que le parpadea el wifi.
+// Justo la persona a la que hay que avisarle sería la que nunca dispara el
+// aviso.
+let selloPantalla: { compartiendo: boolean; desde: number } | null = null;
+
+function selloDePantalla(compartiendo: boolean): number {
+  if (!selloPantalla || selloPantalla.compartiendo !== compartiendo) {
+    selloPantalla = { compartiendo, desde: Date.now() };
+  }
+  return selloPantalla.desde;
+}
+
 function publicar(entrada: CanalVivo, state: MediaState) {
-  entrada.ultimoEstado = state;
+  // El estado se re-publica cada diez segundos aunque no cambie nada, así que
+  // el sello se ARRASTRA: solo se renueva cuando de verdad cambió el compartir.
+  const screenShareSince = selloDePantalla(state.screenShareOn);
+  entrada.ultimoEstado = { ...state, screenShareSince };
   entrada.canal.track({
     user_id: entrada.userId,
     micOn: state.micOn,
     camOn: state.camOn,
     screenShareOn: state.screenShareOn,
+    screenShareSince,
     onBreak: !!state.onBreak,
     breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
     breakKind: state.breakKind ?? null,
@@ -233,6 +259,10 @@ function alVolverAMirar() {
  *  desde acá el resto ve el `leave`, que es lo correcto en ese caso. */
 export function salirDePresencia() {
   ultimoEstadoPendiente = null;
+  // Se va de Cowork de verdad: el contador de "sin compartir" arranca de cero
+  // la próxima vez. Arrastrarlo entre sesiones haría que alguien que vuelve
+  // mañana entre ya con el aviso disparado.
+  selloPantalla = null;
   if (!vivo) return;
   supabase.removeChannel(vivo.canal);
   vivo = null;

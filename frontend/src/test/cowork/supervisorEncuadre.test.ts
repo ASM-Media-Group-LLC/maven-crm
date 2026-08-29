@@ -23,7 +23,7 @@ vi.mock("@/lib/notificationSound", () => ({ playMessageNotification: (...a: unkn
 vi.mock("@/lib/voz", () => ({ hablar: (...a: unknown[]) => habla(...a) }));
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausa, marcarPausa: (v: boolean) => { pausa = v; } }));
 
-const { useFaceNudge, esProblemaDeEncuadre, useScreenShareNudge } = await import("@/hooks/useFaceNudge");
+const { useFaceNudge, esProblemaDeEncuadre, useScreenShareNudge, debeAvisarSinPantalla, AVISAR_SUPERVISOR_SIN_PANTALLA_MS } = await import("@/hooks/useFaceNudge");
 
 /** Monta el supervisor con el problema empezado hace `segundos`. */
 function supervisar(state: string, segundos: number, enPausaProp?: boolean) {
@@ -150,5 +150,73 @@ describe("aviso de compartir pantalla", () => {
     vi.advanceTimersByTime(125_000); b.unmount();
     expect(habla).toHaveBeenCalledTimes(2);
     expect(habla.mock.calls[0][0]).not.toBe(habla.mock.calls[1][0]);
+  });
+});
+
+// Lo que el supervisor ve. La persona ya recibía su aviso a los dos minutos,
+// pero al supervisor NO le llegaba nada: sabía quién no estaba en cámara y no
+// sabía quién no estaba compartiendo. Es el mismo hueco que tenía el encuadre
+// antes de arreglarlo — el sistema sabía y solo se lo decía a quien ya lo sabe.
+describe("avisarle al supervisor que alguien no comparte pantalla", () => {
+  const AHORA = 1_800_000_000_000;
+  const haceMinutos = (m: number) => AHORA - m * 60_000;
+
+  it("a los cinco minutos sí", () => {
+    expect(debeAvisarSinPantalla({ screenShareOn: false, screenShareSince: haceMinutos(5) }, AHORA)).toBe(true);
+  });
+
+  it("a los dos minutos todavía no: es el turno de la persona, no del supervisor", () => {
+    // A los 2 min recién recibe SU primer aviso; a los 4 el segundo. Avisarle
+    // al supervisor antes es interrumpirlo por algo que la persona no tuvo
+    // chance de corregir.
+    expect(debeAvisarSinPantalla({ screenShareOn: false, screenShareSince: haceMinutos(2) }, AHORA)).toBe(false);
+  });
+
+  it("si está compartiendo, nunca", () => {
+    expect(debeAvisarSinPantalla({ screenShareOn: true, screenShareSince: haceMinutos(30) }, AHORA)).toBe(false);
+  });
+
+  it("en pausa se calla, aunque lleve media hora", () => {
+    expect(debeAvisarSinPantalla({ screenShareOn: false, onBreak: true, screenShareSince: haceMinutos(30) }, AHORA)).toBe(false);
+  });
+
+  it("sin sello de tiempo no acusa a nadie", () => {
+    // "No comparte" y "acaba de entrar" se ven igual hasta que hay sello.
+    expect(debeAvisarSinPantalla({ screenShareOn: false, screenShareSince: null }, AHORA)).toBe(false);
+    expect(debeAvisarSinPantalla(undefined, AHORA)).toBe(false);
+  });
+
+  it("el umbral del supervisor es MAYOR que el de la persona", () => {
+    // Si se invirtieran, el supervisor se enteraría antes que el interesado.
+    expect(AVISAR_SUPERVISOR_SIN_PANTALLA_MS).toBeGreaterThan(120_000);
+  });
+});
+
+// Por qué el aviso "dejaba de andar" después de la primera vez.
+describe("marcas de ya-avisé del supervisor", () => {
+  it("olvida a quien se fue, para poder volver a avisarle", async () => {
+    const { olvidarAusentes } = await import("@/lib/avisosSupervisor");
+    const marcas = new Set(["ana", "beto"]);
+    // Beto cerró Cowork: ya no está en presence.
+    olvidarAusentes(marcas, { ana: {} });
+    expect(marcas.has("beto")).toBe(false);
+    // Ana sigue conectada: su marca se respeta, no se le vuelve a avisar.
+    expect(marcas.has("ana")).toBe(true);
+  });
+
+  it("sin esto, quien se va y vuelve no volvería a disparar el aviso NUNCA", async () => {
+    const { olvidarAusentes } = await import("@/lib/avisosSupervisor");
+    const marcas = new Set<string>(["beto"]);
+    olvidarAusentes(marcas, {});          // se fue
+    expect(marcas.size).toBe(0);
+    // Vuelve con la cámara apagada: como ya no hay marca, el hub avisa de nuevo.
+    expect(marcas.has("beto")).toBe(false);
+  });
+
+  it("no inventa marcas para gente presente que nunca tuvo problema", async () => {
+    const { olvidarAusentes } = await import("@/lib/avisosSupervisor");
+    const marcas = new Set<string>();
+    olvidarAusentes(marcas, { ana: {}, beto: {} });
+    expect(marcas.size).toBe(0);
   });
 });

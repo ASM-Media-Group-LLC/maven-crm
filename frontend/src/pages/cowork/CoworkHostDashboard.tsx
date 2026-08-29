@@ -10,7 +10,7 @@ import {
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
   PanelLeftClose, PanelLeftOpen,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -28,7 +28,8 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { hablar } from "@/lib/voz";
-import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
+import { AVISAR_COORDINADOR_MS, debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
+import { olvidarAusentes } from "@/lib/avisosSupervisor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
@@ -481,6 +482,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // que se buscaba: que un descuido se resuelva solo sin interrumpir a nadie.
   const FACE_ALERT_MS = 60_000;
   const FACE_SONIDO_MS = AVISAR_COORDINADOR_MS;
+  // ¿Lleva rato sin compartir pantalla?
+  //
+  // En Cowork la pantalla es la mitad del trabajo: sin ella el supervisor ve
+  // una cara pero no ve QUÉ está haciendo esa persona. La persona ya recibe su
+  // propio aviso a los dos minutos; esto es lo que faltaba del otro lado, y es
+  // lo mismo que ya pasaba con el encuadre antes de arreglarlo: el sistema
+  // sabía, pero solo se lo decía a quien tenía el problema.
+  const sinPantalla = (ms: MediaState | undefined): boolean => debeAvisarSinPantalla(ms, now);
+
   const faceIssue = (ms: MediaState | undefined): string | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
@@ -537,6 +547,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // — se rearma solo cuando esa persona vuelve a cuadro.
   const yaAvisado = useRef<Set<string>>(new Set());
   useEffect(() => {
+    // Si alguien se FUE de la sesión, su marca se va con él. Sin esto la marca
+    // queda pegada para siempre: al volver ya figura como "ya avisado" y no
+    // vuelve a sonar nunca más. Era por qué el aviso funcionaba una vez y
+    // después no, y se veía como "dejó de andar" cuando en realidad nunca se
+    // rearmaba. Solo se limpiaba al VOLVER a estar bien — irse no cuenta como
+    // volver a estar bien.
+    olvidarAusentes(yaAvisado.current, mediaStates);
     for (const [uid, st] of Object.entries(mediaStates)) {
       const problema = faceIssue(st);
       const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
@@ -566,6 +583,40 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         yaAvisado.current.delete(uid);
       }
     }
+  }, [mediaStates, now, cowork.profiles]);
+
+  // Lo mismo, para compartir pantalla. Es un aviso aparte y no una rama del de
+  // arriba porque son dos problemas distintos: alguien puede estar perfecto en
+  // cámara y llevar media hora sin compartir, que es justamente el caso que no
+  // se veía. Suena UNA vez por persona y por episodio, y se rearma solo cuando
+  // vuelve a compartir.
+  const yaAvisadoPantalla = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Misma purga que arriba, por la misma razón.
+    olvidarAusentes(yaAvisadoPantalla.current, mediaStates);
+    for (const [uid, st] of Object.entries(mediaStates)) {
+      if (sinPantalla(st)) {
+        if (yaAvisadoPantalla.current.has(uid)) continue;
+        yaAvisadoPantalla.current.add(uid);
+        const quien = nombreYApellido(cowork.profiles[uid]);
+        const minutos = Math.floor((now - (st.screenShareSince as number)) / 60000);
+        playCoordinatorRequestSound();
+        // Con nombre y apellido, igual que el de encuadre: en una grilla de
+        // nueve salas, saber A QUIÉN mirar es la mitad del aviso. Y en el
+        // equipo hay dos Álvaro Mejía.
+        hablar(`${quien} lleva ${minutos} minutos sin compartir pantalla.`, { volumen: 0.85 });
+        toast.warning(`${quien}: sin compartir pantalla`, {
+          description: `Lleva ${minutos} minutos así y ya se le avisó dos veces.`,
+          duration: 8000,
+        });
+      } else if (st.screenShareOn) {
+        // Se rearma solo cuando VUELVE a compartir, no apenas deja de cumplirse
+        // la condición: si se rearmara con la pausa, volvería a sonar al
+        // volver del baño sin que la persona haya hecho nada distinto.
+        yaAvisadoPantalla.current.delete(uid);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaStates, now, cowork.profiles]);
 
   // El aviso de manos levantadas (sonido + globito del sistema) se mudó a
@@ -1132,6 +1183,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                               >
                                                 <EyeOff className="h-3 w-3" />
                                                 {formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}
+                                              </span>
+                                            )}
+                                            {sinPantalla(ms) && (
+                                              <span
+                                                className="flex items-center gap-0.5 text-[10px] text-amber-500"
+                                                title={`Sin compartir pantalla desde hace ${formatBreak(Math.floor((now - (ms.screenShareSince as number)) / 1000))}`}
+                                              >
+                                                <MonitorOff className="h-3 w-3" />
+                                                {formatBreak(Math.floor((now - (ms.screenShareSince as number)) / 1000))}
                                               </span>
                                             )}
                                             {ms.onBreak && ms.breakStartedAt && (
