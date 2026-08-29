@@ -137,7 +137,11 @@ Deno.serve(async (req) => {
       if (!token || token !== Deno.env.get("RECORDINGS_CRON_TOKEN")) {
         return json(req, { error: "Unauthorized" }, 401);
       }
-      const cerradas = await cerrarHuerfanas(admin);
+      // `egress_id` lo manda el webhook de LiveKit: "esta grabación terminó".
+      // En ese caso no hay nada que esperar —la espera existe solo porque el
+      // sondeo tiene que adivinar— así que se cierra esa fila y nada más.
+      const { egress_id } = body as { egress_id?: string };
+      const cerradas = await cerrarHuerfanas(admin, egress_id);
       return json(req, { ok: true, cerradas });
     }
 
@@ -456,19 +460,26 @@ const GRACIA_HUERFANA_MS = 15 * 60 * 1000;
  *  Devuelve cuántas cerró.
  */
 // deno-lint-ignore no-explicit-any
-async function cerrarHuerfanas(admin: any): Promise<number> {
-  const desde = new Date(Date.now() - GRACIA_HUERFANA_MS).toISOString();
-  const { data: colgadas } = await admin
+async function cerrarHuerfanas(admin: any, egressId?: string): Promise<number> {
+  let q = admin
     .from("meeting_recordings")
     .select("id, started_by, egress_id, storage_key, room_name, title, started_at")
     .in("status", ["recording", "processing"])
-    .lt("started_at", desde)
     .is("deleted_at", null)
     .limit(50);
 
+  // Con egress_id vino un aviso de LiveKit ("esta terminó"): se cierra esa y
+  // se saltea la espera, que existía solo para el sondeo a ciegas.
+  q = egressId
+    ? q.eq("egress_id", egressId)
+    : q.lt("started_at", new Date(Date.now() - GRACIA_HUERFANA_MS).toISOString());
+
+  const { data: colgadas } = await q;
+
   let cerradas = 0;
   for (const c of colgadas ?? []) {
-    if (await egressActivo(c.egress_id)) continue; // sigue grabando: no tocar
+    // Con aviso de LiveKit no hace falta volver a preguntarle.
+    if (!egressId && await egressActivo(c.egress_id)) continue; // sigue grabando
     if (await finalizarHuerfana(admin, c)) cerradas++;
   }
   return cerradas;

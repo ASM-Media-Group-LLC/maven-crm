@@ -281,5 +281,8 @@ verify_jwt = false  # auth propia: Bearer del usuario + resuelve su conexión ad
 [functions.recordings]
 verify_jwt = false  # auth propia: Bearer del usuario en start/stop/download/delete; X-Cron-Token en expire (el cron no manda JWT)
 
+[functions.livekit-webhook]
+verify_jwt = false  # lo llama LiveKit, que no puede mandar un JWT de Supabase; se valida la FIRMA del webhook adentro
+
 [functions.web-push]
 verify_jwt = false  # auth propia: Bearer del usuario (subscribe/notify); valida adentro
