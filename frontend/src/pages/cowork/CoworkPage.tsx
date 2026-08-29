@@ -232,7 +232,7 @@ export default function CoworkPage() {
                 : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
               : mySessions.length > 0
                 ? "Vuelve a una de tus salas activas."
-                : "Abre el enlace que te compartió tu coordinador para entrar a tu sala."}
+                : "Abre el enlace que te compartió tu supervisor para entrar a tu sala."}
           </p>
           {!permissionLoading && (canCreateSessions ? (
             <Button
@@ -333,7 +333,7 @@ function CoworkSessionEndedRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    toast.info("La sesión fue finalizada por el coordinador");
+    toast.info("La sesión fue finalizada por el supervisor");
     const t = setTimeout(() => navigate("/dashboard", { replace: true }), 50);
     return () => clearTimeout(t);
   }, [navigate]);

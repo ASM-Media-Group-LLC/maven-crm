@@ -31,6 +31,7 @@ import { hablar } from "@/lib/voz";
 import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
+import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -233,10 +234,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const segundos = Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000));
     const kind = (st as any).breakKind === "break" ? "break" : "bano";
     const limite = limitesPausa[kind];
+    // La cuenta la hace lib/pausaCowork, el MISMO módulo que usa la pantalla
+    // del empleado. Si cada lado la calculara por su cuenta, tarde o temprano
+    // dirían cosas distintas sobre el mismo minuto — y ahí se acaba la
+    // conversación sobre si alguien se pasó o no.
+    const cuenta = cuentaPausa(segundos, limite);
     return {
       segundos, kind,
       etiqueta: kind === "break" ? "Break" : "Baño",
-      excedida: limite != null && segundos > limite * 60,
+      excedida: cuenta.excedida,
+      cuenta,
     };
   };
   // Barra lateral plegada, como el menu de Maven. Se recuerda porque es una
@@ -364,7 +371,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       key: hubKey,
       roomName: hubRoom,
       displayName,
-      callDisplayName: "Coordinador Hub",
+      callDisplayName: "Supervisor Hub",
       isAdmin: true,
       onLeave: colgarHub,
       hideShareLink: true,
@@ -498,12 +505,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
       if (bastante && !yaAvisado.current.has(uid)) {
         yaAvisado.current.add(uid);
-        const quien = cowork.profiles[uid] || "Alguien";
+        // Con apellido: en el equipo hay dos Álvaro Mejía y hubo dos Manuela
+        // Zapata. Un aviso que dice solo el nombre de pila no identifica a
+        // nadie, que es exactamente lo que el aviso tiene que hacer.
+        const quien = nombreYApellido(cowork.profiles[uid]);
         playCoordinatorRequestSound();
         // Se lo dice en voz alta y CON EL NOMBRE. Es lo que la voz del propio
         // chatter no puede darle al coordinador: saber a quién mirar sin tener
         // que buscar cuál de las nueve salas parpadea.
-        const nombre = quien.split(" ")[0];
+        const nombre = quien;
         hablar(
           problema === "Sin luz" ? `${nombre} no tiene luz suficiente.`
           : problema === "Fuera de cuadro" ? `${nombre} está fuera de cuadro.`
@@ -618,7 +628,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           {openHostRequests.length > 0 && (
             <button
               onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
-              title={`${openHostRequests.length} ${openHostRequests.length === 1 ? "persona pide" : "personas piden"} coordinador`}
+              title={`${openHostRequests.length} ${openHostRequests.length === 1 ? "persona pide" : "personas piden"} supervisor`}
               className="mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 transition-colors animate-pulse"
             >
               <Hand className="h-4 w-4" />
@@ -675,7 +685,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <h2 className="text-sm font-semibold text-foreground truncate">{cowork.session?.name}</h2>
                 <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
               </button>
-              <p className="text-xs text-muted-foreground">Coordinador Dashboard</p>
+              <p className="text-xs text-muted-foreground">Supervisor Dashboard</p>
             </div>
             <div className="flex gap-1">
               <Button
@@ -726,7 +736,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div className="p-3 border-b border-border/50">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Radio className={`h-3 w-3 ${hubConnected ? "text-success" : "text-muted-foreground/50"}`} />
-              <span>Coordinador Hub</span>
+              <span>Supervisor Hub</span>
               {hubConnected ? (
                 <Button
                   variant="ghost"
@@ -840,6 +850,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   nombre: cowork.profiles[uid] || "User",
                   segundos: Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000)),
                   sala: cowork.rooms.find((r) => r.id === sala?.room_id)?.name,
+                  cuenta: cuentaPausa(
+                    Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000)),
+                    limitesPausa[(st as { breakKind?: string }).breakKind === "break" ? "break" : "bano"],
+                  ),
                 };
               })
               .sort((a, b) => b.segundos - a.segundos);
@@ -861,8 +875,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           {p.sala}
                         </Badge>
                       )}
-                      <span className="text-[11px] font-mono text-amber-500 tabular-nums">
-                        {formatBreak(p.segundos)}
+                      <span className={cn("text-[11px] font-mono tabular-nums", clasesPausa(p.cuenta.estado))}>
+                        {p.cuenta.texto}
                       </span>
                     </div>
                   </div>
@@ -1015,15 +1029,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             {enPausa.map(({ p, pausa }) => (
                               <span
                                 key={p.user_id}
-                                className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${
-                                  pausa!.excedida
-                                    ? "bg-destructive/20 text-destructive animate-pulse"
-                                    : "bg-success/15 text-success"
-                                }`}
-                                title={`${cowork.profiles[p.user_id] || "Alguien"} · ${pausa!.etiqueta}${pausa!.excedida ? " · pasado del límite" : ""}`}
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                                  pausa!.cuenta.estado === "excedida" ? "bg-destructive/20 animate-pulse"
+                                    : pausa!.cuenta.estado === "poco" ? "bg-amber-500/15"
+                                    : "bg-success/15",
+                                  clasesPausa(pausa!.cuenta.estado),
+                                )}
+                                title={`${cowork.profiles[p.user_id] || "Alguien"} · ${pausa!.etiqueta}${pausa!.excedida ? " · PASADO del límite" : " · le quedan " + pausa!.cuenta.texto}`}
                               >
                                 <Coffee className="h-2.5 w-2.5" />
-                                {(cowork.profiles[p.user_id] || "Alguien").split(" ")[0]} {formatBreak(pausa!.segundos)}
+                                <span className="truncate max-w-[92px]">{nombreYApellido(cowork.profiles[p.user_id])}</span> {pausa!.cuenta.texto}
                               </span>
                             ))}
                           </div>
@@ -1293,7 +1309,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 title={hubMaximized ? undefined : "Arrastra para mover la ventana"}
               >
                 <Headphones className="h-3 w-3" />
-                Coordinador Hub
+                Supervisor Hub
               </div>
               <div className="flex gap-0.5">
                 <Button

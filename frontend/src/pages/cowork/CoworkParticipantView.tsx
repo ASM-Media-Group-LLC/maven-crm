@@ -11,6 +11,7 @@ import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { marcarPausa } from "@/lib/coworkPausa";
+import { cuentaPausa, clasesPausa } from "@/lib/pausaCowork";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
@@ -100,6 +101,20 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   const [breakKind, setBreakKind] = useState<"bano" | "break" | null>(null);
   const [breakLimite, setBreakLimite] = useState<number | null>(null);
+  // Los topes salen de la BASE (cowork_break_limits), no de un número escrito
+  // acá. El menú decía "Break (30 min)" y "Baño" a secas: si mañana alguien
+  // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.
+  const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
+  useEffect(() => {
+    supabase.from("cowork_break_limits").select("kind, minutos").then(({ data }) => {
+      if (data) setLimitesPausa(Object.fromEntries(data.map((l: { kind: string; minutos: number }) => [l.kind, l.minutos])));
+    });
+  }, []);
+  const etiquetaPausa = (kind: "bano" | "break") => {
+    const nombre = kind === "break" ? "Break" : "Baño";
+    const min = limitesPausa[kind];
+    return min != null ? `${nombre} (${min} min)` : nombre;
+  };
 
   // La pausa la abre y la cierra el SERVIDOR: el reloj no puede ser el del
   // navegador de quien está siendo medido. Lo que viaja por presence sigue
@@ -279,7 +294,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (req?.status === "resolved" || !req) {
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
-      toast.info("Llamada privada con coordinador finalizada");
+      toast.info("Llamada privada con supervisor finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
@@ -404,7 +419,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
           <div className="w-full flex flex-col gap-2">
             <span className="text-xs text-muted-foreground text-center">
-              {lastRoomId ? "O entra con el código de otra sala" : "Entra con el código que te dio tu coordinador"}
+              {lastRoomId ? "O entra con el código de otra sala" : "Entra con el código que te dio tu supervisor"}
             </span>
             <div className="flex gap-2">
               <Input
@@ -446,7 +461,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     dismissedRequestRef.current = null;
     try {
       await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
-      toast.success("Solicitud enviada al coordinador");
+      toast.success("Solicitud enviada al supervisor");
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -456,7 +471,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     pendingOneOnOneRef.current = true;
     try {
       const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
-      toast.success("Solicitud de llamada privada enviada al coordinador");
+      toast.success("Solicitud de llamada privada enviada al supervisor");
       const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
       const reqId = result?.request?.id;
       if (roomName && reqId) {
@@ -487,7 +502,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {isInOneOnOne ? (
             <>
               <Crown className="h-4 w-4 text-amber-500 shrink-0" />
-              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con coordinador</span>
+              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con supervisor</span>
             </>
           ) : (
             <>
@@ -505,10 +520,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             </Button>
           )}
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={isInOneOnOne} onClick={handleRequestHost}>
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir supervisor"}
           </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
-            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada coordinador"}
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada supervisor"}
           </Button>
           <Button
             variant="ghost"
@@ -521,10 +536,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             {breakStartedAt ? (
               <>
                 <Coffee className="h-4 w-4" />
-                {`${breakKind === "break" ? "Break" : "Baño"} · ${formatBreak(breakElapsed)}`}
-                {breakLimite != null && breakElapsed > breakLimite * 60 && (
-                  <span className="text-destructive">· pasado</span>
-                )}
+                <span>{breakKind === "break" ? "Break" : "Baño"} ·</span>
+                {(() => {
+                  const c = cuentaPausa(breakElapsed, breakLimite);
+                  return (
+                    <span className={cn("tabular-nums", clasesPausa(c.estado))}>
+                      {c.texto}
+                      {c.excedida && <span className="ml-1 font-normal">pasado</span>}
+                    </span>
+                  );
+                })()}
               </>
             ) : (
               <span>
@@ -535,8 +556,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => toggleBreak("bano")}>Baño</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleBreak("break")}>Break (30 min)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleBreak("bano")}>{etiquetaPausa("bano")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleBreak("break")}>{etiquetaPausa("break")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </span>
@@ -562,24 +583,28 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem onClick={handleRequestHost} disabled={isInOneOnOne}>
                 <Hand className="h-4 w-4 mr-2" />
-                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
+                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir supervisor"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
-                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
+                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con supervisor"}
               </DropdownMenuItem>
               {breakStartedAt ? (
                 <DropdownMenuItem onClick={() => toggleBreak()}>
                   <Coffee className="h-4 w-4 mr-2" />
-                  {`${breakKind === "break" ? "Break" : "Baño"} · ${formatBreak(breakElapsed)}`}
+                  <span>{breakKind === "break" ? "Break" : "Baño"} ·&nbsp;</span>
+                  {(() => {
+                    const c = cuentaPausa(breakElapsed, breakLimite);
+                    return <span className={cn("tabular-nums", clasesPausa(c.estado))}>{c.texto}</span>;
+                  })()}
                 </DropdownMenuItem>
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => toggleBreak("bano")}>
-                    <Coffee className="h-4 w-4 mr-2" /> Baño
+                    <Coffee className="h-4 w-4 mr-2" /> {etiquetaPausa("bano")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => toggleBreak("break")}>
-                    <Coffee className="h-4 w-4 mr-2" /> Break (30 min)
+                    <Coffee className="h-4 w-4 mr-2" /> {etiquetaPausa("break")}
                   </DropdownMenuItem>
                 </>
               )}
@@ -595,7 +620,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="Llamada privada con coordinador"
+            callDisplayName="Llamada privada con supervisor"
             isAdmin={false}
             onLeave={async () => {
               const reqId = oneOnOneRequestId;

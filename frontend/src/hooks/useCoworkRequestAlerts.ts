@@ -63,7 +63,7 @@ export function useCoworkRequestAlerts() {
         : { data: null };
       const quien = perfil?.full_name || "Alguien";
       notify(
-        nuevas.length > 1 ? `${nuevas.length} personas piden coordinador` : `${quien} pide coordinador`,
+        nuevas.length > 1 ? `${nuevas.length} personas piden supervisor` : `${quien} pide supervisor`,
         sala?.name ? `Sala ${sala.name}` : "Cowork",
         () => window.focus(),
         false, // el sonido ya sonó arriba; el de mensajes sería otro y confunde
