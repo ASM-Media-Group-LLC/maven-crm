@@ -12,14 +12,42 @@ services:
     # Confirmar en https://hub.docker.com/r/livekit/livekit-server/tags antes de deployar.
     image: livekit/livekit-server:v1.13.3
     restart: unless-stopped
-    command: --config /etc/livekit/livekit.yaml
-    volumes:
-      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
     environment:
       # Formato: "APIxxxxxxxx: secretxxxxxxxx" (una línea key: secret).
       # Se setea en Dokploy > Environment (NO se commitea). Debe coincidir EXACTO
       # con los secrets LIVEKIT_API_KEY / LIVEKIT_API_SECRET de Supabase al hacer el cutover.
       LIVEKIT_KEYS: ${LIVEKIT_KEYS}
+      # La config va INLINE, no por archivo montado, y no es cuestión de gusto:
+      # un bind-mount de un solo archivo no cambia la definición del servicio,
+      # así que `compose up -d` no recrea el contenedor y LiveKit —que lee su
+      # config al bootear— se queda con la vieja mientras el deploy figura
+      # "Done". Nos pasó con el webhook: hubo que reiniciar a mano. Acá la
+      # config ES parte del servicio, así que cambiarla recrea el contenedor.
+      #
+      # ⚠️ La variable se llama LIVEKIT_CONFIG (verificado en el fuente de
+      # v1.13.3: la bandera --config-body lee de LIVEKIT_CONFIG). NO es
+      # LIVEKIT_CONFIG_BODY, aunque el egress de al lado use EGRESS_CONFIG_BODY.
+      #
+      # ⚠️ webhook.api_key TIENE que ser una de las de LIVEKIT_KEYS. Si no
+      # coincide, LiveKit no arranca y se quedan sin videollamadas todos.
+      LIVEKIT_CONFIG: |
+        port: 7880                 # HTTP/WebSocket de señalización (Traefik enruta lk.asmtech.ai acá)
+        rtc:
+          tcp_port: 7881           # media TCP (fallback)
+          udp_port: 7882           # media UDP: puerto ÚNICO multiplexado (más simple que un rango para Docker)
+          use_external_ip: true    # anuncia la IP pública del VPS en los candidatos ICE — CLAVE para que conecte
+        logging:
+          level: info
+        redis:                     # OBLIGATORIO para egress: ahí publica el server los trabajos de grabación
+          address: redis:6379
+        webhook:
+          # LiveKit avisa apenas termina el egress y la grabación se cierra al
+          # instante. El cron cerrar-grabaciones-huerfanas NO se saca: un
+          # webhook que no llega no se reintenta, y sin esa red la grabación
+          # quedaría abierta para siempre.
+          api_key: APIfbcbe6d204c0
+          urls:
+            - https://lsagslbkliprespbyhts.supabase.co/functions/v1/livekit-webhook
     ports:
       - "7881:7881"        # media TCP (fallback cuando UDP está bloqueado)
       - "7882:7882/udp"    # media UDP (puerto único multiplexado)
@@ -93,33 +121,25 @@ services:
           cpus: "4"
           memory: 2g
 
-  # Descargas firmadas + borrado de los MP4 (ver rec-server.mjs).
+  # Descargas firmadas + borrado de los MP4 (ver rec-server/rec-server.mjs).
   # Dominio en Dokploy: rec.asmtech.ai -> este contenedor :8080.
   #
-  # ⚠️ TOCAR rec-server.mjs NO ALCANZA CON DESPLEGAR. El archivo entra por
-  # bind-mount de UN SOLO ARCHIVO, así que `compose up -d` no ve ningún cambio
-  # en la definición del servicio y deja el contenedor como está: node sigue
-  # con el código viejo en memoria y el deploy figura "Done". Hay que
-  # REINICIAR el contenedor a mano (Dokploy → Containers → rec-server →
-  # Restart).
+  # El código va DENTRO de la imagen, no por bind-mount. Antes entraba montado
+  # como un solo archivo y eso escondía una trampa cara: `compose up -d` no ve
+  # ningún cambio en la definición del servicio, así que no recrea nada, y node
+  # —que ya tenía el módulo en memoria— seguía sirviendo el código viejo con el
+  # deploy en verde. Se perdió una hora depurando código que no corría.
+  # Con el código en la imagen, tocarlo cambia la imagen y compose recrea.
   #
-  # Para no depurar a ciegas, rec-server publica su versión:
+  # Igual conviene confirmar qué está sirviendo:
   #   curl -s https://rec.asmtech.ai/health   -> {"version":"...", ...}
-  # Si esa versión no es la del archivo, lo que está sirviendo NO es tu código.
   rec-server:
-    image: node:22-alpine
+    build: ./rec-server
     restart: unless-stopped
-    # El chmod NO es decorativo: Docker crea /var/lib/maven/grabaciones como
-    # root:755 y el egress corre como usuario sin privilegios -> la grabacion
-    # componia bien y moria al ESCRIBIR con "permission denied" (21/08).
-    # rec-server es root, asi que deja el directorio escribible al bootear:
-    # permanente ante re-provisiones, sin pasos manuales en el host.
-    command: ["sh", "-c", "chmod 1777 /out && exec node /app/rec-server.mjs"]
     environment:
       RECORDINGS_SIGNING_SECRET: ${RECORDINGS_SIGNING_SECRET}
       RECORDINGS_DIR: /out
     volumes:
-      - ./rec-server.mjs:/app/rec-server.mjs:ro
       - /var/lib/maven/grabaciones:/out
     networks:
       - dokploy-network

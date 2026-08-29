@@ -50,7 +50,7 @@ entrar a `/call/<sala>` → "Unirse ahora" → debe conectar contra lk.asmtech.a
 - `7882/udp` — media principal
 
 ## Pendiente / opcional
-- **TURN** (Slice 2): activar `turn:` en `livekit.yaml` solo si algún cliente detrás de
+- **TURN** (Slice 2): activar `turn:` en el bloque `LIVEKIT_CONFIG` del compose solo si algún cliente detrás de
   NAT estricto no conecta.
 - **Redis**: no hace falta para un solo nodo. Agregar si algún día se escala a multi-nodo.
 - **Puerto UDP único vs rango**: para muy alta concurrencia conviene un rango; para este
@@ -89,3 +89,31 @@ El compose ahora trae `redis` (coordinación), `egress` (compone el MP4) y
 - `https://rec.asmtech.ai/health` → `{ok:true, archivos, bytes}`.
 - Grabar 1 min de una sala de prueba → aparece el MP4 en el host y la fila
   en `meeting_recordings` pasa a `ready` con tamaño.
+
+## Dónde vive cada cosa (y por qué)
+
+No hay `livekit.yaml` ni `rec-server.mjs` sueltos montados en los contenedores.
+Los dos entran por la **definición del servicio**:
+
+- La config de LiveKit va inline en `LIVEKIT_CONFIG` (docker-compose.yml).
+- El código de rec-server va dentro de su imagen (`rec-server/Dockerfile`).
+
+Esto no es preferencia de estilo. Un bind-mount de **un solo archivo** no cambia
+la definición del servicio, así que `docker compose up -d` —o sea, un Deploy de
+Dokploy— no recrea ni reinicia el contenedor. El proceso adentro ya leyó su
+config (LiveKit) o ya cargó su módulo (node) al arrancar, así que sigue
+corriendo lo viejo **mientras el deploy figura "Done" en verde**. Es el peor
+modo de falla posible: todo dice que salió bien y no salió.
+
+Pasó dos veces: una hora depurando código de rec-server que no estaba
+corriendo, y el webhook de grabaciones que hubo que activar reiniciando el
+contenedor a mano.
+
+Con config y código dentro de la definición, cambiarlos cambia el servicio, y
+el deploy los aplica solo. Un deploy vuelve a significar lo que uno cree.
+
+Para confirmar qué está sirviendo de verdad:
+
+```
+curl -s https://rec.asmtech.ai/health
+```
