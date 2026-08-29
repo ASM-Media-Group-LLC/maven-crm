@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
+import { LlamadaEnVentanaFlotante } from "@/components/LlamadaEnVentanaFlotante";
+import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
 import MeetGuestGate from "./meet/MeetGuestGate";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
@@ -171,31 +173,47 @@ export default function VideoCallPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden">
-      <LiveKitCallView
-        roomName={roomName}
-        displayName={userName}
-        callDisplayName={callDisplayName}
-        isAdmin={isAdmin}
-        onLeave={handleLeave}
-        initialMicOn={joinOpts.micOn}
-        initialCamOn={joinOpts.camOn}
-        initialAudioDeviceId={joinOpts.audioDeviceId}
-        initialVideoDeviceId={joinOpts.videoDeviceId}
-        initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
-        initialBackgroundEffect={joinOpts.backgroundEffect}
-        // Grabar: reuniones de Meet Y llamadas del chat (`call-`). Se guardan
-        // en Grabaciones con la misma lógica; el título (nombre del chat) las
-        // distingue. Con botón, como en Meet — no arranca sola.
-        recording={
-          roomName.startsWith("meet_") || roomName.startsWith("call-")
-            ? { source: "meet", title: callDisplayName }
-            : undefined
-        }
-        shareLink={meetShareLink ?? undefined}
-      />
-      {/* Sala de espera: si es una reunión de Meet, quien está adentro (con cuenta)
-          ve a los invitados sin cuenta que piden entrar y los admite. */}
-      {roomName.startsWith("meet_") && <MeetGuestGate livekitRoom={roomName} />}
+      {/* La llamada puede salir a la ventana flotante del sistema cuando la
+          persona se va a otro programa: esta pestaña es SOLO la llamada, así
+          que si se va, deja de verse. La ventana queda siempre al frente. */}
+      <LlamadaEnVentanaFlotante activa>
+        <LiveKitCallView
+          autoPip={!docPipSupported()}
+          roomName={roomName}
+          displayName={userName}
+          callDisplayName={callDisplayName}
+          isAdmin={isAdmin}
+          onLeave={handleLeave}
+          initialMicOn={joinOpts.micOn}
+          initialCamOn={joinOpts.camOn}
+          initialAudioDeviceId={joinOpts.audioDeviceId}
+          initialVideoDeviceId={joinOpts.videoDeviceId}
+          initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
+          initialBackgroundEffect={joinOpts.backgroundEffect}
+          // Grabar: reuniones de Meet Y llamadas del chat (`call-`). Se guardan
+          // en Grabaciones con la misma lógica; el título (nombre del chat) las
+          // distingue. Con botón, como en Meet — no arranca sola.
+          recording={
+            roomName.startsWith("meet_") || roomName.startsWith("call-")
+              ? { source: "meet", title: callDisplayName }
+              : undefined
+          }
+          shareLink={meetShareLink ?? undefined}
+        />
+        {/* Sala de espera: si es una reunión de Meet, quien está adentro (con
+            cuenta) ve a los invitados sin cuenta que piden entrar y los admite.
+
+            VA ADENTRO DEL ENVOLTORIO a propósito. Si quedara afuera, se dibuja
+            en el documento de la pestaña — y justo cuando la llamada sale a la
+            ventana flotante, el anfitrión está mirando la ventana y NO la
+            pestaña. Un invitado podría golpear y él no ver nada, sin badge, sin
+            sonido y sin nada que lo haga volver. El invitado se queda esperando
+            contra un cartel que no vence nunca.
+
+            Es un hueco que abre esta misma función: antes no había motivo para
+            estar fuera de la pestaña. */}
+        {roomName.startsWith("meet_") && <MeetGuestGate livekitRoom={roomName} />}
+      </LlamadaEnVentanaFlotante>
     </div>
   );
 }

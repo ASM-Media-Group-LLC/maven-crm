@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Video, Loader2, DoorClosed, Clock } from "lucide-react";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import { LlamadaEnVentanaFlotante } from "@/components/LlamadaEnVentanaFlotante";
+import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import { useMeetGuest } from "@/hooks/useMeetGuest";
 import { normalizeRoomCode } from "@/lib/coworkRoomCode";
 
@@ -94,16 +96,21 @@ export default function MeetGuestPage() {
   if (status === "admitted" && call) {
     return (
       <div className="h-screen w-screen bg-background">
-        <LiveKitCallView
-          roomName={call.room}
-          displayName={guestName || "Invitado"}
-          callDisplayName={roomName || "Reunión"}
-          isAdmin={false}
-          getToken={getToken}
-          initialMicOn={false}
-          initialCamOn={false}
-          onLeave={() => window.location.reload()}
-        />
+        {/* Igual que en la videollamada: esta pestaña es solo la reunión, así
+            que si el invitado se va a otro programa la pierde de vista. */}
+        <LlamadaEnVentanaFlotante activa>
+          <LiveKitCallView
+            autoPip={!docPipSupported()}
+            roomName={call.room}
+            displayName={guestName || "Invitado"}
+            callDisplayName={roomName || "Reunión"}
+            isAdmin={false}
+            getToken={getToken}
+            initialMicOn={false}
+            initialCamOn={false}
+            onLeave={() => window.location.reload()}
+          />
+        </LlamadaEnVentanaFlotante>
       </div>
     );
   }

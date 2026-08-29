@@ -80,6 +80,8 @@ export function CallOutlet({ className }: { className?: string }) {
 const POS_KEY = "maven.call.float.pos";
 
 import { useCoworkRequestAlerts } from "@/hooks/useCoworkRequestAlerts";
+import { useAutoFlotante } from "@/hooks/useAutoFlotante";
+import { useReanudarMedia } from "@/hooks/useReanudarMedia";
 
 export function PersistentCallProvider({ children }: { children: React.ReactNode }) {
   // Las manos levantadas de Cowork suenan desde acá y no desde la pagina del
@@ -189,59 +191,10 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     habiaHueco.current = hayHueco;
   }, [outlet, pipWindow, closePip]);
 
-  // ── QUE LA LLAMADA SALGA SOLA AL IRSE A OTRO PROGRAMA ─────────────────────
-  //
-  // Cuando la persona se va a WhatsApp, a OnlyFans o a otra pestaña, la llamada
-  // se queda atrás y deja de verse. Esto la saca sola a la ventana flotante,
-  // que el sistema mantiene siempre al frente.
-  //
-  // Abrir esa ventana normalmente EXIGE un clic — `requestWindow()` se rechaza
-  // sin gesto del usuario. La única vía sin clic es esta acción de MediaSession:
-  // Chrome la dispara justo cuando la persona cambia de pestaña o de app, y solo
-  // en ese momento permite abrirla. Es la misma que usa Meet.
-  //
-  // Pide tres cosas, las tres cumplidas acá: registrar el manejador, estar
-  // capturando cámara o micrófono (estamos en una llamada), y que el permiso de
-  // "picture-in-picture automático" esté activo — viene así por defecto.
-  //
-  // Si el navegador no lo soporta no pasa nada: queda el botón manual.
-  const pipAbiertaSola = useRef(false);
-  const pipAbiertaRef = useRef(false);
-  pipAbiertaRef.current = !!pipWindow;
-
-  useEffect(() => {
-    if (!config) return;                       // sin llamada no hay nada que sacar
-    const ms = navigator.mediaSession as MediaSession | undefined;
-    if (!ms?.setActionHandler) return;
-    const accion = "enterpictureinpicture" as MediaSessionAction;
-    try {
-      ms.setActionHandler(accion, () => {
-        if (pipAbiertaRef.current) return;     // ya está afuera
-        pipAbiertaSola.current = true;
-        void openPip();
-      });
-    } catch { /* navegador sin esta acción: se queda el botón manual */ }
-    return () => { try { ms.setActionHandler(accion, null); } catch { /* noop */ } };
-  }, [config, openPip]);
-
-  // Y que se guarde sola al volver — pero SOLO si la sacó el navegador.
-  //
-  // Quien la sacó A MANO probablemente la puso en otro monitor a propósito, y
-  // cerrársela al volver le rompería justo lo que quiso armar. Esa distinción
-  // es todo el punto de la bandera.
-  useEffect(() => {
-    const alVolver = () => {
-      if (document.visibilityState !== "visible") return;
-      if (!pipAbiertaSola.current || !pipAbiertaRef.current) return;
-      pipAbiertaSola.current = false;
-      closePip();
-    };
-    document.addEventListener("visibilitychange", alVolver);
-    return () => document.removeEventListener("visibilitychange", alVolver);
-  }, [closePip]);
-
-  // Si se cerró por cualquier vía, la bandera deja de aplicar.
-  useEffect(() => { if (!pipWindow) pipAbiertaSola.current = false; }, [pipWindow]);
+  // Que la llamada salga sola al irse a otro programa, y se guarde sola al
+  // volver. La lógica vive en useAutoFlotante porque también la usan las
+  // pantallas de Meet y videollamada, que no pasan por este provider.
+  useAutoFlotante({ activa: !!config, ventana: pipWindow, abrir: openPip, cerrar: closePip });
 
   // Dónde se dibuja la llamada, por orden de prioridad: la ventana del sistema
   // (si la abrió a mano), el hueco de la página, o la ventanita flotante.
@@ -285,26 +238,8 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     if (!config) caja.remove();
   }, [config, caja]);
 
-  // Red de seguridad: mover la llamada de contenedor la saca del documento un
-  // instante, y el navegador PAUSA todo <video>/<audio> que sale del documento
-  // (esta en la spec). Al reinsertarlo no vuelve solo: queda negro y mudo. Esto
-  // pasa en cada mudanza — al hueco, a la ventanita y a la ventana del sistema —
-  // asi que se reanuda despues de cada una en vez de arreglar solo un camino.
-  useEffect(() => {
-    if (!destino || !config) return;
-    let intentos = 0;
-    const reanudar = () => {
-      caja.querySelectorAll("video, audio").forEach((el) => {
-        const m = el as HTMLMediaElement;
-        if (m.paused) m.play().catch(() => { /* sin gesto del usuario, se reintenta */ });
-      });
-      // Los tracks tardan en re-adjuntarse; unos pocos reintentos cubren el hueco
-      // sin dejar un intervalo corriendo para siempre.
-      if (++intentos < 6) window.setTimeout(reanudar, 250);
-    };
-    const id = window.setTimeout(reanudar, 60);
-    return () => window.clearTimeout(id);
-  }, [destino, config, caja]);
+  // Reanudar el video y el audio despues de cada mudanza (ver el hook).
+  useReanudarMedia(caja, destino, !!config);
 
   return (
     <PersistentCallContext.Provider value={ctx}>
@@ -365,7 +300,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
           cambiar de página mueve el video, no lo reinicia. La caja es la que
           viaja al hueco / a la ventanita / a la ventana del sistema. */}
       {config && createPortal(
-        <LiveKitCallView {...config} compact={enFlotante || !!pipWindow} />,
+        <LiveKitCallView {...config} compact={enFlotante || !!pipWindow} autoPip={!docPipSupported()} />,
         caja,
       )}
     </PersistentCallContext.Provider>

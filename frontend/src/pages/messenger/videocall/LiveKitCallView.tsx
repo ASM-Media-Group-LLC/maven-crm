@@ -45,6 +45,17 @@ interface LiveKitCallViewProps {
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
+  /** Deja que ESTA vista maneje el PiP de video del navegador.
+   *
+   *  Se apaga donde la llamada ya sale a la ventana flotante del sistema
+   *  (Cowork, Meet, videollamada): las dos cosas registran la MISMA accion de
+   *  MediaSession —"enterpictureinpicture"— y ese casillero es uno solo. La
+   *  segunda registrada pisa a la primera.
+   *
+   *  Pero NO se apaga incondicionalmente: en Brave y Firefox la ventana del
+   *  sistema no existe, y ahi este PiP de video es el UNICO respaldo. Los
+   *  llamadores pasan `!docPipSupported()`. */
+  autoPip?: boolean;
   /** If set, auto-leave when remote participants reach 0 for this many ms */
   autoLeaveOnEmpty?: number;
   /** Custom token provider; bypasses the default livekit-token edge function */
@@ -71,13 +82,16 @@ interface LiveKitCallViewProps {
   shareLink?: string;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
   // PiP automático estilo Google Meet: al cambiar de pestaña/ventana, la llamada
   // aparece en la ventanita flotante del navegador (pantalla compartida o hablante).
-  useAutoPiP(lk.getRoom, true);
+  //
+  // Se apaga donde la llamada ya sale a la VENTANA DEL SISTEMA, porque las dos
+  // registran la misma acción de MediaSession y el casillero es uno solo.
+  useAutoPiP(lk.getRoom, autoPip);
 
   // Modo compacto AUTOMÁTICO cuando el contenedor es chico (ventana angosta/baja):
   // mismos controles que Google Meet a tamaño mini. Se suma al prop `compact`.
