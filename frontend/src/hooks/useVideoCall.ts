@@ -256,14 +256,35 @@ export function useVideoCall() {
         },
         async (payload) => {
           const call = payload.new as Call;
-          if (call.call_status !== "ringing") return;
+          console.info("[Llamadas] Entrante recibida:", call.id, "estado:", call.call_status);
+          if (call.call_status !== "ringing") {
+            console.info("[Llamadas] Descartada: no viene en 'ringing'.");
+            return;
+          }
 
           // Glare simultáneo (sub-segundo, cuando el query de initiateCall corrió
           // antes de ver la fila del otro): si YO también estoy llamando en esta
           // misma conversación, ya compartimos la sala determinística. No muestro
           // otro modal y marco mi llamada como aceptada para cortar el auto-corte.
           const mineActive = activeCallRef.current;
-          if (mineActive && mineActive.conversation_id === call.conversation_id) {
+          // `call_status === "ringing"` NO es un detalle: es lo que limita esta
+          // rama al caso para el que fue escrita. El choque simultaneo es "los
+          // dos estamos LLAMANDO a la vez", y ahi mi llamada esta en 'ringing'.
+          //
+          // Sin esa condicion, cualquier `activeCall` que quedara colgado de una
+          // llamada YA ACEPTADA de la misma conversacion se tragaba todas las
+          // entrantes siguientes: no sonaba, no aparecia el modal, no habia
+          // error. Y encima la rama no hacia nada util en ese caso — el UPDATE
+          // de abajo filtra por `.eq("call_status", "ringing")`, asi que sobre
+          // una llamada aceptada no actualiza nada. Solo silenciaba.
+          if (mineActive && mineActive.conversation_id === call.conversation_id
+              && mineActive.call_status === "ringing") {
+            // Esta rama existe para el choque simultaneo (los dos se llaman a la
+            // vez). Pero si `activeCall` quedo colgado de una llamada anterior de
+            // la MISMA conversacion, se traga todas las entrantes siguientes sin
+            // decir nada: no suena, no aparece el modal, no hay error.
+            console.warn("[Llamadas] Descartada por choque: ya tengo una llamada activa en esta conversacion",
+              mineActive.id, "estado:", mineActive.call_status);
             void (supabase.from("calls") as any)
               .update({ call_status: "accepted", start_time: new Date().toISOString() })
               .eq("id", mineActive.id)
@@ -277,13 +298,21 @@ export function useVideoCall() {
             .eq("id", call.caller_id)
             .single();
 
+          console.info("[Llamadas] Mostrando el modal de llamada entrante.");
           setIncomingCall({
             ...call,
             caller_name: profile?.full_name ?? "Usuario",
           });
         }
       )
-      .subscribe();
+      // Si el canal no queda SUBSCRIBED, el timbre no suena y hasta ahora eso no
+      // dejaba ni una linea en consola: se veia igual que "me llamaron y no me
+      // llego". Un fallo silencioso en el timbre es el peor de todos, porque el
+      // que no lo escucha no sabe que hubo algo que escuchar.
+      .subscribe((estado) => {
+        if (estado === "SUBSCRIBED") console.info("[Llamadas] Escuchando llamadas entrantes.");
+        else console.warn("[Llamadas] El canal de llamadas entrantes esta en:", estado, "— el timbre NO va a sonar.");
+      });
 
     return () => {
       supabase.removeChannel(channel);
