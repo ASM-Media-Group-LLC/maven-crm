@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect } from "react";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
+import { instalarDesbloqueoDeVoz } from "@/lib/voz";
 
 // Sistema de llamadas GLOBAL. Antes vivía dentro de MessengerPage, así que una
 // llamada entrante solo sonaba si el otro estaba parado en el tab de Messenger.
@@ -117,6 +118,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // Pre-desbloquea el audio del timbre con el primer gesto, así suena aunque la
   // pestaña de Maven quede de fondo cuando llega la llamada.
   useEffect(() => installRingAudioUnlock(), []);
+  // Lo mismo para la VOZ. El navegador puede tener la sintesis frenada hasta
+  // que la persona toque algo en la pestana — y una pestana que se recargo sola
+  // (service worker actualizando) no tuvo ningun gesto todavia. Sin esto, los
+  // avisos hablados se perdian en silencio.
+  useEffect(() => instalarDesbloqueoDeVoz(), []);
   return (
     <CallContext.Provider value={call}>
       {children}
