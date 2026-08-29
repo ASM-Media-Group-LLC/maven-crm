@@ -284,6 +284,15 @@ export function useVideoCall() {
   useEffect(() => {
     if (!user) return;
 
+    // Este efecto se rehace en cada reintento, y su limpieza llama a
+    // removeChannel — que dispara el callback de estado con 'CLOSED'. Sin esta
+    // bandera, ese 'CLOSED' PROPIO programaba otro reintento, que rehacia el
+    // efecto, que volvia a limpiar… un bucle de dos segundos que llenaba la
+    // consola y agitaba el socket sin parar. Es el mismo error que ya habiamos
+    // arreglado en el vigilante de presencia: un reintento que se dispara a si
+    // mismo no es resiliencia, es ruido.
+    let desmontando = false;
+
     // Initial check for any ringing calls
     const checkIncoming = async () => {
       const { data: directCalls } = await (supabase
@@ -382,6 +391,9 @@ export function useVideoCall() {
       // llego". Un fallo silencioso en el timbre es el peor de todos, porque el
       // que no lo escucha no sabe que hubo algo que escuchar.
       .subscribe((estado) => {
+        // Nos estamos yendo: cualquier 'CLOSED' de acá en adelante lo causamos
+        // nosotros al limpiar, y reaccionar a el es morderse la cola.
+        if (desmontando) return;
         if (estado === "SUBSCRIBED") {
           reintentoCanalRef.current = 0;
           console.info("[Llamadas] Escuchando llamadas entrantes.");
@@ -401,6 +413,7 @@ export function useVideoCall() {
       });
 
     return () => {
+      desmontando = true;
       if (reconexionCanalRef.current) {
         clearTimeout(reconexionCanalRef.current);
         reconexionCanalRef.current = null;
@@ -414,6 +427,7 @@ export function useVideoCall() {
   // ── Realtime active call status tracking ───────────────────────
   useEffect(() => {
     if (!activeCall || !user) return;
+    let desmontandoEstado = false;
 
     const channel = supabase
       .channel(`call-status-${activeCall.id}-${estadoVersion}`)
@@ -438,6 +452,7 @@ export function useVideoCall() {
         }
       )
       .subscribe((estado) => {
+        if (desmontandoEstado) return;
         if (estado === "SUBSCRIBED") { reintentoEstadoRef.current = 0; return; }
         console.warn("[Llamadas] El canal de estado de la llamada esta en:", estado, "— reintentando.");
         if (reconexionEstadoRef.current) return;
@@ -450,6 +465,7 @@ export function useVideoCall() {
       });
 
     return () => {
+      desmontandoEstado = true;
       if (reconexionEstadoRef.current) {
         clearTimeout(reconexionEstadoRef.current);
         reconexionEstadoRef.current = null;
