@@ -31,6 +31,12 @@ export interface LKParticipant {
    *  apagó la cámara. */
   isCameraOffReal?: boolean;
   isScreenSharing: boolean;
+  /** Este tile muestra la PANTALLA compartida, no a la persona.
+   *
+   *  Cuando alguien comparte con la cámara prendida se emiten DOS tiles de la
+   *  misma persona. Sin distinguirlos, lo que es de la PERSONA —la calidad de
+   *  conexión— se dibuja dos veces. */
+  esTileDePantalla?: boolean;
   isLocal: boolean;
   handRaised: boolean;
   reactions: string[];
@@ -459,7 +465,7 @@ export function useLiveKit() {
       const localScreenPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
       const localCamPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
       // Screen share tile
-      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true, hasVideoTrack: !!localScreenPub?.track && !localScreenPub.isMuted });
+      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true, esTileDePantalla: true, hasVideoTrack: !!localScreenPub?.track && !localScreenPub.isMuted });
       // Camera tile
       result.push({ ...local, isScreenSharing: false, hasVideoTrack: !!localCamPub?.track && !localCamPub.isMuted });
     } else {
@@ -471,7 +477,7 @@ export function useLiveKit() {
       if (remote.isScreenSharing && !remote.isCameraOff) {
         const screenPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
         const camPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
-        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true, hasVideoTrack: !!screenPub?.track && !screenPub.isMuted });
+        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true, esTileDePantalla: true, hasVideoTrack: !!screenPub?.track && !screenPub.isMuted });
         result.push({ ...remote, isScreenSharing: false, hasVideoTrack: !!camPub?.track && !camPub.isMuted });
       } else {
         result.push(remote);

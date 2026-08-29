@@ -481,7 +481,15 @@ const ParticipantTile = memo(function ParticipantTile({
             </div>
           )}
         </div>
-        <ConnectionIndicator quality={participant.connectionQuality} />
+        {/* La calidad de conexión es de la PERSONA, no de cada recuadro. Cuando
+            alguien comparte pantalla con la cámara prendida se dibujan dos
+            tiles suyos, y sin esta guarda el iconito de señal salía repetido.
+            Se muestra en el de su cámara; el de la pantalla no lo repite.
+            Si comparte con la cámara APAGADA hay un solo tile y no lleva la
+            bandera, así que el indicador se sigue viendo. */}
+        {!participant.esTileDePantalla && (
+          <ConnectionIndicator quality={participant.connectionQuality} />
+        )}
       </div>
     </div>
   );
