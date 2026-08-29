@@ -152,14 +152,26 @@ export function useFaceNudge(
             id: "encuadre", // uno solo: no apilar avisos del mismo problema
           },
         );
-        // El primero es silencioso a proposito: un descuido de un minuto no
-        // amerita un ruido. Si sigue, ya no es un descuido: suena y ademas se
-        // lo dice en voz alta, que es lo que de verdad interrumpe a alguien que
-        // esta mirando otra pantalla.
-        if (conSonido) {
-          playMessageNotification(0.5);
-          hablar(siguienteFrase(watch.state));
-        }
+        // TODOS los avisos hablan, desde el primero.
+        //
+        // Antes el primero era mudo, con el argumento de que un descuido de un
+        // minuto no amerita ruido. La practica dijo otra cosa: el aviso escrito
+        // no sirve justo en los casos en que mas importa. Si estas sin luz, o
+        // fuera de cuadro, o con la camara apagada, lo mas probable es que NO
+        // estes mirando la pantalla — que es exactamente por eso que el detector
+        // se quejo. Un cartel para alguien que no esta mirando la pantalla es
+        // un cartel para nadie.
+        //
+        // Ademas dejaba una inconsistencia rara: el aviso de compartir pantalla
+        // hablaba desde el primero y el de encuadre no. Dos avisos del mismo
+        // sistema comportandose distinto sin una razon que la persona pueda
+        // deducir.
+        //
+        // Lo que SI se conserva escalonado es el aviso al SUPERVISOR (abajo, a
+        // los 3 minutos): interrumpir a quien mira nueve salas sigue siendo
+        // caro, y la persona ya tuvo dos avisos hablados para corregirlo sola.
+        playMessageNotification(0.5);
+        hablar(siguienteFrase(watch.state), { volumen: conSonido ? 0.9 : 0.7 });
         ultimoAviso.current = ahora;
       }
 

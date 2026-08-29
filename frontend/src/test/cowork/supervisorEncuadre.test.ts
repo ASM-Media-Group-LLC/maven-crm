@@ -48,19 +48,22 @@ describe("supervisor de encuadre", () => {
     expect(esProblemaDeEncuadre("unavailable")).toBe(false);
   });
 
-  it("al minuto y medio con la cámara apagada avisa, y en silencio", () => {
+  it("al minuto y medio con la cámara apagada avisa, y YA habla", () => {
     supervisar("cam_off", 95);
     expect(toastWarning).toHaveBeenCalledTimes(1);
     expect(toastWarning.mock.calls[0][0]).toMatch(/cámara apagada/i);
-    // El primero no suena: un descuido de un minuto no amerita ruido.
-    expect(sonido).not.toHaveBeenCalled();
-    expect(habla).not.toHaveBeenCalled();
+    // Antes el primero era mudo. Se cambió, y el motivo importa: si estás sin
+    // luz o fuera de cuadro, lo más probable es que NO estés mirando la
+    // pantalla — que es justo por lo que el detector se quejó. Un cartel para
+    // alguien que no mira la pantalla es un cartel para nadie.
+    expect(sonido).toHaveBeenCalled();
+    expect(habla).toHaveBeenCalled();
   });
 
   it("a los tres minutos suena y habla, y ofrece las DOS salidas", () => {
     supervisar("cam_off", 200);
-    expect(sonido).toHaveBeenCalledTimes(1);
-    expect(habla).toHaveBeenCalledTimes(1);
+    expect(sonido).toHaveBeenCalled();
+    expect(habla).toHaveBeenCalled();
     const frase = habla.mock.calls[0][0] as string;
     // Pedir solo "prendé la cámara" le deja a quien se tuvo que levantar la
     // única opción de ignorar el aviso.
