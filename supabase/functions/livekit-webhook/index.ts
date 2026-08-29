@@ -3,7 +3,7 @@
 // POR QUÉ EXISTE: una grabación solo se cerraba bien si alguien apretaba
 // Detener. Si se cerraba la pestaña o la reunión terminaba sola, la fila
 // quedaba abierta: no se podía descargar y su archivo NO se borraba nunca
-// (el vencimiento de 90 días solo mira filas cerradas). Hay un barrido que
+// (el vencimiento de 15 días solo mira filas cerradas). Hay un barrido que
 // sondea cada 2 minutos, pero preguntar cada rato es peor que que te avisen.
 //
 // QUÉ HACE ESTA FUNCIÓN Y QUÉ NO: verifica que el aviso venga de LiveKit de

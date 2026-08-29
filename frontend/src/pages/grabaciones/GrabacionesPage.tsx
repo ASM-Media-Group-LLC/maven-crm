@@ -17,7 +17,7 @@ import {
 // Grabaciones de Meet/Cowork. Dos reglas que la página tiene que hacer
 // imposibles de ignorar (vienen del diseño de la tabla, ver la migración):
 //
-//   1. TODO vence a los 90 días, sin excepciones. Es lo que hace viable
+//   1. TODO vence a los 15 días, sin excepciones. Es lo que hace viable
 //      guardar en el disco del VPS. La fecha de vencimiento va en cada fila
 //      y el aviso arriba — quien necesite algo más tiempo, lo descarga.
 //   2. El espacio usado se muestra SIEMPRE arriba. En Google terminamos con
@@ -127,7 +127,7 @@ export default function GrabacionesPage() {
       <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-700 dark:text-amber-300">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitas
+          Toda grabación <b>se borra a los 15 días, sin excepciones</b>. Si necesitas
           conservar una por más tiempo, descárgala a tu equipo antes de que venza.
         </span>
       </div>

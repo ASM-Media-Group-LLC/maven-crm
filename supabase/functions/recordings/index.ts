@@ -7,7 +7,7 @@ import { corsFor } from "../_shared/cors.ts";
 // `stop` detiene el egress, espera el cierre del archivo, guarda tamaño y
 // duración, registra a quiénes se comparte y les manda el link por correo.
 // `download` firma URLs de descarga que VENCEN (10 min) contra rec-server.
-// `expire` corre por cron: borra los archivos vencidos (90 días, sin
+// `expire` corre por cron: borra los archivos vencidos (15 días, sin
 // excepciones — es lo que hace viable el disco del VPS) y recién después
 // marca las filas.
 //
@@ -486,7 +486,7 @@ async function cerrarHuerfanas(admin: any, egressId?: string): Promise<number> {
 }
 
 /** Cierra una fila cuyo egress murió sin que nadie llamara a stop: 'ready'
- *  si el archivo existe (y el vencimiento de 90 días la agarra normal),
+ *  si el archivo existe (y el vencimiento de 15 días la agarra normal),
  *  'failed' si no dejó nada.
  *
  *  Se cierra COMO SI HUBIERAN APRETADO DETENER: quien grabó queda registrado
@@ -570,10 +570,10 @@ async function avisarPorCorreo(
       html: `<div style="font-family:system-ui,sans-serif;max-width:520px">
 <p>Quedó disponible la grabación de <b>${titulo}</b>.</p>
 <p><a href="${appUrl}/grabaciones">Verla en Maven → Grabaciones</a></p>
-<p style="color:#b45309;font-size:13px"><b>Se borra a los 90 días, sin excepciones.</b>
+<p style="color:#b45309;font-size:13px"><b>Se borra a los 15 días, sin excepciones.</b>
 Si la necesitás por más tiempo, descargala a tu equipo.</p>
 </div>`,
-      text: `Quedó disponible la grabación de "${titulo}". Vela en ${appUrl}/grabaciones — se borra a los 90 días, sin excepciones: descargala si la necesitás más tiempo.`,
+      text: `Quedó disponible la grabación de "${titulo}". Vela en ${appUrl}/grabaciones — se borra a los 15 días, sin excepciones: descargala si la necesitás más tiempo.`,
     });
 
     const smtp = await SmtpClient.connect(cred.smtp_host, cred.smtp_port);

@@ -217,7 +217,7 @@ function StopDialog({ open, onClose, onConfirm, busy }: {
           <DialogTitle>Detener y compartir</DialogTitle>
           <DialogDescription>
             La grabación queda en <b>Grabaciones</b> para ti y para quienes elijas
-            (se les avisa por correo). <b>Se borra a los 90 días, sin excepciones</b> —
+            (se les avisa por correo). <b>Se borra a los 15 días, sin excepciones</b> —
             quien la necesite más tiempo tiene que descargarla.
           </DialogDescription>
         </DialogHeader>
