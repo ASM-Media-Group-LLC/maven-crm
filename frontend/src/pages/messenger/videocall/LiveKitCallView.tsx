@@ -17,6 +17,7 @@ import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
+import { useFaceNudge } from "@/hooks/useFaceNudge";
 import { BackgroundEffect } from "./BackgroundSelector";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -55,6 +56,9 @@ interface LiveKitCallViewProps {
    * Corre sobre el video LOCAL, en el navegador de la propia persona.
    */
   onFaceStateChange?: (watch: FaceWatch) => void;
+  /** Cowork: avisarle a la propia persona cuando no se le ve. Va acá y no en la
+   *  página para que siga funcionando en la ventanita flotante. */
+  supervisorEncuadre?: boolean;
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
@@ -66,7 +70,7 @@ interface LiveKitCallViewProps {
   shareLink?: string;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
@@ -234,7 +238,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.Camera);
     return (pub?.track?.mediaStreamTrack as MediaStreamTrack | undefined) ?? null;
   }, [lk, localCamOn, lk.connectionState]);
+  // `enabled` NO incluye localCamOn: con la cámara apagada queremos que reporte
+  // `cam_off`, no que se congele en el último estado.
   const faceWatch = useFaceWatch(localCameraTrack, !!onFaceStateChange && localCamOn);
+
+  // EL SUPERVISOR VIVE ACÁ, no en la página de Cowork. Esta vista sobrevive a
+  // navegar a otra sección de Maven (se muda a la ventanita flotante); la
+  // página no. Cuando el aviso vivía allá, se apagaba justo cuando la persona
+  // se iba a mirar otra pantalla — o sea, justo cuando más falta hace.
+  useFaceNudge(supervisorEncuadre ? faceWatch : null);
   const onFaceStateChangeRef = useRef(onFaceStateChange);
   onFaceStateChangeRef.current = onFaceStateChange;
   useEffect(() => {

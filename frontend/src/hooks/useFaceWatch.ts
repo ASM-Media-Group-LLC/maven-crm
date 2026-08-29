@@ -94,8 +94,6 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
   const stateRef = useRef<FaceState>("cam_off");
 
   useEffect(() => {
-    if (!enabled) return;
-
     // Cambiamos `since` SOLO cuando el estado cambia de verdad: es lo que permite
     // decir "sin rostro hace 2 minutos" en vez de "hace 3 segundos" para siempre.
     const setState = (next: FaceState) => {
@@ -103,6 +101,14 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
       stateRef.current = next;
       setWatch({ state: next, since: Date.now() });
     };
+
+    // Apagar la cámara deshabilita el muestreo, pero ANTES esto hacía `return`
+    // sin tocar el estado: quedaba reportando el último valor conocido, así que
+    // el coordinador seguía viendo "ok" con la cámara apagada. Ahora se dice.
+    if (!enabled) {
+      setState("cam_off");
+      return;
+    }
 
     if (!track || track.readyState !== "live" || !track.enabled) {
       setState("cam_off");

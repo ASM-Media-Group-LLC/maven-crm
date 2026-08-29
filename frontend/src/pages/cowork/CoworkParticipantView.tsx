@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
 import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee } from "lucide-react";
 import { toast } from "sonner";
-import { useFaceNudge } from "@/hooks/useFaceNudge";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
+import { marcarPausa } from "@/lib/coworkPausa";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
@@ -147,7 +147,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Lo que ve la propia persona. Hasta ahora el encuadre solo viajaba al
   // coordinador: quien estaba fuera de cuadro no se enteraba y se quedaba así.
   const [faceWatch, setFaceWatch] = useState<{ state: string; since: number } | null>(null);
-  useFaceNudge(faceWatch as never, !!breakStartedAt);
+  // El supervisor de encuadre ya NO se monta acá: vive dentro de la llamada
+  // (`supervisorEncuadre` en la config), que es lo que sobrevive a navegar a
+  // otra sección de Maven. Acá solo se le informa la pausa, porque el botón de
+  // Baño/Break vive en esta página y él la consulta en cada tic.
+  useEffect(() => { marcarPausa(!!breakStartedAt); }, [breakStartedAt]);
 
   const handleFaceStateChange = useCallback(
     (watch: { state: string; since: number }) => {
@@ -324,6 +328,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       getToken,
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
+      supervisorEncuadre: true,
       leaveLabel: "Salir y volver al dashboard",
       leaveIcon: LogOut,
     });

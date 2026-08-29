@@ -469,12 +469,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const faceIssue = (ms: MediaState | undefined): string | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
-    if (ms.faceState === "ok" || ms.faceState === "cam_off") return null;
+    if (ms.faceState === "ok") return null;
     if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo
     if (now - ms.faceSince < FACE_ALERT_MS) return null;
     return ms.faceState === "no_face" ? "Sin rostro"
       : ms.faceState === "too_small" ? "Fuera de cuadro"
       : ms.faceState === "too_dark" ? "Sin luz"
+      // Cámara apagada SIN pausa marcada. Antes se ignoraba, y era el hueco más
+      // grande: apagar la cámara es la forma más fácil de desaparecer, y era
+      // justo la que no avisaba. Con pausa marcada sigue sin avisar (la corta
+      // el `ms.onBreak` de arriba), que es lo correcto.
+      : ms.faceState === "cam_off" ? "Cámara apagada"
       : null;
   };
 
@@ -502,6 +507,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         hablar(
           problema === "Sin luz" ? `${nombre} no tiene luz suficiente.`
           : problema === "Fuera de cuadro" ? `${nombre} está fuera de cuadro.`
+          : problema === "Cámara apagada" ? `${nombre} tiene la cámara apagada y no marcó pausa.`
           : `${nombre} no está frente a la cámara.`,
           { volumen: 0.85 },
         );
