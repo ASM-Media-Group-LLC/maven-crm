@@ -5,142 +5,126 @@
 // una suena en SU propia máquina: no viaja por la llamada, no gasta ancho de
 // banda y no queda dentro de la grabación.
 //
-// ── POR QUÉ ESTO ES MÁS QUE UN `speak()` ────────────────────────────────────
+// ── LA REGLA DE ORO DE ESTE ARCHIVO ─────────────────────────────────────────
 //
-// Chrome carga la lista de voces DE FORMA ASÍNCRONA. Recién cargada la página,
-// `getVoices()` devuelve un arreglo VACÍO — y si le pedís que hable en ese
-// momento, acepta el pedido, pone `speaking = true`… y no dice absolutamente
-// nada. Sin error, sin excepción, sin un evento. La frase se pierde.
+// SIEMPRE se intenta hablar. Nunca se retiene una frase esperando a que algo
+// esté "listo".
 //
-// Medido en producción el 29/08/2026, en una pestaña recién recargada por el
-// service worker:
+// Una versión anterior tenía una guarda que parecía sensata: si `getVoices()`
+// viene vacío, guardar la frase y decirla cuando carguen las voces. Rompió la
+// voz para todos, en producción, la misma noche. Motivo: hay navegadores donde
+// la lista de voces se llena RECIÉN DESPUÉS de la primera llamada a `speak()`.
+// La guarda creaba un candado — no hablaba porque no había voces, y no había
+// voces porque no hablaba.
 //
-//     voces: 0 · speaking: true · evento onstart: ninguno
+// La lista de voces sirve para ELEGIR una voz en español. No para decidir si se
+// habla. Sin voz elegida el navegador usa la suya por defecto: peor acento, se
+// entiende igual. El silencio no se entiende.
 //
-// O sea: el peor fallo posible para un sistema de alertas. Todo dice que
-// funcionó y nadie escuchó nada. Justo el modo de falla que veníamos cazando
-// toda la noche en el timbre y en la presencia.
+// ── LO QUE SÍ HAY QUE CUIDAR ────────────────────────────────────────────────
 //
-// A eso se suma la política de gestos del navegador: una pestaña que se recargó
-// sola y en la que nadie tocó nada todavía puede tener la síntesis frenada.
-//
-// El timbre de llamadas ya tenía resuelto el problema equivalente para el audio
-// (`installRingAudioUnlock`, en CallProvider). Esto es lo mismo, para la voz.
-
-/** La voz en español elegida, cacheada. `getVoices()` puede tardar en llenarse. */
-let vozEs: SpeechSynthesisVoice | null = null;
-let vocesListas = false;
-
-/** Lo último que se quiso decir mientras las voces no estaban listas. Se guarda
- *  UNA sola frase, no una cola: si se acumularan cinco avisos viejos y se
- *  soltaran todos juntos al cargar, sería peor que perderlos. Interesa el
- *  último estado, no la historia. */
-let pendiente: { texto: string; opciones?: OpcionesVoz } | null = null;
+// · `cancel()` inmediatamente antes de `speak()` puede dejar el motor colgado
+//   en Chrome. Solo se cancela si de verdad hay algo sonando.
+// · Si se pidió hablar y nunca arrancó, queda dicho en consola. Un sistema de
+//   alertas que falla callado es peor que uno que se cae: nadie se entera de
+//   que se perdió algo.
+// · Si el motor de voz de Chrome queda trabado —pasa: `speaking` en true, cero
+//   eventos, y sobrevive a recargar la página Y a cambiar de sitio— no hay nada
+//   que este archivo pueda hacer. Se avisa con esas palabras, para no volver a
+//   perder horas buscándolo en el lugar equivocado.
 
 export interface OpcionesVoz {
   volumen?: number;
   velocidad?: number;
 }
 
-function elegirVoz(sintesis: SpeechSynthesis): void {
-  const voces = sintesis.getVoices();
-  if (!voces.length) return;
-  vocesListas = true;
-  vozEs = voces.find((v) => v.lang?.toLowerCase().startsWith("es")) ?? null;
+/** La voz en español elegida, si el navegador ya publicó su lista. Es una
+ *  MEJORA, no un requisito: si no hay, se habla igual. */
+let vozEs: SpeechSynthesisVoice | null = null;
+
+function refrescarVoz(sintesis: SpeechSynthesis): void {
+  try {
+    const voces = sintesis.getVoices();
+    if (!voces.length) return;
+    vozEs = voces.find((v) => v.lang?.toLowerCase().startsWith("es")) ?? vozEs;
+  } catch { /* da igual: se habla con la voz por defecto */ }
 }
 
-/** Se llama sola al importar el módulo: engancha el evento que avisa cuando el
- *  navegador terminó de cargar las voces, y suelta lo que hubiera quedado
- *  pendiente. */
-function prepararVoces(): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  const sintesis = window.speechSynthesis;
-  elegirVoz(sintesis);
-  // `voiceschanged` es el único aviso fiable de que la lista ya está. En
-  // Chrome llega unos cientos de ms después de cargar la página.
-  sintesis.addEventListener?.("voiceschanged", () => {
-    elegirVoz(sintesis);
-    if (vocesListas && pendiente) {
-      const p = pendiente;
-      pendiente = null;
-      hablar(p.texto, p.opciones);
-    }
+// Al cargar el módulo se intenta una vez y se queda escuchando el aviso de que
+// la lista cambió. Ninguna de las dos cosas bloquea nada.
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  refrescarVoz(window.speechSynthesis);
+  window.speechSynthesis.addEventListener?.("voiceschanged", () => {
+    if (window.speechSynthesis) refrescarVoz(window.speechSynthesis);
   });
 }
-prepararVoces();
 
 /** Desbloquea la síntesis con el primer gesto del usuario.
  *
  *  Mismo motivo que `installRingAudioUnlock` para el timbre: el navegador puede
- *  tener la voz frenada hasta que la persona toque algo en esa pestaña. Se
- *  pronuncia una frase vacía a volumen cero, que no se oye pero destraba.
+ *  tener la voz frenada hasta que la persona toque algo en esa pestaña, y una
+ *  pestaña que se recargó sola (service worker actualizando) no tuvo ningún
+ *  gesto todavía. Se pronuncia una frase vacía a volumen cero: no se oye, pero
+ *  destraba y de paso empuja al navegador a publicar la lista de voces.
  *
  *  Devuelve la función para desengancharlo. */
 export function instalarDesbloqueoDeVoz(): () => void {
   if (typeof window === "undefined" || !window.speechSynthesis) return () => {};
   const sintesis = window.speechSynthesis;
+  const eventos: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
   let hecho = false;
-  const destrabar = () => {
+  const quitar = () => eventos.forEach((e) => window.removeEventListener(e, destrabar));
+  function destrabar() {
     if (hecho) return;
     hecho = true;
     try {
-      sintesis.resume();          // por si quedó pausada
+      sintesis.resume();
       const u = new SpeechSynthesisUtterance(" ");
       u.volume = 0;
       sintesis.speak(u);
-      elegirVoz(sintesis);
-    } catch { /* si no se puede, el aviso escrito sigue estando */ }
+      refrescarVoz(sintesis);
+    } catch { /* el aviso escrito sigue estando igual */ }
     quitar();
-  };
-  const eventos: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
-  const quitar = () => eventos.forEach((e) => window.removeEventListener(e, destrabar));
-  eventos.forEach((e) => window.addEventListener(e, destrabar, { once: false, passive: true }));
+  }
+  eventos.forEach((e) => window.addEventListener(e, destrabar, { passive: true }));
   return quitar;
 }
 
-/** Habla el texto. Devuelve false si este navegador no puede hablar AHORA.
- *
- *  Si las voces todavía no cargaron, guarda la frase y la dice apenas estén, en
- *  vez de perderla en silencio — que es lo que pasaba antes. */
+/** Habla el texto. Devuelve false solo si este navegador no tiene síntesis. */
 export function hablar(texto: string, opciones?: OpcionesVoz): boolean {
   try {
     const sintesis = window.speechSynthesis;
     if (!sintesis) return false;
 
-    // Las voces todavía no están: hablar ahora sería tirar la frase a la basura.
-    // Se guarda y `voiceschanged` la suelta.
-    if (!vocesListas) {
-      elegirVoz(sintesis);
-      if (!vocesListas) {
-        pendiente = { texto, opciones };
-        return false;
-      }
-    }
+    // Solo se corta lo anterior si DE VERDAD hay algo sonando. Cancelar por las
+    // dudas, justo antes de hablar, es uno de los patrones que cuelga el motor
+    // de Chrome.
+    if (sintesis.speaking || sintesis.pending) sintesis.cancel();
 
-    // Si venía diciendo otra cosa, se corta: dos frases encimadas no se
-    // entienden y es peor que una sola.
-    sintesis.cancel();
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = "es-419";
     u.rate = opciones?.velocidad ?? 0.95;
     u.volume = opciones?.volumen ?? 0.9;
+    // Si todavía no hay lista de voces, se habla igual con la del navegador.
+    refrescarVoz(sintesis);
     if (vozEs) u.voice = vozEs;
 
-    // Si aceptó el pedido y nunca arrancó, que al menos quede DICHO en la
-    // consola. Un sistema de alertas que falla callado es peor que uno que se
-    // cae: nadie se entera de que se perdió algo.
     let arranco = false;
     u.onstart = () => { arranco = true; };
     u.onerror = (e) => {
-      console.warn("[Voz] El navegador rechazó hablar:", (e as SpeechSynthesisErrorEvent).error,
-        "— el aviso escrito sigue estando.");
+      const motivo = (e as SpeechSynthesisErrorEvent).error;
+      // 'canceled' e 'interrupted' son normales: alguien habló encima.
+      if (motivo === "canceled" || motivo === "interrupted") return;
+      console.warn("[Voz] El navegador rechazó hablar:", motivo, "— el aviso escrito sigue estando.");
     };
     window.setTimeout(() => {
-      if (!arranco) {
-        console.warn("[Voz] Se pidió hablar y nunca arrancó. Suele ser el navegador",
-          "esperando un clic en esta pestaña. Frase:", texto.slice(0, 60));
-      }
-    }, 2000);
+      if (arranco) return;
+      console.warn(
+        "[Voz] Se pidió hablar y nunca arrancó. Si se repite, el motor de voz de Chrome",
+        "quedó trabado: sobrevive a recargar la página y a cambiar de sitio, hay que",
+        "cerrar el navegador por completo. Frase:", texto.slice(0, 60),
+      );
+    }, 2500);
 
     sintesis.speak(u);
     return true;
