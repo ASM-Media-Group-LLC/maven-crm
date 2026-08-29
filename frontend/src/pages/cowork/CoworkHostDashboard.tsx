@@ -26,15 +26,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
-import { hablar } from "@/lib/voz";
-import { AVISAR_COORDINADOR_MS, debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
-import { olvidarAusentes } from "@/lib/avisosSupervisor";
+import { debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
-import { cuentaPausa, clasesPausa, nombreYApellido, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -481,7 +478,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // antes incluso de que el chatter viera su primer aviso— y eso rompía justo lo
   // que se buscaba: que un descuido se resuelva solo sin interrumpir a nadie.
   const FACE_ALERT_MS = 60_000;
-  const FACE_SONIDO_MS = AVISAR_COORDINADOR_MS;
   // ¿Lleva rato sin compartir pantalla?
   //
   // En Cowork la pantalla es la mitad del trabajo: sin ella el supervisor ve
@@ -521,103 +517,33 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // el aviso no haya surtido efecto.
   //
   // Una vez por persona y por pausa: se rearma cuando esa persona vuelve.
-  const yaAvisadoPausa = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    for (const [uid, st] of Object.entries(mediaStates)) {
-      const p = pausaDe(uid);
-      if (!p) { yaAvisadoPausa.current.delete(uid); continue; }
-      const pasadoSeg = -p.cuenta.restante;
-      if (pasadoSeg * 1000 < AVISAR_SUPERVISOR_PASADO_MS) continue;
-      if (yaAvisadoPausa.current.has(uid)) continue;
-      yaAvisadoPausa.current.add(uid);
-      const quien = nombreYApellido(cowork.profiles[uid]);
-      playCoordinatorRequestSound();
-      hablar(`${quien} lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}.`,
-        { volumen: 0.85 });
-      toast.warning(`${quien}: pasado de ${p.etiqueta.toLowerCase()}`, {
-        description: `Lleva ${p.cuenta.texto.replace("−", "")} de más y ya se le avisó por voz.`,
-        duration: 10_000,
-      });
-    }
-  }, [mediaStates, now, cowork.profiles]);
+
 
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
   // mirando otra sala, no se enteraba. Suena UNA vez por persona y por episodio
   // — se rearma solo cuando esa persona vuelve a cuadro.
-  const yaAvisado = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    // Si alguien se FUE de la sesión, su marca se va con él. Sin esto la marca
-    // queda pegada para siempre: al volver ya figura como "ya avisado" y no
-    // vuelve a sonar nunca más. Era por qué el aviso funcionaba una vez y
-    // después no, y se veía como "dejó de andar" cuando en realidad nunca se
-    // rearmaba. Solo se limpiaba al VOLVER a estar bien — irse no cuenta como
-    // volver a estar bien.
-    olvidarAusentes(yaAvisado.current, mediaStates);
-    for (const [uid, st] of Object.entries(mediaStates)) {
-      const problema = faceIssue(st);
-      const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
-      if (bastante && !yaAvisado.current.has(uid)) {
-        yaAvisado.current.add(uid);
-        // Con apellido: en el equipo hay dos Álvaro Mejía y hubo dos Manuela
-        // Zapata. Un aviso que dice solo el nombre de pila no identifica a
-        // nadie, que es exactamente lo que el aviso tiene que hacer.
-        const quien = nombreYApellido(cowork.profiles[uid]);
-        playCoordinatorRequestSound();
-        // Se lo dice en voz alta y CON EL NOMBRE. Es lo que la voz del propio
-        // chatter no puede darle al coordinador: saber a quién mirar sin tener
-        // que buscar cuál de las nueve salas parpadea.
-        const nombre = quien;
-        hablar(
-          problema === "Sin luz" ? `${nombre} no tiene luz suficiente.`
-          : problema === "Fuera de cuadro" ? `${nombre} está fuera de cuadro.`
-          : problema === "Cámara apagada" ? `${nombre} tiene la cámara apagada y no marcó pausa.`
-          : `${nombre} no está frente a la cámara.`,
-          { volumen: 0.85 },
-        );
-        toast.warning(`${quien}: ${problema.toLowerCase()}`, {
-          description: "Lleva más de tres minutos así y ya se le avisó dos veces.",
-          duration: 8000,
-        });
-      } else if (!problema) {
-        yaAvisado.current.delete(uid);
-      }
-    }
-  }, [mediaStates, now, cowork.profiles]);
+
 
   // Lo mismo, para compartir pantalla. Es un aviso aparte y no una rama del de
   // arriba porque son dos problemas distintos: alguien puede estar perfecto en
   // cámara y llevar media hora sin compartir, que es justamente el caso que no
   // se veía. Suena UNA vez por persona y por episodio, y se rearma solo cuando
   // vuelve a compartir.
-  const yaAvisadoPantalla = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    // Misma purga que arriba, por la misma razón.
-    olvidarAusentes(yaAvisadoPantalla.current, mediaStates);
-    for (const [uid, st] of Object.entries(mediaStates)) {
-      if (sinPantalla(st)) {
-        if (yaAvisadoPantalla.current.has(uid)) continue;
-        yaAvisadoPantalla.current.add(uid);
-        const quien = nombreYApellido(cowork.profiles[uid]);
-        const minutos = Math.floor((now - (st.screenShareSince as number)) / 60000);
-        playCoordinatorRequestSound();
-        // Con nombre y apellido, igual que el de encuadre: en una grilla de
-        // nueve salas, saber A QUIÉN mirar es la mitad del aviso. Y en el
-        // equipo hay dos Álvaro Mejía.
-        hablar(`${quien} lleva ${minutos} minutos sin compartir pantalla.`, { volumen: 0.85 });
-        toast.warning(`${quien}: sin compartir pantalla`, {
-          description: `Lleva ${minutos} minutos así y ya se le avisó dos veces.`,
-          duration: 8000,
-        });
-      } else if (st.screenShareOn) {
-        // Se rearma solo cuando VUELVE a compartir, no apenas deja de cumplirse
-        // la condición: si se rearmara con la pausa, volvería a sonar al
-        // volver del baño sin que la persona haya hecho nada distinto.
-        yaAvisadoPantalla.current.delete(uid);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaStates, now, cowork.profiles]);
+  // Los tres avisos del supervisor —encuadre, compartir pantalla y pasado de
+  // pausa— ya NO viven acá: se mudaron a useCoworkSupervisorAlerts, montado por
+  // encima del router. Acá solo sonaban mientras esta página estuviera abierta,
+  // y el supervisor que entraba a un ticket o a un mensaje dejaba de enterarse
+  // — justo la ventana en la que más falta hacen.
+  //
+  // ⚠️ NO los vuelvas a poner acá: sonarían DOS VECES mientras el supervisor
+  // está parado en Cowork. Es el mismo cuidado que ya estaba escrito para los
+  // avisos de mano levantada.
+  //
+  // Las chapas y los contadores de las tarjetas SÍ siguen acá: eso es
+  // información en pantalla, no un aviso, y no tiene sentido fuera de Cowork.
+
+
 
   // El aviso de manos levantadas (sonido + globito del sistema) se mudó a
   // useCoworkRequestAlerts, montado por encima del router: acá solo sonaba

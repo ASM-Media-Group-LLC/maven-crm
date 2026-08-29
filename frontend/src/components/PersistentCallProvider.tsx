@@ -80,12 +80,17 @@ export function CallOutlet({ className }: { className?: string }) {
 const POS_KEY = "maven.call.float.pos";
 
 import { useCoworkRequestAlerts } from "@/hooks/useCoworkRequestAlerts";
+import { useCoworkSupervisorAlerts } from "@/hooks/useCoworkSupervisorAlerts";
 
 export function PersistentCallProvider({ children }: { children: React.ReactNode }) {
   // Las manos levantadas de Cowork suenan desde acá y no desde la pagina del
   // coordinador: si vivieran ahi, navegar a otra seccion lo dejaria sordo justo
   // cuando alguien esta pidiendo ayuda.
   useCoworkRequestAlerts();
+  // Los avisos de supervision (encuadre, compartir pantalla, pasado de pausa)
+  // viven aca por el mismo motivo que los de mano levantada: el supervisor que
+  // navega a otra seccion de Maven no puede dejar de enterarse.
+  useCoworkSupervisorAlerts();
 
   const [config, setConfig] = useState<CallConfig | null>(null);
   const [outlet, setOutlet] = useState<HTMLElement | null>(null);
