@@ -26,6 +26,31 @@ export interface Call {
 export function useVideoCall() {
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
+  // ── Por que el canal de llamadas lleva version y reintento ──────────────────
+  //
+  // Se suscribia UNA vez y listo. Si ese join fallaba —y fallaba— el canal
+  // quedaba muerto para siempre: sin timbre, sin modal y sin un solo error.
+  // Confirmado en produccion: `CLOSED`, `CLOSED`, `TIMED_OUT`, y despues nada.
+  //
+  // Messenger no se salvaba por suerte: `useChat` ya hacia exactamente esto
+  // (ver scheduleChannelReconnect, useChat.ts:223) — detectar que el canal no
+  // quedo suscrito, esperar con espera creciente, y volver a suscribirse CON UN
+  // NOMBRE NUEVO. Por eso los mensajes llegaban en vivo y las llamadas no.
+  //
+  // El nombre nuevo importa: reusar el mismo topic cuando el anterior quedo a
+  // medio morir es justo lo que deja el join colgado. Acá se puede cambiar sin
+  // consecuencias porque este canal es de `postgres_changes` y el nombre es una
+  // etiqueta local. OJO: en un canal de PRESENCIA el nombre es la sala
+  // compartida y cambiarlo dejaria a cada uno en un cuarto distinto.
+  const [canalVersion, setCanalVersion] = useState(0);
+  const reintentoCanalRef = useRef(0);
+  const reconexionCanalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lo mismo para el canal que sigue el estado de la llamada YA activa. Si ese
+  // se cae, quien llama nunca se entera de que le contestaron o le cortaron:
+  // se queda mirando "llamando…" para siempre.
+  const [estadoVersion, setEstadoVersion] = useState(0);
+  const reintentoEstadoRef = useRef(0);
+  const reconexionEstadoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [calling, setCalling] = useState(false);
   const ringingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,7 +270,7 @@ export function useVideoCall() {
 
     // Subscribe to realtime changes on calls table for this user
     const channel = supabase
-      .channel(`incoming-calls-${user.id}`)
+      .channel(`incoming-calls-${user.id}-${canalVersion}`)
       .on(
         "postgres_changes",
         {
@@ -310,21 +335,41 @@ export function useVideoCall() {
       // llego". Un fallo silencioso en el timbre es el peor de todos, porque el
       // que no lo escucha no sabe que hubo algo que escuchar.
       .subscribe((estado) => {
-        if (estado === "SUBSCRIBED") console.info("[Llamadas] Escuchando llamadas entrantes.");
-        else console.warn("[Llamadas] El canal de llamadas entrantes esta en:", estado, "— el timbre NO va a sonar.");
+        if (estado === "SUBSCRIBED") {
+          reintentoCanalRef.current = 0;
+          console.info("[Llamadas] Escuchando llamadas entrantes.");
+          return;
+        }
+        console.warn("[Llamadas] El canal de llamadas entrantes esta en:", estado, "— reintentando.");
+        // Espera creciente con techo de 15s, igual que Messenger. Sin techo, un
+        // corte largo mandaria el proximo intento a media hora; sin espera, el
+        // reintento se vuelve el problema (nos paso con la presencia de Cowork).
+        if (reconexionCanalRef.current) return;
+        reintentoCanalRef.current += 1;
+        const espera = Math.min(1000 * 2 ** reintentoCanalRef.current, 15000);
+        reconexionCanalRef.current = setTimeout(() => {
+          reconexionCanalRef.current = null;
+          setCanalVersion((v) => v + 1);   // nombre nuevo -> canal nuevo
+        }, espera);
       });
 
     return () => {
+      if (reconexionCanalRef.current) {
+        clearTimeout(reconexionCanalRef.current);
+        reconexionCanalRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [user]); // Removed incomingCall/activeCall from deps to avoid re-subscription churn
+    // `canalVersion` en las dependencias es LO QUE HACE que el reintento ocurra:
+    // al subirlo, el efecto se rehace y abre un canal con nombre nuevo.
+  }, [user, canalVersion]);
 
   // ── Realtime active call status tracking ───────────────────────
   useEffect(() => {
     if (!activeCall || !user) return;
 
     const channel = supabase
-      .channel(`call-status-${activeCall.id}`)
+      .channel(`call-status-${activeCall.id}-${estadoVersion}`)
       .on(
         "postgres_changes",
         {
@@ -345,12 +390,26 @@ export function useVideoCall() {
           }
         }
       )
-      .subscribe();
+      .subscribe((estado) => {
+        if (estado === "SUBSCRIBED") { reintentoEstadoRef.current = 0; return; }
+        console.warn("[Llamadas] El canal de estado de la llamada esta en:", estado, "— reintentando.");
+        if (reconexionEstadoRef.current) return;
+        reintentoEstadoRef.current += 1;
+        const espera = Math.min(1000 * 2 ** reintentoEstadoRef.current, 15000);
+        reconexionEstadoRef.current = setTimeout(() => {
+          reconexionEstadoRef.current = null;
+          setEstadoVersion((v) => v + 1);
+        }, espera);
+      });
 
     return () => {
+      if (reconexionEstadoRef.current) {
+        clearTimeout(reconexionEstadoRef.current);
+        reconexionEstadoRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [activeCall?.id, user, clearRingingTimer]); // Use activeCall.id for stable subscription
+  }, [activeCall?.id, user, clearRingingTimer, estadoVersion]); // Use activeCall.id for stable subscription
 
   return {
     incomingCall,
