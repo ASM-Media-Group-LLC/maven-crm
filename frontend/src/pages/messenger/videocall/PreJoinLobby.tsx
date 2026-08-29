@@ -418,7 +418,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                 autoPlay
                 playsInline
                 muted
-                className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-150", showBackgroundWarmupOverlay && "opacity-0")}
+                // `contain`: esta es la pantalla donde uno se mira ANTES de entrar. Si
+                // recorta, la persona se acomoda para una imagen que no es la que van
+                // a ver los demás.
+                className={cn("absolute inset-0 w-full h-full object-contain transition-opacity duration-150", showBackgroundWarmupOverlay && "opacity-0")}
                 style={{ transform: "scaleX(-1)" }}
               />
             ) : (

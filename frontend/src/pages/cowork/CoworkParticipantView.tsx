@@ -12,7 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { cn } from "@/lib/utils";
-import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS } from "@/lib/pausaCowork";
+import { rpcBanoConsumido, leerLimitesPausa } from "@/lib/coworkTablas";
+import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS, fraseDiaAgotado, LIMITE_DIARIO_AGOTADO_MS } from "@/lib/pausaCowork";
 import { hablar } from "@/lib/voz";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -109,10 +110,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.
   const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
   useEffect(() => {
-    supabase.from("cowork_break_limits").select("kind, minutos").then(({ data }) => {
-      if (data) setLimitesPausa(Object.fromEntries(data.map((l: { kind: string; minutos: number }) => [l.kind, l.minutos])));
-    });
+    void leerLimitesPausa(supabase).then(setLimitesPausa);
   }, []);
+  // Cuánto baño gastó HOY esta persona (pausas ya cerradas). El baño es un
+  // presupuesto DIARIO de 10 minutos, no un permiso de 10 cada vez: quien fue
+  // una vez y tardó 4, la próxima arranca en 6.
+  //
+  // Lo cuenta el SERVIDOR: el navegador de quien está siendo medido no puede
+  // ser la fuente, y además el presupuesto cruza sesiones y salas.
+  const [banoConsumido, setBanoConsumido] = useState(0);
+  const recargarConsumido = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await rpcBanoConsumido(supabase, [userId]);
+    setBanoConsumido(data?.[0]?.segundos ?? 0);
+  }, [userId]);
+  // Al entrar, y cada vez que se cierra una pausa (ahí cambia el acumulado).
+  useEffect(() => { void recargarConsumido(); }, [recargarConsumido]);
+  useEffect(() => { if (!breakStartedAt) void recargarConsumido(); }, [breakStartedAt, recargarConsumido]);
+
+  /** Lo ya gastado hoy solo cuenta para el baño; el break sigue siendo por pausa. */
+  const consumidoDe = (kind: "bano" | "break" | null) => (kind === "break" ? 0 : banoConsumido);
+
   // Avisar EN VOZ cuando se acaba la pausa.
   //
   // Quien está en pausa está lejos de la pantalla —es el sentido de la pausa—
@@ -122,23 +140,32 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (!breakStartedAt || breakLimite == null) { avisoFinPausa.current = 0; return; }
     const revisar = () => {
-      const pasadoMs = (Date.now() - breakStartedAt) - breakLimite * 60_000;
+      const transcurrido = Math.floor((Date.now() - breakStartedAt) / 1000) + consumidoDe(breakKind);
+      const pasadoMs = (transcurrido - breakLimite * 60) * 1000;
       if (pasadoMs < 0) return;                       // todavía le queda tiempo
       const ahora = Date.now();
       if (ahora - avisoFinPausa.current < REPETIR_FIN_PAUSA_MS) return;
       avisoFinPausa.current = ahora;
       playMessageNotification(0.5);
-      hablar(fraseFinDePausa(breakKind));
-      toast.warning("Se acabó tu tiempo de pausa", {
-        description: "Vuelve a tu puesto y quita la pausa para que quede registrado.",
-        duration: 10_000,
-        id: "fin-pausa",
-      });
+      // Pasarse un minuto es una cosa; haberse gastado el presupuesto del día
+      // es otra, y merece que se lo digan con esas palabras.
+      const diaAgotado = breakKind !== "break" && pasadoMs >= LIMITE_DIARIO_AGOTADO_MS;
+      hablar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind));
+      toast.warning(
+        diaAgotado ? "Excediste tu tiempo de baño del día" : "Se acabó tu tiempo de pausa",
+        {
+          description: diaAgotado
+            ? "El baño son 10 minutos por día en total. Por favor, regresa a tu puesto."
+            : "Vuelve a tu puesto y quita la pausa para que quede registrado.",
+          duration: 10_000,
+          id: "fin-pausa",
+        },
+      );
     };
     revisar();
     const id = window.setInterval(revisar, 5_000);
     return () => window.clearInterval(id);
-  }, [breakStartedAt, breakLimite, breakKind]);
+  }, [breakStartedAt, breakLimite, breakKind, banoConsumido]);
 
   const etiquetaPausa = (kind: "bano" | "break") => {
     const nombre = kind === "break" ? "Break" : "Baño";
@@ -206,6 +233,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         ...lastMediaRef.current,
         onBreak: !!breakStartedAt,
         breakStartedAt,
+        banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
       });
     },
@@ -568,7 +596,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <Coffee className="h-4 w-4" />
                 <span>{breakKind === "break" ? "Break" : "Baño"} ·</span>
                 {(() => {
-                  const c = cuentaPausa(breakElapsed, breakLimite);
+                  const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                   return (
                     <span className={cn("tabular-nums", clasesPausa(c.estado))}>
                       {c.texto}
@@ -624,7 +652,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                   <Coffee className="h-4 w-4 mr-2" />
                   <span>{breakKind === "break" ? "Break" : "Baño"} ·&nbsp;</span>
                   {(() => {
-                    const c = cuentaPausa(breakElapsed, breakLimite);
+                    const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                     return <span className={cn("tabular-nums", clasesPausa(c.estado))}>{c.texto}</span>;
                   })()}
                 </DropdownMenuItem>

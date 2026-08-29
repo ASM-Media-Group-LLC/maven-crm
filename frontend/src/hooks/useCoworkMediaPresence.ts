@@ -12,11 +12,19 @@ export interface MediaState {
   // de idas al baño por persona, solo el estado de ahora.
   onBreak?: boolean;
   breakStartedAt?: number | null;
+  /** "bano" o "break": el supervisor necesita saber CUÁL, porque los topes son
+   *  distintos y el de baño además es un presupuesto diario. Estaba viajando
+   *  igual, pero fuera del tipo, así que cada lado lo leía con un cast. */
+  breakKind?: "bano" | "break" | null;
   // Encuadre: lo reporta el navegador de cada persona sobre su PROPIO video
   // (ver hooks/useFaceWatch). `faceSince` es el epoch del último cambio, para
   // poder decir "sin rostro hace 2 min" en vez de alarmar al primer frame.
   faceState?: string | null;
   faceSince?: number | null;
+  /** Segundos de baño que esta persona ya gastó HOY en pausas CERRADAS. Viaja
+   *  por presence para que el supervisor vea exactamente el mismo contador que
+   *  la persona: el presupuesto de baño es diario, no por pausa. */
+  banoConsumidoSeg?: number | null;
 }
 
 interface UseCoworkMediaPresenceResult {
@@ -91,8 +99,10 @@ function leerEstados(canal: CanalRealtime) {
       screenShareOn: !!ultima.screenShareOn,
       onBreak: !!ultima.onBreak,
       breakStartedAt: ultima.breakStartedAt ?? null,
+      breakKind: ultima.breakKind ?? null,
       faceState: ultima.faceState ?? null,
       faceSince: ultima.faceSince ?? null,
+      banoConsumidoSeg: ultima.banoConsumidoSeg ?? null,
     };
   });
   return resultado;
@@ -107,8 +117,10 @@ function publicar(entrada: CanalVivo, state: MediaState) {
     screenShareOn: state.screenShareOn,
     onBreak: !!state.onBreak,
     breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
+    breakKind: state.breakKind ?? null,
     faceState: state.faceState ?? null,
     faceSince: state.faceSince ?? null,
+    banoConsumidoSeg: state.banoConsumidoSeg ?? null,
   });
 }
 

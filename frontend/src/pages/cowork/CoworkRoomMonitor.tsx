@@ -41,7 +41,11 @@ function VideoTile({ track }: { track: any }) {
     if (el && track) { try { track.attach(el); } catch { /* noop */ } }
     return () => { try { track?.detach(); } catch { /* noop */ } };
   }, [track]);
-  return <video ref={ref} autoPlay playsInline muted className="w-full h-full object-cover bg-black" />;
+  // `contain` y no `cover`: esta miniatura es la que usa el supervisor para ver
+  // si alguien está en cámara. `cover` rellena el rectángulo RECORTANDO, y como
+  // la caja no tiene la proporción de la cámara, lo primero que se pierde es la
+  // cabeza — justo lo único que hay que mirar.
+  return <video ref={ref} autoPlay playsInline muted className="w-full h-full object-contain bg-black" />;
 }
 
 // Miniatura de un participante con botón de SWAP cámara ↔ pantalla. Por defecto muestra la

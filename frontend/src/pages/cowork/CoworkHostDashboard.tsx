@@ -32,6 +32,7 @@ import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
+import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { cuentaPausa, clasesPausa, nombreYApellido, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
@@ -224,22 +225,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // nada de rojo: mejor sin señal que marcando a alguien por un dato que falta.
   const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
   useEffect(() => {
-    supabase.from("cowork_break_limits").select("kind, minutos").then(({ data }) => {
-      if (data) setLimitesPausa(Object.fromEntries(data.map((l: any) => [l.kind, l.minutos])));
-    });
+    void leerLimitesPausa(supabase).then(setLimitesPausa);
   }, []);
   // Segundos que lleva alguien en pausa, o null si no está en una.
   const pausaDe = (uid: string) => {
     const st = mediaStates[uid];
     if (!st?.onBreak || !st.breakStartedAt) return null;
     const segundos = Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000));
-    const kind = (st as any).breakKind === "break" ? "break" : "bano";
+    const kind = st.breakKind === "break" ? "break" : "bano";
     const limite = limitesPausa[kind];
     // La cuenta la hace lib/pausaCowork, el MISMO módulo que usa la pantalla
     // del empleado. Si cada lado la calculara por su cuenta, tarde o temprano
     // dirían cosas distintas sobre el mismo minuto — y ahí se acaba la
     // conversación sobre si alguien se pasó o no.
-    const cuenta = cuentaPausa(segundos, limite);
+    // El baño es un presupuesto DIARIO: lo ya gastado hoy viaja por presence
+    // para que el supervisor vea EXACTAMENTE el mismo número que la persona.
+    // Si cada lado lo calculara aparte, discutirían sobre distintos minutos.
+    const cuenta = cuentaPausa(segundos, limite, kind === "bano" ? (st.banoConsumidoSeg ?? 0) : 0);
     return {
       segundos, kind,
       etiqueta: kind === "break" ? "Break" : "Baño",
@@ -887,7 +889,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   sala: cowork.rooms.find((r) => r.id === sala?.room_id)?.name,
                   cuenta: cuentaPausa(
                     Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000)),
-                    limitesPausa[(st as { breakKind?: string }).breakKind === "break" ? "break" : "bano"],
+                    limitesPausa[st.breakKind === "break" ? "break" : "bano"],
+                    st.breakKind === "break" ? 0 : (st.banoConsumidoSeg ?? 0),
                   ),
                 };
               })

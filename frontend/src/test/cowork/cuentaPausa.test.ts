@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cuentaPausa, clasesPausa, nombreYApellido, fraseFinDePausa, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido, fraseFinDePausa, AVISAR_SUPERVISOR_PASADO_MS, LIMITE_DIARIO_AGOTADO_MS, fraseDiaAgotado } from "@/lib/pausaCowork";
 
 // La cuenta regresiva de las pausas. Lo que se fija acá es lo que el
 // coordinador y el empleado tienen que ver IGUAL: si cada lado calculara por su
@@ -90,5 +90,38 @@ describe("aviso hablado de fin de pausa", () => {
     expect(-unMinutoPasado.restante * 1000).toBeLessThan(AVISAR_SUPERVISOR_PASADO_MS);
     const cuatroPasado = cuentaPausa(14 * 60, 10);
     expect(-cuatroPasado.restante * 1000).toBeGreaterThan(AVISAR_SUPERVISOR_PASADO_MS);
+  });
+});
+
+// El baño es un PRESUPUESTO DIARIO de 10 minutos, no un permiso de 10 minutos
+// cada vez. Sin esto, alguien puede ir cinco veces nueve minutos y nunca
+// aparecer en rojo.
+describe("presupuesto diario de baño", () => {
+  it("la segunda pausa arranca donde quedó la primera", () => {
+    // Ya gastó 4 min hoy; recién arranca la segunda → le quedan 6.
+    expect(cuentaPausa(0, 10, 4 * 60).texto).toBe("6:00");
+    // Y al minuto de esta segunda, le quedan 5.
+    expect(cuentaPausa(60, 10, 4 * 60).texto).toBe("5:00");
+  });
+
+  it("si ya se pasó, la siguiente arranca EN NEGATIVO donde quedó", () => {
+    // Gastó 13 min hoy: la próxima empieza 3 minutos en rojo.
+    const c = cuentaPausa(0, 10, 13 * 60);
+    expect(c.excedida).toBe(true);
+    expect(c.texto).toBe("−3:00");
+  });
+
+  it("el amarillo también cuenta contra el acumulado del día", () => {
+    // Gastó 8 min; a los 30s de la nueva ya está en los últimos 2:30.
+    expect(cuentaPausa(30, 10, 8 * 60).estado).toBe("poco");
+  });
+
+  it("sin nada gastado se comporta como antes", () => {
+    expect(cuentaPausa(180, 10, 0).texto).toBe("7:00");
+  });
+
+  it("el aviso de 'agotaste el día' entra a los 5 minutos pasado", () => {
+    expect(LIMITE_DIARIO_AGOTADO_MS).toBe(300_000);
+    expect(fraseDiaAgotado().toLowerCase()).toMatch(/baño|puesto/);
   });
 });

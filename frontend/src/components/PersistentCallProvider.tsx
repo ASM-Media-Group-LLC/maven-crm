@@ -166,6 +166,25 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     [startCall, endCall, registerOutlet, config?.key, openPip, closePip, pipWindow],
   );
 
+  // VOLVER A UNA PÁGINA QUE OFRECE HUECO CIERRA LA VENTANA DEL SISTEMA.
+  //
+  // La ventana del sistema le gana al hueco de la página (es una elección
+  // explícita: alguien la sacó del navegador para ponerla en otro monitor).
+  // Pero al VOLVER a la sala, esa prioridad dejaba el hueco de la página vacío
+  // —pantalla negra— con la llamada atrapada en la ventanita. Jhon: "cuando el
+  // chatter vuelve a cowork, la pantalla sale negra y persiste la flotante".
+  //
+  // Se cierra SOLO EN LA TRANSICIÓN de "no había hueco" a "hay hueco", no
+  // mientras el hueco ya estaba: así quien la saca a un segundo monitor
+  // ESTANDO en el dashboard la conserva, y quien vuelve a su sala la recupera
+  // adentro, que es lo que espera al entrar.
+  const habiaHueco = useRef(!!outlet);
+  useEffect(() => {
+    const hayHueco = !!outlet;
+    if (hayHueco && !habiaHueco.current && pipWindow) closePip();
+    habiaHueco.current = hayHueco;
+  }, [outlet, pipWindow, closePip]);
+
   // Dónde se dibuja la llamada, por orden de prioridad: la ventana del sistema
   // (si la abrió a mano), el hueco de la página, o la ventanita flotante.
   const destino = pipWindow?.document?.body ?? outlet ?? floatSlot;

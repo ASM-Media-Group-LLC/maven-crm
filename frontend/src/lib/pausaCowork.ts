@@ -34,10 +34,19 @@ function mmss(segundos: number): string {
 }
 
 /**
- * @param transcurrido segundos desde que arrancó la pausa
+ * @param transcurrido segundos desde que arrancó ESTA pausa
  * @param limiteMinutos el tope de ese tipo de pausa (de cowork_break_limits)
+ * @param consumidoPrevio segundos que esta persona YA gastó hoy en este tipo de
+ *        pausa. El baño es un presupuesto DIARIO de 10 minutos, no un permiso
+ *        de 10 minutos cada vez: quien fue una vez y tardó 4, la próxima
+ *        arranca en 6, y quien se pasó arranca en negativo donde quedó.
  */
-export function cuentaPausa(transcurrido: number, limiteMinutos?: number | null): CuentaPausa {
+export function cuentaPausa(
+  transcurrido: number,
+  limiteMinutos?: number | null,
+  consumidoPrevio = 0,
+): CuentaPausa {
+  transcurrido += consumidoPrevio;
   // Sin límite configurado no se puede prometer una cuenta regresiva: se
   // muestra lo transcurrido y en neutro. Inventar un tope sería peor.
   if (limiteMinutos == null) {
@@ -123,3 +132,26 @@ export const REPETIR_FIN_PAUSA_MS = 120_000;
  *  Antes que eso es asunto de la persona: pasarse un minuto del baño no es algo
  *  que amerite interrumpir a quien supervisa nueve salas. */
 export const AVISAR_SUPERVISOR_PASADO_MS = 180_000;
+
+// ── Presupuesto diario de baño agotado ──────────────────────────────────────
+//
+// Pasarse un minuto es una cosa; haberse gastado el presupuesto del día es
+// otra, y merece que se lo digan con esas palabras. Antes de este umbral el
+// aviso normal ya le viene diciendo que se le acabó el tiempo.
+
+/** Cuánto tiene que estar en negativo para que se le diga que agotó el día. */
+export const LIMITE_DIARIO_AGOTADO_MS = 300_000; // 5 minutos pasado
+
+const FRASES_DIA_AGOTADO = [
+  "Has excedido el límite de pausas para ir al baño por hoy. Por favor, regresa a tu puesto.",
+  "Ya superaste tu tiempo de baño del día. Por favor, vuelve a tu puesto ahora.",
+  "Se agotó tu tiempo de baño de hoy y lo superaste. Regresa a tu puesto, por favor.",
+];
+
+let idxDiaAgotado = 0;
+
+export function fraseDiaAgotado(): string {
+  const frase = FRASES_DIA_AGOTADO[idxDiaAgotado % FRASES_DIA_AGOTADO.length];
+  idxDiaAgotado += 1;
+  return frase;
+}
