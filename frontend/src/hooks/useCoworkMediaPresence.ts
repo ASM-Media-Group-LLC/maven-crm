@@ -211,14 +211,53 @@ function estadoDelCanal(canal: CanalRealtime): string | undefined {
   return (canal as unknown as { state?: string }).state;
 }
 
+// ── Por qué este vigilante lleva freno ──────────────────────────────────────
+//
+// La primera versión reintentaba en cada tic, cada cuatro segundos, sin
+// límite. Parecía prudente —"reintentar es barato y quedarse mudo no"— y era
+// exactamente al revés: si el canal no se recuperaba, rearmarlo cada cuatro
+// segundos GENERABA el tráfico que impedía que se recuperara.
+//
+// Supabase lo corta con `ClientPresenceRateLimitReached`, y no corta solo el
+// canal culpable: corta el SOCKET ENTERO del cliente. Por ese socket viajan
+// también las llamadas entrantes y los mensajes en vivo, así que un vigilante
+// de Cowork demasiado ansioso dejaba a la persona sin timbre de llamadas y sin
+// Messenger en vivo, sin un solo error a la vista. Pasó en producción.
+//
+// Un reintento que no afloja no es persistencia: es la causa.
+
+const ESPERA_BASE_MS = 8_000;
+const ESPERA_MAX_MS = 60_000;
+/** Mínimo entre dos reanuncios de MI estado. Reanunciarse es un mensaje de
+ *  presencia más, así que hacerlo en cada tic es justo lo que dispara el
+ *  límite. Veinte segundos alcanzan de sobra: el tablero del supervisor
+ *  tolera esa demora, un socket caído no. */
+const MIN_ENTRE_REPUBLICACIONES_MS = 20_000;
+
+let fallosSeguidos = 0;
+let proximoIntento = 0;
+let ultimaRepublicacion = 0;
+
+/** Vuelve a cero el freno. Se llama cuando el canal está sano de verdad. */
+export function reiniciarFrenoDePresencia() {
+  fallosSeguidos = 0;
+  proximoIntento = 0;
+}
+
 function revisarSalud() {
   const entrada = vivo;
   if (!entrada) return;
+  const ahora = Date.now();
 
   const estado = estadoDelCanal(entrada.canal);
-  // 'joined' es lo sano. Si quedó 'closed' o 'errored', rearmar: reintentar es
-  // barato y quedarse mudo no.
+  // 'joined' es lo sano. Si quedó 'closed' o 'errored' hay que rearmar — pero
+  // CON ESPERA CRECIENTE. Sin ella, un canal que no vuelve se convierte en un
+  // martillo de un mensaje cada cuatro segundos que tira el socket entero.
   if (typeof estado === "string" && estado !== "joined" && estado !== "joining") {
+    if (ahora < proximoIntento) return;
+    fallosSeguidos += 1;
+    proximoIntento = ahora + Math.min(ESPERA_MAX_MS, ESPERA_BASE_MS * 2 ** (fallosSeguidos - 1));
+
     const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
     supabase.removeChannel(entrada.canal);
     const nueva = abrirCanal(sessionId, userId);
@@ -228,19 +267,30 @@ function revisarSalud() {
     vivo = nueva;
     // Si esta persona estaba publicando su estado, lo vuelve a publicar: si no,
     // reaparecería en el tablero de los demás pero sin cámara ni micro.
-    if (ultimoEstado) publicar(nueva, ultimoEstado);
+    if (ultimoEstado) { publicar(nueva, ultimoEstado); ultimaRepublicacion = ahora; }
     return;
   }
 
+  // Llegó acá: el canal está sano. Se afloja el freno.
+  fallosSeguidos = 0;
+  proximoIntento = 0;
+
   // Aunque el canal esté sano, se relee: un `sync` perdido no deja rastro.
+  // Esto NO manda nada, solo lee lo que ya está en memoria — es gratis.
   const estados = leerEstados(entrada.canal);
   entrada.oyentes.forEach((f) => f(estados));
 
   // Y el chequeo que de verdad importa para quien PUBLICA: "yo debería
-  // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia. Cubre cualquier
-  // camino por el que se pierda el track sin que el canal se caiga.
+  // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia — pero con techo:
+  // reanunciarse es un mensaje más, y hacerlo en cada tic era la otra mitad del
+  // martillo. Si sigo sin aparecer, el próximo intento es en veinte segundos,
+  // no en cuatro.
   const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
-  if (aPublicar && !estados[entrada.userId]) publicar(entrada, aPublicar);
+  if (aPublicar && !estados[entrada.userId]
+      && ahora - ultimaRepublicacion >= MIN_ENTRE_REPUBLICACIONES_MS) {
+    ultimaRepublicacion = ahora;
+    publicar(entrada, aPublicar);
+  }
 }
 
 function arrancarRevisor() {
@@ -263,6 +313,9 @@ export function salirDePresencia() {
   // la próxima vez. Arrastrarlo entre sesiones haría que alguien que vuelve
   // mañana entre ya con el aviso disparado.
   selloPantalla = null;
+  fallosSeguidos = 0;
+  proximoIntento = 0;
+  ultimaRepublicacion = 0;
   if (!vivo) return;
   supabase.removeChannel(vivo.canal);
   vivo = null;
