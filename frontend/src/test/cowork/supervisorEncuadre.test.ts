@@ -23,7 +23,7 @@ vi.mock("@/lib/notificationSound", () => ({ playMessageNotification: (...a: unkn
 vi.mock("@/lib/voz", () => ({ hablar: (...a: unknown[]) => habla(...a) }));
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausa, marcarPausa: (v: boolean) => { pausa = v; } }));
 
-const { useFaceNudge, esProblemaDeEncuadre } = await import("@/hooks/useFaceNudge");
+const { useFaceNudge, esProblemaDeEncuadre, useScreenShareNudge } = await import("@/hooks/useFaceNudge");
 
 /** Monta el supervisor con el problema empezado hace `segundos`. */
 function supervisar(state: string, segundos: number, enPausaProp?: boolean) {
@@ -107,5 +107,48 @@ describe("supervisor de encuadre", () => {
     );
     expect(alCoordinador).toHaveBeenCalledTimes(1);
     expect(alCoordinador.mock.calls[0][0]).toBeGreaterThanOrEqual(180);
+  });
+});
+
+// El aviso de compartir pantalla. En Cowork la pantalla es la mitad del
+// trabajo: sin ella el supervisor ve una cara pero no QUÉ está haciendo.
+describe("aviso de compartir pantalla", () => {
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); toastWarning.mockClear(); habla.mockClear(); pausa = false; });
+  afterEach(() => vi.useRealTimers());
+
+  it("no dice nada antes de los 2 minutos", () => {
+    renderHook(() => useScreenShareNudge(false, true));
+    vi.advanceTimersByTime(100_000);
+    expect(toastWarning).not.toHaveBeenCalled();
+  });
+
+  it("a los 2 minutos avisa y habla", () => {
+    renderHook(() => useScreenShareNudge(false, true));
+    vi.advanceTimersByTime(125_000);
+    expect(toastWarning).toHaveBeenCalled();
+    expect(habla).toHaveBeenCalled();
+    expect((habla.mock.calls[0][0] as string).toLowerCase()).toMatch(/pantalla/);
+  });
+
+  it("si está compartiendo no molesta nunca", () => {
+    renderHook(() => useScreenShareNudge(true, true));
+    vi.advanceTimersByTime(400_000);
+    expect(toastWarning).not.toHaveBeenCalled();
+  });
+
+  it("en pausa se calla: quien avisó que se iba no tiene que compartir nada", () => {
+    pausa = true;
+    renderHook(() => useScreenShareNudge(false, true));
+    vi.advanceTimersByTime(400_000);
+    expect(toastWarning).not.toHaveBeenCalled();
+  });
+
+  it("las frases rotan", () => {
+    const a = renderHook(() => useScreenShareNudge(false, true));
+    vi.advanceTimersByTime(125_000); a.unmount();
+    const b = renderHook(() => useScreenShareNudge(false, true));
+    vi.advanceTimersByTime(125_000); b.unmount();
+    expect(habla).toHaveBeenCalledTimes(2);
+    expect(habla.mock.calls[0][0]).not.toBe(habla.mock.calls[1][0]);
   });
 });

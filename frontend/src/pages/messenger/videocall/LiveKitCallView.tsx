@@ -17,7 +17,7 @@ import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
-import { useFaceNudge } from "@/hooks/useFaceNudge";
+import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { BackgroundEffect } from "./BackgroundSelector";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -228,6 +228,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const localP = lk.participants.find((p) => p.isLocal);
   const localMicOn = localP ? !localP.isMuted : false;
   const localCamOn = localP ? !localP.isCameraOff : false;
+  // Para SUPERVISAR se usa el estado real: `isCameraOff` incluye el freno de
+  // dibujado del efecto de fondo, y ese freno haciendose pasar por "camara
+  // apagada" es lo que le reclamaba encuadre a gente que estaba en camara.
+  const camaraRealOn = localP ? !(localP.isCameraOffReal ?? localP.isCameraOff) : false;
   const localScreenShare = localP ? localP.isScreenSharing : false;
   const onMediaStateChangeRef = useRef(onMediaStateChange);
   onMediaStateChangeRef.current = onMediaStateChange;
@@ -260,13 +264,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk, localCamOn, lk.connectionState]);
   // `enabled` NO incluye localCamOn: con la cámara apagada queremos que reporte
   // `cam_off`, no que se congele en el último estado.
-  const faceWatch = useFaceWatch(localCameraTrack, !!onFaceStateChange && localCamOn);
+  const faceWatch = useFaceWatch(localCameraTrack, !!onFaceStateChange && camaraRealOn);
 
   // EL SUPERVISOR VIVE ACÁ, no en la página de Cowork. Esta vista sobrevive a
   // navegar a otra sección de Maven (se muda a la ventanita flotante); la
   // página no. Cuando el aviso vivía allá, se apagaba justo cuando la persona
   // se iba a mirar otra pantalla — o sea, justo cuando más falta hace.
   useFaceNudge(supervisorEncuadre ? faceWatch : null);
+  // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
+  // cara pero no QUÉ está haciendo la persona.
+  useScreenShareNudge(localScreenShare, !!supervisorEncuadre);
   const onFaceStateChangeRef = useRef(onFaceStateChange);
   onFaceStateChangeRef.current = onFaceStateChange;
   useEffect(() => {
@@ -274,7 +281,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [faceWatch]);
 
   useEffect(() => {
-    onMediaStateChangeRef.current?.({ micOn: localMicOn, camOn: localCamOn, screenShareOn: localScreenShare });
+    const avisar = () => onMediaStateChangeRef.current?.({
+      micOn: localMicOn, camOn: camaraRealOn, screenShareOn: localScreenShare,
+    });
+    avisar();
+    // Se repite cada 10 s aunque no cambie nada. El aviso "solo al cambiar"
+    // deja a la persona invisible para el supervisor si ESE aviso se pierde
+    // —y esta noche se perdio varias veces—; repetirlo es barato y convierte
+    // cualquier hueco en 10 segundos de atraso en vez de un turno entero.
+    const id = window.setInterval(avisar, 10_000);
+    return () => window.clearInterval(id);
   }, [localMicOn, localCamOn, localScreenShare]);
 
   const effectiveLayout: "grid" | "sidebar" = useMemo(() => {

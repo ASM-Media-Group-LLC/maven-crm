@@ -174,3 +174,60 @@ export function useFaceNudge(
     return () => window.clearInterval(id);
   }, [watch, enPausaProp]);
 }
+
+// ── Compartir pantalla ──────────────────────────────────────────────────────
+//
+// En Cowork la pantalla compartida es la mitad del trabajo: sin ella el
+// supervisor ve una cara pero no ve QUÉ está haciendo esa persona. Dejar de
+// compartir es tan fácil como cerrar una ventana por accidente, y quien lo hace
+// casi nunca se da cuenta — por eso el aviso, y por eso hablado.
+//
+// Dos minutos de gracia: cambiar de pantalla, reiniciar el compartir o abrir
+// algo a pantalla completa corta el stream unos segundos, y reclamar por eso
+// sería puro ruido.
+
+const SIN_PANTALLA_MS = 120_000;
+const REPETIR_SIN_PANTALLA_MS = 120_000;
+
+const FRASES_SIN_PANTALLA = [
+  "No estás compartiendo pantalla. Por favor, vuelve a compartirla.",
+  "Recuerda compartir tu pantalla para que se vea tu trabajo.",
+  "Tu pantalla dejó de compartirse. Actívala de nuevo, por favor.",
+  "Por favor, comparte tu pantalla: sin ella no se ve en qué estás trabajando.",
+  "Sigues sin compartir pantalla. Por favor, actívala.",
+  "Falta que compartas tu pantalla. Hazlo cuando puedas, por favor.",
+];
+
+let idxSinPantalla = 0;
+
+export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
+  const ultimo = useRef(0);
+  const desde = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!activo || compartiendo) { desde.current = null; ultimo.current = 0; return; }
+    if (desde.current === null) desde.current = Date.now();
+
+    const tick = () => {
+      // La pausa se consulta en cada tic, igual que en el encuadre: quien
+      // avisó que se iba no tiene por qué estar compartiendo nada.
+      if (estaEnPausa()) { desde.current = null; ultimo.current = 0; return; }
+      if (desde.current === null) desde.current = Date.now();
+      if (Date.now() - desde.current < SIN_PANTALLA_MS) return;
+      const ahora = Date.now();
+      if (ahora - ultimo.current < REPETIR_SIN_PANTALLA_MS) return;
+      ultimo.current = ahora;
+      playMessageNotification(0.5);
+      hablar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length]);
+      toast.warning("No estás compartiendo pantalla", {
+        description: "Comparte tu pantalla para que se vea tu trabajo.",
+        duration: 10_000,
+        id: "sin-pantalla",
+      });
+    };
+
+    tick();
+    const id = window.setInterval(tick, 5_000);
+    return () => window.clearInterval(id);
+  }, [compartiendo, activo]);
+}

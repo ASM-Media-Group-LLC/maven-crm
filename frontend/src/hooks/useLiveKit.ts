@@ -24,6 +24,11 @@ export interface LKParticipant {
   isSpeaking: boolean;
   isMuted: boolean;
   isCameraOff: boolean;
+  /** El estado REAL de la cámara, sin el freno de dibujado del efecto de fondo.
+   *  `isCameraOff` gobierna qué se dibuja; esto es lo que se puede REPORTAR.
+   *  Un detalle de render no puede hacerle creer al supervisor que alguien
+   *  apagó la cámara. */
+  isCameraOffReal?: boolean;
   isScreenSharing: boolean;
   isLocal: boolean;
   handRaised: boolean;
@@ -333,6 +338,29 @@ export function useLiveKit() {
   const skipAutoBackgroundRestoreRef = useRef(false);
   // Hide local camera tile while a background effect is being prepared for the current track.
   const holdLocalVideoUntilBackgroundRef = useRef(false);
+  // Vigilante del freno de dibujado. Se pone en true desde una docena de
+  // lugares y se apaga desde otros tantos; alcanza con que UN camino no lo
+  // apague para que la vista local se quede en negro para siempre. En vez de
+  // auditar los doce, se le pone vencimiento: si lleva mas de 6 s frenado, el
+  // fondo ya no va a llegar y es mejor mostrar el video sin efecto que no
+  // mostrar nada.
+  const holdDesdeRef = useRef<number | null>(null);
+  // Se rellena mas abajo, cuando `refreshParticipants` ya existe. Con una ref y
+  // no con la funcion directa para no depender del orden de declaracion — eso
+  // ya nos tumbo la pagina dos veces.
+  const refreshParticipantsRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!holdLocalVideoUntilBackgroundRef.current) { holdDesdeRef.current = null; return; }
+      if (holdDesdeRef.current === null) { holdDesdeRef.current = Date.now(); return; }
+      if (Date.now() - holdDesdeRef.current > 6000) {
+        holdLocalVideoUntilBackgroundRef.current = false;
+        holdDesdeRef.current = null;
+        refreshParticipantsRef.current?.();
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
   // ── Noise cancellation ──────────────────────────────────────────
   const [isNoiseCancellationOn, setIsNoiseCancellationOn] = useState(false);
   const ncProcessorRef = useRef<NoiseSuppresionTrackProcessor | null>(null);
@@ -357,17 +385,29 @@ export function useLiveKit() {
     const shouldHoldLocalVideo =
       isLocal && holdLocalVideoUntilBackgroundRef.current && backgroundEffectRef.current !== "none";
 
-    const camOff = shouldHoldLocalVideo
-      ? true
-      : isLocal
-        ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
-        : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
+    // El estado REAL de la camara, sin el freno de dibujado.
+    const camOffReal = isLocal
+      ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
+      : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
+
+    // `shouldHoldLocalVideo` es un freno de DIBUJADO: no mostrar el video crudo
+    // antes de aplicar el fondo. Se propaga a `camOff` para que la vista local
+    // no parpadee... y ahi estaba el problema: ese mismo `camOff` es el que
+    // viaja al supervisor. Si el freno queda pegado —el fondo no termina de
+    // aplicarse, la camara se reinicia, lo que sea— el supervisor ve "camara
+    // apagada" y el supervisor de encuadre le reclama a alguien que se esta
+    // viendo perfectamente. Le paso a Jhon probando, con su cara en pantalla.
+    //
+    // Se separan: `camOff` sigue gobernando el dibujado, `camOffReal` es lo que
+    // se reporta. Un detalle de render no puede acusar a nadie.
+    const camOff = shouldHoldLocalVideo ? true : camOffReal;
 
     const isScreenSharing = !!screenTrack && !screenTrack.isMuted;
     const hasCameraTrack = !!videoTrack?.track && !videoTrack.isMuted;
     const hasScreenTrack = !!screenTrack?.track && !screenTrack.isMuted;
 
     return {
+      isCameraOffReal: camOffReal,
       sid: p.sid,
       identity: p.identity,
       name: p.name || p.identity,
@@ -435,6 +475,7 @@ export function useLiveKit() {
 
     setParticipants(result);
   }, [buildParticipant]);
+  refreshParticipantsRef.current = refreshParticipants;
 
   const debouncedRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
