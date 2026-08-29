@@ -26,6 +26,20 @@ const DIR = process.env.RECORDINGS_DIR || "/out";
 const SECRET = process.env.RECORDINGS_SIGNING_SECRET;
 const PORT = Number(process.env.PORT || 8080);
 
+// El archivo entra por bind-mount, asi que `compose up -d` NO recrea el
+// contenedor cuando cambia: Docker no ve diferencia en la definicion del
+// servicio y node se queda con el codigo viejo en memoria. Sin esta marca no
+// hay forma de saber qué version esta sirviendo, y se depura a ciegas.
+// Subirla al tocar este archivo; sale en el arranque y en /health.
+const VERSION = "2026-08-28.1-rangos";
+
+/** Una linea por pedido: sin esto no se puede saber si el navegador llego. */
+function registrar(req, estado, extra = "") {
+  console.log(`[rec] ${req.method} ${req.url?.split("?")[0]} -> ${estado}` +
+    (req.headers.range ? ` range=${req.headers.range}` : "") +
+    (extra ? ` ${extra}` : ""));
+}
+
 if (!SECRET) {
   console.error("Falta RECORDINGS_SIGNING_SECRET");
   process.exit(1);
@@ -61,7 +75,7 @@ http.createServer(async (req, res) => {
         try { total += (await stat(path.join(DIR, a))).size; } catch { /* borrado en el medio */ }
       }
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: true, archivos: archivos.length, bytes: total }));
+      res.end(JSON.stringify({ ok: true, version: VERSION, archivos: archivos.length, bytes: total }));
     } catch (e) {
       res.writeHead(500);
       res.end(String(e?.message ?? e));
@@ -75,6 +89,7 @@ http.createServer(async (req, res) => {
   const sig = url.searchParams.get("sig");
 
   if (!archivo || !firmaValida(archivo, exp, sig)) {
+    registrar(req, 403, archivo ? "firma invalida o vencida" : "nombre invalido");
     res.writeHead(403);
     res.end("forbidden");
     return;
@@ -115,6 +130,7 @@ http.createServer(async (req, res) => {
 
       const rango = req.headers.range;
       if (!rango) {
+        registrar(req, 200, `completo ${st.size}b`);
         res.writeHead(200, { ...cabeceras, "content-length": st.size });
         if (req.method === "HEAD") return res.end();
         createReadStream(ruta).pipe(res);
@@ -142,6 +158,7 @@ http.createServer(async (req, res) => {
         return res.end();
       }
 
+      registrar(req, 206, `${desde}-${hasta}/${st.size}`);
       res.writeHead(206, {
         ...cabeceras,
         "content-range": `bytes ${desde}-${hasta}/${st.size}`,
@@ -163,6 +180,7 @@ http.createServer(async (req, res) => {
       res.end(JSON.stringify({ ok: true }));
       return;
     }
+    registrar(req, 404, `accion desconocida: ${accion}`);
     res.writeHead(404);
     res.end();
   } catch (e) {
@@ -170,4 +188,4 @@ http.createServer(async (req, res) => {
     res.writeHead(noExiste ? 404 : 500);
     res.end(noExiste ? "not found" : String(e?.message ?? e));
   }
-}).listen(PORT, () => console.log(`rec-server en :${PORT}, sirviendo ${DIR}`));
+}).listen(PORT, () => console.log(`rec-server ${VERSION} en :${PORT}, sirviendo ${DIR}`));
