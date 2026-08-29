@@ -365,35 +365,38 @@ const ParticipantTile = memo(function ParticipantTile({
         <audio ref={audioRef} autoPlay playsInline data-lk-audio="true" style={{ display: "none" }} />
       )}
 
-      {/* Controles del recuadro: anclar y "más opciones".
-          NO se dibujan en la vista chica, por dos motivos concretos:
+      {/* Controles del recuadro.
+          En la vista chica va SOLO el de anclar, y más chico. Dos razones:
 
           1. EL MENÚ NO FUNCIONA AHÍ. Es un DropdownMenu de Radix, que dibuja su
              contenido en `document.body` — y dentro de la ventana flotante del
              sistema `document` sigue siendo el de la ventana PRINCIPAL. El menú
              se abre en la otra ventana, donde nadie lo ve. El botón responde y
              no pasa nada, que es peor que no tenerlo.
-          2. NO ENTRAN. Son dos botones de 40px centrados sobre un recuadro de
-             unos 84 de alto: tapan la cara y el nombre de la persona.
-
-          En la vista grande siguen igual. */}
-      {!compact && (
+          2. LOS DOS JUNTOS NO ENTRABAN. Eran dos botones de 40px pegados sobre
+             un recuadro de ~150x84. En los grandes había lugar y el anclar
+             funcionaba; en el chico de la otra persona ocupaban casi todo el
+             ancho, así que el clic caía sobre el menú roto y parecía que anclar
+             no servía para los demás. Con uno solo y más chico, entra. */}
+      {(onPinParticipant || !compact) && (
       <div className="absolute inset-0 z-[5] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
         <div className="flex items-center gap-1 pointer-events-auto">
           {onPinParticipant && (
             <button
               onClick={() => onPinParticipant(participant.sid)}
               className={cn(
-                "h-10 w-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors",
+                "rounded-full backdrop-blur-sm flex items-center justify-center transition-colors",
+                compact ? "h-8 w-8" : "h-10 w-10",
                 isPinned
                   ? "bg-primary/30 text-primary hover:bg-primary/40"
                   : "bg-[hsl(220_3%_18%/0.85)] text-foreground hover:bg-[hsl(220_3%_25%/0.95)]"
               )}
               title={isPinned ? "Desanclar" : "Anclar en pantalla"}
             >
-              {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+              {isPinned ? <PinOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} /> : <Pin className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />}
             </button>
           )}
+          {!compact && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -427,6 +430,7 @@ const ParticipantTile = memo(function ParticipantTile({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
       </div>
       )}
