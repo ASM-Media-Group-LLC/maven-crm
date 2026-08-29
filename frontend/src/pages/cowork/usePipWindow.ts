@@ -44,8 +44,16 @@ export function usePipWindow() {
       const w: Window = await (window as unknown as {
         documentPictureInPicture: { requestWindow: (o: { width: number; height: number }) => Promise<Window> };
       }).documentPictureInPicture.requestWindow({
-        width: opts?.width ?? 480,
-        height: opts?.height ?? 420,
+        // Retrato, no apaisado, y un poco más chica. Es la forma que usa Meet
+        // en su mini-ventana (ver la referencia que mandó Jhon el 28/08): la
+        // pantalla compartida ocupa el ancho completo, la cámara propia va
+        // superpuesta en una esquina, y los controles quedan abajo con lugar
+        // propio en vez de pelear espacio con el video.
+        //
+        // Con 480 de ancho la vista metía una barra lateral fija de 192px —el
+        // 40% de la ventana— y terminaba recortada contra el borde.
+        width: opts?.width ?? 380,
+        height: opts?.height ?? 460,
       });
       copyStyles(w);
       w.addEventListener("pagehide", () => { pipRef.current = null; setPipWindow(null); });

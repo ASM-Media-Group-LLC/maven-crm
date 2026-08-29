@@ -346,6 +346,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return ss || visibleParticipants.find((p) => p.identity === lk.activeSpeaker) || visibleParticipants[0];
   }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
 
+  // Los que NO son el destacado. Se calculaba dos veces inline; con la vista
+  // compacta pasaban a ser tres, así que se nombra una vez.
+  //
+  // Va DESPUÉS de `spotlightParticipant` y no antes: declarar esto arriba lo
+  // dejaría leyendo una variable que todavía no existe, y eso no es un detalle
+  // de estilo — ese error exacto tumbó la página en producción dos veces.
+  const otrosParticipantes = useMemo(
+    () => visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid),
+    [visibleParticipants, spotlightParticipant],
+  );
+
   const room = lk.getRoom();
 
   if (lk.connectionState === ConnectionState.Connecting) {
@@ -423,14 +434,42 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}
             </div>
           ) : (
-            <div className="flex h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>}
-              {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).length > 0 && (
-                <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
-                  {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
-                  ))}
+            // En COMPACTO (ventana flotante) las caras van SUPERPUESTAS sobre la
+            // pantalla compartida, en la esquina, como hace Meet. En grande, al
+            // costado como siempre.
+            //
+            // La barra lateral medía 192px FIJOS y `shrink-0`: en la ventanita
+            // de 480px eso es el 40% del ancho, y como el panel grande tampoco
+            // cedía (le faltaba `min-w-0`), la barra terminaba empujada fuera
+            // del `overflow-hidden` del padre. La cámara estaba en el DOM pero
+            // fuera de lo visible: Alexandra solo veía el cuadro de su pantalla.
+            <div className={cn("h-full", effectiveCompact ? "relative" : "flex gap-2")}>
+              {spotlightParticipant && (
+                // `min-w-0` es lo que le permite al panel grande achicarse. Sin
+                // eso, un flex item se niega a bajar de su contenido y desborda.
+                <div className={effectiveCompact ? "h-full" : "flex-1 min-w-0"}>
+                  <ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
+              )}
+              {otrosParticipantes.length > 0 && (
+                effectiveCompact ? (
+                  // Esquina inferior derecha, encima de la pantalla. Se muestran
+                  // como mucho DOS: en una ventana de este tamaño, una tira de
+                  // nueve caritas no se ve, estorba.
+                  <div className="absolute bottom-2 right-2 flex flex-col-reverse gap-1.5 w-[34%] max-w-[150px] pointer-events-none">
+                    {otrosParticipantes.slice(0, 2).map((p) => (
+                      <div key={`${p.identity}-${p.sid}`} className="aspect-video rounded-lg overflow-hidden ring-1 ring-white/25 shadow-lg pointer-events-auto">
+                        <ParticipantTile participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
+                    {otrosParticipantes.map((p) => (
+                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           )}
