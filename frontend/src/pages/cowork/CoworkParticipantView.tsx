@@ -10,7 +10,7 @@ import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
-import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
+import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
@@ -71,7 +71,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return () => { alive = false; };
   }, [cowork.session?.id, myAssignment, cowork.getMyLastRoomId]);
 
-  const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
+  // `persistente`: la presencia del chatter tiene que durar lo que dura su
+  // LLAMADA, no lo que dura esta página. Al navegar a otra sección la llamada
+  // sigue viva en la ventanita flotante; si el canal de presencia se cerrara
+  // acá, el coordinador lo vería IRSE de la sala sin que se haya ido.
+  const { trackMediaState } = useCoworkMediaPresence(
+    cowork.session?.id, userId, { persistente: true },
+  );
 
   // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
   // por presence, así el coordinador lo ve en vivo aunque recargue su dashboard.
@@ -125,6 +131,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     setConnectedLkRoom(null);
     setManuallyLeft(true);
     endCall();
+    // Se fue de verdad: acá el `leave` del presence SÍ corresponde.
+    salirDePresencia();
     try { await cowork.leaveRoom?.(); } catch { /* best-effort */ }
     toast.success("Saliste de la sala");
     navigate("/dashboard");

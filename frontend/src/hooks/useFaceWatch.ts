@@ -39,8 +39,14 @@ const MIN_FACE_RATIO = 0.035;
 const MIN_BRIGHTNESS = 24;
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+// ⚠️ OJO: esta URL YA SE ROMPIÓ UNA VEZ. Estuvo apuntando a
+// `.../float16/1/blaze_face_short_range.task` y Google cambió la extensión a
+// `.tflite`: devolvía 404, el detector nunca se creaba y —como el error se
+// tragaba -- el supervisor de encuadre estuvo MUERTO sin que nadie se enterara.
+// Nadie reportó "falla el supervisor"; se reportó "no me dice nada".
+// Si vuelve a pasar, la consola ahora lo grita (ver getDetector).
 const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.task";
+  "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite";
 
 // Un solo detector para toda la pestaña: cargarlo es lo caro, usarlo no.
 let detectorPromise: Promise<any | null> | null = null;
@@ -56,7 +62,17 @@ async function getDetector(): Promise<any | null> {
           runningMode: "IMAGE",
           minDetectionConfidence: 0.5,
         });
-      } catch {
+      } catch (e) {
+        // NO se traga el error en silencio. La versión anterior hacía
+        // `catch { return null }` y eso convirtió un 404 de una URL externa en
+        // una función que simplemente no existía: el chatter creía que lo
+        // estaban supervisando y el coordinador creía que le iban a avisar.
+        // Un aviso que nunca llega es peor que no tener aviso.
+        console.error(
+          "[encuadre] no se pudo cargar el detector de rostros: el supervisor NO va a avisar. " +
+          "Revisar que respondan 200:\n  " + WASM_BASE + "\n  " + MODEL_URL,
+          e,
+        );
         return null;
       }
     })();
