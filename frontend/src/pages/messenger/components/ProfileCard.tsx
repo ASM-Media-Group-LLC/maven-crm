@@ -43,7 +43,13 @@ function Stat({ label, value, sub }: { label: string; value: number; sub: string
 function CardBody({ data, onSend, sending }: { data: KarmaProfile; onSend: () => void; sending: boolean }) {
   const legend = isKarmaLegend(data);
   const admin = data.viewer_is_admin;
-  const earned = KARMA_ORDER.filter((k) => data.stars[k]).map((k) => STAR_LABEL[k]);
+  // Las estrellas se rellenan EN ORDEN (izquierda→derecha): las ganadas primero,
+  // las pendientes después. Así 1 estrella siempre aparece en la 1ª posición.
+  // La especial (karma votado) va aparte, en su posición fija al final.
+  const earnedKeys = KARMA_ORDER.filter((k) => data.stars[k]);
+  const pendingKeys = KARMA_ORDER.filter((k) => !data.stars[k]);
+  const packed = [...earnedKeys, ...pendingKeys];
+  const earned = earnedKeys.map((k) => STAR_LABEL[k]);
 
   return (
     <div className={cn("kp-card", legend && "kp-legend", !legend && admin && "kp-admin")}>
@@ -83,13 +89,16 @@ function CardBody({ data, onSend, sending }: { data: KarmaProfile; onSend: () =>
             <span className="text-[11px] font-bold font-mono" style={{ color: GOLD }}>{data.stars_count} / 5</span>
           </div>
           <div className="flex items-center justify-center gap-2">
-            {KARMA_ORDER.map((k) => (
-              <Star
-                key={k}
-                filled={data.stars[k]}
-                tip={admin ? `<b>${STAR_LABEL[k]}</b>${data.stars[k] ? "Conseguida" : "Bloqueada"} · ${data.admin?.criteria?.[k]?.rule ?? ""}` : undefined}
-              />
-            ))}
+            {packed.map((k, i) => {
+              const filled = i < earnedKeys.length;
+              return (
+                <Star
+                  key={k}
+                  filled={filled}
+                  tip={admin ? `<b>${STAR_LABEL[k]}</b>${filled ? "Conseguida" : "Bloqueada"} · ${data.admin?.criteria?.[k]?.rule ?? ""}` : undefined}
+                />
+              );
+            })}
             {data.special && (
               <>
                 <div className="kp-sep" />
