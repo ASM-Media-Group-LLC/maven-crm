@@ -181,7 +181,18 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
       //
       // Al re-suscribirse, se vuelve a anunciar lo último que se sabía.
       const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
-      if (estado === "SUBSCRIBED" && aPublicar) publicar(entrada, aPublicar);
+      if (estado === "SUBSCRIBED") {
+        if (aPublicar) publicar(entrada, aPublicar);
+        return;
+      }
+      // Cualquier otro estado significa que este canal NO entrega nada, y hasta
+      // ahora eso no dejaba rastro: el tablero del supervisor se quedaba vacío
+      // en silencio y parecía que todos estaban bien. Es el mismo fallo mudo
+      // que tenía el timbre de llamadas, y costó una noche encontrarlo ahí.
+      console.warn(
+        "[Cowork] El canal de presencia está en:", estado,
+        "— el tablero del supervisor no va a recibir estados de nadie.",
+      );
     });
 
   return entrada;
@@ -234,6 +245,10 @@ const ESPERA_MAX_MS = 60_000;
  *  tolera esa demora, un socket caído no. */
 const MIN_ENTRE_REPUBLICACIONES_MS = 20_000;
 
+/** Cuánto se tolera un canal 'uniéndose' antes de darlo por colgado. Unirse
+ *  sano tarda menos de un segundo. */
+const MAX_UNIENDO_MS = 15_000;
+let uniendoDesde: number | null = null;
 let fallosSeguidos = 0;
 let proximoIntento = 0;
 let ultimaRepublicacion = 0;
@@ -250,10 +265,24 @@ function revisarSalud() {
   const ahora = Date.now();
 
   const estado = estadoDelCanal(entrada.canal);
-  // 'joined' es lo sano. Si quedó 'closed' o 'errored' hay que rearmar — pero
-  // CON ESPERA CRECIENTE. Sin ella, un canal que no vuelve se convierte en un
-  // martillo de un mensaje cada cuatro segundos que tira el socket entero.
-  if (typeof estado === "string" && estado !== "joined" && estado !== "joining") {
+
+  // 'joining' se dejaba pasar por sano, y ahí estaba el agujero: un canal que
+  // se queda uniéndose PARA SIEMPRE nunca se rearmaba, y el tablero quedaba
+  // vacío sin que nada lo notara. Unirse tarda menos de un segundo cuando
+  // funciona; si lleva más de quince, no está tardando: está colgado.
+  if (estado === "joining") {
+    if (uniendoDesde === null) uniendoDesde = ahora;
+    if (ahora - uniendoDesde < MAX_UNIENDO_MS) return;
+    // Lleva demasiado: se lo trata como caído y sigue por el camino de abajo.
+  } else {
+    uniendoDesde = null;
+  }
+
+  // 'joined' es lo sano. Si quedó 'closed', 'errored' o colgado uniéndose hay
+  // que rearmar — pero CON ESPERA CRECIENTE. Sin ella, un canal que no vuelve
+  // se convierte en un martillo de un mensaje cada cuatro segundos que tira el
+  // socket entero.
+  if (typeof estado === "string" && estado !== "joined") {
     if (ahora < proximoIntento) return;
     fallosSeguidos += 1;
     proximoIntento = ahora + Math.min(ESPERA_MAX_MS, ESPERA_BASE_MS * 2 ** (fallosSeguidos - 1));
@@ -316,6 +345,7 @@ export function salirDePresencia() {
   fallosSeguidos = 0;
   proximoIntento = 0;
   ultimaRepublicacion = 0;
+  uniendoDesde = null;
   if (!vivo) return;
   supabase.removeChannel(vivo.canal);
   vivo = null;
