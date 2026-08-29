@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Disc, Loader2, Search, Square } from "lucide-react";
+import { Loader2, Search, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -149,15 +149,32 @@ export default function RecordingControl({ room, roomName, source, title, canCon
           )}
         </button>
       ) : (
+        // Este botón FLOTA SOBRE EL VIDEO, y debajo puede haber cualquier cosa:
+        // un mosaico apagado, la cara de alguien con buena luz o una pantalla
+        // compartida en blanco. Antes era `bg-[hsl(220_3%_20%/0.9)]`, un gris
+        // casi negro y encima translúcido — o sea, el mismo color que el
+        // mosaico. Desaparecía, y en modo compacto perdía hasta la palabra.
+        //
+        // Ahora: fondo OPACO (no translúcido, para no adoptar el color de
+        // atrás), borde rojo —que es como se dice "grabar" en todos lados— y
+        // un halo negro exterior que lo despega también de un fondo claro.
+        //
+        // CONTORNO, no relleno: el estado "grabando" es una pastilla roja
+        // LLENA con el punto latiendo. Si este fuera rojo lleno también, alguien
+        // entraría a una reunión, lo vería rojo y creería que ya se está
+        // grabando. Esa confusión es el error más caro que puede tener este
+        // botón, y la diferencia contorno/relleno es lo que la evita.
         <button
           type="button"
           disabled={busy}
           onClick={() => void start()}
           title="Grabar la reunión"
-          className="flex items-center gap-1.5 rounded-full border border-border bg-[hsl(220_3%_20%/0.9)] px-3 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm hover:bg-secondary hover:text-white"
+          className="flex items-center gap-2 rounded-full border-[1.5px] border-red-500 bg-[hsl(240_5%_9%)] px-3 py-1.5 text-xs font-semibold text-red-200 shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_2px_10px_rgba(0,0,0,0.5)] hover:border-red-400 hover:bg-[hsl(0_50%_16%)] hover:text-white disabled:opacity-70"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Disc className="h-3.5 w-3.5 text-red-400" />}
-          {!compact && "Grabar"}
+          {busy
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />}
+          Grabar
         </button>
       )}
 
