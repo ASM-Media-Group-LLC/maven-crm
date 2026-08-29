@@ -31,6 +31,7 @@ import { hablar } from "@/lib/voz";
 import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
+import { cn } from "@/lib/utils";
 import { cuentaPausa, clasesPausa, nombreYApellido, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
@@ -317,7 +318,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         setMicBaseTrack(track);
       } catch {
         // Sin micro no podés hablarle a nadie → desarmamos todo.
-        if (!cancelled) { toast.error("No pude acceder al micrófono"); setGlobalMic(false); setRoomMic({}); }
+        // `setRoomMic({})` YA apaga todo: sin entrada, cada sala vuelve a su
+        // default (no hablar). Acá había además un `setGlobalMic(false)` que
+        // quedó huérfano cuando el botón global pasó a ser una acción sobre
+        // las salas — o sea que si a alguien le fallaba el micrófono, en vez
+        // del aviso se llevaba una pantalla negra.
+        if (!cancelled) { toast.error("No pude acceder al micrófono"); setRoomMic({}); }
       }
     })();
     return () => {

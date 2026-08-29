@@ -11,6 +11,7 @@ import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { marcarPausa } from "@/lib/coworkPausa";
+import { cn } from "@/lib/utils";
 import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS } from "@/lib/pausaCowork";
 import { hablar } from "@/lib/voz";
 import { playMessageNotification } from "@/lib/notificationSound";
