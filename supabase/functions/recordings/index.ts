@@ -117,33 +117,28 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Filas colgadas en 'recording'/'processing': quien grababa se cayó y
-      // nadie la paró. Sin este barrido nunca pasan a 'ready', o sea nunca
-      // vencen, o sea el archivo queda ocupando disco para siempre —
-      // exactamente el crecimiento sin techo que este diseño promete evitar.
-      //
-      // Antes esperaba 24 h. La espera no protegía nada: quien decide si la
-      // grabación terminó es `egressActivo` preguntándole a LiveKit, y si
-      // LiveKit no contesta asume que sigue viva. Lo único que lograban las
-      // 24 h era que la persona viera "En curso" todo un día y que Descargar
-      // le respondiera "grabación no disponible". 15 minutos es margen de
-      // sobra para que el egress termine de cerrar el MP4.
-      const haceRato = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      const { data: colgadas } = await admin
-        .from("meeting_recordings")
-        .select("id, egress_id, storage_key")
-        .in("status", ["recording", "processing"])
-        .lt("started_at", haceRato)
-        .is("deleted_at", null)
-        .limit(50);
-      let cerradas = 0;
-      for (const c of colgadas ?? []) {
-        if (await egressActivo(c.egress_id)) continue; // 24 h y sigue viva: no tocar
-        await finalizarHuerfana(admin, c);
-        cerradas++;
-      }
-
+      const cerradas = await cerrarHuerfanas(admin);
       return json(req, { ok: true, borradas, cerradas, fallas });
+    }
+
+    // === SWEEP (cron, sin usuario) ===
+    // Solo cierra las colgadas. Va aparte de `expire` porque corren a ritmos
+    // muy distintos: borrar lo vencido es una vez al día, pero una grabación
+    // que quedó abierta hay que cerrarla YA — mientras siga abierta no se
+    // puede descargar y, peor, `expire_meeting_recordings` solo mira filas
+    // en 'ready', así que su archivo NO se borra nunca. Eso es el disco
+    // creciendo sin techo.
+    //
+    // El cron que llama acá pregunta primero en Postgres si hay algo abierto
+    // y solo entonces despierta esta función: sin eso serían ~720 arranques
+    // diarios para no hacer nada.
+    if (action === "sweep") {
+      const token = req.headers.get("x-cron-token");
+      if (!token || token !== Deno.env.get("RECORDINGS_CRON_TOKEN")) {
+        return json(req, { error: "Unauthorized" }, 401);
+      }
+      const cerradas = await cerrarHuerfanas(admin);
+      return json(req, { ok: true, cerradas });
     }
 
     // === Resto: requiere usuario autenticado ===
@@ -306,21 +301,18 @@ Deno.serve(async (req) => {
       // "grabación no disponible" y la persona ve un archivo que existe pero
       // no puede bajar.
       //
-      // Ya había un barrido igual, pero SOLO en el cron y a las 24 h: quien
-      // grabó se quedaba un día entero mirando "En curso". Acá se hace al
-      // abrir la lista, que es exactamente cuando a alguien le importa.
+      // El cron `sweep` ya barre esto cada 2 minutos. Acá se repite igual
+      // porque es el momento en que a alguien LE IMPORTA: está mirando la
+      // lista, ve su grabación en "En curso" y el botón no le sirve. Esperar
+      // al próximo tic sería hacerlo esperar mirando algo roto.
       //
-      // Quién decide si terminó no es un reloj, es LiveKit: `egressActivo`
-      // pregunta si el egress sigue componiendo, y si no contesta asume que
-      // sí — un corte de LiveKit no puede cerrar grabaciones vivas.
-      //
-      // Los 5 minutos son por la carrera del arranque: `start` inserta la
-      // fila y RECIÉN DESPUÉS guarda el egress_id. Sin ese margen, abrir la
-      // lista en ese instante mataría una grabación que acaba de empezar.
-      const haceRato = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      // Se limita a las SUYAS (`puedeVer`): que abrir una lista dispare
+      // llamadas a LiveKit por grabaciones ajenas no tiene por qué pasar.
+      // El barrido completo, sin ese filtro, lo hace el cron.
+      const haceRato = new Date(Date.now() - GRACIA_HUERFANA_MS).toISOString();
       const { data: colgadas } = await admin
         .from("meeting_recordings")
-        .select("id, started_by, egress_id, storage_key")
+        .select("id, started_by, egress_id, storage_key, room_name, title, started_at")
         .in("status", ["recording", "processing"])
         .lt("started_at", haceRato)
         .not("egress_id", "is", null)
@@ -330,12 +322,12 @@ Deno.serve(async (req) => {
 
       let cerradas = 0;
       for (const c of (colgadas ?? []) as Array<
-        { id: string; started_by: string; egress_id: string; storage_key: string | null }
+        { id: string; started_by: string; egress_id: string; storage_key: string | null;
+          room_name: string; title: string | null; started_at: string }
       >) {
         if (!(await puedeVer(admin, user.id, c))) continue;
         if (await egressActivo(c.egress_id)) continue;
-        await finalizarHuerfana(admin, c);
-        cerradas++;
+        if (await finalizarHuerfana(admin, c)) cerradas++;
       }
 
       const { data: pendientes } = await admin
@@ -449,11 +441,56 @@ async function egressActivo(egressId: string | null): Promise<boolean> {
   }
 }
 
+/** Cuánto esperar antes de mirar una grabación abierta. No es para adivinar
+ *  si terminó —de eso se encarga `egressActivo`— sino para dos carreras
+ *  reales: `start` inserta la fila y RECIÉN DESPUÉS guarda el egress_id, y
+ *  el egress necesita unos segundos para cerrar el MP4 después de terminar. */
+const GRACIA_HUERFANA_MS = 15 * 60 * 1000;
+
+/** Cierra las grabaciones que quedaron abiertas porque nadie apretó Detener.
+ *
+ *  Quién decide si terminó es LiveKit, no un reloj: `egressActivo` pregunta
+ *  si el egress sigue componiendo, y si LiveKit no contesta asume que sí —
+ *  un corte de LiveKit no puede cerrar grabaciones vivas.
+ *
+ *  Devuelve cuántas cerró.
+ */
+// deno-lint-ignore no-explicit-any
+async function cerrarHuerfanas(admin: any): Promise<number> {
+  const desde = new Date(Date.now() - GRACIA_HUERFANA_MS).toISOString();
+  const { data: colgadas } = await admin
+    .from("meeting_recordings")
+    .select("id, started_by, egress_id, storage_key, room_name, title, started_at")
+    .in("status", ["recording", "processing"])
+    .lt("started_at", desde)
+    .is("deleted_at", null)
+    .limit(50);
+
+  let cerradas = 0;
+  for (const c of colgadas ?? []) {
+    if (await egressActivo(c.egress_id)) continue; // sigue grabando: no tocar
+    if (await finalizarHuerfana(admin, c)) cerradas++;
+  }
+  return cerradas;
+}
+
 /** Cierra una fila cuyo egress murió sin que nadie llamara a stop: 'ready'
  *  si el archivo existe (y el vencimiento de 90 días la agarra normal),
- *  'failed' si no dejó nada. */
+ *  'failed' si no dejó nada.
+ *
+ *  Se cierra COMO SI HUBIERAN APRETADO DETENER: quien grabó queda registrado
+ *  como destinatario y recibe el correo. Antes se cerraba a medias y la
+ *  grabación aparecía sin que nadie se enterara — que es casi lo mismo que
+ *  perderla. Lo que no se puede reponer es a quién MÁS se la iban a
+ *  compartir: eso se elige al parar, y acá nadie paró. */
 // deno-lint-ignore no-explicit-any
-async function finalizarHuerfana(admin: any, rec: { id: string; storage_key: string | null }) {
+async function finalizarHuerfana(
+  admin: any,
+  rec: {
+    id: string; storage_key: string | null; started_by?: string;
+    room_name?: string; title?: string | null; started_at?: string;
+  },
+): Promise<boolean> {
   let size: number | null = null;
   if (rec.storage_key) {
     try {
@@ -461,11 +498,26 @@ async function finalizarHuerfana(admin: any, rec: { id: string; storage_key: str
       if (r.ok) size = (await r.json()).size ?? null;
     } catch { /* sin tamaño: se trata como sin archivo */ }
   }
+  const ahora = new Date().toISOString();
   await admin.from("meeting_recordings")
     .update(size
-      ? { status: "ready", ended_at: new Date().toISOString(), size_bytes: size }
-      : { status: "failed", ended_at: new Date().toISOString(), error: "el egress terminó sin stop y no dejó archivo" })
+      ? { status: "ready", ended_at: ahora, size_bytes: size }
+      : { status: "failed", ended_at: ahora, error: "el egress terminó sin stop y no dejó archivo" })
     .eq("id", rec.id);
+
+  // Sin archivo no hay nada que compartir ni que avisar.
+  if (!size || !rec.started_by) return !!size;
+
+  await admin.from("meeting_recording_recipients")
+    .upsert({ recording_id: rec.id, user_id: rec.started_by }, { onConflict: "recording_id,user_id" });
+
+  if (rec.room_name && rec.started_at) {
+    await avisarPorCorreo(admin, {
+      id: rec.id, started_by: rec.started_by, room_name: rec.room_name,
+      title: rec.title ?? null, started_at: rec.started_at,
+    }, [rec.started_by]);
+  }
+  return true;
 }
 
 /** Manda el link de la grabación a los destinatarios que tengan correo en
