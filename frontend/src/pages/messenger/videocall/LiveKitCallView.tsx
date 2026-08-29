@@ -330,6 +330,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return lk.participants.some((p) => p.isScreenSharing) ? "sidebar" : "grid";
   }, [viewSettings.layout, lk.participants, pinnedSid]);
 
+  // PERSONAS, no recuadros. Al compartir pantalla se emiten DOS tiles de la
+  // misma persona (uno para la pantalla, otro para su camara), asi que
+  // `participants.length` contaba de mas: dos personas se leian como tres.
+  const cantidadDePersonas = useMemo(
+    () => new Set(lk.participants.map((p) => p.identity)).size,
+    [lk.participants],
+  );
+
   const visibleParticipants = useMemo(() => {
     let list = lk.participants;
     if (viewSettings.hideNoVideo) list = list.filter((p) => !p.isCameraOff || p.isScreenSharing || p.isLocal);
@@ -387,7 +395,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div ref={rootRef} className="flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">

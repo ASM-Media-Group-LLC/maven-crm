@@ -82,13 +82,22 @@ export function useVideoZoom(enabled: boolean): VideoZoom {
       const dy = ((ev.clientY - d.y) / Math.max(1, rect.height)) * 100;
       setOffset(clamp({ x: d.ox + dx, y: d.oy + dy }, scale));
     };
+    // LA VENTANA DEL ELEMENTO, NO LA GLOBAL. Esto no es puntillosidad:
+    //
+    // Cuando la llamada se dibuja en la ventana flotante del sistema, el
+    // componente sigue viviendo en el arbol de React de la ventana PRINCIPAL,
+    // pero sus nodos estan en OTRO documento. El `window` global sigue siendo
+    // el de la principal, asi que los movimientos del mouse dentro de la
+    // flotante nunca llegaban a estos listeners: el zoom andaba —es un clic en
+    // un boton— y la manito no movia nada.
+    const vista = contenedor.ownerDocument.defaultView ?? window;
     const soltar = () => {
       dragRef.current = null;
-      window.removeEventListener("pointermove", mover);
-      window.removeEventListener("pointerup", soltar);
+      vista.removeEventListener("pointermove", mover);
+      vista.removeEventListener("pointerup", soltar);
     };
-    window.addEventListener("pointermove", mover);
-    window.addEventListener("pointerup", soltar);
+    vista.addEventListener("pointermove", mover);
+    vista.addEventListener("pointerup", soltar);
   }, [enabled, scale, offset, clamp]);
 
   const reset = useCallback(() => { setScale(1); setOffset({ x: 0, y: 0 }); }, []);
