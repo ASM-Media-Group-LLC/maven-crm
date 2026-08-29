@@ -13,31 +13,29 @@ redis:
 # keys: se inyectan por la variable de entorno LIVEKIT_KEYS (Dokploy), no van en este archivo.
 #
 # ─────────────────────────────────────────────────────────────────────────
-# WEBHOOK DE GRABACIONES — PREPARADO, SIN ACTIVAR. Descomentar para activar.
+# WEBHOOK DE GRABACIONES — ACTIVO desde el 29/08/2026.
 #
-# Qué gana: hoy una grabación que nadie detuvo se cierra por sondeo (cron
-# `cerrar-grabaciones-huerfanas`, cada 2 min). Con esto, LiveKit AVISA en
-# cuanto el egress termina y se cierra al instante. El endpoint ya está
-# desplegado y verificado — rechaza todo lo que no venga firmado.
+# Qué hace: LiveKit avisa apenas termina un egress, y la grabación se cierra al
+# instante en vez de esperar al sondeo. El endpoint verifica la firma y rechaza
+# todo lo que no venga de acá.
 #
-# El sondeo NO se saca: un webhook que no llega no se reintenta, y sin la
-# red de seguridad la grabación quedaría abierta para siempre.
+# El sondeo (cron `cerrar-grabaciones-huerfanas`, cada 2 min) NO se saca: un
+# webhook que no llega no se reintenta, y sin esa red la grabación quedaría
+# abierta para siempre.
 #
-# ⚠️ DOS COSAS ANTES DE DESCOMENTAR:
+# ⚠️ DOS COSAS SI ALGUIEN TOCA ESTO:
 #
-# 1. `api_key` tiene que ser EXACTAMENTE la parte izquierda de LIVEKIT_KEYS
-#    (Dokploy → livekit → Environment), la que empieza con "API". Si no
-#    coincide con una key configurada, LIVEKIT NO ARRANCA — y eso deja sin
-#    videollamadas a todo el mundo. No lo escribo yo porque no me consta el
-#    valor, y equivocarlo es peor que no hacerlo.
+# 1. `api_key` tiene que ser EXACTAMENTE una de las keys de LIVEKIT_KEYS
+#    (Dokploy → livekit → Environment). Si no coincide, LIVEKIT NO ARRANCA y
+#    eso deja sin videollamadas a todo el mundo. El valor de acá se verificó
+#    contra el emisor (`iss`) de un token real antes de escribirlo.
 #
-# 2. Este archivo entra por bind-mount, así que desplegar NO alcanza: hay
-#    que RECREAR el contenedor de livekit, y eso corta las llamadas ~30 s.
-#    Hacerlo con nadie trabajando.
-#
-# webhook:
-#   api_key: APIxxxxxxxx        # ← la parte izquierda de LIVEKIT_KEYS
-#   urls:
-#     - https://lsagslbkliprespbyhts.supabase.co/functions/v1/livekit-webhook
+# 2. Este archivo entra por bind-mount: desplegar NO alcanza. Hay que RECREAR
+#    el contenedor de livekit, y eso corta las llamadas ~30 s. Hacerlo con
+#    nadie trabajando.
+webhook:
+  api_key: APIfbcbe6d204c0
+  urls:
+    - https://lsagslbkliprespbyhts.supabase.co/functions/v1/livekit-webhook
 # ─────────────────────────────────────────────────────────────────────────
 # turn: (opcional, Slice 2) se activa solo si hay clientes detrás de NAT/firewall estricto que no conecten.
