@@ -209,6 +209,53 @@ export function useVideoCall() {
     setIncomingCall(null);
   }, [incomingCall, user]);
 
+  // ── Que el timbre se calle en TODAS las pestanas ─────────────────
+  //
+  // Rechazar una llamada la marca como 'declined' en la base, pero las OTRAS
+  // pestanas de la misma persona no se enteraban: solo escuchan los INSERT de
+  // llamadas nuevas, nunca el desenlace de la que ya estan mostrando. Resultado:
+  // rechazabas en una y las demas seguian sonando hasta el auto-corte. Hubo que
+  // colgar en cada una, a mano.
+  //
+  // Tener Maven en dos pestanas no es raro: es lo normal. Y el sintoma es de los
+  // que dan mas bronca, porque el ruido sigue despues de que ya dijiste que no.
+  //
+  // Dos caminos, a proposito:
+  //   1. El evento en vivo, que cierra al instante.
+  //   2. Un plazo maximo, por si el evento no llega. La llamada se auto-corta a
+  //      los 30 s del lado de quien llama, asi que a los 40 ya no hay nada que
+  //      contestar: seguir sonando es puro ruido. Esta red NO depende de
+  //      realtime, que es justo lo que fallo toda la noche.
+  const MAX_TIMBRE_MS = 40_000;
+  useEffect(() => {
+    if (!incomingCall || !user) return;
+    const id = incomingCall.id;
+    const cerrarSiEsEsta = () =>
+      setIncomingCall((prev) => (prev && prev.id === id ? null : prev));
+
+    const canal = supabase
+      .channel(`entrante-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${id}` },
+        (payload) => {
+          const c = payload.new as Call;
+          // Cualquier cosa que no sea 'ringing' significa que ya se resolvio:
+          // la atendieron, la rechazaron o se corto. En los tres casos, aca no
+          // hay nada mas que mostrar.
+          if (c.call_status !== "ringing") cerrarSiEsEsta();
+        },
+      )
+      .subscribe();
+
+    const plazo = setTimeout(cerrarSiEsEsta, MAX_TIMBRE_MS);
+
+    return () => {
+      clearTimeout(plazo);
+      supabase.removeChannel(canal);
+    };
+  }, [incomingCall?.id, user]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── End call ─────────────────────────────────────────────────────
   const endCall = useCallback(async () => {
     if (!activeCall || !user) return;
