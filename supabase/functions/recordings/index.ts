@@ -50,7 +50,7 @@ function egress(): EgressClient {
 }
 
 /** Firma para rec-server: HMAC(archivo.exp). El link vence solo. */
-async function firmarUrl(archivo: string, accion: "d" | "f" | "stat", vidaSegundos: number): Promise<string> {
+async function firmarUrl(archivo: string, accion: "d" | "v" | "f" | "stat", vidaSegundos: number): Promise<string> {
   const secret = Deno.env.get("RECORDINGS_SIGNING_SECRET")!;
   const base = Deno.env.get("RECORDINGS_BASE_URL")!; // https://rec.asmtech.ai
   const exp = Math.floor(Date.now() / 1000) + vidaSegundos;
@@ -117,17 +117,23 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Filas colgadas en 'recording'/'processing' hace más de 24 h: quien
-      // grababa se cayó y nadie la paró. Sin este barrido nunca pasan a
-      // 'ready', o sea nunca vencen, o sea el archivo queda ocupando disco
-      // para siempre — exactamente el crecimiento sin techo que este diseño
-      // promete evitar. Se cierran acá y el vencimiento normal las agarra.
-      const hace24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      // Filas colgadas en 'recording'/'processing': quien grababa se cayó y
+      // nadie la paró. Sin este barrido nunca pasan a 'ready', o sea nunca
+      // vencen, o sea el archivo queda ocupando disco para siempre —
+      // exactamente el crecimiento sin techo que este diseño promete evitar.
+      //
+      // Antes esperaba 24 h. La espera no protegía nada: quien decide si la
+      // grabación terminó es `egressActivo` preguntándole a LiveKit, y si
+      // LiveKit no contesta asume que sigue viva. Lo único que lograban las
+      // 24 h era que la persona viera "En curso" todo un día y que Descargar
+      // le respondiera "grabación no disponible". 15 minutos es margen de
+      // sobra para que el egress termine de cerrar el MP4.
+      const haceRato = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const { data: colgadas } = await admin
         .from("meeting_recordings")
         .select("id, egress_id, storage_key")
         .in("status", ["recording", "processing"])
-        .lt("started_at", hace24h)
+        .lt("started_at", haceRato)
         .is("deleted_at", null)
         .limit(50);
       let cerradas = 0;
@@ -293,7 +299,45 @@ Deno.serve(async (req) => {
     // === SYNC SIZES ===
     // Completa el peso de las grabaciones que quedaron sin él. La lista lo llama
     // al abrirse: barato, y recupera también las viejas.
-    if (action === "syncSizes") {
+    if (action === "syncSizes" || action === "reconcile") {
+      // Primero: grabaciones que quedaron en 'En curso' porque nadie apretó
+      // Detener (se cerró la pestaña, se cayó internet, terminó la reunión
+      // sola). La fila nunca pasa a 'ready', así que Descargar responde
+      // "grabación no disponible" y la persona ve un archivo que existe pero
+      // no puede bajar.
+      //
+      // Ya había un barrido igual, pero SOLO en el cron y a las 24 h: quien
+      // grabó se quedaba un día entero mirando "En curso". Acá se hace al
+      // abrir la lista, que es exactamente cuando a alguien le importa.
+      //
+      // Quién decide si terminó no es un reloj, es LiveKit: `egressActivo`
+      // pregunta si el egress sigue componiendo, y si no contesta asume que
+      // sí — un corte de LiveKit no puede cerrar grabaciones vivas.
+      //
+      // Los 5 minutos son por la carrera del arranque: `start` inserta la
+      // fila y RECIÉN DESPUÉS guarda el egress_id. Sin ese margen, abrir la
+      // lista en ese instante mataría una grabación que acaba de empezar.
+      const haceRato = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: colgadas } = await admin
+        .from("meeting_recordings")
+        .select("id, started_by, egress_id, storage_key")
+        .in("status", ["recording", "processing"])
+        .lt("started_at", haceRato)
+        .not("egress_id", "is", null)
+        .is("deleted_at", null)
+        .order("started_at", { ascending: false })
+        .limit(20);
+
+      let cerradas = 0;
+      for (const c of (colgadas ?? []) as Array<
+        { id: string; started_by: string; egress_id: string; storage_key: string | null }
+      >) {
+        if (!(await puedeVer(admin, user.id, c))) continue;
+        if (await egressActivo(c.egress_id)) continue;
+        await finalizarHuerfana(admin, c);
+        cerradas++;
+      }
+
       const { data: pendientes } = await admin
         .from("meeting_recordings")
         .select("id, started_by, storage_key")
@@ -315,7 +359,7 @@ Deno.serve(async (req) => {
           actualizadas++;
         } catch { /* una que falle no corta las demás */ }
       }
-      return json(req, { ok: true, actualizadas });
+      return json(req, { ok: true, actualizadas, cerradas });
     }
 
     if (action === "download") {
@@ -332,6 +376,24 @@ Deno.serve(async (req) => {
       // 10 minutos: suficiente para arrancar la descarga, inútil si el
       // link se filtra en un chat.
       return json(req, { ok: true, url: await firmarUrl(rec.storage_key, "d", 600) });
+    }
+
+    // === VIEW (reproducir dentro de Maven) ===
+    // Mismo permiso que descargar, pero el link apunta a /v (inline + Range)
+    // y dura más: una reunión de una hora se ve de a ratos, y si el link
+    // vence a la mitad el reproductor se corta al saltar de posición.
+    if (action === "view") {
+      const { recording_id } = body as { recording_id?: string };
+      if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);
+      const { data: rec } = await admin
+        .from("meeting_recordings")
+        .select("id, started_by, storage_key, status, deleted_at")
+        .eq("id", recording_id).maybeSingle();
+      if (!rec || rec.deleted_at || rec.status !== "ready" || !rec.storage_key) {
+        return json(req, { error: "grabación no disponible" }, 404);
+      }
+      if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
+      return json(req, { ok: true, url: await firmarUrl(rec.storage_key, "v", 3 * 3600) });
     }
 
     // === DELETE (anticipado) ===

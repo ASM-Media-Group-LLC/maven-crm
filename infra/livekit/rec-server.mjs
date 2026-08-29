@@ -8,6 +8,7 @@
 // pasó ese control.
 //
 //   GET    /d/{archivo}?exp={epoch}&sig={hmac}   → descarga (mp4)
+//   GET    /v/{archivo}?exp&sig                  → reproducir en el navegador
 //   GET    /stat/{archivo}?exp&sig               → { size }
 //   DELETE /f/{archivo}?exp&sig                  → borra el archivo
 //   GET    /health                               → ok + espacio usado
@@ -92,6 +93,62 @@ http.createServer(async (req, res) => {
         "content-disposition": `attachment; filename="${archivo}"`,
       });
       createReadStream(ruta).pipe(res);
+      return;
+    }
+    // Reproducir DENTRO de Maven, sin bajarse 260 MB primero.
+    //
+    // Dos cosas que /d no hace y sin las cuales un <video> no sirve:
+    //   · `inline` en vez de `attachment` — con attachment el navegador
+    //     descarga el archivo en vez de reproducirlo.
+    //   · Range. Sin `accept-ranges` + 206, el navegador tiene que traerse
+    //     el archivo entero antes de mostrar nada y la barra de progreso no
+    //     deja saltar; Safari directamente no reproduce.
+    if (accion === "v" && (req.method === "GET" || req.method === "HEAD")) {
+      const st = await stat(ruta);
+      const cabeceras = {
+        "content-type": "video/mp4",
+        "accept-ranges": "bytes",
+        "content-disposition": `inline; filename="${archivo}"`,
+        // Privado: el link es firmado y personal, no lo cachea ningún proxy.
+        "cache-control": "private, max-age=600",
+      };
+
+      const rango = req.headers.range;
+      if (!rango) {
+        res.writeHead(200, { ...cabeceras, "content-length": st.size });
+        if (req.method === "HEAD") return res.end();
+        createReadStream(ruta).pipe(res);
+        return;
+      }
+
+      // bytes=0-  ·  bytes=100-200  ·  bytes=-500 (los últimos 500)
+      const m = /^bytes=(\d*)-(\d*)$/.exec(rango.trim());
+      if (!m || (m[1] === "" && m[2] === "")) {
+        res.writeHead(416, { "content-range": `bytes */${st.size}` });
+        return res.end();
+      }
+      let desde;
+      let hasta;
+      if (m[1] === "") {
+        // Sufijo: los últimos N bytes. Si pide más de lo que hay, es todo.
+        desde = Math.max(0, st.size - Number(m[2]));
+        hasta = st.size - 1;
+      } else {
+        desde = Number(m[1]);
+        hasta = m[2] === "" ? st.size - 1 : Math.min(Number(m[2]), st.size - 1);
+      }
+      if (!Number.isFinite(desde) || !Number.isFinite(hasta) || desde > hasta || desde >= st.size) {
+        res.writeHead(416, { "content-range": `bytes */${st.size}` });
+        return res.end();
+      }
+
+      res.writeHead(206, {
+        ...cabeceras,
+        "content-range": `bytes ${desde}-${hasta}/${st.size}`,
+        "content-length": hasta - desde + 1,
+      });
+      if (req.method === "HEAD") return res.end();
+      createReadStream(ruta, { start: desde, end: hasta }).pipe(res);
       return;
     }
     if (accion === "stat" && req.method === "GET") {

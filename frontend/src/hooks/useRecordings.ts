@@ -72,14 +72,22 @@ export function useRecordings() {
     setUsage((uso.data as RecordingsUsage | null) ?? null);
     setLoading(false);
 
-    // El peso no se conoce al terminar de grabar: el egress todavía está
-    // cerrando el MP4, así que el `stat` de ese momento no encuentra el archivo.
-    // Se completa acá, al abrir la lista, y de paso recupera las viejas que
-    // quedaron sin dato.
-    if (filas.some((r) => r.status === "ready" && r.size_bytes == null)) {
+    // Dos arreglos que solo se pueden hacer del lado del servidor, los dos al
+    // abrir la lista porque es cuando a alguien le importa:
+    //
+    //  · El peso no se conoce al terminar de grabar: el egress todavía está
+    //    cerrando el MP4, así que el `stat` de ese momento no encuentra el
+    //    archivo.
+    //  · Las que quedaron en "En curso" porque nadie apretó Detener. Esas no
+    //    se pueden descargar (el edge exige `ready`), así que la persona ve
+    //    una grabación que existe y no puede bajar. El servidor le pregunta a
+    //    LiveKit si el egress ya terminó y recién ahí la cierra.
+    const hayColgadas = filas.some((r) => r.status === "recording" || r.status === "processing");
+    const faltaPeso = filas.some((r) => r.status === "ready" && r.size_bytes == null);
+    if (hayColgadas || faltaPeso) {
       try {
-        const res = await invokeRecordings("syncSizes", {});
-        if (res?.actualizadas) {
+        const res = await invokeRecordings("reconcile", {});
+        if (res?.actualizadas || res?.cerradas) {
           const { data } = await supabase
             .from("meeting_recordings")
             .select("id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at")
@@ -103,10 +111,20 @@ export function useRecordings() {
     window.open(url, "_blank", "noopener");
   }, []);
 
+  // URL para VER la grabación acá adentro. Es otra ruta que la de descarga:
+  // aquella la sirve como adjunto (el navegador la baja) y sin Range, así que
+  // un <video> no podía ni reproducirla ni adelantarla.
+  const view = useCallback(async (id: string) => {
+    const res = await invokeRecordings("view", { recording_id: id });
+    const url = res.url as string | undefined;
+    if (!url) throw new Error("no llegó la URL de reproducción");
+    return url;
+  }, []);
+
   const remove = useCallback(async (id: string) => {
     await invokeRecordings("delete", { recording_id: id });
     await refresh();
   }, [refresh]);
 
-  return { rows, usage, myUserId, loading, refresh, download, remove };
+  return { rows, usage, myUserId, loading, refresh, download, view, remove };
 }

@@ -8,8 +8,11 @@ import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import { EmptyState } from "@/components/EmptyState";
 import {
-  Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock,
+  Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock, Play,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 
 // Grabaciones de Meet/Cowork. Dos reglas que la página tiene que hacer
 // imposibles de ignorar (vienen del diseño de la tabla, ver la migración):
@@ -42,9 +45,21 @@ const fechaCorta = (iso: string) =>
   new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function GrabacionesPage() {
-  const { rows, usage, myUserId, loading, download, remove } = useRecordings();
+  const { rows, usage, myUserId, loading, download, view, remove } = useRecordings();
   const { isAdmin } = useUserRole();
   const [trabajando, setTrabajando] = useState<string | null>(null);
+  const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
+
+  const handleVer = async (r: RecordingRow) => {
+    setTrabajando(r.id);
+    try {
+      setViendo({ rec: r, url: await view(r.id) });
+    } catch (e) {
+      toast.error((e as Error).message || "No se pudo abrir la grabación");
+    } finally {
+      setTrabajando(null);
+    }
+  };
 
   const handleDownload = async (r: RecordingRow) => {
     setTrabajando(r.id);
@@ -179,6 +194,17 @@ export default function GrabacionesPage() {
                 {r.status === "ready" && (
                   <Button
                     size="sm"
+                    className="shrink-0 gap-1.5 rounded-full"
+                    disabled={ocupado}
+                    onClick={() => void handleVer(r)}
+                  >
+                    {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                    <span className="hidden sm:inline">Ver</span>
+                  </Button>
+                )}
+                {r.status === "ready" && (
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="shrink-0 gap-1.5 rounded-full"
                     disabled={ocupado}
@@ -205,6 +231,37 @@ export default function GrabacionesPage() {
           })}
         </div>
       )}
+
+      {/* Reproductor. El <video> apunta a la ruta /v del servidor de
+          grabaciones, que la sirve inline y con Range: sin eso el navegador
+          tendría que bajarse el archivo entero antes de mostrar nada y la
+          barra de progreso no dejaría saltar. */}
+      <Dialog open={!!viendo} onOpenChange={(abierto) => { if (!abierto) setViendo(null); }}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <DialogHeader className="px-4 pt-4">
+            <DialogTitle className="text-base">
+              {viendo?.rec.title || (viendo?.rec.source === "cowork" ? "Sesión de Cowork" : "Reunión")}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {viendo && fechaCorta(viendo.rec.started_at)}
+              {viendo?.rec.duration_seconds != null && ` · ${formatDur(viendo.rec.duration_seconds)}`}
+              {viendo?.rec.size_bytes != null && ` · ${formatBytes(viendo.rec.size_bytes)}`}
+            </DialogDescription>
+          </DialogHeader>
+          {viendo && (
+            <video
+              key={viendo.rec.id}
+              src={viendo.url}
+              controls
+              autoPlay
+              playsInline
+              controlsList="nodownload"
+              className="w-full max-h-[70vh] bg-black"
+              onError={() => toast.error("No se pudo reproducir. Probá descargarla.")}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
