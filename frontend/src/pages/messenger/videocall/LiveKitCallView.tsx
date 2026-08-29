@@ -238,7 +238,30 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // dibujado del efecto de fondo, y ese freno haciendose pasar por "camara
   // apagada" es lo que le reclamaba encuadre a gente que estaba en camara.
   const camaraRealOn = localP ? !(localP.isCameraOffReal ?? localP.isCameraOff) : false;
-  const localScreenShare = localP ? localP.isScreenSharing : false;
+  // ⚠️ `localP.isScreenSharing` sale de la LISTA de participantes, y esa lista
+  // solo se recalcula cuando algún evento la refresca. Si queda vieja —una
+  // reconexión, un evento que no llegó— el valor se pega en `false` mientras la
+  // persona SÍ está compartiendo, y entonces el aviso le reclama que comparta
+  // algo que ya está compartiendo. Le pasó a Alexandra en producción.
+  //
+  // Es el mismo bug que tuvo la cámara y tiene el mismo arreglo, que acá arriba
+  // ya está probado: leer el estado REAL en un tic, no confiar en la lista.
+  // Cuesta nada — es mirar una propiedad de un objeto que ya está en memoria.
+  const [compartiendoReal, setCompartiendoReal] = useState(false);
+  useEffect(() => {
+    const mirar = () => {
+      const room = lk.getRoom();
+      const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.ScreenShare);
+      const activo = !!pub && !pub.isMuted;
+      setCompartiendoReal((antes) => (antes === activo ? antes : activo));
+    };
+    mirar();
+    const id = window.setInterval(mirar, 1000);
+    return () => window.clearInterval(id);
+  }, [lk]);
+  // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
+  // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
+  const localScreenShare = compartiendoReal;
   const onMediaStateChangeRef = useRef(onMediaStateChange);
   onMediaStateChangeRef.current = onMediaStateChange;
   // Vigilancia de encuadre sobre la cámara local. El track sale del room de
