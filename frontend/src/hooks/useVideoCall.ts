@@ -25,6 +25,29 @@ export interface Call {
  */
 export function useVideoCall() {
   const { user } = useAuth();
+  // ── Por que existe `uid` y no se usa `user` en los efectos de realtime ──────
+  //
+  // `useAuth` llama a setUser desde DOS fuentes async distintas
+  // (onAuthStateChange y getSession), y auth-js re-parsea la sesion en cada
+  // lectura: cada emision trae un objeto `user` NUEVO por referencia, con el
+  // mismo id. React compara con Object.is, asi que un efecto que depende de
+  // `user` se re-corre dos o tres veces al arrancar.
+  //
+  // Eso, por si solo, seria ruido. Lo que lo volvia fatal es un detalle de
+  // supabase-js 2.95.3: `removeChannel` es ASINCRONO (espera el unsubscribe) y
+  // su `_remove` filtra por NOMBRE DE TOPIC, no por instancia
+  // (RealtimeClient.js:451). Entonces la limpieza de la corrida anterior se
+  // ejecuta DESPUES de que la nueva ya creo su canal con el mismo nombre… y
+  // borra el canal NUEVO de la tabla de ruteo. El servidor contesta ok al join
+  // y el cliente ya no tiene a quien entregarselo: a los 10 s, TIMED_OUT.
+  //
+  // Por eso Messenger andaba y las llamadas no: sus canales llevan nombre
+  // aleatorio, asi que el borrado por topic no los alcanzaba.
+  //
+  // La cura es depender del ID (un string estable) en vez del objeto. Se
+  // verifico que esto NO rompe el refresco del JWT: supabase-js empuja el token
+  // nuevo a los canales con realtime.setAuth, sin re-suscribir.
+  const uid = user?.id;
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   // ── Por que el canal de llamadas lleva version y reintento ──────────────────
   //
@@ -228,7 +251,7 @@ export function useVideoCall() {
   //      realtime, que es justo lo que fallo toda la noche.
   const MAX_TIMBRE_MS = 40_000;
   useEffect(() => {
-    if (!incomingCall || !user) return;
+    if (!incomingCall || !uid) return;
     const id = incomingCall.id;
     const cerrarSiEsEsta = () =>
       setIncomingCall((prev) => (prev && prev.id === id ? null : prev));
@@ -246,7 +269,15 @@ export function useVideoCall() {
           if (c.call_status !== "ringing") cerrarSiEsEsta();
         },
       )
-      .subscribe();
+      .subscribe((estado) => {
+        // Sin este aviso, este canal fallaba igual de mudo que los otros dos.
+        // Si no queda suscrito, el modal se cierra igual por el plazo de abajo
+        // — pero conviene saber cual de los dos caminos nos salvo.
+        if (estado !== "SUBSCRIBED") {
+          console.warn("[Llamadas] El canal de esta llamada entrante esta en:", estado,
+            "— el modal se va a cerrar por tiempo, no por evento.");
+        }
+      });
 
     const plazo = setTimeout(cerrarSiEsEsta, MAX_TIMBRE_MS);
 
@@ -254,7 +285,7 @@ export function useVideoCall() {
       clearTimeout(plazo);
       supabase.removeChannel(canal);
     };
-  }, [incomingCall?.id, user]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [incomingCall?.id, uid]);
 
   // ── End call ─────────────────────────────────────────────────────
   const endCall = useCallback(async () => {
@@ -282,7 +313,7 @@ export function useVideoCall() {
 
   // ── Realtime listener for incoming calls (stable deps) ─────────
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
 
     // Este efecto se rehace en cada reintento, y su limpieza llama a
     // removeChannel — que dispara el callback de estado con 'CLOSED'. Sin esta
@@ -298,7 +329,7 @@ export function useVideoCall() {
       const { data: directCalls } = await (supabase
         .from("calls") as any)
         .select("*")
-        .eq("receiver_id", user.id)
+        .eq("receiver_id", uid)
         .eq("call_status", "ringing")
         .order("created_at", { ascending: false })
         .limit(1);
@@ -326,14 +357,14 @@ export function useVideoCall() {
 
     // Subscribe to realtime changes on calls table for this user
     const channel = supabase
-      .channel(`incoming-calls-${user.id}-${canalVersion}`)
+      .channel(`incoming-calls-${uid}-${canalVersion}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "calls",
-          filter: `receiver_id=eq.${user.id}`,
+          filter: `receiver_id=eq.${uid}`,
         },
         async (payload) => {
           const call = payload.new as Call;
@@ -422,11 +453,11 @@ export function useVideoCall() {
     };
     // `canalVersion` en las dependencias es LO QUE HACE que el reintento ocurra:
     // al subirlo, el efecto se rehace y abre un canal con nombre nuevo.
-  }, [user, canalVersion]);
+  }, [uid, canalVersion]);
 
   // ── Realtime active call status tracking ───────────────────────
   useEffect(() => {
-    if (!activeCall || !user) return;
+    if (!activeCall || !uid) return;
     let desmontandoEstado = false;
 
     const channel = supabase
@@ -472,7 +503,7 @@ export function useVideoCall() {
       }
       supabase.removeChannel(channel);
     };
-  }, [activeCall?.id, user, clearRingingTimer, estadoVersion]); // Use activeCall.id for stable subscription
+  }, [activeCall?.id, uid, clearRingingTimer, estadoVersion]); // Use activeCall.id for stable subscription
 
   return {
     incomingCall,

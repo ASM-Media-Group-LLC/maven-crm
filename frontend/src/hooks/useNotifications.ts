@@ -36,6 +36,17 @@ interface UseNotificationsOptions {
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
   const { user } = useAuth();
+  // El ID, no el objeto. `useAuth` emite un `user` nuevo por referencia en cada
+  // lectura de sesion, y depender del objeto hacia que este efecto se re-corriera
+  // al arrancar. Con nombre de canal fijo ("notifications-realtime") eso mataba
+  // el canal: el `removeChannel` de la corrida anterior es asincrono y borra por
+  // NOMBRE, asi que se llevaba puesto el canal nuevo (RealtimeClient.js:451).
+  //
+  // Este era el peor de los tres, y por eso nadie lo reporto: fallaba sin un
+  // solo mensaje —el .subscribe() no miraba el estado— y lo tapaba a medias el
+  // refetch de 60 s. Las notificaciones no dejaban de llegar: llegaban hasta un
+  // minuto tarde, y eso se siente como "Maven va lento", no como un bug.
+  const uid = user?.id;
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
   const { isTypeEnabled } = useNotificationPreferences();
@@ -74,7 +85,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
   // ─── Realtime subscription ───────────────────────────────────────
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
 
     const channel = supabase
       .channel("notifications-realtime")
@@ -88,7 +99,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         (payload) => {
           const n = payload.new as Notification;
           // Only add if it's for this user or role-targeted
-          if (n.user_id === user.id || (n.user_id === null && n.role_target)) {
+          if (n.user_id === uid || (n.user_id === null && n.role_target)) {
             qc.invalidateQueries({ queryKey: ["notifications"] });
 
             // Play sound if enabled and not in DND
@@ -98,12 +109,17 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           }
         },
       )
-      .subscribe();
+      .subscribe((estado) => {
+        if (estado !== "SUBSCRIBED") {
+          console.warn("[Notificaciones] El canal esta en:", estado,
+            "— van a llegar con el retraso del refetch, no al instante.");
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, qc, notifSettings.sound_enabled, notifSettings.dnd_enabled]);
+  }, [uid, qc, notifSettings.sound_enabled, notifSettings.dnd_enabled]);
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {
