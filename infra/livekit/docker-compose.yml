@@ -95,6 +95,17 @@ services:
 
   # Descargas firmadas + borrado de los MP4 (ver rec-server.mjs).
   # Dominio en Dokploy: rec.asmtech.ai -> este contenedor :8080.
+  #
+  # ⚠️ TOCAR rec-server.mjs NO ALCANZA CON DESPLEGAR. El archivo entra por
+  # bind-mount de UN SOLO ARCHIVO, así que `compose up -d` no ve ningún cambio
+  # en la definición del servicio y deja el contenedor como está: node sigue
+  # con el código viejo en memoria y el deploy figura "Done". Hay que
+  # REINICIAR el contenedor a mano (Dokploy → Containers → rec-server →
+  # Restart).
+  #
+  # Para no depurar a ciegas, rec-server publica su versión:
+  #   curl -s https://rec.asmtech.ai/health   -> {"version":"...", ...}
+  # Si esa versión no es la del archivo, lo que está sirviendo NO es tu código.
   rec-server:
     image: node:22-alpine
     restart: unless-stopped
