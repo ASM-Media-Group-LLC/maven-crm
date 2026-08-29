@@ -78,3 +78,48 @@ export function nombreYApellido(completo: string | null | undefined): string {
   if (partes.length === 1) return partes[0];
   return `${partes[0]} ${partes[partes.length - 1]}`;
 }
+
+// ── La voz que avisa que se acabó la pausa ──────────────────────────────────
+//
+// Quien está en pausa está LEJOS DE LA PANTALLA — es el sentido de la pausa —
+// así que un cartel no le sirve de nada. Por eso este aviso es hablado, y por
+// eso se repite: el primero, casi por definición, no lo escucha nadie.
+//
+// Rotan por la misma razón que las del supervisor de encuadre: la misma frase
+// repetida cada dos minutos se vuelve ruido de fondo que el oído filtra.
+
+const FRASES_FIN_PAUSA: Record<"bano" | "break", string[]> = {
+  bano: [
+    "Se te acabó el tiempo de baño. Por favor, vuelve a tu puesto.",
+    "Terminó tu tiempo de baño. Regresa a la sala, por favor.",
+    "Tu pausa de baño ya terminó. Por favor, vuelve a la cámara.",
+    "Se cumplió el tiempo de baño. Te esperamos de vuelta.",
+  ],
+  break: [
+    "Se te acabó el break. Por favor, vuelve a tu puesto.",
+    "Terminó tu break. Regresa a la sala, por favor.",
+    "Tu break ya terminó. Por favor, vuelve a la cámara.",
+    "Se cumplió el tiempo de break. Te esperamos de vuelta.",
+  ],
+};
+
+// Fuera de React: si viviera en un useRef se reiniciaría en cada montaje y la
+// persona escucharía siempre la primera frase, que es lo contrario de rotar.
+let idxFinPausa = 0;
+
+export function fraseFinDePausa(kind: "bano" | "break" | null): string {
+  const lista = FRASES_FIN_PAUSA[kind === "break" ? "break" : "bano"];
+  const frase = lista[idxFinPausa % lista.length];
+  idxFinPausa += 1;
+  return frase;
+}
+
+/** Cada cuánto se repite el aviso hablado mientras siga pasado. Dos minutos:
+ *  suficiente para no atosigar, corto para que quien volvió al escritorio se
+ *  entere sin tener que mirar la pantalla. */
+export const REPETIR_FIN_PAUSA_MS = 120_000;
+
+/** Cuánto tiene que estar pasado alguien para que se le avise al SUPERVISOR.
+ *  Antes que eso es asunto de la persona: pasarse un minuto del baño no es algo
+ *  que amerite interrumpir a quien supervisa nueve salas. */
+export const AVISAR_SUPERVISOR_PASADO_MS = 180_000;

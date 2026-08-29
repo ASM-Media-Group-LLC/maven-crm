@@ -11,7 +11,9 @@ import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { marcarPausa } from "@/lib/coworkPausa";
-import { cuentaPausa, clasesPausa } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS } from "@/lib/pausaCowork";
+import { hablar } from "@/lib/voz";
+import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
@@ -110,6 +112,33 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       if (data) setLimitesPausa(Object.fromEntries(data.map((l: { kind: string; minutos: number }) => [l.kind, l.minutos])));
     });
   }, []);
+  // Avisar EN VOZ cuando se acaba la pausa.
+  //
+  // Quien está en pausa está lejos de la pantalla —es el sentido de la pausa—
+  // así que el cartel rojo no le llega. Por eso se habla, y por eso se repite:
+  // el primer aviso, casi por definición, no lo escucha nadie.
+  const avisoFinPausa = useRef(0);
+  useEffect(() => {
+    if (!breakStartedAt || breakLimite == null) { avisoFinPausa.current = 0; return; }
+    const revisar = () => {
+      const pasadoMs = (Date.now() - breakStartedAt) - breakLimite * 60_000;
+      if (pasadoMs < 0) return;                       // todavía le queda tiempo
+      const ahora = Date.now();
+      if (ahora - avisoFinPausa.current < REPETIR_FIN_PAUSA_MS) return;
+      avisoFinPausa.current = ahora;
+      playMessageNotification(0.5);
+      hablar(fraseFinDePausa(breakKind));
+      toast.warning("Se acabó tu tiempo de pausa", {
+        description: "Vuelve a tu puesto y quita la pausa para que quede registrado.",
+        duration: 10_000,
+        id: "fin-pausa",
+      });
+    };
+    revisar();
+    const id = window.setInterval(revisar, 5_000);
+    return () => window.clearInterval(id);
+  }, [breakStartedAt, breakLimite, breakKind]);
+
   const etiquetaPausa = (kind: "bano" | "break") => {
     const nombre = kind === "break" ? "Break" : "Baño";
     const min = limitesPausa[kind];

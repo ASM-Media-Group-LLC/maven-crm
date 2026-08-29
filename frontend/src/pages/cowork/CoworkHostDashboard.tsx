@@ -31,7 +31,7 @@ import { hablar } from "@/lib/voz";
 import { AVISAR_COORDINADOR_MS } from "@/hooks/useFaceNudge";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
-import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -493,6 +493,35 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
   // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
   // avanzan solos sin depender de que llegue un evento de presence.
+
+  // Aviso sonoro cuando alguien se PASA de su pausa — pero recién a los 3
+  // minutos de excedido, no al segundo uno.
+  //
+  // El motivo es que interrumpir a quien supervisa nueve salas es caro:
+  // pasarse un minuto del baño es asunto de la persona, y ella ya está
+  // recibiendo su propio aviso hablado. Lo que amerita subir un nivel es que
+  // el aviso no haya surtido efecto.
+  //
+  // Una vez por persona y por pausa: se rearma cuando esa persona vuelve.
+  const yaAvisadoPausa = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const [uid, st] of Object.entries(mediaStates)) {
+      const p = pausaDe(uid);
+      if (!p) { yaAvisadoPausa.current.delete(uid); continue; }
+      const pasadoSeg = -p.cuenta.restante;
+      if (pasadoSeg * 1000 < AVISAR_SUPERVISOR_PASADO_MS) continue;
+      if (yaAvisadoPausa.current.has(uid)) continue;
+      yaAvisadoPausa.current.add(uid);
+      const quien = nombreYApellido(cowork.profiles[uid]);
+      playCoordinatorRequestSound();
+      hablar(`${quien} lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}.`,
+        { volumen: 0.85 });
+      toast.warning(`${quien}: pasado de ${p.etiqueta.toLowerCase()}`, {
+        description: `Lleva ${p.cuenta.texto.replace("−", "")} de más y ya se le avisó por voz.`,
+        duration: 10_000,
+      });
+    }
+  }, [mediaStates, now, cowork.profiles]);
 
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba

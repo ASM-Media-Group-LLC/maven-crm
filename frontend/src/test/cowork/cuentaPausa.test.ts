@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido, fraseFinDePausa, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
 
 // La cuenta regresiva de las pausas. Lo que se fija acá es lo que el
 // coordinador y el empleado tienen que ver IGUAL: si cada lado calculara por su
@@ -63,5 +63,32 @@ describe("nombre y apellido en los avisos", () => {
     expect(nombreYApellido("  Ana   Perez  ")).toBe("Ana Perez");
     expect(nombreYApellido(null)).toBe("Alguien");
     expect(nombreYApellido("")).toBe("Alguien");
+  });
+});
+
+// El aviso hablado de fin de pausa. Quien está en pausa está lejos de la
+// pantalla —es el sentido de la pausa— así que el cartel no le llega: el aviso
+// es hablado y se repite, porque el primero casi nunca lo escucha nadie.
+describe("aviso hablado de fin de pausa", () => {
+  it("distingue baño de break: decirle 'break' a quien pidió baño suena a error", () => {
+    const bano = fraseFinDePausa("bano");
+    const brk = fraseFinDePausa("break");
+    expect(bano.toLowerCase()).toContain("baño");
+    expect(brk.toLowerCase()).toContain("break");
+  });
+
+  it("rota: la misma frase cada dos minutos se vuelve ruido que el oído filtra", () => {
+    const dichas = [fraseFinDePausa("bano"), fraseFinDePausa("bano"), fraseFinDePausa("bano")];
+    expect(new Set(dichas).size).toBe(3);
+  });
+
+  it("al supervisor se le avisa a los 3 minutos de excedido, no antes", () => {
+    // Pasarse un minuto es asunto de la persona, que ya recibió su propio
+    // aviso; interrumpir a quien supervisa nueve salas es caro.
+    expect(AVISAR_SUPERVISOR_PASADO_MS).toBe(180_000);
+    const unMinutoPasado = cuentaPausa(11 * 60, 10);
+    expect(-unMinutoPasado.restante * 1000).toBeLessThan(AVISAR_SUPERVISOR_PASADO_MS);
+    const cuatroPasado = cuentaPausa(14 * 60, 10);
+    expect(-cuatroPasado.restante * 1000).toBeGreaterThan(AVISAR_SUPERVISOR_PASADO_MS);
   });
 });
