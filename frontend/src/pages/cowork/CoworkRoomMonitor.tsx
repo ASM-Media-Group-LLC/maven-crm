@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { VideoOff, Loader2, Monitor, Video } from "lucide-react";
+import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
+import { esOtraPestana, TITULO_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
 
 interface Props {
   roomId: string;
@@ -112,7 +113,11 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
   const [screenView, setScreenView] = useState<Record<string, boolean>>({});
-  const [status, setStatus] = useState<"connecting" | "ready" | "error">("connecting");
+  // "duplicada" NO es un error y por eso es un estado aparte: la sala está
+  // perfecta, lo que pasa es que esta cuenta abrió Cowork en otro lado y
+  // LiveKit nos sacó de acá. Mezclarlo con "error" era lo que disparaba el
+  // reintento, y el reintento era el bucle.
+  const [status, setStatus] = useState<"connecting" | "ready" | "error" | "duplicada">("connecting");
   // Reintentos de la miniatura. Antes, un `Disconnected` dejaba la card en
   // "Reconectando…" PARA SIEMPRE: el coordinador quedaba mirando una
   // sala que en realidad estaba llena y trabajando. Una supervisión que se
@@ -226,7 +231,16 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
           .map((sp) => sp?.name || sp?.identity || "Alguien");
         onSpeakingRef.current?.(remotos);
       })
-      .on(RoomEvent.Disconnected, () => { if (!cancelled) { setStatus("error"); programarReintento(); } });
+      // OJO con reintentar acá sin mirar la razón: si nos sacaron porque la
+      // misma cuenta entró en otra pestaña, reconectar la patea a ella, que
+      // reconecta y nos patea a nosotros. Bucle infinito, y desde afuera se ve
+      // como la miniatura parpadeando y la persona entrando y saliendo sola.
+      .on(RoomEvent.Disconnected, (razon) => {
+        if (cancelled) return;
+        if (esOtraPestana(razon)) { setStatus("duplicada"); return; }
+        setStatus("error");
+        programarReintento();
+      });
 
     (async () => {
       try {
@@ -305,6 +319,21 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
       {showVideo && (
         status === "connecting" ? (
           <div className="flex items-center justify-center h-full text-muted-foreground/60"><Loader2 className="h-4 w-4 animate-spin" /></div>
+        ) : status === "duplicada" ? (
+          // Se le dice qué pasó y se le da la salida en el mismo lugar. Antes
+          // esto caía en "Preview no disponible", que hacía pensar que la sala
+          // estaba rota cuando en realidad estaba llena y trabajando.
+          <div className="flex flex-col items-center justify-center h-full gap-1 px-2 text-center">
+            <Copy className="h-4 w-4 text-muted-foreground/50" />
+            <span className="text-[10px] text-muted-foreground/70">{TITULO_OTRA_PESTANA}</span>
+            <button
+              type="button"
+              onClick={() => setIntento((n) => n + 1)}
+              className="text-[10px] underline text-primary hover:text-primary/80"
+            >
+              {BOTON_USAR_AQUI}
+            </button>
+          </div>
         ) : status === "error" ? (
           <div className="flex items-center justify-center h-full text-[11px] text-muted-foreground/50 italic">Preview no disponible</div>
         ) : partVideos.length === 0 ? (

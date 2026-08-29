@@ -13,7 +13,8 @@ import RecordingControl from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 
-import { Loader2, WifiOff } from "lucide-react";
+import { Loader2, WifiOff, Copy } from "lucide-react";
+import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
@@ -95,6 +96,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk.connectionState]);
   const effectiveCompact = compact || autoCompact;
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
+  // Sube cuando la persona aprieta "Usar aquí" tras haber sido sacada por
+  // otra pestaña. Está en las dependencias del efecto de conexión: subirlo
+  // es LO QUE hace que se vuelva a conectar. Un reintento a pedido, nunca
+  // automático — el automático es el que arma la pelea entre las pestañas.
+  const [reintentoManual, setReintentoManual] = useState(0);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -155,7 +161,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       lk.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
+  }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect, reintentoManual]);
 
   useEffect(() => {
     const h = () => { lk.disconnect(); };
@@ -352,6 +358,25 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
           <WifiOff className="h-3.5 w-3.5 animate-pulse" /> Reconectando...
+        </div>
+      )}
+
+      {/* Nos sacaron porque esta cuenta abrió Cowork en otro lado. No se
+          reconecta solo a propósito: si lo hiciera, patearía a la otra pestaña,
+          que volvería a patear a esta, y así para siempre. Se le muestra qué
+          pasó y se le deja elegir dónde quedarse. */}
+      {lk.otraPestanaTomoLaSesion && (
+        <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
+          <Copy className="h-3.5 w-3.5 shrink-0" />
+          <span>{TITULO_OTRA_PESTANA}.</span>
+          <span className="font-normal opacity-80">{DETALLE_OTRA_PESTANA}</span>
+          <button
+            type="button"
+            onClick={() => setReintentoManual((n) => n + 1)}
+            className="underline underline-offset-2 hover:opacity-80"
+          >
+            {BOTON_USAR_AQUI}
+          </button>
         </div>
       )}
 

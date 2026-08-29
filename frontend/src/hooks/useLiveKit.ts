@@ -9,6 +9,7 @@ import {
   ConnectionQuality,
   RoomOptions,
 } from "livekit-client";
+import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -316,6 +317,10 @@ export function useLiveKit() {
   const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  // Nos sacaron porque esta misma cuenta entró desde otra pestaña o equipo.
+  // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
+  // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
+  const [otraPestanaTomoLaSesion, setOtraPestanaTomoLaSesion] = useState(false);
   const handRaisedMap = useRef<Record<string, boolean>>({});
   const preferredDevicesRef = useRef<{
     audioDeviceId?: string;
@@ -918,6 +923,8 @@ export function useLiveKit() {
     isAdmin = false,
     options: ConnectOptions = {},
   ) => {
+    // Empieza un intento nuevo: la marca de "me la tomaron" ya no aplica.
+    setOtraPestanaTomoLaSesion(false);
     // Guard against concurrent connect calls
     if (connectingRef.current) {
       console.warn("[LiveKit] Connect already in progress, ignoring duplicate call");
@@ -1199,7 +1206,8 @@ export function useLiveKit() {
         } catch {}
       });
 
-      room.on(RoomEvent.Disconnected, () => {
+      room.on(RoomEvent.Disconnected, (razon) => {
+        setOtraPestanaTomoLaSesion(esOtraPestana(razon));
         clearSyncInterval();
         clearBackgroundReapplyTimer();
         cleanupAudioResumeListeners();
@@ -1825,6 +1833,7 @@ export function useLiveKit() {
     activeSpeaker,
     error,
     isReconnecting,
+    otraPestanaTomoLaSesion,
     connect,
     disconnect,
     toggleMic,
