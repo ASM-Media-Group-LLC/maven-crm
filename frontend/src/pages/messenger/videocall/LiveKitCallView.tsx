@@ -448,7 +448,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                 // `min-w-0` es lo que le permite al panel grande achicarse. Sin
                 // eso, un flex item se niega a bajar de su contenido y desborda.
                 <div className={effectiveCompact ? "h-full" : "flex-1 min-w-0"}>
-                  <ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                  <ParticipantTile compact={effectiveCompact} participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
               )}
               {otrosParticipantes.length > 0 && (
@@ -459,14 +459,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                   <div className="absolute bottom-2 right-2 flex flex-col-reverse gap-1.5 w-[34%] max-w-[150px] pointer-events-none">
                     {otrosParticipantes.slice(0, 2).map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="aspect-video rounded-lg overflow-hidden ring-1 ring-white/25 shadow-lg pointer-events-auto">
-                        <ParticipantTile participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                     {otrosParticipantes.map((p) => (
-                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
+                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile compact={effectiveCompact} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
                     ))}
                   </div>
                 )

@@ -22,6 +22,9 @@ interface ParticipantTileProps {
   onPinParticipant?: (sid: string) => void;
   pinnedSid?: string | null;
   isAdmin?: boolean;
+  /** Vista chica (ventanita flotante o ventana del sistema). Ahí NO se dibujan
+   *  los controles del recuadro — ver el comentario donde se usa. */
+  compact?: boolean;
 }
 
 
@@ -58,7 +61,8 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prev.isAdmin === next.isAdmin &&
     prev.onMuteParticipant === next.onMuteParticipant &&
     prev.onRemoveParticipant === next.onRemoveParticipant &&
-    prev.onPinParticipant === next.onPinParticipant
+    prev.onPinParticipant === next.onPinParticipant &&
+    prev.compact === next.compact
   );
 }
 
@@ -89,7 +93,7 @@ function ConnectionIndicator({ quality }: { quality: string }) {
 
 const ParticipantTile = memo(function ParticipantTile({
   participant, room, large, className, preferredAudioOutputDeviceId,
-  onMuteParticipant, onRemoveParticipant, onPinParticipant, pinnedSid, isAdmin,
+  onMuteParticipant, onRemoveParticipant, onPinParticipant, pinnedSid, isAdmin, compact,
 }: ParticipantTileProps) {
   const isPinned = pinnedSid === participant.sid;
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -361,7 +365,19 @@ const ParticipantTile = memo(function ParticipantTile({
         <audio ref={audioRef} autoPlay playsInline data-lk-audio="true" style={{ display: "none" }} />
       )}
 
-      {/* Google Meet-style hover overlay */}
+      {/* Controles del recuadro: anclar y "más opciones".
+          NO se dibujan en la vista chica, por dos motivos concretos:
+
+          1. EL MENÚ NO FUNCIONA AHÍ. Es un DropdownMenu de Radix, que dibuja su
+             contenido en `document.body` — y dentro de la ventana flotante del
+             sistema `document` sigue siendo el de la ventana PRINCIPAL. El menú
+             se abre en la otra ventana, donde nadie lo ve. El botón responde y
+             no pasa nada, que es peor que no tenerlo.
+          2. NO ENTRAN. Son dos botones de 40px centrados sobre un recuadro de
+             unos 84 de alto: tapan la cara y el nombre de la persona.
+
+          En la vista grande siguen igual. */}
+      {!compact && (
       <div className="absolute inset-0 z-[5] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
         <div className="flex items-center gap-1 pointer-events-auto">
           {onPinParticipant && (
@@ -413,6 +429,7 @@ const ParticipantTile = memo(function ParticipantTile({
           </DropdownMenu>
         </div>
       </div>
+      )}
 
       {/* Silenciar a otro es irreversible desde acá: solo esa persona puede
           volver a prender su micro. Por eso se confirma y se dice quién es. */}
