@@ -14,7 +14,7 @@ export const docPipSupported = () =>
 // Clona los estilos del documento principal a la ventana PiP (que nace en blanco):
 // <style> inyectados (Tailwind/Vite dev) + <link rel=stylesheet> (bundle en prod),
 // las clases de <html>/<body> (tema dark) y el fondo. Sin esto, la PiP se ve sin CSS.
-function copyStyles(target: Window) {
+export function copyStyles(target: Window) {
   document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
     try { target.document.head.appendChild(node.cloneNode(true)); } catch { /* noop */ }
   });
@@ -23,6 +23,16 @@ function copyStyles(target: Window) {
     target.document.body.className = document.body.className;
     target.document.body.style.margin = "0";
     target.document.body.style.background = getComputedStyle(document.body).backgroundColor || "#14141a";
+    // ALTO. Sin esto la ventana se ve rota y cuesta entender por qué.
+    //
+    // La ventana nace en blanco: su <html> y su <body> tienen alto AUTO. Adentro
+    // se portaliza una caja con `height: 100%`, y un 100% contra un padre sin
+    // alto definido resuelve a CERO. Resultado: se ven el encabezado y los
+    // controles —que tienen alto propio— y el video colapsado, con la ventana
+    // medio vacía. No hay error en consola: simplemente no ocupa nada.
+    target.document.documentElement.style.height = "100%";
+    target.document.body.style.height = "100%";
+    target.document.body.style.overflow = "hidden";
   } catch { /* noop */ }
 }
 

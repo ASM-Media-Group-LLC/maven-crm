@@ -158,7 +158,11 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   const ctx = useMemo<Ctx>(
     () => ({
       startCall, endCall, registerOutlet, activeKey: config?.key ?? null,
-      abrirVentanaDelSistema: (medidas) => openPip(medidas ?? { width: 420, height: 300 }),
+      // Sin medidas: que mande el tamaño por defecto de usePipWindow (retrato,
+      // como Meet). Acá había un 420x300 fijo que pisaba ese default y dejaba
+      // la ventana apaisada y aplastada — o sea que el ajuste de tamaño no
+      // llegaba a aplicarse nunca.
+      abrirVentanaDelSistema: (medidas) => openPip(medidas),
       cerrarVentanaDelSistema: closePip,
       ventanaDelSistemaAbierta: !!pipWindow,
       ventanaDelSistemaSoportada: docPipSupported(),
@@ -184,6 +188,60 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     if (hayHueco && !habiaHueco.current && pipWindow) closePip();
     habiaHueco.current = hayHueco;
   }, [outlet, pipWindow, closePip]);
+
+  // ── QUE LA LLAMADA SALGA SOLA AL IRSE A OTRO PROGRAMA ─────────────────────
+  //
+  // Cuando la persona se va a WhatsApp, a OnlyFans o a otra pestaña, la llamada
+  // se queda atrás y deja de verse. Esto la saca sola a la ventana flotante,
+  // que el sistema mantiene siempre al frente.
+  //
+  // Abrir esa ventana normalmente EXIGE un clic — `requestWindow()` se rechaza
+  // sin gesto del usuario. La única vía sin clic es esta acción de MediaSession:
+  // Chrome la dispara justo cuando la persona cambia de pestaña o de app, y solo
+  // en ese momento permite abrirla. Es la misma que usa Meet.
+  //
+  // Pide tres cosas, las tres cumplidas acá: registrar el manejador, estar
+  // capturando cámara o micrófono (estamos en una llamada), y que el permiso de
+  // "picture-in-picture automático" esté activo — viene así por defecto.
+  //
+  // Si el navegador no lo soporta no pasa nada: queda el botón manual.
+  const pipAbiertaSola = useRef(false);
+  const pipAbiertaRef = useRef(false);
+  pipAbiertaRef.current = !!pipWindow;
+
+  useEffect(() => {
+    if (!config) return;                       // sin llamada no hay nada que sacar
+    const ms = navigator.mediaSession as MediaSession | undefined;
+    if (!ms?.setActionHandler) return;
+    const accion = "enterpictureinpicture" as MediaSessionAction;
+    try {
+      ms.setActionHandler(accion, () => {
+        if (pipAbiertaRef.current) return;     // ya está afuera
+        pipAbiertaSola.current = true;
+        void openPip();
+      });
+    } catch { /* navegador sin esta acción: se queda el botón manual */ }
+    return () => { try { ms.setActionHandler(accion, null); } catch { /* noop */ } };
+  }, [config, openPip]);
+
+  // Y que se guarde sola al volver — pero SOLO si la sacó el navegador.
+  //
+  // Quien la sacó A MANO probablemente la puso en otro monitor a propósito, y
+  // cerrársela al volver le rompería justo lo que quiso armar. Esa distinción
+  // es todo el punto de la bandera.
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!pipAbiertaSola.current || !pipAbiertaRef.current) return;
+      pipAbiertaSola.current = false;
+      closePip();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => document.removeEventListener("visibilitychange", alVolver);
+  }, [closePip]);
+
+  // Si se cerró por cualquier vía, la bandera deja de aplicar.
+  useEffect(() => { if (!pipWindow) pipAbiertaSola.current = false; }, [pipWindow]);
 
   // Dónde se dibuja la llamada, por orden de prioridad: la ventana del sistema
   // (si la abrió a mano), el hueco de la página, o la ventanita flotante.
