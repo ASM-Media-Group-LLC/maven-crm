@@ -84,6 +84,20 @@ function leerEstados(canal: CanalRealtime) {
   return resultado;
 }
 
+function publicar(entrada: CanalVivo, state: MediaState) {
+  entrada.ultimoEstado = state;
+  entrada.canal.track({
+    user_id: entrada.userId,
+    micOn: state.micOn,
+    camOn: state.camOn,
+    screenShareOn: state.screenShareOn,
+    onBreak: !!state.onBreak,
+    breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
+    faceState: state.faceState ?? null,
+    faceSince: state.faceSince ?? null,
+  });
+}
+
 function abrirCanal(sessionId: string, userId: string): CanalVivo {
   const canal = supabase.channel(`cowork-media-${sessionId}`, {
     config: { presence: { key: userId } },
@@ -99,7 +113,25 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
     .on("presence", { event: "sync" }, avisar)
     .on("presence", { event: "join" }, avisar)
     .on("presence", { event: "leave" }, avisar)
-    .subscribe();
+    .subscribe((estado) => {
+      // ESTA ES LA CLAVE, y costó tres teorías descartadas encontrarla.
+      //
+      // `track()` publica la presencia SOBRE LA CONEXIÓN ACTUAL. Si el socket
+      // se cae y vuelve —cosa que pasa sola al navegar por Maven, porque cada
+      // sección abre y cierra sus propios canales— el canal se re-suscribe pero
+      // la presencia NO se reenvía. El chatter desaparece del tablero del
+      // coordinador aunque siga perfectamente dentro de la llamada, y no vuelve
+      // hasta que algo dispare otro `track()`.
+      //
+      // Por eso Jhon veía que "apagar y prender la cámara" lo hacía reaparecer:
+      // ese era el único gesto que volvía a publicar. Y por eso refrescar el
+      // tablero a veces parecía arreglarlo y a veces no.
+      //
+      // Al re-suscribirse, se vuelve a anunciar lo último que se sabía.
+      if (estado === "SUBSCRIBED" && entrada.ultimoEstado) {
+        publicar(entrada, entrada.ultimoEstado);
+      }
+    });
 
   return entrada;
 }
@@ -152,6 +184,13 @@ function revisarSalud() {
   // Aunque el canal esté sano, se relee: un `sync` perdido no deja rastro.
   const estados = leerEstados(entrada.canal);
   entrada.oyentes.forEach((f) => f(estados));
+
+  // Y el chequeo que de verdad importa para quien PUBLICA: "yo debería
+  // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia. Cubre cualquier
+  // camino por el que se pierda el track sin que el canal se caiga.
+  if (entrada.ultimoEstado && !estados[entrada.userId]) {
+    publicar(entrada, entrada.ultimoEstado);
+  }
 }
 
 function arrancarRevisor() {
@@ -164,20 +203,6 @@ function arrancarRevisor() {
 
 function alVolverAMirar() {
   if (document.visibilityState === "visible") revisarSalud();
-}
-
-function publicar(entrada: CanalVivo, state: MediaState) {
-  entrada.ultimoEstado = state;
-  entrada.canal.track({
-    user_id: entrada.userId,
-    micOn: state.micOn,
-    camOn: state.camOn,
-    screenShareOn: state.screenShareOn,
-    onBreak: !!state.onBreak,
-    breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
-    faceState: state.faceState ?? null,
-    faceSince: state.faceSince ?? null,
-  });
 }
 
 /** Cierra la presencia de verdad. Solo al salir de la sala o cambiar de sesión:

@@ -109,6 +109,12 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
   const [screenView, setScreenView] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<"connecting" | "ready" | "error">("connecting");
+  // Reintentos de la miniatura. Antes, un `Disconnected` dejaba la card en
+  // "Reconectando…" PARA SIEMPRE: el coordinador quedaba mirando una
+  // sala que en realidad estaba llena y trabajando. Una supervisión que se
+  // queda ciega en silencio es peor que uno que avisa que está ciega.
+  const [intento, setIntento] = useState(0);
+  const reintentoRef = useRef<number | null>(null);
   const roomRef = useRef<Room | null>(null);
   const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
   const onSharersRef = useRef(onSharersChange);
@@ -126,6 +132,17 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
   useEffect(() => {
     if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); onSpeakingRef.current?.([]); return; }
     let cancelled = false;
+    // Espera creciente, con techo: si LiveKit está caído no tiene sentido
+    // martillarlo desde nueve miniaturas a la vez, pero tampoco rendirse.
+    const esperaMs = Math.min(30_000, 3_000 * 2 ** Math.min(intento, 4));
+    const programarReintento = () => {
+      if (cancelled || reintentoRef.current !== null) return;
+      reintentoRef.current = window.setTimeout(() => {
+        reintentoRef.current = null;
+        setIntento((n) => n + 1);
+      }, esperaMs);
+    };
+
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
@@ -205,7 +222,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
           .map((sp) => sp?.name || sp?.identity || "Alguien");
         onSpeakingRef.current?.(remotos);
       })
-      .on(RoomEvent.Disconnected, () => { if (!cancelled) setStatus("error"); });
+      .on(RoomEvent.Disconnected, () => { if (!cancelled) { setStatus("error"); programarReintento(); } });
 
     (async () => {
       try {
@@ -214,6 +231,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
         await room.connect(url, token);
         if (cancelled) { room.disconnect(); return; }
         setStatus("ready");
+        if (intento !== 0) setIntento(0);   // volvió: se reinicia la espera
         room.remoteParticipants.forEach((p: any) => {
           p.trackPublications.forEach((pub: any) => {
             if (!pub.track || !pub.isSubscribed) return;
@@ -223,12 +241,13 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
         });
         recomputeSharers();
       } catch {
-        if (!cancelled) setStatus("error");
+        if (!cancelled) { setStatus("error"); programarReintento(); }
       }
     })();
 
     return () => {
       cancelled = true;
+      if (reintentoRef.current !== null) { window.clearTimeout(reintentoRef.current); reintentoRef.current = null; }
       onSharersRef.current?.([]);
       onSpeakingRef.current?.([]);
       setPartVideos([]);
@@ -242,7 +261,9 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
       try { room.disconnect(); } catch { /* noop */ }
       roomRef.current = null;
     };
-  }, [getToken, enabled]);
+    // `intento` en las dependencias es LO QUE HACE que el reintento ocurra:
+    // al subirlo, el efecto se rehace y vuelve a conectar la sala.
+  }, [getToken, enabled, intento]);
 
   // Publicar / dejar de publicar el micro según broadcastOn + micBaseTrack.
   useEffect(() => {
