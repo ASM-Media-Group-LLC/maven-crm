@@ -20,7 +20,9 @@ const subscribe = vi.fn();
 function canalFalso() {
   const canal = {
     on: vi.fn(() => canal),
-    subscribe: (...a: unknown[]) => { subscribe(...a); return canal; },
+    // Supabase llama al callback con el estado de la suscripción; el mock lo
+    // imita porque de eso depende que se publique la presencia pendiente.
+    subscribe: (cb?: (estado: string) => void) => { subscribe(cb); cb?.("SUBSCRIBED"); return canal; },
     track,
     presenceState: () => ({}),
   };
@@ -113,5 +115,38 @@ describe("presencia de Cowork al navegar", () => {
     rerender({ s: "sesion-2" });
     expect(removeChannel).toHaveBeenCalledTimes(1);
     expect(channel).toHaveBeenCalledTimes(2);
+  });
+});
+
+// El primer aviso de estado puede llegar ANTES de que exista el canal: la
+// llamada monta y reporta micro/cámara mientras la sesión todavía carga. Ese
+// aviso se perdía en silencio y nadie lo reintentaba, así que la persona
+// quedaba dentro de la sala pero invisible para la supervisión — sin estado de
+// cámara y sin alertas de encuadre — por el resto del turno.
+describe("presencia: el estado no se pierde si llega antes que el canal", () => {
+  beforeEach(() => {
+    salirDePresencia();
+    removeChannel.mockClear(); track.mockClear(); channel.mockClear();
+  });
+
+  it("se publica al abrir el canal lo que se intentó antes", async () => {
+    const { useCoworkMediaPresence: usar } = await import("@/hooks/useCoworkMediaPresence");
+
+    // Sin sesión todavía: el canal no existe.
+    const { result, rerender } = renderHook(
+      ({ s }) => usar(s, CHATTER, { persistente: true }),
+      { initialProps: { s: undefined as string | undefined } },
+    );
+    expect(channel).not.toHaveBeenCalled();
+
+    // La llamada avisa su estado igual. Antes esto se perdía para siempre.
+    act(() => result.current.trackMediaState({ micOn: true, camOn: true, screenShareOn: false }));
+    expect(track).not.toHaveBeenCalled();
+
+    // Llega la sesión → se abre el canal → tiene que publicarse lo pendiente.
+    rerender({ s: SESION });
+    expect(channel).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track.mock.calls[0][0]).toMatchObject({ user_id: CHATTER, camOn: true });
   });
 });

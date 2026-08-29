@@ -65,6 +65,20 @@ interface CanalVivo {
 
 let vivo: CanalVivo | null = null;
 
+// Lo último que esta persona quiso publicar, se haya podido o no.
+//
+// EL HUECO QUE ESTO TAPA: la llamada avisa su estado de micro/cámara apenas
+// monta, y eso puede pasar ANTES de que exista el canal (la sesión todavía se
+// está cargando, o el usuario aún no resolvió). Ese primer aviso se perdía en
+// silencio y NADA lo reintentaba: la persona quedaba dentro de la sala pero sin
+// aparecer nunca en la presencia, así que el coordinador no recibía ni su
+// estado de cámara ni sus alertas de encuadre.
+//
+// Peor: la llamada sobrevive a navegar, así que su efecto de "avisar estado" no
+// se vuelve a disparar al volver. Sin esto, un solo aviso perdido dejaba a esa
+// persona invisible para la supervisión por el resto del turno.
+let ultimoEstadoPendiente: MediaState | null = null;
+
 function leerEstados(canal: CanalRealtime) {
   const estado = canal.presenceState<PayloadPresencia>();
   const resultado: Record<string, MediaState> = {};
@@ -128,9 +142,8 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
       // tablero a veces parecía arreglarlo y a veces no.
       //
       // Al re-suscribirse, se vuelve a anunciar lo último que se sabía.
-      if (estado === "SUBSCRIBED" && entrada.ultimoEstado) {
-        publicar(entrada, entrada.ultimoEstado);
-      }
+      const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
+      if (estado === "SUBSCRIBED" && aPublicar) publicar(entrada, aPublicar);
     });
 
   return entrada;
@@ -188,9 +201,8 @@ function revisarSalud() {
   // Y el chequeo que de verdad importa para quien PUBLICA: "yo debería
   // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia. Cubre cualquier
   // camino por el que se pierda el track sin que el canal se caiga.
-  if (entrada.ultimoEstado && !estados[entrada.userId]) {
-    publicar(entrada, entrada.ultimoEstado);
-  }
+  const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
+  if (aPublicar && !estados[entrada.userId]) publicar(entrada, aPublicar);
 }
 
 function arrancarRevisor() {
@@ -208,6 +220,7 @@ function alVolverAMirar() {
 /** Cierra la presencia de verdad. Solo al salir de la sala o cambiar de sesión:
  *  desde acá el resto ve el `leave`, que es lo correcto en ese caso. */
 export function salirDePresencia() {
+  ultimoEstadoPendiente = null;
   if (!vivo) return;
   supabase.removeChannel(vivo.canal);
   vivo = null;
@@ -260,8 +273,9 @@ export function useCoworkMediaPresence(
 
   const trackMediaState = useCallback(
     (state: MediaState) => {
+      ultimoEstadoPendiente = state;
       const entrada = vivo;
-      if (!entrada || entrada.userId !== userId) return;
+      if (!entrada || entrada.userId !== userId) return;  // se publicará al abrir el canal
       publicar(entrada, state);
     },
     [userId],

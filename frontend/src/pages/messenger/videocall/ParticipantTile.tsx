@@ -334,7 +334,14 @@ const ParticipantTile = memo(function ParticipantTile({
             autoPlay
             playsInline
             muted={participant.isLocal}
-            className={cn("absolute inset-0 w-full h-full", participant.isScreenSharing ? "object-contain bg-black" : "object-cover")}
+            // `contain` y NO `cover`, tambien para la camara. `cover` rellena la
+            // caja RECORTANDO lo que sobra, y como la caja se estira a lo que
+            // le de la grilla, en una pantalla ancha su proporcion no tiene
+            // nada que ver con la de la camara: a Jhon le cortaba la cabeza.
+            // En una herramienta de supervision, ver a la persona entera vale
+            // mas que llenar el rectangulo — las franjas oscuras son el precio
+            // y son baratas.
+            className={cn("absolute inset-0 w-full h-full object-contain", participant.isScreenSharing ? "bg-black" : "bg-black/40")}
             style={
               participant.isScreenSharing
                 ? zoom.style
