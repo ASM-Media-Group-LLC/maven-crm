@@ -104,6 +104,82 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
   return entrada;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// AUTOCURACIÓN: el tablero no puede quedar mintiendo hasta que alguien recargue.
+//
+// Jhon lo pilló probando: un chatter desapareció de su tablero y solo volvió
+// después de refrescar la página. O sea que el dato SÍ estaba del lado del
+// servidor y lo que estaba viejo era la copia local del coordinador.
+//
+// No pude reproducir el evento exacto que se pierde (socket que se cae con la
+// pestaña en segundo plano, un `sync` que no llega, un rejoin a medias), así
+// que en vez de adivinar la causa se ataca la consecuencia: si el canal deja de
+// estar unido, se rearma; y pase lo que pase se vuelve a leer el estado cada
+// pocos segundos. Leer es gratis (es un objeto en memoria, no una consulta).
+//
+// La regla de fondo: un tablero de supervisión que se queda viejo en silencio
+// es peor que uno que se cae, porque el coordinador le sigue creyendo.
+// ────────────────────────────────────────────────────────────────────────────
+
+const REVISION_MS = 4000;
+let revisor: number | null = null;
+
+function estadoDelCanal(canal: CanalRealtime): string | undefined {
+  return (canal as unknown as { state?: string }).state;
+}
+
+function revisarSalud() {
+  const entrada = vivo;
+  if (!entrada) return;
+
+  const estado = estadoDelCanal(entrada.canal);
+  // 'joined' es lo sano. Si quedó 'closed' o 'errored', rearmar: reintentar es
+  // barato y quedarse mudo no.
+  if (typeof estado === "string" && estado !== "joined" && estado !== "joining") {
+    const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
+    supabase.removeChannel(entrada.canal);
+    const nueva = abrirCanal(sessionId, userId);
+    nueva.usos = usos;
+    oyentes.forEach((f) => nueva.oyentes.add(f));
+    nueva.ultimoEstado = ultimoEstado;
+    vivo = nueva;
+    // Si esta persona estaba publicando su estado, lo vuelve a publicar: si no,
+    // reaparecería en el tablero de los demás pero sin cámara ni micro.
+    if (ultimoEstado) publicar(nueva, ultimoEstado);
+    return;
+  }
+
+  // Aunque el canal esté sano, se relee: un `sync` perdido no deja rastro.
+  const estados = leerEstados(entrada.canal);
+  entrada.oyentes.forEach((f) => f(estados));
+}
+
+function arrancarRevisor() {
+  if (revisor !== null) return;
+  revisor = window.setInterval(revisarSalud, REVISION_MS);
+  // Volver a la pestaña es EL momento en que el coordinador vuelve a mirar:
+  // ahí no se espera al próximo tic.
+  document.addEventListener("visibilitychange", alVolverAMirar);
+}
+
+function alVolverAMirar() {
+  if (document.visibilityState === "visible") revisarSalud();
+}
+
+function publicar(entrada: CanalVivo, state: MediaState) {
+  entrada.ultimoEstado = state;
+  entrada.canal.track({
+    user_id: entrada.userId,
+    micOn: state.micOn,
+    camOn: state.camOn,
+    screenShareOn: state.screenShareOn,
+    onBreak: !!state.onBreak,
+    breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
+    faceState: state.faceState ?? null,
+    faceSince: state.faceSince ?? null,
+  });
+}
+
 /** Cierra la presencia de verdad. Solo al salir de la sala o cambiar de sesión:
  *  desde acá el resto ve el `leave`, que es lo correcto en ese caso. */
 export function salirDePresencia() {
@@ -135,6 +211,7 @@ export function useCoworkMediaPresence(
       vivo = null;
     }
     if (!vivo) vivo = abrirCanal(sessionId, userId);
+    arrancarRevisor();
 
     const entrada = vivo;
     entrada.usos += 1;
@@ -160,17 +237,7 @@ export function useCoworkMediaPresence(
     (state: MediaState) => {
       const entrada = vivo;
       if (!entrada || entrada.userId !== userId) return;
-      entrada.ultimoEstado = state;
-      entrada.canal.track({
-        user_id: userId,
-        micOn: state.micOn,
-        camOn: state.camOn,
-        screenShareOn: state.screenShareOn,
-        onBreak: !!state.onBreak,
-        breakStartedAt: state.onBreak ? (state.breakStartedAt ?? Date.now()) : null,
-        faceState: state.faceState ?? null,
-        faceSince: state.faceSince ?? null,
-      });
+      publicar(entrada, state);
     },
     [userId],
   );

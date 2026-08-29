@@ -33,6 +33,7 @@ export interface FaceWatch {
 }
 
 const SAMPLE_MS = 3000;
+const MAX_SIN_CUADROS = 5;
 // Debajo de esto la cara ocupa tan poco cuadro que no sirve para supervisar.
 const MIN_FACE_RATIO = 0.035;
 // Luminancia media (0-255) por debajo de la cual la imagen es una sombra.
@@ -110,6 +111,17 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
       return;
     }
 
+    // Y al VOLVER a encenderla hay que soltar el `cam_off` YA, sin esperar al
+    // primer muestreo (que tarda hasta 3 s). Si no, el supervisor —que revisa
+    // cada 5 s— alcanzaba a ver un `cam_off` con su `since` viejo y le
+    // reclamaba a alguien que ya había encendido la cámara. Le pasó a Jhon
+    // probando: "me llegó el aviso pero ya la tenía encendida".
+    //
+    // Se pone "ok" de arranque: es optimista por 3 segundos como mucho, y si
+    // de verdad no hay nadie el propio muestreo lo corrige enseguida. Mentir
+    // 3 segundos a favor de la persona es mejor que acusarla sin razón.
+    if (stateRef.current === "cam_off") setState("ok");
+
     if (!track || track.readyState !== "live" || !track.enabled) {
       setState("cam_off");
       return;
@@ -117,10 +129,21 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
 
     let cancelled = false;
     let timer: number | null = null;
+    // Cuántos muestreos seguidos sin poder ver un cuadro antes de admitir que
+    // no se puede supervisar. 5 x 3 s = 15 s de gracia.
+    let sinCuadros = 0;
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
     video.srcObject = new MediaStream([track]);
+    // play() NO es opcional: sin esto el elemento nunca decodifica cuadros y
+    // `readyState` se queda en 0. Funcionaba de casualidad mientras la página
+    // estaba montada; al pasar la llamada a la ventanita flotante dejaba de
+    // recibir cuadros y el muestreo salía sin tocar el estado — o sea que se
+    // quedaba clavado en el último problema y le reclamaba a alguien que estaba
+    // perfectamente frente a la cámara.
+    const asegurarReproduccion = () => { if (video.paused) video.play().catch(() => {}); };
+    asegurarReproduccion();
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
@@ -133,7 +156,16 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         return; // sin detector no reintentamos: no hay nada que mejore solo
       }
       try {
-        if (video.readyState < 2 || !video.videoWidth) return;
+        if (video.readyState < 2 || !video.videoWidth) {
+          asegurarReproduccion();
+          // Si no se pueden ver cuadros por un rato, hay que DECIRLO en vez de
+          // dejar el último problema colgado. "No puedo ver" no es lo mismo que
+          // "no estás", y acusar a alguien de algo que no se puede comprobar es
+          // la peor falla posible en una función de supervisión.
+          if (++sinCuadros >= MAX_SIN_CUADROS) setState("unavailable");
+          return;
+        }
+        sinCuadros = 0;
         // 192px de ancho: BlazeFace corto trabaja con entradas chicas y así el
         // muestreo no compite con el encoder de la llamada.
         const w = 192;
