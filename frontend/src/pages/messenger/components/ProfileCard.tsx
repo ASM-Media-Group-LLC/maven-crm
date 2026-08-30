@@ -113,7 +113,7 @@ function CardBody({ data, onSend, sending }: { data: KarmaProfile; onSend: () =>
           </div>
         </div>
 
-        {/* Mandar karma */}
+        {/* Mandar karma — solo en fichas de otras personas */}
         {!data.is_self && (
           <div className="mt-5">
             <button
@@ -132,18 +132,18 @@ function CardBody({ data, onSend, sending }: { data: KarmaProfile; onSend: () =>
                   : sending ? <Loader2 className="h-4 w-4 animate-spin" />
                     : <><Heart className="h-[17px] w-[17px] fill-current" /> Mandar Karma</>}
             </button>
+          </div>
+        )}
 
-            {/* medidor hacia el 70% — SOLO admin */}
-            {admin && !legend && (
-              <div className="mt-3">
-                <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5 font-semibold">
-                  <span>Karma del equipo</span>
-                  <span className="font-mono" style={{ color: GOLD }}>{data.vote_pct}%</span>
-                </div>
-                <div className="kp-track"><div className="kp-fill" style={{ width: `${Math.min(100, data.vote_pct)}%` }} /><div className="kp-goal" /></div>
-                <div className="text-[10.5px] text-muted-foreground/70 mt-1.5 text-center">Al 70% se enciende la estrella dorada ✨</div>
-              </div>
-            )}
+        {/* Medidor "Karma del equipo" hacia el 70% — visible para TODOS (propia o ajena) */}
+        {!legend && (
+          <div className={data.is_self ? "mt-5" : "mt-3"}>
+            <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5 font-semibold">
+              <span>Karma del equipo</span>
+              <span className="font-mono" style={{ color: GOLD }}>{data.vote_pct}%</span>
+            </div>
+            <div className="kp-track"><div className="kp-fill" style={{ width: `${Math.min(100, data.vote_pct)}%` }} /><div className="kp-goal" /></div>
+            <div className="text-[10.5px] text-muted-foreground/70 mt-1.5 text-center">Al 70% se enciende la estrella dorada ✨</div>
           </div>
         )}
 
