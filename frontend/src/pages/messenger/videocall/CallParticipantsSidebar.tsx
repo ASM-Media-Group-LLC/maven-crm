@@ -33,7 +33,7 @@ export default function CallParticipantsSidebar({
   });
 
   return (
-    <div className="w-80 flex flex-col bg-background border-l border-secondary rounded-l-xl">
+    <div className="w-80 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:w-full max-sm:z-30 flex flex-col bg-background border-l border-secondary rounded-l-xl">
       <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
         <h3 className="text-sm font-medium text-foreground">
           Participantes ({participants.length})

@@ -470,7 +470,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     };
 
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4 p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-full flex flex-col items-center justify-center gap-4 p-4">
         <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
           <div className="flex items-center justify-center h-14 w-14 rounded-full bg-primary/10">
             <DoorOpen className="h-7 w-7 text-primary" />
@@ -521,6 +522,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </Button>
         </div>
       </div>
+      </div>
     );
   }
 
@@ -565,9 +567,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col flex-1 min-h-0 bg-background">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-card border-b border-border z-10 shrink-0">
+      <div className="flex items-center justify-between px-3 md:px-4 py-1 md:py-2 bg-card border-b border-border z-10 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           {isInOneOnOne ? (
             <>
@@ -638,15 +640,35 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         </div>
 
         {/* Mobile actions dropdown */}
-        <div className="flex md:hidden items-center gap-1">
+        <div className="flex md:hidden items-center gap-1 shrink-0">
+          {breakStartedAt && (() => {
+            const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
+            return (
+              <button
+                type="button"
+                onClick={() => toggleBreak()}
+                title="Avisar que volviste"
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2.5 h-8 text-[11px] tabular-nums shrink-0",
+                  // Fondo y borde para que se lea como un botón: sin esto queda
+                  // texto suelto y nadie adivina que tocándolo se vuelve.
+                  "bg-muted border border-border active:bg-muted/70",
+                  clasesPausa(c.estado),
+                )}
+              >
+                <Coffee className="h-3.5 w-3.5" />
+                {c.texto}
+              </button>
+            );
+          })()}
           {dismissedActiveRequest && !isInOneOnOne && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
+            <Button variant="ghost" size="icon" className="text-amber-500 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" />
             </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-full">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-full">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

@@ -145,7 +145,8 @@ export default function CoworkPage() {
   // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-4 md:p-6">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6">
         {!loadingSessions && mySessions.length > 0 && (
           <div className="w-full max-w-lg flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
@@ -154,17 +155,18 @@ export default function CoworkPage() {
             {mySessions.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3"
+                className="flex flex-wrap items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3"
               >
                 <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
                   <Users2 className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-foreground truncate">{s.name}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground truncate">
                     {s.role === "host" ? "Host" : "Participante"} · {s.members} {s.members === 1 ? "miembro" : "miembros"}
                   </div>
                 </div>
+                <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
                 {s.role === "host" && (
                   <Button
                     variant="ghost"
@@ -188,6 +190,7 @@ export default function CoworkPage() {
                 >
                   Volver <ArrowRight className="h-4 w-4" />
                 </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -287,13 +290,14 @@ export default function CoworkPage() {
             }}
           />
         )}
+  </div>
       </div>
     );
   }
 
   if (cowork.loading || autoJoining) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center flex-1 min-h-0">
         <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
       </div>
     );
@@ -339,7 +343,8 @@ function CoworkSessionEndedRedirect() {
   }, [navigate]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen gap-5 p-4 md:p-6">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="min-h-full flex flex-col items-center justify-center gap-5 p-4 md:p-6">
       <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
           <Users2 className="h-7 w-7 text-muted-foreground" />
@@ -353,6 +358,7 @@ function CoworkSessionEndedRedirect() {
           Volver al dashboard
         </Button>
       </div>
+    </div>
     </div>
   );
 }

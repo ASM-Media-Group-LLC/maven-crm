@@ -83,6 +83,15 @@ interface LiveKitCallViewProps {
   shareLink?: string;
 }
 
+/** ¿Este dispositivo se maneja con el dedo? Se mide una sola vez: nadie cambia
+ *  de mouse a pantalla táctil en medio de una llamada. */
+function usePunteroGrueso(): boolean {
+  const [grueso] = useState(() => {
+    try { return window.matchMedia("(pointer: coarse)").matches; } catch { return false; }
+  });
+  return grueso;
+}
+
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
@@ -110,6 +119,25 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return () => ro.disconnect();
   }, [lk.connectionState]);
   const effectiveCompact = compact || autoCompact;
+  // ¿Los controles se van a tocar con un dedo?
+  //
+  // El modo compacto se inventó para la ventana flotante de 340px, donde los
+  // botones de 28px se usan con un mouse y están bien. En un teléfono la misma
+  // fila se dibuja igual de chica pero se toca con el pulgar.
+  //
+  // Se pregunta por el TIPO DE PUNTERO, no por el tamaño del contenedor. Un
+  // primer intento usaba `!compact && autoCompact` con el argumento de que
+  // `compact` solo llega por prop desde la ventana flotante: era falso. El Hub
+  // del supervisor dibuja la llamada por CallOutlet, donde el provider pasa
+  // `compact={false}`, y su panel mide menos de 640px — así que en un escritorio
+  // con mouse se prendían los botones grandes. Lo mismo con la sala activa y la
+  // llamada 1:1 en cualquier ventana de menos de ~1216px.
+  //
+  // Se conserva el `!compact` para dejar intactas la ventana flotante y el PiP,
+  // que aunque se abran desde una tablet son demasiado chicos para agrandar
+  // nada adentro.
+  const punteroGrueso = usePunteroGrueso();
+  const tactil = !compact && autoCompact && punteroGrueso;
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   // Sube cuando la persona aprieta "Usar aquí" tras haber sido sacada por
   // otra pestaña. Está en las dependencias del efecto de conexión: subirlo
@@ -422,7 +450,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     : "grid-cols-3 md:grid-cols-4";
 
   return (
-    <div ref={rootRef} className="flex flex-col h-full bg-background text-foreground">
+    <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
       <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
 
       {lk.isReconnecting && (
@@ -450,7 +478,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="relative flex-1 flex overflow-hidden">
         <div className="relative flex-1 p-3 overflow-hidden">
           <div className="absolute left-5 top-5 z-20">
             <RecordingControl
@@ -593,6 +621,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         leaveLabel={leaveLabel}
         leaveIcon={leaveIcon}
         compact={effectiveCompact}
+        tactil={tactil}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
       />

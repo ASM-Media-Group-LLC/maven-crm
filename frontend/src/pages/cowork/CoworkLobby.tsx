@@ -25,7 +25,8 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen p-4 md:p-6">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="min-h-full flex items-center justify-center p-4 md:p-6">
       <div className="max-w-md w-full bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden">
         {/* Header */}
         <div className="flex flex-col items-center gap-3 px-6 md:px-8 pt-8 md:pt-10 pb-5 md:pb-6">
@@ -64,6 +65,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
             ID: {sessionId}
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

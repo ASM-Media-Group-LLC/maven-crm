@@ -106,6 +106,37 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     return { x: window.innerWidth - 360, y: window.innerHeight - 280 };
   });
 
+  // En una pantalla angosta la ventanita de 340px no entra; se achica al ancho
+  // disponible en vez de salirse. Va en ESTADO, no leído en el render: lo único
+  // que re-renderiza al cambiar de tamaño es `acotar`, y `acotar` devuelve el
+  // mismo objeto —y React corta el render— cuando la posición ya estaba
+  // acotada. Leerlo en el render lo dejaba viejo justo en ese caso.
+  const [anchoPantalla, setAnchoPantalla] = useState(() => window.innerWidth);
+  const anchoFlotante = Math.min(minimizada ? 220 : 340, anchoPantalla - 16);
+
+  // Traerla de vuelta a la pantalla: al montar (la posición guardada puede ser
+  // de un monitor mucho más ancho) y cada vez que la ventana cambia de tamaño
+  // o el teléfono rota.
+  useEffect(() => {
+    const acotar = () => {
+      setAnchoPantalla(window.innerWidth);
+      setPos((p) => {
+      const ancho = Math.min(minimizada ? 220 : 340, window.innerWidth - 16);
+      const alto = minimizada ? 44 : 240;
+      const x = Math.min(Math.max(8, p.x), Math.max(8, window.innerWidth - ancho - 8));
+      const y = Math.min(Math.max(8, p.y), Math.max(8, window.innerHeight - alto - 8));
+      return x === p.x && y === p.y ? p : { x, y };
+      });
+    };
+    acotar();
+    window.addEventListener("resize", acotar);
+    window.addEventListener("orientationchange", acotar);
+    return () => {
+      window.removeEventListener("resize", acotar);
+      window.removeEventListener("orientationchange", acotar);
+    };
+  }, [minimizada]);
+
   const startCall = useCallback((next: CallConfig) => {
     setConfig(next);
     setMinimizada(false);
@@ -148,6 +179,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     const soltar = () => {
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", soltar);
       setPos((p) => {
         try { window.localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* noop */ }
         return p;
@@ -155,6 +187,9 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     };
     window.addEventListener("pointermove", mover);
     window.addEventListener("pointerup", soltar);
+    // Sin esto, un gesto que el navegador se queda como scroll dejaba el
+    // listener de pointermove pegado a window para siempre.
+    window.addEventListener("pointercancel", soltar);
   }, [pos, floatEl]);
 
   const ctx = useMemo<Ctx>(
@@ -249,10 +284,10 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
         <div
           ref={setFloatEl}
           className="fixed z-[150] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
-          style={{ left: pos.x, top: pos.y, width: minimizada ? 220 : 340, height: minimizada ? 44 : 240 }}
+          style={{ left: pos.x, top: pos.y, width: anchoFlotante, height: minimizada ? 44 : 240 }}
         >
           <div
-            className="flex items-center justify-between gap-1 px-2 py-1.5 bg-muted border-b border-border shrink-0 cursor-grab active:cursor-grabbing"
+            className="flex items-center justify-between gap-1 px-2 py-1.5 bg-muted border-b border-border shrink-0 touch-none cursor-grab active:cursor-grabbing"
             onPointerDown={onDragStart}
           >
             <span className="flex items-center gap-1.5 text-[11px] text-foreground/80 truncate">
