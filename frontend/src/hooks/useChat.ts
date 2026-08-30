@@ -1190,7 +1190,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   const deleteMessage = useCallback(async (messageId: string) => {
     // Mensaje LOCAL no confirmado (sending/failed): no existe en la BD → descartarlo local
-    // y quitarlo de la cola persistente (permite descartar un fallido que no querés reintentar).
+    // y quitarlo de la cola persistente (permite descartar un fallido que no quieres reintentar).
     const local = messagesRef.current.find((m) => m.id === messageId);
     if (local?._localStatus) {
       optimisticIdsRef.current.delete(messageId);

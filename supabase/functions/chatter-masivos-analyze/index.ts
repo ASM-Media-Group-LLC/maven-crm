@@ -10,9 +10,9 @@ const cors = (req: Request) => corsFor(req);
 const json = (req: Request, b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors(req), "Content-Type": "application/json" } });
 const stripHtml = (h: string) => String(h || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 
-const SYSTEM_PROMPT = `Sos un evaluador de calidad de MENSAJES MASIVOS (PPV/blasts) de una agencia de OnlyFans. Te paso una lista de masivos con su COPY y su PERFORMANCE real: enviado (sent), veces visto (viewed), ventas (purchased), dinero recaudado (earnings), precio. Analizá la CALIDAD del copy cruzada con el rendimiento: gancho/hook, claridad de la oferta, llamado a la acción (CTA), urgencia/escasez, precio vs conversión, personalización, longitud. Identificá qué patrones de copy convierten y cuáles no.
+const SYSTEM_PROMPT = `Eres un evaluador de calidad de MENSAJES MASIVOS (PPV/blasts) de una agencia de OnlyFans. Te paso una lista de masivos con su COPY y su PERFORMANCE real: enviado (sent), veces visto (viewed), ventas (purchased), dinero recaudado (earnings), precio. Analiza la CALIDAD del copy cruzada con el rendimiento: gancho/hook, claridad de la oferta, llamado a la acción (CTA), urgencia/escasez, precio vs conversión, personalización, longitud. Identifica qué patrones de copy convierten y cuáles no.
 
-Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown ni texto extra) con estas claves:
+Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto extra) con estas claves:
 {
   "resumen": "diagnóstico general en 2-4 frases",
   "que_funciona": ["patrón/elemento de copy que está rindiendo, con evidencia de los números", "..."],
@@ -21,7 +21,7 @@ Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown ni texto extra) con estas 
   "mejores_copies": ["cita textual breve del copy que mejor rinde", "..."],
   "peores_copies": ["cita textual breve del copy que peor rinde (alto envío/visto, baja venta)", "..."]
 }
-Reglas: español neutro y accionable. Usá SOLO la evidencia (no inventes números). Sé específico: referí ganchos/frases concretas. Considerá la conversión (ventas/visto) y no solo el total de dinero.`;
+Reglas: español neutro y accionable. Usa SOLO la evidencia (no inventes números). Sé específico: refiere ganchos/frases concretas. Considera la conversión (ventas/visto) y no solo el total de dinero.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     return `${i + 1}. [${tipo}] enviado:${m.sent || 0} visto:${m.viewed || 0} ventas:${m.purchased || 0} $:${m.earnings || 0} precio:${m.price || 0} conv:${conv}% — "${stripHtml(m.copy).slice(0, 220)}"`;
   }).join("\n");
 
-  const userMessage = `Modelo: ${modelName}. ${masivos.length} masivos (muestra top ${top.length} por envío):\n\n${lines}\n\nDevolvé SOLO el JSON con el shape pedido.`;
+  const userMessage = `Modelo: ${modelName}. ${masivos.length} masivos (muestra top ${top.length} por envío):\n\n${lines}\n\nDevuelve SOLO el JSON con el shape pedido.`;
 
   let text = "";
   try {

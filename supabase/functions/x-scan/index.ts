@@ -168,14 +168,14 @@ const VISION_MODEL = "google/gemini-2.5-flash";
 // 30→60 (2026-07-22): con las corridas livianas (#935 persistir solo promos) hay
 // presupuesto para repescar el doble de tweets "mudos de texto pero con foto".
 const MAX_VISION_PER_RUN = 60;
-const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. CÓMO SE PROMOCIONA EN X (Twitter): el link a su OnlyFans/funnel vive en la BIO del perfil, y los posts (selfies, fotos sugerentes, frases coquetas o personales acompañadas de un link) son el ANZUELO para mandar al fan a ese link. Por eso, en X, casi TODO post de la creadora con un link o una invitación APUNTA a su contenido pago — el link suele ser un acortado t.co que redirige a su bio/funnel.
-Mirá la imagen + el texto de este post de X de una creadora y decidí si promociona su contenido pago.
+const X_VISION_PROMPT = `Eres analista de una agencia de OnlyFans. CÓMO SE PROMOCIONA EN X (Twitter): el link a su OnlyFans/funnel vive en la BIO del perfil, y los posts (selfies, fotos sugerentes, frases coquetas o personales acompañadas de un link) son el ANZUELO para mandar al fan a ese link. Por eso, en X, casi TODO post de la creadora con un link o una invitación APUNTA a su contenido pago — el link suele ser un acortado t.co que redirige a su bio/funnel.
+Mira la imagen + el texto de este post de X de una creadora y decide si promociona su contenido pago.
 promoted=true si se cumple CUALQUIERA:
 - se ve a la creadora o una foto sugerente/personal Y el post trae un link (aunque sea acortado t.co) o una invitación a verla/seguirla;
 - menciona OnlyFans / su contenido / "link in bio" / suscríbete / precio / descuento;
 - se ve un link/handle/logo de una plataforma de pago.
 promoted=false SOLO si claramente NO es promo de SU contenido: comentario de fútbol/deportes/noticias SIN foto de ella, un meme genérico, o publicidad de una MARCA/sponsor ajeno. OJO: un casino/apuestas/"gana dinero"/negocio/referido NO es su contenido pago (aunque tenga link) → promoted=false.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
+Responde SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
@@ -593,7 +593,7 @@ Deno.serve(async (req: Request) => {
       }
       runStats.push({ chunk: chunk.length, tweets: items.length });
     } catch (e) {
-      // Marcá como "no leída" a TODA creadora con al menos un handle en este lote caído.
+      // Marca como "no leída" a TODA creadora con al menos un handle en este lote caído.
       for (const h of chunk) { const c = byHandle.get(h); if (c) failedCreatorIds.add(c.id); }
       runStats.push({ chunk: chunk.length, error: String((e as Error)?.message || e) });
     }

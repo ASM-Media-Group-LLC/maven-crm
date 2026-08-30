@@ -27,9 +27,9 @@ const LLM_MODEL = Deno.env.get("WHATSAPP_LLM_MODEL")
 const LLM_TIMEOUT_MS = 30_000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
-const VISION_PROMPT = `Sos un analista de imágenes para un equipo de ventas de agencias de OnlyFans. Te van a pasar una imagen que una modelo/lead mandó por WhatsApp en una conversación 1:1 con el equipo. Tu tarea: extraer toda la info útil de la imagen para que el bot que asiste al equipo pueda entender el contexto de la conversación.
+const VISION_PROMPT = `Eres un analista de imágenes para un equipo de ventas de agencias de OnlyFans. Te van a pasar una imagen que una modelo/lead mandó por WhatsApp en una conversación 1:1 con el equipo. Tu tarea: extraer toda la info útil de la imagen para que el bot que asiste al equipo pueda entender el contexto de la conversación.
 
-Devolvé JSON estricto con esta forma:
+Devuelve JSON estricto con esta forma:
 
 {
   "description": "qué es la imagen, en 1-2 oraciones (ej. 'comprobante de transferencia bancaria por $200' o 'selfie de la modelo' o 'screenshot de su perfil de Instagram')",
@@ -40,7 +40,7 @@ Devolvé JSON estricto con esta forma:
 }
 
 REGLAS:
-- Si el texto es OCR, transcribilo TAL CUAL aparece, sin corregir typos. Preservá emojis y ortografía.
+- Si el texto es OCR, transcríbelo TAL CUAL aparece, sin corregir typos. Preserva emojis y ortografía.
 - NO inventes menciones que no estén visibles claramente.
 - Si hay comprobante de transferencia/factura/payment, contains_payment_proof=true.
 - description es BREVE — máx 2 oraciones. No describas color de fondo ni cosas irrelevantes.

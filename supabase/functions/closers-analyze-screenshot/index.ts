@@ -30,9 +30,9 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // igual que el file_size_limit del buc
 const MAX_ATTEMPTS = 3;
 const BUCKET = "closer-evidence";
 
-const VISION_PROMPT = `Sos un analista para el equipo comercial (closers) de una agencia de OnlyFans. Un closer adjuntó esta captura a la ficha de un lead en el CRM, como evidencia de lo que pasó con ese contacto. Extraé lo que le sirva al asistente del equipo para entender en qué quedó el caso y poder hacerle seguimiento.
+const VISION_PROMPT = `Eres un analista para el equipo comercial (closers) de una agencia de OnlyFans. Un closer adjuntó esta captura a la ficha de un lead en el CRM, como evidencia de lo que pasó con ese contacto. Extrae lo que le sirva al asistente del equipo para entender en qué quedó el caso y poder hacerle seguimiento.
 
-Devolvé JSON estricto con esta forma:
+Devuelve JSON estricto con esta forma:
 
 {
   "description": "qué muestra la captura, en 1-2 oraciones (ej. 'conversación de WhatsApp donde la agencia pide precios de BLU' o 'comprobante de pago de suscripción por $249')",
@@ -45,10 +45,10 @@ Devolvé JSON estricto con esta forma:
 }
 
 REGLAS:
-- El OCR va TAL CUAL aparece, sin corregir typos. Preservá emojis y ortografía.
-- NO inventes nada que no esté visible. Si no se ve, dejá el campo vacío.
+- El OCR va TAL CUAL aparece, sin corregir typos. Preserva emojis y ortografía.
+- NO inventes nada que no esté visible. Si no se ve, deja el campo vacío.
 - description es BREVE — máx 2 oraciones, sin describir colores ni cosas irrelevantes.
-- lead_signal es tu lectura de en qué quedó el contacto según lo que se ve. Si la captura no dice nada del estado, usá "informativo".
+- lead_signal es tu lectura de en qué quedó el contacto según lo que se ve. Si la captura no dice nada del estado, usa "informativo".
 - next_step SOLO si está explícito en la imagen.
 
 OUTPUT: solo JSON. Sin markdown, sin explicaciones.`;

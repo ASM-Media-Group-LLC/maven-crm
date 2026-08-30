@@ -185,7 +185,7 @@ const SectionThumbs = ({
         section_index: index,
         section_label: label ?? null,
         // Si todavía no hay voto explícito, asumimos 👎 cuando hay nota
-        // (es lo más común — querés explicar por qué algo está mal).
+        // (es lo más común — quieres explicar por qué algo está mal).
         thumbs: existing?.thumbs ?? -1,
         note: trimmed || null,
         suggested_score: numericScore,

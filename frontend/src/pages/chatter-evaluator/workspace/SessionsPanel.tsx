@@ -262,7 +262,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   // en PR #139 (dos subscriptions overlapping a chatter_messages).
   //
   // Lag perceptual: hasta ~2s (intervalo del polling). Aceptable para
-  // "tenés mensaje pendiente en otra conversación".
+  // "tienes mensaje pendiente en otra conversación".
   //
   // Skip del primer render (prev=null) para no sonar al cargar la
   // app si ya había mensajes pendientes de antes.

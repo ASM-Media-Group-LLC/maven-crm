@@ -92,7 +92,7 @@ export default function MessageList({
   }, []);
 
   // Al abrir/cambiar de conversación → al fondo. Con la MISMA conversación, si llega un
-  // mensaje nuevo y estabas abajo (o lo mandaste vos), seguí el fondo; si estabas arriba,
+  // mensaje nuevo y estabas abajo (o lo mandaste tú), sigue el fondo; si estabas arriba,
   // contalo para el badge.
   useEffect(() => {
     const el = scrollRef.current;

@@ -62,7 +62,7 @@ serve(async (req) => {
   }
 
   // whoami: ¿de qué cuenta de IG es la sesión (IG_SESSION_COOKIE)? Devuelve SOLO el
-  // user-id + @usuario resuelto — NUNCA el sessionid. Para confirmar que seguís a las
+  // user-id + @usuario resuelto — NUNCA el sessionid. Para confirmar que sigues a las
   // creadoras desde la MISMA cuenta que escanea.
   if (body.whoami) {
     const cookie = Deno.env.get("IG_SESSION_COOKIE") ?? "";
@@ -501,7 +501,7 @@ function buildCheckResultMessage(
     } else if (r.status === "restricted") {
       lines.push(`⚠️ @${r.handle} — existe pero no se puede leer (restringida o privada)`);
     } else {
-      lines.push(`❓ @${r.handle} — sin dato (blip del scraper; pedí reintentar esta)`);
+      lines.push(`❓ @${r.handle} — sin dato (blip del scraper; pide reintentar esta)`);
     }
   }
   if (results.some((r) => r.status === "broken")) {
@@ -526,7 +526,7 @@ function buildCheckResultMessage(
 function buildCheckFailureMessage(handles: string[], requestedBy: string | null, reason: string): string {
   const quien = requestedBy ? ` ${requestedBy},` : "";
   const lista = handles.map((h) => `@${h}`).join(", ");
-  return `⚠️${quien} no pude completar el chequeo de ${lista} — ${reason}. Reintentá pidiéndomelo de nuevo en unos minutos.`;
+  return `⚠️${quien} no pude completar el chequeo de ${lista} — ${reason}. Reintenta pidiéndomelo de nuevo en unos minutos.`;
 }
 
 async function postCheckToGroup(groupId: string, body: string): Promise<{ ok: boolean; error?: string }> {

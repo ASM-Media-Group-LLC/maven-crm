@@ -149,7 +149,7 @@ serve(async (req) => {
     //   A / B+ / B / C+ / C / null → standard (Sonnet 4.6) — buen
     //   balance calidad/costo, suficiente para el grueso del catálogo.
     //
-    // Override por env si querés ajustar:
+    // Override por env si quieres ajustar:
     //   CLAUDE_MODEL_PREMIUM   — modelo para A++/A+ (default: claude-opus-4-7)
     //   CLAUDE_MODEL_STANDARD  — modelo para el resto (default: claude-sonnet-4-6)
     //   CLAUDE_MODEL           — legacy/fuerza para TODAS las calls (override total)

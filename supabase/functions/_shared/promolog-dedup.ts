@@ -1,7 +1,7 @@
 // promolog-dedup.ts — la identidad de una fila de promolog, en un solo lugar.
 //
 // POR QUÉ EXISTE: promolog reinsertaba todo en cada corrida. La deduplicación era
-// de aplicación ("buscá antes de insertar") y encima condicional:
+// de aplicación ("busca antes de insertar") y encima condicional:
 //
 //     if (p.permalink) { ...buscar duplicado... }   ← sin permalink NI SE EJECUTA
 //

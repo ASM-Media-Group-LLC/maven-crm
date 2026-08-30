@@ -53,11 +53,11 @@ Deno.test("positivos: todo formato real de teléfono se enmascara", () => {
     ["La creadora de Madrid: +34 612 345 678.", ["34612345678"], "España 9"],
     ["La de Madrid contesto, su numero es 612 34 56 78.", ["612345678"], "España pares 3-2-2-2"],
     ["+56 9 8765 4321 es el de Camila.", ["56987654321"], "Chile"],
-    ["Escribile por https://wa.me/573001234567 antes de las 6.", ["573001234567"], "wa.me con https"],
+    ["Escríbele por https://wa.me/573001234567 antes de las 6.", ["573001234567"], "wa.me con https"],
     ["Link directo: https://api.whatsapp.com/send?phone=573001234567", ["573001234567"], "api.whatsapp phone="],
     ["wa.me/573001234567 — ahi la ubicas.", ["573001234567"], "wa.me sin protocolo"],
-    ["seguí por https://t.me/+573001234567 mejor", ["573001234567"], "t.me/+ (Telegram)"],
-    ["probá https://wa.me/%2B573001234567 si no abre", ["573001234567"], "wa.me con %2B"],
+    ["sigue por https://t.me/+573001234567 mejor", ["573001234567"], "t.me/+ (Telegram)"],
+    ["prueba https://wa.me/%2B573001234567 si no abre", ["573001234567"], "wa.me con %2B"],
     ["el link https://wa.me/57-300-123-4567 que pasó ella", ["573001234567"], "wa.me malformado con guiones"],
     ["La conversacion es 573001234567@s.whatsapp.net.", ["573001234567"], "JID en prosa"],
     ["Dejo el tel 300.123.4567 por si lo necesitan.", ["3001234567"], "puntos terminando en 4"],
@@ -114,9 +114,9 @@ Deno.test("negativos: cifras, fechas, rangos y handles quedan byte a byte", () =
     ["cerró $3,443 este mes", "coma inglesa"],
     ["llegó a 1,234 followers", "followers con coma"],
     ["**33 leads** nuevos, **0 números** cargados, **245 registros**", "negrita markdown"],
-    ["mirá https://instagram.com/dani2603592 y confirmame", "URL con dígitos"],
+    ["mira https://instagram.com/dani2603592 y confírmame", "URL con dígitos"],
     ["María, dani2603592 no es ex-creadora — es lead nueva", "handle con dígitos en prosa"],
-    ["@143250161664036 revisá esto cuando puedas", "mención LID"],
+    ["@143250161664036 revisa esto cuando puedas", "mención LID"],
     ["promo solo 8 de 22 días", "números cortos"],
     ["le puse 7/10 y a la otra 9/10", "notas"],
     ["el corte va de 14:00 a 16:00", "rango horario"],
@@ -132,7 +132,7 @@ Deno.test("mixtos: la plata queda, el teléfono no", () => {
   const o2 = redactPhones("la lead del +573001234567 gastó $12.450 (32% del total)");
   assert(o2.includes("$12.450 (32% del total)") && !soloDigitos(o2).includes("573001234567"), o2);
 
-  const o3 = redactPhones("mandale $50 al 3001234567 antes del corte");
+  const o3 = redactPhones("mándale $50 al 3001234567 antes del corte");
   assert(o3.includes("$50") && !soloDigitos(o3).includes("3001234567"), o3);
 
   // El monto y el teléfono en el MISMO candidato: se enmascara entero. Se pierde el
@@ -146,18 +146,18 @@ Deno.test("límites aceptados: quedan documentados para que un cambio sea consci
   // es-CO por forma. En la base, TODOS los teléfonos con puntos terminan en grupo de 4
   // (se enmascaran); esto solo fugaría con un fijo escrito "12.345.678", inexistente
   // en la prosa real del bot. Si algún día aparece, este test truena y se re-decide.
-  assertEquals(redactPhones("posible cliente 12.345.678, llamalo"), "posible cliente 12.345.678, llamalo");
+  assertEquals(redactPhones("posible cliente 12.345.678, llámalo"), "posible cliente 12.345.678, llámalo");
   assertEquals(redactPhones("el fijo viejo 2.345.678 de la oficina"), "el fijo viejo 2.345.678 de la oficina");
   // "$" pegado a una corrida única de dígitos = plata. "$3001234567" (typo) fugaría.
-  assertEquals(redactPhones("cobrale al $3001234567 de ayer"), "cobrale al $3001234567 de ayer");
+  assertEquals(redactPhones("cóbrale al $3001234567 de ayer"), "cóbrale al $3001234567 de ayer");
   // Teléfono pegado a una LETRA (typo): el lookbehind bloquea el primer dígito pero el
   // motor re-arranca en el segundo → se enmascara desde ahí ("es3*****4567"). El número
   // NO es recuperable (solo se ve 1 dígito + los 4 finales). Los handles reales quedan a
   // salvo justamente por eso: sus corridas son de ≤7 dígitos y al saltar el primero
   // quedan en <7 ("dani2603592" intacto, ver negativos). Un handle con 8+ dígitos
   // seguidos se enmascararía parcialmente — no existe ninguno así en la base hoy.
-  const glued = redactPhones("confirmalo es3001234567 tal cual");
-  assertEquals(glued, "confirmalo es3*****4567 tal cual");
+  const glued = redactPhones("confírmalo es3001234567 tal cual");
+  assertEquals(glued, "confírmalo es3*****4567 tal cual");
   assert(!soloDigitos(glued).includes("3001234567"), "el pegado a letra debe quedar irrecuperable");
 });
 

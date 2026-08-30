@@ -75,7 +75,7 @@ function openConn(token: string, authTimeoutMs = 22000): Promise<{ query: (q: Ms
 }
 const rid = (p: string) => `${p}:${Date.now()}:${Math.floor(performance.now())}`;
 
-const SYSTEM_PROMPT = `Sos un evaluador de calidad (QA) de chatters de una agencia de OnlyFans, con el mismo criterio que usa el capacitador de chatters de la empresa. Te paso EXTRACTOS REALES de conversaciones entre un chatter y los fans de una o más modelos. IMPORTANTE: los extractos ya EXCLUYEN los mensajes MASIVOS/de cola (PPVs y blasts enviados a muchos fans a la vez) — evaluás SOLO las respuestas 1-a-1 GENUINAS que el chatter escribió de forma personal. Si hay poco 1-a-1 real, decilo en el resumen (suele indicar dependencia excesiva de masivos). Evaluá la EJECUCIÓN COMERCIAL del chatter con este lente:
+const SYSTEM_PROMPT = `Eres un evaluador de calidad (QA) de chatters de una agencia de OnlyFans, con el mismo criterio que usa el capacitador de chatters de la empresa. Te paso EXTRACTOS REALES de conversaciones entre un chatter y los fans de una o más modelos. IMPORTANTE: los extractos ya EXCLUYEN los mensajes MASIVOS/de cola (PPVs y blasts enviados a muchos fans a la vez) — evalúas SOLO las respuestas 1-a-1 GENUINAS que el chatter escribió de forma personal. Si hay poco 1-a-1 real, dilo en el resumen (suele indicar dependencia excesiva de masivos). Evalúa la EJECUCIÓN COMERCIAL del chatter con este lente:
 - Calentamiento previo (¿desarrolla conversación antes de ofrecer/vender, o manda PPV en frío?)
 - Desarrollo de la conversación (¿genera interés/conexión/curiosidad, o solo vende?)
 - Personalización (¿aprovecha historial/preferencias del fan?)
@@ -83,7 +83,7 @@ const SYSTEM_PROMPT = `Sos un evaluador de calidad (QA) de chatters de una agenc
 - Oportunidades desaprovechadas (fans con interés emocional/disposición que no se trabajan)
 - Monetización (iniciativa comercial, llamados a la acción, seguimiento)
 
-Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown, sin backticks, sin texto antes ni después) con EXACTAMENTE estas claves:
+Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown, sin backticks, sin texto antes ni después) con EXACTAMENTE estas claves:
 {
   "intro": "1-2 frases con el objetivo de la evaluación",
   "resumen": "diagnóstico general en 2-4 frases",
@@ -96,7 +96,7 @@ Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown, sin backticks, sin texto 
   "venta_masiva": {"resumen": "diagnóstico de los masivos del chatter en 2-3 frases", "mejores": [{"copy": "copy textual breve", "metricas": "enviados X · vistos Y · ventas Z · $W", "por_que": "qué lo hizo efectivo"}], "peores": [{"copy": "...", "metricas": "...", "por_que": "por qué rindió poco"}], "patrones": ["patrón que separa lo que funciona de lo que no"], "recomendaciones": ["mejora accionable para los masivos"]},
   "veredicto": "uno de: excelente | bueno | requiere_mejora | critico"
 }
-Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. SIEMPRE que menciones a un fan (en observaciones o ejemplos) referencialo por su **@username exacto** (cada extracto trae al fan como "<nombre> @username") — NO solo por el nombre, porque el supervisor necesita el @ para ubicar la conversación. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, decilo en el resumen y usá veredicto conservador. Si te paso un bloque "MASIVOS ENVIADOS POR EL CHATTER", llená "venta_masiva": compará los más efectivos (más ventas/ingresos y mejor conversión vistos→compras) con los menos, detectá PATRONES (gancho de apertura, longitud, precio, explícito vs teaser, con/sin media) y dá recomendaciones concretas. Si NO te paso ese bloque, devolvé "venta_masiva" con arrays vacíos y resumen "El chatter no envió masivos propios en las modelos evaluadas.". NO mezcles los masivos con la evaluación 1-a-1.`;
+Reglas: en español neutro, profesional y constructivo. Usa SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. SIEMPRE que menciones a un fan (en observaciones o ejemplos) referéncialo por su **@username exacto** (cada extracto trae al fan como "<nombre> @username") — NO solo por el nombre, porque el supervisor necesita el @ para ubicar la conversación. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, dilo en el resumen y usa veredicto conservador. Si te paso un bloque "MASIVOS ENVIADOS POR EL CHATTER", llena "venta_masiva": compara los más efectivos (más ventas/ingresos y mejor conversión vistos→compras) con los menos, detecta PATRONES (gancho de apertura, longitud, precio, explícito vs teaser, con/sin media) y da recomendaciones concretas. Si NO te paso ese bloque, devuelve "venta_masiva" con arrays vacíos y resumen "El chatter no envió masivos propios en las modelos evaluadas.". NO mezcles los masivos con la evaluación 1-a-1.`;
 
 const VEREDICTOS = ["excelente", "bueno", "requiere_mejora", "critico"];
 
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
   if (rErr || !report) return json(req, { error: "reporte no encontrado" }, 404);
   const allModels = (report.evaluated_models ?? []) as Array<{ model_id: number; model_name: string }>;
   if (allModels.length === 0) {
-    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Agregá al menos una modelo evaluada antes de generar el borrador IA." }).eq("id", reportId);
+    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Agrega al menos una modelo evaluada antes de generar el borrador IA." }).eq("id", reportId);
     return json(req, { error: "sin modelos evaluadas" }, 400);
   }
   // Cap de modelos: cada modelo = ~15 lecturas WS de hilos + 2 de masivos. Con muchas (un chatter
@@ -252,13 +252,13 @@ Deno.serve(async (req) => {
   if (withFeedback) {
     const { data: fb } = await sb.from("chatter_qa_section_feedback").select("section_type, thumbs, note").eq("report_id", reportId);
     const notes = (fb ?? []).filter((f: any) => f.note).map((f: any) => `- (${f.thumbs > 0 ? "👍" : "👎"} ${f.section_type}) ${f.note}`);
-    if (notes.length) feedbackBlock = `\n\n[CORRECCIONES DEL SUPERVISOR — tenelas en cuenta]\n${notes.join("\n")}`;
+    if (notes.length) feedbackBlock = `\n\n[CORRECCIONES DEL SUPERVISOR — tenlas en cuenta]\n${notes.join("\n")}`;
   }
 
   // Bloque de masivos del chatter (rankeado por ingresos) → la IA llena "venta_masiva".
   const masStats = chatterMasivos.reduce((a, m) => ({ count: a.count + 1, sent: a.sent + m.sent, viewed: a.viewed + m.viewed, purchased: a.purchased + m.purchased, earnings: a.earnings + m.earnings }), { count: 0, sent: 0, viewed: 0, purchased: 0, earnings: 0 });
   const masivosBlock = chatterMasivos.length
-    ? `\n\nMASIVOS ENVIADOS POR EL CHATTER (copy + performance; analizá esto SOLO en "venta_masiva"):\n` +
+    ? `\n\nMASIVOS ENVIADOS POR EL CHATTER (copy + performance; analiza esto SOLO en "venta_masiva"):\n` +
       chatterMasivos.slice().sort((a, b) => b.earnings - a.earnings)
         .map((m) => `[${m.type} · ${m.model}] enviados:${m.sent} vistos:${m.viewed} ventas:${m.purchased} $${m.earnings}${m.price > 0 ? ` (PPV $${m.price})` : ""} — "${m.copy}"`)
         .join("\n").slice(0, 14000)
@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     `Modelos: ${evModels.map((m) => m.model_name).join(", ")}.\n\n` +
     `EXTRACTOS DE CONVERSACIONES (CHATTER = mensajes del chatter, FAN = mensajes del fan):\n\n` +
     blocks.join("\n\n").slice(0, 60000) + feedbackBlock + masivosBlock +
-    `\n\nDevolvé SOLO el JSON con el shape pedido. "model_id" en observaciones_por_modelo debe coincidir con: ${JSON.stringify(evModels)}.`;
+    `\n\nDevuelve SOLO el JSON con el shape pedido. "model_id" en observaciones_por_modelo debe coincidir con: ${JSON.stringify(evModels)}.`;
 
   // ── Una sola llamada a Gemini 2.5 Flash vía OpenRouter (ruta paga → sin 503) ──
   let text = "", usage = { prompt_tokens: 0, completion_tokens: 0 };

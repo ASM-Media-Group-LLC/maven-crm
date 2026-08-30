@@ -36,9 +36,9 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 //   - signals.paywall_strength    → soft/medium/strong
 //   - signals.audience_vibe       → soft/medium/explicit
 //   - signals.leak_risk_signs     → señales de que su contenido se filtra
-const VISION_PROMPT = `Analizá esta story de Instagram de una creadora de contenido. Es para una agencia de OnlyFans que necesita estrategia de venta — además de detectar promo, queremos señales sobre cómo abordarla.
+const VISION_PROMPT = `Analiza esta story de Instagram de una creadora de contenido. Es para una agencia de OnlyFans que necesita estrategia de venta — además de detectar promo, queremos señales sobre cómo abordarla.
 
-Devolvé SOLO JSON con esta forma:
+Devuelve SOLO JSON con esta forma:
 {
   "promoted": true | false,
   "promotion_type": "direct" | "indirect" | "none",
@@ -66,8 +66,8 @@ CONTEXTO OPERACIONAL:
 - leak_risk_signs: cosas que sugieren contenido caro o muy expuesto (watermark grueso, "leaked content stop", paywall fuerte, etc).
 
 REGLAS ESTRICTAS:
-- NO inventes nada que no veas. Si no estás seguro, marcá unknown/null.
-- Si la imagen es lifestyle puro sin connotación, marcá promoted=false, confidence ≥ 0.8.
+- NO inventes nada que no veas. Si no estás seguro, marca unknown/null.
+- Si la imagen es lifestyle puro sin connotación, marca promoted=false, confidence ≥ 0.8.
 - Si hay duda razonable, baja la confidence (0.4-0.6) para que se revise.
 
 OUTPUT: solo JSON. Sin markdown.`;
@@ -668,11 +668,11 @@ function buildRecommendation(signals: any, profile: any): string[] {
   } else if (q === "B+") {
     recs.push("Pitch primario: **Piclink** (link safe en bio) o **Blu** si ya monetiza fuerte. Empezar por Piclink que es entry-point más barato.");
   } else if (q === "B") {
-    recs.push("Pitch primario: **Piclink** — ayudala a monetizar el tráfico que tiene sin riesgo de ban.");
+    recs.push("Pitch primario: **Piclink** — ayúdala a monetizar el tráfico que tiene sin riesgo de ban.");
   } else if (q === "C") {
     recs.push("Quality C: solo si hay capacidad. Pitch Piclink low-effort.");
   } else {
-    recs.push("Quality desconocida — pedí más info antes de pitchear.");
+    recs.push("Quality desconocida — pide más info antes de pitchear.");
   }
 
   // Cross-sell Piclink si tracker actual es problemático

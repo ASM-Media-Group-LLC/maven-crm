@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
   // Auto-tomar (desde Contactos): si el contacto YA es un lead del pipeline SIN dueño, se te
   // asigna (como "Tomar") y queda ligado (wa_contacts.closer_creator_id) para registrar el
   // contacto. Si ya es tuyo, se liga. Si es de otro closer, no se toca. Si no hay lead, no se
-  // crea (queda como contacto suelto). leadOwner=vos hace que la conversación quede tuya.
+  // crea (queda como contacto suelto). leadOwner=tú hace que la conversación quede tuya.
   if (!leadIdForContact && payload.contact_id) {
     const { data: leadRows } = await (sb as any)
       .from("closer_creators").select("id, assigned_to").eq("source_contact_id", payload.contact_id).limit(1);
@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
   // 200 + ok:false (no 422): con 4xx supabase-js devuelve "Edge Function returned a
   // non-2xx status code" SIN el cuerpo, así que el front mostraba ese texto crudo en
   // un toast rojo en vez del motivo. Mismo patrón que los rechazos de gating de arriba.
-  if (!jid) return json({ ok: false, error: "Este contacto no tiene teléfono cargado, así que no se puede abrir un chat de WhatsApp. Agregale el número desde Editar." });
+  if (!jid) return json({ ok: false, error: "Este contacto no tiene teléfono cargado, así que no se puede abrir un chat de WhatsApp. Agrégale el número desde Editar." });
 
   // ── find-or-create wa_contact (por tenant + jid) ───────────────────────────
   let contactId: string;

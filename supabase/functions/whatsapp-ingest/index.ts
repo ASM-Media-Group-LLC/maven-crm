@@ -818,7 +818,7 @@ async function firePresentationFlow(sb: SupabaseClient, groupId: string): Promis
   // 3) CTA con 4 comandos demo (cubren las 4 capacidades clave)
   await sleep(1200);
   await sendToGroup(groupId,
-    "👇 *Probame con cualquiera:*\n\n" +
+    "👇 *Pruébame con cualquiera:*\n\n" +
     "🕐 `@maven horarios de hoy`\n" +
     "✅ `@maven qué pendientes hay`\n" +
     "🔍 `@maven historial de @<handle>`\n" +
@@ -837,7 +837,7 @@ const HELP_REPLY =
   "• `@maven qué pendientes tiene [nombre]`\n" +
   "• `@maven audita el grupo` — cruzo los últimos 30 días con Maven\n" +
   "• `@maven cierre del día` — resumen del turno en vivo\n\n" +
-  "_Para reportes y anuncios de día libre, escribilo normal — los capto solo._";
+  "_Para reportes y anuncios de día libre, escríbelo normal — los capto solo._";
 
 function fireAudit(groupId: string, requestedBy: string | null): void {
   const url = `${PROJECT_URL}/functions/v1/whatsapp-audit-history`;
@@ -1373,7 +1373,7 @@ serve(async (req) => {
   const memberId = await upsertMember(sb, group, msg);
 
   // Si el mensaje es un check-in de inicio de turno ("ya activo", "dispo", etc),
-  // registralo en supervisor_state para que la regla de "ausencia no anunciada"
+  // regístralo en supervisor_state para que la regla de "ausencia no anunciada"
   // sepa que la persona ya entró. Idempotente por (user_id, día).
   maybeRegisterCheckIn(sb, msg, memberId).catch(() => {});
 

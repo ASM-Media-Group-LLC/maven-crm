@@ -2,7 +2,7 @@ import { corsFor } from "../_shared/cors.ts";
 // scrape-profile-deep — análisis deep on-demand de un perfil de Instagram.
 //
 // Llamado por la tool analyze_profile_deep del whatsapp-agent cuando un
-// closer/owner pide en el grupo "@maven analizame a @<handle>".
+// closer/owner pide en el grupo "@maven analízame a @<handle>".
 //
 // Flow:
 //   1. Validar input (handle normalizado)
@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
       ok: true,
       status: "in_flight",
       job_id: inFlight.id,
-      message: "Job ya en curso, esperá ~1 min",
+      message: "Job ya en curso, espera ~1 min",
     });
   }
 

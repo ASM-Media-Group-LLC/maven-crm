@@ -214,7 +214,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada"); }, [lk, onLeave, suppressLeaveToast]);
 
-  // Una acción de moderación puede volver con 403 del servidor (no sos
+  // Una acción de moderación puede volver con 403 del servidor (no eres
   // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
   // honor system anterior no había respuesta posible — el mensaje salía al aire
   // y nadie sabía si había pasado algo.

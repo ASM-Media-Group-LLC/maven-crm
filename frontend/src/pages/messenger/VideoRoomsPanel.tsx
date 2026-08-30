@@ -13,7 +13,7 @@ interface VideoRoomsPanelProps {
   onClose: () => void;
 }
 
-// Atajo a las reuniones desde Messenger: estás chateando y querés llamar.
+// Atajo a las reuniones desde Messenger: estás chateando y quieres llamar.
 //
 // ANTES este panel tenía su propio mecanismo de salas viviendo en el `useState`
 // de MessengerPage: se perdían al recargar, no existían para nadie más, y la

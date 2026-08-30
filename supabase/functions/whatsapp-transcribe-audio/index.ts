@@ -12,7 +12,7 @@ import { corregirTerminos } from "../_shared/whisper-postfix.ts";
 //   2. GROQ Whisper turbo como fallback automático si self-hosted falla.
 //      $0.04/h. Ver https://console.groq.com/docs/speech-text
 //
-// Si solo querés usar self-hosted (sin fallback), setear:
+// Si solo quieres usar self-hosted (sin fallback), setear:
 //   WHISPER_FALLBACK_ENABLED=false
 //
 // Si no hay ninguno seteado, marcamos el audio como '[no transcribible:

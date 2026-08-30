@@ -1,4 +1,4 @@
-// Tab "Alertas" de Scouter Assist — vista para managers que querés ver
+// Tab "Alertas" de Scouter Assist — vista para managers que quieres ver
 // rápido qué spammers están dejando tareas sin completar día a día.
 // Cada fila = (spammer × día) con totales y la cantidad de tasks
 // pendientes acumuladas.
@@ -53,7 +53,7 @@ const ScouterAlertas = () => {
   const rows = alertsQ.data ?? [];
 
   // Solo nos interesan las filas con pending > 0 — las completadas al
-  // 100% no son una alerta. Si querés ver todo, usá el tab de Mis
+  // 100% no son una alerta. Si quieres ver todo, usa el tab de Mis
   // Tareas con vista de manager.
   const alertRows = useMemo(() => rows.filter((r) => r.pending > 0), [rows]);
 

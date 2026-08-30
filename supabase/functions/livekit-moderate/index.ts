@@ -4,7 +4,7 @@ import { corsFor } from "../_shared/cors.ts";
 // POR QUÉ EXISTE: antes esto se hacía publicando un mensaje por el canal de datos
 // de LiveKit y esperando que el cliente de la víctima se muteara o se
 // desconectara solo. Era honor system — con la consola abierta, ignorabas el
-// mensaje y te quedabas — y encima el chequeo de "sos admin" que corría en el
+// mensaje y te quedabas — y encima el chequeo de "eres admin" que corría en el
 // receptor daba verdadero para cualquiera (comparaba `canPublish && canSubscribe`,
 // que todo participante tiene).
 //
@@ -143,7 +143,7 @@ serve(async (req) => {
       if (!enSala.ok) return err(req, `LiveKit ListParticipants ${enSala.status}`, 502);
       const estoyAdentro = ((enSala.data?.participants ?? []) as LkParticipant[])
         .some((p) => userIdFromIdentity(p.identity) === userId);
-      if (!estoyAdentro) return err(req, "Tenés que estar en la llamada para silenciar a alguien", 403);
+      if (!estoyAdentro) return err(req, "Tienes que estar en la llamada para silenciar a alguien", 403);
     }
 
     // Un co-anfitrión no puede tocar al anfitrión ORIGINAL (regla de Google).

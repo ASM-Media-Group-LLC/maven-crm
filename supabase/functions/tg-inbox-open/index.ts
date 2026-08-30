@@ -161,7 +161,7 @@ serve(async (req) => {
           const { data: claimed } = await (sb as any).from("closer_creators")
             .update({ assigned_to: userId, stage: "Asignada", passed_date: today })
             .eq("id", lead.id).is("assigned_to", null).select("id").maybeSingle();
-          if (claimed) leadIdForConv = lead.id;          // lo tomaste vos
+          if (claimed) leadIdForConv = lead.id;          // lo tomaste tú
         }
       } else if (lead.assigned_to === userId) {
         leadIdForConv = lead.id;                        // ya es tuyo → ligar para registrar

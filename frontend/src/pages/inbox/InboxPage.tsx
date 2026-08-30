@@ -232,7 +232,7 @@ const InboxPage = () => {
   // lista cargada, la traemos por id. Pasa cuando el botón de WhatsApp (Closers/Contactos/
   // Creadoras) recién la creó (last_message_at NULL → ordenada al final, fuera del .limit(200)),
   // cuando la lista RLS-filtrada del closer no la incluye, o con cache stale. Sin esto,
-  // `selected` quedaba null → panel "Elegí una conversación para verla" (parecía que "no abría").
+  // `selected` quedaba null → panel "Elige una conversación para verla" (parecía que "no abría").
   const inList = !!selectedId && conversations.some((c) => c.id === selectedId);
   const { data: fallbackConv = null } = useQuery({
     queryKey: ["wa-inbox-conversation-one", selectedId],

@@ -45,7 +45,7 @@ import { logGeminiUsage } from "../_shared/usage.ts";
 // Provider via OpenRouter (mismo billing que Promolog / whatsapp-analyze-image).
 // Default model Gemini 2.5 Flash — 10× más barato que Haiku ($0.075 vs $0.80
 // por M input tokens) y suficiente para extracción JSON estructurada de
-// mensajes cortos en español. Si querés cambiar el modelo (claude-haiku via
+// mensajes cortos en español. Si quieres cambiar el modelo (claude-haiku via
 // OpenRouter, gpt-4o-mini, llama-3.3-70b, etc), basta con override de la env.
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MODEL = Deno.env.get("WHATSAPP_EXTRACT_MODEL")
@@ -53,9 +53,9 @@ const MODEL = Deno.env.get("WHATSAPP_EXTRACT_MODEL")
   ?? "google/gemini-2.5-flash";
 const CLAUDE_TIMEOUT_MS = 60_000;
 
-const SYSTEM_PROMPT = `Sos un extractor de "items operativos" para un grupo de WhatsApp de un equipo de ventas/agencia. Tu tarea es leer mensajes en español (argentino/colombiano/mexicano) y detectar TODO lo que el equipo necesita rastrear, esté o no formalizado en un CRM.
+const SYSTEM_PROMPT = `Eres un extractor de "items operativos" para un grupo de WhatsApp de un equipo de ventas/agencia. Tu tarea es leer mensajes en español (argentino/colombiano/mexicano) y detectar TODO lo que el equipo necesita rastrear, esté o no formalizado en un CRM.
 
-Detectás 5 TIPOS de items (cada uno usa el campo "kind"):
+Detectas 5 TIPOS de items (cada uno usa el campo "kind"):
 
 1. *kind="promise"* — compromiso clásico: alguien dice que va a hacer algo concreto.
    - "mañana le escribo a Camila" → promise
@@ -73,7 +73,7 @@ Detectás 5 TIPOS de items (cada uno usa el campo "kind"):
    - "Juan compra 4 cuentas para Daniel" → task assignada a Juan
    - "Miguel se encarga de pasarnos más cuentas" → task a Miguel
    - "Juan pachas de comprar seguidores" → task a Juan Pachas
-   - "Todos los días entregar una cuenta nueva a Juan pachas" → task recurrente (poné due_at = mañana 11am)
+   - "Todos los días entregar una cuenta nueva a Juan pachas" → task recurrente (pon due_at = mañana 11am)
    committed_by_text = la persona ASIGNADA.
 
 4. *kind="tracking"* — ITEM CON ESTADO EVOLUTIVO que el equipo necesita seguir. Cosas que NO están en el CRM pero importan:
@@ -88,7 +88,7 @@ Detectás 5 TIPOS de items (cada uno usa el campo "kind"):
    - "verifiquemos si respondió" → followup
    - "esperando respuesta de Camila" → followup
 
-Y también detectás RESOLUCIONES (cuando alguien cierra un item):
+Y también detectas RESOLUCIONES (cuando alguien cierra un item):
    - "ya hablé con Camila, dijo que sí" → resolution outcome=done
    - "Sofi no me contestó" → outcome=no_answer
    - "dijo que mejor en otro momento" → outcome=rescheduled
@@ -96,7 +96,7 @@ Y también detectás RESOLUCIONES (cuando alguien cierra un item):
    - "ya cargamos las 4 cuentas" → resolution sobre tracking previo
 
 REGLAS:
-- Solo extraé items con SUJETO + ACCIÓN claros. NO inventes.
+- Solo extrae items con SUJETO + ACCIÓN claros. NO inventes.
 - TIEMPOS por defecto (zona horaria local del grupo):
   · "mañana a las 4PM" / "el lunes 3PM" / "el martes 10AM" → due_at exacto en zona local
   · "mañana le escribo" / "mañana le hablo" / "mañana le mando" (con acción comunicativa específica) → due_at = mañana 11:00 local (inicio típico de turno)
@@ -105,7 +105,7 @@ REGLAS:
   · "en un rato" → +2h desde el mensaje
   · "después" → kind=followup con due_at = +6h desde el mensaje
   · NUNCA poner due_at antes de las 11:00 ni después de las 19:00 local (no spamear fuera de horario laboral)
-- IMPORTANTE: si el compromiso NO incluye una hora explícita y la acción no es comunicativa (escribir, llamar, mandar), preferí kind="followup" sobre "promise". Followup no dispara recordatorios urgentes — promise sí. No conviertas un "voy a usar la cuenta mañana" en promesa con hora puntual.
+- IMPORTANTE: si el compromiso NO incluye una hora explícita y la acción no es comunicativa (escribir, llamar, mandar), prefiere kind="followup" sobre "promise". Followup no dispara recordatorios urgentes — promise sí. No conviertas un "voy a usar la cuenta mañana" en promesa con hora puntual.
 - confidence = 0.5-0.7 si ambiguo, 0.8-1.0 si claro.
 - confidence = 0.5-0.7 si ambiguo, 0.8-1.0 si claro.
 - "committed_by_text" = el ASIGNADO/COMPROMETIDO (no necesariamente el sender). Si dice "Juan compra cuentas", committed_by_text="Juan" aunque el sender sea Luis.
@@ -114,8 +114,8 @@ REGLAS:
   - "tengo ganas de", "habría que", "deberíamos" (sin asignación clara)
   - charlas off-topic, memes, saludos
   - reportes de jornada con números puros ("contactados 70") — esos los captura otro módulo
-  - ⚠️ VOS SOS EL BOT: te llamás "Maven" / "Maven Asistente" (a veces "el bot" / "el asistente"). Mensajes SOBRE vos NO son compromisos entre personas: "hay que contestarle a Maven", "le escribo a Maven", "esperá que responda Maven", "Maven quedó de mandar X", "avísale a Maven". NO los extraigas (ni como task/promise/followup con committed_by_text o target_subject = Maven / Maven Asistente / el bot). Si alguien te PIDE algo a vos, es una instrucción para el asistente, no un item del equipo.
-- Si el mensaje no contiene ningún item NI resolución, devolvé arrays vacíos. Lo más común — no inventes.
+  - ⚠️ TÚ ERES EL BOT: te llamas "Maven" / "Maven Asistente" (a veces "el bot" / "el asistente"). Mensajes SOBRE ti NO son compromisos entre personas: "hay que contestarle a Maven", "le escribo a Maven", "esperá que responda Maven", "Maven quedó de mandar X", "avísale a Maven". NO los extraigas (ni como task/promise/followup con committed_by_text o target_subject = Maven / Maven Asistente / el bot). Si alguien te PIDE algo a ti, es una instrucción para el asistente, no un item del equipo.
+- Si el mensaje no contiene ningún item NI resolución, devuelve arrays vacíos. Lo más común — no inventes.
 
 OUTPUT: JSON estricto con shape:
 {
@@ -374,7 +374,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // Insert commitments. item_kind se setea como columna dedicada (no solo en
   // metadata) para que el agent pueda filtrar/agrupar eficiente.
   const VALID_KINDS = new Set(["promise", "meeting", "task", "tracking", "followup"]);
-  // Guard: el bot ES Maven. Descartá items cuyo responsable o destinatario sea el propio
+  // Guard: el bot ES Maven. Descarta items cuyo responsable o destinatario sea el propio
   // asistente (ej. "contestar a Maven", "escribir a Maven Asistente") — no son compromisos
   // del equipo, y el LLM a veces igual los emite. Refuerza la regla del SYSTEM_PROMPT.
   const SELF_NAME = /^(maven(\s*asistente)?|el\s*bot|el\s*asistente|asistente|bot)$/i;

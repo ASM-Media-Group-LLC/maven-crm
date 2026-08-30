@@ -1208,7 +1208,7 @@ export function useLiveKit() {
           // El tipo "moderation" del canal de datos se ELIMINÓ: mutear y expulsar
           // los ejecuta ahora el servidor (edge livekit-moderate). Obedecer una
           // orden que llegaba por datos era opcional para el cliente, y el
-          // chequeo de "sos admin" que corría acá daba verdadero para cualquier
+          // chequeo de "eres admin" que corría acá daba verdadero para cualquier
           // participante (comparaba canPublish && canSubscribe).
         } catch {}
       });

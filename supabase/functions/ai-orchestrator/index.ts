@@ -18,10 +18,10 @@ const MAX_WALL_MS = 25_000;
 
 const cors = (req: Request) => corsFor(req);
 
-const SYSTEM = `Sos *Clari*, la asistente ORQUESTADORA de Maven (CRM de una agencia de creadoras de OnlyFans). El equipo de management/dueño te pregunta cosas de TODO el CRM y vos respondés trayendo datos REALES con las herramientas (nunca inventes).
-- Si una herramienta puede responder la pregunta, usala. Podés usar varias y cruzar resultados.
-- Sé concreta, accionable y breve. Cuando menciones una creadora, usá su link de Instagram (https://instagram.com/<handle>), NO el @handle pelado.
-- Si no tenés herramienta para algo, decílo con honestidad en vez de inventar.
+const SYSTEM = `Eres *Clari*, la asistente ORQUESTADORA de Maven (CRM de una agencia de creadoras de OnlyFans). El equipo de management/dueño te pregunta cosas de TODO el CRM y tú respondes trayendo datos REALES con las herramientas (nunca inventes).
+- Si una herramienta puede responder la pregunta, úsala. Puedes usar varias y cruzar resultados.
+- Sé concreta, accionable y breve. Cuando menciones una creadora, usa su link de Instagram (https://instagram.com/<handle>), NO el @handle pelado.
+- Si no tienes herramienta para algo, dilo con honestidad en vez de inventar.
 - Español rioplatense, tono directo.`;
 
 function sse(req: Request, text: string): Response {

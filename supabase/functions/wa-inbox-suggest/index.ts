@@ -27,7 +27,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-const BASE = `Sos el copiloto de ventas de una agencia de creadoras de OnlyFans, trabajando DENTRO del inbox de un closer que chatea con una creadora (lead) por WhatsApp. Español natural e informal (registro neutro/latam). NUNCA inventes datos de la creadora (nombre, país, nicho, cifras) ni resultados que no estén en el contexto que te paso; si te falta un dato, no lo afirmes.`;
+const BASE = `Eres el copiloto de ventas de una agencia de creadoras de OnlyFans, trabajando DENTRO del inbox de un closer que chatea con una creadora (lead) por WhatsApp. Español natural e informal (registro neutro/latam). NUNCA inventes datos de la creadora (nombre, país, nicho, cifras) ni resultados que no estén en el contexto que te paso; si te falta un dato, no lo afirmes.`;
 
 const ACTIONS: Record<string, { system: string; instruction: (who: string) => string; maxTokens: number }> = {
   suggest: {
@@ -35,13 +35,13 @@ const ACTIONS: Record<string, { system: string; instruction: (who: string) => st
 
 Tu tarea: redactar EL PRÓXIMO MENSAJE que el closer le enviaría a ELLA, listo para mandar.
 REGLAS DE ORO:
-- Hablá de ELLA, no de "nosotros". Prohibido "nos encantaría", "queremos".
-- Confiado, NUNCA pidas permiso ("si te gustaría escuchar" ❌). Asumí el valor.
-- Cuando aplique, liderá con un resultado/beneficio concreto y bajale el riesgo.
-- Cerrá con un micro-compromiso fácil ("¿hoy o mañana?"). Nunca "quedamos atentos a tu disponibilidad".
-- Humano y cálido, nada robótico. Si hay objeción, manejala con seguridad y empatía.
+- Habla de ELLA, no de "nosotros". Prohibido "nos encantaría", "queremos".
+- Confiado, NUNCA pidas permiso ("si te gustaría escuchar" ❌). Asume el valor.
+- Cuando aplique, lidera con un resultado/beneficio concreto y bájale el riesgo.
+- Cierra con un micro-compromiso fácil ("¿hoy o mañana?"). Nunca "quedamos atentos a tu disponibilidad".
+- Humano y cálido, nada robótico. Si hay objeción, manéjala con seguridad y empatía.
 SALIDA: solo el texto del mensaje, listo para pegar. Sin comillas ni explicaciones. 2-5 líneas máx.`,
-    instruction: (who) => `Redactá el próximo mensaje que el Closer le envía a ${who}. Solo el texto del mensaje.`,
+    instruction: (who) => `Redacta el próximo mensaje que el Closer le envía a ${who}. Solo el texto del mensaje.`,
     maxTokens: 500,
   },
   summarize: {
@@ -49,7 +49,7 @@ SALIDA: solo el texto del mensaje, listo para pegar. Sin comillas ni explicacion
 
 Tu tarea: resumir el hilo para que el closer/supervisor lo retome de un vistazo.
 SALIDA: 3 a 5 bullets cortos cubriendo — estado/interés del lead, qué se le ofreció, objeción principal, último contacto, y qué quedó PENDIENTE. Conciso. Sin preámbulo.`,
-    instruction: (_who) => `Resumí esta conversación en bullets cortos.`,
+    instruction: (_who) => `Resume esta conversación en bullets cortos.`,
     maxTokens: 400,
   },
   signals: {
@@ -59,8 +59,8 @@ Tu tarea: leer la conversación y devolver señal + próximo paso.
 SALIDA exactamente en este formato:
 • Señal: <una señal principal — ej. "lista para cerrar", "enfriándose", "objeción: precio", "sin respuesta hace X días">
 • Próximo paso: <1-2 líneas, accionable>
-Si conviene cambiar el stage del lead, decilo como SUGERENCIA (el humano decide, nunca automático).`,
-    instruction: (_who) => `Analizá la conversación y devolvé la señal y el próximo paso.`,
+Si conviene cambiar el stage del lead, dilo como SUGERENCIA (el humano decide, nunca automático).`,
+    instruction: (_who) => `Analiza la conversación y devuelve la señal y el próximo paso.`,
     maxTokens: 350,
   },
 };

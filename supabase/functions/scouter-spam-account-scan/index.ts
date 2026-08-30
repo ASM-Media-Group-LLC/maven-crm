@@ -64,7 +64,7 @@ interface AiAnalysis {
   scanned_at: string;
 }
 
-const SYSTEM_PROMPT = `Eres un experto en credibilidad de cuentas de Instagram de AGENCIAS de talent / management de OnlyFans. Te paso datos públicos de una cuenta que el user registró como herramienta de outreach (DMs, follows, comentarios) hacia creadoras grandes y prospectivas. Las cuentas pueden ser de cualquier agencia — propias del grupo o de terceros con los que se trabaja, conocidas o no listadas en ningún CRM. No asumas marcas particulares; evaluá lo que ves en el snapshot.
+const SYSTEM_PROMPT = `Eres un experto en credibilidad de cuentas de Instagram de AGENCIAS de talent / management de OnlyFans. Te paso datos públicos de una cuenta que el user registró como herramienta de outreach (DMs, follows, comentarios) hacia creadoras grandes y prospectivas. Las cuentas pueden ser de cualquier agencia — propias del grupo o de terceros con los que se trabaja, conocidas o no listadas en ningún CRM. No asumas marcas particulares; evalúa lo que ves en el snapshot.
 
 Tu tarea: ponerte en el lugar de una INFLUENCER GRANDE que recibe un DM o follow de esta cuenta. La pregunta clave es:
 
@@ -72,16 +72,16 @@ Tu tarea: ponerte en el lugar de una INFLUENCER GRANDE que recibe un DM o follow
 
 Las creadoras grandes son selectivas, ya las contactan muchas agencias. Para responder, necesitan ver que la cuenta es de una agencia REAL, profesional, con track record visible — no un fake recién armado.
 
-═══ PASO 1 OBLIGATORIO: clasificá el tipo de cuenta antes de scorear ═══
+═══ PASO 1 OBLIGATORIO: clasifica el tipo de cuenta antes de scorear ═══
 
-Antes de aplicar reglas, decidí cuál de estos 4 tipos es la cuenta. Esto define la franja de score base — después ajustás dentro de la franja con las señales positivas/negativas:
+Antes de aplicar reglas, decide cuál de estos 4 tipos es la cuenta. Esto define la franja de score base — después ajustas dentro de la franja con las señales positivas/negativas:
 
 A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers no-loggeados. Las creators target ni siquiera pueden validar el perfil al recibir el DM (muro de login, "cuenta restringida", sin info pública). Salir del flag toma weeks: verificar mail+teléfono, eliminar posts NSFW reportados, esperar que IG levante el shadow-flag. Franja: **0-15** sin importar lo que diga el resto del snapshot.
 
   CRÍTICO para tipo A: cuando is_restricted=true Y el snapshot vino vacío (sin bio, sin foto, sin link, sin followers, sin posts), eso NO significa que la cuenta esté efectivamente vacía — significa que el scraper no pudo verla por la restricción. Los datos de la cuenta posiblemente existen, simplemente no los podemos leer. POR LO TANTO:
 
     · El ÚNICO red_flag debe ser el del restricted-flag, severity high.
-    · NO inventes red_flags low/medium tipo "sin foto de perfil", "bio vacía", "sin link externo", "nombre de cuenta vacío" — no sabés si están vacíos, no podés verlos. Esos red_flags serían INVENTADOS y le dan info incorrecta al user.
+    · NO inventes red_flags low/medium tipo "sin foto de perfil", "bio vacía", "sin link externo", "nombre de cuenta vacío" — no sabes si están vacíos, no puedes verlos. Esos red_flags serían INVENTADOS y le dan info incorrecta al user.
     · NO incluyas en strengths/weaknesses cosas que dependan de datos de profile que no podemos ver.
     · summary, why_not y urgent_improvements deben enfocarse en CÓMO RECUPERAR LA RESTRICCIÓN, no en supuestos defectos del perfil. Ejemplos de urgent_improvements correctos para tipo A:
         - "Verificar email + teléfono real en Settings → Account"
@@ -89,11 +89,11 @@ A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers
         - "Activar 2FA y cambiar a perfil business"
         - "Apelar formalmente via Settings → Help → Report a Problem"
         - "Parar TODO outreach hasta que se levante el flag — sino IG nunca lo levanta"
-    · Si el snapshot trae bio/nombre/link/followers (vienen de un screenshot manual que el user subió), AHÍ sí podés ajustar el análisis con esa info verdadera. Pero NO subas el score arriba de 15 — el problema técnico de visibilidad es lo que mata el outreach.
+    · Si el snapshot trae bio/nombre/link/followers (vienen de un screenshot manual que el user subió), AHÍ sí puedes ajustar el análisis con esa info verdadera. Pero NO subas el score arriba de 15 — el problema técnico de visibilidad es lo que mata el outreach.
 
-B) PERFIL PERSONAL sin pretensión de agencia — la cuenta NO se presenta como agencia: bio vacía o personal ("Jorge, BsAs"), username random con números (jorgejunior12748), 0 posts del roster, sin link, sin logo de marca, sin CTA. No es fake-de-agencia; literalmente no intenta serlo. Es accesible (no restricted), las creators sí pueden ver el perfil, pero al chequearlo se dan cuenta que no es agencia y no responden. Franja: **15-30**. El why_not debe decir claro: "No es una cuenta de agencia, es perfil personal — convertila a agencia (bio profesional + posts del roster + link al sitio) o usá otra cuenta para outreach". CLAVE: no acumular red_flags hostiles tipo "cuenta privada" o "bio vacía" como si fuera fake; el problema es de categoría, no de calidad.
+B) PERFIL PERSONAL sin pretensión de agencia — la cuenta NO se presenta como agencia: bio vacía o personal ("Jorge, BsAs"), username random con números (jorgejunior12748), 0 posts del roster, sin link, sin logo de marca, sin CTA. No es fake-de-agencia; literalmente no intenta serlo. Es accesible (no restricted), las creators sí pueden ver el perfil, pero al chequearlo se dan cuenta que no es agencia y no responden. Franja: **15-30**. El why_not debe decir claro: "No es una cuenta de agencia, es perfil personal — conviértela a agencia (bio profesional + posts del roster + link al sitio) o usa otra cuenta para outreach". CLAVE: no acumular red_flags hostiles tipo "cuenta privada" o "bio vacía" como si fuera fake; el problema es de categoría, no de calidad.
 
-C) AGENCIA FAKE / MUY RECIÉN ARMADA — la cuenta SÍ intenta presentarse como agencia (bio dice "talent management", "OF agency", etc.) pero los detalles cantan: pocos posts, sin roster visible, link roto, ratios extraños, mass-following, foto de perfil genérica, bio en mayúsculas con emojis exagerados. Franja: **25-45** (más alto que B porque hay BASE de agencia sobre la cual mejorar; con 5 posts del roster reales sube rápido). Si el patrón es claramente bot/scam (mass-follow + bio spam + 0 engagement), bajá al piso de la franja.
+C) AGENCIA FAKE / MUY RECIÉN ARMADA — la cuenta SÍ intenta presentarse como agencia (bio dice "talent management", "OF agency", etc.) pero los detalles cantan: pocos posts, sin roster visible, link roto, ratios extraños, mass-following, foto de perfil genérica, bio en mayúsculas con emojis exagerados. Franja: **25-45** (más alto que B porque hay BASE de agencia sobre la cual mejorar; con 5 posts del roster reales sube rápido). Si el patrón es claramente bot/scam (mass-follow + bio spam + 0 engagement), baja al piso de la franja.
 
 D) AGENCIA LEGÍTIMA (con distintos grados de profesionalismo):
    - **45-64**: tibia — bio decente, algunos posts, pero falta social proof (roster visible, engagement orgánico, link al sitio). Una creator muy selectiva la skipea.
@@ -130,9 +130,9 @@ Tu respuesta DEBE ser un JSON válido con esta forma exacta (sin backticks, sin 
 
 {
   "score": <int 0-100>,
-  "summary": "<string: 1-2 frases para preview en card, max 25 palabras. Respondé en concreto si una influencer grande respondería o no a esta cuenta. Si es tipo B (personal), aclaralo>",
+  "summary": "<string: 1-2 frases para preview en card, max 25 palabras. Responde en concreto si una influencer grande respondería o no a esta cuenta. Si es tipo B (personal), acláralo>",
   "would_respond": "si" | "no" | "tal_vez",
-  "why_not": "<string: razón principal por la que NO respondería, o vacío si el score >=80. Si es tipo A, mencioná el restricted-flag. Si es tipo B, mencioná que no es agencia y pedí convertir o cambiar de cuenta>",
+  "why_not": "<string: razón principal por la que NO respondería, o vacío si el score >=80. Si es tipo A, menciona el restricted-flag. Si es tipo B, menciona que no es agencia y pide convertir o cambiar de cuenta>",
   "strengths": ["<string concreto, qué tiene la cuenta a favor>", "..."],
   "red_flags": [{"signal": "<string concreto del input>", "severity": "low" | "medium" | "high"}],
   "urgent_improvements": ["<string: punto de mejora URGENTE para empezar a generar respuestas ya>", "..."],
@@ -140,9 +140,9 @@ Tu respuesta DEBE ser un JSON válido con esta forma exacta (sin backticks, sin 
 }
 
 Reglas para red_flags por tipo:
-- Tipo A (restricted) sin screenshot manual: SOLO un red_flag, high, sobre la restricción de IG. NO inventes low/medium sobre datos faltantes — no podés ver el perfil real. Acumular esos red_flags da información falsa al user (la cuenta tal vez SÍ tiene foto/bio/link, pero no podés verlos por la restricción).
+- Tipo A (restricted) sin screenshot manual: SOLO un red_flag, high, sobre la restricción de IG. NO inventes low/medium sobre datos faltantes — no puedes ver el perfil real. Acumular esos red_flags da información falsa al user (la cuenta tal vez SÍ tiene foto/bio/link, pero no puedes verlos por la restricción).
 - Tipo A (restricted) con screenshot manual del perfil logueado: red_flag high de restricción + low/medium sobre lo que efectivamente veas mal en el screenshot.
-- Tipo B (personal): NO acumules red_flags con severity high (la cuenta no pretende ser agencia, marcar "bio vacía" como high es ruido). Limitate a 1-2 medium explicando que falta convertir. Las urgent_improvements deben ser: "armar bio profesional de agencia", "subir 5 posts del roster", "agregar link al sitio", "considerar cambiar a una cuenta de marca".
+- Tipo B (personal): NO acumules red_flags con severity high (la cuenta no pretende ser agencia, marcar "bio vacía" como high es ruido). Limítate a 1-2 medium explicando que falta convertir. Las urgent_improvements deben ser: "armar bio profesional de agencia", "subir 5 posts del roster", "agregar link al sitio", "considerar cambiar a una cuenta de marca".
 - Tipo C/D: regla normal — high para problemas estructurales, medium/low para detalles.
 
 Sé estricto y específico. urgent_improvements deben ser cosas que se pueden hacer en una semana. recommendations son acciones más sostenidas. Cita detalles concretos del input — no recomendaciones genéricas.`;
@@ -685,7 +685,7 @@ async function extractFromScreenshot(
   const mime = (file as Blob).type || "image/png";
   const dataUrl = `data:${mime};base64,${encodeBase64(buf)}`;
 
-  const extractPrompt = `Mirá este screenshot de un perfil de Instagram (cuenta @${expectedHandle}). Extraé los siguientes datos visibles del perfil y devolvé SOLO un JSON con esta forma exacta (sin backticks ni texto adicional):
+  const extractPrompt = `Mira este screenshot de un perfil de Instagram (cuenta @${expectedHandle}). Extrae los siguientes datos visibles del perfil y devuelve SOLO un JSON con esta forma exacta (sin backticks ni texto adicional):
 
 {
   "full_name": "<string o null — el nombre que figura en grande arriba de la bio>",
@@ -700,7 +700,7 @@ async function extractFromScreenshot(
   "notes": "<string corto: cualquier detalle relevante visible — categoría declarada, ubicación, indicadores de profesionalismo, contenido visible en posts, etc.>"
 }
 
-Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número entero. Si algún dato no es visible en el screenshot, usá null. No inventes nada.`;
+Los counts pueden venir abreviados (1.2K, 16.5K, 1M); conviértelos a número entero. Si algún dato no es visible en el screenshot, usa null. No inventes nada.`;
 
   // OpenRouter (OpenAI-compatible): formato image_url con data URI base64.
   // Gemini 2.5 Flash hace vision sobre screenshots de IG igual de bien que
@@ -893,12 +893,12 @@ Restringida por IG: ${snapshot.is_restricted ? "SÍ — IG ocultó la cuenta a v
 NOTA: la cuenta está marcada como restringida por IG. ${
           snapshot.biography || snapshot.full_name
             ? "La data de bio/nombre/followers que ves arriba vino de un screenshot que subió el user (perfil real visto logueado). Es contexto válido para entender la cuenta, pero NO cambia el problema central: las creators target que reciban el DM y vayan a chequear el perfil sin estar logueadas en IG van a topar con un muro o aviso de cuenta restringida. Por eso la regla del deal-breaker se mantiene — la cuenta puede verse bárbara logueado pero no sirve para outreach mientras IG la oculte."
-            : "No tenemos visibilidad sobre bio, followers, ni foto desde un viewer no-loggeado. Evaluá pensando que las creators target reciben el DM y al chequear el perfil van a topar con un muro / aviso de cuenta restringida — eso baja la confianza al piso."
-        } Aplicá la regla del deal-breaker.`
+            : "No tenemos visibilidad sobre bio, followers, ni foto desde un viewer no-loggeado. Evalúa pensando que las creators target reciben el DM y al chequear el perfil van a topar con un muro / aviso de cuenta restringida — eso baja la confianza al piso."
+        } Aplica la regla del deal-breaker.`
       : ""
   }
 
-Devolvé el JSON de evaluación.`;
+Devuelve el JSON de evaluación.`;
 
   // OpenRouter (OpenAI-compatible): el system prompt va como mensaje
   // role=system. Sin cache_control de Anthropic — Gemini tiene caching

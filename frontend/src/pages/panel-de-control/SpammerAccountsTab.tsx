@@ -534,7 +534,7 @@ const SpammerCard = ({
       </div>
 
       {/* Footer: operators — escondido en viewMode='mine' (sería
-          redundante: el único operator que ves sos vos). */}
+          redundante: el único operator que ves eres tú). */}
       {!hideOperators && (
         <div className="flex items-center gap-1.5 border-t border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
           <UserCog className="h-3 w-3" />

@@ -21,9 +21,9 @@ const MIN_MESSAGES = 7;        // por debajo de esto no vale la pena (last-30 ya
 const MAX_CHARS_PER_MSG = 500;
 const TIMEOUT_MS = 30_000;
 
-const SYSTEM = `Sos un asesor de ventas de una agencia que recluta y trabaja con modelos de OnlyFans. Te paso una conversación de WhatsApp 1:1 entre el equipo ("nosotros") y una modelo/lead. Resumila para que otro miembro del equipo (o un bot asesor) entienda la relación de un vistazo, sin leer todo el historial.
+const SYSTEM = `Eres un asesor de ventas de una agencia que recluta y trabaja con modelos de OnlyFans. Te paso una conversación de WhatsApp 1:1 entre el equipo ("nosotros") y una modelo/lead. Resúmela para que otro miembro del equipo (o un bot asesor) entienda la relación de un vistazo, sin leer todo el historial.
 
-Devolvé 3 a 6 bullets cortos en español, cubriendo lo que aplique:
+Devuelve 3 a 6 bullets cortos en español, cubriendo lo que aplique:
 - Estado/etapa del lead y temperatura (frío/tibio/caliente).
 - Qué marca/producto se le ofreció y qué se habló.
 - Objeción, duda o traba principal.

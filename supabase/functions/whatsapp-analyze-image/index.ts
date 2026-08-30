@@ -23,7 +23,7 @@ import { logGeminiUsage } from "../_shared/usage.ts";
 // proveedor (un billing, un cap de gasto, resiliencia multi-model).
 // Default model: google/gemini-2.5-flash. Costo ~$0.00017 por imagen,
 // 100 imágenes/día ≈ $0.50/mes (incluido el ~5% de overhead de OR).
-// Si querés cambiar el modelo (claude-haiku, gpt-4o-mini, etc.), basta
+// Si quieres cambiar el modelo (claude-haiku, gpt-4o-mini, etc.), basta
 // con cambiar PROMOLOG_LLM_MODEL — no toca código.
 
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
@@ -42,9 +42,9 @@ const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 const GATEWAY_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
 const GATEWAY_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
 
-const VISION_PROMPT = `Sos un analista de imágenes para un equipo de ventas de agencias de OnlyFans. Te van a pasar una imagen que alguien compartió en un grupo de WhatsApp del equipo. Tu tarea: extraer toda la info útil de la imagen para que el bot que vive en el grupo pueda detectar compromisos, responder preguntas y trackear casos.
+const VISION_PROMPT = `Eres un analista de imágenes para un equipo de ventas de agencias de OnlyFans. Te van a pasar una imagen que alguien compartió en un grupo de WhatsApp del equipo. Tu tarea: extraer toda la info útil de la imagen para que el bot que vive en el grupo pueda detectar compromisos, responder preguntas y trackear casos.
 
-Devolvé JSON estricto con esta forma:
+Devuelve JSON estricto con esta forma:
 
 {
   "description": "qué es la imagen, en 1-2 oraciones (ej. 'screenshot de Instagram mostrando bandeja de mensajes no leídos del perfil restringido @mariiaroz')",
@@ -57,7 +57,7 @@ Devolvé JSON estricto con esta forma:
 }
 
 REGLAS:
-- Si el texto es OCR, transcribilo TAL CUAL aparece, sin corregir typos. Preserva emojis y ortografía.
+- Si el texto es OCR, transcríbelo TAL CUAL aparece, sin corregir typos. Preserva emojis y ortografía.
 - NO inventes red flags ni mentions que no estén visibles claramente.
 - Si la imagen está restringida (IG dice "esta cuenta es privada" o similar), contains_restriction=true.
 - Si hay comprobante de transferencia/factura/payment, contains_payment_proof=true.

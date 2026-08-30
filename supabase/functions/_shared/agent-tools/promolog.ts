@@ -5,7 +5,7 @@ export const promologTools: AgentTool[] = [
   {
     name: "get_promolog_scan_report",
     description:
-      "Informe de las ÚLTIMAS CORRIDAS DE SCAN de Promolog (qué se revisó y qué NO se pudo revisar). Por red devuelve: cuántas creadoras quedaron marcadas con promo, cuántas se leyeron sin promo, y —lo más importante— CUÁLES NO SE PUDIERON LEER y por qué (canal de Telegram sin vista pública, perfil caído, sesión limitada, etc). Usala cuando pregunten '¿se escanearon todas?', '¿por qué X no aparece?', '¿el scan corrió bien?', o antes de afirmar que alguien NO promocionó: si su canal/perfil está en no_legibles, NO se puede decir que no promocionó — se dice que no se pudo revisar y por qué. Complementa a get_promo_day_breakdown (que dice quién promocionó): esta dice qué quedó FUERA del scan.",
+      "Informe de las ÚLTIMAS CORRIDAS DE SCAN de Promolog (qué se revisó y qué NO se pudo revisar). Por red devuelve: cuántas creadoras quedaron marcadas con promo, cuántas se leyeron sin promo, y —lo más importante— CUÁLES NO SE PUDIERON LEER y por qué (canal de Telegram sin vista pública, perfil caído, sesión limitada, etc). Úsala cuando pregunten '¿se escanearon todas?', '¿por qué X no aparece?', '¿el scan corrió bien?', o antes de afirmar que alguien NO promocionó: si su canal/perfil está en no_legibles, NO se puede decir que no promocionó — se dice que no se pudo revisar y por qué. Complementa a get_promo_day_breakdown (que dice quién promocionó): esta dice qué quedó FUERA del scan.",
     input_schema: {
       type: "object",
       properties: {
@@ -39,7 +39,7 @@ export const promologTools: AgentTool[] = [
       }
       return {
         corridas,
-        nota: "no_legibles = NO se pudieron revisar (no es 'no promocionó'). Si te preguntan por una creadora que está ahí, decí que no se pudo revisar su canal/perfil y el motivo — nunca la reportes como que no promocionó.",
+        nota: "no_legibles = NO se pudieron revisar (no es 'no promocionó'). Si te preguntan por una creadora que está ahí, di que no se pudo revisar su canal/perfil y el motivo — nunca la reportes como que no promocionó.",
       };
     },
   },

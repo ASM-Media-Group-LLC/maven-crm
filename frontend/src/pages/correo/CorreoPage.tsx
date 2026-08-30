@@ -656,7 +656,7 @@ function FilaMensaje({
   /** Pasar el mouse (o apoyar el dedo) ya dispara la descarga: para
    *  cuando llega el clic, el mensaje suele estar listo. */
   onPrecargar: () => void;
-  /** En Enviados y Borradores el remitente sos vos: verte a vos mismo en
+  /** En Enviados y Borradores el remitente eres tú: verte a ti mismo en
    *  cada fila no informa nada. Lo util es A QUIEN fue. */
   mostrarDestinatario?: boolean;
 }) {

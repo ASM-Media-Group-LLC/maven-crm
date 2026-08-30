@@ -102,9 +102,9 @@ const LLM_CAP_PER_RUN = 40;
 // ⚠️ La visión NUNCA se gasta en un post ya guardado: la clave se consulta ANTES
 // (clavesYaGuardadas), igual que en FB/X. Cap por corrida para el costo.
 const MAX_VISION_PER_RUN = 40;
-const TG_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Vas a ver una IMAGEN de un post del canal de Telegram de una creadora. REGLA ESTRICTA del dueño: cuenta como PROMOCIÓN DE SU ONLYFANS solo si la imagen (o su texto quemado) APUNTA a contenido de pago FUERA de Telegram: logo/marca/captura de OnlyFans, un link o handle de OF visible, otra plataforma de pago (Fansly, Fanvue, ManyVids), o un funnel/link-in-bio (linktr.ee, beacons, piclink, stan store, allmylinks).
+const TG_VISION_PROMPT = `Eres analista de una agencia de OnlyFans. Vas a ver una IMAGEN de un post del canal de Telegram de una creadora. REGLA ESTRICTA del dueño: cuenta como PROMOCIÓN DE SU ONLYFANS solo si la imagen (o su texto quemado) APUNTA a contenido de pago FUERA de Telegram: logo/marca/captura de OnlyFans, un link o handle de OF visible, otra plataforma de pago (Fansly, Fanvue, ManyVids), o un funnel/link-in-bio (linktr.ee, beacons, piclink, stan store, allmylinks).
 NO cuenta (promoted=false): foto/selfie sugerente SIN destino de pago visible, promoción de su propio canal/grupo VIP de Telegram, venta de packs por DM ("escríbeme", "mp"), publicidad de marcas/tiendas, casino/apuestas. Si es ambiguo → promoted=false.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
+Responde SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
 
 // Post con imagen → data URI para visión: base64 directo (lector web local /
 // gateway) o URL pública (t.me/s). null = no hay imagen utilizable.
@@ -120,9 +120,9 @@ async function imagenDelPost(p: { image_b64?: string; image_mime?: string; image
   }
   return null;
 }
-const TG_LLM_PROMPT = `Sos analista de una agencia de OnlyFans. REGLA ESTRICTA del dueño: un post del canal de Telegram de una creadora cuenta como PROMOCIÓN DE SU ONLYFANS solo si APUNTA a su contenido de pago FUERA de Telegram: menciona OnlyFans (incluye typos, leet o letras estilizadas: 0nlyfans, onlifans, 𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺, "mi OF", "mi Only"), otra plataforma de pago (Fansly, Fanvue, ManyVids), un funnel/link-in-bio (linktr.ee, bybio, beacons, piclink, stan store, allmylinks), o el nick de OF de la creadora.
+const TG_LLM_PROMPT = `Eres analista de una agencia de OnlyFans. REGLA ESTRICTA del dueño: un post del canal de Telegram de una creadora cuenta como PROMOCIÓN DE SU ONLYFANS solo si APUNTA a su contenido de pago FUERA de Telegram: menciona OnlyFans (incluye typos, leet o letras estilizadas: 0nlyfans, onlifans, 𝑶𝑵𝑳𝒀𝑭𝑨𝑵𝑺, "mi OF", "mi Only"), otra plataforma de pago (Fansly, Fanvue, ManyVids), un funnel/link-in-bio (linktr.ee, bybio, beacons, piclink, stan store, allmylinks), o el nick de OF de la creadora.
 NO cuenta (promoted=false): promocionar su propio canal/grupo VIP de Telegram, vender packs por DM ("escríbeme", "mp"), contenido +18/🔞 SIN destino de pago nombrado, publicidad de marcas/tiendas, casino/apuestas/trading/"gana dinero", saludos y vida diaria. Si la referencia es ambigua o implícita sin destino claro → promoted=false.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
+Responde SOLO JSON: {"promoted": true|false, "reason": "breve, en español"}`;
 
 async function llmSecondOpinion(text: string, ofHandles: string[], apiKey: string): Promise<{ promoted: boolean; reason: string }> {
   try {
@@ -326,7 +326,7 @@ Deno.serve(async (req: Request) => {
           else { promosOtroDia++; fechasPromo.push({ fecha: fechaIso, hoy: false }); }
         }
         if (dryRun) continue;
-        // Ya no hay "buscá antes de insertar": la clave viaja en la fila y el índice
+        // Ya no hay "busca antes de insertar": la clave viaja en la fila y el índice
         // único la rechaza si ya está. Reprocesar es inofensivo y no hay carrera.
         const { error: insErr } = await sb.from("promolog_entries").insert({
           dedup_key: clave,

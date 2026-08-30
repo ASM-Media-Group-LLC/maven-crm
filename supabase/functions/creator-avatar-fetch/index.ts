@@ -93,7 +93,7 @@ serve(async (req) => {
       if (!creatorId) return json(req, { ok: false, error: "creator_id requerido" }, 400);
       if (!(file instanceof File)) return json(req, { ok: false, error: "Archivo requerido" }, 400);
       const mime = (file.type || "").split(";")[0];
-      if (!ALLOWED_MIME.includes(mime)) return json(req, { ok: false, error: "Formato no válido (usá JPG, PNG o WebP)" }, 400);
+      if (!ALLOWED_MIME.includes(mime)) return json(req, { ok: false, error: "Formato no válido (usa JPG, PNG o WebP)" }, 400);
       if (file.size > MAX_BYTES) return json(req, { ok: false, error: "La imagen supera los 5 MB" }, 400);
 
       const bytes = new Uint8Array(await file.arrayBuffer());

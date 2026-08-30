@@ -540,7 +540,7 @@ export default function GroupMembersPanel({
         </div>
       </ScrollArea>
 
-      {/* Salir del grupo — disponible para TODOS (los admins también; si sos el último admin,
+      {/* Salir del grupo — disponible para TODOS (los admins también; si eres el último admin,
           handleLeaveGroup promueve al miembro más antiguo para no dejar el grupo sin admin). */}
       <div className="px-4 py-3 border-t border-border">
         <Button

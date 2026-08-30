@@ -136,10 +136,10 @@ function classifyFb(it: any, ofHandles: string[]): { promoted: boolean; reason: 
 // ── Visión: ¿la IMAGEN del post promociona OF? (el promo de FB suele ir quemado
 // en el arte: flyer con link, "onlyfans", CTA). SOLO se llama cuando el texto no
 // dio señal pero hay imagen → distingue un flyer-promo de una foto personal.
-const FB_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de Facebook de una creadora y decí si el POST PROMOCIONA SU PROPIO OnlyFans (su contenido pago de adultos).
-Marcá promoted=true SOLO si hay una señal CLARA de promo a SU contenido pago de adultos: un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA de contenido +18 ("suscríbete a mi contenido exclusivo", "contenido sin censura", "mi VIP").
+const FB_VISION_PROMPT = `Eres analista de una agencia de OnlyFans. Mira esta imagen de un post de Facebook de una creadora y di si el POST PROMOCIONA SU PROPIO OnlyFans (su contenido pago de adultos).
+Marca promoted=true SOLO si hay una señal CLARA de promo a SU contenido pago de adultos: un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA de contenido +18 ("suscríbete a mi contenido exclusivo", "contenido sin censura", "mi VIP").
 NO marques promoted=true por: (a) una foto sugerente, selfie o contenido personal/familiar; (b) PUBLICIDAD DE UNA MARCA O TIENDA — Shein, Temu, ropa, maquillaje, un cupón o código de descuento de una tienda, "publicidad pagada", #ad. Un precio o descuento de una TIENDA NO es promo de OnlyFans.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
+Responde SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";

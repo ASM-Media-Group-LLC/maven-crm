@@ -247,7 +247,7 @@ serve(async (req) => {
 
       const { data: room } = await admin.from("cowork_rooms")
         .select("id, session_id, name").eq("join_code", code).maybeSingle();
-      if (!room) return err(req, "Código inválido. Pedile el código a tu coordinador.", 404);
+      if (!room) return err(req, "Código inválido. Pídele el código a tu coordinador.", 404);
 
       const { data: session } = await admin.from("cowork_sessions")
         .select("id, name, status").eq("id", room.session_id).maybeSingle();
@@ -876,7 +876,7 @@ serve(async (req) => {
       if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", room.session_id);
-      if (count !== null && count <= 1) return err(req, "No podés cerrar la última sala de la sesión");
+      if (count !== null && count <= 1) return err(req, "No puedes cerrar la última sala de la sesión");
 
       // Sacar a los participantes asignados (su asignación queda inactiva) y borrar la sala.
       await admin.from("cowork_room_assignments").update({ is_active: false }).eq("room_id", roomId).eq("is_active", true);

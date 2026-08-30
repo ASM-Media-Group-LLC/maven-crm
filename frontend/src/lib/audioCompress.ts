@@ -5,8 +5,8 @@
 // durante la beta.
 //
 // Tradeoffs: el output es mono 16kHz 32kbps — calidad bastante para
-// transcripción de habla pero NO para escuchar como audio. Si querés
-// guardar el original como audit trail, tenés que subirlo separado
+// transcripción de habla pero NO para escuchar como audio. Si quieres
+// guardar el original como audit trail, tienes que subirlo separado
 // (Storage) — esto solo prepara el archivo que Whisper necesita.
 
 const TARGET_SAMPLE_RATE = 16_000; // 16kHz — Whisper input nativo

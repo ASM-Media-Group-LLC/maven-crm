@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
               cuentas.data.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
             if (!reusa && usados >= seatLimit) {
               return new Response(JSON.stringify({
-                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Liberá uno borrando un usuario de Maven —ahora eso también da de baja su casilla y libera el puesto— o desde el panel de Zoho, o amplía el plan.`,
+                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Libera uno borrando un usuario de Maven —ahora eso también da de baja su casilla y libera el puesto— o desde el panel de Zoho, o amplía el plan.`,
                 reason: "zoho_seats_full",
               }), { status: 409, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
             }
@@ -416,10 +416,10 @@ Deno.serve(async (req) => {
                   <code style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#111827;">${tempPassword}</code>
                 </div>
                 <p style="color:#6b7280;font-size:13px;line-height:1.55;margin:0 0 16px;">
-                  Iniciá sesión con tu correo (<strong>${loginEmail}</strong>)
-                  y esta contraseña, después cambiala desde
+                  Inicia sesión con tu correo (<strong>${loginEmail}</strong>)
+                  y esta contraseña, después cámbiala desde
                   Settings → Cuenta. Si no esperabas este correo,
-                  ignoralo o avisale al admin.
+                  ignóralo o avísale al admin.
                 </p>
                 <div style="text-align:center;margin:20px 0 0;">
                   <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#6d28d9,#4338ca);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 28px;border-radius:9999px;">
@@ -619,9 +619,9 @@ Deno.serve(async (req) => {
                     <code style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#111827;">${tempPassword}</code>
                   </div>
                   <p style="color:#6b7280;font-size:13px;line-height:1.55;margin:0 0 16px;">
-                    Iniciá sesión con esta contraseña y cambiala inmediatamente
-                    desde Settings → Cuenta. Si vos no pediste este reset,
-                    avisale al admin lo antes posible.
+                    Inicia sesión con esta contraseña y cámbiala inmediatamente
+                    desde Settings → Cuenta. Si tú no pediste este reset,
+                    avísale al admin lo antes posible.
                   </p>
                   <div style="text-align:center;margin:20px 0 0;">
                     <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#6d28d9,#4338ca);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 28px;border-radius:9999px;">

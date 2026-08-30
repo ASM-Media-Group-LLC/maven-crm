@@ -224,7 +224,7 @@ export const equipoTools: AgentTool[] = [
       "La FUENTE DE VERDAD de quiénes están en un grupo de WhatsApp del equipo (whatsapp_members de ESE grupo). " +
       "Sin `group_name` devuelve el grupo actual; con `group_name` busca por nombre (Managers, Marketing/Ventas, " +
       "AI WARMING…). Devuelve los linkeados a Maven (nombre completo + rol) y aparte los sin vincular (display name " +
-      "crudo de WhatsApp, puede ser basura tipo '#21'). USALA SIEMPRE que armes una lista de miembros, de monitoreo " +
+      "crudo de WhatsApp, puede ser basura tipo '#21'). ÚSALA SIEMPRE que armes una lista de miembros, de monitoreo " +
       "o respondas 'quiénes están en X' — NUNCA armes esas listas de memoria ni desde Hubstaff: Hubstaff tiene OTRA " +
       "gente (chatters que no están en los grupos; el 31/07 el bot le inventó al owner dos personas sacadas de ahí, " +
       "y al corregirse inventó una tercera). Si mezclas fuentes, di de cuál sale cada nombre. No devuelve teléfonos.",
@@ -379,7 +379,7 @@ export const equipoTools: AgentTool[] = [
   {
     name: "read_webpage",
     description:
-      "Lee una página web renderizada (con JavaScript) y devuelve su TEXTO limpio + título. Usala cuando alguien pega un link o pide revisar el contenido de una URL, o cuando necesitás datos de una página que no tenés como tool (dashboards, SPAs, radares con JS que el server no puede leer directo). Solo lectura, no envía nada ni interactúa. Si el lector no responde o el host no está permitido, lo DICE — nunca inventes el contenido de la página. Para el estado de cuentas del equipo usa get_radar_accounts (más estructurado); esta es para páginas web genéricas.",
+      "Lee una página web renderizada (con JavaScript) y devuelve su TEXTO limpio + título. Úsala cuando alguien pega un link o pide revisar el contenido de una URL, o cuando necesitas datos de una página que no tienes como tool (dashboards, SPAs, radares con JS que el server no puede leer directo). Solo lectura, no envía nada ni interactúa. Si el lector no responde o el host no está permitido, lo DICE — nunca inventes el contenido de la página. Para el estado de cuentas del equipo usa get_radar_accounts (más estructurado); esta es para páginas web genéricas.",
     input_schema: {
       type: "object",
       properties: {
@@ -393,10 +393,10 @@ export const equipoTools: AgentTool[] = [
     scope: "read",
     handler: async (args, ctx) => {
       const url = String(args?.url ?? "").trim();
-      if (!/^https?:\/\//i.test(url)) return { error: "url_invalida", nota: "Pasá una URL completa https://…" };
+      if (!/^https?:\/\//i.test(url)) return { error: "url_invalida", nota: "Pasa una URL completa https://…" };
       const READER_URL = (Deno.env.get("WEB_READER_URL") ?? "").replace(/\/+$/, "");
       const READER_TOKEN = Deno.env.get("WEB_READER_TOKEN") ?? "";
-      if (!READER_URL || !READER_TOKEN) return { error: "lector_no_configurado", nota: "El micro web-reader todavía no está desplegado/cableado (WEB_READER_URL/WEB_READER_TOKEN). Decí que aún no podés leer páginas web, no inventes." };
+      if (!READER_URL || !READER_TOKEN) return { error: "lector_no_configurado", nota: "El micro web-reader todavía no está desplegado/cableado (WEB_READER_URL/WEB_READER_TOKEN). Di que aún no puedes leer páginas web, no inventes." };
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), clampAlPresupuesto(28_000, ctx.deadlineAt));
       try {
@@ -450,8 +450,8 @@ export const equipoTools: AgentTool[] = [
             "grupo ('cuántos chatters hay conectados en hubstaff', 'las horas de los chatters'). Matchea contra el " +
             "PROYECTO de Hubstaff y trae todos sus proyectos: pedir 'chatters' incluye 'Chatter Supervisor' y " +
             "'Chatters Meeting'. NO uses esto para preguntas de GRUPOS DE WHATSAPP ('del grupo X, cuántos están " +
-            "conectados') — eso es otra cosa: ahí primero get_group_members y después cruzás. " +
-            "La respuesta trae aparte a los que ficharon sin proyecto — nombralos, no los escondas.",
+            "conectados') — eso es otra cosa: ahí primero get_group_members y después cruzas. " +
+            "La respuesta trae aparte a los que ficharon sin proyecto — nómbralos, no los escondas.",
         },
         days: { type: "number", description: "últimos N días (default 7, máx 92). Ignorado si pasas from/to." },
         from: { type: "string", description: "fecha desde YYYY-MM-DD (opcional)" },
@@ -527,9 +527,9 @@ export const equipoTools: AgentTool[] = [
           ...(aliased?.alias ? { alias_aplicado: person } : {}),
           parecidos: parecidos(person, roster),
           nota:
-            "NO respondas con datos de otra persona. Decí que ese nombre no está ni en Hubstaff ni en Maven, " +
-            "mostrá los parecidos y PREGUNTÁ a quién se refiere. Si es alguien de un grupo de WhatsApp (apodo), " +
-            "verificá con get_group_members. Cuando el owner aclare quién es, podés guardarlo con remember_fact " +
+            "NO respondas con datos de otra persona. Di que ese nombre no está ni en Hubstaff ni en Maven, " +
+            "muestra los parecidos y PREGUNTA a quién se refiere. Si es alguien de un grupo de WhatsApp (apodo), " +
+            "verifica con get_group_members. Cuando el owner aclare quién es, puedes guardarlo con remember_fact " +
             "(ej. 'a Juan X le dicen Pachas') para la próxima.",
         };
       }
@@ -542,7 +542,7 @@ export const equipoTools: AgentTool[] = [
             nombre: r.name, rol: r.hubstaff_role, en_maven: r.mapped_to_maven,
           })),
           nota:
-            `"${personRaw}" matchea a ${rows.length} personas. PREGUNTÁ cuál es (nombre completo) antes de dar ` +
+            `"${personRaw}" matchea a ${rows.length} personas. PREGUNTA cuál es (nombre completo) antes de dar ` +
             "cualquier número — no elijas por tu cuenta. Hay nombres repetidos en el equipo (dos Brayan, tres Lizeth).",
         };
       }
@@ -676,8 +676,8 @@ export const equipoTools: AgentTool[] = [
             "Hubstaff no está trayendo el proyecto de cada persona (hubstaff_activities.project_name vacío), " +
             "que es lo ÚNICO que dice quién es chatter/closer/cordi DENTRO de Hubstaff — el rol de Hubstaff es " +
             "solo user/manager/owner. NO respondas con el rol de Maven: es otro padrón y 24 de 63 miembros ni " +
-            "siquiera tienen cuenta en Maven. Decí que falta ese dato y que hay que redesplegar el bridge; " +
-            "ofrecé el listado COMPLETO de quienes ficharon (sin separar por función) si le sirve igual.",
+            "siquiera tienen cuenta en Maven. Di que falta ese dato y que hay que redesplegar el bridge; " +
+            "ofrece el listado COMPLETO de quienes ficharon (sin separar por función) si le sirve igual.",
         };
       }
 
@@ -754,9 +754,9 @@ export const equipoTools: AgentTool[] = [
           })),
           nota_sin_clasificar:
             `${sinClasificar.length} persona(s) ficharon SIN proyecto asignado en Hubstaff, así que Hubstaff no ` +
-            `dice qué son. NO entraron en el filtro "${pedido}" Y PODRÍAN SER DEL GRUPO. Nombralas aparte como ` +
+            `dice qué son. NO entraron en el filtro "${pedido}" Y PODRÍAN SER DEL GRUPO. Nómbralas aparte como ` +
             "\"sin proyecto asignado\": omitirlas haría creer que no ficharon. Si alguna trae `rol_en_maven`, " +
-            "podés mencionarlo como pista DICIENDO que sale de Maven y no de Hubstaff — nunca como si fuera el dato de Hubstaff.",
+            "puedes mencionarlo como pista DICIENDO que sale de Maven y no de Hubstaff — nunca como si fuera el dato de Hubstaff.",
         } : { sin_funcion_registrada: sinClasificar.length }) : {}),
       };
 
@@ -979,7 +979,7 @@ export const equipoTools: AgentTool[] = [
                   ultimo_ping: horaBogota(r.last_ping ? String(r.last_ping) : null),
                 })),
                 nota:
-                  "Esta lista es COMPLETA para el criterio de arriba: transcribila tal cual. NO la re-filtres ni " +
+                  "Esta lista es COMPLETA para el criterio de arriba: transcríbela tal cual. NO la re-filtres ni " +
                   "cierres con 'el resto está por encima del 25%' salvo que uses este total — el 10/08 esa frase " +
                   "convirtió una lista incompleta en un universo cerrado y dejó fuera a tres personas en banda.",
               };
@@ -990,7 +990,7 @@ export const equipoTools: AgentTool[] = [
                 "di explícito que el tracker no reporta desde esa hora y que esto es lo último que se sabe."
               : "Estados: ficho_hoy = horas REALES al último ping · sin_fichar_hoy = el feed está vivo y esta persona " +
                 "no registra NI UN slot hoy (esto sí es 'no fichó') · el agregado diario de hoy atrasa hasta 6h, usa este bloque. " +
-                "Citá horas con horas_hoy_fmt (4.13 horas NO son '4h13'). " +
+                "Cita horas con horas_hoy_fmt (4.13 horas NO son '4h13'). " +
                 "Nombres repetidos (hay tres 'Brayan'): identifica por nombre completo + nombre_en_maven, no adivines.",
           };
         }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Zoom sobre una pantalla compartida, como en Google Meet: cuando alguien
-// comparte su pantalla en 1080p y vos la ves en un recuadro, el texto no se lee.
+// comparte su pantalla en 1080p y tú la ves en un recuadro, el texto no se lee.
 //
 // Es zoom de PRESENTACIÓN, no de captura: se agranda con CSS lo que ya está
 // llegando. No pide más calidad al que comparte ni consume más red. Si la fuente

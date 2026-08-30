@@ -43,26 +43,26 @@ interface DiaGenerado {
   extra_items: Array<{ momento?: string; label: string; copy: string }>;
 }
 
-const SYSTEM_PROMPT = `Sos quien redacta la PARRILLA DE PROMOCIÓN semanal de una agencia de creadoras de OnlyFans: el plan diario que cada creadora ejecuta en sus redes. Escribís en ESPAÑOL LATINO NEUTRO, con el tono cercano y pícaro del material de referencia.
+const SYSTEM_PROMPT = `Eres quien redacta la PARRILLA DE PROMOCIÓN semanal de una agencia de creadoras de OnlyFans: el plan diario que cada creadora ejecuta en sus redes. Escribes en ESPAÑOL LATINO NEUTRO, con el tono cercano y pícaro del material de referencia.
 
 REGLAS DURAS (no negociables):
 - Instagram: lenguaje limpio y NO sexual explícito, sin precios ni llamadas agresivas; el emoji 💙 es el ÚNICO código permitido para aludir al OnlyFans.
 - X y Telegram: canal directo de venta; toda urgencia debe poder ser REAL (cupos, horas límite) y toda oferta debe existir antes de anunciarse.
 - JAMÁS inventes URLs, handles ni nombres de creadoras.
-- No repitas los copys de las semanas anteriores: variá ideas, ganchos y ángulos. Sí mantené el espíritu de cada tipo de día.
+- No repitas los copys de las semanas anteriores: varía ideas, ganchos y ángulos. Sí mantén el espíritu de cada tipo de día.
 - Copys cortos y naturales, como los del material de referencia (1-2 frases). Nada de muros de texto.
 
 Vas a recibir el ESQUELETO de la semana (día por día: fecha, día de semana, formato, franja, tipo de acción extra y cuántas burbujas de copy espera), las parrillas ANTERIORES, el FEEDBACK de las managers y, si existe, el DIFF entre lo que generó la IA y lo que las managers corrigieron a mano (eso te dice qué NO les gustó — no repitas esos patrones).
 
-Entregá el resultado LLAMANDO a la tool entregar_parrilla:
+Entrega el resultado LLAMANDO a la tool entregar_parrilla:
 - "idea" = idea de material del día (concreta y filmable/fotografiable).
 - "copy_sugerido" va ENTRE COMILLAS dentro del string, como en el material de referencia.
-- "extra_items" debe tener EXACTAMENTE la cantidad de burbujas que indica el esqueleto para ese día (respetá los momentos mañana/tarde/noche si el esqueleto los trae).
-- Mantené "extra_title" muy parecido al actual (es el nombre de la sección).
+- "extra_items" debe tener EXACTAMENTE la cantidad de burbujas que indica el esqueleto para ese día (respeta los momentos mañana/tarde/noche si el esqueleto los trae).
+- Mantén "extra_title" muy parecido al actual (es el nombre de la sección).
 - Un elemento por CADA día del esqueleto, en orden.`;
 
 // Salida estructurada por tool_use: la API garantiza el JSON contra este schema
-// (la primera versión pedía "respondé solo JSON" y parseaba texto: se rompía).
+// (la primera versión pedía "responde solo JSON" y parseaba texto: se rompía).
 const TOOL_ENTREGAR = {
   name: "entregar_parrilla",
   description: "Entrega los días redactados de la parrilla",
@@ -138,7 +138,7 @@ serve(async (req) => {
     if (cErr) throw cErr;
     if ((usosHoy ?? 0) >= MAX_GENERACIONES_DIA) {
       return new Response(
-        JSON.stringify({ error: `Límite diario alcanzado: ${MAX_GENERACIONES_DIA} generaciones con IA por día. Volvé a intentar mañana.` }),
+        JSON.stringify({ error: `Límite diario alcanzado: ${MAX_GENERACIONES_DIA} generaciones con IA por día. Vuelve a intentar mañana.` }),
         { status: 429, headers },
       );
     }
@@ -257,7 +257,7 @@ serve(async (req) => {
     const generados: DiaGenerado[] = toolUse?.input?.dias ?? [];
     if (!Array.isArray(generados) || !generados.length) {
       console.error("sin tool_use utilizable; stop_reason:", payload?.stop_reason, "content:", JSON.stringify(payload?.content).slice(0, 400));
-      return new Response(JSON.stringify({ error: "La IA no devolvió días, reintentá" }), { status: 502, headers });
+      return new Response(JSON.stringify({ error: "La IA no devolvió días, reintenta" }), { status: 502, headers });
     }
 
     // Aplicar SOLO textos, día por día, con el JWT del caller (RLS decide).
@@ -320,7 +320,7 @@ serve(async (req) => {
     console.error("parrilla-generate error", e);
     const aborted = (e as Error)?.name === "AbortError";
     return new Response(
-      JSON.stringify({ error: aborted ? "Claude tardó demasiado, reintentá" : String((e as Error)?.message ?? e) }),
+      JSON.stringify({ error: aborted ? "Claude tardó demasiado, reintenta" : String((e as Error)?.message ?? e) }),
       { status: 500, headers },
     );
   }

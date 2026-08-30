@@ -158,13 +158,13 @@ Deno.serve(async (req) => {
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
         <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:28px 24px;color:#ffffff;">
           <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM</div>
-          <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">Recuperá tu contraseña</h1>
+          <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">Recupera tu contraseña</h1>
         </div>
         <div style="padding:24px;">
           <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">
             ${fullName ? `Hola <strong>${fullName}</strong>,` : "Hola,"}
             recibimos una solicitud para restablecer tu contraseña de Maven CRM.
-            Hacé click en el botón de abajo para crear una nueva.
+            Haz click en el botón de abajo para crear una nueva.
           </p>
           ${
             // Si el link salió al correo personal, hay que decir de qué
@@ -185,11 +185,11 @@ Deno.serve(async (req) => {
             </a>
           </div>
           <p style="color:#6b7280;font-size:12px;line-height:1.55;margin:14px 0 0;">
-            Este enlace expira en 1 hora. Si no pediste este cambio, ignorá
+            Este enlace expira en 1 hora. Si no pediste este cambio, ignora
             este correo — tu contraseña actual sigue activa.
           </p>
           <p style="color:#9ca3af;font-size:11px;line-height:1.5;margin:18px 0 0;word-break:break-all;">
-            ¿No funciona el botón? Copiá y pegá este link en tu navegador:<br/>
+            ¿No funciona el botón? Copia y pega este link en tu navegador:<br/>
             <span style="color:#6366f1;">${actionLink}</span>
           </p>
         </div>
@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: fromEmail,
         to: [destino],
-        subject: "Maven CRM · Recuperá tu contraseña",
+        subject: "Maven CRM · Recupera tu contraseña",
         html,
       }),
     });

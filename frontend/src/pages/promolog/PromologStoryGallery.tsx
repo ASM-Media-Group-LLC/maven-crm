@@ -219,7 +219,7 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
 
 // ── Facebook ────────────────────────────────────────────────────────────────────
 // La media de FB suele estar protegida o el permalink expira como vista. En vez de
-// una imagen rota o un placeholder "tocá para abrir", RECREAMOS el post como una
+// una imagen rota o un placeholder "toca para abrir", RECREAMOS el post como una
 // tarjeta estilo Facebook (header con foto+nombre+hora, texto del post, imagen si
 // la tenemos en el bucket, barra de reacciones) — análogo a las capturas de Telegram.
 // Datos: name = nombre de la creadora · notes = texto del post · time = hora ·

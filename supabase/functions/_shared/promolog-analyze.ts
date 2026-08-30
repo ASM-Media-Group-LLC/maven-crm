@@ -58,7 +58,7 @@ export interface RunCtx {
   openrouterKey: string;
 }
 
-const VISION_PROMPT = `Analizá esta story de Instagram de una creadora de contenido para una agencia de OnlyFans.
+const VISION_PROMPT = `Analiza esta story de Instagram de una creadora de contenido para una agencia de OnlyFans.
 
 Tu job: decidir si en ESTA story la creadora está PROMOCIONANDO su contenido pago (OnlyFans / Piclink / Fansly / etc), o no.
 
@@ -69,7 +69,7 @@ Tres categorías:
 2) INDIRECTA (promotion_type="indirect", promoted=true): NO hay link visible, pero el TEXTO tiene un llamado a la acción claro hacia contenido pago: "escríbeme por mi contenido", "más en mi página / mi OF", "contenido exclusivo / VIP / premium", "suscribite", "DM para el link", o una invitación EXPLÍCITA por TEXTO a ir a su cuenta "premium/+18" (esas palabras — o 🔞 / "cuenta de adultos/explícita" — tienen que estar escritas). Tiene que haber una INVITACIÓN a ir a otro lado o comprar — NO alcanza con una foto linda + un emoji, NI con un simple @tag/mención a otra cuenta de IG: un @ suelto NO es "redirección a una cuenta premium/+18" salvo que el texto traiga esas palabras al lado (ver la regla de @MENCIÓN en la GUÍA).
 3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar. ⚠️ Y también: un CTA genérico tipo "VIDEO COMPLETO AQUÍ" / "CONTEXTO COMPLETO AQUÍ" / "míralo completo" que claramente apunta a contenido NO-adulto — un show, comedia, un evento, un vlog, un canal de YouTube/Twitch, una entrevista — NO es promo de contenido pago aunque tenga sticker de link: es promoción de su contenido GRATUITO (caso real: creadora de comedia con "VIDEO COMPLETO AQUÍ" de su show → NO). Solo cuenta como INDIRECTA/DIRECTA si el contexto es de contenido pago (+18/sugerente) o nombra plataforma de pago.
 
-Devolvé SOLO JSON con esta forma:
+Devuelve SOLO JSON con esta forma:
 {
   "promoted": true | false,                       // true SOLO si direct o indirect
   "promotion_type": "direct" | "indirect" | "none",
@@ -82,23 +82,23 @@ Devolvé SOLO JSON con esta forma:
 }
 
 RÚBRICA APPEAL (qué tan buena es la promo como pieza de venta — solo si promoted=true):
-Arrancá de 0.5 y ajustá:
+Arranca de 0.5 y ajusta:
 + hasta +0.20 si la creadora APARECE en la foto/video (contenido real de ella; capturas/memes/solo-texto no suman)
 + hasta +0.15 si la imagen es atractiva/sugerente (lencería, pose, producción — lo que vende)
 + hasta +0.10 si el CTA/link es VISIBLE y prominente (sticker grande, texto claro; un link diminuto/escondido no suma)
 + hasta +0.05 si invita a INTERACTUAR (pregunta, encuesta, "escribime", countdown, oferta con urgencia)
 − hasta −0.25 si es una foto random/reciclada sin ella, un pantallazo, o el link está escondido/apenas legible
-⚠️ Usá TODA la escala en pasos de 0.05 — NO devuelvas 0.7 por defecto: una promo mediocre con link es 0.35-0.5, una killer (ella, sexy, CTA grande, invita a escribirle) es 0.85-1.0.
+⚠️ Usa TODA la escala en pasos de 0.05 — NO devuelvas 0.7 por defecto: una promo mediocre con link es 0.35-0.5, una killer (ella, sexy, CTA grande, invita a escribirle) es 0.85-1.0.
 
 GUÍA:
-- Necesitás una señal CONCRETA para marcar promoted=true: un link/sticker/URL, una mención de su plataforma de pago, o una frase de llamado a la acción. Sin eso → "none".
+- Necesitas una señal CONCRETA para marcar promoted=true: un link/sticker/URL, una mención de su plataforma de pago, o una frase de llamado a la acción. Sin eso → "none".
 - ⚠️ DISTINCIÓN CLAVE — "ganar dinero" NO es promoción de su contenido: un CTA a GANAR PLATA / hacer dinero / "gana aquí" / "ganancias de $X diarios" / oportunidad / negocio / referido / afiliado / trabajá desde casa apunta a que el FAN gane dinero (reclutamiento/afiliados), NO a comprar el contenido pago de ELLA. Eso es promoted=false, promotion_type="none" (aunque haya un link/sticker visible), SALVO que ADEMÁS haya señal real de su contenido (su nick de OnlyFans, "mi contenido / suscribite / VIP / contenido exclusivo / +18"). Promocionar = vender SU contenido, no ofrecer una forma de ganar plata.
 - Si platform_mentioned="ninguna" Y has_buy_link=false Y el texto no tiene ningún CTA → promoted=false (none). NO la marques "indirect" solo por verse sugerente.
 - Los emojis (🍑🔥💦😈🥵) por sí solos NO son promoción; solo cuentan si acompañan un CTA real.
 - ⚠️ WATERMARK/FIRMA ≠ PROMO: las creadoras firman sus fotos/stories con su @usuario de Instagram como marca de agua. Un @handle suelto (watermark/overlay/sticker de mención) NO es promoción por sí solo, SALVO que se cumpla alguna: (a) al lado trae la palabra OnlyFans/OF, su logo, o una URL de plataforma de pago; (b) ES uno de los NICKNAMES DE ONLYFANS listados abajo Y ese bloque de abajo te dice EXPRESAMENTE que ese nick cuenta suelto (los nicks que son iguales a su @ de Instagram NO cuentan sueltos). Casos que NUNCA son promo por sí solos: su PROPIO @ de Instagram como firma; y un handle atribuido a OTRA red ("Twitter @x", "X @x", "TikTok @x", "Telegram @x") → apunta a esa red, NO a contenido pago → promoted=false. Ante la duda de si un @handle suelto es su nick de OF o su firma de IG → promoted=false. Manda lo que diga el bloque de NICKNAMES de abajo sobre esta GUÍA.
 - ⚠️ @MENCIÓN/TAG A OTRA CUENTA DE INSTAGRAM ≠ PROMO: taggear o mencionar a OTRA cuenta de IG (una amiga, una colaboración, un gym, otra creadora, una marca) NO es promocionar SU contenido pago → promoted=false, promotion_type="none". DOS excepciones en las que SÍ cuenta: (a) la mención trae al lado un CTA/puntero a contenido PAGO (cualquiera de los de DIRECTA o INDIRECTA: OnlyFans/OF/premium/VIP/"suscribite"/+18, "mi contenido / mi página / mi OF", "DM para el link", o una URL de plataforma de pago); (b) ese @ es uno de los NICKNAMES DE ONLYFANS listados abajo que cuentan sueltos, o es SU PROPIO nick de OF como watermark (eso NO es "otra cuenta") — en esos casos MANDA ese bloque de abajo, NO esta regla. Fuera de esas dos, una story de lifestyle/gym/foto con un @tag y texto motivacional, SIN link/CTA y que NO es su nick de OF, es "none" — NO la marques promoted=true ni platform_mentioned="onlyfans" solo porque haya un @ a otra cuenta.
-- En "reasoning" citá la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, decilo ("solo una selfie en lencería, sin link ni CTA").
-- Si la imagen está borrosa o el texto ilegible y NO podés saber si hay un link/CTA, poné confidence < 0.6 para revisión manual — pero NO marques promoted=true por las dudas: marcá lo que efectivamente ves.`;
+- En "reasoning" cita la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, dilo ("solo una selfie en lencería, sin link ni CTA").
+- Si la imagen está borrosa o el texto ilegible y NO puedes saber si hay un link/CTA, pon confidence < 0.6 para revisión manual — pero NO marques promoted=true por las dudas: marca lo que efectivamente ves.`;
 
 export function funnelHost(u: string | null | undefined): string {
   const s = String(u ?? "").trim();
@@ -142,10 +142,10 @@ function ofNicksClause(nicks: string[], igHandle = ""): string {
   // carve-out "salvo que esté en la lista" del prompt no licencia la firma de IG.
   let out = `\n\nNICKNAMES DE ONLYFANS DE ESTA CREADORA: ${clean.map((n) => `@${n}`).join(", ")}. La cuenta de Instagram escaneada es @${ig || "desconocida"}.`;
   if (strong.length) {
-    out += `\nSi ves ${strong.map((n) => `@${n}`).join(" o ")} EXACTO en la imagen/video (watermark, overlay, sticker, texto sobreimpreso) o en el caption, contá eso como un PUNTERO a contenido pago aunque NO haya link clickeable: poné has_buy_link=true, buy_link_type="onlyfans", platform_mentioned="onlyfans", promoted=true, promotion_type="direct", y citá el nick visto en "reasoning". DOS excepciones: (1) NO lo infieras de que la foto se parece a ella, tiene que ser el NICK como texto/watermark visible; (2) si el nick aparece atribuido EXPLÍCITAMENTE a otra red (ej. "Twitter ${strong.map((n) => `@${n}`)[0]}", "TikTok …"), apunta a esa red, NO a OF → promoted=false.`;
+    out += `\nSi ves ${strong.map((n) => `@${n}`).join(" o ")} EXACTO en la imagen/video (watermark, overlay, sticker, texto sobreimpreso) o en el caption, cuenta eso como un PUNTERO a contenido pago aunque NO haya link clickeable: pon has_buy_link=true, buy_link_type="onlyfans", platform_mentioned="onlyfans", promoted=true, promotion_type="direct", y cita el nick visto en "reasoning". DOS excepciones: (1) NO lo infieras de que la foto se parece a ella, tiene que ser el NICK como texto/watermark visible; (2) si el nick aparece atribuido EXPLÍCITAMENTE a otra red (ej. "Twitter ${strong.map((n) => `@${n}`)[0]}", "TikTok …"), apunta a esa red, NO a OF → promoted=false.`;
   }
   if (ambiguous.length) {
-    out += `\n⚠️ ${ambiguous.map((n) => `@${n}`).join(", ")} es TAMBIÉN su @ de Instagram: si aparece suelto como watermark/firma NO cuenta como promo (es la firma normal de IG). Solo contalo si aparece CON contexto de plataforma de pago al lado: la palabra "OnlyFans"/"OF", su logo, una URL (onlyfans.com/…), o un CTA a contenido pago.`;
+    out += `\n⚠️ ${ambiguous.map((n) => `@${n}`).join(", ")} es TAMBIÉN su @ de Instagram: si aparece suelto como watermark/firma NO cuenta como promo (es la firma normal de IG). Solo cuéntalo si aparece CON contexto de plataforma de pago al lado: la palabra "OnlyFans"/"OF", su logo, una URL (onlyfans.com/…), o un CTA a contenido pago.`;
   }
   return out;
 }

@@ -24,7 +24,7 @@ const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 // pendientes de la persona en UN mensaje consolidado.
 //
 // Ejemplo de output con 1 pendiente: típico "¿pudiste X?"
-// Con 3 pendientes: "@Miguel tenés 3 cosas pendientes: · X · Y · Z"
+// Con 3 pendientes: "@Miguel tienes 3 cosas pendientes: · X · Y · Z"
 function buildGroupedReminderText(args: {
   committedBy: string | null;
   commitments: Array<{ subject: string; target_subject: string | null; hoursOverdue: number; followupCount: number }>;

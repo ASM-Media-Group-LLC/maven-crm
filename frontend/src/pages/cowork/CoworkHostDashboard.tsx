@@ -320,7 +320,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         if (cancelled) { track?.stop(); return; }
         setMicBaseTrack(track);
       } catch {
-        // Sin micro no podés hablarle a nadie → desarmamos todo.
+        // Sin micro no puedes hablarle a nadie → desarmamos todo.
         // `setRoomMic({})` YA apaga todo: sin entrada, cada sala vuelve a su
         // default (no hablar). Acá había además un `setGlobalMic(false)` que
         // quedó huérfano cuando el botón global pasó a ser una acción sobre

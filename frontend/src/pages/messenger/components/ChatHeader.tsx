@@ -56,7 +56,7 @@ export default function ChatHeader({
   const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
   // "Editar info solo admins": quién puede cambiar nombre/foto del grupo (default 'admins').
   const canEditInfo = isAdmin || (conversation.info_permission ?? "admins") === "all";
-  // Click en el nombre abre el panel SOLO si podés verlo (admin siempre; no-admin solo si
+  // Click en el nombre abre el panel SOLO si puedes verlo (admin siempre; no-admin solo si
   // members_visibility='all'). Antes se colaba el panel de miembros ignorando el candado.
   const nameOpensPanel = isGroup && !!onOpenGroupMembers && canSeeMembers;
 

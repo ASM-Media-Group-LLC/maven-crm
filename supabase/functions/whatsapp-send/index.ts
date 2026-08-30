@@ -470,7 +470,7 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
     commitment_id: string | null;
   }>) {
     // ── kind='accion': el recordatorio es una ORDEN, no un texto a postear ──────
-    // El caso que motivó esto (05/08): Álvaro ordenó "mañana 9AM apretá en WARMING",
+    // El caso que motivó esto (05/08): Álvaro ordenó "mañana 9AM aprieta en WARMING",
     // el bot lo guardó… y a las 9AM el drain publicó la nota tal cual EN EL DM como
     // "Recordatorio interno". Nadie la ejecutó y el grupo recibió un saludo suave.
     // Acá, en vez de postear el body, se re-invoca al agente EN el grupo destino con

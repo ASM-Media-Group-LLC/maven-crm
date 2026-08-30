@@ -50,7 +50,7 @@ interface GrowthRow {
   priority: number;
   diagnosis: string;
   // Red donde promociona de verdad + si IG es su canal. Sin esto el digest mandaba a
-  // "revisar calidad" (que el equipo lee como "revisá tus historias de IG") a creadoras
+  // "revisar calidad" (que el equipo lee como "revisa tus historias de IG") a creadoras
   // cuya promo real es X/Telegram y que no tienen dato de IG.
   promo_networks?: string | null;
   ig_promo_days?: number;

@@ -189,7 +189,7 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
       <p className="text-[10px] leading-tight text-muted-foreground">
         {rows.length === 0
           ? "Adjuntá capturas: click, arrastrá o pegá con ⌘/Ctrl+V"
-          : `${rows.length} captura${rows.length > 1 ? "s" : ""} · solo vos y quien tenga este lead pueden verlas`}
+          : `${rows.length} captura${rows.length > 1 ? "s" : ""} · solo tú y quien tenga este lead pueden verlas`}
       </p>
 
       <Dialog open={activa !== null} onOpenChange={(o) => !o && setAbierta(null)}>

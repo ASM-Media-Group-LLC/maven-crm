@@ -92,7 +92,7 @@ ${JSON.stringify(currentConfig, null, 2)}`;
     userMessages.push({
       role: "user",
       content:
-        "Analizá la compañía con la info de arriba. Si te falta algo crítico, hacé UNA pregunta concreta. Si tenés suficiente, devolvé el JSON con ready:true y la config llena.",
+        "Analiza la compañía con la info de arriba. Si te falta algo crítico, haz UNA pregunta concreta. Si tienes suficiente, devuelve el JSON con ready:true y la config llena.",
     });
   }
 

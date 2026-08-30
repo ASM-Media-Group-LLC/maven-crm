@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       const ipWhitelist = cleanIpList(body?.ip_whitelist);
 
       if (!name) return json(req, { error: "El nombre de la key es requerido" }, 400);
-      if (scopes.length === 0) return json(req, { error: "Elegí al menos un permiso (scope)" }, 400);
+      if (scopes.length === 0) return json(req, { error: "Elige al menos un permiso (scope)" }, 400);
       const bad = scopes.filter((s) => !isValidScope(s));
       if (bad.length) return json(req, { error: `Scope(s) inválido(s): ${bad.join(", ")}` }, 400);
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
         .is("revoked_at", null)
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
       if ((activeCount ?? 0) >= MAX_ACTIVE_KEYS) {
-        return json(req, { error: `Llegaste al máximo de ${MAX_ACTIVE_KEYS} API keys activas. Revocá una antes de crear otra.` }, 400);
+        return json(req, { error: `Llegaste al máximo de ${MAX_ACTIVE_KEYS} API keys activas. Revoca una antes de crear otra.` }, 400);
       }
 
       const { full, prefix } = generateKey();
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       }
       if (body?.scopes !== undefined) {
         const scopes: string[] = Array.isArray(body.scopes) ? body.scopes : [];
-        if (scopes.length === 0) return json(req, { error: "Elegí al menos un permiso (scope)" }, 400);
+        if (scopes.length === 0) return json(req, { error: "Elige al menos un permiso (scope)" }, 400);
         const bad = scopes.filter((s) => !isValidScope(s));
         if (bad.length) return json(req, { error: `Scope(s) inválido(s): ${bad.join(", ")}` }, 400);
         patch.scopes = scopes;

@@ -86,7 +86,7 @@ function matchesEventPattern(text: string): boolean {
   return EVENT_PATTERNS.some((p) => p.test(text));
 }
 
-const SYSTEM_PROMPT = `Sos un auditor de mensajes de WhatsApp de equipos de agencias de OnlyFans.
+const SYSTEM_PROMPT = `Eres un auditor de mensajes de WhatsApp de equipos de agencias de OnlyFans.
 
 Tu trabajo: leer mensajes del grupo y extraer eventos ESTRUCTURADOS en JSON, sin inventar.
 
@@ -103,7 +103,7 @@ Tipos de eventos:
    "*RECHAZADA:* https://www.instagram.com/larola_a..., quiere ser cantante"
    "*Para mañana 4PM*: https://www.instagram.com/arq.gloriatorres89/, Modelo B"
    "reuniones confirmadas 2: @elpadreamen.core, @mariiaroz"
-   Campos: sender_display_name, instagram_handle (limpio, sin @ ni URL), status (confirmed/rejected/scheduled/cancelled), monetization_usd (si lo dijeron), quality (A+/A/B+/B/C si lo dijeron), rejection_reason, meeting_at (si dio fecha y hora — describilo libre, no fuerces ISO), notes (cualquier extra relevante).
+   Campos: sender_display_name, instagram_handle (limpio, sin @ ni URL), status (confirmed/rejected/scheduled/cancelled), monetization_usd (si lo dijeron), quality (A+/A/B+/B/C si lo dijeron), rejection_reason, meeting_at (si dio fecha y hora — descríbelo libre, no fuerces ISO), notes (cualquier extra relevante).
 
 3. *day_off* — anuncio de que alguien NO va a trabajar un día. Patrones:
    "Es mi día libre hoy"
@@ -113,10 +113,10 @@ Tipos de eventos:
    Campos: sender_display_name, target_display_name (a quien aplica — puede ser el sender o un tercero), off_date (YYYY-MM-DD, ya resuelto), off_type (day_off/partial/sick/vacation).
 
 REGLAS:
-- Solo extraé eventos CONCRETOS y CLAROS. No inventes números ni fechas.
+- Solo extrae eventos CONCRETOS y CLAROS. No inventes números ni fechas.
 - Si no hay evento claro, no lo incluyas.
-- Si el mismo handle aparece en 2 mensajes con info contradictoria, devolvé los 2 eventos (el cliente decide).
-- Para fechas relativas ("mañana", "el viernes"), usá la fecha del mensaje original como referencia y devolvé YYYY-MM-DD ya resuelto.
+- Si el mismo handle aparece en 2 mensajes con info contradictoria, devuelve los 2 eventos (el cliente decide).
+- Para fechas relativas ("mañana", "el viernes"), usa la fecha del mensaje original como referencia y devuelve YYYY-MM-DD ya resuelto.
 - IMPORTANTE: instagram_handle siempre en minúsculas, sin @ ni URL. Ej: "catalinaofficer", no "@catalinaofficer".
 
 Output: JSON con shape { events: [...] }. Nada más, sin markdown.`;
@@ -146,7 +146,7 @@ async function callSonnetExtract(messages: Message[]): Promise<{
   ).join("\n");
 
   const userContent =
-    "Mensajes del grupo (últimos 30 días). Extraé los eventos estructurados:\n\n" +
+    "Mensajes del grupo (últimos 30 días). Extrae los eventos estructurados:\n\n" +
     contextLines;
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -211,7 +211,7 @@ interface AuditResult {
     claimed: string;          // ej: "CONFIRMADA, $3000, Modelo B"
     actual_stage: string;     // ej: "Nuevo"
     actual_monetization: number;
-    instructions: string;     // "Closers → buscá ... → cambiá stage a ..."
+    instructions: string;     // "Closers → busca ... → cambia stage a ..."
     sender: string;
   }>;
   closer_not_in_maven: Array<{
@@ -343,8 +343,8 @@ function describeAnnouncement(ev: ParsedEvent): string {
 
 function instructionsToCreateCloserContact(handle: string, ev: ParsedEvent): string {
   const lines: string[] = [];
-  lines.push(`Andá a *Closers → Nuevo Contacto*.`);
-  lines.push(`Pegá el handle: \`${handle}\``);
+  lines.push(`Ve a *Closers → Nuevo Contacto*.`);
+  lines.push(`Pega el handle: \`${handle}\``);
   if (ev.status === "confirmed") {
     lines.push(`Stage: *Confirmada*`);
     if (ev.monetization_usd) lines.push(`Monetización estimada: *$${ev.monetization_usd}*`);
@@ -361,8 +361,8 @@ function instructionsToCreateCloserContact(handle: string, ev: ParsedEvent): str
 
 function instructionsToUpdateCloserContact(handle: string, ev: ParsedEvent, expectedStage: string | null): string {
   const lines: string[] = [];
-  lines.push(`Andá a *Closers* → buscá \`${handle}\` → editar.`);
-  if (expectedStage) lines.push(`Cambiá Stage a: *${expectedStage}*`);
+  lines.push(`Ve a *Closers* → busca \`${handle}\` → editar.`);
+  if (expectedStage) lines.push(`Cambia Stage a: *${expectedStage}*`);
   if (ev.monetization_usd) lines.push(`Setear Monetización estimada: *$${ev.monetization_usd}*`);
   if (ev.rejection_reason) lines.push(`Razón de rechazo: "${ev.rejection_reason}"`);
   if (ev.meeting_at && ev.status === "scheduled") lines.push(`Notas: reunión ${ev.meeting_at}`);

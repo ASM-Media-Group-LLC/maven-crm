@@ -66,7 +66,7 @@ import {
 // modelo no existe, la crea con la metadata mínima del form.
 //
 // Cuando elegís una modelo existente del datalist, autofill: categoría,
-// país, IG (campos que no querés re-tipear cada vez).
+// país, IG (campos que no quieres re-tipear cada vez).
 //
 // Categoría (A++/A/B+/B/C+/C) sigue siendo required como en kash —
 // es la lente principal de segmentación en el dashboard de Modelos.

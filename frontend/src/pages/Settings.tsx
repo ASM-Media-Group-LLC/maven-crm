@@ -629,7 +629,7 @@ const WhatsappPhoneCard = ({
   const hasChanges = dirty && toE164(value) !== (currentValue ?? "");
 
   // Genera el código y abre WhatsApp con el mensaje pre-escrito hacia el bot.
-  // VOS iniciás el chat (el bot nunca escribe primero a un número nuevo).
+  // TÚ inicias el chat (el bot nunca escribe primero a un número nuevo).
   const handleVerify = async () => {
     try {
       const data = await requestMut.mutateAsync();
