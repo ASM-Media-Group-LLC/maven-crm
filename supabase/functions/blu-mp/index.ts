@@ -38,17 +38,22 @@ function bluQuery(
   query: Record<string, unknown>,
   accept: (m: Record<string, unknown>) => boolean,
   timeoutMs = 22000,
-): Promise<{ msg: Record<string, unknown>; freshToken: string | null }> {
+): Promise<{ msg: Record<string, unknown>; freshToken: string | null; authMsg: Record<string, unknown> | null; vistos: Record<string, unknown>[] }> {
   return new Promise((resolve, reject) => {
     let ws: WebSocket;
     try { ws = new WebSocket(BLU_WS_URL); } catch (e) { return reject(new Error("WS open: " + (e as Error).message)); }
     let authed = false, resolved = false, freshToken: string | null = null;
     const seen: string[] = [];
+    // Se guarda el auth:ok entero y los primeros mensajes: es la única forma de
+    // saber qué agencias ve esta sesión sin adivinar el protocolo.
+    let authMsg: Record<string, unknown> | null = null;
+    const vistos: Record<string, unknown>[] = [];
     const to = setTimeout(
       () => done(reject, new Error(`WS timeout (${timeoutMs}ms). Tipos vistos: ${seen.join(", ") || "ninguno"}`)),
       timeoutMs,
     );
-    function done(fn: (a: unknown) => void, arg: unknown) {
+    // Genérico: `resolve` y `reject` reciben cosas distintas.
+    function done<T>(fn: (a: T) => void, arg: T) {
       if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch { /* */ } fn(arg);
     }
     ws.onopen = () => ws.send(JSON.stringify({ type: "auth:token", token }));
@@ -62,14 +67,15 @@ function bluQuery(
       }
       if (t === "auth:ok") {
         authed = true;
+        authMsg = m;
         if (typeof m.token === "string") freshToken = m.token;
         try { ws.send(JSON.stringify(query)); } catch { /* */ }
         return;
       }
       if (t === "connected" || t === "pong") return;
       if (!authed) return;
-      if (seen.length < 25 && t) seen.push(t);
-      if (accept(m)) return done(resolve, { msg: m, freshToken });
+      if (seen.length < 25 && t) { seen.push(t); if (vistos.length < 12) vistos.push(m); }
+      if (accept(m)) return done(resolve, { msg: m, freshToken, authMsg, vistos });
     };
     ws.onerror = () => done(reject, new Error("WS error"));
     ws.onclose = () => { if (!resolved) done(reject, new Error("WS cerró antes de responder")); };
@@ -100,9 +106,34 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* */ }
   const action = String(body.action ?? "");
 
-  const { data: sess } = await sb.from("blu_session").select("token").eq("id", 1).maybeSingle();
-  const token = (sess?.token as string | undefined) ?? Deno.env.get("BLU_JWT");
-  if (!token) return json(req, { error: "sin token de sesión BLU (blu_session vacío)" }, 500);
+  // ── DE QUÉ AGENCIA ────────────────────────────────────────────────────────
+  //
+  // El equipo tiene DOS empresas en BLU (Plus y Massive) y son dos cuentas
+  // distintas, con logins distintos: el correo normal en Plus y el `+1` en
+  // Massive. BLU ata cada sesión a UNA cuenta (`accountId` viaja dentro del
+  // token), así que ser admin da todo DENTRO de la agencia pero no deja saltar
+  // a la otra. Por eso hay una sesión por empresa y no una sola de superusuario.
+  //
+  // Si no se pide ninguna, se usa Plus: es lo que hacía antes este código, así
+  // que nada de lo que ya llamaba cambia de comportamiento.
+  const agency = String(body.agency ?? "plus").toLowerCase() === "massive" ? "massive" : "plus";
+  const { data: sess } = await sb.from("blu_session")
+    .select("id, token").eq("agency", agency).order("id").limit(1).maybeSingle();
+  // Semilla desde variable de entorno: BLU_JWT (Plus) y BLU_JWT_MASSIVE.
+  // A partir de la primera consulta, BLU devuelve un token fresco en cada
+  // respuesta y se guarda en `blu_session` con su agencia, así que la variable
+  // solo hace falta para arrancar o si la sesión se cae.
+  const semilla = agency === "massive"
+    ? Deno.env.get("BLU_JWT_MASSIVE")
+    : Deno.env.get("BLU_JWT");
+  const token = (sess?.token as string | undefined) ?? semilla;
+  if (!token) {
+    return json(req, {
+      error: `sin sesión de BLU para "${agency}". Falta el secreto ${agency === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}.`,
+      agency,
+    }, 500);
+  }
+  const sessionId = (sess?.id as number | undefined) ?? 1;
 
   // Query EXACTA + cómo reconocer su respuesta (los tipos confirmados en la captura del owner).
   const rid = (p: string) => `${p}:${Date.now()}`;
@@ -187,15 +218,36 @@ Deno.serve(async (req) => {
       accept = (m) => m.type === "agency:analytics:employee-reports" && Array.isArray(m.employees);
       break;
     }
+    case "whoami": {
+      // Diagnóstico: no pide datos, solo mira qué contesta BLU al autenticarse.
+      // Sirve para saber si esta sesión ve UNA agencia o las dos.
+      query = { type: "agency:models:list" };
+      accept = (m) => m.type === "agency:models:list";
+      break;
+    }
     default:
       return json(req, { error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees|employee-reports)" }, 400);
   }
 
   try {
-    const { msg, freshToken } = await bluQuery(token, query, accept);
+    const { msg, freshToken, authMsg, vistos } = await bluQuery(token, query, accept);
+    if (action === "whoami") {
+      if (freshToken && freshToken !== token) {
+        await sb.from("blu_session").upsert({ id: sessionId, agency, token: freshToken, refreshed_at: new Date().toISOString() });
+      }
+      const sinToken = authMsg ? Object.fromEntries(Object.entries(authMsg).filter(([k]) => k !== "token")) : null;
+      return json(req, {
+        ok: true,
+        agency,
+        authOk: sinToken,
+        modelosQueVe: Array.isArray((msg as { models?: unknown[] }).models)
+          ? (msg as { models: unknown[] }).models.length : null,
+        tiposVistos: vistos.map((v: Record<string, unknown>) => v?.type),
+      });
+    }
     // El auth:ok puede traer un token fresco → lo persistimos (idempotente; el micro también refresca).
     if (freshToken && freshToken !== token) {
-      await sb.from("blu_session").upsert({ id: 1, token: freshToken, refreshed_at: new Date().toISOString() });
+      await sb.from("blu_session").upsert({ id: sessionId, agency, token: freshToken, refreshed_at: new Date().toISOString() });
     }
     return json(req, { ok: true, data: msg });
   } catch (e) {
