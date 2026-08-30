@@ -666,6 +666,32 @@ serve(async (req) => {
       return json(req, { break: pausa, limiteMinutos: limite?.minutos ?? null, label: limite?.label ?? kind });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // PAUSA ABIERTA — para rehidratar al recargar la pestaña
+    // ═══════════════════════════════════════════════════════════════
+    //
+    // El navegador guardaba el arranque de la pausa SOLO en memoria. Si la
+    // pestaña se recargaba —el banner de actualización, el service worker, un
+    // F5— Maven se olvidaba de que la persona estaba en pausa, aunque la fila
+    // siguiera abierta en la base. Consecuencias, las dos malas:
+    //
+    //   · el botón volvía a decir "Baño", así que al volver se abría una
+    //     pausa NUEVA en vez de cerrar la anterior, y la primera quedaba
+    //     colgada para siempre (nada cierra las pausas abiertas);
+    //   · el contador arrancaba de cero, así que el aviso de "se te acabó el
+    //     break" no saltaba nunca.
+    if (action === "pausaAbierta") {
+      const { data: pausa } = await admin.from("cowork_breaks")
+        .select("id, kind, started_at")
+        .eq("user_id", userId).is("ended_at", null)
+        .order("started_at", { ascending: false }).limit(1).maybeSingle();
+      if (!pausa) return json(req, { pausa: null });
+
+      const { data: limite } = await admin.from("cowork_break_limits")
+        .select("minutos, label").eq("kind", pausa.kind).maybeSingle();
+      return json(req, { pausa, limiteMinutos: limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
+    }
+
     if (action === "endBreak") {
       const { data: cerrada, error: upErr } = await admin.from("cowork_breaks")
         .update({ ended_at: new Date().toISOString() })

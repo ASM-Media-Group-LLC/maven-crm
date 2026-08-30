@@ -105,6 +105,39 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   const [breakKind, setBreakKind] = useState<"bano" | "break" | null>(null);
   const [breakLimite, setBreakLimite] = useState<number | null>(null);
+
+  // ── Recuperar la pausa que quedó abierta ───────────────────────────────
+  //
+  // El arranque de la pausa vivía SOLO en memoria de esta pestaña. Si la
+  // pestaña se recargaba —el banner de actualización de la PWA, el service
+  // worker, un F5, un crash— Maven se olvidaba de que la persona estaba en
+  // pausa, aunque la fila siguiera abierta en la base. Dos consecuencias, y la
+  // segunda es la peor:
+  //
+  //   · el contador arrancaba de cero, así que el aviso de "se te acabó el
+  //     break" no saltaba nunca;
+  //   · el botón volvía a decir "Baño" en vez de "Volver", así que al volver se
+  //     abría una pausa NUEVA en lugar de cerrar la anterior. Y como nada
+  //     cierra las pausas abiertas, la primera quedaba colgada para siempre.
+  //
+  // El servidor sí lo sabía todo el tiempo. Solo había que preguntárselo.
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const p = await cowork.getPausaAbierta?.();
+        // Si mientras tanto la persona marcó o cerró una pausa a mano, gana lo
+        // que hizo ella: no se le pisa una acción con una respuesta vieja.
+        if (!vivo || !p) return;
+        setBreakStartedAt((actual) => (actual === null ? p.startedAt : actual));
+        setBreakKind((actual) => (actual === null ? p.kind : actual));
+        setBreakLimite((actual) => (actual === null ? p.limiteMinutos : actual));
+      } catch { /* si no se pudo consultar, queda como estaba */ }
+    })();
+    return () => { vivo = false; };
+    // Una sola vez al montar: después el estado lo manda `toggleBreak`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Los topes salen de la BASE (cowork_break_limits), no de un número escrito
   // acá. El menú decía "Break (30 min)" y "Baño" a secas: si mañana alguien
   // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.

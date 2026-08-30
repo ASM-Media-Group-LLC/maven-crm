@@ -267,6 +267,19 @@ export function useCoworkSession(sessionId: string | null) {
     };
   }, []);
 
+  /** La pausa que quedó abierta, si hay. Se consulta al montar para que
+   *  recargar la pestaña no le haga perder la pausa a nadie. */
+  const getPausaAbierta = useCallback(async () => {
+    const r = await invokeCowork("pausaAbierta", {});
+    const p = (r as any)?.pausa;
+    if (!p) return null;
+    return {
+      kind: p.kind as "bano" | "break",
+      startedAt: new Date(p.started_at).getTime(),
+      limiteMinutos: (r as any)?.limiteMinutos ?? null,
+    };
+  }, []);
+
   // Lista las sesiones cowork ACTIVAS donde el usuario es miembro (host o participante).
   // Puro cliente: el RLS `is_cowork_member` permite leer las propias membresías y sus
   // sesiones. El conteo de miembros es exacto (los miembros ven toda la membresía de su
@@ -298,7 +311,7 @@ export function useCoworkSession(sessionId: string | null) {
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, refetch: fetchData,
+    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
     listMyActiveSessions, endSessionById,
   };
 }
