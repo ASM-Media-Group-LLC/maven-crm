@@ -147,7 +147,8 @@ export default function MeetPage() {
   })();
 
   return (
-    <div className="flex flex-col items-center min-h-screen gap-6 p-4 md:p-6 pt-10 md:pt-16">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="min-h-full flex flex-col items-center gap-6 p-4 md:p-6 pt-10 md:pt-16">
       <div className="w-full max-w-lg flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12">
         <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
           <Video className="h-8 w-8 md:h-10 md:w-10 text-primary" />
@@ -199,7 +200,7 @@ export default function MeetPage() {
                 <div
                   ref={dropProvided.innerRef}
                   {...dropProvided.droppableProps}
-                  className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1"
+                  className="flex flex-col gap-2 sm:max-h-[420px] sm:overflow-y-auto pr-1"
                 >
                   {myRooms.map((room, index) => (
                     <Draggable key={room.id} draggableId={room.id} index={index}>
@@ -207,7 +208,7 @@ export default function MeetPage() {
                         <div
                           ref={dragProvided.innerRef}
                           {...dragProvided.draggableProps}
-                          className={`flex items-center gap-2 bg-card border rounded-2xl px-3 py-3 ${
+                          className={`flex flex-wrap items-center gap-2 bg-card border rounded-2xl px-3 py-3 ${
                             snapshot.isDragging ? "border-primary shadow-lg" : "border-border"
                           }`}
                         >
@@ -253,10 +254,11 @@ export default function MeetPage() {
                             </button>
                           </div>
 
+                          <div className="flex items-center gap-1 shrink-0 w-full justify-end sm:w-auto">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 rounded-full ${room.pinned ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                            className={`h-8 w-8 tactil:h-10 tactil:w-10 rounded-full ${room.pinned ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
                             title={room.pinned ? "Dejar de fijar" : "Fijar arriba"}
                             onClick={() => togglePin(room)}
                           >
@@ -265,7 +267,7 @@ export default function MeetPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
+                            className="h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-muted-foreground hover:text-primary"
                             title="Copiar link de invitación"
                             onClick={() => copyLink(room)}
                           >
@@ -277,7 +279,7 @@ export default function MeetPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
+                              className="h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-destructive hover:text-destructive"
                               title="Terminar reunión"
                               onClick={() => handleEnd(room)}
                             >
@@ -287,6 +289,7 @@ export default function MeetPage() {
                           <Button size="sm" className="rounded-full gap-1 shrink-0" onClick={() => openCall(room)}>
                             Entrar <ArrowRight className="h-4 w-4" />
                           </Button>
+                          </div>
                         </div>
                       )}
                     </Draggable>
@@ -325,6 +328,7 @@ export default function MeetPage() {
         </DialogContent>
       </Dialog>
 
+    </div>
     </div>
   );
 }
