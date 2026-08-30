@@ -66,7 +66,7 @@ export const useChatterVaultByProfile = (profileId: string | null | undefined) =
       return (data ?? []) as ChatterVaultItem[];
     },
     // Vault items rara vez cambian — cachear agresivo así no re-fetchea
-    // cada vez que abrís el vault. Las invalidations de upload/delete
+    // cada vez que abres el vault. Las invalidations de upload/delete
     // sobreescriben esto cuando hace falta.
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
