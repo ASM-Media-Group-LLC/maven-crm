@@ -100,8 +100,15 @@ serve(async (req: Request) => {
       // Una persona puede tener cuenta en las dos, y las dos cuentan para ella:
       // `localPart` ya recorta el `+1`, así que ambas caen en la misma
       // identidad de Maven y sus ventas se suman.
+      // Qué agencias se pueden consultar. NO se deduce de `blu_session`: esa
+      // tabla solo guarda el token ya rotado, y una agencia que arranca desde
+      // su secreto todavía no tiene fila — deducirlo de ahí hacía que el sync
+      // se saltara Plus en silencio.
       const { data: sesiones } = await admin.from("blu_session").select("agency");
-      const agencias = [...new Set((sesiones ?? []).map((s: { agency: string }) => s.agency))];
+      const conSesion = new Set((sesiones ?? []).map((s: { agency: string }) => s.agency));
+      const agencias = ["plus", "massive"].filter((a) =>
+        conSesion.has(a) ||
+        !!Deno.env.get(a === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"));
       if (agencias.length === 0) agencias.push("plus");
 
       let creadasT = 0, revinculadasT = 0, sinCuentaT = 0, empleadosT = 0;

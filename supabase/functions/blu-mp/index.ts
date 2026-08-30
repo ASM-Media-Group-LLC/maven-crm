@@ -118,22 +118,26 @@ Deno.serve(async (req) => {
   // que nada de lo que ya llamaba cambia de comportamiento.
   const agency = String(body.agency ?? "plus").toLowerCase() === "massive" ? "massive" : "plus";
   const { data: sess } = await sb.from("blu_session")
-    .select("id, token").eq("agency", agency).order("id").limit(1).maybeSingle();
+    .select("token").eq("agency", agency).maybeSingle();
   // Semilla desde variable de entorno: BLU_JWT (Plus) y BLU_JWT_MASSIVE.
   // A partir de la primera consulta, BLU devuelve un token fresco en cada
   // respuesta y se guarda en `blu_session` con su agencia, así que la variable
   // solo hace falta para arrancar o si la sesión se cae.
-  const semilla = agency === "massive"
+  // Se limpia lo que venga: al copiar de un panel a otro es fácil arrastrar
+  // comillas, un "Bearer " o un salto de línea, y el WebSocket rechaza el
+  // token sin decir por qué.
+  const limpiar = (t: string | undefined | null) =>
+    (t ?? "").trim().replace(/^Bearer\s+/i, "").replace(/^["']|["']$/g, "").trim() || undefined;
+  const semilla = limpiar(agency === "massive"
     ? Deno.env.get("BLU_JWT_MASSIVE")
-    : Deno.env.get("BLU_JWT");
-  const token = (sess?.token as string | undefined) ?? semilla;
+    : Deno.env.get("BLU_JWT"));
+  const token = limpiar(sess?.token as string | undefined) ?? semilla;
   if (!token) {
     return json(req, {
       error: `sin sesión de BLU para "${agency}". Falta el secreto ${agency === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}.`,
       agency,
     }, 500);
   }
-  const sessionId = (sess?.id as number | undefined) ?? 1;
 
   // Query EXACTA + cómo reconocer su respuesta (los tipos confirmados en la captura del owner).
   const rid = (p: string) => `${p}:${Date.now()}`;
@@ -233,7 +237,8 @@ Deno.serve(async (req) => {
     const { msg, freshToken, authMsg, vistos } = await bluQuery(token, query, accept);
     if (action === "whoami") {
       if (freshToken && freshToken !== token) {
-        await sb.from("blu_session").upsert({ id: sessionId, agency, token: freshToken, refreshed_at: new Date().toISOString() });
+        await sb.from("blu_session")
+        .upsert({ agency, token: freshToken, refreshed_at: new Date().toISOString() }, { onConflict: "agency" });
       }
       const sinToken = authMsg ? Object.fromEntries(Object.entries(authMsg).filter(([k]) => k !== "token")) : null;
       return json(req, {
@@ -247,11 +252,29 @@ Deno.serve(async (req) => {
     }
     // El auth:ok puede traer un token fresco → lo persistimos (idempotente; el micro también refresca).
     if (freshToken && freshToken !== token) {
-      await sb.from("blu_session").upsert({ id: sessionId, agency, token: freshToken, refreshed_at: new Date().toISOString() });
+      await sb.from("blu_session")
+        .upsert({ agency, token: freshToken, refreshed_at: new Date().toISOString() }, { onConflict: "agency" });
     }
     return json(req, { ok: true, data: msg });
   } catch (e) {
     const err = e as Error & { expired?: boolean };
-    return json(req, { error: err.message, expired: !!err.expired }, err.expired ? 401 : 502);
+    // Los datos PÚBLICOS del token, para poder distinguir "vencido" de "es de
+    // la otra cuenta" sin que nadie tenga que mirar la credencial.
+    let pista: Record<string, unknown> | null = null;
+    try {
+      const cuerpo = token.split(".")[1];
+      const j = JSON.parse(atob(cuerpo.replace(/-/g, "+").replace(/_/g, "/")
+        .padEnd(Math.ceil(cuerpo.length / 4) * 4, "=")));
+      pista = {
+        accountId: j.accountId ?? null,
+        managerId: j.managerId ?? null,
+        vence: j.exp ? new Date(j.exp * 1000).toISOString() : null,
+        yaVencio: j.exp ? j.exp * 1000 < Date.now() : null,
+        vieneDe: sess?.token ? "blu_session" : "secreto",
+        agencia: agency,
+      };
+    } catch { /* si no es un JWT legible, la pista queda en null */ }
+    return json(req, { error: err.message, expired: !!err.expired, agency, tokenUsado: pista },
+      err.expired ? 401 : 502);
   }
 });

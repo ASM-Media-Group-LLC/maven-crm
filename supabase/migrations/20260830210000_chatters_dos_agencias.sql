@@ -55,3 +55,13 @@ update public.blu_session set agency = 'plus' where id = 1;
 
 comment on column public.blu_session.agency is
   'De qué agencia es esta sesión. BLU ata cada token a UNA cuenta; no se puede saltar de agencia con el mismo token. La semilla sale de los secretos BLU_JWT (plus) y BLU_JWT_MASSIVE, y a partir de ahí el token fresco de cada respuesta se guarda acá.';
+
+-- ── UNA SESIÓN POR AGENCIA ─────────────────────────────────────────────────
+--
+-- Al conectar Massive por primera vez no existía su fila y el código usó el
+-- id 1 por defecto: la sesión de Massive PISÓ la de Plus. Las dos pasadas
+-- terminaron leyendo la misma cuenta, los empleados de Massive entraron
+-- etiquetados como Plus, y a cada persona se le dio de baja su enlace bueno.
+-- Con la agencia como clave única el upsert no puede volver a colisionar.
+alter table public.blu_session drop constraint if exists blu_session_agency_key;
+alter table public.blu_session add constraint blu_session_agency_key unique (agency);
