@@ -246,7 +246,7 @@ serve(async (req: Request) => {
     // Diagnóstico: qué ve la sesión de BLU que usa Maven. Sirve para saber si
     // alcanza UNA agencia o las dos (Plus y Massive).
     if (action === "blu-whoami") {
-      return json(req, await blu("whoami", {}));
+      return json(req, await blu("whoami", { agency: body.agency ?? "plus" }));
     }
 
     if (action === "probe") {
