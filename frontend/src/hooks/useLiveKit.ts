@@ -1513,7 +1513,7 @@ export function useLiveKit() {
       // para que el mensaje diga el motivo real en vez de un error del navegador.
       if (newState && !puedeCompartirPantalla()) {
         toast.info("Compartir pantalla no está disponible acá", {
-          description: "Los teléfonos no lo permiten. Hacelo desde la computadora.",
+          description: "Los teléfonos no lo permiten. Hazlo desde la computadora.",
         });
         return;
       }
