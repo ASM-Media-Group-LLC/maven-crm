@@ -576,7 +576,7 @@ const LockedScreen = ({ onRetry, busy }: { onRetry: () => void; busy: boolean })
     </button>
     <p className="max-w-sm text-[11px] text-muted-foreground/70">
       Si abriste el link solo como vista previa (WhatsApp/incógnito) y no llegaste a chatear, en un
-      momento se libera y podés entrar desde tu dispositivo.
+      momento se libera y puedes entrar desde tu dispositivo.
     </p>
   </div>
 );

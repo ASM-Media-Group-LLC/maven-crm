@@ -302,7 +302,7 @@ export default function ChatSidebar({
                 {sorted.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-xs text-muted-foreground">
-                      {search ? "Sin resultados" : tab === "archived" ? "No tenés chats archivados" : "Inicia una conversación"}
+                      {search ? "Sin resultados" : tab === "archived" ? "No tienes chats archivados" : "Inicia una conversación"}
                     </p>
                   </div>
                 ) : (

@@ -187,7 +187,7 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       // El índice único del prefijo es la causa más frecuente y el mensaje de
       // Postgres no le dice nada al usuario.
       const msg = /ticket_forms_code_prefix_key/.test(error.message)
-        ? "Ese prefijo ya está en uso por otra plantilla. Elegí otro."
+        ? "Ese prefijo ya está en uso por otra plantilla. Elige otro."
         : error.message;
       toast({ title: "Error al guardar la plantilla", description: msg, variant: "destructive" });
     },
@@ -270,11 +270,11 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       const msg = /ticket_form_fields_options_needed/.test(error.message)
         ? "Las listas necesitan al menos una opción."
         : /ticket_form_fields_form_key_key/.test(error.message)
-        ? "Hay dos campos con la misma clave. Cambiá una de las etiquetas."
+        ? "Hay dos campos con la misma clave. Cambia una de las etiquetas."
         : /ticket_form_fields_form_maps_to_key/.test(error.message)
         ? "Dos campos apuntan a la misma columna del ticket. Solo uno puede."
         : /ticket_form_fields_key_format/.test(error.message)
-        ? "Una etiqueta no produce una clave válida. Usá al menos una letra."
+        ? "Una etiqueta no produce una clave válida. Usa al menos una letra."
         : error.message;
       toast({ title: "Error al guardar los campos", description: msg, variant: "destructive" });
     },

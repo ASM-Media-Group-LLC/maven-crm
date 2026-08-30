@@ -1094,7 +1094,7 @@ export function useLiveKit() {
         if (pub?.source !== Track.Source.Microphone) return;
         if (Date.now() - meSilencieYoRef.current < 1500) return; // fui yo
         toast.info("Alguien silenció tu micrófono", {
-          description: "Podés volver a activarlo cuando quieras.",
+          description: "Puedes volver a activarlo cuando quieras.",
           duration: 8000,
         });
       });

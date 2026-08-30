@@ -70,7 +70,7 @@ function CopyButton({ text, label = "Copiar", size = "sm" as "sm" | "default" })
           await navigator.clipboard.writeText(text);
           setDone(true); toast.success("Copiado");
           setTimeout(() => setDone(false), 2000);
-        } catch { toast.error("No pude copiar — hacelo manualmente"); }
+        } catch { toast.error("No se pudo copiar — hazlo manualmente"); }
       }}
     >
       {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -190,7 +190,7 @@ const AdminApiKeys = () => {
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <div className="space-y-0.5 text-muted-foreground">
             <p><span className="font-medium text-foreground">Uso interno.</span> No compartas las API keys con proveedores externos ni las publiques.</p>
-            <p>Podés tener hasta <span className="font-medium text-foreground">{maxActive} keys activas</span> a la vez ({activeCount}/{maxActive} en uso).</p>
+            <p>Puedes tener hasta <span className="font-medium text-foreground">{maxActive} keys activas</span> a la vez ({activeCount}/{maxActive} en uso).</p>
           </div>
         </CardContent>
       </Card>
@@ -403,7 +403,7 @@ const AdminApiKeys = () => {
             </div>
             <div>
               <div className="mb-1 font-medium">Autenticación</div>
-              <p className="text-xs text-muted-foreground">Mandá la key en <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer mvk_live_…</code> (o el header <code className="rounded bg-muted px-1 py-0.5">X-API-Key</code>).</p>
+              <p className="text-xs text-muted-foreground">Envía la key en <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer mvk_live_…</code> (o el header <code className="rounded bg-muted px-1 py-0.5">X-API-Key</code>).</p>
             </div>
             <div>
               <div className="mb-1 font-medium">Ejemplo</div>

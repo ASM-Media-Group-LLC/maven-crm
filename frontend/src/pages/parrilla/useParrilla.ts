@@ -207,7 +207,7 @@ export function useCreateWeek() {
       const startD = new Date(start + "T12:00:00Z");
       const endD = new Date(end + "T12:00:00Z");
       const nDias = Math.round((endD.getTime() - startD.getTime()) / 86400000) + 1;
-      if (nDias < 2 || nDias > 10) throw new Error("Elegí un rango de 2 a 10 días");
+      if (nDias < 2 || nDias > 10) throw new Error("Elige un rango de 2 a 10 días");
 
       const { data: userData } = await supabase.auth.getUser();
       const { data: g, error } = await (supabase as any)

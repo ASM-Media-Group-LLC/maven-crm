@@ -42,7 +42,7 @@ export async function uploadLeadScreenshots(leadId: string, files: File[]): Prom
   if (!leadId) throw new Error("Falta el lead para adjuntar la captura.");
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;
-  if (!uid) throw new Error("Sesión expirada, volvé a entrar");
+  if (!uid) throw new Error("Sesión expirada, vuelve a entrar");
 
   for (const f of files) {
     const problema = validarScreenshot(f);

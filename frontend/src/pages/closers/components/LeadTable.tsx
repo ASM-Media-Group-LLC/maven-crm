@@ -478,7 +478,7 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                     }}
                     rows={2}
                     className="text-sm"
-                    placeholder="Notas… (podés pegar capturas con ⌘/Ctrl+V)"
+                    placeholder="Notas… (puedes pegar capturas con ⌘/Ctrl+V)"
                   />
                 </div>
                 <div>

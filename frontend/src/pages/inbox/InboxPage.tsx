@@ -1292,7 +1292,7 @@ const InboxPage = () => {
                                     onClick={() => sendMessage(m.body!)}
                                     disabled={sending}
                                     className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline disabled:opacity-50"
-                                    title="Reenviar este mensaje (el número ya pudo haberse corregido). Hacelo de a uno."
+                                    title="Reenviar este mensaje (el número ya pudo haberse corregido). Hazlo uno por uno."
                                   >
                                     ↻ Reintentar envío
                                   </button>

@@ -129,9 +129,9 @@ const TicketsContent = () => {
         {canCreate && (
         <TabsContent value="new" className="space-y-4">
           <div>
-            <h2 className="text-sm font-medium">¿Qué tipo de ticket querés levantar?</h2>
+            <h2 className="text-sm font-medium">¿Qué tipo de ticket quieres levantar?</h2>
             <p className="text-xs text-muted-foreground">
-              Elegí una plantilla y completá el formulario. El código se asigna solo.
+              Elige una plantilla y completa el formulario. El código se asigna solo.
             </p>
           </div>
 

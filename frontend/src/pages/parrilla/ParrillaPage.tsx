@@ -300,7 +300,7 @@ export default function ParrillaPage() {
 
   const abrirPicker = (open: boolean) => {
     if (open && dirtyRef.current) {
-      toast.warning("Guardá los cambios de esta parrilla antes de crear una nueva");
+      toast.warning("Guarda los cambios de esta parrilla antes de crear una nueva");
       return;
     }
     if (open) {
@@ -323,7 +323,7 @@ export default function ParrillaPage() {
 
   const generarConIA = () => {
     if (!grid) return;
-    if (dirtyRef.current) { toast.warning("Guardá tus cambios antes de generar con IA"); return; }
+    if (dirtyRef.current) { toast.warning("Guarda tus cambios antes de generar con IA"); return; }
     toast("La IA va a reescribir los textos de este borrador", {
       description: "Formato, franjas y referencias se conservan. Tarda ~30-60 segundos.",
       duration: 10000,
@@ -369,7 +369,7 @@ export default function ParrillaPage() {
   // Cambiar de semana con edición a medias: avisar en vez de descartar en silencio.
   const handleSelectWeek = (id: string) => {
     if (!dirtyRef.current) { setSelectedId(id); return; }
-    toast.warning("Tenés cambios sin guardar en esta parrilla", {
+    toast.warning("Tienes cambios sin guardar en esta parrilla", {
       description: "Guardalos, o descartalos para cambiar de semana.",
       duration: 8000,
       action: { label: "Descartar y cambiar", onClick: () => { markDirty(false); setSelectedId(id); } },
@@ -470,8 +470,8 @@ export default function ParrillaPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="end">
-              <p className="text-xs font-semibold">Elegí los días de la parrilla</p>
-              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es lunes → lunes (8 días); podés elegir otro rango.</p>
+              <p className="text-xs font-semibold">Elige los días de la parrilla</p>
+              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es lunes → lunes (8 días); puedes elegir otro rango.</p>
               <Calendar
                 mode="range"
                 selected={range}
@@ -483,8 +483,8 @@ export default function ParrillaPage() {
               <div className="mt-1 flex items-center justify-between gap-3">
                 <span className="text-[11px] text-muted-foreground">
                   {range?.from && range?.to
-                    ? `${nDias} días · ${fmtDia(isoLocal(range.from))} → ${fmtDia(isoLocal(range.to))}${rangoValido ? "" : " (elegí de 2 a 10 días)"}`
-                    : "Elegí inicio y fin"}
+                    ? `${nDias} días · ${fmtDia(isoLocal(range.from))} → ${fmtDia(isoLocal(range.to))}${rangoValido ? "" : " (elige de 2 a 10 días)"}`
+                    : "Elige inicio y fin"}
                 </span>
                 <Button size="sm" disabled={!rangoValido || createWeek.isPending} onClick={crearSemana}>
                   {createWeek.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Crear

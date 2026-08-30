@@ -257,7 +257,7 @@ export default function GrabacionesPage() {
               playsInline
               controlsList="nodownload"
               className="w-full max-h-[70vh] bg-black"
-              onError={() => toast.error("No se pudo reproducir. Probá descargarla.")}
+              onError={() => toast.error("No se pudo reproducir. Prueba descargarla.")}
             />
           )}
         </DialogContent>

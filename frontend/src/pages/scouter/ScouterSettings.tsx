@@ -883,7 +883,7 @@ const CompanyFormModal = ({
                     }`}
                   >
                     <span className="font-medium opacity-70 text-[10px] uppercase tracking-wider mr-2">
-                      {m.role === "assistant" ? "IA" : "Vos"}
+                      {m.role === "assistant" ? "IA" : "Tú"}
                     </span>
                     {m.content}
                   </div>
