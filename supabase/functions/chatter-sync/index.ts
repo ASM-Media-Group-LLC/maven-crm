@@ -24,6 +24,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 /** Consulta a BLU reusando la edge `blu-mp` (no duplicamos el WebSocket). */
 async function blu(action: string, extra: Record<string, unknown> = {}): Promise<any> {
+  // `agency` viaja hasta blu-mp, que elige la sesión correcta. Sin ella, Plus.
   const r = await fetch(`${SUPABASE_URL}/functions/v1/blu-mp`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
@@ -90,7 +91,31 @@ serve(async (req: Request) => {
 
     // ── IDENTIDADES + ASIGNACIONES ────────────────────────────────────────
     if (action === "all" || action === "identities") {
-      const data = await blu("employees");
+      // ── LAS DOS EMPRESAS ────────────────────────────────────────────────
+      //
+      // El equipo tiene Plus y Massive, y en BLU son DOS CUENTAS distintas: el
+      // correo normal en Plus y el `+1` en Massive. BLU ata cada sesión a una
+      // cuenta, así que hay que preguntarle a cada una por separado.
+      //
+      // Una persona puede tener cuenta en las dos, y las dos cuentan para ella:
+      // `localPart` ya recorta el `+1`, así que ambas caen en la misma
+      // identidad de Maven y sus ventas se suman.
+      // Qué agencias se pueden consultar. NO se deduce de `blu_session`: esa
+      // tabla solo guarda el token ya rotado, y una agencia que arranca desde
+      // su secreto todavía no tiene fila — deducirlo de ahí hacía que el sync
+      // se saltara Plus en silencio.
+      const { data: sesiones } = await admin.from("blu_session").select("agency");
+      const conSesion = new Set((sesiones ?? []).map((s: { agency: string }) => s.agency));
+      const agencias = ["plus", "massive"].filter((a) =>
+        conSesion.has(a) ||
+        !!Deno.env.get(a === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"));
+      if (agencias.length === 0) agencias.push("plus");
+
+      let creadasT = 0, revinculadasT = 0, sinCuentaT = 0, empleadosT = 0;
+      const asignacionesT: Array<{ dia: string; identity_id: string; blu_model_id: number; agency: string }> = [];
+
+      for (const ag of agencias) {
+      const data = await blu("employees", { agency: ag });
       const empleados: any[] = data?.employees ?? [];
 
       // Cuentas de Maven, para cruzar. Se compara por correo completo y, si no,
@@ -112,7 +137,7 @@ serve(async (req: Request) => {
       }
 
       let creadas = 0, revinculadas = 0, sinCuenta = 0;
-      const asignaciones: Array<{ dia: string; identity_id: string; blu_model_id: number }> = [];
+      const asignaciones: Array<{ dia: string; identity_id: string; blu_model_id: number; agency: string }> = [];
 
       for (const e of empleados) {
         if (e?.id == null) continue;
@@ -132,7 +157,7 @@ serve(async (req: Request) => {
 
         // ¿Ya conocemos esta cuenta de BLU?
         const { data: link } = await admin.from("chatter_identity_link")
-          .select("id, identity_id").eq("source", "blu").eq("external_id", bluId)
+          .select("id, identity_id").eq("source", "blu").eq("agency", ag).eq("external_id", bluId)
           .is("valid_to", null).maybeSingle();
 
         let identityId = link?.identity_id ?? null;
@@ -150,7 +175,8 @@ serve(async (req: Request) => {
             // siendo la misma y su histórico no se parte.
             await admin.from("chatter_identity_link")
               .update({ valid_to: new Date().toISOString() })
-              .eq("identity_id", identityId).eq("source", "blu").is("valid_to", null);
+              .eq("identity_id", identityId).eq("source", "blu").eq("agency", ag)
+              .is("valid_to", null);
             revinculadas++;
           } else {
             const { data: nueva, error: insErr } = await admin.from("chatter_identity")
@@ -168,7 +194,7 @@ serve(async (req: Request) => {
           }
 
           await admin.from("chatter_identity_link").insert({
-            identity_id: identityId, source: "blu", external_id: bluId,
+            identity_id: identityId, source: "blu", agency: ag, external_id: bluId,
             external_email: email, matched_by: matchedBy ?? "manual",
           });
         } else {
@@ -186,7 +212,8 @@ serve(async (req: Request) => {
           if (email) {
             await admin.from("chatter_identity_link")
               .update({ external_email: email })
-              .eq("source", "blu").eq("external_id", bluId).is("valid_to", null);
+              .eq("source", "blu").eq("agency", ag).eq("external_id", bluId)
+              .is("valid_to", null);
           }
         }
 
@@ -194,7 +221,7 @@ serve(async (req: Request) => {
 
         for (const modelId of (e.assignedCreators ?? [])) {
           if (Number.isFinite(Number(modelId))) {
-            asignaciones.push({ dia: elDia, identity_id: identityId!, blu_model_id: Number(modelId) });
+            asignaciones.push({ dia: elDia, identity_id: identityId!, blu_model_id: Number(modelId), agency: ag });
           }
         }
       }
@@ -202,22 +229,39 @@ serve(async (req: Request) => {
       if (asignaciones.length) {
         // Snapshot del día: si hoy le cambian las modelos, los días pasados no se
         // alteran y las notas viejas siguen explicándose con lo que había.
+        // La agencia va en la clave: el modelo 38 de Plus y el 38 de Massive
+        // pueden ser creadoras distintas y una pisaría a la otra.
         await admin.from("chatter_creator_assignment_daily")
-          .upsert(asignaciones, { onConflict: "dia,identity_id,blu_model_id", ignoreDuplicates: true });
+          .upsert(asignaciones, { onConflict: "dia,identity_id,agency,blu_model_id", ignoreDuplicates: true });
       }
 
-      resultado.identidades = { empleados: empleados.length, creadas, revinculadas, sinCuentaMaven: sinCuenta };
-      resultado.asignaciones = asignaciones.length;
+      empleadosT += empleados.length; creadasT += creadas;
+      revinculadasT += revinculadas; sinCuentaT += sinCuenta;
+      asignacionesT.push(...asignaciones);
+      } // fin del bucle por agencia
+
+      resultado.identidades = {
+        agencias, empleados: empleadosT, creadas: creadasT,
+        revinculadas: revinculadasT, sinCuentaMaven: sinCuentaT,
+      };
+      resultado.asignaciones = asignacionesT.length;
     }
 
     // ── SONDEO (diagnostico) ──────────────────────────────────────────────
     // Devuelve crudo lo que responde BLU, para poder mirar la forma del dato
     // antes de construir encima. No escribe nada.
+    // Diagnóstico: qué ve la sesión de BLU que usa Maven. Sirve para saber si
+    // alcanza UNA agencia o las dos (Plus y Massive).
+    if (action === "blu-whoami") {
+      return json(req, await blu("whoami", { agency: body.agency ?? "plus" }));
+    }
+
     if (action === "probe") {
       const data = await blu("employee-reports", {
         startDate: body.startDate ?? elDia,
         endDate: body.endDate ?? elDia,
         creatorIds: body.creatorIds ?? [],
+        agency: body.agency ?? "plus",
       });
       const emps: any[] = data?.employees ?? [];
       const activo = emps.find((e) => (e?.metrics?.totalSales ?? 0) > 0);
@@ -248,9 +292,15 @@ serve(async (req: Request) => {
         : [];
       if (!modelIds.length) return json(req, { error: "modelIds requerido" }, 400);
 
-      // Mapa cuenta-de-BLU → persona, por el vinculo vigente.
+      // De qué empresa es este lote. Los ids de modelo NO son únicos entre Plus
+      // y Massive, así que preguntarle a la agencia equivocada devolvería otra
+      // creadora — o nada.
+      const ag = String(body.agency ?? "plus").toLowerCase() === "massive" ? "massive" : "plus";
+
+      // Mapa cuenta-de-BLU → persona, por el vinculo vigente DE ESTA AGENCIA.
       const { data: links } = await admin.from("chatter_identity_link")
-        .select("identity_id, external_id").eq("source", "blu").is("valid_to", null);
+        .select("identity_id, external_id").eq("source", "blu").eq("agency", ag)
+        .is("valid_to", null);
       const porBluId = new Map<string, string>();
       for (const l of links ?? []) porBluId.set(String(l.external_id), l.identity_id);
 
@@ -259,7 +309,7 @@ serve(async (req: Request) => {
       // en `aboutMe` como respaldo.
       const nombreDeModelo = new Map<number, string>();
       try {
-        const md = await blu("models");
+        const md = await blu("models", { agency: ag });
         for (const m of (md?.models ?? md?.rows ?? [])) {
           const id = Number(m?.id);
           const nombre = m?.internalName ?? m?.aboutMe?.name ?? m?.aboutMe?.username ?? null;
@@ -276,7 +326,7 @@ serve(async (req: Request) => {
         let emps: any[];
         try {
           const data = await blu("employee-reports", {
-            startDate: elDia, endDate: elDia, creatorIds: [modelId],
+            startDate: elDia, endDate: elDia, creatorIds: [modelId], agency: ag,
           });
           emps = data?.employees ?? [];
         } catch {
@@ -297,26 +347,26 @@ serve(async (req: Request) => {
           const idn = porBluId.get(String(e.id));
           if (!idn) { sinIdentidad++; continue; }
           filas.push({
-            dia: elDia, identity_id: idn, blu_model_id: modelId,
+            dia: elDia, identity_id: idn, agency: ag, blu_model_id: modelId,
             model_name: nombreDeModelo.get(modelId) ?? null,
             sales: ventas, fans_chatted: fans,
             sold_messages: Number(m.soldMessages) || 0,
           });
         }
-        cobertura.push({ dia: elDia, blu_model_id: modelId, chatters: conActividad });
+        cobertura.push({ dia: elDia, agency: ag, blu_model_id: modelId, chatters: conActividad });
       }
 
       if (filas.length) {
         await admin.from("chatter_model_daily")
-          .upsert(filas, { onConflict: "dia,identity_id,blu_model_id" });
+          .upsert(filas, { onConflict: "dia,identity_id,agency,blu_model_id" });
       }
       if (cobertura.length) {
         await admin.from("chatter_model_daily_sync")
-          .upsert(cobertura, { onConflict: "dia,blu_model_id" });
+          .upsert(cobertura, { onConflict: "dia,agency,blu_model_id" });
       }
 
       return json(req, {
-        ok: true, dia: elDia, modelos: modelIds.length,
+        ok: true, dia: elDia, agency: ag, modelos: modelIds.length,
         cubiertos: cobertura.length, fallidos, filas: filas.length, sinIdentidad,
       });
     }
