@@ -14,7 +14,7 @@ import { renderHook, act } from "@testing-library/react";
 // de cuadro ya no le llegaba a nadie.
 
 const removeChannel = vi.fn();
-const track = vi.fn();
+const track = vi.fn(() => "ok");
 const subscribe = vi.fn();
 
 function canalFalso() {
@@ -148,5 +148,69 @@ describe("presencia: el estado no se pierde si llega antes que el canal", () => 
     expect(channel).toHaveBeenCalledTimes(1);
     expect(track).toHaveBeenCalledTimes(1);
     expect(track.mock.calls[0][0]).toMatchObject({ user_id: CHATTER, camOn: true });
+  });
+});
+
+// ── El freno de publicación ────────────────────────────────────────────────
+//
+// EL BUG QUE ESTO CUIDA, medido en producción el 30/08/2026: Supabase corta al
+// cliente que manda demasiados mensajes de presencia
+// (`ClientPresenceRateLimitReached`) y le corta el SOCKET ENTERO, no solo el
+// canal. Al entrar a una sala se juntaban media docena de publicaciones en
+// menos de un segundo —micro, cámara, pantalla, el detector de encuadre, el
+// reanuncio de la suscripción—, cada una con su propio `track()`. Con eso
+// alcanzaba: esa persona quedaba muda para la supervisión por el resto del
+// turno, sin un solo error a la vista.
+//
+// Se encontró con el canal de una sesión con once personas adentro y CERO
+// presencias publicadas, y diez cortes en las dos horas previas en los logs.
+describe("el freno de publicación de presencia", () => {
+  beforeEach(() => {
+    salirDePresencia();
+    track.mockClear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("junta la ráfaga de entrar a una sala en una sola publicación", () => {
+    const { result } = renderHook(() =>
+      useCoworkMediaPresence(SESION, CHATTER, { persistente: true }),
+    );
+    const publicar = result.current.trackMediaState;
+
+    // Lo que pasa de verdad al entrar: seis avisos en el mismo instante.
+    act(() => {
+      publicar({ micOn: false, camOn: false, screenShareOn: false });
+      publicar({ micOn: true, camOn: false, screenShareOn: false });
+      publicar({ micOn: true, camOn: true, screenShareOn: false });
+      publicar({ micOn: true, camOn: true, screenShareOn: false, faceState: "cam_off", faceSince: 1 });
+      publicar({ micOn: true, camOn: true, screenShareOn: false, faceState: "ok", faceSince: 2 });
+      publicar({ micOn: true, camOn: true, screenShareOn: true, faceState: "ok", faceSince: 2 });
+    });
+
+    // La primera sale al toque: "acabo de entrar" no puede esperar.
+    expect(track).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(2_100); });
+
+    // Y las otras cinco salen como UNA, con el estado más nuevo. Antes salían
+    // seis, y seis alcanzaban para que el servidor cortara.
+    expect(track).toHaveBeenCalledTimes(2);
+    const ultimo = track.mock.calls[1][0] as Record<string, unknown>;
+    expect(ultimo.screenShareOn).toBe(true);
+    expect(ultimo.faceState).toBe("ok");
+  });
+
+  it("no se traga un cambio: lo que llega después de la ventana sí sale", () => {
+    const { result } = renderHook(() =>
+      useCoworkMediaPresence(SESION, CHATTER, { persistente: true }),
+    );
+    act(() => { result.current.trackMediaState({ micOn: true, camOn: true, screenShareOn: false }); });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(2_100); });
+    act(() => { result.current.trackMediaState({ micOn: false, camOn: true, screenShareOn: false }); });
+    expect(track).toHaveBeenCalledTimes(2);
+    expect((track.mock.calls[1][0] as Record<string, unknown>).micOn).toBe(false);
   });
 });

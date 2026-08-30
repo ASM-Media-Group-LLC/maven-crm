@@ -130,12 +130,76 @@ function selloDePantalla(compartiendo: boolean): number {
   return selloPantalla.desde;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// EL FRENO DE PUBLICACIÓN. Sin esto, Cowork se queda ciego.
+//
+// Supabase corta al cliente que manda demasiados mensajes de presencia
+// (`ClientPresenceRateLimitReached`) y NO corta solo el canal culpable: corta
+// el SOCKET ENTERO de esa persona. Por ese socket viaja también el resto de
+// Realtime, así que quien lo pierde deja de publicar su estado Y deja de
+// recibir los cambios en vivo — por eso una sala nueva no aparecía hasta
+// refrescar la página.
+//
+// Y el aviso no llega nunca al navegador: para el cliente todo parece bien.
+//
+// EL PROBLEMA ESTABA AL ENTRAR A UNA SALA. Ahí se juntan, en menos de un
+// segundo, media docena de motivos para publicar: LiveKit avisa el micro, la
+// cámara y la pantalla de a uno; el detector de encuadre arranca y pasa de
+// `cam_off` a lo que sea; el canal se suscribe y reanuncia lo pendiente. Cada
+// uno hacía su propio `track()`. Con eso alcanzaba para pasarse del tope, y a
+// partir de ahí esa persona quedaba muda para la supervisión POR EL RESTO DEL
+// TURNO — sin un error a la vista.
+//
+// Medido en producción el 30/08/2026: diez cortes en dos horas y el canal de
+// la sesión con CERO presencias, con once personas trabajando adentro.
+//
+// La solución es juntar las publicaciones en vez de mandarlas de a una. Manda
+// la primera al toque (que es la que importa: "acabo de entrar") y agrupa todo
+// lo que llegue en los próximos segundos en un solo mensaje con el ÚLTIMO
+// estado. Nadie nota dos segundos de atraso; todos notan un turno entero de
+// silencio.
+// ────────────────────────────────────────────────────────────────────────────
+
+const MIN_ENTRE_PUBLICACIONES_MS = 2_000;
+let ultimaPublicacion = 0;
+let pendienteDePublicar: { entrada: CanalVivo; state: MediaState } | null = null;
+let temporizadorPendiente: number | null = null;
+
 function publicar(entrada: CanalVivo, state: MediaState) {
   // El estado se re-publica cada diez segundos aunque no cambie nada, así que
   // el sello se ARRASTRA: solo se renueva cuando de verdad cambió el compartir.
   const screenShareSince = selloDePantalla(state.screenShareOn);
+  // Se anota YA, aunque el envío se demore: es lo que se reanuncia al
+  // re-suscribirse, y no queremos que ahí salga un estado viejo.
   entrada.ultimoEstado = { ...state, screenShareSince };
-  entrada.canal.track({
+
+  const ahora = Date.now();
+  const falta = MIN_ENTRE_PUBLICACIONES_MS - (ahora - ultimaPublicacion);
+  if (falta <= 0) { enviar(entrada, entrada.ultimoEstado, screenShareSince); return; }
+
+  // Gana el último: si en la ventana llegan cinco cambios, sale uno solo y con
+  // el estado más nuevo. Publicar los cinco es justamente lo que nos cortaba.
+  pendienteDePublicar = { entrada, state: entrada.ultimoEstado };
+  if (temporizadorPendiente === null) {
+    temporizadorPendiente = window.setTimeout(() => {
+      temporizadorPendiente = null;
+      const p = pendienteDePublicar;
+      pendienteDePublicar = null;
+      if (p) enviar(p.entrada, p.state, selloDePantalla(p.state.screenShareOn));
+    }, falta);
+  }
+}
+
+/** Olvida lo que estuviera esperando para salir. Al cerrar la presencia no
+ *  queremos que un envío atrasado reviva un canal que ya no existe. */
+function olvidarPendiente() {
+  if (temporizadorPendiente !== null) { window.clearTimeout(temporizadorPendiente); temporizadorPendiente = null; }
+  pendienteDePublicar = null;
+}
+
+function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number) {
+  ultimaPublicacion = Date.now();
+  const envio = entrada.canal.track({
     user_id: entrada.userId,
     micOn: state.micOn,
     camOn: state.camOn,
@@ -148,6 +212,19 @@ function publicar(entrada: CanalVivo, state: MediaState) {
     faceSince: state.faceSince ?? null,
     banoConsumidoSeg: state.banoConsumidoSeg ?? null,
   });
+  // `track()` devuelve una promesa y hasta ahora nadie la miraba. Cuando el
+  // servidor rechaza la publicación —justamente el caso del corte por límite—
+  // el fallo era MUDO: la persona creía estar anunciándose y no la veía nadie.
+  void Promise.resolve(envio)
+    .then((r) => {
+      if (r === "ok") return;
+      console.warn("[Cowork] El servidor rechazó publicar tu estado:", r,
+        "— el tablero del supervisor no te va a ver hasta que se reconecte el canal.");
+      // Que el vigilante lo rearme: si el socket se cayó, reanunciarse no
+      // alcanza y hay que rehacer el canal.
+      noAparezco = REINTENTOS_ANTES_DE_REHACER;
+    })
+    .catch(() => { noAparezco = REINTENTOS_ANTES_DE_REHACER; });
 }
 
 function abrirCanal(sessionId: string, userId: string): CanalVivo {
@@ -249,6 +326,15 @@ const MIN_ENTRE_REPUBLICACIONES_MS = 20_000;
  *  sano tarda menos de un segundo. */
 const MAX_UNIENDO_MS = 15_000;
 let uniendoDesde: number | null = null;
+/** Cuántas veces seguidas me reanuncié y SEGUÍ sin aparecer en la sala.
+ *
+ *  Reanunciarse no sirve de nada si lo que se rompió es el socket: el canal
+ *  puede seguir diciendo 'joined' mientras el servidor ya nos cortó. Después de
+ *  unos cuantos intentos en falso hay que rehacer el canal, que es lo único que
+ *  vuelve a levantar la conexión. Antes no había salida: la persona se quedaba
+ *  invisible hasta que recargaba la página, y nadie tenía motivo para hacerlo.*/
+let noAparezco = 0;
+const REINTENTOS_ANTES_DE_REHACER = 3;
 let fallosSeguidos = 0;
 let proximoIntento = 0;
 let ultimaRepublicacion = 0;
@@ -315,11 +401,33 @@ function revisarSalud() {
   // martillo. Si sigo sin aparecer, el próximo intento es en veinte segundos,
   // no en cuatro.
   const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
-  if (aPublicar && !estados[entrada.userId]
-      && ahora - ultimaRepublicacion >= MIN_ENTRE_REPUBLICACIONES_MS) {
-    ultimaRepublicacion = ahora;
-    publicar(entrada, aPublicar);
+  if (!aPublicar) return;              // esta persona no publica (es el supervisor)
+  if (estados[entrada.userId]) { noAparezco = 0; return; }   // aparezco: todo bien
+  if (ahora - ultimaRepublicacion < MIN_ENTRE_REPUBLICACIONES_MS) return;
+  ultimaRepublicacion = ahora;
+  noAparezco += 1;
+
+  // Me reanuncié varias veces y sigo sin figurar. El canal dice estar unido,
+  // pero el servidor no me ve: es el cuadro que deja el corte por límite de
+  // presencia. Reanunciarse otra vez es hablarle a un teléfono descolgado.
+  if (noAparezco >= REINTENTOS_ANTES_DE_REHACER) {
+    noAparezco = 0;
+    console.warn(
+      "[Cowork] Me reanuncié", REINTENTOS_ANTES_DE_REHACER,
+      "veces y sigo sin aparecer en la sala — rehago el canal.",
+    );
+    const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
+    olvidarPendiente();
+    supabase.removeChannel(entrada.canal);
+    const nueva = abrirCanal(sessionId, userId);
+    nueva.usos = usos;
+    oyentes.forEach((f) => nueva.oyentes.add(f));
+    nueva.ultimoEstado = ultimoEstado;
+    vivo = nueva;
+    return;   // el `subscribe` del canal nuevo reanuncia solo
   }
+
+  publicar(entrada, aPublicar);
 }
 
 function arrancarRevisor() {
@@ -338,6 +446,9 @@ function alVolverAMirar() {
  *  desde acá el resto ve el `leave`, que es lo correcto en ese caso. */
 export function salirDePresencia() {
   ultimoEstadoPendiente = null;
+  olvidarPendiente();
+  ultimaPublicacion = 0;
+  noAparezco = 0;
   // Se va de Cowork de verdad: el contador de "sin compartir" arranca de cero
   // la próxima vez. Arrastrarlo entre sesiones haría que alguien que vuelve
   // mañana entre ya con el aviso disparado.
