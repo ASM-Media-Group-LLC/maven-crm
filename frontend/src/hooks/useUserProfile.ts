@@ -209,16 +209,29 @@ export const useUploadUserAvatar = () => {
       const uid = userData.user?.id;
       if (!uid) throw new Error("No autenticado");
 
-      const path = `user-avatars/${uid}/${Date.now()}-${sanitize(file.name)}`;
+      // Bucket PÚBLICO y dedicado. Antes esto subía a `creator-files`, que es
+      // privado, y guardaba igual el resultado de `getPublicUrl()`.
+      //
+      // ⚠️ `getPublicUrl` NO COMPRUEBA NADA: arma la URL a mano, exista o no el
+      // permiso de lectura. Sobre un bucket privado devuelve una URL que
+      // responde 400. Por eso la subida "funcionaba" —el archivo se guardaba,
+      // la fila se actualizaba, el aviso decía "Foto de perfil actualizada"— y
+      // la imagen no cargaba nunca: el <img> fallaba y el avatar caía a las
+      // iniciales. Desde afuera parecía que no se había guardado nada.
+      //
+      // La carpeta es el uid porque la política de escritura del bucket exige
+      // que el primer segmento de la ruta sea el de quien sube: así nadie puede
+      // pisarle la foto a otro.
+      const path = `${uid}/${Date.now()}-${sanitize(file.name)}`;
       const { error: upErr } = await supabase.storage
-        .from("creator-files")
+        .from("user-avatars")
         .upload(path, file, {
           upsert: false,
           contentType: file.type,
           cacheControl: "3600",
         });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("creator-files").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("user-avatars").getPublicUrl(path);
 
       const { error: updErr } = await supabase
         .from("profiles")

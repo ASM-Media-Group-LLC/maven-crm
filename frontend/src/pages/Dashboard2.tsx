@@ -233,13 +233,18 @@ const Dashboard2 = () => {
     setPhotoUploading(true);
     try {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `avatars/${creatorDetail.creatorId}/profile-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("creator-files").upload(path, file, {
+      // Bucket PÚBLICO y dedicado, el mismo que ya usa el edge que trae la foto
+      // de Instagram. Antes esto subía a `creator-files`, que es privado, y
+      // guardaba igual el resultado de `getPublicUrl()` — que arma la URL a
+      // mano SIN comprobar el permiso. Resultado: la subida decía que sí y la
+      // foto no cargaba nunca.
+      const path = `${creatorDetail.creatorId}/profile-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("creator-avatars").upload(path, file, {
         cacheControl: "3600",
         upsert: false,
       });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("creator-files").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("creator-avatars").getPublicUrl(path);
       const newUrl = pub?.publicUrl;
       if (!newUrl) throw new Error("No se pudo obtener la URL pública");
       const { error: dbErr } = await supabase
