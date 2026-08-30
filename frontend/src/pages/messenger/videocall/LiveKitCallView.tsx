@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
+import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { BackgroundEffect } from "./BackgroundSelector";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -317,6 +318,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
   useScreenShareNudge(localScreenShare, !!supervisorEncuadre);
+  // Y que quede constancia: los mismos llamados, guardados. Va acá al lado de
+  // los avisos a propósito — se anota lo que la persona efectivamente escuchó,
+  // no una regla parecida calculada en otra parte que puede irse separando.
+  useRegistrarLlamados({
+    faceWatch,
+    compartiendo: localScreenShare,
+    activo: !!supervisorEncuadre,
+    // Con la sala caída, LiveKit vacía la lista de participantes y la cámara de
+    // todo el mundo se ve apagada aunque esté prendida. Sin esto, una caída de
+    // veinte minutos le anotaba a cada persona veinte minutos de "cámara
+    // apagada" — y como Supabase vive en otro servidor, las escrituras salían.
+    conectado: lk.connectionState === ConnectionState.Connected,
+  });
   const onFaceStateChangeRef = useRef(onFaceStateChange);
   onFaceStateChangeRef.current = onFaceStateChange;
   useEffect(() => {

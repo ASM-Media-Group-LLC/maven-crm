@@ -675,6 +675,129 @@ serve(async (req) => {
       return json(req, { break: cerrada });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // REGISTRAR LLAMADO DE ATENCIÓN (cámara / encuadre / luz / pantalla)
+    // ═══════════════════════════════════════════════════════════════
+    //
+    // Lo llama el navegador de la propia persona cuando un problema ya lleva el
+    // tiempo suficiente como para que se le avise al supervisor. Hasta ahora
+    // esos avisos se decían por voz, aparecían en la pantalla del supervisor y
+    // se perdían: al cerrar la pestaña no quedaba nada.
+    //
+    // ⚠️ Por ahora esto SOLO registra. No afecta ninguna nota.
+    //
+    // ── POR QUÉ ACÁ NO SE LE CREE NADA AL CLIENTE ───────────────────────────
+    //
+    // Esto va a terminar afectando la nota de la gente, así que el defecto que
+    // importa no es perder un llamado: es INVENTAR uno. Una acusación falsa le
+    // baja un número a alguien que hizo todo bien. Por eso:
+    //
+    //   · el user_id sale del token y la sala de la asignación real — el cuerpo
+    //     no puede anotarle un llamado a otra persona;
+    //   · el cliente manda CUÁNTO DURÓ, no CUÁNDO EMPEZÓ, y el inicio lo resta
+    //     el servidor. Con una fecha absoluta, un reloj desviado la corría en
+    //     cada llamada y cada reintento creaba una fila nueva en vez de estirar
+    //     la misma. Una duración es un delta: no le importa en qué hora cree
+    //     vivir la máquina de la persona;
+    //   · si el rato reclamado se solapa con una pausa registrada, se descarta.
+    //     Esta es la garantía importante y por eso vive acá y no en el
+    //     navegador: la bandera de pausa del cliente es un booleano en memoria
+    //     que NO sobrevive a recargar la pestaña, mientras que la escritura sí
+    //     es durable. Alguien que marcó "Break", se fue, y cuya pestaña se
+    //     recargó sola, se llevaba un llamado de media hora por estar ausente
+    //     justo después de haber avisado que se ausentaba.
+    //
+    // Se llama repetido a propósito para ir estirando `seconds` mientras el
+    // problema sigue. El índice único (user_id, kind, started_at) convierte eso
+    // en una actualización en vez de N filas, y un trigger impide que una
+    // llamada demorada acorte el llamado.
+    if (action === "registrarLlamado") {
+      const KINDS = ["camara", "encuadre", "luz", "pantalla"];
+      const kind = String(body.kind ?? "");
+      if (!KINDS.includes(kind)) return err(req, "kind inválido");
+
+      const { data: asignacion } = await admin.from("cowork_room_assignments")
+        .select("session_id, room_id").eq("user_id", userId).eq("is_active", true)
+        .order("assigned_at", { ascending: false }).limit(1).maybeSingle();
+      // Sin sala activa no hay nada que anotar: esta persona no está en Cowork.
+      // No es un error — la llamada puede seguir viva un instante después de
+      // que la sacaron de la sala.
+      if (!asignacion?.session_id) return json(req, { skipped: "sin sala" });
+
+      const ahora = Date.now();
+      const TURNO_MS = 12 * 60 * 60 * 1000;
+      const segundos = Math.max(0, Math.min(
+        Math.floor(Number(body.seconds) || 0),
+        Math.floor(TURNO_MS / 1000),
+      ));
+
+      const inicio = new Date(ahora - segundos * 1000);
+
+      // Qué episodio es. Lo sortea el cliente al arrancar su reloj y lo repite
+      // mientras el problema siga.
+      //
+      // Antes esto se resolvía redondeando el inicio al minuto y usándolo como
+      // identidad. No alcanzaba: el cliente trunca los segundos a entero, así
+      // que la resta se mueve casi un segundo entre llamadas y de vez en cuando
+      // cruza el borde del minuto. Una simulación de 20.000 episodios dio 1-2%
+      // partidos en dos filas, y las dos siguen creciendo — o sea que sumar
+      // duraciones contaba el episodio dos veces.
+      //
+      // El nonce no le da poder al cliente sobre nada ajeno: la identidad real
+      // es (user_id del token, kind, nonce). Lo peor que puede hacer un cliente
+      // roto es abrir filas de más para sí mismo.
+      const nonce = String(body.nonce ?? "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64)
+        // Sin nonce se cae al comportamiento viejo (el minuto redondeado), para
+        // que un navegador con el bundle anterior en caché siga registrando.
+        || `t${Math.round(inicio.getTime() / 60_000) * 60_000}`;
+
+      // ¿El rato reclamado pisa una pausa? Se mira contra `cowork_breaks`, que
+      // es la única fuente que sobrevive a que la persona recargue la pestaña.
+      //
+      // Se acota a las últimas 12 h porque una pausa que alguien dejó abierta y
+      // nunca cerró no debería silenciar los llamados de esa persona para
+      // siempre.
+      // Una pausa ABIERTA solo cuenta si empezó hace poco. Nada cierra las
+      // pausas colgadas —no hay cron, y `endBreak` necesita que la persona
+      // apriete "volver"—, así que alguien a quien se le cerró la pestaña
+      // durante un break deja una fila abierta para siempre. Sin este límite,
+      // esa persona dejaba de registrar llamados por el resto del turno sin que
+      // nadie se enterara. Ninguna pausa legítima dura tres horas.
+      const PAUSA_ABIERTA_MAX_MS = 3 * 60 * 60 * 1000;
+      const { data: pausa, error: pausaErr } = await admin.from("cowork_breaks")
+        .select("id")
+        .eq("user_id", userId)
+        .gt("started_at", new Date(ahora - TURNO_MS).toISOString())
+        .lt("started_at", new Date(ahora).toISOString())
+        .or(
+          `and(ended_at.is.null,started_at.gt.${new Date(ahora - PAUSA_ABIERTA_MAX_MS).toISOString()}),` +
+          `ended_at.gt.${inicio.toISOString()}`,
+        )
+        .limit(1).maybeSingle();
+      // Si NO se pudo comprobar, no se escribe. La regla de toda esta acción es
+      // que ante la duda se pierde el llamado, y "la consulta falló" es duda:
+      // dejarlo pasar convertiría una caída de la base en una tanda de
+      // acusaciones falsas contra gente que estaba en su break.
+      if (pausaErr) return json(req, { skipped: "no se pudo verificar la pausa" });
+      // Se descarta ENTERO, aunque parte del rato caiga fuera de la pausa.
+      if (pausa) return json(req, { skipped: "en pausa" });
+
+      const { data: llamado, error: insErr } = await admin.from("cowork_llamados")
+        .upsert({
+          session_id: asignacion.session_id,
+          room_id: asignacion.room_id,
+          user_id: userId,
+          kind,
+          detail: body.detail ? String(body.detail).slice(0, 40) : null,
+          nonce,
+          started_at: inicio.toISOString(),
+          seconds: segundos,
+        }, { onConflict: "user_id,kind,nonce" })
+        .select("id, kind, started_at, seconds").single();
+      if (insErr) return err(req, insErr.message, 500);
+      return json(req, { llamado });
+    }
+
     if (action === "updateSession") {
       const { sessionId, name } = body;
       if (!sessionId) return err(req, "sessionId required");
@@ -690,7 +813,7 @@ serve(async (req) => {
         .eq("id", sessionId)
         .select("id, name")
         .single();
-      if (upErr) return err(upErr.message, 500);
+      if (upErr) return err(req, upErr.message, 500);
       return json(req, { session: updated });
     }
 
