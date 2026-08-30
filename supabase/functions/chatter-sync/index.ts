@@ -261,6 +261,7 @@ serve(async (req: Request) => {
         startDate: body.startDate ?? elDia,
         endDate: body.endDate ?? elDia,
         creatorIds: body.creatorIds ?? [],
+        agency: body.agency ?? "plus",
       });
       const emps: any[] = data?.employees ?? [];
       const activo = emps.find((e) => (e?.metrics?.totalSales ?? 0) > 0);

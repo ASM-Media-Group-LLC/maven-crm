@@ -65,3 +65,50 @@ comment on column public.blu_session.agency is
 -- Con la agencia como clave única el upsert no puede volver a colisionar.
 alter table public.blu_session drop constraint if exists blu_session_agency_key;
 alter table public.blu_session add constraint blu_session_agency_key unique (agency);
+
+-- ── `id` AUTONUMÉRICO (si no, la segunda sesión no entra nunca) ─────────────
+--
+-- `id` era la PK con DEFAULT 1 fijo, de cuando había una sola sesión. Con dos
+-- agencias, el upsert por `agency` inserta sin id, toma el 1 y choca contra la
+-- clave primaria. Y el upsert no comprobaba el error: fallaba MUDO.
+--
+-- Consecuencia: solo sobrevivía la fila de la primera agencia que escribiera y
+-- el token de la otra no se persistía nunca. Cada consulta suya arrancaba del
+-- secreto, y como el JWT de BLU dura 24 h, al vencer ese secreto esa agencia
+-- entera se caía a cero. El mismo síntoma que tenía Alexandra, pero al revés y
+-- para la mitad del equipo.
+create sequence if not exists public.blu_session_id_seq owned by public.blu_session.id;
+select setval('public.blu_session_id_seq', greatest(coalesce((select max(id) from public.blu_session), 0), 1));
+alter table public.blu_session alter column id set default nextval('public.blu_session_id_seq');
+
+comment on column public.blu_session.id is
+  'Autonumérico. Antes tenía DEFAULT 1 fijo: con dos agencias el upsert chocaba contra la PK y la segunda sesión no se guardaba nunca. La identidad real de la fila es `agency`.';
+
+-- ── La base de "lo esperado" también es por agencia ─────────────────────────
+--
+-- Se calculaba por id de modelo sin mirar la agencia. Hoy no mezcla porque los
+-- ids de las dos empresas resultaron disjuntos, pero eso es suerte: el día que
+-- BLU reuse un id, el esperado de una creadora se calcularía con las ventas de
+-- otra.
+create or replace function public.chatter_model_baseline(
+  _blu_model_id bigint, _hasta date, _dias integer default 30, _agency text default null)
+returns numeric language sql stable security definer set search_path to 'public'
+as $function$
+  WITH por_dia AS (
+    SELECT c.dia, sum(c.sales) AS total_dia, count(DISTINCT c.identity_id) AS chatters_dia
+    FROM public.chatter_model_daily c
+    WHERE c.blu_model_id = _blu_model_id
+      AND c.dia <= _hasta AND c.dia > _hasta - _dias
+      AND (_agency IS NULL OR c.agency = _agency)
+    GROUP BY c.dia
+  )
+  SELECT AVG(total_dia / GREATEST(1, chatters_dia)) FROM por_dia;
+$function$;
+
+create or replace function public.chatter_expected_sales(_identity uuid, _dia date, _dias integer default 30)
+returns numeric language sql stable security definer set search_path to 'public'
+as $function$
+  SELECT SUM(public.chatter_model_baseline(c.blu_model_id, _dia, _dias, c.agency))
+  FROM public.chatter_model_daily c
+  WHERE c.identity_id = _identity AND c.dia = _dia;
+$function$;

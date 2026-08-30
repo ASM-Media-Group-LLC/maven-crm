@@ -237,8 +237,14 @@ Deno.serve(async (req) => {
     const { msg, freshToken, authMsg, vistos } = await bluQuery(token, query, accept);
     if (action === "whoami") {
       if (freshToken && freshToken !== token) {
-        await sb.from("blu_session")
+        const { error: errSesion } = await sb.from("blu_session")
         .upsert({ agency, token: freshToken, refreshed_at: new Date().toISOString() }, { onConflict: "agency" });
+      // Un fallo acá NO puede ser mudo: si la sesión no se guarda, esa agencia
+      // queda dependiendo del secreto, y el JWT de BLU dura 24 h. Al vencer, la
+      // agencia entera se cae a cero sin que nadie sepa por qué. Ya pasó: el
+      // `id` de blu_session tenía DEFAULT 1 fijo, el upsert chocaba contra la
+      // clave primaria y el error se descartaba.
+      if (errSesion) console.error(`[blu-mp] no se pudo guardar la sesión de ${agency}:`, errSesion.message);
       }
       const sinToken = authMsg ? Object.fromEntries(Object.entries(authMsg).filter(([k]) => k !== "token")) : null;
       return json(req, {
@@ -252,8 +258,14 @@ Deno.serve(async (req) => {
     }
     // El auth:ok puede traer un token fresco → lo persistimos (idempotente; el micro también refresca).
     if (freshToken && freshToken !== token) {
-      await sb.from("blu_session")
+      const { error: errSesion } = await sb.from("blu_session")
         .upsert({ agency, token: freshToken, refreshed_at: new Date().toISOString() }, { onConflict: "agency" });
+      // Un fallo acá NO puede ser mudo: si la sesión no se guarda, esa agencia
+      // queda dependiendo del secreto, y el JWT de BLU dura 24 h. Al vencer, la
+      // agencia entera se cae a cero sin que nadie sepa por qué. Ya pasó: el
+      // `id` de blu_session tenía DEFAULT 1 fijo, el upsert chocaba contra la
+      // clave primaria y el error se descartaba.
+      if (errSesion) console.error(`[blu-mp] no se pudo guardar la sesión de ${agency}:`, errSesion.message);
     }
     return json(req, { ok: true, data: msg });
   } catch (e) {
