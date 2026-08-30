@@ -451,7 +451,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} />
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} />
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
@@ -622,6 +622,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         leaveIcon={leaveIcon}
         compact={effectiveCompact}
         tactil={tactil}
+        onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
       />

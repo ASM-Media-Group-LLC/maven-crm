@@ -11,10 +11,14 @@ interface CallTopBarProps {
   shareLink: string;
   hideShareLink?: boolean;
   compact?: boolean;
+  /** Compacto porque es un TELÉFONO, no porque esté en una ventanita. El
+   *  cronómetro vuelve solo en ese caso: en 340px no hay lugar, en un teléfono
+   *  sí — y saber cuánto lleva la llamada es de lo más básico. */
+  tactil?: boolean;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -38,7 +42,7 @@ export default function CallTopBar({
     <div className={cn("shrink-0 flex items-center justify-between bg-background", compact ? "px-2 py-1" : "px-4 py-2")}>
       <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
         <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
-        {!compact && (
+        {(!compact || tactil) && (
           <>
             <div className="h-4 w-px bg-muted" />
             <div className="flex items-center gap-1.5 text-muted-foreground">

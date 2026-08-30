@@ -67,7 +67,7 @@ export default function VideoSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-background border-secondary text-foreground max-w-sm p-0 gap-0">
+      <DialogContent className="z-[200] bg-background border-secondary text-foreground max-w-sm p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="text-base font-medium text-white">Vídeo</DialogTitle>
         </DialogHeader>

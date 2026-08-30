@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users,
-  ChevronUp, Info, Volume2, ChevronDown, Check, Cloud, Sparkles,
+  ChevronUp, MoreVertical, SwitchCamera, LayoutGrid, Info, Volume2, ChevronDown, Check, Cloud, Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +40,10 @@ interface CallControlsProps {
   onVideoInputChange: (id: string) => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
+  /** Abre "Ajustar vista". Solo lo usa el menú del teléfono: en el modo
+   *  completo ese control vive en la barra de arriba, que en compacto no se
+   *  dibuja. Opcional para no romper a quien ya monta este componente. */
+  onOpenAdjustView?: () => void;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
   leaveLabel?: string;
@@ -238,6 +242,76 @@ function useDevices(open: boolean) {
   return { audioInputs, audioOutputs, videoInputs, pedirPermiso, pidiendo };
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   MENÚ "MÁS" DEL TELÉFONO
+
+   El modo compacto se inventó para la ventanita flotante de 340px, que se usa
+   CON MOUSE, y ahí está bien que no tenga menús. En un teléfono el mismo modo
+   se enciende por TAMAÑO DE CONTENEDOR —la pantalla entera mide menos de
+   640px— y se lleva puestos el selector de cámara (o sea, pasar a la trasera,
+   que en un teléfono es básico), el de micrófono, el de altavoz, los fondos,
+   el cronómetro y "Ajustar vista".
+
+   POR QUÉ UN SOLO BOTÓN Y NO VARIOS, medido y no estimado: la fila compacta
+   táctil mide 356px y entra en UNA línea desde 375px de ancho — tres píxeles
+   de sobra en un iPhone SE. Un botón nuevo de 32px sube ese umbral a ~410px:
+   dos filas en el iPhone 12/13/14 y 48px menos de video. Los tres selectores
+   sueltos darían ~494px: dos filas en TODOS los teléfonos. Este menú OCUPA EL
+   LUGAR del botón de métricas, así que la fila no crece ni un píxel. Si algún
+   día hay que agregar algo, que sea ADENTRO del panel.
+   ────────────────────────────────────────────────────────────────────────── */
+
+function FilaMenu({ icon: Icon, label, onClick, activa }: {
+  icon: React.ElementType; label: string; onClick: () => void; activa?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full h-11 px-3 rounded-lg flex items-center gap-3 text-sm transition-colors",
+        activa ? "bg-primary/15 text-primary" : "text-foreground hover:bg-muted",
+      )}
+    >
+      <Icon className="h-[18px] w-[18px] shrink-0" />
+      <span className="flex-1 text-left truncate">{label}</span>
+    </button>
+  );
+}
+
+/** Lista PLANA de dispositivos.
+ *
+ *  No se reusa `DevicePill`: abre su lista con `absolute bottom-full`, y acá
+ *  el panel tiene scroll propio — una lista absoluta queda RECORTADA por el
+ *  contenedor y se ve como un botón muerto. */
+function GrupoDispositivos({ titulo, icon: Icon, devices, selectedId, onSelect }: {
+  titulo: string; icon: React.ElementType; devices: DeviceInfo[];
+  selectedId?: string; onSelect: (id: string) => void;
+}) {
+  if (devices.length === 0) return null;
+  return (
+    <div>
+      <p className="flex items-center gap-2 px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3 w-3 shrink-0" /> {titulo}
+      </p>
+      {devices.map((d) => (
+        <button
+          key={d.deviceId}
+          type="button"
+          onClick={() => onSelect(d.deviceId)}
+          className={cn(
+            "w-full h-11 px-3 rounded-lg flex items-center gap-2 text-sm text-left transition-colors",
+            d.deviceId === selectedId ? "text-primary" : "text-foreground hover:bg-muted",
+          )}
+        >
+          <Check className={cn("h-4 w-4 shrink-0", d.deviceId === selectedId ? "opacity-100" : "opacity-0")} />
+          <span className="flex-1 truncate">{d.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
   currentAudioInputId, currentAudioOutputId, currentVideoInputId,
@@ -245,15 +319,35 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil,
+  onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil,
   backgroundEffect, onToggleBlurBackground,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
-  const devices = useDevices(audioPopoverOpen || videoPopoverOpen);
+  // El menú del teléfono también tiene que disparar la consulta de
+  // dispositivos: si no, sus listas salen VACÍAS. `useDevices` solo enumera
+  // cuando algún panel se abre, y en modo compacto los dos popovers viejos no
+  // existen — así que sin esto el menú mostraría "Girar cámara" nunca y las
+  // listas en blanco. Lo encontró un test, no una lectura.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const devices = useDevices(audioPopoverOpen || videoPopoverOpen || menuAbierto);
 
   // Se mide una vez: el navegador no adquiere la capacidad a mitad de llamada.
   const [puedeCompartir] = useState(puedeCompartirPantalla);
+
+  // Elegir algo cierra el menú: en un teléfono ocupa media pantalla, y dejarlo
+  // abierto tapa justamente el video que se acaba de ir a ajustar.
+  const cerrarY = (fn?: () => void) => () => { setMenuAbierto(false); fn?.(); };
+
+  const camaras = devices.videoInputs;
+  const girarCamara = () => {
+    if (camaras.length < 2) return;
+    const i = camaras.findIndex((d) => d.deviceId === currentVideoInputId);
+    // Sin cámara elegida se asume que está la primera (es la que abre el
+    // navegador por defecto), así que la siguiente es la de índice 1.
+    const siguiente = i < 0 ? 1 : (i + 1) % camaras.length;
+    onVideoInputChange(camaras[siguiente].deviceId);
+  };
 
   const btnSize = compact ? (tactil ? "h-9 w-9" : "h-8 w-8") : "h-11 w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
@@ -452,7 +546,52 @@ export default function CallControls({
         {/* Panel toggles — inline in compact, right-aligned otherwise */}
         {compact && (
           <>
-            <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" compact tactil={tactil} />
+            {tactil ? (
+              <Popover open={menuAbierto} onOpenChange={setMenuAbierto}>
+                <PopoverTrigger asChild>
+                  <button
+                    title="Más opciones"
+                    className={cn(
+                      "rounded-full flex items-center justify-center transition-colors",
+                      "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-card",
+                    )}
+                  >
+                    <MoreVertical className="h-[18px] w-[18px]" />
+                  </button>
+                </PopoverTrigger>
+                {/* z-[200]: adentro del Supervisor Hub (z-120) y de la ventanita
+                    de llamada (z-150), un menú con el z-50 de shadcn se dibuja
+                    DETRÁS del panel y parece un botón muerto.
+                    El tope de alto es necesario de verdad: con dos cámaras, dos
+                    micrófonos y tres salidas el contenido pasa los 630px y arriba
+                    de la fila hay ~608px. */}
+                <PopoverContent
+                  side="top" align="end" sideOffset={8}
+                  className="z-[200] w-[min(320px,90vw)] max-h-[70vh] overflow-y-auto overscroll-contain p-1.5 bg-background border-border"
+                >
+                  {camaras.length > 1 && (
+                    <FilaMenu icon={SwitchCamera} label="Girar cámara" onClick={cerrarY(girarCamara)} />
+                  )}
+                  <GrupoDispositivos titulo="Cámara" icon={VideoIcon} devices={camaras}
+                    selectedId={currentVideoInputId} onSelect={(id) => cerrarY(() => onVideoInputChange(id))()} />
+                  <GrupoDispositivos titulo="Micrófono" icon={Mic} devices={devices.audioInputs}
+                    selectedId={currentAudioInputId} onSelect={(id) => cerrarY(() => onAudioInputChange(id))()} />
+                  <GrupoDispositivos titulo="Altavoz" icon={Volume2} devices={devices.audioOutputs}
+                    selectedId={currentAudioOutputId} onSelect={(id) => cerrarY(() => onAudioOutputChange(id))()} />
+                  <div className="h-px bg-border my-1" />
+                  <FilaMenu icon={Cloud} label="Difuminar fondo"
+                    activa={backgroundEffect === "blur"}
+                    onClick={cerrarY(onToggleBlurBackground)} />
+                  <FilaMenu icon={Sparkles} label="Fondos y efectos" onClick={cerrarY(onOpenVideoSettings)} />
+                  {onOpenAdjustView && (
+                    <FilaMenu icon={LayoutGrid} label="Ajustar vista" onClick={cerrarY(onOpenAdjustView)} />
+                  )}
+                  <FilaMenu icon={Info} label="Métricas" onClick={cerrarY(onOpenMetrics)} />
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" compact tactil={tactil} />
+            )}
             <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" compact tactil={tactil} />
             <PanelBtn icon={MessageSquare} active={isChatOpen} onClick={onToggleChat} label="Chat" badge={!isChatOpen ? unreadChatCount : undefined} compact tactil={tactil} />
           </>

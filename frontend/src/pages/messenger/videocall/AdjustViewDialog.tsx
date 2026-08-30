@@ -42,7 +42,7 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
   const sliderIndex = currentStepIndex === -1 ? TILE_STEPS.length - 1 : currentStepIndex;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       <div className="relative w-full max-w-md mx-4 rounded-2xl bg-background border border-secondary shadow-2xl text-foreground">
