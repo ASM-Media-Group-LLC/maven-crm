@@ -307,18 +307,89 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // cuando le hablás a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
   // sala publica un clon (CoworkRoomMonitor). El Coordinador Hub queda INDEPENDIENTE (su mic está
   // apagado por defecto, así que no hay conflicto de captura ni doble publicación de tu voz).
+  // ── EL MICRÓFONO SE PUEDE MORIR SOLO, Y NADIE LO MIRABA ─────────────────
+  //
+  // El micro se tomaba UNA vez y se volvía a tomar únicamente cuando `micArmed`
+  // cambiaba, o sea al pasar de "ninguna sala" a "alguna" o al revés. Pero un
+  // MediaStreamTrack se muere por su cuenta y sin avisar: te quitas los
+  // auriculares, cambia el dispositivo por defecto, u otro programa (Zoom,
+  // Discord, Meet) se queda con el micro.
+  //
+  // Cuando eso pasaba, las copias publicadas en las salas se quedaban MUDAS, el
+  // botón seguía verde, y el supervisor hablaba sin que lo oyera nadie. Y no se
+  // recuperaba solo: seguía así el resto del turno, salvo que por casualidad
+  // apagara el micro de TODAS las salas y lo volviera a encender — que es
+  // exactamente lo que hace quien va a "probar otra vez", y por eso el fallo
+  // parecía arreglarse solo y no había forma de reproducirlo.
+  //
+  // Se vigila por tres vías porque ninguna sola alcanza:
+  //   · `ended`  — el track murió (dispositivo desconectado).
+  //   · `mute`   — el track vive pero la FUENTE no entrega audio (otro programa
+  //                se quedó con el micro). No hace falta re-tomarlo: puede
+  //                volver solo, y ahí llega `unmute`.
+  //   · un tic de respaldo, porque hay navegadores donde `ended` no llega.
+  const [generacionMic, setGeneracionMic] = useState(0);
+  /** Qué le pasa al micro AHORA, para poder decirlo en pantalla en vez de
+   *  dejar el botón en verde mintiendo. */
+  const [micCaido, setMicCaido] = useState<null | "muerto" | "silenciado">(null);
+  const recapturasMic = useRef(0);
+  /** Tope de re-tomas seguidas. Sin él, un micro que muere al instante hace un
+   *  bucle de getUserMedia. No cuenta la re-toma de un micro que venía
+   *  funcionando bien: esa es un cambio de dispositivo normal, no un bucle. */
+  const MAX_RECAPTURAS_MIC = 5;
+  const VIGILANCIA_MIC_MS = 5_000;
+  const SOBREVIVIO_MS = 60_000;
+
   useEffect(() => {
-    if (!micArmed) return;
+    if (!micArmed) { recapturasMic.current = 0; setMicCaido(null); return; }
     let cancelled = false;
     let track: MediaStreamTrack | null = null;
+    let vigilante: number | null = null;
+    let renaciendo = false;
+    let vivoDesde = 0;
+
+    const renacer = (motivo: "muerto" | "silenciado") => {
+      if (cancelled) return;
+      setMicCaido(motivo);
+      // Silenciado no es muerto: la fuente puede volver sola y llega `unmute`.
+      // Re-tomar acá sería pelearle el micro a otro programa.
+      if (motivo !== "muerto" || renaciendo) return;
+      renaciendo = true;
+      if (vivoDesde && Date.now() - vivoDesde > SOBREVIVIO_MS) recapturasMic.current = 0;
+      if (recapturasMic.current >= MAX_RECAPTURAS_MIC) {
+        toast.error("Tu micrófono se sigue cayendo", {
+          description: "Nadie te está oyendo. Revisa el dispositivo y vuelve a activar el micro.",
+          duration: 12_000, id: "micro-supervisor",
+        });
+        return;
+      }
+      recapturasMic.current += 1;
+      toast.warning("Tu micrófono se cayó — lo estoy retomando", {
+        description: "Mientras tanto las salas no te oyen.",
+        duration: 6_000, id: "micro-supervisor",
+      });
+      setGeneracionMic((n) => n + 1);
+    };
+
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
         track = stream.getAudioTracks()[0] || null;
-        if (cancelled) { track?.stop(); return; }
+        if (cancelled || !track) { track?.stop(); return; }
         setMicBaseTrack(track);
+        setMicCaido(null);
+        vivoDesde = Date.now();
+        track.addEventListener("ended", () => renacer("muerto"));
+        track.addEventListener("mute", () => renacer("silenciado"));
+        track.addEventListener("unmute", () => { if (!cancelled) setMicCaido(null); });
+        // Respaldo: hay navegadores donde `ended` no llega nunca. Mirar una
+        // propiedad cada cinco segundos no cuesta nada y es lo único que
+        // convierte un fallo mudo en uno que se nota.
+        vigilante = window.setInterval(() => {
+          if (track && track.readyState === "ended") renacer("muerto");
+        }, VIGILANCIA_MIC_MS);
       } catch {
         // Sin micro no puedes hablarle a nadie → desarmamos todo.
         // `setRoomMic({})` YA apaga todo: sin entrada, cada sala vuelve a su
@@ -331,10 +402,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     })();
     return () => {
       cancelled = true;
+      if (vigilante !== null) window.clearInterval(vigilante);
       setMicBaseTrack(null);
       try { track?.stop(); } catch { /* noop */ }
     };
-  }, [micArmed]);
+  }, [micArmed, generacionMic]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
@@ -1040,14 +1112,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant={hablandoATodas ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${hablandoATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
-                  title={hablandoATodas
-                    ? "Tu voz va a TODAS las salas. Toca para dejar de hablarles."
-                    : "Habla a todas a la vez. Las que ya tenías activadas se quedan como están."}
+                  className={`gap-1.5 rounded-full h-8 ${
+                    hablandoATodas
+                      // Verde solo si de verdad te están oyendo. Un botón en
+                      // verde con el micro caído es peor que no tener botón.
+                      ? (micCaido
+                          ? "bg-destructive hover:bg-destructive/90 text-white border-transparent animate-pulse"
+                          : "bg-success hover:bg-success/90 text-white border-transparent")
+                      : ""
+                  }`}
+                  title={micCaido
+                    ? (micCaido === "muerto"
+                        ? "Tu micrófono se cayó: NADIE te está oyendo. Revisa el dispositivo."
+                        : "Otro programa se quedó con tu micrófono: NADIE te está oyendo.")
+                    : hablandoATodas
+                      ? "Tu voz va a TODAS las salas. Toca para dejar de hablarles."
+                      : "Habla a todas a la vez. Las que ya tenías activadas se quedan como están."}
                   onClick={() => fijarMicDeTodas(!hablandoATodas)}
                 >
-                  {hablandoATodas ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  {hablandoATodas ? "Hablando a todas" : "Hablar a todas"}
+                  {hablandoATodas && !micCaido ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  {micCaido ? "Micro caído" : hablandoATodas ? "Hablando a todas" : "Hablar a todas"}
                 </Button>
                 <Button
                   size="sm"
