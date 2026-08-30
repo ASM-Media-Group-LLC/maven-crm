@@ -406,7 +406,7 @@ const ParticipantTile = memo(function ParticipantTile({
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="bg-card border-border">
+            <DropdownMenuContent align="center" className="z-[200] bg-card border-border">
               {onPinParticipant && (
                 <DropdownMenuItem onClick={() => onPinParticipant(participant.sid)} className="text-foreground focus:bg-muted">
                   {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}

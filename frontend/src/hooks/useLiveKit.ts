@@ -12,6 +12,7 @@ import {
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { toast } from "sonner";
+import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
@@ -1508,11 +1509,23 @@ export function useLiveKit() {
       // comparte tiene que marcar la casilla de compartir audio en el diálogo
       // de Chrome. En macOS, Chrome solo captura el audio de una PESTAÑA, no el
       // de la pantalla completa. Si no hay audio, el video se comparte igual.
+      // Los teléfonos no exponen getDisplayMedia. Se avisa ANTES de intentarlo,
+      // para que el mensaje diga el motivo real en vez de un error del navegador.
+      if (newState && !puedeCompartirPantalla()) {
+        toast.info("Compartir pantalla no está disponible acá", {
+          description: "Los teléfonos no lo permiten. Hacelo desde la computadora.",
+        });
+        return;
+      }
       await room.localParticipant.setScreenShareEnabled(newState, { audio: newState });
       setIsScreenSharing(newState);
       debouncedRefresh();
     } catch (err) {
+      // Antes esto era un console.error a secas: quien tocaba el botón no veía
+      // NADA pasar, ni siquiera un mensaje de por qué.
       console.error("Screen share error:", err);
+      const motivo = motivoDeFalloAlCompartir(err);
+      if (motivo) toast.error("No se pudo compartir la pantalla", { description: motivo });
     }
   }, [debouncedRefresh]);
 

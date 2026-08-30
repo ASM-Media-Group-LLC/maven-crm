@@ -81,7 +81,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           <ImageIcon className="h-[18px] w-[18px]" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" className="w-80 p-3 bg-background border-secondary">
+      <PopoverContent side="top" align="center" className="z-[200] w-80 p-3 bg-background border-secondary">
         <p className="text-xs font-medium text-foreground mb-3">Fondos y efectos</p>
 
         {/* Effect options */}

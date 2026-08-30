@@ -6,6 +6,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { BackgroundEffect } from "./BackgroundSelector";
@@ -251,6 +252,9 @@ export default function CallControls({
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
   const devices = useDevices(audioPopoverOpen || videoPopoverOpen);
 
+  // Se mide una vez: el navegador no adquiere la capacidad a mitad de llamada.
+  const [puedeCompartir] = useState(puedeCompartirPantalla);
+
   const btnSize = compact ? (tactil ? "h-9 w-9" : "h-8 w-8") : "h-11 w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
 
@@ -287,7 +291,7 @@ export default function CallControls({
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
+              <PopoverContent side="top" className="z-[200] w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
                   <DevicePill icon={Mic} tipo="micrófono" devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
@@ -336,7 +340,7 @@ export default function CallControls({
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" className="w-auto p-2.5 bg-background border-border" align="center">
+              <PopoverContent side="top" className="z-[200] w-auto p-2.5 bg-background border-border" align="center">
                 <div className="flex items-center gap-2">
                   <DevicePill icon={VideoIcon} tipo="cámara" devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} onPedirPermiso={() => devices.pedirPermiso("video")} pidiendo={devices.pidiendo} />
                   <button
@@ -383,13 +387,28 @@ export default function CallControls({
             icon={isScreenSharing ? MonitorOff : Monitor}
             active={!isScreenSharing ? undefined : true}
             onClick={onToggleScreenShare}
+            // El botón sigue tocándose aunque el teléfono no pueda compartir:
+            // así el toque explica POR QUÉ no se puede. Deshabilitarlo sería
+            // peor — en una pantalla táctil no hay hover, o sea que nadie
+            // llegaría a leer el motivo.
+            //
+            // El NOMBRE no cambia con la detección, a propósito. Atarlo a
+            // `puedeCompartir` hacía que el botón se llamara distinto en
+            // cualquier entorno donde `navigator.mediaDevices` no exista —
+            // empezando por los tests, que fue donde se notó. Un control que
+            // cambia de nombre accesible según una detección es peor que uno
+            // que siempre se llama igual y explica al tocarlo.
             label="Compartir pantalla"
+            className={puedeCompartir ? undefined : "opacity-60"}
             compact={compact}
             tactil={tactil}
           />
         )}
 
-        {/* Reactions */}
+        {/* Reactions — el z-[200] del content NO es decorativo: sin él el menú
+            se dibuja detrás del Supervisor Hub (z-120) y de la ventanita de
+            llamada (z-150), y parece que el botón no hace nada. Fue justo así
+            como se reportó. Lo mismo vale para los demás menús de la llamada. */}
         <Popover>
           <PopoverTrigger asChild>
             <button title="Reacciones" className={cn(
@@ -399,7 +418,7 @@ export default function CallControls({
               <Smile className={compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="top" className="w-auto p-2 bg-card border-border" align="center">
+          <PopoverContent side="top" className="z-[200] w-auto p-2 bg-card border-border" align="center">
             <div className="flex gap-1">
               {REACTIONS.map((emoji) => (
                 <button key={emoji} onClick={() => onSendReaction(emoji)} className={cn("hover:scale-125 transition-transform rounded-full hover:bg-muted", compact ? "text-base p-1" : "text-xl p-1.5")}>

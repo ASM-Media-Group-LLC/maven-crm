@@ -89,7 +89,7 @@ export default function CallParticipantsSidebar({
                         <MoreVertical className="h-3.5 w-3.5" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border">
+                    <DropdownMenuContent align="end" className="z-[200] bg-card border-border">
                       {/* Cualquiera puede silenciar a quien dejó el micrófono
                           abierto — el servidor lo ejecuta de verdad y verifica
                           que quien lo pide esté en la llamada. Nadie puede
