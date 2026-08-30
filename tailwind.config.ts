@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 export default {
   darkMode: ["class"],
@@ -123,5 +124,25 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // `tactil:` — el dispositivo se maneja con un DEDO, no con un mouse.
+    //
+    // Existe porque agrandar los botones por ANCHO de pantalla no funciona: un
+    // telefono acostado mide mas de 640px, asi que con `sm:` volvia a los
+    // tamaños de escritorio justo cuando la persona lo estaba usando con el
+    // pulgar. Y al reves, una ventana de escritorio angosta se llenaba de
+    // botones gigantes que nadie necesitaba.
+    //
+    // Se usa al reves de un breakpoint: la clase SIN prefijo es el valor de
+    // escritorio, y `tactil:` la agranda. Asi el default es el de siempre.
+    //
+    //   <Button className="h-6 w-6 tactil:h-9 tactil:w-9" />
+    //
+    // Una laptop con pantalla tactil NO entra: `pointer: coarse` mira el
+    // puntero PRIMARIO, y ahi sigue siendo el mouse.
+    plugin(({ addVariant }) => {
+      addVariant("tactil", "@media (pointer: coarse)");
+    }),
+  ],
 } satisfies Config;

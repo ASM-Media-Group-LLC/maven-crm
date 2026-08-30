@@ -63,7 +63,7 @@ function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScre
       ) : (
         <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
           <VideoOff className="h-4 w-4" />
-          <span className="text-[11px] sm:text-[9px]">Cámara apagada</span>
+          <span className="text-[9px] tactil:text-[11px]">Cámara apagada</span>
         </div>
       )}
       <button
@@ -78,12 +78,12 @@ function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScre
               : "Ver pantalla compartida"
         }
         aria-label={viewingScreen ? "Ver cámara" : "Ver pantalla compartida"}
-        className="absolute top-1 right-1 z-10 flex h-8 w-8 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+        className="absolute top-1 right-1 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
       </button>
       {(pv.name || viewingScreen) && (
-        <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[11px] sm:text-[9px] text-white/90">
+        <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">
           {pv.name}{viewingScreen ? " · pantalla" : ""}
         </span>
       )}
@@ -325,7 +325,7 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
           // estaba rota cuando en realidad estaba llena y trabajando.
           <div className="flex flex-col items-center justify-center h-full gap-1 px-2 text-center">
             <Copy className="h-4 w-4 text-muted-foreground/50" />
-            <span className="text-[11px] sm:text-[10px] text-muted-foreground/70">{TITULO_OTRA_PESTANA}</span>
+            <span className="text-[10px] tactil:text-[11px] text-muted-foreground/70">{TITULO_OTRA_PESTANA}</span>
             <button
               type="button"
               onClick={() => setIntento((n) => n + 1)}
@@ -335,11 +335,11 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
             </button>
           </div>
         ) : status === "error" ? (
-          <div className="flex items-center justify-center h-full text-[12px] sm:text-[11px] text-muted-foreground/50 italic">Preview no disponible</div>
+          <div className="flex items-center justify-center h-full text-[11px] tactil:text-[12px] text-muted-foreground/50 italic">Preview no disponible</div>
         ) : partVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
             <VideoOff className="h-4 w-4" />
-            <span className="text-[11px] sm:text-[10px]">Cámaras apagadas</span>
+            <span className="text-[10px] tactil:text-[11px]">Cámaras apagadas</span>
           </div>
         ) : (
           <div className={`grid ${partVideos.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-1 h-full auto-rows-fr`}>

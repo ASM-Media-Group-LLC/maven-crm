@@ -54,7 +54,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
                 <div key={i} className="flex gap-2 items-center">
                   <Input value={rn} onChange={(e) => updateRoom(i, e.target.value)} className="rounded-xl" />
                   {roomNames.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeRoom(i)} className="shrink-0 h-10 w-10 sm:h-8 sm:w-8 rounded-full text-muted-foreground hover:text-destructive">
+                    <Button variant="ghost" size="icon" onClick={() => removeRoom(i)} className="shrink-0 h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-muted-foreground hover:text-destructive">
                       <X className="h-4 w-4" />
                     </Button>
                   )}

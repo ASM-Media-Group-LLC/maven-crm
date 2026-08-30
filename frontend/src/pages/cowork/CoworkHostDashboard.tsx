@@ -1080,14 +1080,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     <div className="p-4 pb-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{room.name}</span>
-                        <div className="flex items-center gap-1.5 sm:gap-1 shrink-0">
+                        <div className="flex items-center gap-1 tactil:gap-1.5 shrink-0">
                           <Badge variant="secondary" className="text-[10px] rounded-full">
                             {participants.length} <Users2 className="h-2.5 w-2.5 ml-0.5" />
                           </Badge>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 sm:h-6 sm:w-6 text-muted-foreground hover:text-foreground rounded-lg"
+                            className="h-6 w-6 tactil:h-9 tactil:w-9 text-muted-foreground hover:text-foreground rounded-lg"
                             title="Editar sala"
                             onClick={() => openEdit(room)}
                           >
@@ -1096,7 +1096,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 sm:h-6 sm:w-6 text-muted-foreground hover:text-destructive rounded-lg"
+                            className="h-6 w-6 tactil:h-9 tactil:w-9 text-muted-foreground hover:text-destructive rounded-lg"
                             title="Cerrar sala"
                             onClick={() => setCloseTarget(room)}
                           >
@@ -1241,7 +1241,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className={`h-9 sm:h-7 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
+                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
                               title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la oís). Toca para escuchar."}
                               onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
                             >
@@ -1251,7 +1251,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className={`h-9 sm:h-7 flex-1 text-[11px] gap-1 rounded-lg font-medium ${broadcastFor(room.id) ? "bg-success text-white hover:bg-success/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
+                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${broadcastFor(room.id) ? "bg-success text-white hover:bg-success/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
                               title={broadcastFor(room.id)
                                 ? "Tu voz va a esta sala. Toca para dejar de hablarle."
                                 : "Toca para hablarle solo a esta sala."}
@@ -1268,7 +1268,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="flex-1 h-9 sm:h-8 text-xs gap-1 rounded-xl"
+                          className="flex-1 h-8 tactil:h-9 text-xs gap-1 rounded-xl"
                           onClick={() => enterRoom(room.id)}
                         >
                           <DoorOpen className="h-3 w-3" /> Entrar
@@ -1276,7 +1276,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 sm:h-8 sm:w-8 text-primary hover:text-primary/80 rounded-xl"
+                          className="h-8 w-8 tactil:h-9 tactil:w-9 text-primary hover:text-primary/80 rounded-xl"
                           title="Copiar enlace de participante para esta sala"
                           onClick={() => {
                             const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
@@ -1295,7 +1295,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <button
                           type="button"
                           title="Copiar código de esta sala"
-                          className="flex items-center justify-center gap-1.5 w-full py-2 sm:py-0 text-[11px] text-muted-foreground hover:text-primary active:text-primary transition-colors"
+                          className="flex items-center justify-center gap-1.5 w-full py-0 tactil:py-2 text-[11px] text-muted-foreground hover:text-primary active:text-primary transition-colors"
                           onClick={() => {
                             navigator.clipboard.writeText(room.join_code!);
                             toast.success(`Código de ${room.name}: ${room.join_code}`);
@@ -1374,7 +1374,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {hubConnected && cowork.session?.host_hub_livekit_room && (
         <div
           className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${
-            hubPos && !hubMaximized ? "" : hubMinimized ? "bottom-24 right-4 sm:bottom-4" : "bottom-4 right-4"
+            hubPos && !hubMaximized ? "" : hubMinimized ? "bottom-4 right-4 tactil:bottom-24" : "bottom-4 right-4"
           }`}
           style={hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
         >
@@ -1393,11 +1393,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             ref={hubPanelRef}
             className={`relative rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
               hubMaximized
-                ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
+                ? "w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]"
                 : hubSize ? "" : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
             } ${hubMinimized ? "hidden" : ""}`}
             style={hubMaximized ? undefined : {
               ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 380 }),
+              // Nunca más alto que la pantalla. Aplica también al alto que la
+              // persona haya elegido arrastrando la esquina: si después gira el
+              // teléfono, ese alto tampoco entra.
+              maxHeight: "calc(100dvh - 2rem)",
             }}
           >
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
