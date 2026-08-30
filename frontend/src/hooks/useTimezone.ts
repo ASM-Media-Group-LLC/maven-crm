@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 // useTimezone — preferencia global de zona horaria del usuario. Se guarda
 // en localStorage para que persista entre sesiones del mismo browser, y
-// se comparte vía storage events si abrís Maven en varias tabs (cambio
+// se comparte vía storage events si abres Maven en varias tabs (cambio
 // en una tab refresca las demás).
 //
 // La lista de timezones es curada — sólo las que el equipo usa

@@ -626,7 +626,7 @@ const InboxPage = () => {
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
-  // Copiloto (6a): el menú dispara una acción puntual (solo gasta cuando elegís).
+  // Copiloto (6a): el menú dispara una acción puntual (solo gasta cuando eliges).
   // 'suggest' carga el mensaje en el compose box (editable, humano en control);
   // 'summarize'/'signals' muestran info read-only (no se envía).
   const runCopilot = async (action: "suggest" | "summarize" | "signals") => {

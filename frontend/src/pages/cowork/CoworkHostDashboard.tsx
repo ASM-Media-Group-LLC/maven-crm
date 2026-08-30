@@ -284,7 +284,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const hablandoATodas = cowork.rooms.length > 0 && cowork.rooms.every((r) => broadcastFor(r.id));
   const fijarMicDeTodas = (encendido: boolean) =>
     setRoomMic(Object.fromEntries(cowork.rooms.map((r) => [r.id, encendido])));
-  // El micro se captura si le hablás a alguien: a todas, o al menos a una sala.
+  // El micro se captura si le hablas a alguien: a todas, o al menos a una sala.
   const micArmed = Object.values(roomMic).some(Boolean);
 
   useEffect(() => {
@@ -304,7 +304,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   }, [cowork.session?.id]);
 
   // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
-  // cuando le hablás a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
+  // cuando le hablas a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
   // sala publica un clon (CoworkRoomMonitor). El Coordinador Hub queda INDEPENDIENTE (su mic está
   // apagado por defecto, así que no hay conflicto de captura ni doble publicación de tu voz).
   useEffect(() => {
@@ -1242,7 +1242,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               variant="ghost"
                               size="sm"
                               className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
-                              title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la oís). Toca para escuchar."}
+                              title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la escuchas). Toca para escuchar."}
                               onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
                             >
                               {hearFor(room.id) ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}

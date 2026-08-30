@@ -65,7 +65,7 @@ import {
 // están en el catálogo). El backend hace UPSERT por nombre — si la
 // modelo no existe, la crea con la metadata mínima del form.
 //
-// Cuando elegís una modelo existente del datalist, autofill: categoría,
+// Cuando eliges una modelo existente del datalist, autofill: categoría,
 // país, IG (campos que no quieres re-tipear cada vez).
 //
 // Categoría (A++/A/B+/B/C+/C) sigue siendo required como en kash —

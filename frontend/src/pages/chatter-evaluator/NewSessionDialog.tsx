@@ -153,7 +153,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
   const [created, setCreated] = useState<ChatterSession | null>(null);
 
   // Default a "yo mismo" cuando el user está disponible (mismo
-  // comportamiento que antes: si no tocás el select, la sesión queda
+  // comportamiento que antes: si no tocas el select, la sesión queda
   // asignada al creador).
   useEffect(() => {
     if (open && user?.id && !examinerUserId) {
