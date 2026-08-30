@@ -11,6 +11,10 @@ verify_jwt = false
 [functions.public-api]
 verify_jwt = false
 
+# Grupos de correo por rol (listas Zoho + auto-sync). Solo-admin, gate interno (+ X-Cron-Token para el cron).
+[functions.role-email-groups]
+verify_jwt = false
+
 [functions.manage-user-roles]
 verify_jwt = false
 

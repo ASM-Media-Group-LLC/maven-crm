@@ -249,3 +249,77 @@ export function resetMailboxPassword(
     body: JSON.stringify({ zuid, mode: "resetPassword", password: newPassword }),
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRUPOS (listas de distribución). Un correo al grupo hace fan-out a los
+// miembros. NO consumen puesto de usuario (a diferencia de las casillas).
+// ⚠️ SCOPE: estas llamadas necesitan `ZohoMail.organization.groups.ALL` en el
+// refresh token. El token original se generó para casillas
+// (`...accounts.ALL`); si falta el de grupos, Zoho responde OAUTH_SCOPE_MISMATCH
+// y hay que regenerar el refresh token agregando ese scope.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ZohoGroupMember {
+  memberEmailId: string;
+  displayName?: string;
+  role?: string;
+  status?: string;
+}
+export interface ZohoGroup {
+  zgid: string | number;
+  emailId: string;
+  name: string;
+  mailGroupMemberList?: ZohoGroupMember[];
+}
+
+/** Lista los grupos de la organización (con sus miembros). `limit=200` porque
+ *  Zoho pagina de a ~10 por defecto y necesitamos TODOS los grupos para que el
+ *  sync compare bien (si no, cree que un grupo fuera de la página tiene 0
+ *  miembros y re-agrega todo). */
+export function listGroups(): Promise<ZohoResult<{ count?: number; groups?: ZohoGroup[] }>> {
+  return zohoFetch<{ count?: number; groups?: ZohoGroup[] }>("/groups?limit=200", { method: "GET" });
+}
+
+export interface CreateGroupInput {
+  emailId: string;
+  name: string;
+  description?: string;
+  /** Public = cualquiera (incl. externos, ej. RH desde Google) puede enviarle.
+   *  Organization = solo miembros de la org. Default Public. */
+  accessType?: "Public" | "Organization" | "Group" | "Moderated";
+  members?: string[];
+}
+export function createGroup(input: CreateGroupInput): Promise<ZohoResult<ZohoGroup>> {
+  return zohoFetch<ZohoGroup>("/groups", {
+    method: "POST",
+    body: JSON.stringify({
+      emailId: input.emailId,
+      name: input.name,
+      groupDescription: input.description ?? "",
+      accessType: input.accessType ?? "Public",
+      mailGroupMemberList: (input.members ?? []).map((e) => ({ memberEmailId: e, role: "member" })),
+    }),
+  });
+}
+
+/** Agrega miembros a un grupo existente (mode addMailGroupMember). */
+export function addGroupMembers(zgid: string | number, emails: string[]): Promise<ZohoResult> {
+  return zohoFetch(`/groups/${zgid}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      mode: "addMailGroupMember",
+      mailGroupMemberList: emails.map((e) => ({ memberEmailId: e })),
+    }),
+  });
+}
+
+/** Saca miembros de un grupo (mode removeMailGroupMember). */
+export function removeGroupMembers(zgid: string | number, emails: string[]): Promise<ZohoResult> {
+  return zohoFetch(`/groups/${zgid}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      mode: "removeMailGroupMember",
+      mailGroupMemberList: emails.map((e) => ({ memberEmailId: e })),
+    }),
+  });
+}
