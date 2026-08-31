@@ -29,7 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { hablar } from "@/lib/voz";
 import { AVISAR_COORDINADOR_MS, debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
-import { olvidarAusentes } from "@/lib/avisosSupervisor";
+import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSupervisor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
@@ -592,16 +592,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // recibiendo su propio aviso hablado. Lo que amerita subir un nivel es que
   // el aviso no haya surtido efecto.
   //
-  // Una vez por persona y por pausa: se rearma cuando esa persona vuelve.
-  const yaAvisadoPausa = useRef<Set<string>>(new Set());
+  // Se REPITE mientras siga pasada (ver REPETIR_AVISO_SUPERVISOR_MS), y la
+  // marca se borra cuando la pausa termina o la persona se va.
+  const yaAvisadoPausa = useRef<MarcasAviso>(new Map());
   useEffect(() => {
-    for (const [uid, st] of Object.entries(mediaStates)) {
+    // Olvidar a quien se fue. Faltaba SOLO en este aviso —los otros dos ya la
+    // hacían—, y esa asimetría dejaba muda la próxima pausa de quien se
+    // desconectaba estando pasado: su marca quedaba puesta para siempre.
+    olvidarAusentes(yaAvisadoPausa.current, mediaStates);
+    for (const uid of Object.keys(mediaStates)) {
       const p = pausaDe(uid);
       if (!p) { yaAvisadoPausa.current.delete(uid); continue; }
       const pasadoSeg = -p.cuenta.restante;
       if (pasadoSeg * 1000 < AVISAR_SUPERVISOR_PASADO_MS) continue;
-      if (yaAvisadoPausa.current.has(uid)) continue;
-      yaAvisadoPausa.current.add(uid);
+      if (!tocaAvisar(yaAvisadoPausa.current, uid, now)) continue;
       const quien = nombreYApellido(cowork.profiles[uid]);
       playCoordinatorRequestSound();
       hablar(`${quien} lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}.`,
@@ -615,9 +619,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
-  // mirando otra sala, no se enteraba. Suena UNA vez por persona y por episodio
-  // — se rearma solo cuando esa persona vuelve a cuadro.
-  const yaAvisado = useRef<Set<string>>(new Set());
+  // mirando otra sala, no se enteraba. Se REPITE mientras siga fuera de cuadro
+  // (ver REPETIR_AVISO_SUPERVISOR_MS) y la marca se borra cuando vuelve o se va.
+  const yaAvisado = useRef<MarcasAviso>(new Map());
   useEffect(() => {
     // Si alguien se FUE de la sesión, su marca se va con él. Sin esto la marca
     // queda pegada para siempre: al volver ya figura como "ya avisado" y no
@@ -629,8 +633,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     for (const [uid, st] of Object.entries(mediaStates)) {
       const problema = faceIssue(st);
       const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
-      if (bastante && !yaAvisado.current.has(uid)) {
-        yaAvisado.current.add(uid);
+      if (bastante && tocaAvisar(yaAvisado.current, uid, now)) {
         // Con apellido: en el equipo hay dos Álvaro Mejía y hubo dos Manuela
         // Zapata. Un aviso que dice solo el nombre de pila no identifica a
         // nadie, que es exactamente lo que el aviso tiene que hacer.
@@ -660,16 +663,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Lo mismo, para compartir pantalla. Es un aviso aparte y no una rama del de
   // arriba porque son dos problemas distintos: alguien puede estar perfecto en
   // cámara y llevar media hora sin compartir, que es justamente el caso que no
-  // se veía. Suena UNA vez por persona y por episodio, y se rearma solo cuando
-  // vuelve a compartir.
-  const yaAvisadoPantalla = useRef<Set<string>>(new Set());
+  // se veía. Se REPITE mientras siga sin compartir (ver
+  // REPETIR_AVISO_SUPERVISOR_MS) y se rearma cuando vuelve a compartir.
+  const yaAvisadoPantalla = useRef<MarcasAviso>(new Map());
   useEffect(() => {
     // Misma purga que arriba, por la misma razón.
     olvidarAusentes(yaAvisadoPantalla.current, mediaStates);
     for (const [uid, st] of Object.entries(mediaStates)) {
       if (sinPantalla(st)) {
-        if (yaAvisadoPantalla.current.has(uid)) continue;
-        yaAvisadoPantalla.current.add(uid);
+        if (!tocaAvisar(yaAvisadoPantalla.current, uid, now)) continue;
         const quien = nombreYApellido(cowork.profiles[uid]);
         const minutos = Math.floor((now - (st.screenShareSince as number)) / 60000);
         playCoordinatorRequestSound();
