@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, KeyRound, UserCog, X, ExternalLink } from "lucide-react";
+import { Pencil, Trash2, KeyRound, UserCog, X, ExternalLink, AtSign } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,11 +20,13 @@ interface UsersTableProps {
   onEditRole: (user: AdminUser) => void;
   onEdit: (user: AdminUser) => void;
   onResetPassword: (user: AdminUser) => void;
+  /** Cambiar el correo de acceso y crearle la casilla del equipo. */
+  onMigrarCorreo: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
   onRemoveRole: (user: AdminUser) => void;
 }
 
-const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRemoveRole }: UsersTableProps) => {
+const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
   const navigate = useNavigate();
 
   return (
@@ -119,6 +121,14 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Reset contraseña</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)}>
+                              <AtSign className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Cambiar correo / crear casilla</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
