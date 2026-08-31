@@ -92,6 +92,23 @@ export function reproducirAudiosPausados(): number {
   return pausados;
 }
 
+/** ¿Este elemento se quedó SIN pista?
+ *
+ *  Pasa cuando otro componente hace `track.detach()` SIN argumentos: eso
+ *  desconecta la pista de TODOS los elementos donde esté adjunta, no solo del
+ *  suyo. Fue exactamente el bug: el recuadro de un participante, al desmontarse,
+ *  le arrancaba la pista al `<audio>` de la red de seguridad de la sala.
+ *
+ *  Se mira el `srcObject` y no una bandera nuestra: la bandera decía "adjunto"
+ *  mientras el elemento ya estaba vacío, y por eso nadie lo reponía. */
+export function perdioLaPista(el: { srcObject?: unknown } | null | undefined): boolean {
+  if (!el) return false;
+  const ms = el.srcObject as { getAudioTracks?: () => unknown[] } | null | undefined;
+  if (!ms) return true;
+  const pistas = ms.getAudioTracks?.();
+  return Array.isArray(pistas) ? pistas.length === 0 : false;
+}
+
 // ── Desbloqueos registrados ─────────────────────────────────────────────────
 //
 // Darle `play()` al elemento no alcanza si lo que está suspendido es el

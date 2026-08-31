@@ -272,14 +272,25 @@ const ParticipantTile = memo(function ParticipantTile({
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
     return () => {
+      // ⚠️ SOLO NUESTRO ELEMENTO. Acá había además un `detach()` SIN argumentos,
+      // y `detach()` sin argumentos desconecta el track de TODOS los elementos
+      // donde esté adjunto — incluido el `<audio>` oculto de RoomAudioSink, que
+      // es la red de seguridad de toda la sala.
+      //
+      // O sea: cada vez que un recuadro se desmontaba —y se desmontan todo el
+      // tiempo: al pasar a la ventana flotante solo se dibujan DOS, al volver se
+      // dibujan todos, y `hideNoVideo` los filtra según prendan o apaguen la
+      // cámara— ese gesto le arrancaba la pista a la red de seguridad. Y el sink
+      // no la reponía nunca, porque su mapa seguía diciendo "ya está adjunto".
+      //
+      // Resultado: la persona dejaba de escuchar a quien no tuviera recuadro
+      // —justamente el supervisor, que entra sin cámara— por el resto del turno.
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
-        try { attachedVideo.current.detach(); } catch {}
         attachedVideo.current = null;
       }
       if (attachedAudio.current) {
         try { attachedAudio.current.detach(audioElRef.current!); } catch {}
-        try { attachedAudio.current.detach(); } catch {}
         attachedAudio.current = null;
       }
     };

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   MARCA_AUDIO, marcarAudio, documentosDeLaLlamada, audiosDeLaLlamada,
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto,
-  registrarDesbloqueo,
+  registrarDesbloqueo, perdioLaPista,
 } from "@/lib/audioDeLaLlamada";
 
 // EL BUG QUE ESTOS TESTS CUIDAN (31/08/2026): un chatter de Cowork no escuchaba
@@ -192,5 +192,43 @@ describe("esperar el gesto del usuario", () => {
     handler?.();                      // el play() del mock marca paused=false
     expect(a.play).toHaveBeenCalled();
     expect(quitar).toHaveBeenCalledWith("click", expect.any(Function));
+  });
+});
+
+// ── El segundo bug: que te arranquen la pista ───────────────────────────────
+//
+// `track.detach()` SIN argumentos desconecta la pista de TODOS los elementos
+// donde esté adjunta, no solo del propio. `ParticipantTile` lo hacía en su
+// limpieza de desmontaje, y los recuadros se desmontan todo el tiempo: al pasar
+// a la ventana flotante se dibujan solo DOS, al volver se dibujan todos, y
+// `hideNoVideo` los filtra según prendan o apaguen la cámara.
+//
+// Cada desmontaje le arrancaba la pista al <audio> de RoomAudioSink —la red de
+// seguridad de la sala— y el sink no la reponía nunca porque su mapa seguía
+// diciendo "ya está adjunto". La persona dejaba de escuchar a quien no tuviera
+// recuadro (el supervisor entra SIN cámara) por el resto del turno.
+describe("detectar que a un elemento le arrancaron la pista", () => {
+  const conPistas = (n: number) => ({ srcObject: { getAudioTracks: () => Array(n).fill({}) } });
+
+  it("un elemento con su pista está sano", () => {
+    expect(perdioLaPista(conPistas(1))).toBe(false);
+  });
+
+  it("un elemento cuyo srcObject quedó VACÍO perdió la pista", () => {
+    // Esto es lo que deja un detach() sin argumentos.
+    expect(perdioLaPista(conPistas(0))).toBe(true);
+  });
+
+  it("un elemento sin srcObject perdió la pista", () => {
+    expect(perdioLaPista({ srcObject: null })).toBe(true);
+    expect(perdioLaPista({})).toBe(true);
+  });
+
+  it("no opina sobre lo que no puede mirar", () => {
+    expect(perdioLaPista(null)).toBe(false);
+    expect(perdioLaPista(undefined)).toBe(false);
+    // Un srcObject que no es MediaStream (no expone getAudioTracks): no se
+    // inventa un diagnóstico.
+    expect(perdioLaPista({ srcObject: {} })).toBe(false);
   });
 });

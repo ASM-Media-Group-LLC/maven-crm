@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Room, RoomEvent, RemoteTrack, RemoteTrackPublication, RemoteParticipant, Track } from "livekit-client";
-import { marcarAudio, reanudarAudioConGesto, registrarDesbloqueo } from "@/lib/audioDeLaLlamada";
+import { marcarAudio, reanudarAudioConGesto, registrarDesbloqueo, perdioLaPista } from "@/lib/audioDeLaLlamada";
 
 interface Props {
   room: Room | null | undefined;
@@ -103,9 +103,38 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
     // nunca; y `once` daba UN solo intento en toda la vida del componente.
     const bajaDesbloqueo = registrarDesbloqueo(() => room.startAudio());
 
+    // ── VIGILANTE: que no nos arranquen la pista ──────────────────────────
+    //
+    // `track.detach()` SIN argumentos desconecta la pista de TODOS los
+    // elementos donde esté adjunta. Otros componentes lo usaban en su limpieza,
+    // así que al desmontarse un recuadro este elemento —la red de seguridad de
+    // la sala— se quedaba vacío. Y no se reponía nunca: `attachedRef` seguía
+    // diciendo "ya está adjunto".
+    //
+    // Se arregló el sitio que lo hacía, pero la red de seguridad no puede
+    // depender de que nadie vuelva a escribir esa línea: mirar el `srcObject`
+    // cada pocos segundos no cuesta nada y convierte un silencio permanente en
+    // un hueco de tres segundos.
+    const vigilante = window.setInterval(() => {
+      let repuestas = 0;
+      attachedRef.current.forEach(({ track, el }) => {
+        if (!perdioLaPista(el)) return;
+        repuestas += 1;
+        try { track.attach(el); } catch { /* noop */ }
+        el.play().catch(() => { /* lo resuelve el gesto */ });
+      });
+      if (repuestas) {
+        console.warn(
+          `[Audio] Le habían arrancado la pista a ${repuestas} elemento(s) de la red de seguridad`,
+          "— re-adjuntadas. Si esto se repite, alguien está haciendo detach() sin argumentos.",
+        );
+      }
+    }, 3000);
+
     return () => {
       room.off(RoomEvent.TrackSubscribed, onSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, onUnsubscribed);
+      window.clearInterval(vigilante);
       bajaDesbloqueo();
       attachedRef.current.forEach((entry) => {
         try { entry.track.detach(entry.el); } catch {}
