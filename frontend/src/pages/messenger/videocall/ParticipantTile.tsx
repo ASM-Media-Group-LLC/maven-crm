@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo, useCallback, useState } from "react";
+import { MARCA_AUDIO, reanudarAudioConGesto } from "@/lib/audioDeLaLlamada";
 import { Track, Room } from "livekit-client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX, ZoomIn, ZoomOut, Minimize2 } from "lucide-react";
@@ -147,10 +148,14 @@ const ParticipantTile = memo(function ParticipantTile({
           mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
         }
 
-        // Robust play with retries
+        // Robust play with retries. Antes se rendia tras 5 intentos (~4,8 s) y
+        // en silencio: los reintentos rapidos cubren una carrera de
+        // milisegundos, pero no la politica de autoplay del navegador, que solo
+        // se levanta con un gesto del usuario y puede tardar minutos.
         const tryPlay = (attempt = 0) => {
           audioEl.play().catch(() => {
-            if (attempt < 5) setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt));
+            if (attempt < 5) { setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt)); return; }
+            reanudarAudioConGesto(`no arranco el audio de ${participant.identity}`);
           });
         };
         tryPlay();
@@ -361,8 +366,12 @@ const ParticipantTile = memo(function ParticipantTile({
         />
       )}
 
+      {/* El atributo sale de la CONSTANTE, no escrito a mano: tener ese nombre
+          suelto en dos archivos fue exactamente el bug — el sink marcaba
+          `data-lk-room-audio` y los recuperadores buscaban `data-lk-audio`, así
+          que no encontraban nada y nadie se enteraba. */}
       {!participant.isLocal && (
-        <audio ref={audioRef} autoPlay playsInline data-lk-audio="true" style={{ display: "none" }} />
+        <audio ref={audioRef} autoPlay playsInline {...{ [MARCA_AUDIO]: "true" }} style={{ display: "none" }} />
       )}
 
       {/* Controles del recuadro.
