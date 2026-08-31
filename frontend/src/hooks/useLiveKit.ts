@@ -10,6 +10,9 @@ import {
   RoomOptions,
 } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
+import {
+  reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
+} from "@/lib/audioDeLaLlamada";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { toast } from "sonner";
 import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
@@ -344,6 +347,8 @@ export function useLiveKit() {
   const bgReapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectingRef = useRef(false);
   const audioResumeCleanupRef = useRef<(() => void) | null>(null);
+  /** Da de baja el desbloqueo de audio de esta Room (ver lib/audioDeLaLlamada). */
+  const bajaDesbloqueoAudioRef = useRef<(() => void) | null>(null);
   // Track whether the initial background has been applied for this session
   const bgInitialApplyDoneRef = useRef(false);
   // Prevent automatic background restoration after reload/failure (user can re-enable manually)
@@ -909,17 +914,23 @@ export function useLiveKit() {
       audioResumeCleanupRef.current();
       audioResumeCleanupRef.current = null;
     }
+    // La espera de gesto vive en la libreria (cubre TODOS los documentos, no
+    // solo el principal), asi que se corta desde aca tambien.
+    dejarDeEsperarGesto();
+    bajaDesbloqueoAudioRef.current?.();
+    bajaDesbloqueoAudioRef.current = null;
   }, []);
 
   // ── Kick all audio elements (used after connect and reconnect) ─
   const kickAudioPlayback = useCallback((room: Room) => {
     room.startAudio().then(() => {
       console.info("[LiveKit] Audio context started successfully");
-      document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-        if (el.paused && el.srcObject) {
-          el.play().catch(() => {});
-        }
-      });
+      // Antes: `document.querySelectorAll("audio[data-lk-audio]")`. Dos huecos.
+      // (a) La llamada se muda a la ventana flotante del sistema, que es OTRO
+      //     documento: los elementos quedaban fuera de alcance justo cuando la
+      //     persona trabaja en otra cosa. (b) El sink los marcaba con otro
+      //     atributo, asi que ni en el documento principal los encontraba.
+      reproducirAudiosPausados();
     }).catch(() => {});
   }, []);
 
@@ -1072,12 +1083,12 @@ export function useLiveKit() {
         // Force audio playback for newly subscribed audio tracks
         if (track.kind === "audio") {
           room.startAudio().catch(() => {});
+          // Si a los 200 ms sigue pausado, se espera el gesto que lo desbloquee
+          // en vez de dejarlo mudo. Este es EL camino de la voz del supervisor:
+          // entra sin camara, la grilla lo filtra y su audio vive solo en el
+          // sink, que ningun recuperador encontraba.
           setTimeout(() => {
-            document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-              if (el.paused && el.srcObject) {
-                el.play().catch(() => {});
-              }
-            });
+            reanudarAudioConGesto(`se suscribio audio de ${participant.identity}`);
           }, 200);
         }
       });
@@ -1115,30 +1126,22 @@ export function useLiveKit() {
         debouncedRefresh();
       });
 
+      // El desbloqueo de ESTA Room, para que la libreria pueda levantar el
+      // contexto de audio suspendido cuando llegue el gesto. Sin esto, el
+      // `play()` del elemento no produce sonido si el contexto sigue abajo.
+      bajaDesbloqueoAudioRef.current?.();
+      bajaDesbloqueoAudioRef.current = registrarDesbloqueo(() => room.startAudio());
+
       // ── Handle autoplay policy (resume audio context) ────────
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
         if (!room.canPlaybackAudio) {
-          cleanupAudioResumeListeners();
-
-          const resumeAudio = () => {
-            room.startAudio().then(() => {
-              console.info("[LiveKit] Audio playback resumed");
-              document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-                if (el.paused && el.srcObject) {
-                  el.play().catch(() => {});
-                }
-              });
-              cleanupAudioResumeListeners();
-            });
-          };
-
-          document.addEventListener("click", resumeAudio);
-          document.addEventListener("touchstart", resumeAudio);
-
-          audioResumeCleanupRef.current = () => {
-            document.removeEventListener("click", resumeAudio);
-            document.removeEventListener("touchstart", resumeAudio);
-          };
+          // El navegador bloqueo la reproduccion. La espera del gesto la maneja
+          // la libreria, que engancha los listeners en TODOS los documentos de
+          // la llamada —incluida la ventana flotante del sistema, y tambien la
+          // que se abra despues—. Antes se enganchaban solo al documento
+          // principal: la persona podia hacer mil clics dentro de la ventana
+          // flotante y ninguno llegaba, asi que el audio no volvia nunca.
+          reanudarAudioConGesto("el navegador bloqueo la reproduccion");
         }
       });
 

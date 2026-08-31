@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Room, RoomEvent, RemoteTrack, RemoteTrackPublication, RemoteParticipant, Track } from "livekit-client";
+import { marcarAudio, reanudarAudioConGesto, registrarDesbloqueo, perdioLaPista } from "@/lib/audioDeLaLlamada";
 
 interface Props {
   room: Room | null | undefined;
@@ -39,7 +40,13 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
       const el = document.createElement("audio");
       el.autoplay = true;
       (el as any).playsInline = true;
-      el.setAttribute("data-lk-room-audio", "true");
+      // ⚠️ Se marca con el MISMO atributo que el resto de la app. Acá el nombre
+      // divergía (`data-lk-room-audio`) y los tres recuperadores de
+      // useLiveKit —que buscan `audio[data-lk-audio]`— eran CIEGOS a este
+      // elemento. Y es el único que lleva la voz de quien no tiene tile: el
+      // supervisor entra sin cámara y la grilla lo filtra. Resultado: un chatter
+      // sin escuchar a su supervisora por el resto del turno.
+      marcarAudio(el);
       el.style.display = "none";
       container.appendChild(el);
       try { track.attach(el); } catch {}
@@ -49,7 +56,12 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
       }
       const tryPlay = (attempt = 0) => {
         el.play().catch(() => {
-          if (attempt < 5) setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt));
+          if (attempt < 5) { setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt)); return; }
+          // Antes acá se RENDÍA en silencio. Los reintentos rápidos cubren una
+          // carrera de milisegundos, pero no la política de autoplay: esa solo
+          // se levanta con un gesto del usuario y puede tardar minutos. Sin esto,
+          // la pista quedaba muda para siempre y sin dejar rastro.
+          reanudarAudioConGesto(`no arrancó el audio de ${participant.identity}`);
         });
       };
       tryPlay();
@@ -82,16 +94,48 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
     room.on(RoomEvent.TrackSubscribed, onSubscribed);
     room.on(RoomEvent.TrackUnsubscribed, onUnsubscribed);
 
-    // Resume audio on user gesture if blocked
-    const resume = () => { room.startAudio().catch(() => {}); };
-    document.addEventListener("click", resume, { once: true });
-    document.addEventListener("touchstart", resume, { once: true });
+    // Desbloquear el contexto de audio de LiveKit forma parte de reanudar: si
+    // sigue suspendido, el `play()` del elemento no produce sonido.
+    //
+    // Antes esto era un listener de click en el documento PRINCIPAL con
+    // `{ once: true }`. Dos fallas: la llamada se muda a la ventana flotante del
+    // sistema —OTRO documento—, así que los clics de la persona no llegaban
+    // nunca; y `once` daba UN solo intento en toda la vida del componente.
+    const bajaDesbloqueo = registrarDesbloqueo(() => room.startAudio());
+
+    // ── VIGILANTE: que no nos arranquen la pista ──────────────────────────
+    //
+    // `track.detach()` SIN argumentos desconecta la pista de TODOS los
+    // elementos donde esté adjunta. Otros componentes lo usaban en su limpieza,
+    // así que al desmontarse un recuadro este elemento —la red de seguridad de
+    // la sala— se quedaba vacío. Y no se reponía nunca: `attachedRef` seguía
+    // diciendo "ya está adjunto".
+    //
+    // Se arregló el sitio que lo hacía, pero la red de seguridad no puede
+    // depender de que nadie vuelva a escribir esa línea: mirar el `srcObject`
+    // cada pocos segundos no cuesta nada y convierte un silencio permanente en
+    // un hueco de tres segundos.
+    const vigilante = window.setInterval(() => {
+      let repuestas = 0;
+      attachedRef.current.forEach(({ track, el }) => {
+        if (!perdioLaPista(el)) return;
+        repuestas += 1;
+        try { track.attach(el); } catch { /* noop */ }
+        el.play().catch(() => { /* lo resuelve el gesto */ });
+      });
+      if (repuestas) {
+        console.warn(
+          `[Audio] Le habían arrancado la pista a ${repuestas} elemento(s) de la red de seguridad`,
+          "— re-adjuntadas. Si esto se repite, alguien está haciendo detach() sin argumentos.",
+        );
+      }
+    }, 3000);
 
     return () => {
       room.off(RoomEvent.TrackSubscribed, onSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, onUnsubscribed);
-      document.removeEventListener("click", resume);
-      document.removeEventListener("touchstart", resume);
+      window.clearInterval(vigilante);
+      bajaDesbloqueo();
       attachedRef.current.forEach((entry) => {
         try { entry.track.detach(entry.el); } catch {}
         try { entry.el.remove(); } catch {}
