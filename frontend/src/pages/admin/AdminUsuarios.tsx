@@ -12,6 +12,7 @@ import EditUserModal from "./EditUserModal";
 import DeleteUserDialog from "./DeleteUserDialog";
 import RolesContent from "./RolesContent";
 import ResetPasswordModal from "./ResetPasswordModal";
+import MigrarCorreoModal from "./MigrarCorreoModal";
 import AddUserModal, { type CredencialesCreadas } from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -24,7 +25,7 @@ const AdminUsuarios = () => {
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
   const { canAccess } = usePermissions();
-  const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
+  const { users, isLoading, refetch, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
@@ -34,6 +35,7 @@ const AdminUsuarios = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [resetPwOpen, setResetPwOpen] = useState(false);
+  const [migrarCorreoOpen, setMigrarCorreoOpen] = useState(false);
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,6 +76,14 @@ const AdminUsuarios = () => {
   const handleResetPassword = (user: AdminUser) => {
     setSelectedUser(user);
     setResetPwOpen(true);
+  };
+
+  /** Cambiar el correo de acceso y crearle la casilla del equipo.
+   *  El backend (`migrate_email`) ya hacia las dos cosas; lo que faltaba
+   *  era la pantalla — se venia haciendo a mano. */
+  const handleMigrarCorreo = (user: AdminUser) => {
+    setSelectedUser(user);
+    setMigrarCorreoOpen(true);
   };
 
   const kpis = [
@@ -185,6 +195,7 @@ const AdminUsuarios = () => {
                       onEditRole={handleEditRole}
                       onEdit={handleEdit}
                       onResetPassword={handleResetPassword}
+                      onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
                         adminAction.mutate(
@@ -199,6 +210,7 @@ const AdminUsuarios = () => {
                       onEditRole={handleEditRole}
                       onEdit={handleEdit}
                       onResetPassword={handleResetPassword}
+                      onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
                         adminAction.mutate(
@@ -237,6 +249,15 @@ const AdminUsuarios = () => {
                     onOpenChange={setResetPwOpen}
                     userName={selectedUser?.full_name || ""}
                     userId={selectedUser?.id || ""}
+                  />
+
+                  <MigrarCorreoModal
+                    open={migrarCorreoOpen}
+                    onOpenChange={setMigrarCorreoOpen}
+                    userId={selectedUser?.id || ""}
+                    userName={selectedUser?.full_name || ""}
+                    emailActual={selectedUser?.email || ""}
+                    onMigrado={() => refetch()}
                   />
 
                   <DeleteUserDialog

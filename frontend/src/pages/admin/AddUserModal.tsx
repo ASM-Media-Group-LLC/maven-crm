@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AtSign, Check, Copy, KeyRound, Loader2, Mail, User, UserCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DOMINIO_CASILLA, sugerirDireccion } from "@/lib/direccionCorreo";
 
 /**
  * Alta de usuario: NOMBRE, APELLIDO, ROL y el TIPO de correo.
@@ -25,22 +26,6 @@ import { supabase } from "@/integrations/supabase/client";
  * la bienvenida por Resend; sin `email` genera la dirección y no manda nada.
  */
 
-/** Dominio de las casillas. Copia SOLO para previsualizar: la dirección
- *  final la decide el backend (que además resuelve colisiones). */
-const DOMINIO_CASILLA = "maven-ai.me";
-
-function sugerirDireccion(nombre: string, apellido: string): string | null {
-  const limpiar = (s: string) =>
-    s.normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "")
-      .trim();
-  const n = limpiar(nombre);
-  const a = limpiar(apellido);
-  if (!n && !a) return null;
-  return `${[n, a].filter(Boolean).join(".")}@${DOMINIO_CASILLA}`;
-}
 
 export interface NuevoUsuario {
   first_name: string;

@@ -23,7 +23,7 @@ export const useAdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
       // Fetch profiles
@@ -121,5 +121,5 @@ export const useAdminUsers = () => {
     employees: users.filter((u) => u.role === "employee").length,
   };
 
-  return { users, isLoading, changeRole: changeRoleMutation.mutate, isChangingRole: changeRoleMutation.isPending, stats };
+  return { users, isLoading, refetch, changeRole: changeRoleMutation.mutate, isChangingRole: changeRoleMutation.isPending, stats };
 };

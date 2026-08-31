@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Trash2, KeyRound, UserCog, Shield, User, X, ExternalLink } from "lucide-react";
+import { Pencil, Trash2, KeyRound, UserCog, Shield, User, X, ExternalLink, AtSign } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
@@ -21,11 +21,13 @@ interface UsersGridProps {
   onEditRole: (user: AdminUser) => void;
   onEdit: (user: AdminUser) => void;
   onResetPassword: (user: AdminUser) => void;
+  /** Cambiar el correo de acceso y crearle la casilla del equipo. */
+  onMigrarCorreo: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
   onRemoveRole: (user: AdminUser) => void;
 }
 
-const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRemoveRole }: UsersGridProps) => {
+const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersGridProps) => {
   const navigate = useNavigate();
 
   return (
@@ -55,6 +57,9 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRem
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onResetPassword(user)}>
                           <KeyRound className="h-4 w-4 mr-2" /> Reset contraseña
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onMigrarCorreo(user)}>
+                          <AtSign className="h-4 w-4 mr-2" /> Cambiar correo / crear casilla
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" /> Eliminar
