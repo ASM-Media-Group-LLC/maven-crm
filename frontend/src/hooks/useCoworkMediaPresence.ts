@@ -74,6 +74,9 @@ interface CanalVivo {
   oyentes: Set<(estados: Record<string, MediaState>) => void>;
   /** Lo último que se publicó, para poder re-publicarlo si hiciera falta. */
   ultimoEstado: MediaState | null;
+  /** Lo estamos cerrando NOSOTROS, a propósito (salir de Cowork, cambiar de
+   *  sesión, rehacer el canal). Sirve para no gritar por algo que pedimos. */
+  cerrando?: boolean;
 }
 
 let vivo: CanalVivo | null = null;
@@ -227,6 +230,19 @@ function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number)
     .catch(() => { noAparezco = REINTENTOS_ANTES_DE_REHACER; });
 }
 
+/** Cierra el canal AVISANDO que el cierre es nuestro.
+ *
+ *  Sin esto, cada cierre deliberado —salir de Cowork, cambiar de sesión,
+ *  rehacer el canal— disparaba el aviso de "el tablero no va a recibir estados
+ *  de nadie", como si algo se hubiera roto. Y ese aviso es nuestro ÚNICO
+ *  detector de la ceguera de verdad: si suena cada vez que alguien sale de la
+ *  pantalla, en una semana nadie le cree. Una alarma que grita en falso es una
+ *  alarma perdida. */
+function cerrarCanal(entrada: CanalVivo): void {
+  entrada.cerrando = true;
+  supabase.removeChannel(entrada.canal);
+}
+
 function abrirCanal(sessionId: string, userId: string): CanalVivo {
   const canal = supabase.channel(`cowork-media-${sessionId}`, {
     config: { presence: { key: userId } },
@@ -266,6 +282,8 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
       // ahora eso no dejaba rastro: el tablero del supervisor se quedaba vacío
       // en silencio y parecía que todos estaban bien. Es el mismo fallo mudo
       // que tenía el timbre de llamadas, y costó una noche encontrarlo ahí.
+      // Si el cierre lo pedimos nosotros, no hay nada que avisar.
+      if (entrada.cerrando) return;
       console.warn(
         "[Cowork] El canal de presencia está en:", estado,
         "— el tablero del supervisor no va a recibir estados de nadie.",
@@ -374,7 +392,7 @@ function revisarSalud() {
     proximoIntento = ahora + Math.min(ESPERA_MAX_MS, ESPERA_BASE_MS * 2 ** (fallosSeguidos - 1));
 
     const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
-    supabase.removeChannel(entrada.canal);
+    cerrarCanal(entrada);
     const nueva = abrirCanal(sessionId, userId);
     nueva.usos = usos;
     oyentes.forEach((f) => nueva.oyentes.add(f));
@@ -418,7 +436,7 @@ function revisarSalud() {
     );
     const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
     olvidarPendiente();
-    supabase.removeChannel(entrada.canal);
+    cerrarCanal(entrada);
     const nueva = abrirCanal(sessionId, userId);
     nueva.usos = usos;
     oyentes.forEach((f) => nueva.oyentes.add(f));
@@ -458,7 +476,7 @@ export function salirDePresencia() {
   ultimaRepublicacion = 0;
   uniendoDesde = null;
   if (!vivo) return;
-  supabase.removeChannel(vivo.canal);
+  cerrarCanal(vivo);
   vivo = null;
 }
 
@@ -481,7 +499,7 @@ export function useCoworkMediaPresence(
 
     // Cambió la sesión (o el usuario): el canal viejo ya no sirve para nada.
     if (vivo && (vivo.sessionId !== sessionId || vivo.userId !== userId)) {
-      supabase.removeChannel(vivo.canal);
+      cerrarCanal(vivo);
       vivo = null;
     }
     if (!vivo) vivo = abrirCanal(sessionId, userId);
@@ -501,7 +519,7 @@ export function useCoworkMediaPresence(
       // el canal se queda abierto. Cerrarlo mandaría un `leave` y el
       // coordinador vería irse a alguien que sigue en la llamada.
       if (entrada.usos <= 0 && !persistenteRef.current && vivo === entrada) {
-        supabase.removeChannel(entrada.canal);
+        cerrarCanal(entrada);
         vivo = null;
       }
     };
