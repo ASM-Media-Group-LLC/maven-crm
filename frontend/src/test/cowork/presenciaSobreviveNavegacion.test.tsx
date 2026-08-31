@@ -214,3 +214,58 @@ describe("el freno de publicación de presencia", () => {
     expect((track.mock.calls[1][0] as Record<string, unknown>).micOn).toBe(false);
   });
 });
+
+// ── El aviso que gritaba en falso ──────────────────────────────────────────
+//
+// EL BUG QUE ESTO CUIDA (31/08/2026): al cerrar un canal, Supabase llama al
+// callback de suscripción con "CLOSED". Nuestro código avisaba ante cualquier
+// estado que no fuera "SUBSCRIBED", así que **salir de Cowork disparaba el
+// aviso de "el tablero no va a recibir estados de nadie"** — una acción
+// perfectamente normal, que se hace veinte veces por día.
+//
+// Lo detectó Jhon: "¿no es porque me salí de Cowork y fui a Messenger?". Tenía
+// razón; yo lo había reportado como si su tablero se hubiera quedado ciego.
+//
+// Importa porque ese aviso es el ÚNICO detector de la ceguera de verdad (la de
+// #1458, con gente adentro y el canal caído). Si suena cada vez que alguien
+// sale de la pantalla, en una semana nadie le cree. Una alarma que grita en
+// falso es una alarma perdida.
+describe("el aviso de canal caído no debe gritar por un cierre nuestro", () => {
+  beforeEach(() => {
+    salirDePresencia();
+    removeChannel.mockClear();
+    channel.mockClear();
+    subscribe.mockClear();
+  });
+
+  /** El último callback de suscripción que registró el mock. */
+  const ultimoCallback = () =>
+    subscribe.mock.calls.at(-1)?.[0] as ((estado: string) => void) | undefined;
+
+  it("salir de Cowork NO avisa: el cierre lo pedimos nosotros", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // El supervisor NO usa presencia persistente: al desmontar, se cierra.
+    const { unmount } = renderHook(() => useCoworkMediaPresence(SESION, "supervisor-1"));
+    const cb = ultimoCallback();
+
+    unmount();
+    // Esto es lo que hace Supabase de verdad al cerrar un canal.
+    cb?.("CLOSED");
+
+    expect(removeChannel).toHaveBeenCalled();   // sí se cerró
+    expect(warn).not.toHaveBeenCalled();        // pero no gritó
+    warn.mockRestore();
+  });
+
+  it("pero si el canal se cae SOLO, sí avisa — que es para lo que existe", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderHook(() => useCoworkMediaPresence(SESION, "supervisor-1"));
+
+    // Nadie pidió cerrarlo: se cayó.
+    ultimoCallback()?.("CHANNEL_ERROR");
+
+    expect(warn).toHaveBeenCalled();
+    expect(String(warn.mock.calls[0]?.[0])).toContain("canal de presencia");
+    warn.mockRestore();
+  });
+});

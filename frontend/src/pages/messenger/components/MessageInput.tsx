@@ -18,6 +18,7 @@ import { ScriptsButton } from "@/components/chat/ScriptsButton";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 
 interface PendingFile {
   file: File;
@@ -140,7 +141,11 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         const pf = pendingFiles[i];
         setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
         setUploadPercent(0);
-        const path = `${user!.id}/${Date.now()}-${pf.file.name}`;
+        // La clave se SANEA; el nombre que ve la gente sigue siendo el original
+        // (se manda aparte, más abajo). Meter el nombre crudo acá era el bug:
+        // macOS nombra las capturas con un espacio invisible (U+202F) y Storage
+        // rechaza la clave entera. Cualquier tilde o eñe la rompía igual.
+        const path = `${user!.id}/${Date.now()}-${claveSeguraParaArchivo(pf.file.name)}`;
 
         // Use XHR for files > 5MB for progress, SDK for small files
         let uploadError: string | null = null;

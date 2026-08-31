@@ -25,6 +25,7 @@ import VoiceNoteRecorder from "./VoiceNoteRecorder";
 import { formatTime, formatDate, safeFileUrl } from "../utils";
 
 import { EMOJIS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 
 interface ThreadPanelProps {
   parentMessage: ChatMessage;
@@ -111,7 +112,8 @@ export default function ThreadPanel({
     setUploading(true);
     setUploadProgress(`Subiendo: ${file.name} (${formatFileSize(file.size)})`);
     setUploadPercent(0);
-    const path = `${user.id}/${Date.now()}-${file.name}`;
+    // Misma razón que en MessageInput: la clave se sanea, el nombre visible no.
+    const path = `${user.id}/${Date.now()}-${claveSeguraParaArchivo(file.name)}`;
     let uploadError: string | null = null;
     if (file.size > 5 * 1024 * 1024) {
       const result = await uploadFileWithProgress(file, path);
