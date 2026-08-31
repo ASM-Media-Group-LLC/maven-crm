@@ -23,8 +23,30 @@ type Mapping = {
 // Miembros esperados por rol (Set de emails en minúscula). '__all__' = todos.
 // deno-lint-ignore no-explicit-any
 async function getDesired(admin: any): Promise<Map<string, Set<string>>> {
-  const { data } = await admin.rpc("role_group_members");
+  const { data, error } = await admin.rpc("role_group_members");
+  // ── FRENO DE MANO ─────────────────────────────────────────────────────────
+  //
+  // Antes esto era `const { data } = ...` y `data ?? []`: el error se descartaba
+  // y el sync seguía con el padrón VACÍO. Y como más abajo saca del grupo a todo
+  // el que no esté en el padrón, un fallo de esta consulta —un deploy a medias,
+  // un cambio en la función, un timeout— habría VACIADO LOS DOCE GRUPOS de una
+  // sola corrida, dejando como único rastro un `removed: N` en una tabla que
+  // ninguna pantalla de Maven muestra. Nadie se habría enterado hasta que RH
+  // mandara un correo y no le llegara a nadie.
+  //
+  // El padrón de correo de la empresa entera sale de acá: si no se pudo leer, no
+  // se toca nada. Fallar ruidosamente es lo correcto — el cron reintenta mañana
+  // y el estado de los grupos queda como estaba.
+  if (error) {
+    throw new Error(`role_group_members falló (${error.message}) — sync abortado para no vaciar los grupos`);
+  }
   const rows = (data ?? []) as { role: string; email: string }[];
+  // Cero filas no es "la empresa se quedó vacía", es un problema de datos:
+  // siempre hay alguien con rol (de hecho `handle_new_user` le pone `employee`
+  // a todo usuario nuevo). Tratarlo como padrón válido sería el mismo desastre.
+  if (rows.length === 0) {
+    throw new Error("role_group_members devolvió CERO filas — sync abortado (siempre hay usuarios con rol; esto es un problema de datos)");
+  }
   const byRole = new Map<string, Set<string>>();
   const all = new Set<string>();
   for (const row of rows) {
