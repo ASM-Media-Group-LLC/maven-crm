@@ -19,6 +19,7 @@ import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
+import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 
 interface PendingFile {
   file: File;
@@ -170,9 +171,21 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
         const baseContent = i === 0 && text.trim() ? text.trim() : "";
-        const msgContent = baseContent
-          ? `${baseContent}\n📎 ${pf.file.name}`
-          : pf.file.name;
+        // El nombre del archivo NO se pega al texto.
+        //
+        // La burbuja ya lo muestra por su cuenta: en la tarjeta de archivo y en
+        // el `alt` de la imagen, los dos desde `file_name`. Pegarlo al mensaje
+        // tenía dos costos visibles:
+        //   · se leía el nombre crudo debajo de una imagen que ya se ve, y
+        //   · un nombre de sesenta caracteres estiraba la burbuja hasta el 70%
+        //     del ancho, dejando un vacío enorme al lado de una captura
+        //     vertical (la burbuja se encoge a su contenido, así que el texto
+        //     largo era lo ÚNICO que la estiraba).
+        //
+        // Sin texto se conserva el nombre como contenido: la burbuja lo oculta
+        // sola (`content !== file_name`) y la búsqueda y las vistas previas
+        // siguen teniendo algo que mostrar.
+        const msgContent = contenidoDeAdjunto(baseContent, pf.file.name);
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
       }
       setPendingFiles([]);
