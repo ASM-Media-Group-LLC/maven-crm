@@ -381,7 +381,21 @@ serve(async (req) => {
         if (!roomId) return err(req, "roomId required");
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
         if (!room) return err(req, "Room not found");
-        const token = await createLKToken(lkKey, lkSecret, `${userId}__monitor`, `📢 ${userName}`, {
+        // La identidad lleva el id de la PESTAÑA, no solo el del usuario.
+        //
+        // Con `${userId}__monitor` a secas, la misma persona con el tablero
+        // abierto dos veces (otra pestaña, la app instalada además del
+        // navegador, otra máquina) generaba DOS monitores con la misma
+        // identidad en cada sala, y LiveKit expulsa al que estaba. El expulsado
+        // no vuelve a publicar su micro nunca —el efecto que lo publica está
+        // guardado por `status !== "ready"`— mientras el botón sigue verde.
+        //
+        // Se sanea porque viene del cliente: solo minúsculas y dígitos, corto.
+        // Nunca se interpola algo de afuera en una identidad sin acotarlo.
+        const tabRaw = typeof body.clientId === "string" ? body.clientId : "";
+        const tab = tabRaw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+        const monitorIdentity = tab ? `${userId}__monitor__${tab}` : `${userId}__monitor`;
+        const token = await createLKToken(lkKey, lkSecret, monitorIdentity, `📢 ${userName}`, {
           roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: false, canPublishSources: ["microphone"],
         }, 3600);
         return json(req, { token, url: lkUrl, room: room.livekit_room_name });

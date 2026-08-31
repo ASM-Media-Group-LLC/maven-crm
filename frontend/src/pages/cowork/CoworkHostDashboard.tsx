@@ -965,23 +965,37 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           coordinador ya resolvió por otro lado (le habló por el 🎤,
                           pasó por su puesto) y solo necesita sacarla de la lista.
                           Antes la única salida era "Atender", que te metía a la sala. */}
-                      {!is1on1 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 text-[10px] text-muted-foreground hover:text-foreground rounded-full"
-                          title="Sacarla de la lista sin entrar a la sala"
-                          onClick={async () => {
-                            try {
-                              await cowork.resolveHostRequest(req.id);
-                            } catch {
-                              toast.error("No se pudo marcar como atendida");
-                            }
-                          }}
-                        >
-                          <Check className="h-3 w-3 mr-0.5" /> Listo
-                        </Button>
-                      )}
+                      {/* También para las PRIVADAS, y ahí no es una comodidad:
+                          es la única salida.
+
+                          Mientras una solicitud privada siga abierta, al chatter
+                          se lo lleva automáticamente a esa sala 1:1 — y si nadie
+                          la cierra, queda parado en una sala VACÍA mientras acá
+                          le hablan a la sala principal. Se ve igual que un
+                          problema de audio: "le hablo y no me escucha".
+
+                          Antes este botón estaba envuelto en `!is1on1`, así que
+                          para una privada solo había "Atender" y "Unirse":
+                          ninguna de las dos la cierra. Si ella tocaba Atender y
+                          después cerraba la pestaña, la solicitud quedaba viva
+                          para siempre. */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 text-[10px] text-muted-foreground hover:text-foreground rounded-full"
+                        title={is1on1
+                          ? "Cerrar la llamada privada y devolver a la persona a su sala"
+                          : "Sacarla de la lista sin entrar a la sala"}
+                        onClick={async () => {
+                          try {
+                            await cowork.resolveHostRequest(req.id);
+                          } catch {
+                            toast.error("No se pudo marcar como atendida");
+                          }
+                        }}
+                      >
+                        <Check className="h-3 w-3 mr-0.5" /> {is1on1 ? "Cerrar" : "Listo"}
+                      </Button>
                       {req.status === "acknowledged" && is1on1 && (
                         <Button size="sm" variant="ghost" className="h-5 text-[10px] text-primary rounded-full" onClick={() => {
                           setOneOnOneRequestId(req.id);
@@ -1296,6 +1310,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
                               <CoworkRoomMonitor
                                 roomId={room.id}
+                                roomName={room.name}
                                 issueToken={cowork.issueLiveKitToken}
                                 showVideo={false}
                                 hearOn={hearFor(room.id)}
@@ -1310,6 +1325,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <div className="h-36 rounded-xl overflow-hidden bg-black/40 border border-border">
                               <CoworkRoomMonitor
                                 roomId={room.id}
+                                roomName={room.name}
                                 issueToken={cowork.issueLiveKitToken}
                                 showVideo
                                 hearOn={hearFor(room.id)}

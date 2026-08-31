@@ -3,9 +3,14 @@ import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
 import { esOtraPestana, TITULO_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
+import { toast } from "sonner";
 
 interface Props {
   roomId: string;
+  /** Nombre visible de la sala. Solo para poder AVISAR con precisión cuál se
+   *  quedó sin tu voz: "no pude publicar tu micro" sin decir dónde no sirve
+   *  cuando se supervisan nueve. */
+  roomName?: string;
   // cowork.issueLiveKitToken — devuelve { token, url, ... }
   issueToken: (purpose: string, roomId?: string) => Promise<{ token: string; url: string }>;
   // Renderizar la miniatura de video (modo 'video'). En modo 'avatars' es false: la conexión
@@ -109,7 +114,7 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange, onSpeakingChange }: Props) {
+export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange, onSpeakingChange }: Props) {
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -330,15 +335,36 @@ export default function CoworkRoomMonitor({ roomId, issueToken, showVideo, hearO
           baseDelCloneRef.current = micBaseTrack;
           await room.localParticipant.publishTrack(clone, { source: Track.Source.Microphone });
           if (intentoPublicar !== 0) setIntentoPublicar(0);
+          // Si veníamos avisando que esta sala no te oía, ya no corresponde.
+          toast.dismiss(`voz-sala-${roomId}`);
         } catch (e) {
           console.error("[cowork monitor] no pude publicar tu micro en la sala:", e);
           if (clone) { try { clone.stop(); } catch { /* noop */ } }
           publishedCloneRef.current = null;
           baseDelCloneRef.current = null;
-          // Se reintenta con espera creciente. Rendirse en silencio es lo que
-          // dejaba una sala sin la voz del supervisor durante todo el turno.
-          if (!cancelado && intentoPublicar < MAX_INTENTOS_PUBLICAR) {
-            window.setTimeout(() => setIntentoPublicar((n) => n + 1), 2_000 * (intentoPublicar + 1));
+          // Se reintenta con espera creciente. Y NO se abandona nunca.
+          //
+          // Antes, tras cuatro intentos esto se rendía y no volvía a intentar:
+          // esa sala se quedaba sin la voz del supervisor por el resto del
+          // turno, con el botón 🎤 igual en verde y sin un solo aviso en
+          // pantalla. El único rastro era un console.error que nadie mira.
+          //
+          // Ahora: los primeros intentos son rápidos (una falla pasajera al
+          // conectar se cura sola), y a partir de ahí se sigue intentando cada
+          // quince segundos —barato— para que se recupere solo cuando la red o
+          // el dispositivo vuelvan. Y se AVISA, una vez por episodio.
+          if (!cancelado) {
+            if (intentoPublicar === MAX_INTENTOS_PUBLICAR) {
+              toast.error(`No se está publicando tu micrófono en ${roomName ? `«${roomName}»` : "una sala"}`, {
+                description: "Ahí no te escuchan. Se sigue reintentando solo; si no vuelve, apaga y vuelve a encender el 🎤 de esa sala.",
+                duration: 15_000,
+                id: `voz-sala-${roomId}`,
+              });
+            }
+            const espera = intentoPublicar < MAX_INTENTOS_PUBLICAR
+              ? 2_000 * (intentoPublicar + 1)
+              : 15_000;
+            window.setTimeout(() => setIntentoPublicar((n) => n + 1), espera);
           }
         }
       } else {
