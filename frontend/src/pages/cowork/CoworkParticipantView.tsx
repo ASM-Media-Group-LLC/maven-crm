@@ -17,6 +17,7 @@ import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS, fraseD
 import { hablar } from "@/lib/voz";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { marcarDescartada, fueDescartada, olvidarDescartada } from "@/lib/solicitudPrivada";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -395,6 +396,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (req) oneOnOneSeenInListRef.current = true;
     if (!oneOnOneSeenInListRef.current) return;
     if (req?.status === "resolved" || !req) {
+      olvidarDescartada(oneOnOneRequestId);
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
       toast.info("Llamada privada con supervisor finalizada");
@@ -406,7 +408,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
-    if (existingReq && dismissedRequestRef.current !== existingReq.id) {
+    // `fueDescartada` mira sessionStorage, no solo la ref en memoria. La ref se
+    // borra al recargar, y por eso una solicitud que quedó viva en la base
+    // volvía a llevarse al chatter a una sala 1:1 VACÍA en cada recarga,
+    // mientras la supervisora le hablaba a la sala principal.
+    if (existingReq && dismissedRequestRef.current !== existingReq.id
+        && !fueDescartada(existingReq.id)) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
       setConnectedLkRoom(null);
@@ -417,7 +424,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     r => r.user_id === userId
       && (r.status === "open" || r.status === "acknowledged")
       && r.oneone_livekit_room
-      && r.id === dismissedRequestRef.current
+      && (r.id === dismissedRequestRef.current || fueDescartada(r.id))
   );
 
   const getToken = useCallback(async () => {
@@ -593,6 +600,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   const handleReconnectPrivateCall = () => {
     if (!dismissedActiveRequest) return;
+    olvidarDescartada(dismissedActiveRequest.id);
     dismissedRequestRef.current = null;
     setOneOnOneRequestId(dismissedActiveRequest.id);
     setOneOnOneRoom(dismissedActiveRequest.oneone_livekit_room!);
@@ -750,6 +758,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={async () => {
               const reqId = oneOnOneRequestId;
               dismissedRequestRef.current = reqId;
+              // Se anota ANTES de intentar resolver: el resolve de abajo es
+              // best-effort y si falla (sin red, sesión vencida) la solicitud
+              // queda abierta en la base. Sin esta marca, la próxima recarga
+              // volvía a secuestrar al chatter a la sala vacía.
+              marcarDescartada(reqId);
               // Resolver la solicitud 1:1 para que NO quede abierta en la BD y vuelva a
               // secuestrar al participante tras recargar o al aprobarle una pantalla.
               if (reqId) { try { await cowork.resolveHostRequest(reqId); } catch { /* best-effort */ } }

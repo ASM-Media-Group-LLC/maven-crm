@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { idDePestana } from "@/lib/idDePestana";
 
 export interface CoworkRoom {
   id: string;
@@ -213,7 +214,12 @@ export function useCoworkSession(sessionId: string | null) {
 
 
   const issueLiveKitToken = useCallback(async (purpose: string, roomId?: string) => {
-    return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId });
+    // `clientId` = id de ESTA pestaña. El monitor lo usa para que su identidad
+    // en LiveKit sea única por pestaña y no solo por persona: con el tablero
+    // abierto dos veces, los dos monitores de cada sala se expulsaban entre sí
+    // y el expulsado dejaba de publicar el micro PARA SIEMPRE, con el botón
+    // igual en verde.
+    return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId, clientId: idDePestana() });
   }, [sessionId]);
 
   const requestHost = useCallback(async (roomId: string, message?: string, requestOneOnOne?: boolean) => {
