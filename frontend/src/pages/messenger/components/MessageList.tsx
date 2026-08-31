@@ -4,6 +4,7 @@ import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
 import { Loader2, ChevronDown } from "lucide-react";
+import { agruparEnAlbumes } from "@/lib/albumDeImagenes";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -235,41 +236,13 @@ export default function MessageList({
             </div>
 
             {(() => {
-              const imageGroups = new Map<number, ChatMessage[]>();
-              const msgGridLeader = new Map<string, boolean>();
-              const msgGridPart = new Map<string, boolean>();
-              const msgGridImages = new Map<string, ChatMessage[]>();
-
-              let i = 0;
-              while (i < group.messages.length) {
-                const msg = group.messages[i];
-                if (msg.type === "image" && msg.file_url && !msg.is_deleted) {
-                  const imgs: ChatMessage[] = [msg];
-                  let j = i + 1;
-                  while (j < group.messages.length) {
-                    const next = group.messages[j];
-                    if (next.type === "image" && next.file_url && !next.is_deleted &&
-                        next.sender_id === msg.sender_id &&
-                        Math.abs(new Date(next.created_at).getTime() - new Date(msg.created_at).getTime()) < 60000) {
-                      imgs.push(next);
-                      j++;
-                    } else break;
-                  }
-                  if (imgs.length > 1) {
-                    imageGroups.set(i, imgs);
-                    imgs.forEach((im, idx) => {
-                      msgGridPart.set(im.id, true);
-                      if (idx === 0) {
-                        msgGridLeader.set(im.id, true);
-                        msgGridImages.set(im.id, imgs);
-                      }
-                    });
-                  }
-                  i = j;
-                } else {
-                  i++;
-                }
-              }
+              // El agrupado en álbumes vive en `lib/albumDeImagenes`, con su
+              // propia batería de tests: acá adentro era imposible de probar, y
+              // la regla tiene bordes (comentarios, remitente, ventana de
+              // tiempo) que conviene fijar. `imageGroups` se escribía y no se
+              // leía nunca; se fue con la extracción.
+              const { lideres: msgGridLeader, partes: msgGridPart, imagenes: msgGridImages } =
+                agruparEnAlbumes(group.messages);
 
               return group.messages.map((msg, mi) => {
                 const isMe = msg.sender_id === currentUserId;
