@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
-import { hablar } from "@/lib/voz";
+import { encolarVoz, alFallarLaVoz } from "@/lib/colaDeVoz";
 import { AVISAR_COORDINADOR_MS, debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
 import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSupervisor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
@@ -584,6 +584,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Tic de un segundo: los contadores de pausa se calculan contra este reloj, así
   // avanzan solos sin depender de que llegue un evento de presence.
 
+  // ── LA VOZ SE MURIÓ Y NADIE SE ENTERABA ────────────────────────────────
+  //
+  // Cuando el motor de voz de Chromium se traba, `speak()` se acepta sin error
+  // y la frase nunca suena. El único rastro era un `console.warn` — así que el
+  // supervisor seguía viendo los avisos escritos, no escuchaba ninguno, y no
+  // tenía forma de saber que le faltaba la mitad del sistema. Se descubrió
+  // porque hubo que pedirle la consola.
+  //
+  // Ahora se dice en pantalla, con la instrucción que de verdad sirve: recargar
+  // NO destraba el motor, hay que cerrar el navegador entero.
+  useEffect(() => alFallarLaVoz((motivo) => {
+    toast.error("Los avisos por voz no se están escuchando", {
+      description: `${motivo}. Cierra el navegador POR COMPLETO y vuelve a abrirlo — recargar la página no alcanza. Los avisos escritos siguen funcionando.`,
+      duration: 20_000,
+      id: "voz-muerta",
+    });
+  }), []);
+
   // Aviso sonoro cuando alguien se PASA de su pausa — pero recién a los 3
   // minutos de excedido, no al segundo uno.
   //
@@ -608,7 +626,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       if (!tocaAvisar(yaAvisadoPausa.current, uid, now)) continue;
       const quien = nombreYApellido(cowork.profiles[uid]);
       playCoordinatorRequestSound();
-      hablar(`${quien} lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}.`,
+      // Se ENCOLA en vez de hablar directo: los tres avisos recorren a toda la
+      // gente en el mismo ciclo, y disparar `cancel()+speak()` decenas de veces
+      // de golpe es lo que traba el motor de voz de Chromium. La cola agrupa
+      // por persona y habla de a una.
+      encolarVoz(quien, `lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}`,
         { volumen: 0.85 });
       toast.warning(`${quien}: pasado de ${p.etiqueta.toLowerCase()}`, {
         description: `Lleva ${p.cuenta.texto.replace("−", "")} de más y ya se le avisó por voz.`,
@@ -642,12 +664,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // Se lo dice en voz alta y CON EL NOMBRE. Es lo que la voz del propio
         // chatter no puede darle al coordinador: saber a quién mirar sin tener
         // que buscar cuál de las nueve salas parpadea.
-        const nombre = quien;
-        hablar(
-          problema === "Sin luz" ? `${nombre} no tiene luz suficiente.`
-          : problema === "Fuera de cuadro" ? `${nombre} está fuera de cuadro.`
-          : problema === "Cámara apagada" ? `${nombre} tiene la cámara apagada y no marcó pausa.`
-          : `${nombre} no está frente a la cámara.`,
+        // El nombre lo pone la cola: así dos problemas de la misma persona se
+        // dicen en UNA frase ("...tiene la cámara apagada, y lleva 8 minutos
+        // sin compartir pantalla") en vez de dos que se cortan entre sí.
+        encolarVoz(
+          quien,
+          problema === "Sin luz" ? "no tiene luz suficiente"
+          : problema === "Fuera de cuadro" ? "está fuera de cuadro"
+          : problema === "Cámara apagada" ? "tiene la cámara apagada y no marcó pausa"
+          : "no está frente a la cámara",
           { volumen: 0.85 },
         );
         toast.warning(`${quien}: ${problema.toLowerCase()}`, {
@@ -678,7 +703,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // Con nombre y apellido, igual que el de encuadre: en una grilla de
         // nueve salas, saber A QUIÉN mirar es la mitad del aviso. Y en el
         // equipo hay dos Álvaro Mejía.
-        hablar(`${quien} lleva ${minutos} minutos sin compartir pantalla.`, { volumen: 0.85 });
+        encolarVoz(quien, `lleva ${minutos} minutos sin compartir pantalla`, { volumen: 0.85 });
         toast.warning(`${quien}: sin compartir pantalla`, {
           description: `Lleva ${minutos} minutos así y ya se le avisó dos veces.`,
           duration: 8000,

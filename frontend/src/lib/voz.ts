@@ -30,8 +30,29 @@
 // Regla: si no estas seguro de que un cambio aca no puede callar la voz, no lo
 // hagas. Un aviso de supervision que no suena no se nota hasta que importa.
 
-/** Habla el texto. Devuelve false si este navegador no puede hablar. */
-export function hablar(texto: string, opciones?: { volumen?: number; velocidad?: number }): boolean {
+/** Cómo terminó una frase. `nunca-arranco` = el navegador aceptó el pedido y
+ *  la frase jamás empezó a sonar; es el cuadro del motor trabado. */
+export type FinDeFrase = "fin" | "error" | "nunca-arranco";
+
+/** Habla el texto. Devuelve false si este navegador no puede hablar.
+ *
+ *  `onInicio` y `onFin` son ADITIVOS y opcionales: no cambian nada de cómo se
+ *  habla. Existen para poder ENCADENAR frases en vez de dispararlas todas
+ *  juntas — que es lo que trababa el motor de Chromium. `onFin` se llama
+ *  siempre exactamente una vez (termine, falle, o nunca arranque), porque quien
+ *  encadena no puede quedarse esperando para siempre.
+ *
+ *  ⚠️ Si esta función devuelve `false`, `onFin` NO se va a llamar: no llegó a
+ *  haber frase. Quien encadene tiene que mirar el retorno. */
+export function hablar(
+  texto: string,
+  opciones?: {
+    volumen?: number;
+    velocidad?: number;
+    onInicio?: () => void;
+    onFin?: (como: FinDeFrase) => void;
+  },
+): boolean {
   try {
     const sintesis = window.speechSynthesis;
     if (!sintesis) return false;
@@ -49,15 +70,30 @@ export function hablar(texto: string, opciones?: { volumen?: number; velocidad?:
     // pedido y nunca arranca, que quede dicho. Un sistema de alertas que falla
     // callado es peor que uno que se cae.
     let arranco = false;
-    u.onstart = () => { arranco = true; };
+    // `onFin` se llama UNA sola vez pase lo que pase. Si se llamara dos veces,
+    // quien encadena frases adelantaria la cola de a dos y volveria a encimar
+    // — que es justo lo que se quiere evitar.
+    let termino = false;
+    const terminar = (como: FinDeFrase) => {
+      if (termino) return;
+      termino = true;
+      opciones?.onFin?.(como);
+    };
+
+    u.onstart = () => { arranco = true; opciones?.onInicio?.(); };
+    u.onend = () => terminar("fin");
     u.onerror = (e) => {
       const motivo = (e as SpeechSynthesisErrorEvent).error;
-      if (motivo === "canceled" || motivo === "interrupted") return;  // normal
+      if (motivo === "canceled" || motivo === "interrupted") { terminar("error"); return; }  // normal
       console.warn("[Voz] El navegador rechazo hablar:", motivo, "— el aviso escrito sigue estando.");
+      terminar("error");
     };
     window.setTimeout(() => {
       if (!arranco) {
         console.warn("[Voz] Se pidio hablar y nunca arranco. Frase:", texto.slice(0, 60));
+        // Se la da por muerta para que la cola SIGA. Si se dejara colgada, una
+        // sola frase trabada callaria todos los avisos que vengan detras.
+        terminar("nunca-arranco");
       }
     }, 2500);
 

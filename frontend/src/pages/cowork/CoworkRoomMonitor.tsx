@@ -146,6 +146,12 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
   const MAX_INTENTOS_PUBLICAR = 4;
   const onSharersRef = useRef(onSharersChange);
   onSharersRef.current = onSharersChange;
+  /** Mi propia identidad en ESTA sala, capturada al conectar.
+   *  Antes se leía `roomRef.current?.localParticipant?.identity` en el momento
+   *  de filtrar, y durante una reconexión eso puede ser null: ahí el filtro no
+   *  filtraba nada y MI PROPIA voz pintaba la tarjeta de verde, como si
+   *  estuviera hablando el chatter. */
+  const identidadLocalRef = useRef<string | null>(null);
   const onSpeakingRef = useRef(onSpeakingChange);
   onSpeakingRef.current = onSpeakingChange;
 
@@ -245,7 +251,10 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       // card como si estuvieran hablando los chatters.
       .on(RoomEvent.ActiveSpeakersChanged, (speakers: any[]) => {
         const remotos = (speakers || [])
-          .filter((sp) => sp?.identity !== roomRef.current?.localParticipant?.identity)
+          // Doble guarda: `isLocal` lo dice LiveKit y no depende de ninguna
+          // referencia nuestra; la identidad capturada al conectar es el
+          // respaldo. Cualquiera de las dos alcanza para no contarme a mí.
+          .filter((sp) => !sp?.isLocal && sp?.identity !== identidadLocalRef.current)
           .map((sp) => sp?.name || sp?.identity || "Alguien");
         onSpeakingRef.current?.(remotos);
       })
@@ -266,6 +275,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
         if (cancelled) return;
         await room.connect(url, token);
         if (cancelled) { room.disconnect(); return; }
+        identidadLocalRef.current = room.localParticipant?.identity ?? null;
         setStatus("ready");
         if (intento !== 0) setIntento(0);   // volvió: se reinicia la espera
         room.remoteParticipants.forEach((p: any) => {
@@ -301,6 +311,25 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
     // `intento` en las dependencias es LO QUE HACE que el reintento ocurra:
     // al subirlo, el efecto se rehace y vuelve a conectar la sala.
   }, [getToken, enabled, intento]);
+
+  // ── SI LA SALA NO ESTÁ CONECTADA, NO SABEMOS QUIÉN HABLA ────────────────
+  //
+  // El borde verde de la tarjeta significa "acá hay alguien hablando AHORA", y
+  // ese dato llega por eventos en vivo de la sala. Si la sala se desconectó,
+  // dejan de llegar — pero la última lista se quedaba pegada, así que quien
+  // estuviera hablando en el instante justo de la caída dejaba la tarjeta
+  // VERDE PARA SIEMPRE. El supervisor veía conversación donde no había nadie.
+  //
+  // La lista solo se limpiaba al desmontar el monitor o al desactivarlo; NO al
+  // desconectarse. Acá se cubre cualquier estado que no sea "conectado":
+  // desconexión, error, reintento y sesión duplicada.
+  //
+  // Mejor no decir nada que decir algo de hace veinte minutos.
+  useEffect(() => {
+    if (status === "ready") return;
+    onSpeakingRef.current?.([]);
+    onSharersRef.current?.([]);
+  }, [status]);
 
   // Publicar / dejar de publicar el micro según broadcastOn + micBaseTrack.
   //
