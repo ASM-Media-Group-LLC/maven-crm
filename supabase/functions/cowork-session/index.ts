@@ -191,6 +191,29 @@ serve(async (req) => {
         // LiveKit caído o inalcanzable: contadores en null, la lista no se cae.
       }
 
+      // Admins de incógnito con latido fresco (la vista pinguea cada 60s; 150s
+      // tolera un tic perdido). Solo llega acá: esta acción exige rol admin, así
+      // que "visible solo para otro admin" lo garantiza el borde.
+      const incognitoPorSesion = new Map<string, string[]>();
+      {
+        const corte = new Date(Date.now() - 150_000).toISOString();
+        // Sin el propio solicitante: la marca es para que OTRO admin lo sepa;
+        // verse a uno mismo como "también de incógnito" solo confunde.
+        const { data: watchers } = await admin.from("cowork_incognito_watch")
+          .select("session_id, user_id").in("session_id", ids)
+          .gte("last_seen", corte).neq("user_id", userId);
+        if (watchers?.length) {
+          const uids = [...new Set(watchers.map((w) => w.user_id))];
+          const { data: profs } = await admin.from("profiles").select("id, full_name").in("id", uids);
+          const nombre = new Map((profs || []).map((p) => [p.id, p.full_name || "Admin"]));
+          for (const w of watchers) {
+            const list = incognitoPorSesion.get(w.session_id) ?? [];
+            list.push(nombre.get(w.user_id) ?? "Admin");
+            incognitoPorSesion.set(w.session_id, list);
+          }
+        }
+      }
+
       const result = sessions.map((s: { id: string; [k: string]: unknown }) => {
         const sessRooms = (rooms || []).filter((r) => r.session_id === s.id);
         const roomList = sessRooms.map((r) => ({
@@ -202,6 +225,7 @@ serve(async (req) => {
           ...s,
           rooms: roomList,
           online: lkOk ? roomList.reduce((acc, r) => acc + (r.online || 0), 0) : null,
+          incognito: incognitoPorSesion.get(s.id as string) ?? [],
         };
       });
       return json(req, { sessions: result });
@@ -370,6 +394,30 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // INCÓGNITO: latido / salida (solo rol admin)
+    // ═══════════════════════════════════════════════════════════════
+    // La vista incógnito pinguea cada 60s mientras está montada, y avisa al
+    // salir. Sin latido fresco la fila caduca sola (adminListSessions filtra
+    // por last_seen), así que un cierre sucio de la pestaña no deja un
+    // "de incógnito" fantasma para siempre.
+    if (action === "incognitoPing" || action === "incognitoLeave") {
+      const { sessionId } = body;
+      if (!sessionId) return err(req, "sessionId required");
+      const { data: adminRole } = await admin.from("user_roles")
+        .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
+      if (!adminRole) return err(req, "Solo admins", 403);
+      if (action === "incognitoLeave") {
+        await admin.from("cowork_incognito_watch").delete()
+          .eq("session_id", sessionId).eq("user_id", userId);
+      } else {
+        await admin.from("cowork_incognito_watch").upsert({
+          session_id: sessionId, user_id: userId, last_seen: new Date().toISOString(),
+        });
+      }
+      return json(req, { ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // ISSUE LIVEKIT TOKEN
     // ═══════════════════════════════════════════════════════════════
     if (action === "issueLiveKitToken") {
@@ -378,6 +426,34 @@ serve(async (req) => {
       if (!sessionId || !purpose) return err(req, "sessionId and purpose required");
 
       const { data: membership } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+
+      // INCÓGNITO (solo rol admin): observador OCULTO de una sala — no publica
+      // nada, no aparece en la lista de participantes y NO crea membresía (una
+      // membresía lo delataría en el tablero del host). Es el único purpose que
+      // no exige ser miembro; se resuelve ANTES del check de membresía.
+      if (purpose === "incognito_room") {
+        const { data: adminRole } = await admin.from("user_roles")
+          .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
+        if (!adminRole) return err(req, "Solo admins", 403);
+        if (!roomId) return err(req, "roomId required");
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name, session_id").eq("id", roomId).single();
+        if (!room || room.session_id !== sessionId) return err(req, "Room not found");
+        // Identidad con id de pestaña, como el monitor: dos vistas incógnito de
+        // la misma cuenta no deben expulsarse entre sí.
+        const tabRaw = typeof body.clientId === "string" ? body.clientId : "";
+        const tab = tabRaw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+        const identity = tab ? `${userId}__incognito__${tab}` : `${userId}__incognito`;
+        const token = await createLKToken(lkKey, lkSecret, identity, userName, {
+          roomJoin: true, room: room.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
+        }, 3600);
+        // Registro admin-a-admin: invisible para TODOS en LiveKit, pero otro
+        // admin sí ve quién está de incógnito (lo lee solo adminListSessions).
+        await admin.from("cowork_incognito_watch").upsert({
+          session_id: sessionId, user_id: userId, last_seen: new Date().toISOString(),
+        });
+        return json(req, { token, url: lkUrl, room: room.livekit_room_name });
+      }
+
       if (!membership) return err(req, "Not a member of this session", 403);
 
       const isHost = membership.role === "host";

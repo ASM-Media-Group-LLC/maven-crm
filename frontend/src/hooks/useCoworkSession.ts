@@ -27,6 +27,9 @@ export interface AdminSessionRow {
   my_role: string | null;
   online: number | null;
   rooms: Array<{ id: string; name: string; online: number | null }>;
+  // Admins mirando esta sesión DE INCÓGNITO ahora (latido fresco). Solo lo ven
+  // otros admins: el dato sale de adminListSessions, que exige rol admin.
+  incognito: string[];
 }
 
 export interface CoworkMembership {
@@ -330,8 +333,16 @@ export function useCoworkSession(sessionId: string | null) {
   // sala (contada por LiveKit en el edge). Para un no-admin devuelve [].
   const adminListSessions = useCallback(async (): Promise<AdminSessionRow[]> => {
     const r = await invokeCowork("adminListSessions", {});
-    return (r as { sessions?: AdminSessionRow[] })?.sessions ?? [];
+    const sessions = (r as { sessions?: AdminSessionRow[] })?.sessions ?? [];
+    // Normaliza contra una versión vieja del edge que aún no mande el campo.
+    return sessions.map((s) => ({ ...s, incognito: s.incognito ?? [] }));
   }, []);
+
+  // Latido del modo incógnito (solo admin): mantiene fresca la marca que ven
+  // los OTROS admins. `leave` la borra al salir prolijamente; un cierre sucio
+  // la deja caducar sola en el edge.
+  const incognitoPing = useCallback(async (sid: string) => invokeCowork("incognitoPing", { sessionId: sid }), []);
+  const incognitoLeave = useCallback(async (sid: string) => invokeCowork("incognitoLeave", { sessionId: sid }), []);
 
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
@@ -339,6 +350,6 @@ export function useCoworkSession(sessionId: string | null) {
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
-    listMyActiveSessions, endSessionById, adminListSessions,
+    listMyActiveSessions, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
   };
 }

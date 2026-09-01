@@ -16,7 +16,8 @@ import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Plus, Users2, ArrowRight, KeyRound, Loader2 } from "lucide-react";
+import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask } from "lucide-react";
+import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
 
 export default function CoworkPage() {
@@ -269,6 +270,22 @@ export default function CoworkPage() {
                       )}
                     </div>
                   </div>
+                  {s.incognito.length > 0 && (
+                    <span className="text-[11px] text-violet-500 shrink-0" title="Solo los admins ven esto">
+                      🕶 {s.incognito.join(", ")}
+                    </span>
+                  )}
+                  {/* Incógnito: observar sin unirse — no crea membresía ni
+                      aparece en ninguna lista (token hidden solo-lectura). */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
+                    title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
+                    onClick={() => setSearchParams({ session: s.id, spy: "1" })}
+                  >
+                    <VenetianMask className="h-4 w-4" /> Incógnito
+                  </Button>
                   <Button
                     size="sm"
                     className="rounded-full gap-1 shrink-0"
@@ -396,6 +413,19 @@ export default function CoworkPage() {
         )}
   </div>
       </div>
+    );
+  }
+
+  // Modo incógnito (solo admin): va ANTES de los checks de membresía/lobby a
+  // propósito — la gracia es observar SIN ser miembro. Con ?spy=1 y sin rol
+  // admin se cae al flujo normal (y el edge rechazaría los tokens igual).
+  if (searchParams.get("spy") === "1" && isAdmin) {
+    return (
+      <CoworkIncognitoView
+        sessionId={sessionId}
+        cowork={cowork}
+        onExit={() => setSearchParams({})}
+      />
     );
   }
 
