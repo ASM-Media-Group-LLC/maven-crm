@@ -13,7 +13,7 @@ import RecordingControl from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 
-import { Loader2, WifiOff, Copy } from "lucide-react";
+import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
 import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -83,6 +83,15 @@ interface LiveKitCallViewProps {
   // desde otro lado (el header de la ventanita flotante del provider), para
   // que sincronice su estado/persistencia. La vista no lo usa.
   onIncomingAudioMutedChange?: (muted: boolean) => void;
+  // Navegador de salas (Cowork, supervisor+): flechas a los costados estilo
+  // Instagram + botón con la lista completa. La vista solo DIBUJA y avisa;
+  // moverse de verdad (colgar la sala anterior, entrar muteado a la nueva) es
+  // del dueño, vía onSwitch.
+  roomSwitcher?: {
+    rooms: Array<{ id: string; name: string }>;
+    currentId: string;
+    onSwitch: (id: string) => void;
+  };
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
@@ -103,7 +112,9 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+  // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
+  const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
@@ -639,6 +650,68 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}
       <RoomAudioSink room={room} preferredAudioOutputDeviceId={audioOutputId} />
+
+      {/* Navegador de salas (Cowork): flechas estilo Instagram + lista. Al
+          moverse, el dueño cuelga la sala anterior y te mete MUTEADO a la
+          nueva (initialMicOn=false del flujo de entrar a sala): no quedás como
+          presencia fantasma ni hablando donde ya no estás mirando. */}
+      {roomSwitcher && roomSwitcher.rooms.length > 1 && (() => {
+        const n = roomSwitcher.rooms.length;
+        const idx = Math.max(0, roomSwitcher.rooms.findIndex((r) => r.id === roomSwitcher.currentId));
+        const anterior = roomSwitcher.rooms[(idx - 1 + n) % n];
+        const siguiente = roomSwitcher.rooms[(idx + 1) % n];
+        return (
+          <>
+            <button
+              type="button"
+              title={`Ir a ${anterior.name}`}
+              aria-label={`Ir a ${anterior.name}`}
+              onClick={() => roomSwitcher.onSwitch(anterior.id)}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              title={`Ir a ${siguiente.name}`}
+              aria-label={`Ir a ${siguiente.name}`}
+              onClick={() => roomSwitcher.onSwitch(siguiente.id)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+
+            {/* Botón de lista, pegado a la barra de controles. */}
+            <div className="absolute bottom-16 tactil:bottom-20 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1">
+              {salasAbiertas && (
+                <div className="max-h-56 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-sm shadow-xl py-1 min-w-[200px]">
+                  {roomSwitcher.rooms.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => { setSalasAbiertas(false); if (r.id !== roomSwitcher.currentId) roomSwitcher.onSwitch(r.id); }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-primary/10 ${r.id === roomSwitcher.currentId ? "text-primary font-medium" : "text-foreground"}`}
+                    >
+                      <span className="w-4 shrink-0">{r.id === roomSwitcher.currentId && <Check className="h-3.5 w-3.5" />}</span>
+                      <span className="truncate">{r.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setSalasAbiertas((v) => !v)}
+                title="Cambiar de sala: te saca de la actual y entras muteado a la elegida"
+                className="flex items-center gap-1.5 rounded-full bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white px-3 py-1.5 text-xs font-medium transition-colors"
+              >
+                <DoorOpen className="h-3.5 w-3.5" />
+                {roomSwitcher.rooms[idx]?.name ?? "Salas"}
+                <ChevronRight className={`h-3 w-3 transition-transform ${salasAbiertas ? "-rotate-90" : "rotate-90"}`} />
+              </button>
+            </div>
+          </>
+        );
+      })()}
 
       <CallControls
         isMicOn={lk.isMicOn}
