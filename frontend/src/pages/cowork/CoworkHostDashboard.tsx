@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,11 @@ interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
 }
+
+// Sala pedida desde las flechas del Hub mientras el dashboard NO estaba
+// montado (el Hub flotaba en otra sección). Vive fuera de React a propósito
+// (mismo patrón que la pausa de Cowork): el mount del dashboard la consume.
+let salaObjetivoAlVolver: string | null = null;
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
@@ -548,6 +553,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     endCall();
   }, [endCall]);
 
+  // Refs del navegador de salas. DECLARADOS acá arriba (antes de conectarHub,
+  // que los usa) pero SINCRONIZADOS más abajo, donde viven salasNavegables y
+  // cambiarDeSala — que dependen de enterRoom/leaveActiveRoom.
+  const salasNavegablesRef = useRef<Array<{ id: string; name: string }>>([]);
+  const cambiarDeSalaRef = useRef<(id: string) => void>(() => {});
+  const montadoRef = useRef(true);
+
   const conectarHub = useCallback(() => {
     if (!hubRoom || !hubKey) return;
     startCall({
@@ -567,8 +579,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // La ventanita flotante del provider también tiene el 🔇: cuando lo
       // togglean allá, acá se sincroniza el estado y la persistencia.
       onIncomingAudioMutedChange: fijarHubSilencio,
+      // Navegador de salas del Hub. Todo por REF: los VALORES (lista y acción)
+      // se calculan más abajo y se leen al momento de empujar/usar la config —
+      // meterlos como deps de este useCallback sería la TDZ que ya tumbó la
+      // página una vez. Si el dashboard NO está montado (el Hub flota en otra
+      // sección), se anota la sala pedida y se vuelve a Cowork: el mount la consume.
+      roomSwitcher: {
+        rooms: salasNavegablesRef.current,
+        currentId: "hub",
+        onSwitch: (id: string) => {
+          if (montadoRef.current) { cambiarDeSalaRef.current(id); return; }
+          salaObjetivoAlVolver = id;
+          navigate(`/cowork?session=${cowork.session?.id ?? ""}`);
+        },
+      },
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, navigate, cowork.session?.id]);
 
   // Entrar al Hub al abrir la sesión. UNA sola vez: sin el candado, colgar el
   // Hub lo volvería a conectar en el mismo instante.
@@ -579,7 +605,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   useEffect(() => {
     if (!profileLoaded || !hubRoom || yaEntroAlHub.current) return;
     yaEntroAlHub.current = true;
-    if (activeKey !== hubKey) conectarHub();
+    // Si el Hub ya venía sonando, conectarHub() con el MISMO key solo re-empuja
+    // la config (sin reconectar): así los closures (flechas de salas, 🔇)
+    // apuntan siempre a ESTA instancia del dashboard y no a una desmontada.
+    conectarHub();
   }, [profileLoaded, hubRoom, hubKey, activeKey, conectarHub]);
 
   // Re-empujar la config al provider cuando cambia el silencio: mismo key →
@@ -604,6 +633,53 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
     // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
   }, []);
+
+  // ── Navegador de salas (flechas + lista dentro de la llamada) ─────────────
+  //
+  // Moverse = la semántica de siempre de "Entrar": la sala anterior se CUELGA
+  // (no se puede estar en dos) y a la nueva llegás con el micro APAGADO
+  // (initialMicOn=false del flujo de sala) — sin presencias fantasma ni voz
+  // colándose donde ya no estás mirando. "hub" te devuelve al Hub (cuelga la
+  // sala y quedás solo en el Hub, que nunca se corta).
+  const salasNavegables = useMemo(
+    () => [{ id: "hub", name: "🎧 Supervisor Hub" }, ...cowork.rooms.map((r) => ({ id: r.id, name: r.name }))],
+    [cowork.rooms],
+  );
+  const cambiarDeSala = useCallback((id: string) => {
+    if (id === "hub") leaveActiveRoom();
+    else enterRoom(id);
+  }, [leaveActiveRoom, enterRoom]);
+  // El Hub vive en el provider y su config puede sobrevivir a desmontar esta
+  // página: el onSwitch va por REF para que siempre apunte al dashboard
+  // vigente, y si el dashboard NO está montado, se anota la sala pedida y se
+  // navega de vuelta a Cowork (el mount la consume).
+  // Sincronización de los refs declarados arriba de conectarHub.
+  cambiarDeSalaRef.current = cambiarDeSala;
+  salasNavegablesRef.current = salasNavegables;
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => { montadoRef.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si el mount encuentra una sala pedida desde la ventanita flotante (el
+  // coordinador tocó una flecha estando en otra sección), se entra apenas
+  // carguen las salas.
+  useEffect(() => {
+    if (!salaObjetivoAlVolver || cowork.rooms.length === 0) return;
+    const objetivo = salaObjetivoAlVolver;
+    salaObjetivoAlVolver = null;
+    if (objetivo !== "hub") enterRoom(objetivo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cowork.rooms.length]);
+
+  // La lista de salas cambió (se añadió/cerró una) → re-empujar la config del
+  // Hub para que las flechas del provider vean la lista nueva. Mismo patrón
+  // que el re-push del silencio: mismo key, sin reconectar.
+  useEffect(() => {
+    if (yaEntroAlHub.current && activeKey === hubKey) conectarHub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salasNavegables]);
 
   const leaveOneOnOne = useCallback(async () => {
     if (oneOnOneRequestId) {
@@ -1666,6 +1742,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialCamOn={false}
               getToken={getActiveRoomToken}
               leaveLabel="Colgar"
+              // Flechas + lista para saltar de sala sin volver al dashboard.
+              // Moverse cuelga esta sala y entra MUTEADO a la siguiente;
+              // "hub" cuelga y te deja solo en el Hub.
+              roomSwitcher={{
+                rooms: salasNavegables,
+                currentId: activeRoomId,
+                onSwitch: cambiarDeSala,
+              }}
             />
           </div>
         </div>
