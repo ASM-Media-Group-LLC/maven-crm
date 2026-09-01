@@ -557,8 +557,10 @@ serve(async (req) => {
         const tabRaw = typeof body.clientId === "string" ? body.clientId : "";
         const tab = tabRaw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
         const monitorIdentity = tab ? `${userId}__monitor__${tab}` : `${userId}__monitor`;
+        // camera y screen_share: el dashboard ahora puede broadcastear la cámara
+        // y la pantalla del coordinador a las salas (clones, igual que el micro).
         const token = await createLKToken(lkKey, lkSecret, monitorIdentity, `📢 ${userName}`, {
-          roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: false, canPublishSources: ["microphone"],
+          roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: false, canPublishSources: ["microphone", "camera", "screen_share"],
         }, 3600);
         return json(req, { token, url: lkUrl, room: room.livekit_room_name });
       }
