@@ -210,6 +210,11 @@ export default function CoworkPage() {
                         {" "}· {viva.online} en línea
                       </span>
                     )}
+                    {!!viva?.incognito?.length && (
+                      <span className="text-violet-500" title="Solo los admins ven esto">
+                        {" "}· 🕶 {viva.incognito.join(", ")}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
@@ -221,6 +226,19 @@ export default function CoworkPage() {
                     onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
                   >
                     Finalizar
+                  </Button>
+                )}
+                {/* Incógnito también en las sesiones PROPIAS (solo admin): entrar
+                    como host te anuncia en el hub; esto observa sin aparecer. */}
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
+                    title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
+                    onClick={() => setSearchParams({ session: s.id, spy: "1" })}
+                  >
+                    <VenetianMask className="h-4 w-4" /> Incógnito
                   </Button>
                 )}
                 <Button
