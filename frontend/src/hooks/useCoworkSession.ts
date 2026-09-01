@@ -15,6 +15,20 @@ export interface CoworkRoom {
   join_code?: string;
 }
 
+// Fila de la lista de admin: sesión activa ajena o propia, con ocupación en
+// vivo (online=null cuando LiveKit no contestó — se dibuja "–", no "0").
+export interface AdminSessionRow {
+  id: string;
+  name: string;
+  description: string | null;
+  members: number;
+  created_at: string;
+  host_name: string | null;
+  my_role: string | null;
+  online: number | null;
+  rooms: Array<{ id: string; name: string; online: number | null }>;
+}
+
 export interface CoworkMembership {
   id: string;
   session_id: string;
@@ -312,12 +326,19 @@ export function useCoworkSession(sessionId: string | null) {
   // Finalizar una sesión por id (para el botón de la pantalla de inicio, sin sessionId activo).
   const endSessionById = useCallback(async (sid: string) => invokeCowork("endSession", { sessionId: sid }), []);
 
+  // ADMIN: todas las sesiones activas de la empresa, con ocupación en vivo por
+  // sala (contada por LiveKit en el edge). Para un no-admin devuelve [].
+  const adminListSessions = useCallback(async (): Promise<AdminSessionRow[]> => {
+    const r = await invokeCowork("adminListSessions", {});
+    return (r as { sessions?: AdminSessionRow[] })?.sessions ?? [];
+  }, []);
+
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
-    listMyActiveSessions, endSessionById,
+    listMyActiveSessions, endSessionById, adminListSessions,
   };
 }

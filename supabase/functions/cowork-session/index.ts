@@ -27,13 +27,14 @@ async function signHS256(payload: string, secret: string): Promise<string> {
 }
 
 interface LKGrants {
-  roomJoin: boolean;
-  room: string;
-  canPublish: boolean;
-  canSubscribe: boolean;
-  canPublishData: boolean;
+  roomJoin?: boolean;
+  room?: string;
+  canPublish?: boolean;
+  canSubscribe?: boolean;
+  canPublishData?: boolean;
   canPublishSources?: string[];
   roomAdmin?: boolean;
+  roomList?: boolean; // solo para consultar RoomService/ListRooms (ocupación), sin entrar a nada
   hidden?: boolean; // observador invisible: se suscribe pero no aparece en la lista de participantes
 }
 
@@ -147,6 +148,66 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // ADMIN: LISTAR TODAS LAS SESIONES ACTIVAS (con ocupación en vivo)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "adminListSessions") {
+      // La lista sale del RPC cowork_sesiones_activas_admin, llamado con el
+      // cliente DEL USUARIO (no service_role: con service_role auth.uid() es
+      // NULL y la guarda de rol devolvería cero filas). El RPC ya filtra por
+      // rol admin — un no-admin recibe lista vacía, no un error.
+      const { data: sessions, error: rpcErr } = await supabase.rpc("cowork_sesiones_activas_admin");
+      if (rpcErr) return err(req, rpcErr.message, 500);
+      if (!sessions?.length) return json(req, { sessions: [] });
+
+      const ids = sessions.map((s: { id: string }) => s.id);
+      const { data: rooms } = await admin.from("cowork_rooms")
+        .select("id, session_id, name, livekit_room_name, sort_order")
+        .in("session_id", ids)
+        .order("sort_order");
+
+      // Ocupación EN VIVO desde LiveKit: un solo ListRooms trae todas las salas
+      // activas con num_participants. Es la verdad del SFU — no presencia de
+      // Supabase (a esa ya la vimos tirar el socket bajo carga, #1458) ni
+      // asignaciones is_active (quedan activas aunque cierres la pestaña).
+      // Si LiveKit no contesta, la lista sale igual con online=null.
+      const lkOnline = new Map<string, number>();
+      let lkOk = false;
+      try {
+        const token = await createLKToken(lkKey, lkSecret, `cowork-admin-list-${userId.slice(0, 8)}`, userName, { roomList: true }, 60);
+        const httpUrl = lkUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+        const resp = await fetch(`${httpUrl}/twirp/livekit.RoomService/ListRooms`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (resp.ok) {
+          const j = await resp.json();
+          for (const r of (j.rooms || [])) {
+            lkOnline.set(r.name, Number(r.numParticipants ?? r.num_participants ?? 0));
+          }
+          lkOk = true;
+        }
+      } catch (_e) {
+        // LiveKit caído o inalcanzable: contadores en null, la lista no se cae.
+      }
+
+      const result = sessions.map((s: { id: string; [k: string]: unknown }) => {
+        const sessRooms = (rooms || []).filter((r) => r.session_id === s.id);
+        const roomList = sessRooms.map((r) => ({
+          id: r.id,
+          name: r.name,
+          online: lkOk ? (lkOnline.get(r.livekit_room_name) ?? 0) : null,
+        }));
+        return {
+          ...s,
+          rooms: roomList,
+          online: lkOk ? roomList.reduce((acc, r) => acc + (r.online || 0), 0) : null,
+        };
+      });
+      return json(req, { sessions: result });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // JOIN SESSION (as participant or host)
     // ═══════════════════════════════════════════════════════════════
     if (action === "joinSession") {
@@ -161,7 +222,12 @@ serve(async (req) => {
       let memberRole = "participant";
       if (role === "host") {
         if (!hostCode || hostCode !== session.host_invite_code) {
-          return err(req, "Código de host inválido", 403);
+          // Sin código válido solo pasa un ADMIN: puede entrar como host a
+          // cualquier sesión (es su vía para supervisar salas ajenas desde la
+          // lista global del landing, sin pedirle el código al coordinador).
+          const { data: adminRole } = await admin.from("user_roles")
+            .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
+          if (!adminRole) return err(req, "Código de host inválido", 403);
         }
         memberRole = "host";
       }
