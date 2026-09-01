@@ -3,6 +3,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  LocalAudioTrack,
   ConnectionState,
   Participant,
   VideoPresets,
@@ -1353,6 +1354,37 @@ export function useLiveKit() {
   // le corta el micro sin ninguna explicacion y sigue hablando al vacio.
   const meSilencieYoRef = useRef(0);
 
+  // Re-aplicar el noise cancellation al track de micrófono VIGENTE.
+  //
+  // El procesador se engancha a UN LocalTrack. Apagar y prender el micro (o el
+  // fallback de cambio de dispositivo, que hace disable/enable) crea un track
+  // NUEVO — y nadie volvía a aplicar el procesador: el botón de NC quedaba
+  // diciendo "activado" mientras el NC ya no existía. El botón verde mintiendo,
+  // otra vez. (El camino feliz de switchActiveDevice NO lo pierde: LiveKit
+  // reinicia el track por dentro y llama al restart() del procesador.)
+  const reapplyNC = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room || !ncEnabledRef.current) return;
+    try {
+      const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+        (p) => p.source === Track.Source.Microphone,
+      );
+      const t = micPub?.track as LocalAudioTrack | undefined;
+      if (!t) return;
+      // Si el track vigente ya tiene un procesador, no hay nada que reponer.
+      if (t.getProcessor?.()) return;
+      // El procesador viejo quedó huérfano (su track murió): se destruye para
+      // no filtrar AudioContexts.
+      if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch { /* noop */ } }
+      const processor = new NoiseSuppresionTrackProcessor();
+      ncProcessorRef.current = processor;
+      await t.setProcessor(processor as unknown as Parameters<LocalAudioTrack["setProcessor"]>[0]);
+      console.info("[LiveKit] Noise cancellation re-aplicado al track nuevo del micrófono");
+    } catch (err) {
+      console.warn("[LiveKit] no pude re-aplicar el noise cancellation:", err);
+    }
+  }, []);
+
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
@@ -1363,6 +1395,8 @@ export function useLiveKit() {
         shouldEnable,
         shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
       );
+      // Encender el micro crea un track nuevo → el NC hay que volver a ponerlo.
+      if (shouldEnable) await reapplyNC();
       // Ensure remote audio playback is unblocked (browsers require a user gesture).
       // toggleMic is always invoked by a user gesture, so this is the right moment.
       if (!room.canPlaybackAudio) {
@@ -1376,7 +1410,7 @@ export function useLiveKit() {
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
     }
-  }, [refreshParticipants]);
+  }, [refreshParticipants, reapplyNC]);
 
   // ── Noise Cancellation toggle ─────────────────────────────────
   const toggleNoiseCancellation = useCallback(async () => {
@@ -1719,13 +1753,15 @@ export function useLiveKit() {
       try {
         await room.localParticipant.setMicrophoneEnabled(false);
         await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(deviceId));
+        // Este camino crea un track NUEVO → el noise cancellation se perdía acá.
+        await reapplyNC();
         setIsMicOn(room.localParticipant.isMicrophoneEnabled);
         refreshParticipants();
       } catch (fallbackErr) {
         console.error("[LiveKit] Audio input fallback switch error:", fallbackErr);
       }
     }
-  }, [refreshParticipants]);
+  }, [refreshParticipants, reapplyNC]);
 
   const switchAudioOutput = useCallback(async (deviceId: string) => {
     const room = roomRef.current;

@@ -354,6 +354,31 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
         </div>
       )}
 
+      {/* El 🔇 local también en la VENTANA DEL SISTEMA (Document PiP): ahí la
+          llamada se porta directo al body, sin nuestro header, así que el botón
+          de la ventanita no existe. Se portala al documento del PiP como botón
+          flotante — mismo opt-in (incomingAudioMuted en la config) y misma
+          sincronización con el dueño. Los estilos llegan porque usePipWindow
+          copia las hojas al abrir la ventana. */}
+      {config && pipWindow && config.incomingAudioMuted !== undefined && createPortal(
+        <button
+          type="button"
+          title={config.incomingAudioMuted
+            ? "Silenciado solo para ti (ellos siguen hablando). Toca para volver a escuchar."
+            : "Silenciar solo para ti: no los escuchas, tu micro no cambia."}
+          aria-label={config.incomingAudioMuted ? "Volver a escuchar" : "Silenciar para mí"}
+          onClick={() => {
+            const next = !config.incomingAudioMuted;
+            setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
+            config.onIncomingAudioMutedChange?.(next);
+          }}
+          className={`fixed top-2 left-2 z-[200] h-8 w-8 rounded-full flex items-center justify-center bg-black/55 backdrop-blur-sm transition-colors ${config.incomingAudioMuted ? "text-amber-400 hover:text-amber-300" : "text-white/80 hover:text-white"}`}
+        >
+          {config.incomingAudioMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </button>,
+        pipWindow.document.body,
+      )}
+
       {/* La llamada se monta UNA sola vez, siempre dentro de la MISMA caja: así
           cambiar de página mueve el video, no lo reinicia. La caja es la que
           viaja al hueco / a la ventanita / a la ventana del sistema. */}
