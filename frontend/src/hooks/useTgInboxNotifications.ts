@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { usePermissions } from "@/hooks/usePermissions";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
   useBrowserNotifications,
@@ -51,8 +52,13 @@ export function useTgInboxNotifications() {
 
   const userId = user?.id ?? null;
 
+  // Sin acceso al MÓDULO Telegram no hay suscripción (mismo motivo que la
+  // bandeja de WhatsApp: el reporte de Andrea, HHRR).
+  const { canAccess, isLoading: permsLoading } = usePermissions();
+  const accesoInbox = !permsLoading && canAccess("Telegram");
+
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !accesoInbox) return;
     const channel = supabase
       .channel("tg-inbox-notify-" + Math.random().toString(36).slice(2))
       .on(
@@ -118,5 +124,5 @@ export function useTgInboxNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, qc, navigate]);
+  }, [userId, accesoInbox, qc, navigate]);
 }
