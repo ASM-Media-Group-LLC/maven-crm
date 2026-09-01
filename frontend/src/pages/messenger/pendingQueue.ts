@@ -11,6 +11,7 @@ export interface PendingMessage {
   fileName?: string;
   replyToId?: string;
   albumId?: string;
+  isThreadReply?: boolean;
   createdAt: string;
 }
 

@@ -1028,6 +1028,7 @@ export type Database = {
           id: string
           is_deleted: boolean
           is_edited: boolean
+          is_thread_reply: boolean
           reply_to_id: string | null
           sender_id: string
           type: string
@@ -1044,6 +1045,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          is_thread_reply?: boolean
           reply_to_id?: string | null
           sender_id: string
           type?: string
@@ -1060,6 +1062,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          is_thread_reply?: boolean
           reply_to_id?: string | null
           sender_id?: string
           type?: string
