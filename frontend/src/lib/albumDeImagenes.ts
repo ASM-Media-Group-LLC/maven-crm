@@ -24,6 +24,17 @@
 // Y encaja con la regla que ya existía: `muestraTextoDebajo` decide si una
 // imagen tiene pie de foto, y es exactamente la misma pregunta que decide si
 // puede entrar al álbum. Una sola regla para las dos cosas.
+//
+// ── ÁLBUM EXPLÍCITO (01/09/2026) ────────────────────────────────────────────
+//
+// Ahora el que envía varias imágenes en un mismo envío les estampa el MISMO
+// `album_id` (columna en chat_messages). Para esos mensajes el agrupado es
+// determinístico: mismo album_id consecutivo = mismo álbum, sin ventana de
+// tiempo (una subida lenta ya no lo parte) y CON comentario permitido — el
+// comentario del envío viaja en el content de la primera imagen y la
+// cuadrícula lo dibuja debajo, como pie de TODO el álbum (modo WhatsApp).
+//
+// La heurística vieja (sin album_id) queda solo para los mensajes históricos.
 
 import { muestraTextoDebajo } from "./mensajeConAdjunto";
 
@@ -37,6 +48,7 @@ export interface MensajeAgrupable {
   sender_id?: string | null;
   created_at: string;
   is_deleted?: boolean | null;
+  album_id?: string | null;
 }
 
 /** Cuánto pueden separarse dos imágenes y seguir siendo el mismo álbum. */
@@ -58,9 +70,25 @@ export interface Albumes<T> {
 /** ¿Esta imagen puede entrar a un álbum? */
 function puedeEntrarAlAlbum(m: MensajeAgrupable): boolean {
   if (m.type !== "image" || !m.file_url || m.is_deleted) return false;
-  // Con comentario, NO: la cuadrícula solo dibuja un texto y el suyo se
-  // perdería. Que tenga pie de foto es justo lo que la saca del álbum.
+  // Álbum explícito: el comentario SÍ entra — es el pie de todo el álbum y la
+  // cuadrícula lo dibuja debajo (solo la primera imagen del envío lo lleva).
+  if (m.album_id) return true;
+  // Heurística vieja: con comentario, NO — la cuadrícula solo dibuja un texto
+  // y el suyo se perdería. Que tenga pie de foto es justo lo que la saca.
   return !muestraTextoDebajo(m.content, m.file_name);
+}
+
+/** ¿`sig` continúa el álbum que abrió `msg`? */
+function continuaElAlbum(msg: MensajeAgrupable, sig: MensajeAgrupable): boolean {
+  if (!puedeEntrarAlAlbum(sig)) return false;
+  // Álbum explícito: el mismo album_id manda; sin ventana de tiempo (una
+  // subida lenta no lo parte) y sin mezclar con imágenes de otro envío.
+  if (msg.album_id || sig.album_id) return msg.album_id === sig.album_id;
+  if (sig.sender_id !== msg.sender_id) return false;
+  const separacion = Math.abs(
+    new Date(sig.created_at).getTime() - new Date(msg.created_at).getTime(),
+  );
+  return separacion < VENTANA_ALBUM_MS;
 }
 
 /**
@@ -84,12 +112,7 @@ export function agruparEnAlbumes<T extends MensajeAgrupable>(mensajes: T[]): Alb
     let j = i + 1;
     while (j < mensajes.length) {
       const sig = mensajes[j];
-      if (!puedeEntrarAlAlbum(sig)) break;
-      if (sig.sender_id !== msg.sender_id) break;
-      const separacion = Math.abs(
-        new Date(sig.created_at).getTime() - new Date(msg.created_at).getTime(),
-      );
-      if (!(separacion < VENTANA_ALBUM_MS)) break;
+      if (!continuaElAlbum(msg, sig)) break;
       grupo.push(sig);
       j++;
     }

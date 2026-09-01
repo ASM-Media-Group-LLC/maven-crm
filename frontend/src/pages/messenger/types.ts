@@ -37,6 +37,12 @@ export interface ChatMessage {
   file_name: string | null;
   file_size: number | null;
   reply_to_id: string | null;
+  // Varias imágenes enviadas en un mismo envío comparten album_id y se dibujan
+  // como UNA cuadrícula (álbum estilo WhatsApp). Opcional: filas viejas no lo tienen.
+  album_id?: string | null;
+  // true = enviado DESDE el panel de hilo: vive solo en el hilo, el timeline
+  // principal lo esconde. Las citas ("Responder") quedan en false y se ven inline.
+  is_thread_reply?: boolean;
   is_edited: boolean;
   is_deleted: boolean;
   created_at: string;

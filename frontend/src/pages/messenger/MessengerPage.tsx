@@ -14,7 +14,6 @@ import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission } from "@/hooks/useBrowserNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { useCall } from "@/components/CallProvider";
-import { useSpaces } from "@/hooks/useSpaces";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
 import { useArchivedChats } from "@/hooks/useArchivedChats";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -38,7 +37,6 @@ export default function MessengerPage() {
   const { user } = useAuth();
   useNotificationPermission();
   const { initiateCall } = useCall();
-  const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();
   const { isAdmin: isSystemAdmin } = useUserRole();
@@ -215,12 +213,6 @@ export default function MessengerPage() {
           isArchived={isArchived}
           onToggleArchive={toggleArchive}
           onToggleMute={toggleMute}
-          spaces={spaces}
-          onCreateSpace={createSpace}
-          onDeleteSpace={deleteSpace}
-          onRenameSpace={renameSpace}
-          onAddConversationToSpace={addConversationToSpace}
-          onRemoveConversationFromSpace={removeConversationFromSpace}
         />
       </div>
 

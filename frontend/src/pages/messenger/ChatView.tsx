@@ -19,7 +19,7 @@ interface ChatViewProps {
   messages: ChatMessage[];
   profiles: Record<string, UserProfile>;
   typingUsers: string[];
-  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string) => void;
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string, isThreadReply?: boolean) => void;
   onSendTyping: (isTyping: boolean) => void;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
@@ -74,13 +74,15 @@ export default function ChatView({
     if (except !== "search") setHighlightedMsgId(null);
   }, []);
 
-  // Mostramos TODOS los mensajes en el timeline principal. El filtro anterior intentaba
-  // esconder las respuestas de hilo, pero lo infería según si el mensaje padre estaba en la
-  // ventana paginada (PAGE_SIZE=50) → los mensajes aparecían/desaparecían al hacer scroll y
-  // TODA respuesta-cita a un mensaje de primer nivel se perdía del chat. Las citas se
-  // renderizan inline (bloque de cita en la burbuja) y el hilo sigue disponible en su panel.
-  // (Separar del todo "cita" vs "hilo" requeriría un flag is_thread_reply en la DB.)
-  const mainMessages = messages;
+  // El timeline principal esconde las respuestas de HILO: viven solo en su panel.
+  // Se filtra por el flag is_thread_reply de la DB (lo estampa el que envía desde
+  // el panel), NO por heurística sobre reply_to_id: eso ya se intentó y se
+  // revirtió — dependía de si el padre estaba en la ventana paginada (PAGE_SIZE=50)
+  // y los mensajes aparecían/desaparecían al hacer scroll. Las citas ("Responder")
+  // tienen el flag en false y se ven inline como siempre. Los mensajes de hilo
+  // HISTÓRICOS (anteriores al flag) quedan en false y siguen visibles: no hay
+  // forma retroactiva de distinguirlos de una cita.
+  const mainMessages = useMemo(() => messages.filter(m => !m.is_thread_reply), [messages]);
 
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];
@@ -89,7 +91,8 @@ export default function ChatView({
 
   const handleSendThreadReply = useCallback((content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string) => {
     if (!threadParent) return;
-    onSendMessage(content, type || "text", fileUrl, fileName, threadParent.id);
+    // isThreadReply=true: el mensaje vive SOLO dentro del hilo (el timeline lo esconde).
+    onSendMessage(content, type || "text", fileUrl, fileName, threadParent.id, undefined, true);
   }, [threadParent, onSendMessage]);
 
   const getThreadCount = useCallback((messageId: string) => {
@@ -237,6 +240,7 @@ export default function ChatView({
       ) : (
         <MessageInput
           ref={messageInputRef}
+          conversationId={conversation.id}
           onSendMessage={onSendMessage}
           onSendTyping={onSendTyping}
           replyTo={replyTo}

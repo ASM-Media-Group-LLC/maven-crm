@@ -1,0 +1,13 @@
+-- Respuestas de HILO separadas de las citas.
+--
+-- "Responder" (cita) y "Abrir hilo" comparten reply_to_id, así que el timeline
+-- no podía distinguirlos y dibujaba las respuestas de hilo DOS veces: dentro
+-- del panel del hilo y también en el chat principal. Filtrarlas por heurística
+-- ya se intentó y se revirtió (los mensajes aparecían/desaparecían según la
+-- ventana de paginación — ver comentario en ChatView).
+--
+-- is_thread_reply lo estampa el que envía DESDE el panel de hilo. El timeline
+-- principal esconde esas filas; el panel del hilo las muestra. Las citas
+-- normales siguen con false y se ven inline como siempre.
+-- Los mensajes históricos quedan en false (imposible distinguirlos retroactivamente).
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS is_thread_reply boolean NOT NULL DEFAULT false;

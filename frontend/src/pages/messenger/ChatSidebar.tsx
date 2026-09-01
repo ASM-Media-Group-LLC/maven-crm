@@ -13,9 +13,6 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -23,9 +20,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
@@ -34,9 +28,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
-import SpacesPanel from "./components/SpacesPanel";
-import { ChatSpace } from "@/hooks/useSpaces";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
+import { getDraft } from "./drafts";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -55,12 +48,6 @@ interface ChatSidebarProps {
   isArchived: (id: string) => boolean;
   onToggleArchive: (id: string) => void;
   onToggleMute: (id: string, muted: boolean) => void;
-  spaces: ChatSpace[];
-  onCreateSpace: (name: string) => Promise<string | null>;
-  onDeleteSpace: (id: string) => Promise<boolean>;
-  onRenameSpace: (id: string, name: string) => Promise<boolean>;
-  onAddConversationToSpace: (spaceId: string, convId: string) => Promise<boolean>;
-  onRemoveConversationFromSpace: (spaceId: string, convId: string) => Promise<boolean>;
 }
 
 function formatTime(dateStr?: string) {
@@ -85,8 +72,6 @@ export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
   onSelectContact, onDeleteChat, loading, profiles,
   isPinned, onTogglePin, pinnedOrder, onReorderPinned, isArchived, onToggleArchive, onToggleMute,
-  spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
-  onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
@@ -106,6 +91,7 @@ export default function ChatSidebar({
   const [deleting, setDeleting] = useState(false);
   const [draggingChatId, setDraggingChatId] = useState<string | null>(null);
   const [dmExpanded, setDmExpanded] = useState(true);
+  const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(false);
 
   const currentUserName = user ? profiles[user.id]?.full_name : null;
@@ -143,6 +129,11 @@ export default function ChatSidebar({
       return 0;
     });
   }, [filtered, isPinned, pinnedOrder]);
+
+  // Organización estilo Google Chat: los DMs y los grupos viven en secciones
+  // separadas (antes iban mezclados y los grupos además tenían "Espacios").
+  const sortedDirect = useMemo(() => sorted.filter(c => c.type !== "group"), [sorted]);
+  const sortedGroups = useMemo(() => sorted.filter(c => c.type === "group"), [sorted]);
 
   const unreadTotal = useMemo(() => conversations.reduce((s, c) => s + c.unreadCount, 0), [conversations]);
   const archivedCount = useMemo(() => conversations.filter(c => isArchived(c.id)).length, [conversations, isArchived]);
@@ -253,7 +244,6 @@ export default function ChatSidebar({
                 { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
                 { key: "mentions", icon: AtSign, label: "Menciones", badge: mentionedIds.size },
                 { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
-                { key: "groups", icon: Users, label: "Grupos", badge: 0 },
                 { key: "archived", icon: Archive, label: "Archivados", badge: archivedCount },
               ].map(item => {
                 const isActive = tab === item.key;
@@ -282,55 +272,72 @@ export default function ChatSidebar({
             </div>
           </CollapsibleSection>
 
-          {/* Direct messages section */}
-          <div className="mt-1 px-2">
-            <button
-              onClick={() => setDmExpanded(!dmExpanded)}
-              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
-            >
-              {dmExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <span>{tab === "archived" ? "Archivados" : "Mensajes directos"}</span>
-              {sorted.length > 0 && (
-                <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground/70">
-                  {sorted.length}
-                </span>
-              )}
-            </button>
+          {/* Secciones de conversaciones — estilo Google Chat: "Mensajes directos"
+              y después "Grupos". En el tab Archivados va una sola sección combinada. */}
+          {(() => {
+            const renderConvs = (items: ConversationWithDetails[], emptyText: string) =>
+              items.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-xs text-muted-foreground">{search ? "Sin resultados" : emptyText}</p>
+                </div>
+              ) : (
+                items.map(conv => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={conv.id === activeChatId}
+                    onClick={() => onSelectChat(conv.id)}
+                    onDelete={() => setDeleteTarget(conv)}
+                    isPinned={isPinned(conv.id)}
+                    onTogglePin={() => onTogglePin(conv.id)}
+                    onArchive={() => onToggleArchive(conv.id)}
+                    isArchivedChat={isArchived(conv.id)}
+                    onToggleMute={onToggleMute}
+                    onDragStart={(e) => handleDragStart(e, conv.id)}
+                    onDragEnd={handleDragEnd}
+                    canReorderDrop={draggedIsPinned && isPinned(conv.id)}
+                    onReorderDrop={() => handleReorderDrop(conv.id)}
+                    isSystemAdmin={isAdmin}
+                  />
+                ))
+              );
 
-            {dmExpanded && (
-              <>
-                {sorted.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-xs text-muted-foreground">
-                      {search ? "Sin resultados" : tab === "archived" ? "No tienes chats archivados" : "Inicia una conversación"}
-                    </p>
-                  </div>
-                ) : (
-                  sorted.map(conv => (
-                    <ConversationItem
-                      key={conv.id}
-                      conversation={conv}
-                      isActive={conv.id === activeChatId}
-                      onClick={() => onSelectChat(conv.id)}
-                      onDelete={() => setDeleteTarget(conv)}
-                      isPinned={isPinned(conv.id)}
-                      onTogglePin={() => onTogglePin(conv.id)}
-                      onArchive={() => onToggleArchive(conv.id)}
-                      isArchivedChat={isArchived(conv.id)}
-                      onToggleMute={onToggleMute}
-                      onDragStart={(e) => handleDragStart(e, conv.id)}
-                      onDragEnd={handleDragEnd}
-                      canReorderDrop={draggedIsPinned && isPinned(conv.id)}
-                      onReorderDrop={() => handleReorderDrop(conv.id)}
-                      spaces={spaces}
-                      onAddToSpace={onAddConversationToSpace}
-                      isSystemAdmin={isAdmin}
-                    />
-                  ))
+            const sectionHeader = (label: string, count: number, expanded: boolean, toggle: () => void) => (
+              <button
+                onClick={toggle}
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
+              >
+                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                <span>{label}</span>
+                {count > 0 && (
+                  <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground/70">
+                    {count}
+                  </span>
                 )}
+              </button>
+            );
+
+            if (tab === "archived") {
+              return (
+                <div className="mt-1 px-2">
+                  {sectionHeader("Archivados", sorted.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
+                  {dmExpanded && renderConvs(sorted, "No tienes chats archivados")}
+                </div>
+              );
+            }
+            return (
+              <>
+                <div className="mt-1 px-2">
+                  {sectionHeader("Mensajes directos", sortedDirect.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
+                  {dmExpanded && renderConvs(sortedDirect, "Inicia una conversación")}
+                </div>
+                <div className="mt-1 px-2">
+                  {sectionHeader("Grupos", sortedGroups.length, groupsExpanded, () => setGroupsExpanded(!groupsExpanded))}
+                  {groupsExpanded && renderConvs(sortedGroups, "Sin grupos todavía")}
+                </div>
               </>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Global message search results */}
           {search.trim().length >= 2 && (
@@ -386,22 +393,6 @@ export default function ChatSidebar({
               })()}
             </div>
           )}
-
-          {/* Spaces section */}
-          <div className="mt-1 px-1">
-            <SpacesPanel
-              spaces={spaces}
-              conversations={conversations}
-              activeChatId={activeChatId}
-              onSelectChat={onSelectChat}
-              onCreateSpace={onCreateSpace}
-              onDeleteSpace={onDeleteSpace}
-              onRenameSpace={onRenameSpace}
-              onAddConversation={onAddConversationToSpace}
-              onRemoveConversation={onRemoveConversationFromSpace}
-              draggingChatId={draggingChatId}
-            />
-          </div>
 
           {/* Contacts section */}
           <div className="mt-1 px-2">
@@ -485,7 +476,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, canReorderDrop, onReorderDrop, spaces, onAddToSpace, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, canReorderDrop, onReorderDrop, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
@@ -499,8 +490,6 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   onDragEnd: () => void;
   canReorderDrop?: boolean;
   onReorderDrop?: () => void;
-  spaces: ChatSpace[];
-  onAddToSpace: (spaceId: string, convId: string) => Promise<boolean>;
   isSystemAdmin?: boolean;
 }) {
   const { user } = useAuth();
@@ -539,7 +528,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
     }
     return body;
   };
-  const lastMsgPreview = getMessagePreview();
+  // Borrador pendiente (estilo WhatsApp): si dejaste un mensaje a medias en este
+  // chat, la lista lo recuerda. En el chat activo no hace falta — lo estás viendo.
+  const draft = !isActive ? getDraft(user?.id, conversation.id) : "";
+  const lastMsgPreview = draft ? `✏️ Borrador: ${draft}` : getMessagePreview();
 
   return (
     <ContextMenu>
@@ -646,18 +638,6 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
                 {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
               </DropdownMenuItem>
-              {spaces.length > 0 && (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Agregar a espacio</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="rounded-2xl">
-                    {spaces.map(space => (
-                      <DropdownMenuItem key={space.id} onClick={() => onAddToSpace(space.id, conversation.id)}>
-                        {space.icon} {space.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              )}
               {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
                 <DropdownMenuItem
                   onClick={onDelete}
@@ -684,18 +664,6 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
           {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
         </ContextMenuItem>
-        {spaces.length > 0 && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>Agregar a espacio</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="rounded-2xl">
-              {spaces.map(space => (
-                <ContextMenuItem key={space.id} onClick={() => onAddToSpace(space.id, conversation.id)}>
-                  {space.icon} {space.name}
-                </ContextMenuItem>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        )}
         {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
           <ContextMenuItem
             onClick={onDelete}

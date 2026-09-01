@@ -20,6 +20,7 @@ import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
+import { getDraft, setDraft } from "../drafts";
 
 interface PendingFile {
   file: File;
@@ -32,7 +33,8 @@ export interface MessageInputHandle {
 }
 
 interface MessageInputProps {
-  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string) => void;
+  conversationId: string;
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string) => void;
   onSendTyping: (isTyping: boolean) => void;
   replyTo: ChatMessage | null;
   profiles: Record<string, UserProfile>;
@@ -41,13 +43,21 @@ interface MessageInputProps {
   chatType?: string;
 }
 
-const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({ 
-  onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
+const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
+  conversationId, onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
   participants, chatType,
 }, ref) => {
   const { user } = useAuth();
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [text, setText] = useState("");
+  // El texto arranca desde el borrador guardado: si te fuiste a otro chat (o
+  // recargaste) sin terminar el mensaje, al volver sigue acá.
+  const [text, setText] = useState(() => getDraft(user?.id, conversationId));
+
+  // Persistir el borrador en CADA cambio de texto, venga de donde venga
+  // (tecleo, emoji, script pegado). Vaciarlo (p.ej. al enviar) lo borra.
+  useEffect(() => {
+    setDraft(user?.id, conversationId, text);
+  }, [text, user?.id, conversationId]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
@@ -138,9 +148,23 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (uploading) return;
     if (pendingFiles.length > 0) {
       setUploading(true);
-      for (let i = 0; i < pendingFiles.length; i++) {
-        const pf = pendingFiles[i];
-        setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
+      // Álbum estilo WhatsApp: si van VARIAS imágenes, comparten un album_id y el
+      // cliente las dibuja como UNA cuadrícula. Las imágenes se mandan primero y
+      // juntas (sort estable) para que el álbum quede contiguo en el timeline;
+      // los demás archivos van después, cada uno en su burbuja como siempre.
+      const files = [...pendingFiles].sort(
+        (a, b) => (a.type === "image" ? 0 : 1) - (b.type === "image" ? 0 : 1)
+      );
+      const imageCount = files.filter((f) => f.type === "image").length;
+      const albumId = imageCount > 1 ? crypto.randomUUID() : undefined;
+      // El comentario escrito acompaña a TODO el envío: viaja en la primera
+      // imagen que suba bien (la cuadrícula lo dibuja debajo, como pie del
+      // álbum) o, si no hay imágenes, en el primer archivo.
+      const caption = text.trim();
+      let captionPending = !!caption;
+      for (let i = 0; i < files.length; i++) {
+        const pf = files[i];
+        setUploadProgress(`Subiendo ${i + 1}/${files.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
         setUploadPercent(0);
         // La clave se SANEA; el nombre que ve la gente sigue siendo el original
         // (se manda aparte, más abajo). Meter el nombre crudo acá era el bug:
@@ -170,7 +194,12 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-        const baseContent = i === 0 && text.trim() ? text.trim() : "";
+        const isImg = pf.type === "image";
+        // El comentario va con la primera IMAGEN subida con éxito (pie del álbum);
+        // sin imágenes, con el primer archivo que suba bien.
+        const givesCaption = captionPending && (imageCount > 0 ? isImg : true);
+        const baseContent = givesCaption ? caption : "";
+        if (givesCaption) captionPending = false;
         // El nombre del archivo NO se pega al texto.
         //
         // La burbuja ya lo muestra por su cuenta: en la tarjeta de archivo y en
@@ -186,7 +215,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         // sola (`content !== file_name`) y la búsqueda y las vistas previas
         // siguen teniendo algo que mostrar.
         const msgContent = contenidoDeAdjunto(baseContent, pf.file.name);
-        onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
+        onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id, isImg ? albumId : undefined);
       }
       setPendingFiles([]);
       setText("");
