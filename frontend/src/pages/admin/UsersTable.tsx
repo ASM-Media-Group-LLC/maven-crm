@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   admin: "destructive",
@@ -28,6 +29,7 @@ interface UsersTableProps {
 
 const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   return (
     <div className="rounded-md border">
@@ -54,8 +56,26 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                   <span className="font-medium">{user.full_name || "Sin nombre"}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                {user.email || "—"}
+              <TableCell className="text-muted-foreground text-sm max-w-[200px]">
+                {/* En pantallas chicas el correo se trunca y no había forma de
+                    copiarlo: clic = copiar el correo COMPLETO (no lo que se ve),
+                    y el title muestra la dirección entera al pasar el mouse. */}
+                {user.email ? (
+                  <button
+                    type="button"
+                    title={`${user.email} — clic para copiar`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(user.email!);
+                      toast({ title: "Correo copiado", description: user.email! });
+                    }}
+                    className="block w-full truncate text-left hover:text-foreground hover:underline decoration-dotted underline-offset-2 cursor-copy"
+                  >
+                    {user.email}
+                  </button>
+                ) : (
+                  "—"
+                )}
               </TableCell>
               <TableCell>
                 {user.role ? (

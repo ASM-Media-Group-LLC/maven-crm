@@ -9,6 +9,7 @@ import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   admin: { icon: <Shield className="h-3 w-3" />, variant: "destructive" },
@@ -29,6 +30,7 @@ interface UsersGridProps {
 
 const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersGridProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -76,7 +78,22 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                 </Avatar>
                 <div>
                   <p className="font-semibold">{user.full_name || "Sin nombre"}</p>
-                  <p className="text-xs text-muted-foreground truncate max-w-[180px]">{user.email || "Sin email"}</p>
+                  {user.email ? (
+                    <button
+                      type="button"
+                      title={`${user.email} — clic para copiar`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(user.email!);
+                        toast({ title: "Correo copiado", description: user.email! });
+                      }}
+                      className="block text-xs text-muted-foreground truncate max-w-[180px] text-left hover:text-foreground hover:underline decoration-dotted underline-offset-2 cursor-copy"
+                    >
+                      {user.email}
+                    </button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sin email</p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
                   </p>
