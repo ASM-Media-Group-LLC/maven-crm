@@ -1,0 +1,12 @@
+-- Álbum de imágenes estilo WhatsApp en el Messenger.
+--
+-- Hasta ahora el álbum era una HEURÍSTICA del cliente (imágenes consecutivas del
+-- mismo remitente con <60s entre sí, y sin comentario). Por eso "la primera se
+-- iba separada": la imagen que llevaba el comentario quedaba fuera del álbum, y
+-- una subida lenta (>60s) también lo partía.
+--
+-- album_id hace el álbum determinístico: el que envía varias imágenes en un
+-- mismo envío les estampa el MISMO uuid, y el cliente agrupa por esa marca.
+-- El comentario del envío viaja en el content de la primera imagen del álbum y
+-- se dibuja debajo de la cuadrícula, para todo el álbum.
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS album_id uuid;

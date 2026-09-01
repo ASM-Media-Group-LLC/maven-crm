@@ -19,7 +19,7 @@ interface ChatViewProps {
   messages: ChatMessage[];
   profiles: Record<string, UserProfile>;
   typingUsers: string[];
-  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string) => void;
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string) => void;
   onSendTyping: (isTyping: boolean) => void;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
@@ -237,6 +237,7 @@ export default function ChatView({
       ) : (
         <MessageInput
           ref={messageInputRef}
+          conversationId={conversation.id}
           onSendMessage={onSendMessage}
           onSendTyping={onSendTyping}
           replyTo={replyTo}

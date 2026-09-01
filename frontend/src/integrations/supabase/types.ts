@@ -1018,6 +1018,7 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          album_id: string | null
           content: string | null
           conversation_id: string
           created_at: string
@@ -1033,6 +1034,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          album_id?: string | null
           content?: string | null
           conversation_id: string
           created_at?: string
@@ -1048,6 +1050,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          album_id?: string | null
           content?: string | null
           conversation_id?: string
           created_at?: string

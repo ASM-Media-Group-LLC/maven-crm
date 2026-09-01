@@ -126,6 +126,59 @@ describe("qué corta un álbum", () => {
   });
 });
 
+describe("álbum explícito (album_id, 01/09/2026)", () => {
+  it("mismo album_id se agrupa AUNQUE la primera lleve comentario (pie del álbum)", () => {
+    const msgs = [
+      img("a", { album_id: "alb-1", content: "miren esto", created_at: enSegundos(0) }),
+      img("b", { album_id: "alb-1", created_at: enSegundos(1) }),
+      img("c", { album_id: "alb-1", created_at: enSegundos(2) }),
+    ];
+    const { lideres, partes, imagenes } = agruparEnAlbumes(msgs);
+    expect(lideres.has("a")).toBe(true);
+    expect(imagenes.get("a")).toHaveLength(3);
+    expect(partes.size).toBe(3);
+  });
+
+  it("una subida lenta NO parte el álbum: sin ventana de tiempo con album_id", () => {
+    const msgs = [
+      img("a", { album_id: "alb-1", created_at: enSegundos(0) }),
+      img("b", { album_id: "alb-1", created_at: enSegundos(300) }),
+    ];
+    expect(agruparEnAlbumes(msgs).lideres.has("a")).toBe(true);
+  });
+
+  it("álbumes distintos no se mezclan aunque cumplan la heurística vieja", () => {
+    const msgs = [
+      img("a", { album_id: "alb-1", created_at: enSegundos(0) }),
+      img("b", { album_id: "alb-1", created_at: enSegundos(1) }),
+      img("c", { album_id: "alb-2", created_at: enSegundos(2) }),
+      img("d", { album_id: "alb-2", created_at: enSegundos(3) }),
+    ];
+    const { lideres, imagenes } = agruparEnAlbumes(msgs);
+    expect([...lideres].sort()).toEqual(["a", "c"]);
+    expect(imagenes.get("a")?.map((m) => m.id)).toEqual(["a", "b"]);
+    expect(imagenes.get("c")?.map((m) => m.id)).toEqual(["c", "d"]);
+  });
+
+  it("una imagen con album_id no se pega a una suelta sin album_id", () => {
+    const msgs = [
+      img("a", { album_id: "alb-1", created_at: enSegundos(0) }),
+      img("b", { created_at: enSegundos(1) }),
+    ];
+    expect(agruparEnAlbumes(msgs).lideres.size).toBe(0);
+  });
+
+  it("una borrada del álbum no entra ni rompe al resto contiguo", () => {
+    const msgs = [
+      img("a", { album_id: "alb-1", created_at: enSegundos(0) }),
+      img("b", { album_id: "alb-1", created_at: enSegundos(1), is_deleted: true }),
+      img("c", { album_id: "alb-1", created_at: enSegundos(2) }),
+    ];
+    const { partes } = agruparEnAlbumes(msgs);
+    expect(partes.has("b")).toBe(false);
+  });
+});
+
 describe("no reordena ni pierde nada", () => {
   it("el álbum conserva el orden en que llegaron", () => {
     const msgs = [0, 1, 2].map((n) => img(`i${n}`, { created_at: enSegundos(n) }));
