@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { VenetianMask, Volume2, VolumeX, Loader2, ArrowLeft } from "lucide-react";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
@@ -24,6 +24,17 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
   // Audio POR SALA, apagado por defecto: entrar y que exploten nueve salas de
   // audio a la vez no es espiar, es un susto.
   const [escuchando, setEscuchando] = useState<Record<string, boolean>>({});
+
+  // MEMOIZADO a propósito: el efecto de conexión de cada CoworkRoomMonitor
+  // depende de esta función. Como arrow inline se recreaba en cada render
+  // (p.ej. al togglear el 🔊 de UNA sala) y TODAS las salas se desconectaban
+  // y reconectaban — el video se cortaba en todas y volvía. El purpose que
+  // pide el monitor se ignora: incógnito canjea SIEMPRE el token oculto de
+  // solo-lectura.
+  const issueIncognitoToken = useCallback(
+    (_purpose: string, rid?: string) => cowork.issueLiveKitToken("incognito_room", rid),
+    [cowork.issueLiveKitToken],
+  );
 
   // Las salas salen de adminListSessions, no de cowork.rooms: sin membresía la
   // RLS no deja leer cowork_rooms, y justamente NO queremos membresía.
@@ -117,9 +128,7 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
                     <CoworkRoomMonitor
                       roomId={room.id}
                       roomName={room.name}
-                      // El purpose que pida el monitor se ignora: incógnito canjea
-                      // SIEMPRE el token oculto de solo-lectura.
-                      issueToken={(_purpose, rid) => cowork.issueLiveKitToken("incognito_room", rid)}
+                      issueToken={issueIncognitoToken}
                       showVideo
                       hearOn={oyendo}
                       broadcastOn={false}
