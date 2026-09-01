@@ -1,7 +1,8 @@
 import { forwardRef, useState, useMemo, memo, useRef, useEffect } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw, Check,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw, Check, Download,
 } from "lucide-react";
+import { descargarArchivo } from "../downloadFile";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
@@ -420,6 +421,13 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 <DropdownMenuItem onClick={onCopy}>
                   <Copy className="h-3.5 w-3.5 mr-2" /> Copiar
                 </DropdownMenuItem>
+                {/* Todo mensaje con archivo (imagen, video, audio, documento) se
+                    puede descargar desde acá, además del botón del zoom. */}
+                {message.file_url && (
+                  <DropdownMenuItem onClick={() => void descargarArchivo(message.file_url!, message.file_name)}>
+                    <Download className="h-3.5 w-3.5 mr-2" /> Descargar
+                  </DropdownMenuItem>
+                )}
                 {isMe && (
                   <>
                     {message.type === "text" && (
