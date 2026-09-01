@@ -79,6 +79,10 @@ interface LiveKitCallViewProps {
   // <audio> de los tiles como los de la red de seguridad (RoomAudioSink), y la
   // pista recuerda el volumen para elementos que se adjunten después.
   incomingAudioMuted?: boolean;
+  // Aviso hacia el DUEÑO de la llamada cuando el silencio local se togglea
+  // desde otro lado (el header de la ventanita flotante del provider), para
+  // que sincronice su estado/persistencia. La vista no lo usa.
+  onIncomingAudioMutedChange?: (muted: boolean) => void;
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */

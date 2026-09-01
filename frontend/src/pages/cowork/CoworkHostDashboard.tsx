@@ -75,6 +75,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [hubSilenciado, setHubSilenciado] = useState(
     () => localStorage.getItem("maven.cowork.hub.silenciado") === "1",
   );
+  const fijarHubSilencio = useCallback((n: boolean) => {
+    setHubSilenciado(n);
+    try { localStorage.setItem("maven.cowork.hub.silenciado", n ? "1" : "0"); } catch { /* noop */ }
+  }, []);
   const toggleHubSilencio = useCallback(() => {
     setHubSilenciado((v) => {
       const n = !v;
@@ -560,8 +564,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       initialCamOn: false,
       getToken: getHubToken,
       incomingAudioMuted: hubSilenciado,
+      // La ventanita flotante del provider también tiene el 🔇: cuando lo
+      // togglean allá, acá se sincroniza el estado y la persistencia.
+      onIncomingAudioMutedChange: fijarHubSilencio,
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio]);
 
   // Entrar al Hub al abrir la sesión. UNA sola vez: sin el candado, colgar el
   // Hub lo volvería a conectar en el mismo instante.

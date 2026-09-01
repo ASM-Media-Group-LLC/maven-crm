@@ -2,7 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal } from "lucide-react";
+import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal, Volume2, VolumeX } from "lucide-react";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePipWindow, docPipSupported } from "@/pages/cowork/usePipWindow";
 
@@ -295,6 +295,29 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               {config.callDisplayName || "En llamada"}
             </span>
             <span className="flex items-center gap-0.5 shrink-0">
+              {/* Silencio local del audio entrante (p.ej. el Hub de Cowork).
+                  Solo aparece si la llamada OPTÓ por el control (el dueño pasó
+                  incomingAudioMuted en la config): en una llamada común no
+                  tiene sentido "no escuchar a nadie" desde acá. */}
+              {config.incomingAudioMuted !== undefined && (
+                <button
+                  type="button"
+                  title={config.incomingAudioMuted
+                    ? "Silenciado solo para ti (ellos siguen hablando). Toca para volver a escuchar."
+                    : "Silenciar solo para ti: no los escuchas, tu micro no cambia."}
+                  aria-label={config.incomingAudioMuted ? "Volver a escuchar" : "Silenciar para mí"}
+                  onClick={() => {
+                    const next = !config.incomingAudioMuted;
+                    setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
+                    // Que el dueño de la llamada (p.ej. el dashboard de Cowork)
+                    // sincronice su propio estado/persistencia.
+                    config.onIncomingAudioMutedChange?.(next);
+                  }}
+                  className={`h-6 w-6 rounded-md flex items-center justify-center hover:bg-background/60 ${config.incomingAudioMuted ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {config.incomingAudioMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                </button>
+              )}
               {docPipSupported() && (
                 <button
                   type="button"
