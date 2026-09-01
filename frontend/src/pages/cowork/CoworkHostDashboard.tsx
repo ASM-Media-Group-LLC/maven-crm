@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
-  Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX,
+  Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelLeftClose, PanelLeftOpen,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff,
 } from "lucide-react";
@@ -302,6 +302,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // El micro se captura si le hablas a alguien: a todas, o al menos a una sala.
   const micArmed = Object.values(roomMic).some(Boolean);
 
+  // Cámara y pantalla broadcasteadas: MISMO modelo que la escucha y el micro
+  // (el botón global fija todas de un golpe; el de cada miniatura manda).
+  // Una sola captura de cada cosa; cada sala activada publica un clon.
+  const [roomCam, setRoomCam] = useState<Record<string, boolean>>({});
+  const [roomScreen, setRoomScreen] = useState<Record<string, boolean>>({});
+  const [camBaseTrack, setCamBaseTrack] = useState<MediaStreamTrack | null>(null);
+  const [screenBaseTrack, setScreenBaseTrack] = useState<MediaStreamTrack | null>(null);
+  const camFor = (roomId: string) => roomCam[roomId] ?? false;
+  const screenFor = (roomId: string) => roomScreen[roomId] ?? false;
+  const camaraATodas = cowork.rooms.length > 0 && cowork.rooms.every((r) => camFor(r.id));
+  const pantallaATodas = cowork.rooms.length > 0 && cowork.rooms.every((r) => screenFor(r.id));
+  const fijarCamDeTodas = (encendido: boolean) =>
+    setRoomCam(Object.fromEntries(cowork.rooms.map((r) => [r.id, encendido])));
+  const fijarScreenDeTodas = (encendido: boolean) =>
+    setRoomScreen(Object.fromEntries(cowork.rooms.map((r) => [r.id, encendido])));
+  const camArmed = Object.values(roomCam).some(Boolean);
+  const screenArmed = Object.values(roomScreen).some(Boolean);
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
@@ -422,6 +440,71 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       try { track?.stop(); } catch { /* noop */ }
     };
   }, [micArmed, generacionMic]);
+
+  // Captura ÚNICA de la cámara para broadcastear (calidad capada a ~540p/15fps
+  // a propósito: publicar video es un encoder POR SALA — con nueve salas, la
+  // máquina y la subida del coordinador tienen que sobrevivir). Si el track
+  // muere (otro programa tomó la cámara, se desconectó), se desarma todo y se
+  // avisa — un botón verde sin cámara detrás es el bug del micro otra vez.
+  useEffect(() => {
+    if (!camArmed) return;
+    let cancelled = false;
+    let track: MediaStreamTrack | null = null;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 15, max: 15 } },
+        });
+        track = stream.getVideoTracks()[0] || null;
+        if (cancelled || !track) { track?.stop(); return; }
+        track.addEventListener("ended", () => {
+          if (cancelled) return;
+          toast.error("Tu cámara se cayó", { description: "Las salas dejaron de ver tu cámara.", id: "cam-broadcast" });
+          setRoomCam({});
+        });
+        setCamBaseTrack(track);
+      } catch {
+        if (!cancelled) { toast.error("No pude acceder a la cámara"); setRoomCam({}); }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setCamBaseTrack(null);
+      try { track?.stop(); } catch { /* noop */ }
+    };
+  }, [camArmed]);
+
+  // Captura ÚNICA de la pantalla (el picker del navegador se abre UNA vez; esa
+  // misma pantalla va a todas las salas activadas). "Dejar de compartir" desde
+  // el navegador dispara `ended` → se desarma todo, sin botones mintiendo.
+  useEffect(() => {
+    if (!screenArmed) return;
+    let cancelled = false;
+    let track: MediaStreamTrack | null = null;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { max: 1280 }, height: { max: 720 }, frameRate: { ideal: 15, max: 15 } },
+          audio: false,
+        });
+        track = stream.getVideoTracks()[0] || null;
+        if (cancelled || !track) { track?.stop(); return; }
+        track.addEventListener("ended", () => {
+          if (cancelled) return;
+          setRoomScreen({});
+        });
+        setScreenBaseTrack(track);
+      } catch {
+        // Canceló el picker o el navegador lo negó: desarmar sin drama.
+        if (!cancelled) setRoomScreen({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setScreenBaseTrack(null);
+      try { track?.stop(); } catch { /* noop */ }
+    };
+  }, [screenArmed]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
@@ -1199,6 +1282,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   {hablandoATodas && !micCaido ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                   {micCaido ? "Micro caído" : hablandoATodas ? "Hablando a todas" : "Hablar a todas"}
                 </Button>
+                {/* Cámara y pantalla a todas: mismo modelo que escuchar/hablar —
+                    el global fija todas y después se apagan salas individuales. */}
+                <Button
+                  size="sm"
+                  variant={camaraATodas ? "default" : "outline"}
+                  className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  title={camaraATodas
+                    ? "Tu cámara se ve en TODAS las salas. Toca para apagarla en todas."
+                    : "Comparte tu cámara con todas las salas a la vez. Después puedes apagarla en salas puntuales."}
+                  onClick={() => fijarCamDeTodas(!camaraATodas)}
+                >
+                  {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+                  {camaraATodas ? "Cámara en todas" : "Cámara a todas"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={pantallaATodas ? "default" : "outline"}
+                  className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  title={pantallaATodas
+                    ? "Tu pantalla se ve en TODAS las salas. Toca para dejar de compartirla en todas."
+                    : "Comparte tu pantalla con todas las salas a la vez (eliges qué pantalla una sola vez)."}
+                  onClick={() => fijarScreenDeTodas(!pantallaATodas)}
+                >
+                  {pantallaATodas ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
+                  {pantallaATodas ? "Pantalla en todas" : "Pantalla a todas"}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -1366,6 +1475,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 hearOn={hearFor(room.id)}
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
+                                camOn={camFor(room.id)}
+                                camBaseTrack={camBaseTrack}
+                                screenOn={screenFor(room.id)}
+                                screenBaseTrack={screenBaseTrack}
                                 enabled={activeRoomId !== room.id}
                                 onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
                                 onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
@@ -1381,6 +1494,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 hearOn={hearFor(room.id)}
                                 broadcastOn={broadcastFor(room.id)}
                                 micBaseTrack={micBaseTrack}
+                                camOn={camFor(room.id)}
+                                camBaseTrack={camBaseTrack}
+                                screenOn={screenFor(room.id)}
+                                screenBaseTrack={screenBaseTrack}
                                 enabled={activeRoomId !== room.id}
                                 onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
                                 onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
@@ -1411,6 +1528,35 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             >
                               {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
                               {broadcastFor(room.id) ? "Hablando" : "Hablar"}
+                            </Button>
+                          </div>
+                          {/* Fila 2: broadcast de cámara y pantalla a ESTA sala.
+                              Igual que el 🎤: el global enciende todas, acá se
+                              apagan (o encienden) salas puntuales. */}
+                          <div className="flex gap-1 mt-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${camFor(room.id) ? "bg-success text-white hover:bg-success/90" : "text-muted-foreground/60 hover:text-foreground"}`}
+                              title={camFor(room.id)
+                                ? "Tu cámara se ve en esta sala. Toca para apagarla acá."
+                                : "Comparte tu cámara solo con esta sala."}
+                              onClick={() => setRoomCam((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+                            >
+                              {camFor(room.id) ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
+                              {camFor(room.id) ? "Cámara" : "Cámara"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${screenFor(room.id) ? "bg-success text-white hover:bg-success/90" : "text-muted-foreground/60 hover:text-foreground"}`}
+                              title={screenFor(room.id)
+                                ? "Tu pantalla se ve en esta sala. Toca para dejar de compartirla acá."
+                                : "Comparte tu pantalla solo con esta sala."}
+                              onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+                            >
+                              {screenFor(room.id) ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
+                              Pantalla
                             </Button>
                           </div>
                         </>

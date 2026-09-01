@@ -22,6 +22,13 @@ interface Props {
   // track base compartido para no capturar el micro N veces.
   broadcastOn: boolean;
   micBaseTrack: MediaStreamTrack | null;
+  // Broadcastear mi CÁMARA a esta sala (misma mecánica que el micro: la cámara
+  // se captura UNA vez en el dashboard y cada sala publica un clon).
+  camOn?: boolean;
+  camBaseTrack?: MediaStreamTrack | null;
+  // Broadcastear mi PANTALLA a esta sala (una sola captura, un clon por sala).
+  screenOn?: boolean;
+  screenBaseTrack?: MediaStreamTrack | null;
   // Cuando el coordinador ENTRÓ a esta misma sala, el monitor se apaga: si no, aparecería
   // dos veces (📢 monitor + él mismo como participante). Default true.
   enabled?: boolean;
@@ -110,11 +117,123 @@ function AudioSink({ track, muted }: { track: any; muted: boolean }) {
   return <audio ref={ref} autoPlay />;
 }
 
+// ── Publicar un CLON de un track base en la sala ────────────────────────────
+//
+// Es la mecánica del 🎤 "hablar a la sala", generalizada para poder broadcastear
+// también la cámara y la pantalla: el dashboard captura el track UNA vez y cada
+// sala publica su propio clon. Conserva las tres defensas que el micro aprendió
+// a los golpes:
+//   · `copiaSirve`: re-publica si el clon murió o si el track base cambió.
+//   · Reintentos con espera creciente que NUNCA se rinden, con aviso al 4º.
+//   · Si la sala se desconecta, el clon viejo se descarta: pertenece a la
+//     conexión vieja, y dejarlo colgado era quedarse mudo tras reconectar.
+function useClonPublicado(opts: {
+  roomRef: React.MutableRefObject<Room | null>;
+  status: string;
+  activo: boolean;
+  baseTrack: MediaStreamTrack | null | undefined;
+  source: Track.Source;
+  roomId: string;
+  roomName?: string;
+  /** Para los avisos: "tu micrófono", "tu cámara", "tu pantalla". */
+  etiqueta: string;
+}) {
+  const { roomRef, status, activo, baseTrack, source, roomId, roomName, etiqueta } = opts;
+  const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
+  const baseDelCloneRef = useRef<MediaStreamTrack | null>(null);
+  const [intentoPublicar, setIntentoPublicar] = useState(0);
+  const MAX_INTENTOS_PUBLICAR = 4;
+  const toastId = `clon-${source}-sala-${roomId}`;
+
+  useEffect(() => {
+    const room = roomRef.current;
+    if (status !== "ready") {
+      // Sala caída o reconectando: el clon pertenece a la conexión VIEJA.
+      // Guardarlo hacía que copiaSirve dijera "todo bien" y la sala nueva
+      // quedara sin el track para siempre.
+      const viejo = publishedCloneRef.current;
+      if (viejo) {
+        publishedCloneRef.current = null;
+        baseDelCloneRef.current = null;
+        try { viejo.stop(); } catch { /* noop */ }
+      }
+      return;
+    }
+    if (!room) return;
+    let cancelado = false;
+    (async () => {
+      if (activo && baseTrack) {
+        const actual = publishedCloneRef.current;
+        if (copiaSirve(actual, baseDelCloneRef.current, baseTrack)) return;
+
+        // Lo que había ya no sirve: se retira antes de poner lo nuevo, para no
+        // dejar dos pistas tuyas en la sala (una de ellas muerta).
+        if (actual) {
+          publishedCloneRef.current = null;
+          baseDelCloneRef.current = null;
+          try { room.localParticipant.unpublishTrack(actual, true); } catch { /* noop */ }
+          try { actual.stop(); } catch { /* noop */ }
+        }
+
+        let clone: MediaStreamTrack | null = null;
+        try {
+          clone = baseTrack.clone();
+          publishedCloneRef.current = clone;
+          baseDelCloneRef.current = baseTrack;
+          await room.localParticipant.publishTrack(clone, { source });
+          if (intentoPublicar !== 0) setIntentoPublicar(0);
+          toast.dismiss(toastId);
+        } catch (e) {
+          console.error(`[cowork monitor] no pude publicar ${etiqueta} en la sala:`, e);
+          if (clone) { try { clone.stop(); } catch { /* noop */ } }
+          publishedCloneRef.current = null;
+          baseDelCloneRef.current = null;
+          if (!cancelado) {
+            if (intentoPublicar === MAX_INTENTOS_PUBLICAR) {
+              toast.error(`No se está publicando ${etiqueta} en ${roomName ? `«${roomName}»` : "una sala"}`, {
+                description: "Se sigue reintentando solo; si no vuelve, apaga y vuelve a encender el botón de esa sala.",
+                duration: 15_000,
+                id: toastId,
+              });
+            }
+            const espera = intentoPublicar < MAX_INTENTOS_PUBLICAR
+              ? 2_000 * (intentoPublicar + 1)
+              : 15_000;
+            window.setTimeout(() => setIntentoPublicar((n) => n + 1), espera);
+          }
+        }
+      } else {
+        const clone = publishedCloneRef.current;
+        if (clone) {
+          publishedCloneRef.current = null;
+          baseDelCloneRef.current = null;
+          try { room.localParticipant.unpublishTrack(clone, true); } catch { /* noop */ }
+          try { clone.stop(); } catch { /* noop */ }
+        }
+      }
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, baseTrack, status, intentoPublicar]);
+
+  // Al desmontar el monitor, el clon no puede quedar vivo reteniendo hardware.
+  useEffect(() => () => {
+    const clone = publishedCloneRef.current;
+    if (clone) {
+      publishedCloneRef.current = null;
+      baseDelCloneRef.current = null;
+      try { roomRef.current?.localParticipant.unpublishTrack(clone, true); } catch { /* noop */ }
+      try { clone.stop(); } catch { /* noop */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 // Monitor EN VIVO de una sala para el dashboard del host: escucha su audio, puede hablarle
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, enabled = true, onSharersChange, onSpeakingChange }: Props) {
+export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange }: Props) {
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -131,19 +250,6 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
   const [intento, setIntento] = useState(0);
   const reintentoRef = useRef<number | null>(null);
   const roomRef = useRef<Room | null>(null);
-  const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
-  /** De QUÉ micro salió la copia que está publicada. Sin esto, cuando el
-   *  supervisor vuelve a tomar el micrófono (porque el anterior se murió), esta
-   *  sala se quedaba con la copia vieja —ya muerta— y no publicaba la nueva:
-   *  `if (!publishedCloneRef.current)` era falso y no hacía nada. La sala
-   *  quedaba muda para siempre con el botón en verde. */
-  const baseDelCloneRef = useRef<MediaStreamTrack | null>(null);
-  /** Reintentos de la publicación. Si publishTrack fallaba, se registraba el
-   *  error y NUNCA se volvía a intentar: las dependencias del efecto no
-   *  cambiaban. Un fallo pasajero al conectar dejaba esa sala sin tu voz por el
-   *  resto del turno. */
-  const [intentoPublicar, setIntentoPublicar] = useState(0);
-  const MAX_INTENTOS_PUBLICAR = 4;
   const onSharersRef = useRef(onSharersChange);
   onSharersRef.current = onSharersChange;
   /** Mi propia identidad en ESTA sala, capturada al conectar.
@@ -298,13 +404,8 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       onSpeakingRef.current?.([]);
       setPartVideos([]);
       setAudioTracks([]);
-      const clone = publishedCloneRef.current;
-      if (clone) {
-        try { room.localParticipant.unpublishTrack(clone, true); } catch { /* noop */ }
-        try { clone.stop(); } catch { /* noop */ }
-        publishedCloneRef.current = null;
-      }
-      baseDelCloneRef.current = null;
+      // Los clones publicados (micro/cámara/pantalla) los limpia su propio
+      // hook (useClonPublicado) cuando status deja de ser "ready" o al desmontar.
       try { room.disconnect(); } catch { /* noop */ }
       roomRef.current = null;
     };
@@ -331,83 +432,11 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
     onSharersRef.current?.([]);
   }, [status]);
 
-  // Publicar / dejar de publicar el micro según broadcastOn + micBaseTrack.
-  //
-  // Antes la condición era "si no hay copia publicada, publica una". Eso deja
-  // fuera los dos casos que de verdad pasan:
-  //   · la copia publicada está MUERTA (murió con el micro del que salió), y
-  //   · el supervisor volvió a tomar el micrófono, así que la copia vieja ya no
-  //     corresponde a este micro.
-  // En los dos, la sala se quedaba muda con el botón en verde.
-  useEffect(() => {
-    const room = roomRef.current;
-    if (!room || status !== "ready") return;
-    let cancelado = false;
-    (async () => {
-      if (broadcastOn && micBaseTrack) {
-        const actual = publishedCloneRef.current;
-        if (copiaSirve(actual, baseDelCloneRef.current, micBaseTrack)) return;
-
-        // Lo que había ya no sirve: se retira antes de poner lo nuevo, para no
-        // dejar dos pistas tuyas en la sala (una de ellas muda).
-        if (actual) {
-          publishedCloneRef.current = null;
-          baseDelCloneRef.current = null;
-          try { room.localParticipant.unpublishTrack(actual, true); } catch { /* noop */ }
-          try { actual.stop(); } catch { /* noop */ }
-        }
-
-        let clone: MediaStreamTrack | null = null;
-        try {
-          clone = micBaseTrack.clone();
-          publishedCloneRef.current = clone;
-          baseDelCloneRef.current = micBaseTrack;
-          await room.localParticipant.publishTrack(clone, { source: Track.Source.Microphone });
-          if (intentoPublicar !== 0) setIntentoPublicar(0);
-          // Si veníamos avisando que esta sala no te oía, ya no corresponde.
-          toast.dismiss(`voz-sala-${roomId}`);
-        } catch (e) {
-          console.error("[cowork monitor] no pude publicar tu micro en la sala:", e);
-          if (clone) { try { clone.stop(); } catch { /* noop */ } }
-          publishedCloneRef.current = null;
-          baseDelCloneRef.current = null;
-          // Se reintenta con espera creciente. Y NO se abandona nunca.
-          //
-          // Antes, tras cuatro intentos esto se rendía y no volvía a intentar:
-          // esa sala se quedaba sin la voz del supervisor por el resto del
-          // turno, con el botón 🎤 igual en verde y sin un solo aviso en
-          // pantalla. El único rastro era un console.error que nadie mira.
-          //
-          // Ahora: los primeros intentos son rápidos (una falla pasajera al
-          // conectar se cura sola), y a partir de ahí se sigue intentando cada
-          // quince segundos —barato— para que se recupere solo cuando la red o
-          // el dispositivo vuelvan. Y se AVISA, una vez por episodio.
-          if (!cancelado) {
-            if (intentoPublicar === MAX_INTENTOS_PUBLICAR) {
-              toast.error(`No se está publicando tu micrófono en ${roomName ? `«${roomName}»` : "una sala"}`, {
-                description: "Ahí no te escuchan. Se sigue reintentando solo; si no vuelve, apaga y vuelve a encender el 🎤 de esa sala.",
-                duration: 15_000,
-                id: `voz-sala-${roomId}`,
-              });
-            }
-            const espera = intentoPublicar < MAX_INTENTOS_PUBLICAR
-              ? 2_000 * (intentoPublicar + 1)
-              : 15_000;
-            window.setTimeout(() => setIntentoPublicar((n) => n + 1), espera);
-          }
-        }
-      } else {
-        const clone = publishedCloneRef.current;
-        if (clone) {
-          publishedCloneRef.current = null;
-          baseDelCloneRef.current = null;
-          try { room.localParticipant.unpublishTrack(clone, true); } catch { /* noop */ }
-          try { clone.stop(); } catch { /* noop */ }
-        }
-      }
-    })();
-    return () => { cancelado = true; };
-  }, [broadcastOn, micBaseTrack, status, intentoPublicar]);
+  // Los tres broadcasts del coordinador hacia esta sala, con la MISMA mecánica
+  // (clon del track base + copiaSirve + reintentos que no se rinden):
+  useClonPublicado({ roomRef, status, activo: broadcastOn, baseTrack: micBaseTrack, source: Track.Source.Microphone, roomId, roomName, etiqueta: "tu micrófono" });
+  useClonPublicado({ roomRef, status, activo: camOn, baseTrack: camBaseTrack, source: Track.Source.Camera, roomId, roomName, etiqueta: "tu cámara" });
+  useClonPublicado({ roomRef, status, activo: screenOn, baseTrack: screenBaseTrack, source: Track.Source.ScreenShare, roomId, roomName, etiqueta: "tu pantalla" });
 
   return (
     <>
