@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { estaEnPausa } from "@/lib/coworkPausa";
+import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import {
   AVISAR_COORDINADOR_MS,
@@ -227,7 +228,9 @@ export function useRegistrarLlamados({ faceWatch, compartiendo, activo, conectad
       if (hueco > MAX_HUECO_MS) { olvidar(TODOS); return; }
 
       // Cualquier motivo para dudar borra el reloj entero, no lo congela.
-      if (!con || estaEnPausa()) {
+      // Una llamada de Maven en curso cuenta como motivo: la cámara está EN esa
+      // llamada — anotarle "cámara apagada" sería registrar trabajo como falta.
+      if (!con || estaEnPausa() || estaEnLlamadaDeMaven()) {
         olvidar(TODOS);
         return;
       }

@@ -4,6 +4,7 @@ import { faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { hablar } from "@/lib/voz";
 import { estaEnPausa } from "@/lib/coworkPausa";
+import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 
 // Avisarle a la PROPIA PERSONA que no se le ve.
 //
@@ -132,7 +133,9 @@ export function useFaceNudge(
     const tick = () => {
       // La pausa se consulta EN CADA TIC, no al montar: se marca desde la
       // página de Cowork, que puede no estar montada cuando esto corre.
-      if (enPausaProp || estaEnPausa()) {
+      // Y una llamada de Maven en curso (Messenger/Meet/1:1) silencia igual
+      // que la pausa: la cámara está EN esa llamada, no ausente (Grace, 01/09).
+      if (enPausaProp || estaEnPausa() || estaEnLlamadaDeMaven()) {
         ultimoAviso.current = 0;
         avisadoCoordinador.current = false;
         return;
@@ -255,8 +258,9 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
 
     const tick = () => {
       // La pausa se consulta en cada tic, igual que en el encuadre: quien
-      // avisó que se iba no tiene por qué estar compartiendo nada.
-      if (estaEnPausa()) { desde.current = null; ultimo.current = 0; return; }
+      // avisó que se iba no tiene por qué estar compartiendo nada. Y en una
+      // llamada de Maven tampoco se reclama pantalla: la misma regla que arriba.
+      if (estaEnPausa() || estaEnLlamadaDeMaven()) { desde.current = null; ultimo.current = 0; return; }
       if (desde.current === null) desde.current = Date.now();
       if (Date.now() - desde.current < SIN_PANTALLA_MS) return;
       const ahora = Date.now();

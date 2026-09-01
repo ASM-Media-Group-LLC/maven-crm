@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
+import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { BackgroundEffect } from "./BackgroundSelector";
 
@@ -341,8 +342,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // EL SUPERVISOR VIVE ACÁ, no en la página de Cowork. Esta vista sobrevive a
   // navegar a otra sección de Maven (se muda a la ventanita flotante); la
   // página no. Cuando el aviso vivía allá, se apagaba justo cuando la persona
-  // se iba a mirar otra pantalla — o sea, justo cuando más falta hace.
+  // se iba a mirar otra pestaña — o sea, justo cuando más falta hace.
   useFaceNudge(supervisorEncuadre ? faceWatch : null);
+  // Cualquier llamada que NO es la sala de Cowork (Messenger, Meet, la 1:1 con
+  // el coordinador) deja un latido en localStorage mientras está montada: el
+  // supervisor de encuadre de Cowork lo consulta en cada tic y se calla — estar
+  // en una llamada de Maven es trabajo, no una ausencia que reclamar. Cross-
+  // pestaña a propósito: /call/... y Meet abren en OTRA pestaña.
+  useEffect(() => {
+    if (supervisorEncuadre) return;
+    latirEnLlamada();
+    const id = window.setInterval(() => latirEnLlamada(), LATIDO_LLAMADA_MS);
+    return () => { window.clearInterval(id); salirDeLlamada(); };
+  }, [supervisorEncuadre]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
   useScreenShareNudge(localScreenShare, !!supervisorEncuadre);
