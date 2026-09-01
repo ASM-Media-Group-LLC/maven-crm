@@ -99,16 +99,22 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-4">
-        {sesion.rooms.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-10">Esta sesión no tiene salas.</p>
-        ) : (
+        {(() => {
+          // El Supervisor Hub también se espía: es donde hablan los coordinadores.
+          // No es una fila de cowork_rooms — el edge acepta roomId="hub" y resuelve
+          // la sala LiveKit del hub de la sesión.
+          const espiables = [
+            { id: "hub", name: "🎧 Supervisor Hub", online: sesion.hubOnline },
+            ...sesion.rooms,
+          ];
+          return (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {sesion.rooms.map((room) => {
+            {espiables.map((room) => {
               const oyendo = !!escuchando[room.id];
               return (
-                <div key={room.id} className="flex flex-col rounded-2xl border border-border bg-card overflow-hidden">
+                <div key={room.id} className={`flex flex-col rounded-2xl border bg-card overflow-hidden ${room.id === "hub" ? "border-amber-500/40" : "border-border"}`}>
                   <div className="flex items-center gap-2 px-3 py-2">
-                    <span className="font-medium text-sm text-foreground truncate flex-1">{room.name}</span>
+                    <span className={`font-medium text-sm truncate flex-1 ${room.id === "hub" ? "text-amber-500" : "text-foreground"}`}>{room.name}</span>
                     {room.online != null && (
                       <span className={`text-[11px] ${room.online > 0 ? "text-emerald-500 font-medium" : "text-muted-foreground"}`}>
                         {room.online} en línea
@@ -139,7 +145,8 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
               );
             })}
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

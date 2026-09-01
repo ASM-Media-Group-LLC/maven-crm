@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { ConnectionState, Track } from "livekit-client";
+import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
@@ -73,6 +73,12 @@ interface LiveKitCallViewProps {
   /** Cowork: avisarle a la propia persona cuando no se le ve. Va acá y no en la
    *  página para que siga funcionando en la ventanita flotante. */
   supervisorEncuadre?: boolean;
+  // Silenciar TODO el audio entrante de esta llamada SOLO para mí (los demás
+  // siguen hablando y escuchándose entre sí; mi micro tampoco se toca). Se hace
+  // con setVolume(0) de LiveKit sobre cada participante remoto: cubre tanto los
+  // <audio> de los tiles como los de la red de seguridad (RoomAudioSink), y la
+  // pista recuerda el volumen para elementos que se adjunten después.
+  incomingAudioMuted?: boolean;
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
@@ -93,8 +99,34 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
   const lk = useLiveKit();
+
+  // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
+  // coordinador está metido en una sala). setVolume(0) por participante remoto:
+  // LiveKit lo aplica a todos los <audio> ya adjuntos Y lo recuerda para los
+  // que se adjunten después (tiles que se montan, la red de seguridad, un
+  // participante que entra más tarde — por eso además se re-aplica en los
+  // eventos de entrada/suscripción mientras el silencio esté activo).
+  useEffect(() => {
+    const room = lk.getRoom();
+    if (!room) return;
+    const vol = incomingAudioMuted ? 0 : 1;
+    const aplicar = () => {
+      room.remoteParticipants.forEach((p) => {
+        try { p.setVolume(vol); } catch { /* noop */ }
+        try { p.setVolume(vol, Track.Source.ScreenShareAudio); } catch { /* noop */ }
+      });
+    };
+    aplicar();
+    if (!incomingAudioMuted) return;
+    room.on(RoomEvent.ParticipantConnected, aplicar);
+    room.on(RoomEvent.TrackSubscribed, aplicar);
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, aplicar);
+      room.off(RoomEvent.TrackSubscribed, aplicar);
+    };
+  }, [incomingAudioMuted, lk, lk.connectionState]);
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
   // PiP automático estilo Google Meet: al cambiar de pestaña/ventana, la llamada
