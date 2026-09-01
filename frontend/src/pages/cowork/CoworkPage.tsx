@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useCoworkSession } from "@/hooks/useCoworkSession";
+import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,12 @@ export default function CoworkPage() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [roomCode, setRoomCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
+
+  // Vista de admin en el landing: TODAS las sesiones activas de la empresa,
+  // con cuánta gente hay conectada en cada sala (contado por LiveKit).
+  const { isAdmin } = useUserRole();
+  const [allSessions, setAllSessions] = useState<AdminSessionRow[]>([]);
+  const [enteringId, setEnteringId] = useState<string | null>(null);
 
   const cowork = useCoworkSession(sessionId);
 
@@ -63,6 +70,36 @@ export default function CoworkPage() {
       .finally(() => { if (alive) setLoadingSessions(false); });
     return () => { alive = false; };
   }, [sessionId, cowork.listMyActiveSessions]);
+
+  // Admin: cargar todas las sesiones activas y refrescar la ocupación cada 30s
+  // mientras el landing esté abierto. Es UNA llamada al edge (que hace un solo
+  // ListRooms a LiveKit) — nada de canales de presencia por sesión (#1458).
+  useEffect(() => {
+    if (sessionId || !isAdmin) return;
+    let alive = true;
+    const load = () => {
+      cowork.adminListSessions()
+        .then((s) => { if (alive) setAllSessions(s); })
+        .catch(() => { /* sin permiso o edge caído: la sección no se dibuja */ });
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, [sessionId, isAdmin, cowork.adminListSessions]);
+
+  // Entrar a una sesión ajena: el edge deja a los admin unirse como host sin
+  // código. Queda como supervisor de esa sesión (tablero con todas las salas).
+  const handleAdminEnter = async (s: AdminSessionRow) => {
+    setEnteringId(s.id);
+    try {
+      if (!s.my_role) await cowork.joinSession(s.id, "host");
+      setSearchParams({ session: s.id });
+    } catch (e) {
+      toast.error((e as Error).message || "No se pudo entrar a la sesión");
+    } finally {
+      setEnteringId(null);
+    }
+  };
 
   // Finalizar saca a TODOS de sus salas y no se puede deshacer, asi que se
   // confirma nombrando la sesion y cuanta gente hay adentro: "¿finalizar esta
@@ -152,7 +189,10 @@ export default function CoworkPage() {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
               Tus sesiones activas
             </h2>
-            {mySessions.map((s) => (
+            {mySessions.map((s) => {
+              // Ocupación en vivo (solo llega para admins; para el resto queda undefined).
+              const viva = allSessions.find((a) => a.id === s.id);
+              return (
               <div
                 key={s.id}
                 className="flex flex-wrap items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3"
@@ -164,6 +204,11 @@ export default function CoworkPage() {
                   <div className="font-semibold text-foreground truncate">{s.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
                     {s.role === "host" ? "Host" : "Participante"} · {s.members} {s.members === 1 ? "miembro" : "miembros"}
+                    {viva?.online != null && (
+                      <span className={viva.online > 0 ? "text-emerald-500 font-medium" : ""}>
+                        {" "}· {viva.online} en línea
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
@@ -192,10 +237,69 @@ export default function CoworkPage() {
                 </Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
+        {/* Admin: TODAS las sesiones activas de la empresa (las que no son suyas),
+            con la gente conectada en cada sala según LiveKit. */}
+        {isAdmin && allSessions.some((s) => !s.my_role) && (
+          <div className="w-full max-w-lg flex flex-col gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+              Todas las sesiones activas
+            </h2>
+            {allSessions.filter((s) => !s.my_role).map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
+                    <Users2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-foreground truncate">{s.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {s.host_name ? `Host: ${s.host_name} · ` : ""}{s.members} {s.members === 1 ? "miembro" : "miembros"}
+                      {s.online != null && (
+                        <span className={s.online > 0 ? "text-emerald-500 font-medium" : ""}>
+                          {" "}· {s.online} en línea
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="rounded-full gap-1 shrink-0"
+                    disabled={enteringId === s.id}
+                    onClick={() => handleAdminEnter(s)}
+                  >
+                    {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
+                  </Button>
+                </div>
+                {s.rooms.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pl-13 sm:pl-[52px]">
+                    {s.rooms.map((r) => (
+                      <span
+                        key={r.id}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        <span className={
+                          r.online != null && r.online > 0
+                            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+                            : "h-1.5 w-1.5 rounded-full bg-muted-foreground/30"
+                        } />
+                        {r.name}
+                        <span className="font-semibold text-foreground/80">{r.online ?? "–"}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
       <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
         <AlertDialogContent>
