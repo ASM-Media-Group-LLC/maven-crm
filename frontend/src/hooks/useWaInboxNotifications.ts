@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { usePermissions } from "@/hooks/usePermissions";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
   useBrowserNotifications,
@@ -65,8 +66,15 @@ export function useWaInboxNotifications() {
 
   const userId = user?.id ?? null;
 
+  // Sin acceso al MÓDULO WhatsApp no hay suscripción: la RLS ya no le entrega
+  // eventos (fix del scope global), pero tampoco tiene sentido mantener un
+  // canal realtime abierto para alguien que ni ve la bandeja. Fue el reporte
+  // de Andrea (HHRR): notificaciones de tabs a los que no tiene acceso.
+  const { canAccess, isLoading: permsLoading } = usePermissions();
+  const accesoInbox = !permsLoading && canAccess("WhatsApp");
+
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !accesoInbox) return;
     const channel = supabase
       .channel("wa-inbox-notify-" + Math.random().toString(36).slice(2))
       .on(
@@ -146,5 +154,5 @@ export function useWaInboxNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, qc, navigate]);
+  }, [userId, accesoInbox, qc, navigate]);
 }
