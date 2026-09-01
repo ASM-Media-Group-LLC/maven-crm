@@ -164,6 +164,11 @@ serve(async (req) => {
         .select("id, session_id, name, livekit_room_name, sort_order")
         .in("session_id", ids)
         .order("sort_order");
+      // La sala LiveKit del Supervisor Hub de cada sesión (no es una fila de
+      // cowork_rooms): para contar sus conectados y poder espiarlo en incógnito.
+      const { data: hubs } = await admin.from("cowork_sessions")
+        .select("id, host_hub_livekit_room").in("id", ids);
+      const hubDe = new Map((hubs || []).map((h) => [h.id, h.host_hub_livekit_room as string | null]));
 
       // Ocupación EN VIVO desde LiveKit: un solo ListRooms trae todas las salas
       // activas con num_participants. Es la verdad del SFU — no presencia de
@@ -221,10 +226,14 @@ serve(async (req) => {
           name: r.name,
           online: lkOk ? (lkOnline.get(r.livekit_room_name) ?? 0) : null,
         }));
+        const hubLk = hubDe.get(s.id as string) ?? null;
         return {
           ...s,
           rooms: roomList,
           online: lkOk ? roomList.reduce((acc, r) => acc + (r.online || 0), 0) : null,
+          // Conectados al Supervisor Hub (coordinadores). null = LiveKit no contestó
+          // o la sesión no tiene hub.
+          hubOnline: lkOk && hubLk ? (lkOnline.get(hubLk) ?? 0) : null,
           incognito: incognitoPorSesion.get(s.id as string) ?? [],
         };
       });
@@ -436,22 +445,33 @@ serve(async (req) => {
           .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
         if (!adminRole) return err(req, "Solo admins", 403);
         if (!roomId) return err(req, "roomId required");
-        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name, session_id").eq("id", roomId).single();
-        if (!room || room.session_id !== sessionId) return err(req, "Room not found");
+        // roomId="hub" espía el Supervisor Hub de la sesión (no es una fila de
+        // cowork_rooms: su sala LiveKit vive en cowork_sessions).
+        let lkRoomName: string;
+        if (roomId === "hub") {
+          const { data: sess } = await admin.from("cowork_sessions")
+            .select("host_hub_livekit_room").eq("id", sessionId).single();
+          if (!sess?.host_hub_livekit_room) return err(req, "Hub not found");
+          lkRoomName = sess.host_hub_livekit_room;
+        } else {
+          const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name, session_id").eq("id", roomId).single();
+          if (!room || room.session_id !== sessionId) return err(req, "Room not found");
+          lkRoomName = room.livekit_room_name;
+        }
         // Identidad con id de pestaña, como el monitor: dos vistas incógnito de
         // la misma cuenta no deben expulsarse entre sí.
         const tabRaw = typeof body.clientId === "string" ? body.clientId : "";
         const tab = tabRaw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
         const identity = tab ? `${userId}__incognito__${tab}` : `${userId}__incognito`;
         const token = await createLKToken(lkKey, lkSecret, identity, userName, {
-          roomJoin: true, room: room.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
+          roomJoin: true, room: lkRoomName, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
         }, 3600);
         // Registro admin-a-admin: invisible para TODOS en LiveKit, pero otro
         // admin sí ve quién está de incógnito (lo lee solo adminListSessions).
         await admin.from("cowork_incognito_watch").upsert({
           session_id: sessionId, user_id: userId, last_seen: new Date().toISOString(),
         });
-        return json(req, { token, url: lkUrl, room: room.livekit_room_name });
+        return json(req, { token, url: lkUrl, room: lkRoomName });
       }
 
       if (!membership) return err(req, "Not a member of this session", 403);

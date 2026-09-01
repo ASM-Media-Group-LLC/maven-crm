@@ -26,6 +26,8 @@ export interface AdminSessionRow {
   host_name: string | null;
   my_role: string | null;
   online: number | null;
+  // Conectados al Supervisor Hub (null = LiveKit no contestó o no hay hub).
+  hubOnline: number | null;
   rooms: Array<{ id: string; name: string; online: number | null }>;
   // Admins mirando esta sesión DE INCÓGNITO ahora (latido fresco). Solo lo ven
   // otros admins: el dato sale de adminListSessions, que exige rol admin.
@@ -334,8 +336,8 @@ export function useCoworkSession(sessionId: string | null) {
   const adminListSessions = useCallback(async (): Promise<AdminSessionRow[]> => {
     const r = await invokeCowork("adminListSessions", {});
     const sessions = (r as { sessions?: AdminSessionRow[] })?.sessions ?? [];
-    // Normaliza contra una versión vieja del edge que aún no mande el campo.
-    return sessions.map((s) => ({ ...s, incognito: s.incognito ?? [] }));
+    // Normaliza contra una versión vieja del edge que aún no mande los campos.
+    return sessions.map((s) => ({ ...s, incognito: s.incognito ?? [], hubOnline: s.hubOnline ?? null }));
   }, []);
 
   // Latido del modo incógnito (solo admin): mantiene fresca la marca que ven

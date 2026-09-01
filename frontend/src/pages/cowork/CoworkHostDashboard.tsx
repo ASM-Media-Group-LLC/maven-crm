@@ -67,6 +67,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
+  // Silenciar el Hub SOLO para mí (pedido de Álvaro 01/09): metido en una sala
+  // seguía escuchando a los managers del Hub sin ninguna forma de callarlos.
+  // No mutea a nadie ni toca mi micro: es volumen local de reproducción
+  // (setVolume(0) vía incomingAudioMuted en la llamada del Hub). Persistido:
+  // quien lo silencia lo quiere así también mañana.
+  const [hubSilenciado, setHubSilenciado] = useState(
+    () => localStorage.getItem("maven.cowork.hub.silenciado") === "1",
+  );
+  const toggleHubSilencio = useCallback(() => {
+    setHubSilenciado((v) => {
+      const n = !v;
+      try { localStorage.setItem("maven.cowork.hub.silenciado", n ? "1" : "0"); } catch { /* noop */ }
+      return n;
+    });
+  }, []);
   // Ventana del Hub: arrastrable (posición persistida) + pin "always on top".
   const [hubPos, setHubPos] = useState<{ x: number; y: number } | null>(() => {
     try {
@@ -461,8 +476,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       initialMicOn: false,
       initialCamOn: false,
       getToken: getHubToken,
+      incomingAudioMuted: hubSilenciado,
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado]);
 
   // Entrar al Hub al abrir la sesión. UNA sola vez: sin el candado, colgar el
   // Hub lo volvería a conectar en el mismo instante.
@@ -475,6 +491,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     yaEntroAlHub.current = true;
     if (activeKey !== hubKey) conectarHub();
   }, [profileLoaded, hubRoom, hubKey, activeKey, conectarHub]);
+
+  // Re-empujar la config al provider cuando cambia el silencio: mismo key →
+  // el provider actualiza props del MISMO LiveKitCallView, sin reconectar la
+  // llamada (setConfig re-renderiza, no remonta).
+  useEffect(() => {
+    if (yaEntroAlHub.current && activeKey === hubKey) conectarHub();
+    // Solo cuando cambia el silencio; conectarHub cambia de identidad justo por eso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubSilenciado]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = await cowork.issueLiveKitToken("join_room", activeRoomId!);
@@ -1541,6 +1566,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 Supervisor Hub
               </div>
               <div className="flex gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-5 w-5 ${hubSilenciado ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={toggleHubSilencio}
+                  title={hubSilenciado
+                    ? "Hub silenciado solo para ti (ellos siguen hablando). Toca para volver a escucharlo."
+                    : "Silenciar el Hub solo para ti: no los escuchas, pero ellos no se enteran y tu micro no cambia."}
+                >
+                  {hubSilenciado ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
