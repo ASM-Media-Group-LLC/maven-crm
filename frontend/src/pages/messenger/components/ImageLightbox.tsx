@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Download, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { descargarArchivo } from "../downloadFile";
 
 interface MediaLightboxProps {
   src: string;
@@ -125,12 +126,10 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
     };
   }, [isOpen]);
 
+  // fetch→blob: `<a download>` directo sobre la URL del bucket es cross-origin
+  // y el navegador lo ignoraba (guardaba "la página", no el archivo).
   const handleDownload = useCallback(() => {
-    const a = document.createElement("a");
-    a.href = src;
-    a.download = alt || (type === "video" ? "video" : "image");
-    a.target = "_blank";
-    a.click();
+    void descargarArchivo(src, alt || (type === "video" ? "video.mp4" : "imagen"));
   }, [src, alt, type]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -184,11 +183,10 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
             <RotateCw className="h-5 w-5" />
           </Button>
         )}
-        {type === "image" && (
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload}>
-            <Download className="h-5 w-5" />
-          </Button>
-        )}
+        {/* Descargar aplica a TODO: imagen y video (antes el video no tenía botón). */}
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload} title="Descargar">
+          <Download className="h-5 w-5" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={onClose}>
           <X className="h-5 w-5" />
         </Button>
