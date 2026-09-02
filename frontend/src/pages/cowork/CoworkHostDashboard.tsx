@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
-import CoworkReglasSheet from "./CoworkReglasSheet";
+import CoworkReglasDialog from "./CoworkReglasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -1962,7 +1962,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           supervisor). Guardar las escribe en cowork_sessions.alert_rules; el
           realtime de la sesión las trae de vuelta a todos, incluido este
           dashboard. */}
-      <CoworkReglasSheet
+      <CoworkReglasDialog
         open={reglasOpen}
         onOpenChange={setReglasOpen}
         reglas={reglas}
