@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, Sparkles, LogOut, Star } from "lucide-react";
+import { LayoutDashboard, Users, Sparkles, LogOut } from "lucide-react";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -17,7 +17,6 @@ const CreadoresSubtabs = () => {
     { url: "/creadores", label: "Listado", icon: Users, submodule: "Lista", exact: true },
     { url: "/creadores/onboarding", label: "Onboarding", icon: Sparkles, submodule: "Onboarding" },
     { url: "/creadores/offboarding", label: "Offboarding", icon: LogOut, submodule: "Offboarding" },
-    { url: "/creadores/personalizados", label: "Personalizados", icon: Star, submodule: "Personalizados" },
   ];
 
   const isActive = (tab: typeof tabs[number]) => {

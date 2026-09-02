@@ -32,7 +32,7 @@ import {
   ClipboardCheck, Map, Search, Headphones, Video, Users2, MessageCircle,
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
-  CalendarDays, Building2, Briefcase, History, CalendarRange } from "lucide-react";
+  CalendarDays, Building2, Briefcase, History, CalendarRange, Gift } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -81,7 +81,6 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Creadoras · Listado", url: "/creadores", icon: Users, module: "Creadores", submodule: "Lista", section: "Creadoras", keywords: ["modelos", "roster"] },
   { title: "Creadoras · Onboarding", url: "/creadores/onboarding", icon: ClipboardCheck, module: "Creadores", submodule: "Onboarding", section: "Creadoras" },
   { title: "Creadoras · Offboarding", url: "/creadores/offboarding", icon: ClipboardCheck, module: "Creadores", submodule: "Offboarding", section: "Creadoras" },
-  { title: "Creadoras · Personalizados", url: "/creadores/personalizados", icon: Sparkles, module: "Creadores", submodule: "Personalizados", section: "Creadoras", keywords: ["customs"] },
 
   // ── Ventas ────────────────────────────────────────────────────────────
   { title: "Ventas · Dashboard", url: "/sales-overview", icon: TrendingUp, module: "Creator Sales", submodule: "Dashboard", section: "Ventas", keywords: ["sales", "ingresos"] },
@@ -92,6 +91,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   // ── Operaciones ───────────────────────────────────────────────────────
   { title: "Promolog", i18nKey: "nav.promolog", url: "/promolog", icon: Megaphone, module: "Promolog", section: "Operaciones", keywords: ["promos", "historias"] },
   { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", section: "Operaciones", keywords: ["parrilla de contenido", "plan semanal", "promocion"] },
+  { title: "Personalizados", url: "/personalizados", icon: Gift, module: "Personalizados", section: "Operaciones", keywords: ["custom", "pedidos", "personalizado", "fan", "buster"] },
   { title: "LeadGen", i18nKey: "nav.leadgen", url: "/leadgen", icon: Activity, module: "LeadGen", section: "Operaciones", keywords: ["leads"] },
   { title: "LeadGen · Base de datos", url: "/leadgen/base-datos", icon: Database, module: "LeadGen", section: "Operaciones" },
   { title: "Closers", i18nKey: "nav.closers", url: "/closers", icon: Phone, module: "Closers", section: "Operaciones", keywords: ["pipeline", "operaciones"] },

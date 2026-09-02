@@ -80,7 +80,6 @@ const OffboardingListPage = lazy(() => import("./pages/creadores/offboarding/Off
 const OffboardingDetailPage = lazy(() => import("./pages/creadores/offboarding/OffboardingDetailPage"));
 const NuevoCreador = lazy(() => import("./pages/NuevoCreador"));
 const CreadorProfile = lazy(() => import("./pages/CreadorProfile"));
-const PersonalizadosPage = lazy(() => import("./pages/creadores/personalizados/PersonalizadosPage"));
 
 // Teléfonos (cloud phones)
 const TelefonosPage = lazy(() => import("./pages/telefonos/TelefonosPage"));
@@ -92,6 +91,7 @@ const Closers = lazy(() => import("./pages/Closers"));
 const Tickets = lazy(() => import("./pages/Tickets"));
 const Promolog = lazy(() => import("./pages/Promolog"));
 const Parrilla = lazy(() => import("./pages/Parrilla"));
+const Personalizados = lazy(() => import("./pages/personalizados/PersonalizadosPage"));
 const ChatterEvaluator = lazy(() => import("./pages/ChatterEvaluator"));
 const ScouterAssist = lazy(() => import("./pages/scouter/ScouterAssist"));
 const AgencyQA = lazy(() => import("./pages/agency-qa/AgencyQA"));
@@ -271,7 +271,6 @@ const App = () => (
                 <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
                 <Route path="/creadores/offboarding" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingListPage /></PermissionRoute>} />
                 <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingDetailPage /></PermissionRoute>} />
-                <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores" submodule="Personalizados"><PersonalizadosPage /></PermissionRoute>} />
                 <Route path="/creadores/:id" element={<PermissionRoute module="Creadores" submodule="Perfil"><CreadorProfile /></PermissionRoute>} />
                 <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
                 <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
@@ -289,6 +288,7 @@ const App = () => (
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
                 <Route path="/parrilla" element={<PermissionRoute module="Parrilla"><Parrilla /></PermissionRoute>} />
+                <Route path="/personalizados" element={<PermissionRoute module="Personalizados"><Personalizados /></PermissionRoute>} />
                 <Route path="/telefonos" element={<PermissionRoute module="Telefonos"><TelefonosPage /></PermissionRoute>} />
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
