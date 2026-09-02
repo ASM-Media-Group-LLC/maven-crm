@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
+import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -133,6 +133,27 @@ export default function ChatSidebar({
   // Organización estilo Google Chat: los DMs y los grupos viven en secciones
   // separadas (antes iban mezclados y los grupos además tenían "Espacios").
   const sortedDirect = useMemo(() => sorted.filter(c => c.type !== "group"), [sorted]);
+
+  // "Mensajes directos" muestra como mucho 10 (estilo Google Chat): con 25+
+  // DMs la lista se hacía interminable y Grupos/Contactos quedaban a tres
+  // scrolls de distancia. Reglas para que nada se PIERDA al recortar:
+  //   · buscando, se muestran todos los resultados (recortar una búsqueda es mentir);
+  //   · el chat ABIERTO nunca se esconde, esté donde esté en la lista;
+  //   · el renglón "Mostrar todo" avisa cuántos quedan ocultos y cuántos de
+  //     esos tienen no leídos — así un mensaje nuevo en el DM nº 14 no pasa
+  //     desapercibido.
+  const DM_VISIBLES = 10;
+  const [dmMostrarTodos, setDmMostrarTodos] = useState(false);
+  const dmRecorte = useMemo(() => {
+    const recortar = !search.trim() && !dmMostrarTodos && sortedDirect.length > DM_VISIBLES;
+    if (!recortar) return { visibles: sortedDirect, ocultos: [] as ConversationWithDetails[] };
+    const visibles = sortedDirect.slice(0, DM_VISIBLES);
+    const activoOculto = activeChatId ? sortedDirect.slice(DM_VISIBLES).find(c => c.id === activeChatId) : undefined;
+    if (activoOculto) visibles.push(activoOculto);
+    const ocultos = sortedDirect.slice(DM_VISIBLES).filter(c => c.id !== activoOculto?.id);
+    return { visibles, ocultos };
+  }, [sortedDirect, search, dmMostrarTodos, activeChatId]);
+  const dmOcultosNoLeidos = useMemo(() => dmRecorte.ocultos.filter(c => c.unreadCount > 0).length, [dmRecorte.ocultos]);
   const sortedGroups = useMemo(() => sorted.filter(c => c.type === "group"), [sorted]);
 
   const unreadTotal = useMemo(() => conversations.reduce((s, c) => s + c.unreadCount, 0), [conversations]);
@@ -329,7 +350,29 @@ export default function ChatSidebar({
               <>
                 <div className="mt-1 px-2">
                   {sectionHeader("Mensajes directos", sortedDirect.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
-                  {dmExpanded && renderConvs(sortedDirect, "Inicia una conversación")}
+                  {dmExpanded && renderConvs(dmRecorte.visibles, "Inicia una conversación")}
+                  {/* Renglón "Mostrar todo / Mostrar menos", alineado como un chat
+                      más (el ícono ocupa la columna del avatar). */}
+                  {dmExpanded && !search.trim() && sortedDirect.length > DM_VISIBLES && (
+                    <button
+                      type="button"
+                      onClick={() => setDmMostrarTodos(v => !v)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left text-sm text-muted-foreground hover:bg-primary/5 hover:text-foreground transition-colors"
+                    >
+                      <span className="hidden sm:block w-3 shrink-0" />
+                      <span className="h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-primary/5 flex items-center justify-center shrink-0">
+                        {dmMostrarTodos ? <ChevronsDownUp className="h-4 w-4" /> : <ChevronsUpDown className="h-4 w-4" />}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate">
+                        {dmMostrarTodos ? "Mostrar menos" : `Mostrar todo · ${dmRecorte.ocultos.length} más`}
+                      </span>
+                      {!dmMostrarTodos && dmOcultosNoLeidos > 0 && (
+                        <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full shrink-0 font-bold" title={`${dmOcultosNoLeidos} chats ocultos con mensajes sin leer`}>
+                          {dmOcultosNoLeidos}
+                        </Badge>
+                      )}
+                    </button>
+                  )}
                 </div>
                 <div className="mt-1 px-2">
                   {sectionHeader("Grupos", sortedGroups.length, groupsExpanded, () => setGroupsExpanded(!groupsExpanded))}
