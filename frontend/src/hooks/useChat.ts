@@ -1212,13 +1212,16 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       toast.info("Espera a que el mensaje termine de enviarse");
       return;
     }
-    // Optimistic soft delete
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true, content: null } : m));
-    const { error } = await supabase
-      .from("chat_messages")
-      .update({ is_deleted: true, content: null })
-      .eq("id", messageId);
-    if (error) {
+    // Optimistic soft delete (también el adjunto: la RPC vacía content y file_url)
+    setMessages(prev => prev.map(m => m.id === messageId
+      ? { ...m, is_deleted: true, content: null, file_url: null, file_name: null }
+      : m));
+    // El borrado va por RPC: archiva el original en chat_message_deletions
+    // (solo-admin por RLS) y RECIÉN ahí vacía el mensaje visible, así el
+    // contenido eliminado no queda legible para los no-admin.
+    const { data, error } = await supabase.rpc("delete_chat_message" as never, { p_message_id: messageId } as never);
+    const res = data as unknown as { ok?: boolean } | null;
+    if (error || (res && res.ok === false)) {
       toast.error("Error al eliminar mensaje");
       void loadMessagesRef.current?.();
     }

@@ -12,6 +12,7 @@ import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
 import ProfileCard from "./components/ProfileCard";
+import { useDeletedMessages } from "./useDeletedMessages";
 import { Upload, Megaphone } from "lucide-react";
 
 interface ChatViewProps {
@@ -84,6 +85,12 @@ export default function ChatView({
   // HISTÓRICOS (anteriores al flag) quedan en false y siguen visibles: no hay
   // forma retroactiva de distinguirlos de una cita.
   const mainMessages = useMemo(() => messages.filter(m => !m.is_thread_reply), [messages]);
+
+  // Contenido original de los mensajes eliminados. `chat_message_deletions` es
+  // solo-admin por RLS: a un usuario normal esto llega VACÍO desde el servidor
+  // (no es un esconder en la UI) y se pinta "Eliminado por el autor".
+  const deletedIds = useMemo(() => messages.filter((m) => m.is_deleted).map((m) => m.id), [messages]);
+  const deletedArchive = useDeletedMessages(deletedIds);
 
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];
@@ -215,6 +222,7 @@ export default function ChatView({
         loading={loading}
         onReply={setReplyTo}
         onOpenProfile={setProfileUserId}
+        deletedArchive={deletedArchive}
         onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
         onEdit={onEditMessage}
         onDelete={onDeleteMessage}
@@ -279,6 +287,7 @@ export default function ChatView({
               profiles={profiles}
               currentUserId={user?.id}
               onSendReply={handleSendThreadReply}
+              deletedArchive={deletedArchive}
               onClose={() => setThreadParent(null)}
               participants={conversation.participants}
               onEditMessage={onEditMessage}
