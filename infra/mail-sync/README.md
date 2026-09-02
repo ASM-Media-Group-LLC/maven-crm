@@ -24,6 +24,8 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... MAIL_CRED_KEY=... npm start
 | `MAIL_CRED_KEY` | — | la MISMA clave AES que usan las edge functions |
 | `SWEEP_INTERVAL_MS` | 180000 | barrido de carpetas no-INBOX |
 | `PER_FOLDER_INIT` | 50 | mensajes iniciales por carpeta |
+| `HOT_FOLDERS` | INBOX,Notification | carpetas revisadas con la cadencia de INBOX (`SWEEP_INBOX_MS`) en vez del barrido completo; Notification porque ahí Zoho archiva resets de contraseña y avisos |
+| `STARTUP_STAGGER_MS` | 6000 | espaciado entre logins al arrancar — los logins en ráfaga (cada deploy) son lo que el proveedor castiga |
 | `PORT` | 4610 | `/health` |
 
 ## Dokploy

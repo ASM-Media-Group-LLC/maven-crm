@@ -37,6 +37,16 @@ const MAIL_CRED_KEY = process.env.MAIL_CRED_KEY;
 // SWEEP_INTERVAL_MS se mantiene como piso de compatibilidad para INBOX.
 const SWEEP_INBOX_MS = Number(process.env.SWEEP_INBOX_MS || process.env.SWEEP_INTERVAL_MS || 60_000);
 const SWEEP_FULL_MS = Number(process.env.SWEEP_FULL_MS || 300_000);
+// Carpetas "calientes": se revisan con la cadencia de INBOX (SWEEP_INBOX_MS) en
+// vez de esperar el barrido completo. "Notification" entra porque ahí Zoho
+// archiva resets de contraseña y avisos (caso BLU 02/09): 5 min de espera para
+// un reset es mucho. Claves canónicas (INBOX siempre se guarda como INBOX).
+const HOT_FOLDERS = (process.env.HOT_FOLDERS || "INBOX,Notification")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+// Espaciado entre logins al arrancar. Los logins en ráfaga son lo que el
+// proveedor castiga (tarpit); 3s a 35 casillas = ~20 logins/min en cada deploy
+// (medido 02/09: 22/35 con "Connection not available"). 6s lo baja a la mitad.
+const STARTUP_STAGGER_MS = Number(process.env.STARTUP_STAGGER_MS || 6_000);
 // Cada cuánto se relee mail_credentials (altas/bajas de casillas).
 const CREDS_REFRESH_MS = Number(process.env.CREDS_REFRESH_MS || 300_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
@@ -174,6 +184,10 @@ class CuentaSync {
     await this.client.connect();
     this.estado = "conectada";
     this.log("conectada");
+    // La conexión entró: si había un last_error (casi siempre de conexión, y
+    // pegajoso hasta ahora), se limpia. Sin esto no se distingue un error de
+    // hoy de uno de hace semanas y la salud del worker es ilegible.
+    await this.limpiarError();
 
     try {
       // Ciclo de vida con DOS relojes:
@@ -192,7 +206,7 @@ class CuentaSync {
           proximoFull = Date.now() + SWEEP_FULL_MS;
           proximoInbox = Date.now() + SWEEP_INBOX_MS;
         } else if (ahora >= proximoInbox) {
-          await this.sincronizarCarpeta("INBOX");
+          await this.barrerCalientes();
           proximoInbox = Date.now() + SWEEP_INBOX_MS;
         }
 
@@ -237,13 +251,32 @@ class CuentaSync {
   async barrerTodo() {
     this.estado = "barriendo";
     const buzones = await this.client.list();
+    // Se recuerda clave→path de las carpetas seleccionables para que el barrido
+    // caliente abra por el path real del servidor (INBOX puede venir localizado).
+    const carpetas = new Map();
     for (const b of buzones) {
       if (this.detenida) return;
       if (b.flags?.has("\\Noselect")) continue;
-      await this.sincronizarCarpeta(b.path, claveCanonica(b));
+      const clave = claveCanonica(b);
+      carpetas.set(clave, b.path);
+      await this.sincronizarCarpeta(b.path, clave);
     }
+    this.carpetas = carpetas;
     this.ultimoBarrido = new Date().toISOString();
     this.estado = "idle";
+  }
+
+  /** Barrido "caliente": solo HOT_FOLDERS (INBOX + Notification por defecto),
+   *  con la cadencia de SWEEP_INBOX_MS. Solo las que existen en esta casilla —
+   *  pedir una carpeta inexistente tiraría todo el ciclo a backoff. */
+  async barrerCalientes() {
+    if (!this.carpetas) return; // aún no corrió el barrido completo
+    for (const clave of HOT_FOLDERS) {
+      if (this.detenida) return;
+      const path = this.carpetas.get(clave);
+      if (!path) continue;
+      await this.sincronizarCarpeta(path, clave);
+    }
   }
 
   async sincronizarCarpeta(path, clave = path) {
@@ -424,6 +457,16 @@ class CuentaSync {
       .eq("email_address", this.cred.email_address);
   }
 
+  /** Borra last_error al recuperarse. marcarError lo escribía y nadie lo
+   *  limpiaba: quedaba pegajoso y 22/35 casillas "con error" eran historia. */
+  async limpiarError() {
+    this.ultimoError = null;
+    await db.from("mail_credentials")
+      .update({ last_error: null })
+      .eq("user_id", this.cred.user_id)
+      .eq("email_address", this.cred.email_address);
+  }
+
   async detener() {
     this.detenida = true;
     try {
@@ -458,7 +501,7 @@ async function refrescarCuentas() {
       const cuenta = new CuentaSync(cred);
       cuentas.set(cred.email_address, cuenta);
       // ESCALONADO: los logins simultáneos son lo que el proveedor castiga.
-      const retraso = i * 3_000;
+      const retraso = i * STARTUP_STAGGER_MS;
       i++;
       setTimeout(() => void cuenta.run(), retraso);
       console.log(`cuenta nueva: ${cred.email_address} (arranca en ${retraso / 1000}s)`);
