@@ -67,6 +67,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
+  // Confirmación del botón de apagado (Power) del dashboard: finalizar es
+  // irreversible y saca a todos — nunca a un solo clic.
+  const [confirmarApagado, setConfirmarApagado] = useState(false);
+  const [apagando, setApagando] = useState(false);
+  const confirmarFinalizarSesion = async () => {
+    setApagando(true);
+    try {
+      setActiveRoomLk(null);
+      setActiveRoomId(null);
+      setActiveRoomName(null);
+      colgarHub();
+      await cowork.endSession();
+      toast.success("Sesión finalizada");
+      navigate("/cowork");
+    } catch {
+      toast.error("No se pudo finalizar la sesión");
+    } finally {
+      setApagando(false);
+      setConfirmarApagado(false);
+    }
+  };
   // Silenciar el Hub SOLO para mí (pedido de Álvaro 01/09): metido en una sala
   // seguía escuchando a los managers del Hub sin ninguna forma de callarlos.
   // No mutea a nadie ni toca mi micro: es volumen local de reproducción
@@ -1096,15 +1117,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-destructive hover:text-destructive/80"
-                onClick={async () => {
-                  setActiveRoomLk(null);
-                  setActiveRoomId(null);
-                  setActiveRoomName(null);
-                  colgarHub();
-                  await cowork.endSession();
-                  toast.success("Sesión finalizada");
-                  navigate("/cowork");
-                }}
+                title="Finalizar la sesión para todos"
+                // Finalizar saca a TODOS y no se puede deshacer: pasa por la
+                // misma confirmación que el botón del landing. Este apagaba
+                // directo — un clic de más y veintitrés personas afuera.
+                onClick={() => setConfirmarApagado(true)}
               >
                 <Power className="h-3.5 w-3.5" />
               </Button>
@@ -1952,6 +1969,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       </Dialog>
 
       {/* Cerrar sala (confirmación) */}
+      {/* Misma confirmación (texto incluido) que el Finalizar del landing:
+          nombra la sesión y cuánta gente hay adentro. */}
+      <AlertDialog open={confirmarApagado} onOpenChange={(o) => { if (!o && !apagando) setConfirmarApagado(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Finalizar «{cowork.session?.name ?? "esta sesión"}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cowork.memberships.length > 1
+                ? `Se cierra para las ${cowork.memberships.length} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
+                : "Se cierra la sesión para todos los participantes."}
+              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={apagando}
+              onClick={(e) => { e.preventDefault(); void confirmarFinalizarSesion(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {apagando ? "Finalizando…" : "Finalizar sesión"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!closeTarget} onOpenChange={(o) => { if (!o) setCloseTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
