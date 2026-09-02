@@ -491,12 +491,18 @@ Deno.serve(async (req) => {
     // (indexada por email_local) y sus vínculos de Hubstaff/BLU se preservan. Además
     // provisiona el buzón Zoho en la nueva dirección. `email` = la NUEVA dirección.
     if (action === "migrate_email") {
-      const gMig = await assertCanManage(adminClient, callerId, user_id, "delete_user");
-      if (!gMig.ok) {
-        return new Response(JSON.stringify(gMig.body), {
-          status: gMig.status,
-          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
-        });
+      // Self-servicio permitido: cambiar el PROPIO correo de login + buzón es
+      // benigno (mismo user_id y contraseña), a diferencia de borrar/degradar.
+      // El gate de arriba (can_manage_users) ya asegura que quien llama es admin;
+      // para OTRAS cuentas se aplica la jerarquía normal.
+      if (String(user_id) !== callerId) {
+        const gMig = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+        if (!gMig.ok) {
+          return new Response(JSON.stringify(gMig.body), {
+            status: gMig.status,
+            headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+          });
+        }
       }
       const nuevo = (email as string | undefined)?.trim().toLowerCase();
       if (!nuevo) {

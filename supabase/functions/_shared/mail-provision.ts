@@ -159,5 +159,16 @@ export async function provisionMailbox(input: ProvisionInput): Promise<Provision
     return { ...base, outcome, error: "la casilla quedó creada pero no se pudo guardar su credencial" };
   }
 
+  // Al MIGRAR de correo, el upsert (onConflict user_id,email_address) inserta una
+  // fila nueva y la vieja (otro email_address) quedaría activa — Correo abriría el
+  // buzón equivocado. Revocamos cualquier otra credencial activa del usuario,
+  // dejando solo la recién provisionada. Idempotente si ya hay una sola.
+  await adminClient
+    .from("mail_credentials")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .neq("email_address", email)
+    .is("revoked_at", null);
+
   return { ok: true, email_address: email, outcome, error: null };
 }
