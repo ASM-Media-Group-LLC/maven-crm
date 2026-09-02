@@ -5,6 +5,7 @@ import { playMessageNotification } from "@/lib/notificationSound";
 import { hablar } from "@/lib/voz";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
+import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
 
 // Avisarle a la PROPIA PERSONA que no se le ve.
 //
@@ -20,7 +21,8 @@ import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 // supervisor se apagaba justo cuando la persona se iba a mirar otra pantalla —
 // o sea, justo cuando es más probable que se distraiga.
 //
-// LA ESCALERA, y por qué en ese orden:
+// LA ESCALERA, y por qué en ese orden (los tiempos son los del ESTÁNDAR; cada
+// sesión puede moverlos desde sus reglas, ver `lib/coworkReglas`):
 //   1) A los 90s, un aviso en su pantalla. Silencioso: alcanza para el descuido.
 //   2) A los 3 min, se repite con sonido — ya no es un descuido.
 //   3) Recién después, el coordinador. Interrumpir a alguien es caro y es él
@@ -28,9 +30,13 @@ import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 //
 // NO CORRE EN PAUSA. Quien apretó "Baño" o "Break" avisó que se iba: seguir
 // reclamándole sería castigarlo por haber usado bien el botón.
-
-const PRIMER_AVISO_MS = 90_000;
-const REPETIR_CADA_MS = 90_000;
+//
+// LAS REGLAS SE LEEN EN CADA TIC, no al montar. Las fija la página de Cowork
+// —que puede no estar montada mientras esto corre— y el supervisor puede
+// cambiarlas en vivo: capturadas una sola vez, el cambio llegaría recién al
+// remontar la llamada. Una alerta apagada en la sesión es como si no hubiera
+// problema: ni aviso, ni coordinador. Y `supervisorSeg` en null quiere decir
+// "a la persona sí, al coordinador nunca".
 
 // "Maven supervisor": la voz que le pide a la persona que se acomode.
 //
@@ -101,7 +107,10 @@ function siguienteFrase(estado: string): string {
   return frase;
 }
 
-/** Tras cuánto tiempo así se considera que hay que avisarle a alguien más. */
+/** El ESTÁNDAR de cuánto lleva alguien así hasta avisarle a alguien más
+ *  (`REGLAS_ESTANDAR.camara/encuadre.supervisorSeg`). Lo que rige en cada
+ *  sesión sale de sus reglas, no de acá: esto sigue exportado como referencia
+ *  del comportamiento por defecto para el dashboard y los tests. */
 export const AVISAR_COORDINADOR_MS = 180_000;
 
 /** ¿Este estado amerita avisarle a la persona? `unavailable` NO: significa que
@@ -141,12 +150,23 @@ export function useFaceNudge(
         return;
       }
 
+      // La regla de ESTA sesión para lo que vio el detector, leída acá y no
+      // arriba: si el supervisor la apaga en vivo, este es el tic que se
+      // entera. Apagada, se trata igual que si el problema no existiera.
+      const regla = reglaDeEstado(reglasActuales(), watch.state);
+      if (!regla || !regla.activa) {
+        ultimoAviso.current = 0;
+        avisadoCoordinador.current = false;
+        return;
+      }
+      const supervisorMs = regla.supervisorSeg === null ? null : regla.supervisorSeg * 1000;
+
       const fuera = Date.now() - watch.since;
-      if (fuera < PRIMER_AVISO_MS) return;
+      if (fuera < regla.primerAvisoSeg * 1000) return;
 
       const ahora = Date.now();
-      if (ahora - ultimoAviso.current >= REPETIR_CADA_MS) {
-        const conSonido = fuera >= AVISAR_COORDINADOR_MS;
+      if (ahora - ultimoAviso.current >= regla.repetirSeg * 1000) {
+        const conSonido = supervisorMs !== null && fuera >= supervisorMs;
         toast.warning(
           TITULOS[watch.state] ?? faceStateLabel(watch.state) ?? "No se te ve la cara",
           {
@@ -171,14 +191,17 @@ export function useFaceNudge(
         // deducir.
         //
         // Lo que SI se conserva escalonado es el aviso al SUPERVISOR (abajo, a
-        // los 3 minutos): interrumpir a quien mira nueve salas sigue siendo
-        // caro, y la persona ya tuvo dos avisos hablados para corregirlo sola.
+        // los 3 minutos en el estándar): interrumpir a quien mira nueve salas
+        // sigue siendo caro, y la persona ya tuvo avisos hablados para
+        // corregirlo sola.
         playMessageNotification(0.5);
         hablar(siguienteFrase(watch.state), { volumen: conSonido ? 0.9 : 0.7 });
         ultimoAviso.current = ahora;
       }
 
-      if (fuera >= AVISAR_COORDINADOR_MS && !avisadoCoordinador.current) {
+      // Con `supervisorSeg` en null la sesión decidió que el coordinador no se
+      // entera por esto, nunca: la escalera termina en la propia persona.
+      if (supervisorMs !== null && fuera >= supervisorMs && !avisadoCoordinador.current) {
         avisadoCoordinador.current = true;
         alCoordinadorRef.current?.(Math.floor(fuera / 1000));
       }
@@ -197,30 +220,39 @@ export function useFaceNudge(
 // compartir es tan fácil como cerrar una ventana por accidente, y quien lo hace
 // casi nunca se da cuenta — por eso el aviso, y por eso hablado.
 //
-// Dos minutos de gracia: cambiar de pantalla, reiniciar el compartir o abrir
-// algo a pantalla completa corta el stream unos segundos, y reclamar por eso
-// sería puro ruido.
+// Dos minutos de gracia (en el estándar): cambiar de pantalla, reiniciar el
+// compartir o abrir algo a pantalla completa corta el stream unos segundos, y
+// reclamar por eso sería puro ruido.
+//
+// Y hay sesiones donde esto directamente NO EXISTE: a las managers no se les
+// pide pantalla. Por eso el tic mira `reglasActuales().pantalla.activa` antes
+// que nada, y apagada se comporta como si la persona estuviera compartiendo.
 
-const SIN_PANTALLA_MS = 120_000;
-const REPETIR_SIN_PANTALLA_MS = 120_000;
-
-/** Cuánto tiene que llevar alguien sin compartir para que se le avise al
- *  SUPERVISOR. Cinco minutos, no dos: a los dos minutos la persona recién
- *  recibe su primer aviso, y a los cuatro el segundo. Avisarle al supervisor
- *  antes de eso es interrumpirlo por algo que la persona todavía no tuvo
- *  chance de corregir — y un supervisor que mira nueve salas aprende rápido a
- *  ignorar los avisos que llegan demasiado pronto. */
+/** El ESTÁNDAR de cuánto tiene que llevar alguien sin compartir para que se le
+ *  avise al SUPERVISOR (`REGLAS_ESTANDAR.pantalla.supervisorSeg`). Cinco
+ *  minutos, no dos: a los dos minutos la persona recién recibe su primer aviso,
+ *  y a los cuatro el segundo. Avisarle al supervisor antes de eso es
+ *  interrumpirlo por algo que la persona todavía no tuvo chance de corregir —
+ *  y un supervisor que mira nueve salas aprende rápido a ignorar los avisos
+ *  que llegan demasiado pronto. Lo vigente en cada sesión sale de sus reglas;
+ *  esto queda como referencia del comportamiento por defecto. */
 export const AVISAR_SUPERVISOR_SIN_PANTALLA_MS = 300_000;
 
 /** ¿Hay que avisarle al SUPERVISOR de que esta persona no comparte pantalla?
  *
  *  Vive acá y no dentro del dashboard para que sea una sola regla y se pueda
  *  testear: la de encuadre ya vivía repartida y costó darse cuenta de que en
- *  pausa no debía avisar. */
+ *  pausa no debía avisar.
+ *
+ *  `umbralMs` es el de la sesión que mira el dashboard; sin él se asume el
+ *  estándar. `null` es "en esta sesión el supervisor nunca se entera por
+ *  pantalla", y entonces la respuesta es no, lleve lo que lleve. */
 export function debeAvisarSinPantalla(
   ms: { screenShareOn?: boolean; onBreak?: boolean; screenShareSince?: number | null } | undefined,
   ahora: number,
+  umbralMs: number | null = AVISAR_SUPERVISOR_SIN_PANTALLA_MS,
 ): boolean {
+  if (umbralMs === null) return false;
   if (!ms || ms.screenShareOn) return false;
   // Marcó pausa: avisó que se iba, y reclamarle sería castigarla por haber
   // usado bien el botón. Misma regla que el encuadre.
@@ -229,7 +261,7 @@ export function debeAvisarSinPantalla(
   // "acabo de entrar" se ven exactamente igual, y acusar por eso sería
   // inventar un dato que no tenemos.
   if (!ms.screenShareSince) return false;
-  return ahora - ms.screenShareSince >= AVISAR_SUPERVISOR_SIN_PANTALLA_MS;
+  return ahora - ms.screenShareSince >= umbralMs;
 }
 
 // Las frases ROTAN, pero todas dicen lo mismo: que se comparta AHORA. Compartir
@@ -261,10 +293,15 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       // avisó que se iba no tiene por qué estar compartiendo nada. Y en una
       // llamada de Maven tampoco se reclama pantalla: la misma regla que arriba.
       if (estaEnPausa() || estaEnLlamadaDeMaven()) { desde.current = null; ultimo.current = 0; return; }
+      // La regla de la sesión, en cada tic. Apagada = acá no se pide pantalla:
+      // se olvida el reloj para que, si la vuelven a encender, cuente desde ahí
+      // y no desde que la persona entró.
+      const regla = reglasActuales().pantalla;
+      if (!regla.activa) { desde.current = null; ultimo.current = 0; return; }
       if (desde.current === null) desde.current = Date.now();
-      if (Date.now() - desde.current < SIN_PANTALLA_MS) return;
+      if (Date.now() - desde.current < regla.primerAvisoSeg * 1000) return;
       const ahora = Date.now();
-      if (ahora - ultimo.current < REPETIR_SIN_PANTALLA_MS) return;
+      if (ahora - ultimo.current < regla.repetirSeg * 1000) return;
       ultimo.current = ahora;
       playMessageNotification(0.5);
       hablar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length]);

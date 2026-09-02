@@ -3,11 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
-import {
-  AVISAR_COORDINADOR_MS,
-  AVISAR_SUPERVISOR_SIN_PANTALLA_MS,
-  esProblemaDeEncuadre,
-} from "@/hooks/useFaceNudge";
+import { esProblemaDeEncuadre } from "@/hooks/useFaceNudge";
+import { reglasActuales, reglaDeLlamado } from "@/lib/coworkReglas";
 
 // Dejar constancia de los llamados de atención de Cowork.
 //
@@ -32,6 +29,17 @@ import {
 // para dudar: una pausa marcada, una desconexión de LiveKit, salir de Cowork.
 // Al volver se empieza a contar de cero, y eso significa que los primeros
 // minutos después de cada uno de esos eventos nunca se anotan. Es intencional.
+//
+// ── SIGUE LAS REGLAS DE LA SESIÓN ───────────────────────────────────────────
+//
+// El umbral de cada categoría es el `supervisorSeg` de la regla de la sesión
+// (`lib/coworkReglas`), leído en cada tic: un llamado es, literalmente, "se le
+// avisó al supervisor", así que se anota cuando la sesión dice que al
+// supervisor se le avisa. Una alerta APAGADA en la sesión no le queda anotada
+// a nadie, y una que no escala al supervisor (`supervisorSeg` en null)
+// tampoco: a las managers no se les pide pantalla, y anotarles "sin pantalla"
+// sería cobrarles una norma que no es la suya. Cuando la regla cambia en vivo
+// a apagada, el reloj de esa categoría se olvida, como con cualquier duda.
 //
 // ── DE DÓNDE SALE EL RELOJ, Y POR QUÉ NO ES `faceWatch.since` ───────────────
 //
@@ -205,6 +213,15 @@ export function useRegistrarLlamados({ faceWatch, compartiendo, activo, conectad
         .catch((e) => console.error("[cowork] falló el registro del llamado", e));
     };
 
+    /** `revisar`, pero solo si la sesión manda anotar esta categoría. La regla
+     *  se lee acá, en el tic, para que un cambio en vivo del supervisor se
+     *  aplique en el siguiente y no al remontar la llamada. */
+    const segunLaRegla = (kind: KindLlamado, ahora: number, detail?: string) => {
+      const regla = reglaDeLlamado(reglasActuales(), kind);
+      if (!regla.activa || regla.supervisorSeg === null) { olvidar([kind]); return; }
+      revisar(kind, regla.supervisorSeg * 1000, ahora, detail);
+    };
+
     const tick = () => {
       const { faceWatch: fw, compartiendo: comp, conectado: con } = estado.current;
       const ahora = Date.now();
@@ -238,11 +255,11 @@ export function useRegistrarLlamados({ faceWatch, compartiendo, activo, conectad
       // ── Encuadre, cámara y luz ── son excluyentes: solo uno puede estar mal.
       const kind = kindDeLlamado(fw?.state);
       olvidar(DE_ENCUADRE.filter((k) => k !== kind));
-      if (kind) revisar(kind, AVISAR_COORDINADOR_MS, ahora, fw?.state);
+      if (kind) segunLaRegla(kind, ahora, fw?.state);
 
       // ── Pantalla ── independiente de lo anterior.
       if (comp) olvidar(["pantalla"]);
-      else revisar("pantalla", AVISAR_SUPERVISOR_SIN_PANTALLA_MS, ahora);
+      else segunLaRegla("pantalla", ahora);
     };
 
     const id = window.setInterval(tick, 15_000);

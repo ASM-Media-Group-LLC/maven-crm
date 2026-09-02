@@ -2,6 +2,25 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { idDePestana } from "@/lib/idDePestana";
+import type { ReglasCowork } from "@/lib/coworkReglas";
+
+// La fila de cowork_sessions tal como la lee el hook (select *). Mínima a
+// propósito: solo lo que Cowork consume. `alert_rules` todavía no está en los
+// tipos generados de Supabase, por eso es opcional y `unknown`: quien la use
+// la pasa por normalizarReglas, que tolera cualquier cosa (null = estándar).
+export interface CoworkSessionRow {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  host_hub_livekit_room: string | null;
+  created_by: string;
+  created_at: string;
+  ended_at: string | null;
+  updated_at: string;
+  /** Reglas de alerta propias de la sesión. null/ausente = estándar. */
+  alert_rules?: unknown;
+}
 
 export interface CoworkRoom {
   id: string;
@@ -91,7 +110,7 @@ async function invokeCowork(action: string, payload: Record<string, unknown>) {
 }
 
 export function useCoworkSession(sessionId: string | null) {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<CoworkSessionRow | null>(null);
   const [rooms, setRooms] = useState<CoworkRoom[]>([]);
   const [memberships, setMemberships] = useState<CoworkMembership[]>([]);
   const [assignments, setAssignments] = useState<CoworkAssignment[]>([]);
@@ -200,6 +219,11 @@ export function useCoworkSession(sessionId: string | null) {
   // Gestión de salas (host): añadir, renombrar / cambiar modo de preview, cerrar.
   const renameSession = useCallback(async (name: string) =>
     invokeCowork("updateSession", { sessionId, name }), [sessionId]);
+  // Reglas de alerta de la sesión (host). `null` = volver al estándar. La edge
+  // valida y normaliza antes de escribir; el realtime de cowork_sessions
+  // refetchea la sesión y las reglas nuevas llegan a todos en vivo.
+  const updateAlertRules = useCallback(async (rules: ReglasCowork | null) =>
+    invokeCowork("setAlertRules", { sessionId, rules }), [sessionId]);
   const addRoom = useCallback(async (name: string) => invokeCowork("addRoom", { sessionId, name }), [sessionId]);
   const updateRoom = useCallback(async (roomId: string, patch: { name?: string; previewMode?: "video" | "avatars" }) =>
     invokeCowork("updateRoom", { roomId, ...patch }), []);
@@ -349,7 +373,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
-    createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, addRoom, updateRoom, closeRoom,
+    createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
     listMyActiveSessions, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
