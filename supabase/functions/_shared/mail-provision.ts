@@ -163,12 +163,26 @@ export async function provisionMailbox(input: ProvisionInput): Promise<Provision
   // fila nueva y la vieja (otro email_address) quedaría activa — Correo abriría el
   // buzón equivocado. Revocamos cualquier otra credencial activa del usuario,
   // dejando solo la recién provisionada. Idempotente si ya hay una sola.
-  await adminClient
+  const { data: revocadas } = await adminClient
     .from("mail_credentials")
     .update({ revoked_at: new Date().toISOString() })
     .eq("user_id", userId)
     .neq("email_address", email)
-    .is("revoked_at", null);
+    .is("revoked_at", null)
+    .select("id");
+
+  // Si el buzón CAMBIÓ (había otra credencial activa con otro email), la caché y
+  // el estado de sync del buzón viejo quedarían pegados al user_id. Peor: Zoho da
+  // uidvalidity=1 a TODOS los buzones nuevos, así que el worker (infra/mail-sync)
+  // no detecta el cambio de buzón y sigue pidiendo "UIDs > last_uid viejo" → nunca
+  // trae nada del buzón nuevo (caso real: prueba@ → jhon.lopez@, last_uid=17 vs
+  // UIDs 1-2). Se limpia todo para que el worker arranque de cero con la casilla
+  // nueva. NO se toca cuando es la misma casilla (reset de contraseña, alta).
+  if ((revocadas?.length ?? 0) > 0) {
+    await adminClient.from("mail_sync_state").delete().eq("user_id", userId);
+    await adminClient.from("mail_folders").delete().eq("user_id", userId);
+    await adminClient.from("mail_messages").delete().eq("user_id", userId);
+  }
 
   return { ok: true, email_address: email, outcome, error: null };
 }
