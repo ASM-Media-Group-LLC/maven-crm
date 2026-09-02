@@ -275,15 +275,19 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     (watch: { state: string; since: number }) => {
       setFaceWatch(watch);
       faceRef.current = { faceState: watch.state, faceSince: watch.since };
+      // La pausa viaja COMPLETA (tipo y consumido incluidos): presence
+      // reemplaza el payload entero en cada track(), así que si acá faltara
+      // breakKind el tablero vería la pausa como "Baño" y con consumido 0.
       trackMediaState({
         ...lastMediaRef.current,
         onBreak: !!breakStartedAt,
         breakStartedAt,
+        breakKind,
         banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
       });
     },
-    [breakStartedAt, trackMediaState]
+    [breakStartedAt, breakKind, banoConsumido, trackMediaState]
   );
   // Compartir pantalla ya es DIRECTO (el token de sala lo permite para todos) —
   // acá solo reportamos el estado de media para que el dashboard lo muestre.
@@ -292,9 +296,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       // Guardamos el último estado de media para poder re-publicarlo junto con la
       // pausa: presence reemplaza el payload entero en cada track().
       lastMediaRef.current = state;
-      trackMediaState({ ...state, onBreak: !!breakStartedAt, breakStartedAt, ...faceRef.current });
+      trackMediaState({
+        ...state,
+        onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
+        ...faceRef.current,
+      });
     },
-    [trackMediaState, breakStartedAt]
+    [trackMediaState, breakStartedAt, breakKind, banoConsumido]
   );
 
   const reconnectToMainRoom = useCallback(() => {
