@@ -7,7 +7,7 @@
 // (ver useParrilla.ts) → de cada guardado se derivan las tareas esperadas que
 // Promolog usará para medir cumplimiento (fase futura).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Sparkles, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Sparkles, Trash2 } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   type ContentGrid, type GridDay, type ExtraType, type GridTheme,
-  DEFAULT_THEME, EXTRA_TYPE_META, proximoCiclo, useCreateWeek, useGenerateParrilla, useGridDays, useGridList, useSaveGrid, weekdayLabel,
+  DEFAULT_THEME, EXTRA_TYPE_META, proximoCiclo, useCreateWeek, useGenerateParrilla, useGridDays, useGridList, useSaveGrid, useSetWeekStart, weekdayLabel,
 } from "./useParrilla";
 
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -289,9 +289,11 @@ export default function ParrillaPage() {
   const save = useSaveGrid();
   const createWeek = useCreateWeek();
   const genIA = useGenerateParrilla();
+  const setStart = useSetWeekStart();
+  const [startPickerOpen, setStartPickerOpen] = useState(false);
 
   // Picker de "Nueva semana": rango elegido en el calendario (default: el
-  // ciclo estándar lunes → lunes que sigue a la última parrilla).
+  // ciclo estándar jueves → jueves que sigue a la última parrilla).
   const [pickerOpen, setPickerOpen] = useState(false);
   const [range, setRange] = useState<DateRange | undefined>();
   const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -317,6 +319,38 @@ export default function ParrillaPage() {
       {
         onSuccess: (id) => { setPickerOpen(false); setSelectedId(id); toast.success("Parrilla nueva creada (borrador)"); },
         onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Ya existe una parrilla que empieza ese día" : `No se pudo crear: ${e.message}`),
+      },
+    );
+  };
+
+  // Cambiar el día de inicio de la parrilla ACTUAL (solo borradores). Conserva la
+  // cantidad de días; el trigger de BD corre las fechas y el contenido se mantiene.
+  const abrirStartPicker = (open: boolean) => {
+    if (open && dirtyRef.current) {
+      toast.warning("Guarda los cambios antes de cambiar el día de inicio");
+      return;
+    }
+    setStartPickerOpen(open);
+  };
+
+  const cambiarInicio = (d: Date | undefined) => {
+    if (!d || !grid) return;
+    const start = isoLocal(d);
+    if (start === grid.week_start) { setStartPickerOpen(false); return; }
+    // Conservar el span (week_end - week_start) para no cambiar la cantidad de días.
+    const spanDias = Math.round(
+      (new Date(grid.week_end + "T12:00:00Z").getTime() - new Date(grid.week_start + "T12:00:00Z").getTime()) / 86400000,
+    );
+    const endD = new Date(d); endD.setDate(endD.getDate() + spanDias);
+    setStart.mutate(
+      { gridId: grid.id, start, end: isoLocal(endD) },
+      {
+        onSuccess: () => { setStartPickerOpen(false); toast.success("Día de inicio actualizado — se corrieron las fechas; el contenido se mantiene"); },
+        onError: (e: any) => toast.error(
+          (e?.code === "23505" || /duplicate/i.test(e?.message ?? ""))
+            ? "Ya existe una parrilla que empieza ese día"
+            : `No se pudo cambiar: ${e?.message ?? "error"}`,
+        ),
       },
     );
   };
@@ -463,6 +497,29 @@ export default function ParrillaPage() {
               {genIA.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />} Generar con IA
             </Button>
           )}
+          {grid?.status === "borrador" && (
+            <Popover open={startPickerOpen} onOpenChange={abrirStartPicker}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" disabled={setStart.isPending}>
+                  {setStart.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1 h-4 w-4" />} Día de inicio
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="end">
+                <p className="text-xs font-semibold">Cambiar el día de inicio</p>
+                <p className="mb-1 text-[11px] text-muted-foreground">
+                  Se corren las fechas ({days.length} días). El contenido de cada columna se mantiene.
+                </p>
+                <Calendar
+                  mode="single"
+                  selected={grid ? new Date(grid.week_start + "T00:00:00") : undefined}
+                  onSelect={cambiarInicio}
+                  defaultMonth={grid ? new Date(grid.week_start + "T00:00:00") : undefined}
+                  weekStartsOn={1}
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
           <Popover open={pickerOpen} onOpenChange={abrirPicker}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" disabled={createWeek.isPending}>
@@ -471,7 +528,7 @@ export default function ParrillaPage() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="end">
               <p className="text-xs font-semibold">Elige los días de la parrilla</p>
-              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es lunes → lunes (8 días); puedes elegir otro rango.</p>
+              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es jueves → jueves (8 días); puedes elegir otro rango.</p>
               <Calendar
                 mode="range"
                 selected={range}

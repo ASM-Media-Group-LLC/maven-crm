@@ -174,24 +174,30 @@ const emptyDay = (dayIndex: number): Omit<GridDay, "grid_id" | "date"> => ({
   refs: [],
 });
 
-// Ciclo estándar siguiente: la parrilla previa + 7 días de calendario (fallback:
-// el próximo lunes en día Bogotá, igual que el cron de F2). Es el DEFAULT del
-// picker de "Nueva semana" — la manager puede elegir otro rango en el calendario.
+// Día de inicio del ciclo estándar: JUEVES (la parrilla se manda todos los jueves —
+// cambio pedido por Carolina/Jhon; antes era lunes). 0=dom … 6=sáb → jueves=4.
+const CICLO_DOW = 4; // jueves
+
+// Ciclo estándar siguiente: el próximo JUEVES en día Bogotá, y si hay una parrilla
+// previa, el primer jueves DESPUÉS de que ese ciclo termina (así no se solapan). Es
+// el DEFAULT del picker de "Nueva semana" — la manager puede elegir otro rango. El
+// cron de F2, cuando exista, reutiliza este mismo cómputo (dispararlo un jueves).
+// Robusto en la transición: aunque `prev` sea una parrilla vieja lunes-alineada, el
+// default siempre cae en jueves (avanza de a 7 días desde el próximo jueves).
 export function proximoCiclo(prev?: Pick<ContentGrid, "week_start"> | null): { start: string; end: string } {
   const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
   const now = new Date(hoyBogota + "T12:00:00Z");
   const dow = now.getUTCDay(); // 0=dom
-  const delta = dow === 1 ? 0 : (8 - dow) % 7;
-  const proxLunes = new Date(now); proxLunes.setUTCDate(proxLunes.getUTCDate() + delta);
-  let monday = proxLunes;
+  const delta = (CICLO_DOW - dow + 7) % 7; // días hasta el próximo jueves (0 si hoy es jueves)
+  const inicio = new Date(now); inicio.setUTCDate(inicio.getUTCDate() + delta);
   if (prev?.week_start) {
-    const siguiente = new Date(prev.week_start + "T12:00:00Z");
-    siguiente.setUTCDate(siguiente.getUTCDate() + 7);
-    if (siguiente > proxLunes) monday = siguiente;
+    // Avanzar de a 7 días (sigue siendo jueves) hasta pasar el fin del ciclo previo.
+    const prevEnd = new Date(prev.week_start + "T12:00:00Z"); prevEnd.setUTCDate(prevEnd.getUTCDate() + 7);
+    while (inicio < prevEnd) inicio.setUTCDate(inicio.getUTCDate() + 7);
   }
-  const end = new Date(monday); end.setUTCDate(end.getUTCDate() + 7);
+  const end = new Date(inicio); end.setUTCDate(end.getUTCDate() + 7);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { start: iso(monday), end: iso(end) };
+  return { start: iso(inicio), end: iso(end) };
 }
 
 // Nueva parrilla para el rango elegido en el calendario (borrador). La plantilla
@@ -255,6 +261,28 @@ export function useCreateWeek() {
       return g.id as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-grids"] }),
+  });
+}
+
+// Cambia el DÍA DE INICIO de una parrilla ya creada. Actualiza week_start/week_end
+// conservando la cantidad de días; el trigger `parrilla_sync_week_dates` recalcula la
+// fecha de cada columna → el contenido se queda en su day_index (NO se pierde), solo
+// cambian las fechas/etiquetas de día. week_start es UNIQUE: si ya hay otra parrilla
+// ese día, la BD tira 23505 y el llamador muestra el error amistoso.
+export function useSetWeekStart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { gridId: string; start: string; end: string }) => {
+      const { error } = await (supabase as any)
+        .from("content_grids")
+        .update({ week_start: args.start, week_end: args.end, updated_at: new Date().toISOString() })
+        .eq("id", args.gridId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, args) => {
+      qc.invalidateQueries({ queryKey: ["content-grids"] });
+      qc.invalidateQueries({ queryKey: ["content-grid-days", args.gridId] });
+    },
   });
 }
 
