@@ -146,7 +146,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.
   def("Menú", "Creadores",
     [
-      "Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil",
+      "Dashboard", "Lista", "Onboarding", "Offboarding", "Perfil",
       { name: "Perfil: Info", parent: "Perfil" }, { name: "Perfil: Lineamientos", parent: "Perfil" },
       { name: "Perfil: Redes", parent: "Perfil" }, { name: "Perfil: Monetización", parent: "Perfil" },
       { name: "Perfil: Documentos", parent: "Perfil" }, { name: "Perfil: Notas", parent: "Perfil" },
@@ -162,6 +162,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Parrilla de contenido: plan semanal de promoción de las creadoras (editor visual
   // + banco de referencias). Default: manager y HHRR (seed en migración 20260827160000).
   def("Operaciones", "Parrilla", ["Parrilla", "Referencias"], ["Editar", "Enviar al grupo"]),
+  def("Operaciones", "Personalizados", ["Tablero", "Tabla"], ["Crear pedido", "Aprobar", "Gestionar"]),
   // LeadGen: vistas internas + acciones de crear/eliminar entradas.
   def("Operaciones", "LeadGen", ["Dashboard", "Lista", "Agentes", "Supervisores", "Rendimiento"], ["Crear Entrada", "Eliminar Entradas"]),
   // Closers: subtabs de navegación (Dashboard / Actividad / Operaciones / Oportunidades) + acciones.
