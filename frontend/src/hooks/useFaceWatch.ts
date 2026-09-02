@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 
 // Vigilancia de encuadre: ¿se le ve la cara a quien está en la llamada?
 //
@@ -58,8 +59,21 @@ async function getDetector(): Promise<any | null> {
       try {
         const vision = await import("@mediapipe/tasks-vision");
         const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
+        // CPU, no GPU — a propósito (02/09/2026, crash reportado por Grace).
+        //
+        // Chrome pone las pestañas del MISMO sitio en el MISMO proceso: la del
+        // Meet (/call/...) y la de Cowork comparten renderer. Con delegate GPU,
+        // arrancar este detector (WASM + WebGL) en la pestaña de Cowork mientras
+        // la del Meet ya tiene su propio pipeline de video con WebGL (el fondo
+        // borroso también es MediaPipe) tumbaba el proceso entero — SIGSEGV,
+        // "No se puede abrir esta página · código 11" — y la persona salía de la
+        // llamada sin haber tocado nada en esa pestaña.
+        //
+        // El modelo es BlazeFace short-range sobre un cuadro de 192px, una vez
+        // cada 3 segundos: en CPU sobra, y saca a MediaPipe de la pelea por la
+        // GPU. Si algún día hace falta más, medir antes de volver a GPU.
         return await vision.FaceDetector.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" },
+          baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
           runningMode: "IMAGE",
           minDetectionConfidence: 0.5,
         });
@@ -149,6 +163,13 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
 
     const sample = async () => {
       if (cancelled || !ctx) return;
+      // En una llamada de Maven (Messenger, Meet, 1:1) ni se carga ni se evalúa
+      // el detector: los avisos de encuadre están silenciados de todas formas en
+      // ese caso (useFaceNudge), así que sería gastar un pipeline WASM entero
+      // para un aviso que no va a sonar — y arrancarlo mientras la otra pestaña
+      // ya corre su video con WebGL es exactamente el momento del crash. El
+      // muestreo sigue latiendo cada 3 s: al colgar la llamada retoma solo.
+      if (estaEnLlamadaDeMaven()) return;
       const detector = await getDetector();
       if (cancelled) return;
       if (!detector) {
