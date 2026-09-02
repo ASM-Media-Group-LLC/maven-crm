@@ -22,13 +22,30 @@ interface Props {
  * because LiveKit's attach() returns the same underlying element source.
  */
 export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const attachedRef = useRef<Map<string, { track: RemoteTrack; el: HTMLAudioElement }>>(new Map());
 
   useEffect(() => {
     if (!room) return;
-    const container = containerRef.current;
-    if (!container) return;
+    // ── LOS <audio> VIVEN EN EL DOCUMENTO PRINCIPAL, NO EN EL ÁRBOL ──────────
+    //
+    // TERCER bug del mismo silencio "dejo la pestaña y no escucho al
+    // supervisor" (reportado de nuevo 02/09/2026, tras #1463 y el detach).
+    //
+    // La llamada salta SOLA a la ventana del sistema al cambiar de pestaña
+    // (useAutoFlotante), y su caja entera —incluidos estos <audio>— se
+    // reparenta a OTRO documento. Mover un elemento de media entre documentos
+    // lo PAUSA, y el play() en el documento nuevo lo bloquea el autoplay: ese
+    // documento no tiene activación de usuario. Los recuperadores esperan un
+    // GESTO… que no llega nunca, porque justamente la persona está mirando
+    // otra app. Silencio hasta que vuelve — el síntoma exacto del reporte.
+    //
+    // La regla: el VIDEO puede mudarse de ventana; el AUDIO no tiene por qué.
+    // Estos elementos son invisibles — se anclan a document.body del documento
+    // PRINCIPAL (los scripts corren siempre en el contexto principal, así que
+    // `document` es el principal aunque este componente se dibuje dentro del
+    // PiP) y ninguna mudanza vuelve a tocarlos: siguen sonando con el permiso
+    // de autoplay que ya ganó el gesto de entrar a la llamada.
+    const container = document.body;
 
     const attach = (track: RemoteTrack, participant: RemoteParticipant) => {
       // Micrófono Y audio de pantalla compartida. El segundo faltaba: aunque
@@ -144,5 +161,7 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
     };
   }, [room, preferredAudioOutputDeviceId]);
 
-  return <div ref={containerRef} aria-hidden="true" style={{ display: "none" }} />;
+  // Nada que dibujar: los <audio> viven colgados de document.body (principal)
+  // a propósito — ver el comentario grande de arriba.
+  return null;
 }
