@@ -36,10 +36,13 @@ interface ChatHeaderProps {
   onArchive?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
+  // Se llegó a este chat desde una MENCIÓN en otro chat: botón para volver a
+  // ese grupo (salto y vuelta). Ausente = entrada normal, sin botón.
+  returnTo?: { name: string; onBack: () => void } | null;
 }
 
 export default function ChatHeader({
-  conversation, profiles, typingUsers,
+  conversation, profiles, typingUsers, returnTo,
   onSearchToggle, onBack, onStartVideoCall, onOpenProfile,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
   onAvatarChanged,
@@ -143,6 +146,20 @@ export default function ChatHeader({
         <Button variant="ghost" size="icon" aria-label="Volver a la lista de chats" className="sm:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
+
+        {/* Volver al grupo desde el que se clickeó la mención (también en desktop). */}
+        {returnTo && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Volver a ${returnTo.name}`}
+            title={`Volver a ${returnTo.name}`}
+            className="shrink-0 h-9 w-9 rounded-full text-primary hover:bg-primary/8"
+            onClick={returnTo.onBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
 
         <div className="relative">
           {isGroup && canEditInfo ? (

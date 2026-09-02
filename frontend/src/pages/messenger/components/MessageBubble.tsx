@@ -101,7 +101,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     const perfil = Object.values(profiles).find((p) => p.full_name === nombre);
     if (!perfil) return;
     if (perfil.id === message.sender_id && isMe) { onOpenProfile?.(perfil.id); return; }
-    navigate(`/messenger?dm=${perfil.id}`);
+    navigate(`/messenger?dm=${perfil.id}&from=${message.conversation_id}`);
   };
 
   if (isPartOfGrid && !isGridLeader) return null;
