@@ -40,6 +40,7 @@ interface ChatViewProps {
   onArchive?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
+  returnTo?: { name: string; onBack: () => void } | null;
 }
 
 export default function ChatView({
@@ -47,7 +48,7 @@ export default function ChatView({
   onEditMessage, onDeleteMessage, onRetryMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers,
   hasMore, loadingMore, onLoadMore, onMembersChanged,
-  isPinned, onTogglePin, onArchive, onDelete, canDelete,
+  isPinned, onTogglePin, onArchive, onDelete, canDelete, returnTo,
 }: ChatViewProps) {
   const { user } = useAuth();
   // Grupo "anuncios": solo admins escriben. Un no-admin ve un aviso en vez del composer.
@@ -202,6 +203,7 @@ export default function ChatView({
         onArchive={onArchive}
         onDelete={onDelete}
         canDelete={canDelete}
+        returnTo={returnTo}
       />
 
       <MessageList

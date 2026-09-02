@@ -105,13 +105,26 @@ export default function MessengerPage() {
   // Abrir (o crear) un DM al llegar desde el ⌘K (/messenger?dm=<userId>).
   // Espera a que las conversaciones carguen para reutilizar el DM existente,
   // y limpia el parámetro para que un back/refresh no lo re-dispare.
+  // Si el DM se abrió desde una MENCIÓN (`&from=<convId>`), se recuerda el
+  // grupo de origen para ofrecer "volver" en el header del DM. Se limpia al
+  // elegir cualquier chat desde la lista: el salto-y-vuelta es solo para el
+  // viaje que empezó en la mención.
+  const [volverA, setVolverA] = useState<string | null>(null);
   useEffect(() => {
     const dm = searchParams.get("dm");
     if (!dm || loading) return;
+    const from = searchParams.get("from");
     searchParams.delete("dm");
+    searchParams.delete("from");
     setSearchParams(searchParams, { replace: true });
+    setVolverA(from && conversations.some((c) => c.id === from) ? from : null);
     handleSelectUser(dm);
-  }, [searchParams, loading, handleSelectUser, setSearchParams]);
+  }, [searchParams, loading, handleSelectUser, setSearchParams, conversations]);
+
+  const grupoDeOrigen = volverA ? conversations.find((c) => c.id === volverA) ?? null : null;
+  const returnTo = grupoDeOrigen
+    ? { name: grupoDeOrigen.displayName, onBack: () => { const id = grupoDeOrigen.id; setVolverA(null); selectChat(id); } }
+    : null;
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);
@@ -199,7 +212,7 @@ export default function MessengerPage() {
         <ChatSidebar
           conversations={conversations}
           activeChatId={activeChatId}
-          onSelectChat={selectChat}
+          onSelectChat={(id) => { setVolverA(null); selectChat(id); }}
           onNewChat={() => setNewChatOpen(true)}
           onNewGroup={() => setNewGroupOpen(true)}
           onSelectContact={handleSelectUser}
@@ -252,6 +265,7 @@ export default function MessengerPage() {
               onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
               onDelete={() => setDeleteTarget(activeConv)}
               canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === user?.id && p.role === "admin")}
+              returnTo={returnTo}
             />
           </div>
         ) : (

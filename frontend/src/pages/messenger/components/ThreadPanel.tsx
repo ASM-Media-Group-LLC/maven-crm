@@ -61,7 +61,7 @@ export default function ThreadPanel({
   const navigate = useNavigate();
   const abrirDmDeMencion = (nombre: string) => {
     const perfil = Object.values(profiles).find((p) => p?.full_name === nombre);
-    if (perfil) navigate(`/messenger?dm=${perfil.id}`);
+    if (perfil) navigate(`/messenger?dm=${perfil.id}&from=${parentMessage.conversation_id}`);
   };
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
