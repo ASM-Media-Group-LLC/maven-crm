@@ -216,6 +216,12 @@ export default function ThreadPanel({
     const isImage = msg.type === "image" && msg.file_url;
     const isVideo = msg.file_url && msg.file_url.match(/\.(mp4|webm|mov)(\?|$)/i);
 
+    // El borrado se chequea PRIMERO: si va después de las ramas de imagen/video/
+    // audio/archivo, esas retornan antes y un adjunto eliminado seguía mostrándose.
+    if (msg.is_deleted) {
+      return <span className="italic text-muted-foreground text-[13px]">Eliminado por el autor</span>;
+    }
+
     if (isImage) {
       return (
         <div>
@@ -274,10 +280,6 @@ export default function ThreadPanel({
           </div>
         </a>
       );
-    }
-
-    if (msg.is_deleted) {
-      return <span className="italic text-muted-foreground text-[13px]">Mensaje eliminado</span>;
     }
 
     if (editingId === msg.id) {
