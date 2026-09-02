@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Coffee, Info, Loader2, Monitor, RotateCcw, ScanFace, VideoOff, type LucideIcon } from "lucide-react";
+import { ChevronDown, Coffee, Info, Loader2, Monitor, RotateCcw, ScanFace, VideoOff, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -13,10 +13,16 @@ import {
   type Preset, type ReglaAviso, type ReglaPausas, type ReglasCowork,
 } from "@/lib/coworkReglas";
 
-// Panel del supervisor para las reglas de UNA sesión de Cowork (ver
+// Popup del supervisor para las reglas de UNA sesión de Cowork (ver
 // lib/coworkReglas). Trabaja sobre un BORRADOR: nada se aplica hasta tocar
 // "Guardar cambios", porque cada cambio llega en vivo a todas las personas de
 // la sesión y no queremos que un menú a medio elegir les cambie los avisos.
+//
+// Es un Dialog centrado y no un panel lateral: Jhon lo vio en producción como
+// Sheet y pidió el popup con el vidrio de Maven. El `Dialog` del proyecto ya
+// trae ese acabado (borde translúcido, degradado del acento, blur); acá solo se
+// arma el contenido con las mismas piezas de vidrio (`glass-card-subtle`) y en
+// dos columnas, para que las cuatro reglas entren de un vistazo sin scroll.
 
 interface Props {
   open: boolean;
@@ -78,7 +84,7 @@ function resumenPausas(p: ReglaPausas): string {
   return `Baño ${p.banoMin} min/día · Break ${p.breakMin} min · ${supervisor}`;
 }
 
-export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSesion, onGuardar }: Props) {
+export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreSesion, onGuardar }: Props) {
   const [borrador, setBorrador] = useState<ReglasCowork>(reglas);
   const [guardando, setGuardando] = useState(false);
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
@@ -144,16 +150,18 @@ export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSe
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
-        <SheetHeader className="text-left space-y-1">
-          <p className="text-[11px] font-semibold tracking-widest uppercase text-primary">Reglas de esta sesión</p>
-          <SheetTitle className="font-display text-2xl">{nombreSesion || "Esta sesión"}</SheetTitle>
-          <SheetDescription>Aplican a todas las personas que entren a esta sesión, hoy y en adelante.</SheetDescription>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-3xl max-h-[92vh] overflow-y-auto overflow-x-hidden gap-0 p-0 grid-cols-[minmax(0,1fr)] [&>*]:min-w-0">
+        {/* Cabecera: el nombre grande en la display, como los títulos del
+            reskin. El degradado del acento del Dialog vive justo detrás. */}
+        <DialogHeader className="px-7 pt-7 pb-5 text-left space-y-1.5">
+          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-primary">Reglas de esta sesión</p>
+          <DialogTitle className="font-display text-[26px] leading-tight tracking-tight">{nombreSesion || "Esta sesión"}</DialogTitle>
+          <DialogDescription>Aplican a todas las personas que entren a esta sesión, hoy y en adelante.</DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-5 space-y-2">
-          <div className="grid grid-cols-4 rounded-xl bg-muted border border-border p-1">
+        <div className="px-7 space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-2xl sm:rounded-full bg-white/[0.04] border border-white/10 p-1 backdrop-blur-md">
             {OPCIONES_PRESET.map((op) => {
               const activo = presetActivo === op.valor;
               // "Personalizado" no se elige: es lo que queda al tocar cualquier
@@ -167,10 +175,10 @@ export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSe
                   disabled={manual}
                   onClick={() => { if (!manual) setBorrador(PRESETS[op.valor]); }}
                   className={cn(
-                    "h-8 tactil:h-10 rounded-lg text-xs font-medium transition-colors disabled:cursor-default",
+                    "h-8 tactil:h-10 min-w-0 truncate px-2 rounded-full text-xs font-medium transition-all disabled:cursor-default",
                     activo
-                      ? "bg-card text-foreground ring-1 ring-white/10"
-                      : "text-muted-foreground enabled:hover:text-foreground",
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
+                      : "text-muted-foreground enabled:hover:text-foreground enabled:hover:bg-white/[0.06]",
                   )}
                 >
                   {op.texto}
@@ -178,12 +186,12 @@ export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSe
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground px-1">
             Estándar es lo que Cowork hace hoy con los chatters. Al tocar cualquier regla pasa a Personalizado.
           </p>
         </div>
 
-        <div className="mt-5 space-y-3">
+        <div className="px-7 pt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <TarjetaRegla
             icono={VideoOff}
             titulo="Cámara apagada"
@@ -257,15 +265,15 @@ export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSe
           </TarjetaRegla>
         </div>
 
-        <div className="mt-6 border-t border-border pt-4 space-y-4">
-          <p className="flex items-start gap-2 text-xs text-muted-foreground">
+        <div className="mt-6 mx-7 mb-7 border-t border-white/10 pt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2 text-xs text-muted-foreground sm:max-w-[46%]">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
               Los llamados de atención se registran con estas mismas reglas: si una alerta no existe acá,
               no queda anotada en nadie.
             </span>
           </p>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-end gap-2">
             <Button
               variant="ghost"
               className="gap-1.5 tactil:h-10"
@@ -280,8 +288,8 @@ export default function CoworkReglasSheet({ open, onOpenChange, reglas, nombreSe
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -302,26 +310,27 @@ interface TarjetaProps {
 function TarjetaRegla({ icono: Icono, titulo, resumen, activa, onActiva, abierta, onAlternar, children }: TarjetaProps) {
   const apagada = activa === false;
   return (
-    <div className={cn("rounded-2xl border border-border bg-background/40 p-4 transition-opacity", apagada && "opacity-60")}>
+    <div className={cn("glass-card-subtle bg-white/[0.03] p-4 transition-all hover:bg-white/[0.05]", apagada && "opacity-60")}>
       <div className="flex items-start gap-3">
         {/* La cabecera despliega los campos; el interruptor va AL LADO y no
             adentro del botón (un botón dentro de otro no es HTML válido y el
             clic llegaría a los dos). */}
         <button type="button" onClick={onAlternar} className="flex flex-1 items-start gap-3 text-left min-w-0">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-muted">
-            <Icono className="h-4 w-4 text-foreground" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/25">
+            <Icono className="h-4 w-4 text-primary" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">{titulo}</span>
             <span className="block text-xs text-muted-foreground">{apagada ? "Sin aviso en esta sesión." : resumen}</span>
           </span>
+          <ChevronDown className={cn("h-4 w-4 shrink-0 mt-2 text-muted-foreground/60 transition-transform", abierta && "rotate-180")} />
         </button>
         {activa !== undefined && onActiva && (
           <Switch checked={activa} onCheckedChange={onActiva} aria-label={`${titulo}: activa en esta sesión`} />
         )}
       </div>
       {abierta && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3">
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
           {children}
         </div>
       )}
@@ -342,7 +351,7 @@ function CampoOpcion({ etiqueta, valor, opciones, onCambio }: CampoProps) {
     <div className="space-y-1 min-w-0">
       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{etiqueta}</Label>
       <Select value={valor} onValueChange={onCambio}>
-        <SelectTrigger className="h-9 tactil:h-10 rounded-xl">
+        <SelectTrigger className="h-9 tactil:h-10 rounded-xl bg-white/[0.04] border-white/10">
           {/* En el disparador va la versión corta: "3:00 después de pasarse"
               no entra en un tercio del panel. El menú sí dice la frase entera. */}
           <SelectValue>{actual?.textoCorto ?? actual?.texto ?? valor}</SelectValue>
