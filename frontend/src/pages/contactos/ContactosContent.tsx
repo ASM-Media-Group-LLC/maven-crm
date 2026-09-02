@@ -128,7 +128,17 @@ const ContactosContent = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, isManager } = useUserRole();
-  const { canAccess } = usePermissions();
+  const { canAccess, permissions } = usePermissions();
+  // Teléfono visible: admin, o rol con el permiso EXPLÍCITO Contactos/Ver
+  // Teléfonos (mismo criterio default-deny que can_see_contact_phone() en la
+  // BD y que ContactoDetailDialog). Gobierna si el buscador también busca por
+  // número: para quien no puede ver teléfonos, el buscador ni lo intenta — la
+  // vista además se lo daría enmascarado, así que tampoco filtraría nada útil.
+  const canSeePhone =
+    isAdmin ||
+    permissions.some(
+      (p) => p.module === "Contactos" && p.submodule === "Ver Teléfonos" && p.can_access,
+    );
   // "Vender plataforma" (mismo gate que el carrito de Creadoras): manda el
   // contacto al pipeline de closers como deal de venta.
   const canSellPlatform = canAccess("Closers", "Asignar Closer");
@@ -242,7 +252,7 @@ const ContactosContent = () => {
 
   // Server-side paginated query
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["closers_contacts", page, filters, salesChannelConstraint, creadoPorUserId, cityContactIds],
+    queryKey: ["closers_contacts", page, filters, salesChannelConstraint, creadoPorUserId, cityContactIds, canSeePhone],
     queryFn: async () => {
       let q = supabase
         // Vista enmascarada: phone/email solo vienen reales para admin; el resto NULL.
@@ -253,7 +263,15 @@ const ContactosContent = () => {
 
       // Server-side filters
       if (filters.search) {
-        q = q.or(`name.ilike.%${filters.search}%,handle.ilike.%${filters.search}%,ticket_number.ilike.%${filters.search}%`);
+        const term = filters.search;
+        const clauses = [`name.ilike.%${term}%`, `handle.ilike.%${term}%`, `ticket_number.ilike.%${term}%`];
+        // Buscar por TELÉFONO, solo con permiso de verlos. Se compara por los
+        // dígitos que tipeó la persona (sin +, espacios ni guiones): los números
+        // se guardan casi siempre como dígitos pegados, y con 4+ dígitos ya
+        // vale la pena probar (menos es cualquier ticket o año).
+        const digits = term.replace(/\D/g, "");
+        if (canSeePhone && digits.length >= 4) clauses.push(`phone.ilike.%${digits}%`);
+        q = q.or(clauses.join(","));
       }
       if (filters.estado) {
         // Map display status back to DB status
@@ -624,6 +642,7 @@ const ContactosContent = () => {
                 creators={creatorsList}
                 cities={citiesList}
                 salesChannelOptions={canSeeChannels ? salesChannels.channels : []}
+                canSearchPhone={canSeePhone}
               />
             </div>
 

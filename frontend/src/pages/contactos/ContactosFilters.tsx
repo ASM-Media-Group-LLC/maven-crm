@@ -56,9 +56,12 @@ interface Props {
   cities?: string[];
   // Solo admin: opciones del filtro "Canal de venta" (los 7 canales).
   salesChannelOptions?: SalesChannelOption[];
+  // Con permiso de ver teléfonos, el buscador también busca por número (y el
+  // placeholder lo dice).
+  canSearchPhone?: boolean;
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [], salesChannelOptions = [] }: Props) => {
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [], salesChannelOptions = [], canSearchPhone = false }: Props) => {
   const [agentOpen, setAgentOpen] = useState(false);
   const [channelOpen, setChannelOpen] = useState(false);
 
@@ -85,7 +88,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       <div className="relative w-full sm:w-64 sm:shrink-0">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Buscar por ticket, nombre, handle..."
+          placeholder={canSearchPhone ? "Buscar por ticket, nombre, handle, teléfono..." : "Buscar por ticket, nombre, handle..."}
           className="pl-9"
           value={filters.search}
           onChange={(e) => onChange({ search: e.target.value })}
