@@ -22,6 +22,24 @@ applyStoredAppearance();
 // El candado en sessionStorage es lo que impide un bucle: si al recargar vuelve
 // a fallar, no es un deploy a mitad de camino sino un problema de verdad, y hay
 // que dejar que se vea en vez de recargar para siempre.
+function mostrarAvisoDeRecarga() {
+  if (document.getElementById("maven-recarga-aviso")) return;
+  const aviso = document.createElement("div");
+  aviso.id = "maven-recarga-aviso";
+  aviso.setAttribute("role", "status");
+  aviso.style.cssText =
+    "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;" +
+    "background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:12px;" +
+    "display:flex;align-items:center;gap:10px;font-size:14px;font-family:system-ui,sans-serif;" +
+    "box-shadow:0 4px 20px rgba(0,0,0,.4)";
+  aviso.innerHTML =
+    '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);' +
+    'border-top-color:#fff;border-radius:50%;animation:maven-giro .8s linear infinite"></span>' +
+    "<span>Actualizando Maven a la versión nueva…</span>" +
+    "<style>@keyframes maven-giro{to{transform:rotate(360deg)}}</style>";
+  document.body.appendChild(aviso);
+}
+
 window.addEventListener("vite:preloadError", (e) => {
   const CLAVE = "maven.recarga-por-deploy";
   const ANTIBUCLE_MS = 15_000;
@@ -36,7 +54,13 @@ window.addEventListener("vite:preloadError", (e) => {
     if (Date.now() - ultima < ANTIBUCLE_MS) return;
     sessionStorage.setItem(CLAVE, String(Date.now()));
     e.preventDefault();
-    window.location.reload();
+    // Un aviso de un segundo antes de recargar. Sin él, el refresh parecía un
+    // glitch ("entro a Maven y a los segundos se me refresca solo"); con él se
+    // entiende que es Maven actualizándose a la versión que se acaba de
+    // desplegar. Es DOM pelado a propósito: esto corre antes de que React
+    // monte y el sistema de toasts de la app no existe todavía.
+    mostrarAvisoDeRecarga();
+    window.setTimeout(() => window.location.reload(), 1200);
   } catch {
     /* sin sessionStorage se deja pasar el error, que es el comportamiento previo */
   }
