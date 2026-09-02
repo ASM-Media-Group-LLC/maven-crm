@@ -11,6 +11,7 @@ import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { marcarPausa } from "@/lib/coworkPausa";
+import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
 import { rpcBanoConsumido, leerLimitesPausa } from "@/lib/coworkTablas";
 import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS, fraseDiaAgotado, LIMITE_DIARIO_AGOTADO_MS } from "@/lib/pausaCowork";
@@ -28,6 +29,13 @@ import {
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
+}
+
+/** ¿La fila de la sesión trae topes de pausa PROPIOS? `alert_rules` llega como
+ *  jsonb sin tipar (`unknown`), y una sesión con reglas solo de cámara sigue a
+ *  la tabla para las pausas: eso es lo correcto, no un hueco. */
+function traePausasPropias(raw: unknown): boolean {
+  return !!raw && typeof raw === "object" && (raw as { pausas?: unknown }).pausas != null;
 }
 
 // mm:ss mientras dura poco; hh:mm:ss si la pausa se estira.
@@ -139,13 +147,36 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // Una sola vez al montar: después el estado lo manda `toggleBreak`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Las reglas de ESTA sesión (qué alertas existen y cuándo saltan) van al
+  // store de `coworkReglas`, no por props, por la misma razón que la pausa: los
+  // avisos corren dentro de la llamada, que sobrevive a esta página, y las
+  // leen en cada tic. Como el realtime de la sesión refetchea la fila, un cambio
+  // del supervisor pasa por acá y llega en vivo. `null`/sin columna = estándar.
+  const alertRulesDeSesion: unknown = cowork.session?.alert_rules;
+  useEffect(() => {
+    fijarReglas(normalizarReglas(alertRulesDeSesion));
+  }, [alertRulesDeSesion]);
   // Los topes salen de la BASE (cowork_break_limits), no de un número escrito
   // acá. El menú decía "Break (30 min)" y "Baño" a secas: si mañana alguien
   // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.
+  //
+  // Salvo que la sesión traiga pausas propias en `alert_rules`: ahí mandan
+  // esas, porque son las que el supervisor eligió para este grupo (a las
+  // managers no se les mide el break igual que a los chatters). La tabla queda
+  // como el estándar de toda sesión sin reglas propias.
   const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
   useEffect(() => {
-    void leerLimitesPausa(supabase).then(setLimitesPausa);
-  }, []);
+    if (traePausasPropias(alertRulesDeSesion)) {
+      const { pausas } = normalizarReglas(alertRulesDeSesion);
+      setLimitesPausa({ bano: pausas.banoMin, break: pausas.breakMin });
+      return;
+    }
+    // Si la sesión trae pausas propias mientras la tabla todavía responde, la
+    // respuesta vieja no debe pisar lo que eligió el supervisor.
+    let vigente = true;
+    void leerLimitesPausa(supabase).then((l) => { if (vigente) setLimitesPausa(l); });
+    return () => { vigente = false; };
+  }, [alertRulesDeSesion]);
   // Cuánto baño gastó HOY esta persona (pausas ya cerradas). El baño es un
   // presupuesto DIARIO de 10 minutos, no un permiso de 10 cada vez: quien fue
   // una vez y tardó 4, la próxima arranca en 6.
@@ -239,6 +270,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     endCall();
     // Se fue de verdad: acá el `leave` del presence SÍ corresponde.
     salirDePresencia();
+    // Y vuelve el estándar: las reglas eran de ESA sesión. La próxima que se
+    // abra las fija de nuevo al cargar su fila.
+    fijarReglas(null);
     try { await cowork.leaveRoom?.(); } catch { /* best-effort */ }
     toast.success("Saliste de la sala");
     // Solo se lo lleva a otro lado si esta MIRANDO Cowork: ahi la pantalla se

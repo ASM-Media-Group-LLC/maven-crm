@@ -57,6 +57,91 @@ function err(req: Request, msg: string, status = 400) {
   return json(req, { error: msg }, status);
 }
 
+// ── Reglas de alerta por sesión ─────────────────────────────────
+// ESPEJA frontend/src/lib/coworkReglas.ts (normalizarReglas y sus topes).
+// Deno no puede importar el módulo del frontend, así que la forma y los
+// límites se repiten acá: si cambian allá, cambian acá. Se normaliza del lado
+// del servidor porque esta función corre con service_role y el cuerpo viene
+// del navegador: nada de lo que llegue se escribe sin pasar por acá.
+// Tolerante a propósito —se acota, no se rechaza— para que una sesión nunca
+// quede con reglas incompletas: un número fuera de rango se recorta, una clave
+// que falta o trae basura cae al estándar, una clave desconocida se descarta.
+interface ReglaAviso { activa: boolean; primerAvisoSeg: number; repetirSeg: number; supervisorSeg: number | null }
+interface ReglaPausas { banoMin: number; breakMin: number; supervisorSeg: number | null }
+interface ReglasCowork { preset: string; camara: ReglaAviso; encuadre: ReglaAviso; pantalla: ReglaAviso; pausas: ReglaPausas }
+
+// Lo que Cowork hace por defecto, número por número (= REGLAS_ESTANDAR del front).
+const REGLAS_ESTANDAR: ReglasCowork = {
+  preset: "estandar",
+  camara:   { activa: true, primerAvisoSeg: 90,  repetirSeg: 90,  supervisorSeg: 180 },
+  encuadre: { activa: true, primerAvisoSeg: 90,  repetirSeg: 90,  supervisorSeg: 180 },
+  pantalla: { activa: true, primerAvisoSeg: 120, repetirSeg: 120, supervisorSeg: 300 },
+  pausas:   { banoMin: 10, breakMin: 30, supervisorSeg: 180 },
+};
+const PRESETS = ["estricto", "estandar", "relajado", "personalizado"];
+const SEG_MIN = 30, SEG_MAX = 3600;
+const MIN_MIN = 1, MIN_MAX = 240;
+
+function numeroEntre(v: unknown, min: number, max: number, porDefecto: number): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return porDefecto;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+// null explícito = "nunca": la persona recibe sus avisos, pero el supervisor
+// no se entera ni queda registro. Cualquier otra cosa inválida cae al defecto.
+function segundosONunca(v: unknown, porDefecto: number | null): number | null {
+  if (v === null) return null;
+  if (v === undefined) return porDefecto;
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return porDefecto;
+  return Math.min(SEG_MAX, Math.max(SEG_MIN, Math.round(n)));
+}
+
+function normalizarAviso(raw: unknown, base: ReglaAviso): ReglaAviso {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    activa: typeof r.activa === "boolean" ? r.activa : base.activa,
+    primerAvisoSeg: numeroEntre(r.primerAvisoSeg, SEG_MIN, SEG_MAX, base.primerAvisoSeg),
+    repetirSeg: numeroEntre(r.repetirSeg, SEG_MIN, SEG_MAX, base.repetirSeg),
+    supervisorSeg: segundosONunca(r.supervisorSeg, base.supervisorSeg),
+  };
+}
+
+function normalizarPausas(raw: unknown, base: ReglaPausas): ReglaPausas {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    banoMin: numeroEntre(r.banoMin, MIN_MIN, MIN_MAX, base.banoMin),
+    breakMin: numeroEntre(r.breakMin, MIN_MIN, MIN_MAX, base.breakMin),
+    supervisorSeg: segundosONunca(r.supervisorSeg, base.supervisorSeg),
+  };
+}
+
+/** Reglas completas y sanas a partir de lo que mande el cliente. Solo salen las
+ *  claves conocidas. El preset es informativo: el front lo recalcula al leer
+ *  comparando los valores, así que acá basta con que sea un nombre válido. */
+function normalizarReglas(raw: unknown): ReglasCowork {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    preset: typeof r.preset === "string" && PRESETS.includes(r.preset) ? r.preset : "personalizado",
+    camara: normalizarAviso(r.camara, REGLAS_ESTANDAR.camara),
+    encuadre: normalizarAviso(r.encuadre, REGLAS_ESTANDAR.encuadre),
+    pantalla: normalizarAviso(r.pantalla, REGLAS_ESTANDAR.pantalla),
+    pausas: normalizarPausas(r.pausas, REGLAS_ESTANDAR.pausas),
+  };
+}
+
+/** Tope de pausa (minutos) que fija la SESIÓN, o null si no tiene reglas de
+ *  pausas propias y rige la tabla cowork_break_limits como hasta ahora. */
+function minutosDePausaDeSesion(alertRules: unknown, kind: string): number | null {
+  const pausas = alertRules && typeof alertRules === "object"
+    ? (alertRules as Record<string, unknown>).pausas
+    : undefined;
+  if (!pausas || typeof pausas !== "object") return null;
+  const p = normalizarPausas(pausas, REGLAS_ESTANDAR.pausas);
+  return kind === "break" ? p.breakMin : p.banoMin;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
@@ -839,9 +924,16 @@ serve(async (req) => {
         .select("id, kind, started_at").single();
       if (insErr) return err(req, insErr.message, 500);
 
+      // Tope de la pausa. La sesión puede tener sus propios topes
+      // (alert_rules.pausas, los pone el supervisor desde el tablero) y esos
+      // mandan; sin reglas propias rige la tabla cowork_break_limits, como
+      // hasta ahora. La etiqueta sale siempre de la tabla.
+      const { data: sesion } = await admin.from("cowork_sessions")
+        .select("alert_rules").eq("id", asignacion.session_id).maybeSingle();
+      const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, kind);
       const { data: limite } = await admin.from("cowork_break_limits")
         .select("minutos, label").eq("kind", kind).maybeSingle();
-      return json(req, { break: pausa, limiteMinutos: limite?.minutos ?? null, label: limite?.label ?? kind });
+      return json(req, { break: pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? kind });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -860,14 +952,20 @@ serve(async (req) => {
     //     break" no saltaba nunca.
     if (action === "pausaAbierta") {
       const { data: pausa } = await admin.from("cowork_breaks")
-        .select("id, kind, started_at")
+        .select("id, kind, started_at, session_id")
         .eq("user_id", userId).is("ended_at", null)
         .order("started_at", { ascending: false }).limit(1).maybeSingle();
       if (!pausa) return json(req, { pausa: null });
 
+      // Mismo criterio que startBreak: el tope de la sesión manda si existe;
+      // si no, la tabla. Al rehidratar hay que devolver el MISMO tope que se
+      // le dio al arrancar, o el contador cambiaría de límite con un F5.
+      const { data: sesion } = await admin.from("cowork_sessions")
+        .select("alert_rules").eq("id", pausa.session_id).maybeSingle();
+      const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, pausa.kind);
       const { data: limite } = await admin.from("cowork_break_limits")
         .select("minutos, label").eq("kind", pausa.kind).maybeSingle();
-      return json(req, { pausa, limiteMinutos: limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
+      return json(req, { pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
     }
 
     if (action === "endBreak") {
@@ -927,6 +1025,26 @@ serve(async (req) => {
       // No es un error — la llamada puede seguir viva un instante después de
       // que la sacaron de la sala.
       if (!asignacion?.session_id) return json(req, { skipped: "sin sala" });
+
+      // ¿La SESIÓN manda anotar esta categoría? El navegador ya lo decide con
+      // las mismas reglas, pero esto va a pesar en la nota de la gente, así que
+      // la última palabra la tiene el servidor: un navegador con el bundle viejo
+      // en caché, o uno al que no le llegaron las reglas nuevas, no puede
+      // anotarle "sin pantalla" a una manager cuya sesión no pide pantalla.
+      // Misma regla que la pausa: si no se pudo comprobar, ante la duda no se
+      // escribe.
+      const { data: sesionDelLlamado, error: sesionErr } = await admin.from("cowork_sessions")
+        .select("alert_rules").eq("id", asignacion.session_id).maybeSingle();
+      if (sesionErr) return json(req, { skipped: "no se pudo leer las reglas de la sesión" });
+      const reglasDelLlamado = sesionDelLlamado?.alert_rules == null
+        ? REGLAS_ESTANDAR
+        : normalizarReglas(sesionDelLlamado.alert_rules);
+      const reglaDelKind = kind === "camara" ? reglasDelLlamado.camara
+        : kind === "pantalla" ? reglasDelLlamado.pantalla
+        : reglasDelLlamado.encuadre;   // encuadre y luz
+      if (!reglaDelKind.activa || reglaDelKind.supervisorSeg === null) {
+        return json(req, { skipped: "la sesión no registra esta alerta" });
+      }
 
       const ahora = Date.now();
       const TURNO_MS = 12 * 60 * 60 * 1000;
@@ -1016,6 +1134,39 @@ serve(async (req) => {
         .update({ name: clean.slice(0, 80), updated_at: new Date().toISOString() })
         .eq("id", sessionId)
         .select("id, name")
+        .single();
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { session: updated });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SET ALERT RULES (reglas de alerta de la sesión) — host only
+    //
+    // Las reglas viven en cowork_sessions.alert_rules y aplican a todos los
+    // que están en la sesión: el realtime de la fila hace que cada navegador
+    // refetchee y las tome en vivo. `rules: null` = volver al estándar; se
+    // guarda NULL y no una copia, para que la sesión siga al estándar si este
+    // cambia mañana. Lo que llega se normaliza acá (ver normalizarReglas):
+    // el cliente propone, el servidor decide qué se escribe.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "setAlertRules") {
+      const { sessionId, rules } = body;
+      if (!sessionId) return err(req, "sessionId required");
+      // Se exige la clave: un cuerpo sin `rules` es un cliente roto, no un
+      // pedido de volver al estándar. Un array o un escalar tampoco valen.
+      if (!("rules" in body) || (rules !== null && (typeof rules !== "object" || Array.isArray(rules)))) {
+        return err(req, "rules debe ser null (estándar) o un objeto");
+      }
+
+      const { data: hostCheck } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
+
+      const reglas = rules === null ? null : normalizarReglas(rules);
+      const { data: updated, error: upErr } = await admin.from("cowork_sessions")
+        .update({ alert_rules: reglas, updated_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .select("id, alert_rules")
         .single();
       if (upErr) return err(req, upErr.message, 500);
       return json(req, { session: updated });

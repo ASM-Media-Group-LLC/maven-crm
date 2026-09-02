@@ -10,7 +10,7 @@ import {
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelLeftClose, PanelLeftOpen,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -28,13 +28,15 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { encolarVoz, alFallarLaVoz } from "@/lib/colaDeVoz";
-import { AVISAR_COORDINADOR_MS, debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
+import { debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
 import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSupervisor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
-import { cuentaPausa, clasesPausa, nombreYApellido, AVISAR_SUPERVISOR_PASADO_MS } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
+import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
+import CoworkReglasSheet from "./CoworkReglasSheet";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -46,6 +48,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
   const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
+  // Las reglas de ESTA sesión (lib/coworkReglas): qué alertas existen y a qué
+  // umbral se escala al supervisor. Sin `alert_rules` en la fila es el
+  // estándar, o sea lo que Cowork hizo siempre. Va ARRIBA de todo lo que la
+  // usa: es una const, y leerla desde un arreglo de dependencias antes de su
+  // línea es la TDZ que ya tumbó esta pantalla dos veces.
+  const reglas = useMemo(() => normalizarReglas(cowork.session?.alert_rules), [cowork.session?.alert_rules]);
+  const [reglasOpen, setReglasOpen] = useState(false);
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
@@ -262,12 +271,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     return () => window.clearInterval(id);
   }, []);
 
-  // Límites por tipo de pausa (tabla, no constantes). Si no cargan, no se pinta
-  // nada de rojo: mejor sin señal que marcando a alguien por un dato que falta.
-  const [limitesPausa, setLimitesPausa] = useState<Record<string, number>>({});
+  // Límites por tipo de pausa. Si la sesión trae pausas propias en sus reglas,
+  // mandan esas; si no, la tabla (no constantes). Si la tabla no carga, no se
+  // pinta nada de rojo: mejor sin señal que marcando a alguien por un dato que
+  // falta.
+  const [limitesTabla, setLimitesTabla] = useState<Record<string, number>>({});
   useEffect(() => {
-    void leerLimitesPausa(supabase).then(setLimitesPausa);
+    void leerLimitesPausa(supabase).then(setLimitesTabla);
   }, []);
+  // Se mira la FILA cruda y no `reglas`: normalizar rellena las pausas con el
+  // estándar aunque la sesión nunca las haya tocado, y una sesión sin reglas
+  // propias tiene que seguir leyendo la tabla exactamente como hasta hoy.
+  // `alert_rules` llega como `unknown` (los tipos generados no la conocen);
+  // el cast solo afirma "es un objeto que puede traer pausas", nada más.
+  const traePausasPropias = !!(cowork.session?.alert_rules as { pausas?: unknown } | null | undefined)?.pausas;
+  const limitesPausa = useMemo<Record<string, number>>(
+    () => (traePausasPropias ? { bano: reglas.pausas.banoMin, break: reglas.pausas.breakMin } : limitesTabla),
+    [traePausasPropias, reglas, limitesTabla],
+  );
   // Segundos que lleva alguien en pausa, o null si no está en una.
   const pausaDe = (uid: string) => {
     const st = mediaStates[uid];
@@ -763,27 +784,52 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // lo ve; si no, no lo interrumpe nada. Agacharse a buscar algo o tomar agua no
   // tiene por qué sonarle a nadie.
   //
-  // El sonido y la voz esperan a los 3 minutos, que es cuando el supervisor ya
-  // le avisó DOS VECES a la persona y no corrigió. Antes sonaba al minuto —
-  // antes incluso de que el chatter viera su primer aviso— y eso rompía justo lo
-  // que se buscaba: que un descuido se resuelva solo sin interrumpir a nadie.
+  // El sonido y la voz esperan al umbral del supervisor de la REGLA de esa
+  // persona (cámara o encuadre, según lo que vio el detector): 3:00 en el
+  // estándar, que es cuando ya se le avisó DOS VECES y no corrigió. Antes
+  // sonaba al minuto —antes incluso de que el chatter viera su primer aviso— y
+  // eso rompía justo lo que se buscaba: que un descuido se resuelva solo sin
+  // interrumpir a nadie. Con `supervisorSeg` en null la etiqueta se ve, pero
+  // no suena ni habla: en esa sesión al supervisor no se lo escala.
   const FACE_ALERT_MS = 60_000;
-  const FACE_SONIDO_MS = AVISAR_COORDINADOR_MS;
+  /** Cuándo suena y habla por encuadre para ESTA persona; null = en esta
+   *  sesión nunca (regla apagada o sin escalar al supervisor). */
+  const umbralSonidoEncuadre = (ms: MediaState | undefined): number | null => {
+    const regla = reglaDeEstado(reglas, ms?.faceState);
+    if (!regla || !regla.activa || regla.supervisorSeg === null) return null;
+    return regla.supervisorSeg * 1000;
+  };
+  /** Cuántos avisos ya recibió la persona según SU regla. El toast del
+   *  supervisor decía "ya se le avisó dos veces" con los números fijos; con
+   *  reglas por sesión eso puede ser cero o cinco. */
+  const vecesAvisada = (regla: ReglaAviso, seg: number): number =>
+    seg < regla.primerAvisoSeg ? 0 : 1 + Math.floor((seg - regla.primerAvisoSeg) / Math.max(1, regla.repetirSeg));
+  const textoAvisada = (n: number): string =>
+    n === 0 ? "todavía no recibió su aviso" : n === 1 ? "ya se le avisó una vez" : `ya se le avisó ${n} veces`;
   // ¿Lleva rato sin compartir pantalla?
   //
   // En Cowork la pantalla es la mitad del trabajo: sin ella el supervisor ve
   // una cara pero no ve QUÉ está haciendo esa persona. La persona ya recibe su
-  // propio aviso a los dos minutos; esto es lo que faltaba del otro lado, y es
-  // lo mismo que ya pasaba con el encuadre antes de arreglarlo: el sistema
-  // sabía, pero solo se lo decía a quien tenía el problema.
-  const sinPantalla = (ms: MediaState | undefined): boolean => debeAvisarSinPantalla(ms, now);
+  // propio aviso (2:00 en el estándar); esto es lo que faltaba del otro lado, y
+  // es lo mismo que ya pasaba con el encuadre antes de arreglarlo: el sistema
+  // sabía, pero solo se lo decía a quien tenía el problema. El umbral es el de
+  // la sesión; null (regla apagada o sin escalar) = acá no se avisa nunca.
+  const sinPantalla = (ms: MediaState | undefined): boolean => debeAvisarSinPantalla(
+    ms, now,
+    reglas.pantalla.activa && reglas.pantalla.supervisorSeg !== null ? reglas.pantalla.supervisorSeg * 1000 : null,
+  );
 
   const faceIssue = (ms: MediaState | undefined): string | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
     if (ms.faceState === "ok") return null;
     if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo
-    if (now - ms.faceSince < FACE_ALERT_MS) return null;
+    const regla = reglaDeEstado(reglas, ms.faceState);
+    // Apagada = esa alerta no existe en esta sesión: tampoco la etiqueta.
+    if (!regla || !regla.activa) return null;
+    // La etiqueta aparece al minuto, pero nunca DESPUÉS de que suene: un umbral
+    // de supervisor más corto (Estricto, o uno personalizado) la adelanta.
+    if (now - ms.faceSince < Math.min(FACE_ALERT_MS, (regla.supervisorSeg ?? Infinity) * 1000)) return null;
     return ms.faceState === "no_face" ? "Sin rostro"
       : ms.faceState === "too_small" ? "Fuera de cuadro"
       : ms.faceState === "too_dark" ? "Sin luz"
@@ -817,8 +863,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     });
   }), []);
 
-  // Aviso sonoro cuando alguien se PASA de su pausa — pero recién a los 3
-  // minutos de excedido, no al segundo uno.
+  // Aviso sonoro cuando alguien se PASA de su pausa — pero recién al umbral
+  // de la sesión de excedido (3:00 en el estándar), no al segundo uno. Con
+  // `supervisorSeg` en null, en esta sesión pasarse no escala a nadie.
   //
   // El motivo es que interrumpir a quien supervisa nueve salas es caro:
   // pasarse un minuto del baño es asunto de la persona, y ella ya está
@@ -837,7 +884,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       const p = pausaDe(uid);
       if (!p) { yaAvisadoPausa.current.delete(uid); continue; }
       const pasadoSeg = -p.cuenta.restante;
-      if (pasadoSeg * 1000 < AVISAR_SUPERVISOR_PASADO_MS) continue;
+      if (reglas.pausas.supervisorSeg === null) continue;
+      if (pasadoSeg * 1000 < reglas.pausas.supervisorSeg * 1000) continue;
       if (!tocaAvisar(yaAvisadoPausa.current, uid, now)) continue;
       const quien = nombreYApellido(cowork.profiles[uid]);
       playCoordinatorRequestSound();
@@ -852,7 +900,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         duration: 10_000,
       });
     }
-  }, [mediaStates, now, cowork.profiles]);
+  }, [mediaStates, now, cowork.profiles, reglas]);
 
   // Aviso sonoro cuando alguien lleva rato fuera de cuadro. Hasta ahora la
   // alerta era una etiqueta silenciosa en la tarjeta: si el coordinador estaba
@@ -869,7 +917,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     olvidarAusentes(yaAvisado.current, mediaStates);
     for (const [uid, st] of Object.entries(mediaStates)) {
       const problema = faceIssue(st);
-      const bastante = !!problema && !!st.faceSince && (now - st.faceSince) >= FACE_SONIDO_MS;
+      const umbral = umbralSonidoEncuadre(st);
+      const bastante = !!problema && umbral !== null && !!st.faceSince && (now - st.faceSince) >= umbral;
       if (bastante && tocaAvisar(yaAvisado.current, uid, now)) {
         // Con apellido: en el equipo hay dos Álvaro Mejía y hubo dos Manuela
         // Zapata. Un aviso que dice solo el nombre de pila no identifica a
@@ -890,15 +939,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           : "no está frente a la cámara",
           { volumen: 0.85 },
         );
+        const seg = Math.floor((now - (st.faceSince as number)) / 1000);
+        const regla = reglaDeEstado(reglas, st.faceState);
         toast.warning(`${quien}: ${problema.toLowerCase()}`, {
-          description: "Lleva más de tres minutos así y ya se le avisó dos veces.",
+          description: `Lleva ${formatBreak(seg)} así y ${textoAvisada(regla ? vecesAvisada(regla, seg) : 0)}.`,
           duration: 8000,
         });
       } else if (!problema) {
         yaAvisado.current.delete(uid);
       }
     }
-  }, [mediaStates, now, cowork.profiles]);
+  }, [mediaStates, now, cowork.profiles, reglas]);
 
   // Lo mismo, para compartir pantalla. Es un aviso aparte y no una rama del de
   // arriba porque son dos problemas distintos: alguien puede estar perfecto en
@@ -919,8 +970,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // nueve salas, saber A QUIÉN mirar es la mitad del aviso. Y en el
         // equipo hay dos Álvaro Mejía.
         encolarVoz(quien, `lleva ${minutos} minutos sin compartir pantalla`, { volumen: 0.85 });
+        const seg = Math.floor((now - (st.screenShareSince as number)) / 1000);
         toast.warning(`${quien}: sin compartir pantalla`, {
-          description: `Lleva ${minutos} minutos así y ya se le avisó dos veces.`,
+          description: `Lleva ${minutos} minutos así y ${textoAvisada(vecesAvisada(reglas.pantalla, seg))}.`,
           duration: 8000,
         });
       } else if (st.screenShareOn) {
@@ -1112,6 +1164,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 }}
               >
                 <Share2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-7 w-7 text-muted-foreground hover:text-foreground"
+                title="Reglas de esta sesión"
+                onClick={() => setReglasOpen(true)}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                {/* Punto cuando la sesión NO sigue el estándar: de un vistazo se
+                    sabe que acá los avisos son distintos a los de siempre. */}
+                {!sonEstandar(reglas) && (
+                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -1891,6 +1957,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         </div>
       )}
+
+      {/* Reglas de la sesión (qué alertas existen y cuándo se escala al
+          supervisor). Guardar las escribe en cowork_sessions.alert_rules; el
+          realtime de la sesión las trae de vuelta a todos, incluido este
+          dashboard. */}
+      <CoworkReglasSheet
+        open={reglasOpen}
+        onOpenChange={setReglasOpen}
+        reglas={reglas}
+        nombreSesion={cowork.session?.name ?? ""}
+        onGuardar={(r) => cowork.updateAlertRules(r)}
+      />
 
       {/* Añadir sala */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
