@@ -95,11 +95,26 @@ let vivo: CanalVivo | null = null;
 // persona invisible para la supervisión por el resto del turno.
 let ultimoEstadoPendiente: MediaState | null = null;
 
+/** Con VARIAS conexiones bajo la misma clave (la persona tiene Cowork abierto
+ *  en la PWA y en el navegador, o está reconectando y la conexión vieja
+ *  todavía no murió), ¿cuál se muestra?
+ *
+ *  Antes se tomaba la PRIMERA (`[0]`), que es la más VIEJA: la pestaña que no
+ *  sabe nada de la pausa, o el socket muerto. Por eso el contador de break/baño
+ *  no aparecía en el tablero aunque la persona lo tuviera corriendo en pantalla.
+ *  Regla: si alguna conexión dice "en pausa", esa manda (la pausa es una acción
+ *  deliberada registrada en el servidor; la pestaña que la hizo es la que sabe).
+ *  Si ninguna, la más NUEVA. Exportada para poder testearla. */
+export function elegirPresencia<T extends { onBreak?: boolean }>(presencias: T[] | undefined): T | undefined {
+  if (!presencias?.length) return undefined;
+  return presencias.find((p) => p.onBreak) ?? presencias[presencias.length - 1];
+}
+
 function leerEstados(canal: CanalRealtime) {
   const estado = canal.presenceState<PayloadPresencia>();
   const resultado: Record<string, MediaState> = {};
   Object.entries(estado).forEach(([key, presencias]) => {
-    const ultima = presencias?.[0];
+    const ultima = elegirPresencia(presencias);
     if (!ultima) return;
     resultado[key] = {
       micOn: !!ultima.micOn,
