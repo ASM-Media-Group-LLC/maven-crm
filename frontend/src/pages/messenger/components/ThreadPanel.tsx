@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   X, MessageSquareText, Send, MoreVertical, Copy, Edit2, Trash2,
-  SmilePlus, Smile, Paperclip, Loader2, File, Mic, Play,
+  SmilePlus, Smile, Paperclip, Loader2, File as FileIcon, Mic, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import MentionAutocomplete, { renderTextWithMentions } from "./MentionAutocomplete";
 import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
@@ -55,6 +56,13 @@ export default function ThreadPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Mención clickeada → abrir el DM con esa persona (mismo gesto que en el
+  // timeline; /messenger?dm=<id> lo resuelve MessengerPage).
+  const navigate = useNavigate();
+  const abrirDmDeMencion = (nombre: string) => {
+    const perfil = Object.values(profiles).find((p) => p?.full_name === nombre);
+    if (perfil) navigate(`/messenger?dm=${perfil.id}`);
+  };
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
@@ -134,6 +142,26 @@ export default function ThreadPanel({
     setUploadPercent(0);
   }, [user, onSendReply, uploadFileWithProgress]);
 
+  // Pegar imágenes en el hilo (Ctrl/Cmd+V con una captura en el portapapeles):
+  // mismo criterio que el composer principal — se interceptan SOLO las imágenes
+  // (el texto pegado sigue su curso normal) y se suben con el flujo de archivos
+  // del hilo. Antes el hilo simplemente ignoraba el pegado.
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const imageFiles = Array.from(e.clipboardData.items)
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => {
+        const file = item.getAsFile();
+        if (!file) return null;
+        const ext = file.type.split("/")[1] || "png";
+        return new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
+      })
+      .filter((f): f is File => f !== null);
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      imageFiles.forEach((f) => void handleFileUploadAndSend(f));
+    }
+  }, [handleFileUploadAndSend]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     files.forEach(f => handleFileUploadAndSend(f));
@@ -199,7 +227,7 @@ export default function ThreadPanel({
           />
           {msg.content && msg.content !== msg.file_name && (
             <p className="text-[13px] mt-1 whitespace-pre-wrap break-words">
-              {renderTextWithMentions(msg.content, participantNames)}
+              {renderTextWithMentions(msg.content, participantNames, abrirDmDeMencion)}
             </p>
           )}
         </div>
@@ -238,7 +266,7 @@ export default function ThreadPanel({
       return (
         <a href={safeFileUrl(msg.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
           <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted">
-            <File className="h-3.5 w-3.5" />
+            <FileIcon className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0">
             <span className="text-[13px] truncate block">{msg.file_name || "Archivo"}</span>
@@ -280,7 +308,7 @@ export default function ThreadPanel({
 
     return (
       <p className="text-[13px] text-foreground/90 whitespace-pre-wrap break-words">
-        {renderTextWithMentions(msg.content || "", participantNames)}
+        {renderTextWithMentions(msg.content || "", participantNames, abrirDmDeMencion)}
       </p>
     );
   };
@@ -498,6 +526,7 @@ export default function ThreadPanel({
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   onClick={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
                   onKeyUp={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
+                  onPaste={handlePaste}
                 />
               </div>
 

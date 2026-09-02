@@ -31,7 +31,13 @@ export function insertMention(text: string, startIndex: number, endIndex: number
   return text.slice(0, startIndex) + `@${displayName} ` + text.slice(endIndex);
 }
 
-export function renderTextWithMentions(text: string, participantNames: string[]) {
+export function renderTextWithMentions(
+  text: string,
+  participantNames: string[],
+  // Con handler, la mención es un HIPERVÍNCULO: clic → abrir el DM con esa
+  // persona (lo resuelve el que llama, que es quien conoce nombre→userId).
+  onMentionClick?: (name: string) => void,
+) {
   if (!text || participantNames.length === 0) return text;
 
   const mentionPattern = new RegExp(
@@ -47,10 +53,23 @@ export function renderTextWithMentions(text: string, participantNames: string[])
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
+    const nombre = match[1];
     parts.push(
-      <span key={match.index} className="font-bold">
-        @{match[1]}
-      </span>
+      onMentionClick ? (
+        <button
+          key={match.index}
+          type="button"
+          title={`Abrir chat con ${nombre}`}
+          onClick={(e) => { e.stopPropagation(); onMentionClick(nombre); }}
+          className="font-bold underline decoration-dotted underline-offset-2 hover:opacity-80"
+        >
+          @{nombre}
+        </button>
+      ) : (
+        <span key={match.index} className="font-bold">
+          @{nombre}
+        </span>
+      )
     );
     lastIndex = match.index + match[0].length;
   }
