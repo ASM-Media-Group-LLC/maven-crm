@@ -66,6 +66,9 @@ export default function ThreadPanel({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
+  // Archivos EN ESPERA: adjuntar NO envía — se previsualizan y se suben al
+  // presionar Enviar, igual que el compositor principal del Messenger.
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; isImg: boolean; preview?: string }[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -111,13 +114,9 @@ export default function ThreadPanel({
     });
   }, []);
 
-  const handleFileUploadAndSend = useCallback(async (file: File) => {
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      toast.error(`Archivo demasiado grande (máx ${MAX_FILE_SIZE_MB}MB)`);
-      return;
-    }
-    if (!user) return;
-    setUploading(true);
+  // Sube UN archivo y devuelve su URL pública. NO envía nada.
+  const uploadOne = useCallback(async (file: File): Promise<{ url: string; isImg: boolean } | null> => {
+    if (!user) return null;
     setUploadProgress(`Subiendo: ${file.name} (${formatFileSize(file.size)})`);
     setUploadPercent(0);
     // Misma razón que en MessageInput: la clave se sanea, el nombre visible no.
@@ -130,17 +129,37 @@ export default function ThreadPanel({
       const { error } = await supabase.storage.from("chat-files").upload(path, file);
       uploadError = error?.message || null;
     }
-    if (uploadError === "cancelled") { toast("Subida cancelada"); }
-    else if (uploadError) { toast.error(`Error: ${uploadError}`); }
-    else {
-      const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-      const isImg = file.type.startsWith("image/");
-      onSendReply(file.name, isImg ? "image" : "file", urlData.publicUrl, file.name);
+    if (uploadError === "cancelled") { toast("Subida cancelada"); return null; }
+    if (uploadError) { toast.error(`Error: ${uploadError}`); return null; }
+    const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+    return { url: urlData.publicUrl, isImg: file.type.startsWith("image/") };
+  }, [user, uploadFileWithProgress]);
+
+  // Adjuntar = poner EN ESPERA con preview. Se envía al presionar Enviar.
+  const stageFiles = useCallback((files: File[]) => {
+    if (files.some((f) => f.size > MAX_FILE_SIZE_BYTES)) {
+      toast.error(`Archivo demasiado grande (máx ${MAX_FILE_SIZE_MB}MB)`);
     }
-    setUploading(false);
-    setUploadProgress("");
-    setUploadPercent(0);
-  }, [user, onSendReply, uploadFileWithProgress]);
+    const ok = files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES);
+    if (!ok.length) return;
+    setPendingFiles((prev) => [
+      ...prev,
+      ...ok.map((file) => {
+        const isImg = file.type.startsWith("image/");
+        return { file, isImg, preview: isImg ? URL.createObjectURL(file) : undefined };
+      }),
+    ]);
+  }, []);
+
+  const removePendingFile = useCallback((index: number) => {
+    setPendingFiles((prev) => {
+      const copy = [...prev];
+      const gone = copy[index];
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      copy.splice(index, 1);
+      return copy;
+    });
+  }, []);
 
   // Pegar imágenes en el hilo (Ctrl/Cmd+V con una captura en el portapapeles):
   // mismo criterio que el composer principal — se interceptan SOLO las imágenes
@@ -158,13 +177,13 @@ export default function ThreadPanel({
       .filter((f): f is File => f !== null);
     if (imageFiles.length > 0) {
       e.preventDefault();
-      imageFiles.forEach((f) => void handleFileUploadAndSend(f));
+      stageFiles(imageFiles);
     }
-  }, [handleFileUploadAndSend]);
+  }, [stageFiles]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(f => handleFileUploadAndSend(f));
+    stageFiles(files);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -185,9 +204,23 @@ export default function ThreadPanel({
     setUploading(false);
   }, [user, onSendReply]);
 
-  const handleSend = () => {
-    if (!text.trim()) return;
-    onSendReply(text.trim());
+  const handleSend = async () => {
+    const body = text.trim();
+    if (!body && pendingFiles.length === 0) return;
+    if (pendingFiles.length > 0) {
+      setUploading(true);
+      const batch = [...pendingFiles];
+      for (const pf of batch) {
+        const up = await uploadOne(pf.file);
+        if (up) onSendReply(pf.file.name, up.isImg ? "image" : "file", up.url, pf.file.name);
+      }
+      batch.forEach((pf) => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+      setPendingFiles([]);
+      setUploading(false);
+      setUploadProgress("");
+      setUploadPercent(0);
+    }
+    if (body) onSendReply(body);
     setText("");
   };
 
@@ -459,6 +492,31 @@ export default function ThreadPanel({
 
       {/* Reply input with full controls */}
       <div className="shrink-0 bg-primary/[0.03] px-3 py-2.5">
+        {/* Archivos EN ESPERA: se envían al presionar Enviar, no al adjuntar. */}
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 pb-2">
+            {pendingFiles.map((pf, i) => (
+              <div key={`${pf.file.name}-${i}`} className="relative">
+                {pf.preview ? (
+                  <img src={pf.preview} alt={pf.file.name} className="h-14 w-14 rounded-lg object-cover border border-border" />
+                ) : (
+                  <div className="h-14 w-[124px] rounded-lg border border-border bg-muted/40 flex items-center gap-1.5 px-2">
+                    <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="text-[10px] truncate">{pf.file.name}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removePendingFile(i)}
+                  title="Quitar"
+                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-background border border-border flex items-center justify-center shadow hover:bg-muted"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="relative flex items-end gap-1.5">
           {/* Emoji picker */}
           {!isRecording && (
@@ -532,7 +590,7 @@ export default function ThreadPanel({
                 />
               </div>
 
-              {text.trim() ? (
+              {text.trim() || pendingFiles.length > 0 ? (
                 <Button
                   size="icon"
                   className="h-8 w-8 rounded-full shrink-0 bg-primary text-primary-foreground"
