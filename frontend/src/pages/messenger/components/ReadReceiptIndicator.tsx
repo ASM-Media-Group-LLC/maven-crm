@@ -35,20 +35,23 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
   const allRead = readCount >= othersCount;
   const allDelivered = deliveredCount >= othersCount;
 
-  // Enviado: todavía no le llegó a (todos) los demás → un solo check.
-  if (!allDelivered && !allRead) {
-    return <Check className={cn("h-3 w-3", palette.dim)} />;
-  }
-
   const names = (uids: string[]) => uids.map((uid) => profileName(profiles[uid])).join(", ");
-  const label = allRead ? `Leído por ${names(readByUsers)}` : `Entregado a ${names(deliveredByUsers)}`;
+  // ✓ simple = enviado (todavía no llegó al navegador de la otra persona). Antes no
+  // tenía tooltip y se leía como "entregado": esa confusión fue el reporte de
+  // Jackeline con Fabiana (que salía "Disponible" pero tenía la app en segundo plano).
+  const sentOnly = !allDelivered && !allRead;
+  const label = sentOnly
+    ? "Enviado · aún no le llegó"
+    : allRead ? `Leído por ${names(readByUsers)}` : `Entregado a ${names(deliveredByUsers)}`;
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex">
-            <CheckCheck className={cn("h-3 w-3", allRead ? palette.read : palette.dim)} />
+            {sentOnly
+              ? <Check className={cn("h-3 w-3", palette.dim)} />
+              : <CheckCheck className={cn("h-3 w-3", allRead ? palette.read : palette.dim)} />}
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-xs">{label}</TooltipContent>

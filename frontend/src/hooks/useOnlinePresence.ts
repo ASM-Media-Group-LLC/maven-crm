@@ -69,7 +69,8 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
           await presenceChannel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
-            status: myStatusRef.current,
+            // Si Maven se abre ya en segundo plano, no anunciar "Disponible".
+            status: document.hidden ? "away" : myStatusRef.current,
           });
         }
       });
@@ -77,6 +78,33 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     return () => {
       channelRef.current = null;
       supabase.removeChannel(presenceChannel);
+    };
+  }, [user?.id]);
+
+  // Presencia HONESTA: "Disponible" solo mientras la pestaña está visible.
+  // Al pasar a segundo plano (cambiar de app, bloquear el celular, otra pestaña) se
+  // publica "away" SIN pisar el estado que la persona eligió; al volver se restaura.
+  // Antes la presencia se registraba una vez y quedaba en "Disponible" hasta que el
+  // socket moría solo → alguien sin mirar la pantalla seguía "Disponible" y lo que le
+  // mandaban quedaba en ✓ (enviado) sin pasar a ✓✓. Al cerrar (pagehide) se hace
+  // untrack para que la presencia caiga de inmediato en vez de quedar colgada.
+  useEffect(() => {
+    if (!user?.id) return;
+    const trackAs = (status: UserStatus) => {
+      const channel = channelRef.current;
+      if (!channel) return;
+      void channel.track({ user_id: userIdRef.current, online_at: new Date().toISOString(), status });
+    };
+    const onVisibility = () => { trackAs(document.hidden ? "away" : myStatusRef.current); };
+    const onPageHide = () => { void channelRef.current?.untrack(); };
+    const onPageShow = () => { trackAs(myStatusRef.current); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [user?.id]);
 
