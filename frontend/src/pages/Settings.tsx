@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
-  Rocket,
   Shield,
   ClipboardCheck,
   Palette,
@@ -58,7 +57,7 @@ import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 // right side renders the active section. Layout matches the screenshot
 // the user shared (KASH "Role settings" page).
 
-type TabKey = "account" | "mp" | "admin" | "resources";
+type TabKey = "account" | "admin" | "resources";
 
 interface TabDef {
   key: TabKey;
@@ -776,30 +775,6 @@ const WhatsappPhoneCard = ({
   );
 };
 
-const ProyectoMPTab = () => {
-  const { t } = useLanguage();
-  return (
-  <div className="space-y-4">
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">{t("settings.mpTitle")}</h1>
-      <p className="text-sm text-muted-foreground">
-        {t("settings.mpDesc")}
-      </p>
-    </div>
-    <Card>
-      <CardContent className="space-y-2 p-4">
-        <Row
-          to="/proyectomp"
-          icon={Rocket}
-          title={t("settings.mpOpen")}
-          description={t("settings.mpOpenDesc")}
-        />
-      </CardContent>
-    </Card>
-  </div>
-  );
-};
-
 const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePermissions>["canAccess"]; isAdmin: boolean }) => {
   const { t } = useLanguage();
   return (
@@ -897,7 +872,6 @@ const Settings = () => {
     navigate("/login");
   };
 
-  const showProyectoMP = canAccess("ProyectoMP") || isAdmin;
   const showAdmin = canAccess("Administración") || isAdmin;
   const showResources = showAdmin;
 
@@ -905,7 +879,6 @@ const Settings = () => {
   // sidebar used to apply.
   const tabs: TabDef[] = [
     { key: "account", label: t("settings.myAccount"), icon: UserIcon },
-    ...(showProyectoMP ? [{ key: "mp" as const, label: t("settings.mpTitle"), icon: Rocket }] : []),
     ...(showAdmin ? [{ key: "admin" as const, label: t("settings.adminTitle"), icon: Shield }] : []),
     ...(showResources ? [{ key: "resources" as const, label: t("sidebar.resources") || "Recursos", icon: Palette }] : []),
   ];
@@ -983,7 +956,6 @@ const Settings = () => {
           en vez de mandar al usuario a otra ruta. */}
       <SettingsRightPane
         active={active}
-        showProyectoMP={showProyectoMP}
         showAdmin={showAdmin}
         showResources={showResources}
         canAccess={canAccess}
@@ -999,7 +971,6 @@ const Settings = () => {
 // hooks (useSearchParams) sin contaminar el render principal.
 const SettingsRightPane = ({
   active,
-  showProyectoMP,
   showAdmin,
   showResources,
   canAccess,
@@ -1007,7 +978,6 @@ const SettingsRightPane = ({
   t,
 }: {
   active: TabKey;
-  showProyectoMP: boolean;
   showAdmin: boolean;
   showResources: boolean;
   canAccess: ReturnType<typeof usePermissions>["canAccess"];
@@ -1088,7 +1058,6 @@ const SettingsRightPane = ({
   return (
     <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
       {active === "account" && <MyAccountTab />}
-      {active === "mp" && showProyectoMP && <ProyectoMPTab />}
       {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
       {active === "resources" && showResources && <ResourcesTab t={t} />}
     </section>

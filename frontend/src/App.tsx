@@ -23,7 +23,7 @@ import Logo from "@/components/Logo";
 // the user expects ("se siente como en otros CRMs").
 //
 // Only pages that are public, full-screen, or rarely visited stay
-// lazy (login forgot/reset, video calls, Proyecto MP, share tokens).
+// lazy (login forgot/reset, video calls, share tokens).
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -57,16 +57,6 @@ const TelegramChannelsPage = lazy(() => import("./pages/telegram/TelegramChannel
 const TelegramInboxPage = lazy(() => import("./pages/telegram/TelegramInboxPage"));
 const OpportunitiesPage = lazy(() => import("./pages/opportunities/OpportunitiesPage"));
 
-// Proyecto MP — its own sub-app, kept lazy.
-const ProyectoMPLayout = lazy(() => import("./pages/proyectomp/ProyectoMPLayout"));
-const ProyectoMPDashboard = lazy(() => import("./pages/proyectomp/ProyectoMPDashboard"));
-const ProyectoMPTareas = lazy(() => import("./pages/proyectomp/ProyectoMPTareas"));
-const ProyectoMPPipeline = lazy(() => import("./pages/proyectomp/ProyectoMPPipeline"));
-const ProyectoMPContenido = lazy(() => import("./pages/proyectomp/ProyectoMPContenido"));
-const ProyectoMPTrafico = lazy(() => import("./pages/proyectomp/ProyectoMPTrafico"));
-const ProyectoMPFinanzas = lazy(() => import("./pages/proyectomp/ProyectoMPFinanzas"));
-const ProyectoMPEquipo = lazy(() => import("./pages/proyectomp/ProyectoMPEquipo"));
-const ProyectoMPMilestones = lazy(() => import("./pages/proyectomp/ProyectoMPMilestones"));
 
 // Eager — main CRM pages.
 const DesignSystem = lazy(() => import("./pages/DesignSystem"));
@@ -264,8 +254,7 @@ const App = () => (
 
               {/* Protected routes that share the AppShell — Sidebar +
                   Topbar mount once and persist across nav between these
-                  routes. Only ProyectoMP (its own MP-specific layout)
-                  and the full-screen video pages stay outside. */}
+                  routes. Only the full-screen video pages stay outside. */}
               <Route element={<ProtectedRoute><CallProvider><PersistentCallProvider><AppShell /></PersistentCallProvider></CallProvider></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
@@ -392,16 +381,6 @@ const App = () => (
 
               {/* Full-screen routes that intentionally bypass the shell */}
               <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
-
-              {/* Proyecto MP routes (own custom MPSidebar + MPTopbar) */}
-              <Route path="/proyectomp" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPDashboard /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/tareas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTareas /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/pipeline" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPPipeline /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/contenido" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPContenido /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/trafico" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTrafico /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/finanzas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPFinanzas /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/equipo" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPEquipo /></ProyectoMPLayout></PermissionRoute>} />
-              <Route path="/proyectomp/milestones" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPMilestones /></ProyectoMPLayout></PermissionRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

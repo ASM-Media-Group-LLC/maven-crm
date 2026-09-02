@@ -756,7 +756,7 @@ const DashboardSidebar = () => {
         </CollapsibleSidebarGroup>
         )}
 
-        {/* Proyecto MP, Administración and Recursos used to live here
+        {/* Administración and Recursos used to live here
             as their own sidebar groups. They've all moved into the
             Settings page (reachable from the user dropdown), keeping
             the left rail focused on day-to-day operational tabs. */}

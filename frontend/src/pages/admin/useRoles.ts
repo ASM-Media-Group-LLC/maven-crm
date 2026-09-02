@@ -227,7 +227,6 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // === Configuración / Settings ===
   // "Roles" es una pestaña interna de Usuarios (CRUD de roles) → es una ACCIÓN, no un subtab navegable.
   def("Configuración", "Administración", ["Usuarios", "Auditoría"], ["Roles"]),
-  def("Configuración", "ProyectoMP"),
 ];
 
 export const useRoles = () => {
