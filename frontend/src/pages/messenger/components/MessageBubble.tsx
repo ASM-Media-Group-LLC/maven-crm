@@ -18,6 +18,7 @@ import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { renderTextWithMentions } from "./MentionAutocomplete";
 import { formatTime as formatMsgTime } from "../utils";
+import { useNavigate } from "react-router-dom";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -91,6 +92,18 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     return Object.values(profiles).map(p => p.full_name).filter(Boolean) as string[];
   }, [profiles]);
 
+  // Mención clickeada → abrir el DM con esa persona. MessengerPage ya sabe
+  // resolver /messenger?dm=<userId> (crea o reutiliza el chat 1:1); acá solo
+  // se traduce el nombre de la mención a su userId. La mención a uno mismo no
+  // linkea a nada útil, así que abre la ficha en su lugar.
+  const navigate = useNavigate();
+  const abrirDmDeMencion = (nombre: string) => {
+    const perfil = Object.values(profiles).find((p) => p.full_name === nombre);
+    if (!perfil) return;
+    if (perfil.id === message.sender_id && isMe) { onOpenProfile?.(perfil.id); return; }
+    navigate(`/messenger?dm=${perfil.id}`);
+  };
+
   if (isPartOfGrid && !isGridLeader) return null;
 
   if (message.is_deleted) {
@@ -121,7 +134,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const highlightText = (text: string) => {
     if (!highlight) {
       if (chatType === "group") {
-        return renderTextWithMentions(text, participantNames);
+        return renderTextWithMentions(text, participantNames, abrirDmDeMencion);
       }
       return linkifyText(text);
     }
