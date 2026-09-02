@@ -98,10 +98,18 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
     if (!open) return;
     setBorrador(reglas);
     setAbiertas({});
+    setModoPersonalizado(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const presetActivo = detectarPreset(borrador);
+  // "Personalizado" no tiene valores propios: es lo que queda al tocar
+  // cualquier número. Pero Jhon lo intentó tocar y no pasaba nada, y un botón
+  // que no responde se lee como roto. Ahora al elegirlo se marca y se
+  // despliegan las cuatro tarjetas: la invitación es "ajústalas una por una".
+  // La marca dura hasta que se elija otro preset; guardar sigue usando los
+  // valores reales (si quedaron iguales a un preset, se guarda ese).
+  const [modoPersonalizado, setModoPersonalizado] = useState(false);
+  const presetActivo = modoPersonalizado ? "personalizado" : detectarPreset(borrador);
   const sinCambios = mismasReglas(borrador, reglas);
 
   const cambiarAviso = (clave: ClaveAviso, parche: Partial<ReglaAviso>) =>
@@ -164,21 +172,25 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-2xl sm:rounded-full bg-white/[0.04] border border-white/10 p-1 backdrop-blur-md">
             {OPCIONES_PRESET.map((op) => {
               const activo = presetActivo === op.valor;
-              // "Personalizado" no se elige: es lo que queda al tocar cualquier
-              // número. Se muestra activo cuando el borrador ya no coincide con
-              // ningún preset.
               const manual = op.valor === "personalizado";
               return (
                 <button
                   key={op.valor}
                   type="button"
-                  disabled={manual}
-                  onClick={() => { if (!manual) setBorrador(PRESETS[op.valor]); }}
+                  onClick={() => {
+                    if (manual) {
+                      setModoPersonalizado(true);
+                      setAbiertas({ camara: true, encuadre: true, pantalla: true, pausas: true });
+                      return;
+                    }
+                    setModoPersonalizado(false);
+                    setBorrador(PRESETS[op.valor]);
+                  }}
                   className={cn(
-                    "h-8 tactil:h-10 min-w-0 truncate px-2 rounded-full text-xs font-medium transition-all disabled:cursor-default",
+                    "h-8 tactil:h-10 min-w-0 truncate px-2 rounded-full text-xs font-medium transition-all",
                     activo
                       ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
-                      : "text-muted-foreground enabled:hover:text-foreground enabled:hover:bg-white/[0.06]",
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]",
                   )}
                 >
                   {op.texto}
@@ -187,7 +199,7 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
             })}
           </div>
           <p className="text-xs text-muted-foreground px-1">
-            Estándar es lo que Cowork hace hoy con los chatters. Al tocar cualquier regla pasa a Personalizado.
+            Estándar es lo que Cowork hace hoy con los chatters. Personalizado abre las cuatro reglas para ajustarlas una por una.
           </p>
         </div>
 
