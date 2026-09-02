@@ -32,7 +32,7 @@ import {
   ClipboardCheck, Map, Search, Headphones, Video, Users2, MessageCircle,
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
-  CalendarDays, Building2, Briefcase, History, Rocket, CalendarRange } from "lucide-react";
+  CalendarDays, Building2, Briefcase, History, CalendarRange } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -43,7 +43,6 @@ export type NavSection =
   | "Operaciones"
   | "RRHH"
   | "Finanzas"
-  | "Proyecto MP"
   | "Admin"
   | "Sistema";
 
@@ -148,15 +147,6 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Finanzas · Reportes Avanzados", url: "/finanzas/reportes", icon: BarChart3, module: "Finanzas", submodule: "Reportes", section: "Finanzas" },
   { title: "Finanzas · Configuración", url: "/finanzas/configuracion", icon: Settings, module: "Finanzas", submodule: "Configuración", section: "Finanzas" },
 
-  // ── Proyecto MP ───────────────────────────────────────────────────────
-  { title: "Proyecto MP · Dashboard", url: "/proyectomp", icon: Rocket, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Tareas", url: "/proyectomp/tareas", icon: ListChecks, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Pipeline", url: "/proyectomp/pipeline", icon: TrendingUp, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Contenido", url: "/proyectomp/contenido", icon: Clapperboard, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Tráfico", url: "/proyectomp/trafico", icon: Activity, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Finanzas", url: "/proyectomp/finanzas", icon: Wallet, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Equipo", url: "/proyectomp/equipo", icon: Users2, module: "ProyectoMP", section: "Proyecto MP" },
-  { title: "Proyecto MP · Milestones", url: "/proyectomp/milestones", icon: Map, module: "ProyectoMP", section: "Proyecto MP" },
 
   // ── Admin ─────────────────────────────────────────────────────────────
   { title: "Admin · Usuarios", url: "/admin/usuarios", icon: UserCog, adminOnly: true, section: "Admin", keywords: ["roles"] },
@@ -173,7 +163,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
 
 /** Orden estable de secciones para render agrupado en el ⌘K. */
 export const NAV_SECTIONS: NavSection[] = [
-  "Menú", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Proyecto MP", "Admin", "Sistema",
+  "Menú", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Admin", "Sistema",
 ];
 
 /**
