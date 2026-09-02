@@ -9,6 +9,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
+import type { DeletedMessageArchive } from "../useDeletedMessages";
 import { profileName, safeFileUrl } from "../utils";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ interface MessageBubbleProps {
   highlight: string;
   onReply: () => void;
   onOpenProfile?: (userId: string) => void;
+  /** Contenido original si el mensaje fue eliminado. Solo llega a admins (RLS). */
+  deletedArchive?: DeletedMessageArchive;
   onCopy: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
@@ -52,7 +55,7 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
-  message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, onCopy, onEdit, onDelete, onRetry,
+  message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
@@ -110,9 +113,28 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     return (
       <div ref={ref} className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start", "px-1")}>
         {!isMe && <div className="w-8 shrink-0" />}
-        <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
-          <p className="text-xs text-muted-foreground italic">Mensaje eliminado</p>
-        </div>
+        {deletedArchive ? (
+          /* Si llegó el archivo, quien mira es admin (la tabla es solo-admin por
+             RLS): se conserva el mensaje original con tinte rosa + etiqueta de
+             eliminado, mismo criterio que Chatter Evaluator. */
+          <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-rose-500/10 border border-rose-500/25">
+            {deletedArchive.type === "image" && deletedArchive.file_url ? (
+              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} className="rounded-lg max-w-full max-h-48 object-cover" />
+            ) : deletedArchive.file_url ? (
+              <a href={deletedArchive.file_url} target="_blank" rel="noopener noreferrer" className="text-xs underline break-all">
+                {deletedArchive.file_name || "Archivo"}
+              </a>
+            ) : null}
+            {deletedArchive.content && (
+              <p className="text-sm whitespace-pre-wrap break-words mt-1">{deletedArchive.content}</p>
+            )}
+            <div className="mt-0.5 text-[10px] italic text-rose-300/90">Eliminado por el autor · solo admins</div>
+          </div>
+        ) : (
+          <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
+            <p className="text-xs text-muted-foreground italic">Eliminado por el autor</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -562,6 +584,7 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
     prev.threadCount === next.threadCount &&
     prev.unreadThreadCount === next.unreadThreadCount &&
     prev.replyMessage === next.replyMessage &&
+    prev.deletedArchive === next.deletedArchive &&
     prev.adjacentImages === next.adjacentImages &&
     prev.isGridLeader === next.isGridLeader &&
     prev.isPartOfGrid === next.isPartOfGrid

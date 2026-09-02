@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { ChatMessage, UserProfile } from "../types";
+import type { DeletedMessageArchive } from "../useDeletedMessages";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ interface MessageListProps {
   loading: boolean;
   onReply: (msg: ChatMessage) => void;
   onOpenProfile?: (userId: string) => void;
+  deletedArchive?: Record<string, DeletedMessageArchive>;
   onCopy: (content: string) => void;
   onEdit: (id: string, content: string) => void;
   onDelete: (id: string) => void;
@@ -64,7 +66,7 @@ function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onOpenProfile, onCopy, onEdit, onDelete, onRetry,
+  loading, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
@@ -270,6 +272,7 @@ export default function MessageList({
                       highlight={searchQuery.toLowerCase()}
                       onReply={() => onReply(msg)}
                       onOpenProfile={onOpenProfile}
+                      deletedArchive={deletedArchive?.[msg.id]}
                       onCopy={() => onCopy(msg.content || "")}
                       onEdit={(content) => onEdit(msg.id, content)}
                       onDelete={() => onDelete(msg.id)}

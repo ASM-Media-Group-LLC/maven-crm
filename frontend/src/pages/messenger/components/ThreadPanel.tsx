@@ -11,6 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
+import type { DeletedMessageArchive } from "../useDeletedMessages";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,12 +44,14 @@ interface ThreadPanelProps {
   getReadByUsers: (messageId: string) => string[];
   getDeliveredByUsers: (messageId: string) => string[];
   totalParticipants: number;
+  /** Contenido original de los eliminados. Solo llega a admins (RLS). */
+  deletedArchive?: Record<string, DeletedMessageArchive>;
 }
 
 export default function ThreadPanel({
   parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants,
   onEditMessage, onDeleteMessage, getReactionsForMessage, onToggleReaction,
-  getReadByUsers, getDeliveredByUsers, totalParticipants,
+  getReadByUsers, getDeliveredByUsers, totalParticipants, deletedArchive,
 }: ThreadPanelProps) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -252,6 +255,23 @@ export default function ThreadPanel({
     // El borrado se chequea PRIMERO: si va después de las ramas de imagen/video/
     // audio/archivo, esas retornan antes y un adjunto eliminado seguía mostrándose.
     if (msg.is_deleted) {
+      const arch = deletedArchive?.[msg.id];
+      // Con fila de archivo = quien mira es admin (RLS solo-admin) → ve el original.
+      if (arch) {
+        return (
+          <div className="rounded-lg px-2 py-1.5 bg-rose-500/10 border border-rose-500/25">
+            {arch.type === "image" && arch.file_url ? (
+              <img src={arch.file_url} alt={arch.file_name || "imagen"} className="rounded-lg max-w-full max-h-48 object-cover" />
+            ) : arch.file_url ? (
+              <a href={safeFileUrl(arch.file_url)} target="_blank" rel="noopener noreferrer" className="text-[12px] underline break-all">
+                {arch.file_name || "Archivo"}
+              </a>
+            ) : null}
+            {arch.content && <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{arch.content}</p>}
+            <div className="mt-0.5 text-[10px] italic text-rose-300/90">Eliminado por el autor · solo admins</div>
+          </div>
+        );
+      }
       return <span className="italic text-muted-foreground text-[13px]">Eliminado por el autor</span>;
     }
 
