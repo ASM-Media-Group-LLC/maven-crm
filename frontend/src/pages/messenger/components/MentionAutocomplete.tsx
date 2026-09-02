@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserProfile } from "../types";
@@ -31,6 +32,35 @@ export function insertMention(text: string, startIndex: number, endIndex: number
   return text.slice(0, startIndex) + `@${displayName} ` + text.slice(endIndex);
 }
 
+// URLs clickeables dentro del texto (abren en otra pestaña). Vive acá y no
+// en MessageBubble porque los tramos SIN mención también pasan por esta
+// función: antes, en los grupos, el texto entraba por las menciones y se
+// saltaba el linkify de MessageBubble — un link de OnlyFans pegado en un grupo
+// salía como texto plano (Vanessa, 02/09/2026). En los DMs sí funcionaba,
+// porque ahí MessageBubble no llamaba a esta función.
+const URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
+
+export function linkifyText(text: string, keyPrefix = ""): ReactNode[] {
+  return text.split(URL_REGEX).map((part, i) =>
+    // El regex es global: `test` mueve lastIndex y se salta matches alternos,
+    // por eso se resetea antes de cada prueba.
+    ((URL_REGEX.lastIndex = 0), URL_REGEX.test(part)) ? (
+      <a
+        key={`${keyPrefix}u${i}`}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="underline hover:opacity-80 break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={`${keyPrefix}t${i}`}>{part}</span>
+    ),
+  );
+}
+
 export function renderTextWithMentions(
   text: string,
   participantNames: string[],
@@ -38,20 +68,22 @@ export function renderTextWithMentions(
   // persona (lo resuelve el que llama, que es quien conoce nombre→userId).
   onMentionClick?: (name: string) => void,
 ) {
-  if (!text || participantNames.length === 0) return text;
+  // Sin participantes no hay menciones que buscar, pero los links igual van.
+  if (!text) return text;
+  if (participantNames.length === 0) return <>{linkifyText(text)}</>;
 
   const mentionPattern = new RegExp(
     `@(${participantNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`,
     'g'
   );
 
-  const parts: (string | JSX.Element)[] = [];
+  const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match;
 
   while ((match = mentionPattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+      parts.push(...linkifyText(text.slice(lastIndex, match.index), `s${lastIndex}-`));
     }
     const nombre = match[1];
     parts.push(
@@ -75,7 +107,7 @@ export function renderTextWithMentions(
   }
 
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    parts.push(...linkifyText(text.slice(lastIndex), `e${lastIndex}-`));
   }
 
   return parts.length > 0 ? <>{parts}</> : text;

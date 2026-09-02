@@ -17,7 +17,7 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
-import { renderTextWithMentions } from "./MentionAutocomplete";
+import { renderTextWithMentions, linkifyText } from "./MentionAutocomplete";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
 
@@ -138,20 +138,6 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       </div>
     );
   }
-
-  const linkifyText = (text: string): React.ReactNode[] => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-    return parts.map((part, i) =>
-      urlRegex.test(part) ? (
-        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80 break-all">
-          {part}
-        </a>
-      ) : (
-        <span key={i}>{part}</span>
-      )
-    );
-  };
 
   const highlightText = (text: string) => {
     if (!highlight) {
