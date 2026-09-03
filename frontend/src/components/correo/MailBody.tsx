@@ -82,7 +82,12 @@ function documento(cuerpo: string, cargarRemotas: boolean): string {
   table { border-collapse: collapse; }
   pre { white-space: pre-wrap; }
   a { color: #2563eb; }
-</style></head><body>${cuerpo}</body></html>`;
+  /* El envoltorio existe SOLO para medir: el alto de <body> nunca baja del
+     alto del iframe (scrollHeight >= clientHeight), así que un correo de dos
+     líneas quedaba en una tarjeta blanca de 240px casi vacía. Un div sí
+     reporta su alto real. */
+  #medida { display: block; }
+</style></head><body><div id="medida">${cuerpo}</div></body></html>`;
 }
 
 /** Escapa texto plano para mostrarlo dentro del iframe. */
@@ -96,7 +101,7 @@ function textoPlano(t: string): string {
 
 export function MailBody({ html, text, remoteImages, truncated }: Props) {
   const [cargarRemotas, setCargarRemotas] = useState(false);
-  const [alto, setAlto] = useState(240);
+  const [alto, setAlto] = useState(160);   // provisorio: se remide con el contenido
   const ref = useRef<HTMLIFrameElement>(null);
 
   const srcDoc = useMemo(() => {
@@ -115,8 +120,13 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
       try {
         const doc = marco.contentDocument;
         if (!doc?.body) return;
-        const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
-        if (h > 0) setAlto(Math.min(h + 16, 20000));
+        // El alto REAL es el del envoltorio (ver #medida en `documento()`);
+        // body/documentElement nunca bajan del alto del propio iframe.
+        const medida = doc.getElementById("medida");
+        const h = medida
+          ? Math.ceil(medida.getBoundingClientRect().height) + 32   // + el padding del body
+          : Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+        if (h > 0) setAlto(Math.min(Math.max(h, 96), 20000));
       } catch {
         // Si el navegador no deja leer el documento, queda el alto por
         // defecto y el iframe scrollea solo. Se ve peor, no se rompe.
