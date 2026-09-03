@@ -15,6 +15,7 @@ import { useCreadorById } from "./useCreadores";
 import ProfilePhotoEditor from "./ProfilePhotoEditor";
 import InfoTabContent from "./InfoTabContent";
 import LineamientosTabContent from "./LineamientosTabContent";
+import LineamientosSoloLectura from "./LineamientosSoloLectura";
 import RedesTabContent from "./RedesTabContent";
 import MonetizacionTabContent from "./MonetizacionTabContent";
 import NotasTabContent from "./NotasTabContent";
@@ -27,6 +28,7 @@ import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
 import { useOffboarding } from "./useOffboarding";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useVistaTrabajo } from "./vistaTrabajo";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -127,15 +129,21 @@ const CreadorProfileContent = () => {
   // step atrás en el history para preservar el contexto (filtros,
   // popup abierto, scroll position). Si entró directo por URL
   // (location.key === "default"), caemos a /creadores como antes.
-  const goBack = () => {
-    if (location.key !== "default") navigate(-1);
-    else navigate("/creadores");
-  };
   const { data: creator, isLoading } = useCreadorById(id ?? "");
-  const { isAgent, isAdmin, isManager } = useUserRole();
+  const { isAdmin, isManager } = useUserRole();
+  // Chatter que entró por su roster (o el rol legacy `agent`): perfil de
+  // trabajo, sin datos de contacto ni gestión. Ver `vistaTrabajo.ts`.
+  const { vistaTrabajo, cargando: permisosCargando } = useVistaTrabajo();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 
-  if (isLoading) {
+  const goBack = () => {
+    if (location.key !== "default") navigate(-1);
+    // Entró por URL directa: el chatter no tiene el tab Creadoras, así que
+    // volver a /creadores lo dejaría en una pantalla que no puede ver.
+    else navigate(vistaTrabajo ? "/chatters/horarios" : "/creadores");
+  };
+
+  if (isLoading || permisosCargando) {
     return (
       <main className="flex-1 p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -158,8 +166,10 @@ const CreadorProfileContent = () => {
 
   const c = creator;
   
-  // Privacy logic: agents see restricted data unless privacy flags are ON
-  const canSeeAllData = isAdmin || isManager || !isAgent;
+  // Privacy logic: la vista de trabajo ve el nombre artístico, la edad a
+  // mostrar y la ubicación artística, salvo que la creadora haya dado permiso
+  // explícito para el dato real.
+  const canSeeAllData = isAdmin || isManager || !vistaTrabajo;
   const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
   const showRealAge = canSeeAllData || (c as any).permiso_edad_real === true;
   const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
@@ -191,7 +201,7 @@ const CreadorProfileContent = () => {
             photoUrl={c.profile_photo_url}
             initials={initials}
             instagramHandle={c.instagram_handle}
-            canEdit={!isAgent}
+            canEdit={!vistaTrabajo}
           />
 
           <div className="flex-1 min-w-0 space-y-2">
@@ -204,10 +214,13 @@ const CreadorProfileContent = () => {
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {c.whatsapp_number && (
+              {/* Contacto: NO en la vista de trabajo. El teléfono ya viene
+                  enmascarado de la BD y estos botones son ese mismo número en
+                  forma de acción (abren la bandeja / el chat con ella). */}
+              {!vistaTrabajo && c.whatsapp_number && (
                 <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
               )}
-              {(c.whatsapp_number || c.phone) && (
+              {!vistaTrabajo && (c.whatsapp_number || c.phone) && (
                 <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700" />
               )}
               {c.instagram_handle && (
@@ -224,13 +237,17 @@ const CreadorProfileContent = () => {
           </div>
 
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={async () => {
-              const { generateCreatorPdf } = await import("./generateCreatorPdf");
-              generateCreatorPdf(c);
-            }}>
-              <Download className="h-4 w-4" /> Exportar Ficha Técnica
-            </Button>
-            {!isAgent && (c as any).entered_crm_at && (
+            {/* La ficha técnica en PDF es un volcado de TODOS los campos:
+                queda fuera de la vista de trabajo. */}
+            {!vistaTrabajo && (
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={async () => {
+                const { generateCreatorPdf } = await import("./generateCreatorPdf");
+                generateCreatorPdf(c);
+              }}>
+                <Download className="h-4 w-4" /> Exportar Ficha Técnica
+              </Button>
+            )}
+            {!vistaTrabajo && (c as any).entered_crm_at && (
               <Badge
                 variant="success-soft"
                 className="gap-1"
@@ -243,8 +260,8 @@ const CreadorProfileContent = () => {
             {c.status && (
               <Badge
                 variant={statusVariant[c.status] ?? "secondary-soft"}
-                className={!isAgent ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
-                onClick={!isAgent ? () => setStatusModalOpen(true) : undefined}
+                className={!vistaTrabajo ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                onClick={!vistaTrabajo ? () => setStatusModalOpen(true) : undefined}
               >
                 {statusLabel[c.status] ?? c.status}
               </Badge>
@@ -259,19 +276,29 @@ const CreadorProfileContent = () => {
         </div>
       </div>
 
-      {c.status && !isAgent && (
+      {c.status && !vistaTrabajo && (
         <VerificationSection creatorId={id!} creatorName={c.name} currentStatus={c.status} />
       )}
 
-      {(c.status === "leaving" || c.status === "terminated") && !isAgent && (
+      {(c.status === "leaving" || c.status === "terminated") && !vistaTrabajo && (
         <OffboardingSummaryCard creatorId={id!} />
       )}
 
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="operaciones">
           <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="operaciones">{isAgent ? "Insights" : "Operaciones"}</TabsTrigger>
-            {!isAgent && (
+            <TabsTrigger value="operaciones">{vistaTrabajo ? "Cómo escribirle" : "Operaciones"}</TabsTrigger>
+            {/* Vista de trabajo: además de la operativa, los lineamientos y las
+                redes públicas, las dos en solo lectura. Nada de Información
+                (teléfono, dirección, notas internas), Documentos, Monetización,
+                Tickets ni Historial. */}
+            {vistaTrabajo && (
+              <>
+                <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
+                <TabsTrigger value="redes">Redes</TabsTrigger>
+              </>
+            )}
+            {!vistaTrabajo && (
               <>
                 <TabsTrigger value="info">Información</TabsTrigger>
                 <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
@@ -289,7 +316,19 @@ const CreadorProfileContent = () => {
             <OperacionesTabContent creator={c} />
           </TabsContent>
 
-          {!isAgent && (
+          {vistaTrabajo && (
+            <>
+              <TabsContent value="lineamientos">
+                <LineamientosSoloLectura creatorId={id!} />
+              </TabsContent>
+
+              <TabsContent value="redes">
+                <RedesTabContent creator={c} creatorId={id!} soloLectura />
+              </TabsContent>
+            </>
+          )}
+
+          {!vistaTrabajo && (
             <>
               <TabsContent value="info">
                 <InfoTabContent creator={c} creatorId={id!} />
@@ -326,7 +365,7 @@ const CreadorProfileContent = () => {
           )}
         </Tabs>
       </div>
-      {c.status && (
+      {c.status && !vistaTrabajo && (
         <ChangeStatusModal
           creatorId={id!}
           creatorName={c.name}

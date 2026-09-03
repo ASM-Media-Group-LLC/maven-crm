@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useUserRole } from "@/hooks/useUserRole";
 import ChatterOperationalView from "./ChatterOperationalView";
+import { useVistaTrabajo } from "./vistaTrabajo";
 
 interface OperacionesTabContentProps {
   creator: {
@@ -89,9 +89,12 @@ const crisisScripts: { key: string; label: string }[] = [
 ];
 
 const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
-  const { isAgent } = useUserRole();
+  // La vista operativa (personaje, precios, protocolo de respuesta) es la que
+  // ve quien abre el perfil como vista de trabajo: el chatter que llega por su
+  // roster de Horarios y el rol legacy `agent`. Ver `vistaTrabajo.ts`.
+  const { vistaTrabajo } = useVistaTrabajo();
 
-  if (isAgent) {
+  if (vistaTrabajo) {
     return <ChatterOperationalView creator={creator} />;
   }
 

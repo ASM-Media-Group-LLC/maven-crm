@@ -22,6 +22,10 @@ import ExtraAccountsInline from "./ExtraAccountsInline";
 interface RedesTabContentProps {
   creator: CreatorFull;
   creatorId: string;
+  /** Vista de trabajo del chatter: solo las redes PÚBLICAS, sin editar nada.
+   *  Deja afuera el WhatsApp (es su número, aunque se muestre enmascarado y el
+   *  botón no exponga dígitos) y las cuentas extra, que RLS no le abre. */
+  soloLectura?: boolean;
 }
 
 // Campo principal de creators → red de creator_social_accounts (multi-cuenta).
@@ -192,10 +196,10 @@ const platforms: PlatformConfig[] = [
   },
 ];
 
-const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
+const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabContentProps) => {
   const queryClient = useQueryClient();
   const { isAdmin, role } = useUserRole();
-  const canManage = isAdmin || role === "manager";
+  const canManage = !soloLectura && (isAdmin || role === "manager");
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<EditData>({
@@ -325,7 +329,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           <h2 className="text-lg font-semibold">Redes Sociales</h2>
           <p className="text-sm text-muted-foreground">Enlaces a perfiles en redes sociales</p>
         </div>
-        {!isEditing ? (
+        {soloLectura ? null : !isEditing ? (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
             <Edit className="h-3.5 w-3.5" /> Editar
           </Button>
@@ -341,7 +345,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         )}
       </div>
 
-      {isEditing ? (
+      {isEditing && !soloLectura ? (
         <div className="space-y-4">
           {platforms.map((platform) => (
             <div key={platform.key} className="space-y-1.5">
@@ -368,7 +372,12 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {platforms.filter((p) => !p.editOnly).map((platform) => {
+          {platforms
+            .filter((p) => !p.editOnly)
+            // El chatter no ve el WhatsApp: es el número de contacto de la
+            // creadora, y el botón de la bandeja es ese número en forma de acción.
+            .filter((p) => !(soloLectura && p.key === "whatsapp_number"))
+            .map((platform) => {
             const maskThis = platform.key === "whatsapp_number" && !isAdmin;
             const url = maskThis ? "" : platform.buildUrl(creator);
             const hasLink = !!url;
@@ -405,7 +414,9 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                   <p className="text-sm text-muted-foreground truncate">
                     {displayVal}
                   </p>
-                  {MULTI_NET[platform.key] && (
+                  {/* Cuentas extra: RLS (creator_social_accounts) no se las abre
+                      al chatter, así que en la vista de trabajo no se piden. */}
+                  {MULTI_NET[platform.key] && !soloLectura && (
                     <ExtraAccountsInline creatorId={creatorId} network={MULTI_NET[platform.key]!} canManage={false} />
                   )}
                 </div>
