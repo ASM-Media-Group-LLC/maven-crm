@@ -37,13 +37,15 @@ type ListResp = { keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: strin
 
 const FALLBACK_CATALOG: ScopeDef[] = [
   { key: "creators:read", group: "Creadoras", label: "Perfil + redes sociales", description: "Roster de creadoras y sus redes." },
+  { key: "contacts:read", group: "Contactos", label: "Contactos y agencias", description: "Directorio comercial: modelos, agencias y ex-creadoras. Teléfono y email ENMASCARADOS." },
+  { key: "contacts:phone", group: "Contactos", label: "⚠️ Teléfono y email sin enmascarar", description: "Entrega la base comercial completa. Dentro de Maven este dato es solo-admin; una API key saltea esa capa." },
   { key: "employees:read", group: "Empleados", label: "Roster del equipo", description: "Nombre y rol de los empleados." },
   { key: "hubstaff:read", group: "Empleados", label: "Horas de Hubstaff (diario)", description: "Horas trackeadas, actividad y proyecto por empleado." },
   { key: "sales:read", group: "Ventas", label: "Ganancias por creadora (diario)", description: "Ganancias brutas diarias por creadora." },
   { key: "sales:chatters", group: "Ventas", label: "Ventas por chatter (diario)", description: "Ventas diarias por chatter." },
   { key: "promolog:read", group: "Promolog", label: "Promoción diaria", description: "Si cada creadora promocionó cada día, por red." },
 ];
-const FALLBACK_GROUPS = ["Creadoras", "Empleados", "Ventas", "Promolog"];
+const FALLBACK_GROUPS = ["Creadoras", "Contactos", "Empleados", "Ventas", "Promolog"];
 
 const API_BASE =
   `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
@@ -418,6 +420,8 @@ const AdminApiKeys = () => {
                 {[
                   { m: "GET", p: "/creators", s: "creators:read", d: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset." },
                   { m: "GET", p: "/creators/{id}", s: "creators:read", d: "Detalle de una creadora." },
+                  { m: "GET", p: "/contacts", s: "contacts:read", d: "Directorio comercial. Filtros: kind (modelo|agencia|ex_creadora), status, country, con_telefono, limit, offset. Teléfono y email enmascarados salvo que la key tenga contacts:phone." },
+                  { m: "GET", p: "/contacts/{id}", s: "contacts:read", d: "Detalle de un contacto." },
                   { m: "GET", p: "/employees", s: "employees:read", d: "Roster del equipo (nombre, rol). Filtro: role." },
                   { m: "GET", p: "/hubstaff", s: "hubstaff:read", d: "Horas diarias de Hubstaff por empleado (horas, actividad, proyecto). Filtros: from, to, profile_id." },
                   { m: "GET", p: "/sales", s: "sales:read", d: "Ganancias diarias por creadora + desglose. Filtros: from, to, creator_id." },
