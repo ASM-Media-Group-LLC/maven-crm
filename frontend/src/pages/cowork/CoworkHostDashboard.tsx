@@ -38,6 +38,7 @@ import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import CoworkReglasDialog from "./CoworkReglasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -72,7 +73,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const hubRoom = cowork.session?.host_hub_livekit_room ?? null;
   const hubKey = hubRoom ? `cowork-hub-${hubRoom}` : null;
   const hubConnected = !!hubKey && activeKey === hubKey;
-  const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
+  // Finalizar y repartir el enlace de host son del CREADOR de la sesión (o de
+  // un admin). Los demás hosts supervisan, pero no apagan la sesión para todos
+  // ni convierten en host a nadie: así se cortó la racha de cierres.
+  const { isAdmin } = useUserRole();
+  const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
+  const [copiandoEnlace, setCopiandoEnlace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
@@ -376,11 +382,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     });
   }, []);
 
-  useEffect(() => {
-    if (cowork.session?.id) {
-      cowork.getHostCode().then((res: any) => setHostInviteCode(res.hostCode)).catch(() => {});
-    }
-  }, [cowork.session?.id]);
 
   // Central de audio: captura del micro compartido para broadcastear a varias salas. Se toma
   // cuando le hablas a AL MENOS una sala (a todas con el botón global, o a una con su 🎤) y cada
@@ -1151,20 +1152,35 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-blue-500 hover:text-blue-400"
-                title="Copiar enlace de host"
-                onClick={() => {
-                  const code = hostInviteCode || "";
-                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host&code=${code}`;
-                  navigator.clipboard.writeText(url);
-                  toast.success("Enlace de host copiado");
-                }}
-              >
-                <Share2 className="h-3.5 w-3.5" />
-              </Button>
+              {puedeFinalizar && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-blue-500 hover:text-blue-400"
+                  title="Copiar enlace de host (vale 30 minutos)"
+                  disabled={copiandoEnlace}
+                  // El código se pide AL COPIAR, no al abrir el tablero: el servidor
+                  // lo emite con vencimiento, y uno pedido hace tres horas ya no
+                  // serviría. Mientras el vigente no venza, devuelve el mismo.
+                  onClick={async () => {
+                    setCopiandoEnlace(true);
+                    try {
+                      const res = await cowork.getHostCode() as { hostCode: string; expiresAt?: string };
+                      const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host&code=${res.hostCode}`;
+                      await navigator.clipboard.writeText(url);
+                      toast.success("Enlace de host copiado", {
+                        description: "Vale 30 minutos y convierte en host a quien lo abra: compártelo solo con quien deba supervisar.",
+                      });
+                    } catch (e) {
+                      toast.error("No se pudo copiar el enlace", { description: (e as Error).message });
+                    } finally {
+                      setCopiandoEnlace(false);
+                    }
+                  }}
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1179,6 +1195,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
                 )}
               </Button>
+              {puedeFinalizar && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -1191,6 +1208,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <Power className="h-3.5 w-3.5" />
               </Button>
+              )}
             </div>
           </div>
         </div>

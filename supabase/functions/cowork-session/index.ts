@@ -57,6 +57,9 @@ function err(req: Request, msg: string, status = 400) {
   return json(req, { error: msg }, status);
 }
 
+// Cuánto vale un enlace de host desde que el creador lo pide.
+const HOST_CODE_TTL_MS = 30 * 60 * 1000;
+
 // ── Reglas de alerta por sesión ─────────────────────────────────
 // ESPEJA frontend/src/lib/coworkReglas.ts (normalizarReglas y sus topes).
 // Deno no puede importar el módulo del frontend, así que la forma y los
@@ -157,6 +160,12 @@ serve(async (req) => {
     const { data: userData, error: authErr } = await supabase.auth.getUser();
     if (authErr || !userData?.user) return err(req, "Unauthorized", 401);
     const userId = userData.user.id;
+    /** ¿Tiene el rol admin de Maven? Es la llave maestra de Cowork: puede
+     *  finalizar y compartir el enlace de host de cualquier sesión. */
+    const esAdmin = async (uid: string): Promise<boolean> => {
+      const { data } = await admin.from("user_roles").select("user_id").eq("user_id", uid).eq("role", "admin").maybeSingle();
+      return !!data;
+    };
 
     // Get profile name
     const { data: profile } = await admin.from("profiles").select("full_name").eq("id", userId).single();
@@ -339,13 +348,17 @@ serve(async (req) => {
       // Determine requested role
       let memberRole = "participant";
       if (role === "host") {
-        if (!hostCode || hostCode !== session.host_invite_code) {
+        // Vigente = coincide Y no venció. Un código nunca emitido (expires_at
+        // null) tampoco vale: entrar como host exige que el creador lo pida hoy.
+        const codigoVigente = !!hostCode && hostCode === session.host_invite_code
+          && !!session.host_code_expires_at && new Date(session.host_code_expires_at).getTime() > Date.now();
+        if (!codigoVigente) {
           // Sin código válido solo pasa un ADMIN: puede entrar como host a
           // cualquier sesión (es su vía para supervisar salas ajenas desde la
           // lista global del landing, sin pedirle el código al coordinador).
           const { data: adminRole } = await admin.from("user_roles")
             .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
-          if (!adminRole) return err(req, "Código de host inválido", 403);
+          if (!adminRole) return err(req, "El enlace de host no es válido o ya venció. Pídele uno nuevo a quien creó la sesión.", 403);
         }
         memberRole = "host";
       }
@@ -843,10 +856,49 @@ serve(async (req) => {
       const { sessionId } = body;
       if (!sessionId) return err(req, "sessionId required");
 
-      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
+      // Finalizar saca a TODOS y no se puede deshacer. Antes bastaba con ser
+      // host, y CHATTERS KASH se finalizó cuatro veces en cuatro días por
+      // cuatro hosts distintos que confundían "finalizar" con "salir". Ahora
+      // solo quien la creó (o un admin) puede apagarla; los demás hosts salen.
+      const { data: sesion } = await admin.from("cowork_sessions")
+        .select("id, created_by, status").eq("id", sessionId).maybeSingle();
+      if (!sesion) return err(req, "Session not found", 404);
+      if (sesion.created_by !== userId && !(await esAdmin(userId))) {
+        return err(req, "Solo quien creó la sesión (o un admin) puede finalizarla. Si quieres irte, usa Salir.", 403);
+      }
+      if (sesion.status === "ended") return json(req, { success: true, yaEstaba: true });
 
-      await admin.from("cowork_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
+      // Y queda escrito QUIÉN. Hasta hoy la sesión no lo guardaba y hubo que
+      // rastrearlo en los registros del servidor, que se borran en semanas.
+      const { error: upErr } = await admin.from("cowork_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString(), ended_by: userId })
+        .eq("id", sessionId);
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { success: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // LEAVE SESSION — un host que NO creó la sesión se va de ella
+    //
+    // Es la salida que faltaba: sin ella, la única puerta visible para un
+    // co-host era "Finalizar", que apaga la sesión para todos. Salir borra la
+    // membresía y cierra sus asignaciones; para volver necesita un enlace de
+    // host nuevo del creador. El creador no puede salir: su puerta es Finalizar.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "leaveSession") {
+      const { sessionId } = body;
+      if (!sessionId) return err(req, "sessionId required");
+      const { data: sesion } = await admin.from("cowork_sessions")
+        .select("id, created_by").eq("id", sessionId).maybeSingle();
+      if (!sesion) return err(req, "Session not found", 404);
+      if (sesion.created_by === userId) {
+        return err(req, "Quien creó la sesión no puede salirse de ella: puede finalizarla.", 400);
+      }
+      await admin.from("cowork_room_assignments")
+        .update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
+      const { error: delErr } = await admin.from("cowork_memberships")
+        .delete().eq("session_id", sessionId).eq("user_id", userId);
+      if (delErr) return err(req, delErr.message, 500);
       return json(req, { success: true });
     }
 
@@ -857,13 +909,29 @@ serve(async (req) => {
       const { sessionId } = body;
       if (!sessionId) return err(req, "sessionId required");
 
-      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err(req, "Only hosts can get the invite code", 403);
+      // El enlace de host es lo que reparte el poder de supervisar (y, antes,
+      // de apagar la sesión). Lo pide solo quien la creó o un admin, y VENCE:
+      // un link que quedó en un chat hace días ya no convierte en host a nadie.
+      // Mientras el código vigente no venza se devuelve el mismo, así el
+      // creador puede mandárselo a dos personas seguidas sin que el segundo
+      // link mate al primero.
+      const { data: session } = await admin.from("cowork_sessions")
+        .select("id, created_by, host_invite_code, host_code_expires_at").eq("id", sessionId).maybeSingle();
+      if (!session) return err(req, "Session not found", 404);
+      if (session.created_by !== userId && !(await esAdmin(userId))) {
+        return err(req, "Solo quien creó la sesión (o un admin) puede compartir el enlace de host", 403);
+      }
 
-      const { data: session } = await admin.from("cowork_sessions").select("host_invite_code").eq("id", sessionId).single();
-      if (!session) return err(req, "Session not found");
+      const vigente = !!session.host_code_expires_at && new Date(session.host_code_expires_at).getTime() > Date.now();
+      if (vigente) return json(req, { hostCode: session.host_invite_code, expiresAt: session.host_code_expires_at });
 
-      return json(req, { hostCode: session.host_invite_code });
+      const hostCode = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+      const expiresAt = new Date(Date.now() + HOST_CODE_TTL_MS).toISOString();
+      const { error: upErr } = await admin.from("cowork_sessions")
+        .update({ host_invite_code: hostCode, host_code_expires_at: expiresAt })
+        .eq("id", sessionId);
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { hostCode, expiresAt });
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -20,6 +20,21 @@ export interface CoworkSessionRow {
   updated_at: string;
   /** Reglas de alerta propias de la sesión. null/ausente = estándar. */
   alert_rules?: unknown;
+  /** Quién la finalizó (auth user id). Lo escribe la edge en endSession. */
+  ended_by?: string | null;
+  /** Hasta cuándo vale el enlace de host. null = nunca emitido. */
+  host_code_expires_at?: string | null;
+}
+
+/** Una sesión finalizada hace poco en la que estuve, con quién la finalizó. */
+export interface SesionFinalizada {
+  id: string;
+  name: string;
+  endedAt: string;
+  endedBy: string | null;
+  endedByName: string | null;
+  createdBy: string | null;
+  members: number;
 }
 
 export interface CoworkRoom {
@@ -338,7 +353,7 @@ export function useCoworkSession(sessionId: string | null) {
   // uno esperaba al anterior. En la base cada consulta tarda ~2 ms: lo que se
   // sentía era la ida y vuelta, no el trabajo. El RPC es SECURITY INVOKER, así
   // que sigue respetando las RLS de cada tabla.
-  const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null }>> => {
+  const listMyActiveSessions = useCallback(async (): Promise<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null; createdBy: string | null }>> => {
     const { data, error } = await supabase.rpc("cowork_mis_sesiones_activas");
     if (error) throw error;
     return (data ?? []).map((s: any) => ({
@@ -349,8 +364,29 @@ export function useCoworkSession(sessionId: string | null) {
       members: s.members ?? 0,
       created_at: s.created_at,
       lastRoomId: s.last_room_id ?? null,
+      // Quién la creó: solo esa persona (o un admin) puede finalizarla.
+      createdBy: s.created_by ?? null,
     }));
   }, []);
+
+  // Las sesiones en las que estuve y que se finalizaron hace poco, con quién
+  // las finalizó. Es la respuesta en pantalla a "¿quién cerró la sala?", que
+  // hasta hoy había que ir a buscar a los registros del servidor.
+  const listMyEndedSessions = useCallback(async (dias = 7): Promise<SesionFinalizada[]> => {
+    // El RPC todavía no está en los tipos generados; el cast se acota acá.
+    const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: any[] | null; error: any }> })
+      .rpc("cowork_mis_sesiones_finalizadas", { _dias: dias });
+    if (error) throw error;
+    return (data ?? []).map((s: any) => ({
+      id: s.id, name: s.name, endedAt: s.ended_at, endedBy: s.ended_by ?? null,
+      endedByName: s.ended_by_name ?? null, createdBy: s.created_by ?? null, members: s.members ?? 0,
+    }));
+  }, []);
+
+  // Un host que NO creó la sesión se va de ella (borra su membresía). Es la
+  // puerta que faltaba: sin ella, la única visible era Finalizar, que apaga la
+  // sesión para todos.
+  const leaveSessionById = useCallback(async (sid: string) => invokeCowork("leaveSession", { sessionId: sid }), []);
 
   // Finalizar una sesión por id (para el botón de la pantalla de inicio, sin sessionId activo).
   const endSessionById = useCallback(async (sid: string) => invokeCowork("endSession", { sessionId: sid }), []);
@@ -376,6 +412,6 @@ export function useCoworkSession(sessionId: string | null) {
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
-    listMyActiveSessions, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
+    listMyActiveSessions, listMyEndedSessions, leaveSessionById, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
   };
 }
