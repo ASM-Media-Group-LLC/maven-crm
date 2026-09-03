@@ -212,8 +212,76 @@ export default function CoworkPage() {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6">
+        {/* Encabezado de la pantalla: va ARRIBA y las listas de salas abajo
+            (pedido de Jhon, 03/09/2026). Al dejar de ser un pie se le bajó el
+            alto: si no, en un portátil el título se comía la pantalla y había
+            que scrollear para ver a qué sala entrar. */}
+        <div className="w-full max-w-3xl rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+          {/* En pantalla ancha el encabezado es una FILA (icono + título a la
+              izquierda, acciones a la derecha): en columna se comía media
+              pantalla y había que scrollear para ver las salas. En móvil se
+              apila y queda centrado, como estaba. */}
+          <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 md:h-12 md:w-12">
+              <Users2 className="h-7 w-7 text-primary md:h-6 md:w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
+                Sala Cowork
+              </h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {canCreateSessions
+                  ? mySessions.length > 0
+                    ? "Vuelve a una de tus salas activas o crea una nueva sesión."
+                    : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
+                  : mySessions.length > 0
+                    ? "Vuelve a una de tus salas activas."
+                    : "Abre el enlace que te compartió tu supervisor para entrar a tu sala."}
+              </p>
+            </div>
+            {!permissionLoading && canCreateSessions && (
+              <Button
+                onClick={() => setShowCreate(true)}
+                size="lg"
+                className="w-full gap-2 rounded-full px-7 shadow-md md:w-auto"
+              >
+                <Plus className="h-5 w-5" /> Crear sesión
+              </Button>
+            )}
+          </div>
+
+          {/* Entrar por código: la puerta que sobrevive al copy/paste de WhatsApp,
+              a la PWA y a que el link largo se pierda. Visible para TODOS — para el
+              nivel miembro es SU vía de acceso. */}
+          <div className="mt-5 flex flex-col items-center gap-2 border-t border-border/40 pt-4 md:flex-row md:justify-between">
+            <span className="text-xs text-muted-foreground">
+              {permissionLoading || canCreateSessions
+                ? "Entrar con el código de tu sala"
+                : "Solo los coordinadores crean sesiones — entrá con el código de tu sala"}
+            </span>
+            <div className="flex w-full gap-2 md:w-auto">
+              <Input
+                value={roomCode}
+                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+                onKeyDown={(e) => e.key === "Enter" && handleJoinByCode()}
+                placeholder="ABC234"
+                maxLength={ROOM_CODE_LENGTH}
+                className="rounded-full text-center font-mono uppercase tracking-[0.25em] md:w-40"
+              />
+              <Button
+                onClick={handleJoinByCode}
+                disabled={!isCompleteRoomCode(roomCode) || joiningByCode}
+                className="shrink-0 gap-1 rounded-full"
+              >
+                {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Entrar
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {!loadingSessions && mySessions.length > 0 && (
-          <div className="w-full max-w-lg flex flex-col gap-2">
+          <div className="w-full max-w-3xl flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
               Tus sesiones activas
             </h2>
@@ -328,7 +396,7 @@ export default function CoworkPage() {
         )}
 
         {isAdmin && allSessions.some((s) => !s.my_role) && (
-          <div className="w-full max-w-lg flex flex-col gap-2">
+          <div className="w-full max-w-3xl flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
               Todas las sesiones activas
             </h2>
@@ -377,8 +445,11 @@ export default function CoworkPage() {
                     {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
                   </Button>
                 </div>
+                {/* pl-[52px] = ancho del avatar (40) + gap (12): alinea los chips
+                    con el nombre. Antes decía `pl-13`, que Tailwind no genera
+                    (no existe en la escala) y en móvil no sangraba nada. */}
                 {s.rooms.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pl-13 sm:pl-[52px]">
+                  <div className="flex flex-wrap gap-1.5 pl-[52px]">
                     {s.rooms.map((r) => (
                       <span
                         key={r.id}
@@ -441,64 +512,6 @@ export default function CoworkPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-        <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12 max-w-lg w-full">
-          <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
-            <Users2 className="h-8 w-8 md:h-10 md:w-10 text-primary" />
-          </div>
-          <h1 className="text-xl md:text-3xl font-bold text-foreground tracking-tight text-center">
-            Sala Cowork
-          </h1>
-          <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
-            {canCreateSessions
-              ? mySessions.length > 0
-                ? "Vuelve a una de tus salas activas o crea una nueva sesión."
-                : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
-              : mySessions.length > 0
-                ? "Vuelve a una de tus salas activas."
-                : "Abre el enlace que te compartió tu supervisor para entrar a tu sala."}
-          </p>
-          {!permissionLoading && (canCreateSessions ? (
-            <Button
-              onClick={() => setShowCreate(true)}
-              size="lg"
-              className="gap-2 rounded-full px-8 mt-2 shadow-md"
-            >
-              <Plus className="h-5 w-5" /> Crear sesión
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground/80 text-center max-w-sm mt-1">
-              Solo los coordinadores pueden crear sesiones de Cowork.
-            </p>
-          ))}
-
-          {/* Entrar por código: la puerta que sobrevive al copy/paste de WhatsApp,
-              a la PWA y a que el link largo se pierda. Visible para TODOS — para el
-              nivel miembro es SU vía de acceso. */}
-          <div className="w-full max-w-xs flex flex-col gap-2 mt-3 pt-4 border-t border-border/40">
-            <span className="text-xs text-muted-foreground text-center">
-              Entrar con el código de tu sala
-            </span>
-            <div className="flex gap-2">
-              <Input
-                value={roomCode}
-                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
-                onKeyDown={(e) => e.key === "Enter" && handleJoinByCode()}
-                placeholder="ABC234"
-                maxLength={ROOM_CODE_LENGTH}
-                className="rounded-full text-center font-mono tracking-[0.25em] uppercase"
-              />
-              <Button
-                onClick={handleJoinByCode}
-                disabled={!isCompleteRoomCode(roomCode) || joiningByCode}
-                className="rounded-full gap-1 shrink-0"
-              >
-                {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                Entrar
-              </Button>
-            </div>
-          </div>
-        </div>
 
         {canCreateSessions && (
           <CoworkCreateDialog
