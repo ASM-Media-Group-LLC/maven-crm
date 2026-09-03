@@ -49,7 +49,7 @@ export default function ChatHeader({
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatHeaderProps) {
   const { user } = useAuth();
-  const { isOnline, getStatus } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusText } = useOnlinePresence();
 
   const isGroup = conversation.type === "group";
   const isAdmin = isGroup && conversation.participants.some(
@@ -94,6 +94,9 @@ export default function ChatHeader({
   const otherProfile = otherUserId ? profiles[otherUserId] : null;
   const online = otherUserId ? isOnline(otherUserId) : false;
   const status = otherUserId ? getStatus(otherUserId) : null;
+  // Estado personalizado de la otra persona (texto libre): si lo tiene, manda sobre
+  // la etiqueta fija ("Disponible"/"Ausente"), como en Google Chat.
+  const statusText = otherUserId ? getStatusText(otherUserId) : "";
 
   const typingNames = typingUsers
     .map(id => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
@@ -107,9 +110,11 @@ export default function ChatHeader({
     ? `${typingNames} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
     : isGroup
       ? (canSeeMembers ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}` : "Grupo")
-      : online
-        ? getStatusLabel(status, online)
-        : "Desconectado";
+      : statusText
+        ? statusText
+        : online
+          ? getStatusLabel(status, online)
+          : "Desconectado";
 
   const avatarUrl = isGroup
     ? conversation.avatar_url
