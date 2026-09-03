@@ -11,6 +11,7 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
+import CreadorRosterRoute from "@/components/CreadorRosterRoute";
 import AdminRoute from "./components/AdminRoute";
 import AppShell from "@/components/dashboard/AppShell";
 import { CallProvider } from "@/components/CallProvider";
@@ -92,6 +93,7 @@ const Tickets = lazy(() => import("./pages/Tickets"));
 const Promolog = lazy(() => import("./pages/Promolog"));
 const Parrilla = lazy(() => import("./pages/Parrilla"));
 const Personalizados = lazy(() => import("./pages/personalizados/PersonalizadosPage"));
+const ChatterHorarios = lazy(() => import("./pages/chatters/horarios/HorariosPage"));
 const ChatterEvaluator = lazy(() => import("./pages/ChatterEvaluator"));
 const ScouterAssist = lazy(() => import("./pages/scouter/ScouterAssist"));
 const AgencyQA = lazy(() => import("./pages/agency-qa/AgencyQA"));
@@ -271,7 +273,8 @@ const App = () => (
                 <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
                 <Route path="/creadores/offboarding" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingListPage /></PermissionRoute>} />
                 <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingDetailPage /></PermissionRoute>} />
-                <Route path="/creadores/:id" element={<PermissionRoute module="Creadores" submodule="Perfil"><CreadorProfile /></PermissionRoute>} />
+                {/* Perfil: permiso Creadores · Perfil, o chatter cuyo grupo atiende a esa creadora (Horarios). */}
+                <Route path="/creadores/:id" element={<CreadorRosterRoute><CreadorProfile /></CreadorRosterRoute>} />
                 <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
                 <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
                 <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
@@ -307,6 +310,7 @@ const App = () => (
                 <Route path="/chatter-evaluator/history/:sessionId" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterHistorySessionDetail /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/workspace" element={<PermissionRoute module="Chatters" submodule="Workspace"><ChatterWorkspace /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/rendimiento" element={<PermissionRoute module="Chatters" submodule="Rendimiento"><ChatterRendimiento /></PermissionRoute>} />
+                <Route path="/chatters/horarios" element={<PermissionRoute module="Chatters" submodule="Horarios"><ChatterHorarios /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterProfileDetail /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey/edit" element={<PermissionRoute module="Chatters" submodule="Admin"><ChatterProfileEdit /></PermissionRoute>} />
                 <Route path="/roadmap" element={<Roadmap />} />

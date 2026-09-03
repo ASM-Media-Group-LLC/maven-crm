@@ -1,0 +1,52 @@
+import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/ui/page-header";
+import { CalendarDays } from "lucide-react";
+import { cn } from "@/lib/utils";
+import MiSemana from "./MiSemana";
+import Equipo from "./Equipo";
+import { useMiIdentidad, usePermisosHorarios } from "./useHorarios";
+
+type Vista = "mia" | "equipo";
+const VISTA_KEY = "maven.horarios.vista";
+
+// CHATTERS · HORARIOS: reemplaza el Excel de horarios. Una página, dos
+// audiencias: el chatter ve SOLO su semana; el supervisor arma la del equipo.
+export default function HorariosPage() {
+  const { esSupervisor, puedeGestionar } = usePermisosHorarios();
+  const identidad = useMiIdentidad();
+  const [vista, setVista] = useState<Vista | null>(() => {
+    const v = localStorage.getItem(VISTA_KEY);
+    return v === "mia" || v === "equipo" ? v : null;
+  });
+
+  // Sin preferencia guardada: quien es chatter entra a lo suyo; el supervisor
+  // sin grupo, al equipo.
+  useEffect(() => {
+    if (vista !== null || identidad.isLoading) return;
+    setVista(identidad.data ? "mia" : esSupervisor ? "equipo" : "mia");
+  }, [vista, identidad.isLoading, identidad.data, esSupervisor]);
+
+  const elegir = (v: Vista) => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
+  const vistaEfectiva: Vista = vista === "equipo" && !esSupervisor ? "mia" : (vista ?? "mia");
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-8 space-y-4">
+        <PageHeader
+          title="Horarios"
+          subtitle="Quién atiende a quién, en qué turno y qué día descansa."
+          icon={<CalendarDays className="h-5 w-5" />}
+          actions={esSupervisor ? (
+            <div className="inline-flex rounded-full border bg-muted/40 p-0.5" role="tablist">
+              {([["mia", "Mi semana"], ["equipo", "Equipo"]] as Array<[Vista, string]>).map(([v, l]) => (
+                <button key={v} type="button" role="tab" aria-selected={vistaEfectiva === v} onClick={() => elegir(v)}
+                  className={cn("rounded-full px-3.5 py-1 text-sm transition-colors", vistaEfectiva === v ? "bg-background font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground")}>{l}</button>
+              ))}
+            </div>
+          ) : undefined}
+        />
+        {vistaEfectiva === "equipo" ? <Equipo puedeGestionar={puedeGestionar} /> : <MiSemana />}
+      </div>
+    </div>
+  );
+}
