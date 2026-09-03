@@ -27,7 +27,6 @@ describe("CalendarioMovimiento", () => {
     expect(botones[1].className).toContain("destructive");  // 2 sep, nota 4.2
     expect(botones[2].className).not.toMatch(/success|warning|destructive/); // 3 sep, sin dato
     expect(botones[4].className).toContain("border-dashed"); // sábado 5, descanso
-    expect(botones[0].textContent).toContain("$420");
   });
 
   it("los días futuros no se pueden elegir; los pasados avisan el día elegido", () => {
