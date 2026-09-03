@@ -12,11 +12,13 @@ vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => permisos }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => tier }));
 vi.mock("@/components/dashboard/DashboardContent", () => ({ default: () => <div>GENERICO</div> }));
 vi.mock("@/pages/chatters/dashboard/ChatterDashboard", () => ({ default: () => <div>CHATTER</div> }));
+vi.mock("@/pages/chatters/dashboard/EquipoDashboard", () => ({ default: () => <div>EQUIPO</div> }));
 vi.mock("@/pages/Dashboard2", () => ({ default: () => <div>VENTAS</div> }));
 
 import Dashboard from "@/pages/Dashboard";
 
 const conVentas = (m: string, s?: string) => m === "Creator Sales" && s === "Dashboard";
+const conChatters = (m: string, s?: string) => m === "Chatters" && s === "Rendimiento";
 
 beforeEach(() => {
   rol = { isChatter: false, isLoading: false };
@@ -40,12 +42,34 @@ describe("/dashboard · reparto por rol", () => {
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
   });
 
-  it("⚠️ nivel supervisor tampoco: la RPC de ingresos le responde 42501 y vería un tablero vacío", async () => {
+  it("⚠️ nivel supervisor NO ve el de ventas: la RPC de ingresos le responde 42501 y sería un tablero vacío", async () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "supervisor", isLoading: false };
     render(<Dashboard />);
     await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
+  });
+
+  it("quien supervisa chatters ve el tablero de su equipo", async () => {
+    permisos = { canAccess: conChatters, isLoading: false };
+    tier = { tier: "supervisor", isLoading: false };
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("EQUIPO")).toBeInTheDocument());
+  });
+
+  it("un chatter raso (member) con el permiso NO ve el del equipo", async () => {
+    permisos = { canAccess: conChatters, isLoading: false };
+    tier = { tier: "member", isLoading: false };
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
+    expect(screen.queryByText("EQUIPO")).not.toBeInTheDocument();
+  });
+
+  it("el admin, aunque supervise chatters, ve el de ventas", async () => {
+    permisos = { canAccess: (m: string, s?: string) => conVentas(m, s) || conChatters(m, s), isLoading: false };
+    tier = { tier: "admin", isLoading: false };
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
   });
 
   it("admin SIN el permiso de ventas se queda con el genérico", async () => {

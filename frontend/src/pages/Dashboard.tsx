@@ -6,6 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useRoleTier } from "@/hooks/useRoleTier";
 
 const ChatterDashboard = lazy(() => import("@/pages/chatters/dashboard/ChatterDashboard"));
+const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
 
 const Cargando = () => (
@@ -48,6 +49,15 @@ const Dashboard = () => {
   // dashboard v2, dejalo así" — cada rol va a tener el suyo.
   if (tier === "admin" && canAccess("Creator Sales", "Dashboard")) {
     return <Suspense fallback={<Cargando />}><DashboardVentas /></Suspense>;
+  }
+
+  // Quien SUPERVISA chatters (nivel supervisor + Chatters · Rendimiento: hoy
+  // Chatter Supervisor, HHRR y Team Leader, 7 personas) ve el tablero de su
+  // equipo: turno de hoy, descansos, cumplimiento y a quién empujar. Toda esa
+  // data ya la puede leer — nada pasa por `blu_is_management`, que es lo que
+  // dejaba en blanco al Dashboard Ventas para estos roles.
+  if (tier === "supervisor" && canAccess("Chatters", "Rendimiento")) {
+    return <Suspense fallback={<Cargando />}><EquipoDashboard /></Suspense>;
   }
 
   return <DashboardContent />;
