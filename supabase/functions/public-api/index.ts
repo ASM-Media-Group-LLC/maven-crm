@@ -5,6 +5,8 @@
 // Recursos (Fase 1): datos de la AGENCIA (no data de fans de OF).
 //   GET /public-api/creators           scope creators:read
 //   GET /public-api/creators/:id        creators:read
+//   GET /public-api/contacts            contacts:read   (+ contacts:phone para PII)
+//   GET /public-api/contacts/:id        contacts:read
 //   GET /public-api/employees           employees:read
 //   GET /public-api/sales               sales:read      (ganancias diarias por creadora)
 //   GET /public-api/sales/chatters      sales:chatters  (ventas diarias por chatter)
@@ -175,6 +177,8 @@ Deno.serve(async (req) => {
       resources: [
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
+        { path: "/contacts", scope: "contacts:read" },
+        { path: "/contacts/{id}", scope: "contacts:read" },
         { path: "/employees", scope: "employees:read" },
         { path: "/hubstaff", scope: "hubstaff:read" },
         { path: "/sales", scope: "sales:read" },
@@ -219,6 +223,94 @@ Deno.serve(async (req) => {
       return shapeCreator(row, ofByCreator.get(row.id) ?? []);
     });
     return json(req, { object: "list", resource: "creators", count: count ?? data.length, limit, offset, data });
+  }
+
+  // ===== /contacts =====
+  // Directorio comercial: modelos, AGENCIAS y ex-creadoras (closers_contacts).
+  // Las agencias NO son un recurso aparte: son este mismo con kind=agencia — viven
+  // en la misma tabla separadas por contact_kind, y darles endpoint propio duplicaba
+  // el codigo sin agregar un solo campo.
+  //
+  // ⚠️ PII: telefono y email van ENMASCARADOS salvo que la key tenga contacts:phone.
+  // Dentro de Maven ese dato esta restringido a admins (columna solo-admin + permiso
+  // "Ver Telefonos" + vista enmascarada), y una API key corre con service_role: se
+  // saltea las tres capas. El scope separado es lo unico que la frena, y permite
+  // revocar el telefono sin cortar el resto del acceso.
+  if (resource === "contacts") {
+    if (!need("contacts:read")) return json(req, { error: "forbidden", message: "Falta el scope contacts:read" }, 403);
+    const conPii = need("contacts:phone");
+
+    const COLS = "id, name, handle, platform, email, phone, country_code, city, company, " +
+      "status, source, contact_kind, record_type, onlyfans_url, created_at, updated_at";
+
+    // Enmascarado: se conservan los ultimos 4 digitos, que alcanzan para cotejar sin
+    // entregar el numero. El booleano permite contar cobertura sin ver el dato.
+    const enmascararTel = (t: unknown): string | null => {
+      const s = String(t ?? "").trim();
+      if (!s) return null;
+      const d = s.replace(/\D/g, "");
+      return d.length >= 4 ? `*****${d.slice(-4)}` : "*****";
+    };
+    const enmascararMail = (m: unknown): string | null => {
+      const s = String(m ?? "").trim();
+      if (!s || !s.includes("@")) return s ? "*****" : null;
+      const [u, dom] = s.split("@");
+      return `${u.slice(0, 1)}***@${dom}`;
+    };
+    const shape = (c: Row) => ({
+      id: c.id,
+      nombre: c.name ?? null,
+      handle: c.handle ?? null,
+      plataforma: c.platform ?? null,
+      tipo: c.contact_kind ?? null,           // modelo | agencia | ex_creadora
+      estado: c.status ?? null,
+      empresa: c.company ?? null,
+      pais_codigo: c.country_code ?? null,
+      ciudad: c.city ?? null,
+      onlyfans_url: c.onlyfans_url ?? null,
+      origen: c.source ?? null,               // de que base salio (import, contacto_directo…)
+      registro: c.record_type ?? null,        // nuevo | reactivado
+      tiene_telefono: !!String(c.phone ?? "").trim(),
+      telefono: conPii ? (c.phone ?? null) : enmascararTel(c.phone),
+      email: conPii ? (c.email ?? null) : enmascararMail(c.email),
+      creado_at: c.created_at ?? null,
+      actualizado_at: c.updated_at ?? null,
+    });
+
+    if (sub) {
+      const { data: c, error } = await admin.from("closers_contacts").select(COLS).eq("id", sub).maybeSingle();
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+      if (!c) return json(req, { error: "not_found", message: "Contacto no encontrado" }, 404);
+      return json(req, { object: "contact", pii: conPii, data: shape(c as unknown as Row) });
+    }
+
+    const { limit, offset } = pageParams(url);
+    const kind = url.searchParams.get("kind");        // modelo | agencia | ex_creadora
+    const status = url.searchParams.get("status");    // new | converted | ...
+    const country = url.searchParams.get("country");
+    const conTel = url.searchParams.get("con_telefono"); // "true" = solo los que tienen
+
+    let q = admin.from("closers_contacts").select(COLS, { count: "exact" });
+    if (kind) {
+      const validos = ["modelo", "agencia", "ex_creadora"];
+      if (!validos.includes(kind)) {
+        return json(req, { error: "bad_request", message: `kind invalido. Usa: ${validos.join(" | ")}` }, 400);
+      }
+      q = q.eq("contact_kind", kind);
+    }
+    if (status) q = q.eq("status", status);
+    if (country) q = q.eq("country_code", country);
+    if (conTel === "true") q = q.not("phone", "is", null);
+    q = q.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: rows, count, error } = await q;
+    if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    return json(req, {
+      object: "list", resource: "contacts",
+      pii: conPii,
+      count: count ?? (rows ?? []).length, limit, offset,
+      data: (rows ?? []).map((r) => shape(r as unknown as Row)),
+    });
   }
 
   // ===== /employees =====

@@ -6,7 +6,7 @@
 // scopes exponen datos de Maven (creadoras, empleados, ventas), no data de fans.
 export type ScopeDef = { key: string; group: string; label: string; description: string };
 
-export const SCOPE_GROUPS = ["Creadoras", "Empleados", "Ventas", "Promolog"] as const;
+export const SCOPE_GROUPS = ["Creadoras", "Contactos", "Empleados", "Ventas", "Promolog"] as const;
 
 export const SCOPE_CATALOG: ScopeDef[] = [
   {
@@ -15,6 +15,20 @@ export const SCOPE_CATALOG: ScopeDef[] = [
     label: "Perfil + redes sociales",
     description:
       "Roster de creadoras: nombre artístico, categoría, estado, ubicación, seguidores de Instagram y todas sus redes (IG, TikTok, Twitter/X, YouTube, Facebook, Reddit, Telegram, LinkedIn, OnlyFans).",
+  },
+  {
+    key: "contacts:read",
+    group: "Contactos",
+    label: "Contactos y agencias",
+    description:
+      "Directorio comercial: modelos, AGENCIAS y ex-creadoras. Nombre, handle, plataforma, país, ciudad, empresa, estado y de qué base salió. Filtro `kind` = modelo | agencia | ex_creadora. El teléfono y el email van ENMASCARADOS salvo que la key tenga además contacts:phone.",
+  },
+  {
+    key: "contacts:phone",
+    group: "Contactos",
+    label: "⚠️ Teléfono y email sin enmascarar",
+    description:
+      "Devuelve el teléfono y el email REALES de cada contacto, en vez de enmascarados. Es la base de datos comercial completa: una vez entregada no se puede deshacer. Dentro de Maven este dato está restringido a admins (columna solo-admin + permiso 'Ver Teléfonos'), y una API key SALTEA esas capas — este scope es lo único que la frena. Dalo solo a keys que de verdad lo necesiten, con vencimiento corto y whitelist de IP.",
   },
   {
     key: "employees:read",
