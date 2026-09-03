@@ -2,6 +2,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
+import { irAlDominioCanonico } from "./lib/dominioCanonico";
+
+// Una sola URL: quien entre por maven-ai.me o www.maven-ai.me termina en
+// app.maven-ai.me con la misma ruta. Va PRIMERO, antes de aplicar tema o montar
+// React, para no pintar nada que se vaya a descartar.
+irAlDominioCanonico();
 
 // Skin de acento del usuario (Settings → Apariencia): aplicado ANTES del
 // primer render para que la app no parpadee con el acento default. La
