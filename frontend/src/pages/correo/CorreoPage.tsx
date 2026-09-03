@@ -14,6 +14,7 @@ import {
   Loader2,
   Mail,
   Newspaper,
+  PanelLeft,
   Paperclip,
   PenLine,
   PenSquare,
@@ -120,12 +121,28 @@ function fechaLarga(iso: string): string {
   return format(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
 }
 
+const CARPETAS_KEY = "maven.correo.carpetas";
+
+/** ¿La columna de carpetas arranca abierta? Se recuerda, como el panel de Maven. */
+const leerCarpetasAbiertas = (): boolean => {
+  try { return localStorage.getItem(CARPETAS_KEY) !== "0"; } catch { return true; }
+};
+
 export default function CorreoPage() {
   const { data: buzon, isLoading: cargandoBuzon, error: errorBuzon } = useMailbox();
   const [params, setParams] = useSearchParams();
   const hayBuzon = !!buzon?.is_active;
 
   const [carpeta, setCarpeta] = useState("INBOX");
+  // Columna de carpetas plegable: igual que el panel lateral de Maven, al
+  // plegarla quedan solo los iconos (con el nombre en el tooltip).
+  const [carpetasAbiertas, setCarpetasAbiertas] = useState(leerCarpetasAbiertas);
+  const alternarCarpetas = () => {
+    setCarpetasAbiertas((v) => {
+      try { localStorage.setItem(CARPETAS_KEY, v ? "0" : "1"); } catch { /* noop */ }
+      return !v;
+    });
+  };
   const [sel, setSel] = useState<MailSummary | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
   const [firmaAbierta, setFirmaAbierta] = useState(false);
@@ -291,6 +308,18 @@ export default function CorreoPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
+        {/* Plegar/desplegar la columna de carpetas — solo donde esa columna existe. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden rounded-full hover:bg-primary/8 lg:inline-flex"
+          onClick={alternarCarpetas}
+          aria-label={carpetasAbiertas ? "Ocultar las carpetas" : "Mostrar las carpetas"}
+          aria-expanded={carpetasAbiertas}
+          title={carpetasAbiertas ? "Ocultar las carpetas" : "Mostrar las carpetas"}
+        >
+          <PanelLeft className="h-4 w-4" />
+        </Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold tracking-tight">Correo</h1>
           <p className="truncate text-xs text-muted-foreground">{buzon.email_address}</p>
@@ -327,15 +356,22 @@ export default function CorreoPage() {
 
       <div className="flex min-h-0 flex-1">
         {/* Carpetas: columna en escritorio grande. */}
-        <nav className="hidden w-52 shrink-0 border-r border-border/60 p-2 lg:block">
-          <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Carpetas
-          </p>
+        <nav className={cn(
+          "hidden shrink-0 border-r border-border/60 p-2 transition-[width] duration-200 lg:block",
+          carpetasAbiertas ? "w-52" : "w-[60px]",
+        )}>
+          {carpetasAbiertas ? (
+            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Carpetas
+            </p>
+          ) : (
+            <div className="pb-1 pt-2" aria-hidden />
+          )}
           {carpetas.isLoading &&
             [...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-2.5 px-3 py-2">
+              <div key={i} className={cn("flex items-center gap-2.5 py-2", carpetasAbiertas ? "px-3" : "justify-center px-0")}>
                 <Skeleton className="h-4 w-4 rounded" />
-                <Skeleton className="h-3.5 w-24" />
+                {carpetasAbiertas && <Skeleton className="h-3.5 w-24" />}
               </div>
             ))}
           {(carpetas.data ?? []).map(({ folder: f, unread }) => {
@@ -345,19 +381,35 @@ export default function CorreoPage() {
               <button
                 key={f}
                 onClick={() => setCarpeta(f)}
+                title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${unread} sin leer` : ""}`}
+                aria-label={nombreCarpeta(f)}
+                aria-current={activa ? "page" : undefined}
                 className={cn(
-                  "relative flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm transition-colors",
+                  "relative flex w-full items-center gap-2.5 rounded-2xl py-2 text-left text-sm transition-colors",
+                  carpetasAbiertas ? "px-3" : "justify-center px-0",
                   activa
                     ? "bg-primary/12 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
                     : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
                 )}
               >
-                <Icono className={cn("h-4 w-4 shrink-0", activa && "text-primary")} />
-                <span className="truncate">{nombreCarpeta(f)}</span>
-                {unread > 0 && (
-                  <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
-                    {unread > 99 ? "99+" : unread}
-                  </span>
+                <span className="relative shrink-0">
+                  <Icono className={cn("h-4 w-4", activa && "text-primary")} />
+                  {/* Plegada no cabe el número al lado: va como globito sobre el icono. */}
+                  {!carpetasAbiertas && unread > 0 && (
+                    <span className="absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-primary px-1 text-[9px] font-bold leading-[15px] text-primary-foreground">
+                      {unread > 9 ? "9+" : unread}
+                    </span>
+                  )}
+                </span>
+                {carpetasAbiertas && (
+                  <>
+                    <span className="truncate">{nombreCarpeta(f)}</span>
+                    {unread > 0 && (
+                      <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
             );
@@ -367,7 +419,7 @@ export default function CorreoPage() {
         {/* Lista */}
         <div
           className={cn(
-            "min-w-0 flex-col border-r border-border/60 md:flex md:w-80 md:shrink-0 lg:w-96",
+            "min-w-0 flex-col border-r border-border/60 md:flex md:w-80 md:shrink-0 lg:w-96 2xl:w-[28rem]",
             enLista ? "flex flex-1" : "hidden",
           )}
         >
@@ -496,7 +548,7 @@ export default function CorreoPage() {
               <p className="text-sm text-muted-foreground">Elige un correo para leerlo.</p>
             </div>
           ) : mensaje.isLoading ? (
-            <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">
+            <div className="w-full max-w-3xl space-y-4 px-4 py-6 sm:px-6 2xl:max-w-4xl">
               <Skeleton className="h-7 w-3/4" />
               <div className="flex items-center gap-3">
                 <Skeleton className="h-11 w-11 rounded-full" />
@@ -514,7 +566,10 @@ export default function CorreoPage() {
             />
           ) : mensaje.data ? (
             <ScrollArea className="h-full [&_[data-radix-scroll-area-viewport]>div]:!block">
-              <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+              {/* Alineado a la IZQUIERDA, no centrado: en un monitor ancho el
+                  correo quedaba flotando en el medio con dos gutters enormes.
+                  Se le da un poco más de ancho recién en pantallas 2xl. */}
+              <article className="w-full max-w-3xl px-4 py-6 sm:px-6 2xl:max-w-4xl">
                 <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
                   {mensaje.data.subject}
                 </h2>
