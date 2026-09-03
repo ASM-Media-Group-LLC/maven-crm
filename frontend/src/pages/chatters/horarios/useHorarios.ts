@@ -97,13 +97,14 @@ export function useNombres(ids: string[]) {
   return q.data ?? SIN_NOMBRES;
 }
 
-// Catálogo de chatters para el supervisor (identidades activas).
+// Catálogo para "Agregar chatter": SOLO personas con rol Chatter o Chatter
+// Supervisor en Maven (vía RPC; user_roles no se lee desde el front).
 export function useChattersCatalogo(habilitado: boolean) {
   return useQuery({
     queryKey: ["horarios-chatters-catalogo"],
     enabled: habilitado,
-    queryFn: async (): Promise<Array<{ id: string; display_name: string }>> =>
-      traer(db.from("chatter_identity").select("id, display_name").eq("is_chatter", true).order("display_name")),
+    queryFn: async (): Promise<Array<{ id: string; display_name: string; role: string }>> =>
+      traer(db.rpc("list_chatters_horarios")),
     staleTime: 5 * 60_000,
   });
 }

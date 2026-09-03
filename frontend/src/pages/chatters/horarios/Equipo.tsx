@@ -335,7 +335,7 @@ function EditarGrupo({ grupo, miembros, creadoras, nombres, onClose }: { grupo: 
           <div className="flex flex-wrap items-center gap-2">
             <Select value={nuevoChatter} onValueChange={setNuevoChatter}>
               <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Agregar chatter…" /></SelectTrigger>
-              <SelectContent>{(chatters.data ?? []).filter((c) => !yaEstan.has(c.id)).map((c) => <SelectItem key={c.id} value={c.id}>{c.display_name}</SelectItem>)}</SelectContent>
+              <SelectContent>{(chatters.data ?? []).filter((c) => !yaEstan.has(c.id)).map((c) => <SelectItem key={c.id} value={c.id}>{c.display_name}{c.role === "Chatter Supervisor" ? " · supervisor" : ""}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={nuevoTurno} onValueChange={(v) => setNuevoTurno(v as Shift)}>
               <SelectTrigger className="h-9 w-24"><SelectValue /></SelectTrigger>

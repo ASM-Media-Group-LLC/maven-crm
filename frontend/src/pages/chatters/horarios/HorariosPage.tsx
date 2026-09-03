@@ -4,7 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MiSemana from "./MiSemana";
 import Equipo from "./Equipo";
-import { useMiIdentidad, usePermisosHorarios } from "./useHorarios";
+import { useMiIdentidad, usePermisosHorarios, useRoster } from "./useHorarios";
 
 type Vista = "mia" | "equipo";
 const VISTA_KEY = "maven.horarios.vista";
@@ -19,15 +19,29 @@ export default function HorariosPage() {
     return v === "mia" || v === "equipo" ? v : null;
   });
 
-  // Sin preferencia guardada: quien es chatter entra a lo suyo; el supervisor
-  // sin grupo, al equipo.
+  // ¿Estoy en algún grupo? Tener identidad de chatter no alcanza: un admin
+  // tiene identidad (para Rendimiento) pero no turno.
+  const { miembros, cargando: cargandoRoster } = useRoster();
+  const tengoGrupo = !!identidad.data && miembros.some((m) => m.identity_id === identidad.data);
+  const cargando = identidad.isLoading || cargandoRoster;
+
+  // Sin preferencia guardada: quien tiene grupo entra a lo suyo; el
+  // supervisor sin grupo, directo al equipo.
   useEffect(() => {
-    if (vista !== null || identidad.isLoading) return;
-    setVista(identidad.data ? "mia" : esSupervisor ? "equipo" : "mia");
-  }, [vista, identidad.isLoading, identidad.data, esSupervisor]);
+    if (vista !== null || cargando) return;
+    setVista(tengoGrupo ? "mia" : esSupervisor ? "equipo" : "mia");
+  }, [vista, cargando, tengoGrupo, esSupervisor]);
 
   const elegir = (v: Vista) => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
-  const vistaEfectiva: Vista = vista === "equipo" && !esSupervisor ? "mia" : (vista ?? "mia");
+  // "Mi semana" solo existe para quien tiene grupo (o no es supervisor, que no
+  // tiene otra cosa que ver); "Equipo" solo para supervisores.
+  const puedeMia = tengoGrupo || !esSupervisor;
+  const vistaEfectiva: Vista = cargando ? (esSupervisor ? "equipo" : "mia")
+    : vista === "equipo" && !esSupervisor ? "mia"
+    : vista === "mia" && !puedeMia ? "equipo"
+    : (vista ?? (esSupervisor ? "equipo" : "mia"));
+  const pestanas = ([["mia", "Mi semana"], ["equipo", "Equipo"]] as Array<[Vista, string]>)
+    .filter(([v]) => (v === "mia" ? puedeMia : esSupervisor));
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -36,9 +50,9 @@ export default function HorariosPage() {
           title="Horarios"
           subtitle="Quién atiende a quién, en qué turno y qué día descansa."
           icon={<CalendarDays className="h-5 w-5" />}
-          actions={esSupervisor ? (
+          actions={pestanas.length > 1 ? (
             <div className="inline-flex rounded-full border bg-muted/40 p-0.5" role="tablist">
-              {([["mia", "Mi semana"], ["equipo", "Equipo"]] as Array<[Vista, string]>).map(([v, l]) => (
+              {pestanas.map(([v, l]) => (
                 <button key={v} type="button" role="tab" aria-selected={vistaEfectiva === v} onClick={() => elegir(v)}
                   className={cn("rounded-full px-3.5 py-1 text-sm transition-colors", vistaEfectiva === v ? "bg-background font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground")}>{l}</button>
               ))}
