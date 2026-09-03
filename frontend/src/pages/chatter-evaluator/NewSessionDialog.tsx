@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -84,7 +85,7 @@ const SuccessView = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
-  const publicUrl = `${window.location.origin}/chatter/${session.id}`;
+  const publicUrl = `${getPublicBaseUrl()}/chatter/${session.id}`;
 
   const handleCopy = async () => {
     try {

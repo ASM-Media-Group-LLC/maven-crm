@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -1380,7 +1381,7 @@ const fireWebhookInBackground = async (
       chatterName: session.chatter_name,
       modelName: profile?.name ?? session.profile_id,
       examinerName: evaluation.examiner_name ?? "(unnamed)",
-      appUrl: typeof window !== "undefined" ? window.location.origin : "",
+      appUrl: getPublicBaseUrl(),
       verdict: evaluation.verdict as "apto" | "no_apto",
       verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
       scorePct: evaluation.score_pct ?? 0,
