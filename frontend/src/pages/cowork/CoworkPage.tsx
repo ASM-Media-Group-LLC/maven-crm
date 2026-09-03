@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
+import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -16,7 +16,7 @@ import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask } from "lucide-react";
+import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
 
@@ -29,7 +29,8 @@ export default function CoworkPage() {
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
-  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null }>>([]);
+  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null; createdBy: string | null }>>([]);
+  const [finalizadas, setFinalizadas] = useState<SesionFinalizada[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [roomCode, setRoomCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
@@ -69,8 +70,13 @@ export default function CoworkPage() {
       .then((s) => { if (alive) setMySessions(s); })
       .catch(() => { /* noop */ })
       .finally(() => { if (alive) setLoadingSessions(false); });
+    // Y las finalizadas hace poco, con quién las finalizó: la pregunta que hoy
+    // se hace por chat ("¿quién cerró la sala?") se contesta acá.
+    cowork.listMyEndedSessions()
+      .then((s) => { if (alive) setFinalizadas(s); })
+      .catch(() => { /* si el RPC aún no existe, la sección no se dibuja */ });
     return () => { alive = false; };
-  }, [sessionId, cowork.listMyActiveSessions]);
+  }, [sessionId, cowork.listMyActiveSessions, cowork.listMyEndedSessions]);
 
   // Admin: cargar todas las sesiones activas y refrescar la ocupación cada 30s
   // mientras el landing esté abierto. Es UNA llamada al edge (que hace un solo
@@ -119,10 +125,31 @@ export default function CoworkPage() {
       setMySessions((prev) => prev.filter((s) => s.id !== porFinalizar.id));
       toast.success("Sesión finalizada");
       setPorFinalizar(null);
-    } catch {
-      toast.error("No se pudo finalizar la sesión");
+      cowork.listMyEndedSessions().then(setFinalizadas).catch(() => {});
+    } catch (e) {
+      // El servidor ya dice por qué (por ejemplo, que solo el creador puede).
+      toast.error("No se pudo finalizar la sesión", { description: (e as Error).message });
     } finally {
       setFinalizando(false);
+    }
+  };
+
+  // Salir de una sesión que NO creé: me voy yo, la sesión sigue para los demás.
+  // Se confirma porque para volver hace falta un enlace de host nuevo.
+  const [porSalir, setPorSalir] = useState<{ id: string; name: string } | null>(null);
+  const [saliendo, setSaliendo] = useState(false);
+  const confirmarSalir = async () => {
+    if (!porSalir) return;
+    setSaliendo(true);
+    try {
+      await cowork.leaveSessionById(porSalir.id);
+      setMySessions((prev) => prev.filter((s) => s.id !== porSalir.id));
+      toast.success(`Saliste de «${porSalir.name}»`);
+      setPorSalir(null);
+    } catch (e) {
+      toast.error("No se pudo salir de la sesión", { description: (e as Error).message });
+    } finally {
+      setSaliendo(false);
     }
   };
 
@@ -218,7 +245,11 @@ export default function CoworkPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
-                {s.role === "host" && (
+                {/* Finalizar apaga la sesión para TODOS: solo quien la creó (o un
+                    admin). Los demás hosts tienen Salir, que se los lleva solo a
+                    ellos. Antes cualquier host veía Finalizar, y CHATTERS KASH se
+                    finalizó cuatro veces en cuatro días por hosts que querían irse. */}
+                {s.role === "host" && (s.createdBy === userId || isAdmin) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -226,6 +257,17 @@ export default function CoworkPage() {
                     onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
                   >
                     Finalizar
+                  </Button>
+                )}
+                {s.role === "host" && s.createdBy !== userId && !isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground rounded-full gap-1"
+                    title="Salir de esta sesión (sigue para los demás)"
+                    onClick={() => setPorSalir({ id: s.id, name: s.name })}
+                  >
+                    <LogOut className="h-4 w-4" /> Salir
                   </Button>
                 )}
                 {/* Incógnito también en las sesiones PROPIAS (solo admin): entrar
@@ -263,6 +305,28 @@ export default function CoworkPage() {
 
         {/* Admin: TODAS las sesiones activas de la empresa (las que no son suyas),
             con la gente conectada en cada sala según LiveKit. */}
+        {/* Quién finalizó qué, a la vista. Cuatro cierres en cuatro días por
+            cuatro personas distintas se ven de un vistazo acá; antes había que
+            rastrearlo en los registros del servidor. */}
+        {finalizadas.length > 0 && (
+          <div className="w-full max-w-lg flex flex-col gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" /> Finalizadas recientemente
+            </h2>
+            {finalizadas.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground/80 truncate">{f.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien sin registro"}</span>
+                    {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isAdmin && allSessions.some((s) => !s.my_role) && (
           <div className="w-full max-w-lg flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
@@ -335,6 +399,24 @@ export default function CoworkPage() {
             ))}
           </div>
         )}
+
+      <AlertDialog open={!!porSalir} onOpenChange={(o) => { if (!o && !saliendo) setPorSalir(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Salir de «{porSalir?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La sesión sigue para los demás; solo te vas tú. Para volver a entrar como host vas a necesitar
+              un enlace nuevo de quien la creó.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saliendo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={saliendo} onClick={(e) => { e.preventDefault(); void confirmarSalir(); }}>
+              {saliendo ? "Saliendo…" : "Salir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
         <AlertDialogContent>
@@ -457,7 +539,7 @@ export default function CoworkPage() {
 
   // Session ended → auto-redirect to main Maven dashboard
   if (cowork.session?.status === "ended") {
-    return <CoworkSessionEndedRedirect />;
+    return <CoworkSessionEndedRedirect session={cowork.session} />;
   }
 
   // Not a member yet → lobby
@@ -485,30 +567,56 @@ export default function CoworkPage() {
 
 // Shown briefly while we redirect participants out of an ended Cowork session
 // back to the main Maven dashboard.
-function CoworkSessionEndedRedirect() {
+/** dd/mm HH:MM en hora local, para las listas y la pantalla de finalizada. */
+function fechaCorta(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | null }) {
   const navigate = useNavigate();
+  const [quien, setQuien] = useState<string | null>(null);
+
+  // Quién la finalizó, con nombre. Antes esta pantalla decía "la finalizó el
+  // supervisor" y te mandaba al dashboard a los 50 ms: nadie llegaba a leerla,
+  // y la pregunta "¿quién cerró la sala?" terminaba en el chat. Ahora se queda
+  // y lo dice; la persona decide a dónde ir.
+  useEffect(() => {
+    const uid = session?.ended_by;
+    if (!uid) return;
+    let vivo = true;
+    supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle()
+      .then(({ data }) => { if (vivo) setQuien(data?.full_name ?? null); });
+    return () => { vivo = false; };
+  }, [session?.ended_by]);
 
   useEffect(() => {
-    toast.info("La sesión fue finalizada por el supervisor");
-    const t = setTimeout(() => navigate("/dashboard", { replace: true }), 50);
-    return () => clearTimeout(t);
-  }, [navigate]);
+    toast.info(quien ? `La sesión la finalizó ${quien}` : "La sesión fue finalizada", { id: "sesion-finalizada" });
+  }, [quien]);
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="min-h-full flex flex-col items-center justify-center gap-5 p-4 md:p-6">
-      <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
+      <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full text-center">
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
           <Users2 className="h-7 w-7 text-muted-foreground" />
         </div>
         <h2 className="text-lg font-semibold text-foreground">Esta sesión ha finalizado</h2>
-        <Button
-          variant="secondary"
-          className="rounded-full px-6 mt-1"
-          onClick={() => navigate("/dashboard", { replace: true })}
-        >
-          Volver al dashboard
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          {session?.ended_by
+            ? <>La finalizó <span className="text-foreground font-medium">{quien ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at)}` : ""}.</>
+            : "La finalizó un supervisor."}
+          {" "}Los enlaces y códigos de esta sesión ya no sirven: pide el de la sesión nueva.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2 mt-1">
+          <Button variant="secondary" className="rounded-full px-6" onClick={() => navigate("/dashboard", { replace: true })}>
+            Volver al dashboard
+          </Button>
+          <Button className="rounded-full px-6" onClick={() => navigate("/cowork", { replace: true })}>
+            Ir a Cowork
+          </Button>
+        </div>
       </div>
     </div>
     </div>
