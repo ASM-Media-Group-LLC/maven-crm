@@ -7,6 +7,7 @@ import { useRoleTier } from "@/hooks/useRoleTier";
 
 const ChatterDashboard = lazy(() => import("@/pages/chatters/dashboard/ChatterDashboard"));
 const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDashboard"));
+const ManagerDashboard = lazy(() => import("@/pages/manager/ManagerDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
 
 const Cargando = () => (
@@ -58,6 +59,14 @@ const Dashboard = () => {
   // dejaba en blanco al Dashboard Ventas para estos roles.
   if (tier === "supervisor" && canAccess("Chatters", "Rendimiento")) {
     return <Suspense fallback={<Cargando />}><EquipoDashboard /></Suspense>;
+  }
+
+  // Manager de creadoras: su nota del bot y por qué le salió, sus creadoras y
+  // cómo viene la promoción de su roster (que es su objetivo medido). Si no
+  // tiene roster ni notas —3 de los 5 roles `manager` están así— el propio
+  // tablero cae al genérico en vez de mostrar una pantalla vacía.
+  if (tier === "manager" && canAccess("Creadores")) {
+    return <Suspense fallback={<Cargando />}><ManagerDashboard /></Suspense>;
   }
 
   return <DashboardContent />;

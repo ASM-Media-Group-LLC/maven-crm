@@ -402,7 +402,8 @@ export default function EquipoDashboard() {
                   </button>
                 ))}
               </div>
-              <Link to="/chatter-evaluator/rendimiento" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              {/* `back` para que Rendimiento pueda ofrecer "volver al dashboard". */}
+              <Link to="/chatter-evaluator/rendimiento?back=/dashboard" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                 Ver rendimiento <ArrowRight className="h-3 w-3" />
               </Link>
             </div>

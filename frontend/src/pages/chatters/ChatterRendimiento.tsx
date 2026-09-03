@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import {
   Users, Gauge, DollarSign, Clock, Send, Info, AlertTriangle, Loader2, ChevronRight,
 } from "lucide-react";
@@ -41,6 +44,11 @@ function AvisoCobertura({ dias, diasConDatos }: { dias: number; diasConDatos: nu
 // tooltip. La columna Nota YA lo incluye — acá se muestra cuánto de esa nota es
 // feedback, que es lo que Jhon pidió ver ("que sea justo lo que el supervisor
 // puso ahí en esa nota").
+// Si llegaste acá desde otra pantalla de Maven (?back=/dashboard), se dibuja
+// un botón para volver. Mismo patrón y misma guarda que el back del Messenger:
+// una ruta que no sea interna no se convierte en botón.
+const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
+
 function FeedbackCelda({ fila }: { fila: ChatterPeriodo }) {
   const pts = Number(fila.feedback_puntos ?? 0);
   if (!fila.feedback_n) return <span className="text-muted-foreground">—</span>;
@@ -235,6 +243,10 @@ export default function ChatterRendimiento() {
     [range],
   );
   const [abierto, setAbierto] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const volverA = searchParams.get("back");
+  const puedeVolver = rutaInterna(volverA);
 
   const periodoQ = useChatterPeriodo(desde, hasta);
   const coberturaQ = useCobertura(desde, hasta);
@@ -268,6 +280,15 @@ export default function ChatterRendimiento() {
     <div className="space-y-4 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
+          {puedeVolver && (
+            <Button
+              variant="ghost" size="sm"
+              className="mb-1 -ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate(volverA!)}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Volver al dashboard
+            </Button>
+          )}
           <h1 className="text-xl font-semibold text-foreground">Rendimiento de chatters</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Ventas contra lo esperado, masivos y nota diaria

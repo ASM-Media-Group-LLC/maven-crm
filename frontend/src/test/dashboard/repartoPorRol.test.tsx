@@ -13,12 +13,14 @@ vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => tier }));
 vi.mock("@/components/dashboard/DashboardContent", () => ({ default: () => <div>GENERICO</div> }));
 vi.mock("@/pages/chatters/dashboard/ChatterDashboard", () => ({ default: () => <div>CHATTER</div> }));
 vi.mock("@/pages/chatters/dashboard/EquipoDashboard", () => ({ default: () => <div>EQUIPO</div> }));
+vi.mock("@/pages/manager/ManagerDashboard", () => ({ default: () => <div>MANAGER</div> }));
 vi.mock("@/pages/Dashboard2", () => ({ default: () => <div>VENTAS</div> }));
 
 import Dashboard from "@/pages/Dashboard";
 
 const conVentas = (m: string, s?: string) => m === "Creator Sales" && s === "Dashboard";
 const conChatters = (m: string, s?: string) => m === "Chatters" && s === "Rendimiento";
+const conCreadores = (m: string) => m === "Creadores";
 
 beforeEach(() => {
   rol = { isChatter: false, isLoading: false };
@@ -34,12 +36,26 @@ describe("/dashboard · reparto por rol", () => {
     await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
   });
 
-  it("un manager NO: el Dashboard Ventas es el tablero del admin (decisión de Jhon)", async () => {
+  it("un manager NO ve el de ventas: ese es el tablero del admin (decisión de Jhon)", async () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "manager", isLoading: false };
     render(<Dashboard />);
     await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
+  });
+
+  it("el manager de creadoras ve SU tablero", async () => {
+    permisos = { canAccess: conCreadores, isLoading: false };
+    tier = { tier: "manager", isLoading: false };
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("MANAGER")).toBeInTheDocument());
+  });
+
+  it("el admin gana sobre el tablero del manager", async () => {
+    permisos = { canAccess: (m: string, s?: string) => conVentas(m, s) || conCreadores(m), isLoading: false };
+    tier = { tier: "admin", isLoading: false };
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
   });
 
   it("⚠️ nivel supervisor NO ve el de ventas: la RPC de ingresos le responde 42501 y sería un tablero vacío", async () => {
