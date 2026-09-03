@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
+import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
 import CoworkReglasDialog from "./CoworkReglasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -427,6 +428,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     let vigilante: number | null = null;
     let renaciendo = false;
     let vivoDesde = 0;
+    /** La cadena de cancelación de ruido sobre el micro, si el supervisor la
+     *  tiene activada en las llamadas (misma preferencia, mismo motor). */
+    let cadenaNC: CadenaNC | null = null;
 
     const renacer = (motivo: "muerto" | "silenciado") => {
       if (cancelled) return;
@@ -454,11 +458,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          // Un canal: RNNoise cuesta CPU por canal y la voz es mono.
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
         });
         track = stream.getAudioTracks()[0] || null;
         if (cancelled || !track) { track?.stop(); return; }
-        setMicBaseTrack(track);
+        // Lo que se reparte a las salas es la pista LIMPIA, si el supervisor
+        // tiene la cancelación de ruido activada en sus llamadas. Antes su voz
+        // salía cruda a nueve salas mientras la de los chatters iba filtrada.
+        // Si la cadena falla, sale la cruda: nunca sin voz.
+        let pistaParaRepartir: MediaStreamTrack = track;
+        if (loadNCPreference()) {
+          try {
+            cadenaNC = await armarCadenaNC(track);
+            if (cancelled) { void cadenaNC.destruir(); cadenaNC = null; track.stop(); return; }
+            pistaParaRepartir = cadenaNC.salida;
+          } catch (e) {
+            console.warn("[cowork] la cancelación de ruido del micro del supervisor no se pudo armar:", e);
+          }
+        }
+        setMicBaseTrack(pistaParaRepartir);
         setMicCaido(null);
         vivoDesde = Date.now();
         track.addEventListener("ended", () => renacer("muerto"));
@@ -484,6 +503,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       cancelled = true;
       if (vigilante !== null) window.clearInterval(vigilante);
       setMicBaseTrack(null);
+      if (cadenaNC) { void cadenaNC.destruir(); cadenaNC = null; }
       try { track?.stop(); } catch { /* noop */ }
     };
   }, [micArmed, generacionMic]);
