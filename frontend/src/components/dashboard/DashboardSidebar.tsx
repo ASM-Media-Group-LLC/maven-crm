@@ -14,6 +14,7 @@ import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
+import { precargarRuta, precargarEnOcio } from "@/lib/prefetchRutas";
 import Logo from "@/components/Logo";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
@@ -110,7 +111,7 @@ const DashboardSidebar = () => {
   }, [pathname, isMobile, setOpenMobile]);
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { canAccess } = usePermissions();
+  const { canAccess, isLoading: permisosCargando } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount } = useSidebarBadges();
@@ -155,6 +156,16 @@ const DashboardSidebar = () => {
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
+
+  // Precarga en ocio de lo que ESTA persona ve en el menú (lib/prefetchRutas):
+  // de a una, espaciadas, nunca en llamada. Así la primera vez que toca una
+  // sección ya está bajada y no ve la barra de carga. Corre una vez, cuando ya
+  // se sabe qué puede ver; si cambian los permisos, se rearma con la lista nueva.
+  const urlsVisibles = [...mainMenu, ...operationsMenu].map((i) => i.url).join("|");
+  useEffect(() => {
+    if (permisosCargando || !urlsVisibles) return;
+    return precargarEnOcio(urlsVisibles.split("|"));
+  }, [permisosCargando, urlsVisibles]);
 
   const isCreatorSalesActive = pathname === "/dashboard2";
 
@@ -400,7 +411,7 @@ const DashboardSidebar = () => {
               {mainMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} end={item.url === "/dashboard"} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
@@ -454,7 +465,7 @@ const DashboardSidebar = () => {
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} className={cn(item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)}>
+                    <NavLink to={item.url} className={cn(item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
