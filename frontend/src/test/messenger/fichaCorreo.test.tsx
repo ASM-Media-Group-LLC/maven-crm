@@ -7,7 +7,10 @@ import type { KarmaProfile } from "@/pages/messenger/useKarmaProfile";
 // aparece si quien mira puede mandar correo desde Maven y no es su propia ficha.
 
 const navegado: string[] = [];
-vi.mock("react-router-dom", () => ({ useNavigate: () => (to: string) => navegado.push(to) }));
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => (to: string) => navegado.push(to),
+  useLocation: () => ({ pathname: "/messenger", search: "" }),
+}));
 
 const toasts: string[] = [];
 vi.mock("sonner", () => ({

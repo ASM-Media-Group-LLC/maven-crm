@@ -8,7 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { AGENCIAS, CANALES, FLAGS, TIPOS, type Agency, type CanalVenta, type Pedido, type TipoContenido } from "./types";
+import {
+  AGENCIAS, CANALES, FLAGS, TIPOS, FLAG_MONTO, TECHO_GASTO_FAN, TECHO_PRECIO, montoSospechoso, usd,
+  type Agency, type CanalVenta, type Pedido, type TipoContenido,
+} from "./types";
 import { useCatalogos, useMutacionesPedidos, type PedidoInput } from "./usePersonalizados";
 
 interface Props {
@@ -60,16 +63,37 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
       setGastoFan(pedido.fan_total_spent_usd?.toString() ?? ""); setPrecio(pedido.price_usd?.toString() ?? "");
       setPagado(pedido.paid_usd?.toString() ?? ""); setFlags(pedido.flags ?? []); setNotas(pedido.notes ?? "");
     } else {
-      setAgency(agenciaPorDefecto); setCreatorId(""); setCreatorName(""); setChatterId(user?.id ?? "");
+      // El chatter arranca en quien está creando SOLO si tiene el rol Chatter
+      // (un supervisor que registra un pedido ajeno no debe quedar como vendedor).
+      const miId = user?.id ?? "";
+      const yoSoyChatter = !!miId && perfiles.some((p) => p.id === miId);
+      setAgency(agenciaPorDefecto); setCreatorId(""); setCreatorName(""); setChatterId(yoSoyChatter ? miId : "");
       setFan(""); setRequestedOn(hoy()); setDueOn(""); setTipo(""); setCanal("normal"); setDescripcion("");
       setCantidad(""); setGastoFan(""); setPrecio(""); setPagado(""); setFlags([]); setNotas("");
     }
-  }, [open, pedido, agenciaPorDefecto, user?.id]);
+  }, [open, pedido, agenciaPorDefecto, user?.id, perfiles]);
 
-  const creadorasOrdenadas = useMemo(
-    () => [...creadoras].sort((a, b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1) || a.nombre.localeCompare(b.nombre)),
-    [creadoras],
-  );
+  // El catálogo ya viene con SOLO creadoras activas. Si el pedido que se edita
+  // apunta a una que ya no está activa, se la agrega igual para no perder el dato.
+  const creadorasOrdenadas = useMemo(() => {
+    const lista = [...creadoras].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    if (pedido?.creator_id && !lista.some((c) => c.id === pedido.creator_id)) {
+      lista.unshift({ id: pedido.creator_id, nombre: `${pedido.creator_name} · ya no activa`, status: "inactiva" });
+    }
+    return lista;
+  }, [creadoras, pedido?.creator_id, pedido?.creator_name]);
+
+  // Igual con el chatter: los pedidos viejos tienen chatters que ya no están.
+  const chattersDelSelector = useMemo(() => {
+    const lista = perfiles.map((p) => ({ id: p.id, nombre: p.full_name as string }));
+    if (pedido?.chatter_id && !lista.some((c) => c.id === pedido.chatter_id)) {
+      lista.unshift({ id: pedido.chatter_id, nombre: `${pedido.chatter_name ?? "Chatter"} · ya no es chatter` });
+    }
+    return lista;
+  }, [perfiles, pedido?.chatter_id, pedido?.chatter_name]);
+
+  const precioRaro = montoSospechoso(num(precio), TECHO_PRECIO);
+  const gastoRaro = montoSospechoso(num(gastoFan), TECHO_GASTO_FAN);
 
   const guardando = crear.isPending || editar.isPending;
   const valido = creatorName.trim().length > 0 && fan.trim().length > 0 && descripcion.trim().length > 0;
@@ -92,7 +116,7 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
       fan_total_spent_usd: num(gastoFan),
       price_usd: num(precio),
       paid_usd: num(pagado),
-      flags,
+      flags: precioRaro || gastoRaro ? [...new Set([...flags, FLAG_MONTO])] : flags.filter((f) => f !== FLAG_MONTO),
       notes: notas.trim() || null,
       denied_reason: pedido?.denied_reason ?? null,
     };
@@ -141,7 +165,7 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
               <SelectTrigger><SelectValue placeholder="Elegir creadora" /></SelectTrigger>
               <SelectContent className="max-h-72">
                 {creadorasOrdenadas.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nombre}{c.status && c.status !== "active" ? " · inactiva" : ""}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
                 ))}
                 <SelectItem value="__libre__">Otra (escribir nombre)</SelectItem>
               </SelectContent>
@@ -155,7 +179,8 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
             <Select value={chatterId} onValueChange={setChatterId}>
               <SelectTrigger><SelectValue placeholder="Quién vendió el pedido" /></SelectTrigger>
               <SelectContent className="max-h-72">
-                {perfiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                {chattersDelSelector.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+                {chattersDelSelector.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">Nadie con el rol Chatter todavía</div>}
               </SelectContent>
             </Select>
           </div>
@@ -194,7 +219,8 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1.5">
               <Label>Precio (USD)</Label>
-              <Input inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="200" />
+              <Input inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="200"
+                className={precioRaro ? "border-amber-500/60 focus-visible:ring-amber-500/40" : undefined} />
             </div>
             <div className="space-y-1.5">
               <Label>Pagado</Label>
@@ -202,10 +228,20 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
             </div>
             <div className="space-y-1.5">
               <Label>Gasto del fan</Label>
-              <Input inputMode="decimal" value={gastoFan} onChange={(e) => setGastoFan(e.target.value)} placeholder="5850" />
+              <Input inputMode="decimal" value={gastoFan} onChange={(e) => setGastoFan(e.target.value)} placeholder="5850"
+                className={gastoRaro ? "border-amber-500/60 focus-visible:ring-amber-500/40" : undefined} />
             </div>
             {num(precio) != null && num(pagado) != null && saldo > 0 && (
               <p className="col-span-3 text-[11px] text-amber-500">Saldo pendiente: ${saldo.toFixed(0)}</p>
+            )}
+            {/* Del sheet llegaron precios de "$5.500.000": si el monto es imposible
+                se avisa acá y el pedido queda marcado para revisar. */}
+            {(precioRaro || gastoRaro) && (
+              <p className="col-span-3 text-[11px] text-amber-500">
+                ¿{precioRaro ? usd(num(precio)) : usd(num(gastoFan))}? Parece un error de tipeo
+                ({precioRaro ? `un personalizado ronda los $150; el techo son ${usd(TECHO_PRECIO)}` : `el techo del gasto del fan son ${usd(TECHO_GASTO_FAN)}`}).
+                Si lo guardás así, el pedido queda marcado como "monto por revisar".
+              </p>
             )}
           </div>
 

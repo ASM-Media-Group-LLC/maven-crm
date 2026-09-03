@@ -19,9 +19,11 @@ export interface FiltrosPedidos {
   chatter: string;    // chatter_name tal como figura en el pedido (hay chatters que
                       // ya no tienen usuario en Maven: por id se perdían del filtro)
   mes: string;        // YYYY-MM sobre requested_on
+  tipo: string;       // content_type — se pone desde el encabezado "Tipo" de la tabla
+  canal: string;      // sale_channel — idem desde "Canal"
   q: string;          // fan / descripción / creadora
 }
-export const FILTROS_VACIOS: FiltrosPedidos = { agencia: "", estado: "", creadora: "", chatter: "", mes: "", q: "" };
+export const FILTROS_VACIOS: FiltrosPedidos = { agencia: "", estado: "", creadora: "", chatter: "", mes: "", tipo: "", canal: "", q: "" };
 
 export function usePedidos(filtros: FiltrosPedidos) {
   return useQuery({
@@ -32,6 +34,8 @@ export function usePedidos(filtros: FiltrosPedidos) {
       if (filtros.estado) q = q.eq("status", filtros.estado);
       if (filtros.creadora) q = q.eq("creator_name", filtros.creadora);
       if (filtros.chatter) q = q.eq("chatter_name", filtros.chatter);
+      if (filtros.tipo) q = q.eq("content_type", filtros.tipo);
+      if (filtros.canal) q = q.eq("sale_channel", filtros.canal);
       if (filtros.mes) {
         const [y, m] = filtros.mes.split("-").map(Number);
         const desde = `${filtros.mes}-01`;
@@ -73,13 +77,17 @@ export function usePedidoAdjuntos(requestId: string | null) {
   });
 }
 
-// Catálogos para los selectores. Creadoras activas de Maven; chatters = perfiles
-// con rol Chatter (y supervisores, que también venden). Nombres para mostrar.
+// Catálogos para los selectores del formulario:
+//   · creadoras: SOLO las activas (el catálogo tiene 174 en "leaving" y 98
+//     terminadas; ofrecerlas era ruido). Si el pedido que se edita apunta a una
+//     que ya no está activa, la pantalla la agrega aparte para no perder el dato.
+//   · chatters: SOLO quienes tienen el rol Chatter, vía RPC `list_chatters`
+//     (user_roles no lo puede leer un chatter: RLS admin/propio).
 export function useCatalogos() {
   const creadoras = useQuery({
     queryKey: ["personalizados-creadoras"],
     queryFn: async () => {
-      const { data, error } = await db.from("creators").select("id, name, artistic_name, status").order("name");
+      const { data, error } = await db.from("creators").select("id, name, artistic_name, status").eq("status", "active").order("name");
       if (error) throw error;
       return ((data ?? []) as Array<{ id: string; name: string | null; artistic_name: string | null; status: string | null }>)
         .map((c) => ({ id: c.id, nombre: (c.artistic_name || c.name || "").trim(), status: c.status }))
@@ -88,9 +96,9 @@ export function useCatalogos() {
     staleTime: 5 * 60_000,
   });
   const perfiles = useQuery({
-    queryKey: ["personalizados-perfiles"],
+    queryKey: ["personalizados-chatters"],
     queryFn: async () => {
-      const { data, error } = await db.from("profiles").select("id, full_name").order("full_name");
+      const { data, error } = await db.rpc("list_chatters");
       if (error) throw error;
       return ((data ?? []) as Array<{ id: string; full_name: string | null }>).filter((p) => p.full_name);
     },

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
@@ -31,6 +31,9 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
   window.open(url, target, "noopener");
 }
 
+/** Solo rutas internas: "/algo". Corta "//host", "http…" y cualquier absoluta. */
+const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
+
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
@@ -58,6 +61,7 @@ export default function MessengerPage() {
   // Abrir una conversación al llegar desde una notificación (/messenger?c=<id>): en cuanto
   // la conversación esté cargada, la seleccionamos y limpiamos el parámetro.
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   useEffect(() => {
     const c = searchParams.get("c");
     if (!c) return;
@@ -110,21 +114,32 @@ export default function MessengerPage() {
   // elegir cualquier chat desde la lista: el salto-y-vuelta es solo para el
   // viaje que empezó en la mención.
   const [volverA, setVolverA] = useState<string | null>(null);
+  // Cuando el DM se abre desde OTRA pantalla de Maven (?back=/personalizados
+  // &backName=Personalizados), el back del header devuelve a esa pantalla.
+  // Solo se aceptan rutas internas: nada de "//host" ni URLs absolutas.
+  const [volverAPagina, setVolverAPagina] = useState<{ ruta: string; nombre: string } | null>(null);
   useEffect(() => {
     const dm = searchParams.get("dm");
     if (!dm || loading) return;
     const from = searchParams.get("from");
+    const back = searchParams.get("back");
+    const backName = searchParams.get("backName");
     searchParams.delete("dm");
     searchParams.delete("from");
+    searchParams.delete("back");
+    searchParams.delete("backName");
     setSearchParams(searchParams, { replace: true });
     setVolverA(from && conversations.some((c) => c.id === from) ? from : null);
+    setVolverAPagina(rutaInterna(back) ? { ruta: back!, nombre: (backName || "atrás").slice(0, 40) } : null);
     handleSelectUser(dm);
   }, [searchParams, loading, handleSelectUser, setSearchParams, conversations]);
 
   const grupoDeOrigen = volverA ? conversations.find((c) => c.id === volverA) ?? null : null;
   const returnTo = grupoDeOrigen
     ? { name: grupoDeOrigen.displayName, onBack: () => { const id = grupoDeOrigen.id; setVolverA(null); selectChat(id); } }
-    : null;
+    : volverAPagina
+      ? { name: volverAPagina.nombre, onBack: () => { const r = volverAPagina.ruta; setVolverAPagina(null); navigate(r); } }
+      : null;
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);

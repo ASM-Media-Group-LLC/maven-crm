@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Loader2, Heart, Check, Mail, PenLine } from "lucide-react";
+import { Loader2, Heart, Check, Mail, PenLine, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NAV_CATALOG } from "@/lib/navCatalog";
 import {
   KARMA_ORDER, KarmaStarKey, KarmaProfile,
   isKarmaLegend, useKarmaProfile, useSendKarma,
 } from "../useKarmaProfile";
+
+/** Nombre de la pantalla actual para el botón "volver" del chat. Sale del
+    catálogo de navegación, así cualquier pantalla que muestre la ficha queda
+    con su nombre real sin tocar nada acá. */
+function nombreDeLaPantalla(ruta: string): string {
+  const item = NAV_CATALOG
+    .filter((n) => ruta === n.url || ruta.startsWith(`${n.url}/`))
+    .sort((a, b) => b.url.length - a.url.length)[0];
+  return item ? item.title.split(" · ").pop()! : "atrás";
+}
 
 const STAR_PATH = "M12 2.4l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.3 6.2 20.3l1.1-6.45L2.6 9.25l6.5-.95z";
 const STAR_LABEL: Record<KarmaStarKey, string> = {
@@ -36,7 +47,7 @@ function Star({ filled, special, tip }: { filled: boolean; special?: boolean; ti
 /* Correo de la persona, debajo del rol: clic = copiar la dirección COMPLETA
    (el chip la trunca), y al lado el lápiz para escribirle desde el correo de
    Maven — solo si quien mira tiene casilla y el módulo Correo. */
-function ContactoCorreo({ email, puedeEscribir, onEscribir }: { email: string; puedeEscribir: boolean; onEscribir: () => void }) {
+function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email: string; puedeEscribir: boolean; onEscribir: () => void; onMensaje?: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const reloj = useRef<number | null>(null);
   useEffect(() => () => { if (reloj.current) window.clearTimeout(reloj.current); }, []);
@@ -56,6 +67,7 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir }: { email: string; p
 
   return (
     <div className="mt-2 flex items-center justify-center gap-1.5 px-1">
+      {email && (
       <button
         type="button"
         onClick={copiar}
@@ -70,6 +82,7 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir }: { email: string; p
         {copiado ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Mail className="h-3.5 w-3.5 shrink-0" />}
         <span className="truncate">{copiado ? "Correo copiado" : email}</span>
       </button>
+      )}
       {puedeEscribir && (
         <button
           type="button"
@@ -79,6 +92,17 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir }: { email: string; p
           className="shrink-0 h-[30px] w-[30px] inline-flex items-center justify-center rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-foreground/25 transition-colors"
         >
           <PenLine className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {onMensaje && (
+        <button
+          type="button"
+          onClick={onMensaje}
+          title="Mandarle un mensaje por Messenger"
+          aria-label="Mandarle un mensaje por Messenger"
+          className="shrink-0 h-[30px] w-[30px] inline-flex items-center justify-center rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-foreground/25 transition-colors"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
@@ -95,7 +119,7 @@ function Stat({ label, value, sub }: { label: string; value: number; sub: string
   );
 }
 
-function CardBody({ data, onSend, sending, onEscribirCorreo }: { data: KarmaProfile; onSend: () => void; sending: boolean; onEscribirCorreo: (email: string) => void }) {
+function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data: KarmaProfile; onSend: () => void; sending: boolean; onEscribirCorreo: (email: string) => void; onMensaje?: () => void }) {
   const legend = isKarmaLegend(data);
   const admin = data.viewer_is_admin;
   // Las estrellas se rellenan EN ORDEN (izquierda→derecha): las ganadas primero,
@@ -137,11 +161,12 @@ function CardBody({ data, onSend, sending, onEscribirCorreo }: { data: KarmaProf
           </span>
         </div>
 
-        {data.email && (
+        {(data.email || onMensaje) && (
           <ContactoCorreo
-            email={data.email}
-            puedeEscribir={data.viewer_can_mail && !data.is_self}
+            email={data.email ?? ""}
+            puedeEscribir={!!data.email && data.viewer_can_mail && !data.is_self}
             onEscribir={() => onEscribirCorreo(data.email!)}
+            onMensaje={onMensaje}
           />
         )}
 
@@ -245,6 +270,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo }: { data: KarmaProf
 
 export default function ProfileCard({ userId, onClose }: { userId: string | null; onClose: () => void }) {
   const open = !!userId;
+  const location = useLocation();
   const { data, isLoading } = useKarmaProfile(userId);
   const sendKarma = useSendKarma();
   const navigate = useNavigate();
@@ -258,6 +284,20 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
   const escribirCorreo = (email: string) => {
     onClose();
     navigate(`/correo?to=${encodeURIComponent(email)}`);
+  };
+
+  // Mandarle un mensaje: abre (o crea) el DM en Messenger. Si la ficha se abrió
+  // desde OTRA pantalla, viaja el "volver" para que el chat muestre el back a
+  // la izquierda de la foto y se pueda regresar a donde estaba.
+  const enMessenger = location.pathname.startsWith("/messenger");
+  const mandarMensaje = !userId || data?.is_self ? undefined : () => {
+    onClose();
+    const p = new URLSearchParams({ dm: userId });
+    if (!enMessenger) {
+      p.set("back", location.pathname);
+      p.set("backName", nombreDeLaPantalla(location.pathname));
+    }
+    navigate(`/messenger?${p.toString()}`);
   };
 
   return (
@@ -279,7 +319,7 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
         ) : invalid ? (
           <div className="kp-card"><div className="kp-banner" /><div className="px-5 py-10 text-center text-sm text-muted-foreground">No se pudo cargar la ficha.</div></div>
         ) : (
-          <CardBody data={data} onSend={handleSend} sending={sendKarma.isPending} onEscribirCorreo={escribirCorreo} />
+          <CardBody data={data} onSend={handleSend} sending={sendKarma.isPending} onEscribirCorreo={escribirCorreo} onMensaje={mandarMensaje} />
         )}
       </DialogContent>
     </Dialog>

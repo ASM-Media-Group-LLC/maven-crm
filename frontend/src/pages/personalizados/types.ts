@@ -120,5 +120,14 @@ export const FLAGS: Array<{ id: string; label: string }> = [
 ];
 export const flagDe = (id: string) => FLAGS.find((f) => f.id === id)?.label ?? id;
 
+// Techos de realidad para la plata. Vienen del histórico: un personalizado sale
+// $150 de mediana y el más caro real fue $3.600, pero en el sheet aparecieron
+// celdas de "$5.500.000" que hacían que el tablero dijera "En juego $5.5M".
+// Por encima del techo el formulario avisa y marca el pedido con FLAG_MONTO.
+export const TECHO_PRECIO = 20_000;
+export const TECHO_GASTO_FAN = 500_000;
+export const FLAG_MONTO = "revisar_monto";
+export const montoSospechoso = (n: number | null | undefined, techo: number) => n != null && n > techo;
+
 export const usd = (n: number | null | undefined) =>
   n == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
