@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { whatsappCors } from "../_shared/whatsapp.ts";
+import { whatsappCorsFor } from "../_shared/whatsapp.ts";
 
 // wa-inbox-send — Slice 3 del inbox propio: envía un mensaje SALIENTE desde la
 // bandeja (responder a una conversación) y lo persiste como
@@ -25,12 +25,6 @@ const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven
 const EVOLUTION_API_VERSION = Deno.env.get("WHATSAPP_EVOLUTION_API_VERSION") ?? "v1";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1 mono-tenant)
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
-  });
-}
 
 async function sendViaEvolution(
   toNumber: string,
@@ -63,7 +57,15 @@ async function sendViaEvolution(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  // `json` vive DENTRO del handler para que los headers de CORS se resuelvan
+  // por request (Maven vive en más de un dominio).
+    const json = (body: unknown, status = 200): Response => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
+    });
+    };
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCorsFor(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

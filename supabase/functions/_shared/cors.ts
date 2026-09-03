@@ -14,6 +14,12 @@
 export const ALLOWED_ORIGINS = [
   "https://maven.asmtech.ai",
   "https://maven.asmtech.me",
+  // Dominio propio de la empresa. Se AGREGA sin quitar el viejo: los links
+  // públicos ya enviados (candidatos del evaluador, invitados de Meet,
+  // grabaciones por correo) apuntan a maven.asmtech.ai y tienen que seguir
+  // funcionando para siempre.
+  "https://www.maven-ai.me",
+  "https://maven-ai.me",
   "http://localhost:5173", // Vite dev
   "http://localhost:4173", // Vite preview
 ];

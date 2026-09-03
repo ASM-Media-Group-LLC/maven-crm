@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { whatsappCors } from "../_shared/whatsapp.ts";
+import { whatsappCorsFor } from "../_shared/whatsapp.ts";
 
 // wa-inbox-suggest — Copiloto del inbox (Slice 6a).
 //
@@ -20,12 +20,6 @@ import { whatsappCors } from "../_shared/whatsapp.ts";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const MODEL = "claude-haiku-4-5"; // barato — suficiente para redactar/resumir un WhatsApp
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
-  });
-}
 
 const BASE = `Eres el copiloto de ventas de una agencia de creadoras de OnlyFans, trabajando DENTRO del inbox de un closer que chatea con una creadora (lead) por WhatsApp. Español natural e informal (registro neutro/latam). NUNCA inventes datos de la creadora (nombre, país, nicho, cifras) ni resultados que no estén en el contexto que te paso; si te falta un dato, no lo afirmes.`;
 
@@ -66,7 +60,15 @@ Si conviene cambiar el stage del lead, dilo como SUGERENCIA (el humano decide, n
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  // `json` vive DENTRO del handler para que los headers de CORS se resuelvan
+  // por request (Maven vive en más de un dominio).
+    const json = (body: unknown, status = 200): Response => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
+    });
+    };
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCorsFor(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
