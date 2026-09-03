@@ -1,6 +1,12 @@
-# Noise cancellation — Nivel 2 (pendiente): denoiser real con RNNoise
+# Noise cancellation — Nivel 2: denoiser real con RNNoise
 
-**Estado**: NO implementado. Este documento existe para cuando se decida hacerlo.
+**Estado**: IMPLEMENTADO el 02/09/2026 (rama feat/nc-nivel2-rnnoise) con
+`@sapphi-red/web-noise-suppressor` (MIT; RNNoise vía shiguredo/rnnoise-wasm).
+La cadena vive en `frontend/src/lib/noise-suppression-processor.ts`
+(`armarCadenaNC`): RNNoise → puerta, con fallback a la puerta sola si el WASM
+no carga. El micro que el supervisor de Cowork reparte a las salas pasa por la
+misma cadena cuando tiene la preferencia activada. Lo de abajo es el plan
+original, que se siguió tal cual.
 **Contexto**: revisión del 01/09/2026 pedida por Jhon. El nivel 1 (ya hecho) fue:
 re-aplicar el procesador cuando el micro se re-crea, y piso de ruido que también
 sube (`src/lib/pisoDeRuido.ts` + su port fiel en el worklet).
