@@ -59,6 +59,82 @@ async function getDesired(admin: any): Promise<Map<string, Set<string>>> {
   return byRole;
 }
 
+// Dominio de los grupos = el de las casillas (MAIL_TEAM_DOMAIN; mismo valor que
+// DOMINIO_CASILLA en _shared/mail-provision.ts — mantener en sincronía).
+const GROUP_DOMAIN = Deno.env.get("MAIL_TEAM_DOMAIN") || "maven-ai.me";
+
+/** "Operations Sales" → "operations-sales". Sin acentos, solo [a-z0-9-]. */
+function slugRol(rol: string): string {
+  return rol.normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// AUTO-DESCUBRIMIENTO: cada rol de roles_config sin fila en email_role_groups
+// recibe su mapeo (slug@dominio) para que provision/sync le creen el grupo.
+// Regla: rol activo Y (custom —no is_system— O con al menos un usuario). Así
+// "Operations Sales" o "LLG" tienen grupo apenas se crean, pero los roles base
+// legacy del sistema sin gente (closer, supervisor) no ensucian Zoho.
+// deno-lint-ignore no-explicit-any
+async function ensureMappings(admin: any, desired: Map<string, Set<string>>): Promise<string[]> {
+  const { data: roles, error } = await admin
+    .from("roles_config").select("name, is_system").eq("is_active", true);
+  if (error) throw new Error(`roles_config falló (${error.message})`);
+  const { data: maps } = await admin.from("email_role_groups").select("role, group_email");
+  const mapped = new Set(((maps ?? []) as { role: string }[]).map((m) => m.role));
+  const emailsUsados = new Set(((maps ?? []) as { group_email: string }[]).map((m) => m.group_email.toLowerCase()));
+  const creados: string[] = [];
+  for (const r of (roles ?? []) as { name: string; is_system: boolean }[]) {
+    if (mapped.has(r.name)) continue;
+    const tieneGente = (desired.get(r.name)?.size ?? 0) > 0;
+    if (r.is_system && !tieneGente) continue;
+    const slug = slugRol(r.name);
+    if (!slug) continue;
+    const group_email = `${slug}@${GROUP_DOMAIN}`;
+    if (emailsUsados.has(group_email)) {
+      console.warn(`[role-email-groups] colisión de slug para "${r.name}": ${group_email} ya existe — mapear a mano`);
+      continue;
+    }
+    const { error: insErr } = await admin
+      .from("email_role_groups").insert({ role: r.name, group_email, group_name: r.name });
+    if (insErr) { console.warn(`[role-email-groups] no pude mapear "${r.name}": ${insErr.message}`); continue; }
+    emailsUsados.add(group_email);
+    creados.push(r.name);
+  }
+  return creados;
+}
+
+// Crea (o vincula, si ya existía en Zoho) los grupos mapeados que aún no tienen zgid.
+// deno-lint-ignore no-explicit-any
+async function provisionMissing(admin: any, zoho: { byEmail: Map<string, { zgid: string }> }, desired: Map<string, Set<string>>, onlyRole?: string): Promise<unknown[]> {
+  const { data: maps } = await admin.from("email_role_groups").select("*").eq("enabled", true).is("zgid", null);
+  const results: unknown[] = [];
+  for (const m of (maps as Mapping[]) ?? []) {
+    if (onlyRole && m.role !== onlyRole) continue;
+    const existing = zoho.byEmail.get(m.group_email.toLowerCase());
+    if (existing) {
+      await admin.from("email_role_groups").update({ zgid: existing.zgid, updated_at: new Date().toISOString() }).eq("role", m.role);
+      results.push({ role: m.role, status: "vinculado_existente", zgid: existing.zgid });
+      continue;
+    }
+    const members = [...(desired.get(m.role) ?? new Set<string>())];
+    // Zoho exige al menos un miembro para crear un grupo (mailGroupMemberList es
+    // obligatorio): con la lista vacía la creación falla. Un rol recién creado sin
+    // nadie asignado (caso LLG) queda MAPEADO y pendiente; en cuanto alguien
+    // reciba el rol, el trigger de user_roles dispara sync y acá se crea con esa
+    // persona adentro. Sin placeholders ni errores repetidos en cada corrida.
+    if (members.length === 0) {
+      results.push({ role: m.role, status: "pendiente_sin_miembros", detalle: "Zoho exige ≥1 miembro; se crea cuando alguien tenga el rol" });
+      continue;
+    }
+    const cr = await createGroup({ emailId: m.group_email, name: m.group_name, accessType: m.access_type as "Public", members });
+    if (!cr.ok) { results.push({ role: m.role, status: "error", error: cr.error }); continue; }
+    const zgid = String(cr.data?.zgid ?? "");
+    await admin.from("email_role_groups").update({ zgid, updated_at: new Date().toISOString() }).eq("role", m.role);
+    results.push({ role: m.role, status: "creado", zgid, miembros_iniciales: members.length });
+  }
+  return results;
+}
+
 // Grupos actuales en Zoho, indexados por email en minúscula.
 async function getZohoGroups(): Promise<{ ok: boolean; error?: string; byEmail: Map<string, { zgid: string; members: Set<string> }> }> {
   const r = await listGroups();
@@ -139,33 +215,28 @@ Deno.serve(async (req) => {
       const zoho = await getZohoGroups();
       if (!zoho.ok) return json(req, { error: `Zoho: ${zoho.error}` }, 502);
       const desired = await getDesired(admin);
-      const { data: maps } = await admin.from("email_role_groups").select("*").eq("enabled", true);
-      const results: unknown[] = [];
-      for (const m of (maps as Mapping[]) ?? []) {
-        if (onlyRole && m.role !== onlyRole) continue;
-        if (m.zgid) { results.push({ role: m.role, status: "ya_provisionado", zgid: m.zgid }); continue; }
-        const existing = zoho.byEmail.get(m.group_email.toLowerCase());
-        if (existing) {
-          await admin.from("email_role_groups").update({ zgid: existing.zgid, updated_at: new Date().toISOString() }).eq("role", m.role);
-          results.push({ role: m.role, status: "vinculado_existente", zgid: existing.zgid });
-          continue;
-        }
-        const members = [...(desired.get(m.role) ?? new Set<string>())];
-        const cr = await createGroup({ emailId: m.group_email, name: m.group_name, accessType: m.access_type as "Public", members });
-        if (!cr.ok) { results.push({ role: m.role, status: "error", error: cr.error }); continue; }
-        const zgid = String(cr.data?.zgid ?? "");
-        await admin.from("email_role_groups").update({ zgid, updated_at: new Date().toISOString() }).eq("role", m.role);
-        results.push({ role: m.role, status: "creado", zgid, miembros_iniciales: members.length });
-      }
-      return json(req, { results });
+      const mapeados_nuevos = await ensureMappings(admin, desired);
+      const results = await provisionMissing(admin, zoho, desired, onlyRole);
+      return json(req, { mapeados_nuevos, results });
     }
 
     // ── SYNC: agrega/saca miembros según user_roles ──
     if (action === "sync") {
       if (!zohoConfigured()) return json(req, { error: "Zoho no configurado" }, 400);
-      const zoho = await getZohoGroups();
+      let zoho = await getZohoGroups();
       if (!zoho.ok) return json(req, { error: `Zoho: ${zoho.error}` }, 502);
       const desired = await getDesired(admin);
+      // Auto-descubrir roles nuevos y crear sus grupos ANTES de reconciliar: así
+      // "creé un rol" o "cambié a alguien de rol" quedan en Zoho en la misma
+      // corrida (los triggers de user_roles / roles_config disparan este sync).
+      const mapeados_nuevos = await ensureMappings(admin, desired);
+      const provisionados = await provisionMissing(admin, zoho, desired, onlyRole);
+      if (provisionados.length) {
+        // Grupos recién creados no están en la lista leída arriba: releer para
+        // no intentar re-agregar a miembros que ya entraron en la creación.
+        zoho = await getZohoGroups();
+        if (!zoho.ok) return json(req, { error: `Zoho (releer): ${zoho.error}` }, 502);
+      }
       const { data: maps } = await admin.from("email_role_groups").select("*").eq("enabled", true).not("zgid", "is", null);
       const results: unknown[] = [];
       for (const m of (maps as Mapping[]) ?? []) {
@@ -183,7 +254,7 @@ Deno.serve(async (req) => {
         await admin.from("email_role_groups").update({ last_synced_at: new Date().toISOString(), last_sync_result: result, updated_at: new Date().toISOString() }).eq("role", m.role);
         results.push({ role: m.role, group: m.group_email, ...result });
       }
-      return json(req, { results });
+      return json(req, { mapeados_nuevos, provisionados, results });
     }
 
     return json(req, { error: `Acción desconocida: ${action ?? "(vacía)"}` }, 400);

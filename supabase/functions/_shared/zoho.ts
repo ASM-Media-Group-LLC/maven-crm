@@ -313,12 +313,12 @@ export function addGroupMembers(zgid: string | number, emails: string[]): Promis
   });
 }
 
-/** Saca miembros de un grupo (mode removeMailGroupMember). */
+/** Saca miembros de un grupo (mode deleteMailGroupMember). */
 export function removeGroupMembers(zgid: string | number, emails: string[]): Promise<ZohoResult> {
   return zohoFetch(`/groups/${zgid}`, {
     method: "PUT",
     body: JSON.stringify({
-      mode: "removeMailGroupMember",
+      mode: "deleteMailGroupMember",
       mailGroupMemberList: emails.map((e) => ({ memberEmailId: e })),
     }),
   });
