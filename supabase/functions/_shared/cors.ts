@@ -18,6 +18,10 @@ export const ALLOWED_ORIGINS = [
   // públicos ya enviados (candidatos del evaluador, invitados de Meet,
   // grabaciones por correo) apuntan a maven.asmtech.ai y tienen que seguir
   // funcionando para siempre.
+  //
+  // `app` es el CANÓNICO (ver lib/dominioCanonico.ts); los otros dos redirigen
+  // ahí, pero quedan permitidos por si alguien llega con una sesión a medias.
+  "https://app.maven-ai.me",
   "https://www.maven-ai.me",
   "https://maven-ai.me",
   "http://localhost:5173", // Vite dev
