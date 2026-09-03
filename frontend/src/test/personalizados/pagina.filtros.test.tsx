@@ -69,9 +69,10 @@ describe("PersonalizadosPage · filtros", () => {
     fireEvent.keyDown(opcion, { key: "Enter" });
 
     await waitFor(() => expect(llamadas.some((l) => l.startsWith('eq:["status","solicitado"]'))).toBe(true));
-    // Con filtro y sin resultados se dibuja el tablero (columnas vacías), no el estado vacío.
+    // Con filtro y sin resultados se dibuja la lista vacía (la vista por
+    // defecto desde 03/09/2026), no el estado "todavía no hay pedidos".
     await waitFor(() => expect(screen.queryByText("Todavía no hay pedidos")).not.toBeInTheDocument());
-    expect(screen.getAllByText("Nada acá").length).toBeGreaterThan(0);
+    expect(screen.getByText("No hay pedidos con esos filtros.")).toBeInTheDocument();
     // y el filtro queda a la vista en el disparador
     await waitFor(() => expect(trigger.textContent?.trim()).toBe("Solicitado"));
     // Un par de consultas por catálogo + la filtrada: nada de bucles.

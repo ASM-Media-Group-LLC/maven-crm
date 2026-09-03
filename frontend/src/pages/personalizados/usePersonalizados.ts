@@ -111,6 +111,24 @@ export function useCatalogos() {
   return { creadoras: creadoras.data ?? [], perfiles: perfiles.data ?? [], nombreDe, cargando: creadoras.isLoading || perfiles.isLoading };
 }
 
+// Foto de la creadora para la ficha. Va aparte del catálogo (que trae solo las
+// activas y sin foto) y pide UNA fila, solo con la ficha abierta: 379 de los
+// 612 pedidos apuntan a una creadora con foto y verla cambia por completo la
+// lectura del pedido. Si no hay, el avatar cae en iniciales.
+export function useFotoCreadora(creatorId: string | null) {
+  const q = useQuery({
+    queryKey: ["personalizados-foto-creadora", creatorId],
+    enabled: !!creatorId,
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await db.from("creators").select("profile_photo_url").eq("id", creatorId!).maybeSingle();
+      if (error) throw error;
+      return ((data as { profile_photo_url: string | null } | null)?.profile_photo_url ?? null);
+    },
+  });
+  return q.data ?? null;
+}
+
 // ¿Qué puede hacer quien está mirando? Misma precedencia que la BD: la fila
 // explícita del modal de permisos manda; sin fila, decide el nivel del rol.
 export function usePermisosPersonalizados() {

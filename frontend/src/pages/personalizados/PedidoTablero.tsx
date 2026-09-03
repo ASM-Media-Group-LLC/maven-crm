@@ -1,7 +1,7 @@
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ESTADOS, SIGUIENTES, SOLO_SUPERVISOR, agenciaDe, tipoDe, usd, type Estado, type Pedido } from "./types";
+import { DIAS_VENCIDO, ESTADOS, SIGUIENTES, SOLO_SUPERVISOR, agenciaDe, alertaDe, estaCerrado, tipoDe, usd, type Estado, type Pedido } from "./types";
 import { useMutacionesPedidos, usePermisosPersonalizados } from "./usePersonalizados";
 
 interface Props {
@@ -16,12 +16,15 @@ const dias = (d: string) => Math.ceil((new Date(`${d}T23:59:59`).getTime() - Dat
 export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
   const tipo = tipoDe(p.content_type);
   const ag = agenciaDe(p.agency);
-  const cerrado = ["entregado", "denegado", "reembolsado"].includes(p.status);
-  const restan = p.due_on && !cerrado ? dias(p.due_on) : null;
+  const cerrado = estaCerrado(p.status);
+  // Plazo de los 12 días (ver `alertaDe`). La cuenta de `due_on` queda solo
+  // para lo que TODAVÍA no vence: el atraso ya lo dice la alerta.
+  const alerta = alertaDe(p);
+  const restan = p.due_on && !cerrado && !alerta ? dias(p.due_on) : null;
   const saldo = (p.price_usd ?? 0) - (p.paid_usd ?? 0);
   return (
     <button type="button" onClick={onClick}
-      className="w-full text-left rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-sm transition-all p-3 space-y-1.5">
+      className={`w-full text-left rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-sm transition-all p-3 space-y-1.5 ${alerta ? `border-l-2 ${alerta.borde}` : ""}`}>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium text-sm truncate flex-1">{p.creator_name}</span>
         <Badge variant="outline" className={`rounded-full text-[10px] px-1.5 ${ag.tono}`}>{ag.label}</Badge>
@@ -32,11 +35,21 @@ export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
         <span className="truncate">@{p.fan_handle}{p.chatter_name ? ` · ${p.chatter_name.split(" ")[0]}` : ""}</span>
         <span className="font-semibold text-foreground">{usd(p.price_usd)}</span>
       </div>
-      {(restan !== null || saldo > 0 || p.flags.length > 0) && (
+      {(alerta || restan !== null || saldo > 0 || p.flags.length > 0) && (
         <div className="flex flex-wrap gap-1">
+          {alerta && (
+            <span
+              title={alerta.nivel === "vencido"
+                ? `Pasó el plazo de ${DIAS_VENCIDO} días: abierto hace ${alerta.dias}.`
+                : `Abierto hace ${alerta.dias} días. El plazo es de ${DIAS_VENCIDO}.`}
+              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${alerta.tono}`}
+            >
+              {alerta.texto}
+            </span>
+          )}
           {restan !== null && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${restan < 0 ? "bg-red-500/15 text-red-600" : restan <= 2 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
-              {restan < 0 ? `Vencido hace ${-restan}d` : restan === 0 ? "Vence hoy" : `${restan}d`}
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${restan <= 2 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+              {restan === 0 ? "Vence hoy" : `${restan}d`}
             </span>
           )}
           {saldo > 0 && p.price_usd != null && p.paid_usd != null && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-amber-500/15 text-amber-600">Debe {usd(saldo)}</span>}

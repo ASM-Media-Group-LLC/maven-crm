@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Gift, Plus, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
-import { AGENCIAS, ESTADOS, agenciaDe, usd, type Agency, type Estado, type Pedido } from "./types";
+import { AGENCIAS, DIAS_ATENCION, DIAS_VENCIDO, ESTADOS, agenciaDe, alertaDe, estaCerrado, usd, type Agency, type Estado, type Pedido } from "./types";
 import { FILTROS_VACIOS, useCatalogos, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
 import PedidoTablero from "./PedidoTablero";
 import PedidoTabla from "./PedidoTabla";
@@ -15,7 +15,6 @@ import PedidoFicha from "./PedidoFicha";
 import ProfileCard from "@/pages/messenger/components/ProfileCard";
 import { ordenarPedidos, type ColumnaOrden, type Orden } from "./orden";
 
-const VISTA_KEY = "maven.personalizados.vista";
 const AGENCIA_KEY = "maven.personalizados.agencia";
 const ORDEN_KEY = "maven.personalizados.orden";
 
@@ -65,7 +64,11 @@ export default function PersonalizadosPage() {
   // La agencia se elige arriba (Plus / Massive / Ambas) y se recuerda: cada
   // equipo trabaja casi siempre con la suya. El resto de filtros arranca vacío.
   const [filtros, setFiltros] = useState<FiltrosPedidos>(() => ({ ...FILTROS_VACIOS, agencia: leerAgencia() }));
-  const [vista, setVista] = useState<"tablero" | "tabla">(() => (localStorage.getItem(VISTA_KEY) === "tabla" ? "tabla" : "tablero"));
+  // La LISTA es siempre la primera pantalla: es la forma en que el equipo venía
+  // leyendo estos pedidos en el sheet, y el tablero se vuelve ilegible con el
+  // histórico (490 entregados en una sola columna). El tablero sigue a un clic,
+  // pero a propósito NO se recuerda: entrar a Personalizados siempre es la lista.
+  const [vista, setVista] = useState<"tablero" | "tabla">("tabla");
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [editando, setEditando] = useState<Pedido | null>(null);
   const [abierto, setAbierto] = useState<Pedido | null>(null);
@@ -78,7 +81,7 @@ export default function PersonalizadosPage() {
   const { puedeCrear } = usePermisosPersonalizados();
   const { canAccess } = usePermissions();
 
-  const cambiarVista = (v: "tablero" | "tabla") => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
+  const cambiarVista = (v: "tablero" | "tabla") => setVista(v);
   const patch = (p: Partial<FiltrosPedidos>) => setFiltros((f) => ({ ...f, ...p }));
   const elegirAgencia = (a: Agency | "") => { patch({ agencia: a }); try { localStorage.setItem(AGENCIA_KEY, a); } catch { /* noop */ } };
   // La agencia no cuenta como "filtro": es el contexto de trabajo, no algo que se limpia.
@@ -130,13 +133,21 @@ export default function PersonalizadosPage() {
   // La ficha muestra siempre la versión fresca del pedido abierto.
   const abiertoFresco = abierto ? pedidos.find((p) => p.id === abierto.id) ?? abierto : null;
 
-  // Resumen arriba: cuánto hay en juego y cuánto está pendiente de la creadora.
+  // Resumen arriba: cuánto hay en juego y qué se está por caer del plazo.
+  // Vencidos = pasados los 12 días (o la fecha de entrega); por vencer = 7 o
+  // más días abiertos. Ver `alertaDe` en types.ts.
   const resumen = useMemo(() => {
-    const abiertos = pedidos.filter((p) => !["entregado", "denegado", "reembolsado"].includes(p.status));
+    const abiertos = pedidos.filter((p) => !estaCerrado(p.status));
     const enJuego = abiertos.reduce((s, p) => s + (p.price_usd ?? 0), 0);
     const porAprobar = pedidos.filter((p) => p.status === "solicitado").length;
-    const vencidos = abiertos.filter((p) => p.due_on && new Date(`${p.due_on}T23:59:59`) < new Date()).length;
-    return { abiertos: abiertos.length, enJuego, porAprobar, vencidos };
+    const alertas = abiertos.map((p) => alertaDe(p));
+    return {
+      abiertos: abiertos.length,
+      enJuego,
+      porAprobar,
+      porVencer: alertas.filter((a) => a?.nivel === "atencion").length,
+      vencidos: alertas.filter((a) => a?.nivel === "vencido").length,
+    };
   }, [pedidos]);
 
   return (
@@ -180,17 +191,27 @@ export default function PersonalizadosPage() {
           </span>
         </div>
 
-        {/* Resumen */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {/* Resumen. Los dos últimos son el reloj del plazo: ámbar avisa, rojo
+            ya se pasó de los 12 días. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {[
-            { l: "Abiertos", v: String(resumen.abiertos) },
-            { l: "En juego", v: usd(resumen.enJuego) },
-            { l: "Por aprobar", v: String(resumen.porAprobar), alerta: resumen.porAprobar > 0 },
-            { l: "Vencidos", v: String(resumen.vencidos), alerta: resumen.vencidos > 0 },
+            { l: "Abiertos", v: String(resumen.abiertos), ayuda: "Pedidos sin cerrar." },
+            { l: "En juego", v: usd(resumen.enJuego), ayuda: "Suma de los precios de los pedidos abiertos." },
+            { l: "Por aprobar", v: String(resumen.porAprobar), nivel: resumen.porAprobar > 0 ? "atencion" : null, ayuda: "Esperando que un supervisor los apruebe." },
+            { l: `Por vencer`, v: String(resumen.porVencer), nivel: resumen.porVencer > 0 ? "atencion" : null, ayuda: `Abiertos hace ${DIAS_ATENCION} días o más.` },
+            { l: "Vencidos", v: String(resumen.vencidos), nivel: resumen.vencidos > 0 ? "vencido" : null, ayuda: `Pasaron los ${DIAS_VENCIDO} días de plazo (o su fecha de entrega).` },
           ].map((k) => (
-            <div key={k.l} className={`rounded-2xl border px-3 py-2 ${k.alerta ? "border-amber-500/30 bg-amber-500/5" : "border-border/60 bg-card"}`}>
+            <div
+              key={k.l}
+              title={k.ayuda}
+              className={`rounded-2xl border px-3 py-2 ${
+                k.nivel === "vencido" ? "border-red-500/40 bg-red-500/5"
+                : k.nivel === "atencion" ? "border-amber-500/30 bg-amber-500/5"
+                : "border-border/60 bg-card"
+              }`}
+            >
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k.l}</p>
-              <p className="text-lg font-semibold leading-tight">{k.v}</p>
+              <p className={`text-lg font-semibold leading-tight ${k.nivel === "vencido" ? "text-red-500" : k.nivel === "atencion" ? "text-amber-500" : ""}`}>{k.v}</p>
             </div>
           ))}
         </div>

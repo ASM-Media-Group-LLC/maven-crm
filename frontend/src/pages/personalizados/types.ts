@@ -76,6 +76,25 @@ export const ESTADOS: Array<{ id: Estado; label: string; corto: string; tono: st
 ];
 export const estadoDe = (id: Estado) => ESTADOS.find((e) => e.id === id) ?? ESTADOS[0];
 
+// El color del estado, abierto en piezas: `tono` sirve para el badge, pero el
+// header de la ficha, los puntos del recorrido y la línea del historial
+// necesitan el mismo color en otras formas. Las clases van ESCRITAS COMPLETAS
+// a propósito: Tailwind no ve las que se arman con template strings.
+export const ACENTO: Record<Estado, { hero: string; punto: string; texto: string; tinte: string }> = {
+  solicitado:    { hero: "from-sky-500/25",     punto: "bg-sky-500",     texto: "text-sky-500",     tinte: "bg-sky-500/10" },
+  aprobado:      { hero: "from-violet-500/25",  punto: "bg-violet-500",  texto: "text-violet-500",  tinte: "bg-violet-500/10" },
+  en_produccion: { hero: "from-amber-500/25",   punto: "bg-amber-500",   texto: "text-amber-500",   tinte: "bg-amber-500/10" },
+  listo:         { hero: "from-teal-500/25",    punto: "bg-teal-500",    texto: "text-teal-500",    tinte: "bg-teal-500/10" },
+  entregado:     { hero: "from-emerald-500/25", punto: "bg-emerald-500", texto: "text-emerald-500", tinte: "bg-emerald-500/10" },
+  denegado:      { hero: "from-red-500/25",     punto: "bg-red-500",     texto: "text-red-500",     tinte: "bg-red-500/10" },
+  reembolsado:   { hero: "from-zinc-500/25",    punto: "bg-zinc-500",    texto: "text-zinc-400",    tinte: "bg-zinc-500/10" },
+};
+export const acentoDe = (id: Estado) => ACENTO[id] ?? ACENTO.solicitado;
+
+/** El camino normal del pedido, sin las salidas laterales: es lo que dibuja el
+ *  recorrido de la ficha (dónde está y cuánto le falta). */
+export const CAMINO: Estado[] = ["solicitado", "aprobado", "en_produccion", "listo", "entregado"];
+
 /** A qué estados se puede pasar desde cada uno (lo que ofrecen los botones).
  *  Aprobar/denegar además lo exige la BD (trigger): solo supervisor+. */
 export const SIGUIENTES: Record<Estado, Estado[]> = {
@@ -88,6 +107,69 @@ export const SIGUIENTES: Record<Estado, Estado[]> = {
   reembolsado:   [],
 };
 export const SOLO_SUPERVISOR: Estado[] = ["aprobado", "denegado"];
+
+// ─── Reloj del pedido ───────────────────────────────────────────────────────
+// Regla del negocio (Jhon, 03/09/2026): un personalizado no puede tardar más
+// de 12 DÍAS desde que el fan lo pidió. A los 7 avisa en ámbar (todavía hay
+// tiempo, pero ya hay que empujarlo) y a los 12 queda VENCIDO en rojo. Si el
+// pedido tiene fecha de entrega propia y ya pasó, cuenta como vencido aunque
+// tenga menos días. Los pedidos cerrados no alertan nunca: ya no hay nada que
+// hacer con ellos.
+export const DIAS_ATENCION = 7;
+export const DIAS_VENCIDO = 12;
+export const CERRADOS: Estado[] = ["entregado", "denegado", "reembolsado"];
+export const estaCerrado = (e: Estado) => CERRADOS.includes(e);
+
+export interface Alerta {
+  nivel: "atencion" | "vencido";
+  dias: number;
+  texto: string;
+  /** Clases del badge. */
+  tono: string;
+  /** Color plano, para el punto y el borde de la fila/tarjeta. */
+  punto: string;
+  borde: string;
+}
+
+/** Días enteros transcurridos entre una fecha `YYYY-MM-DD` y hoy. Se ancla al
+ *  mediodía porque las fechas del pedido son días sin hora: a medianoche, un
+ *  `new Date("2026-09-01")` (UTC) contra la hora local se corría un día. */
+export function diasDesde(dia: string, hoy: Date = new Date()): number {
+  const d = new Date(`${dia.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return 0;
+  const ref = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12, 0, 0);
+  return Math.floor((ref.getTime() - d.getTime()) / 86_400_000);
+}
+
+export function alertaDe(
+  p: Pick<Pedido, "status" | "requested_on" | "due_on">,
+  hoy: Date = new Date(),
+): Alerta | null {
+  if (estaCerrado(p.status)) return null;
+  const dias = diasDesde(p.requested_on, hoy);
+  const entregaPasada = !!p.due_on && diasDesde(p.due_on, hoy) > 0;
+  if (dias >= DIAS_VENCIDO || entregaPasada) {
+    return {
+      nivel: "vencido",
+      dias,
+      texto: `Vencido · ${dias} d`,
+      tono: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
+      punto: "bg-red-500",
+      borde: "border-l-red-500",
+    };
+  }
+  if (dias >= DIAS_ATENCION) {
+    return {
+      nivel: "atencion",
+      dias,
+      texto: `${dias} d sin entregar`,
+      tono: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+      punto: "bg-amber-500",
+      borde: "border-l-amber-500",
+    };
+  }
+  return null;
+}
 
 export const TIPOS: Array<{ id: TipoContenido; label: string; emoji: string }> = [
   { id: "foto", label: "Foto", emoji: "📷" },

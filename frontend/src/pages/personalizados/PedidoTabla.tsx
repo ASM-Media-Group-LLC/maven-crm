@@ -8,7 +8,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { agenciaDe, estadoDe, tipoDe, usd, type Pedido } from "./types";
+import { DIAS_VENCIDO, agenciaDe, alertaDe, estadoDe, tipoDe, usd, type Pedido } from "./types";
 import { CLASE, TEXTOS, etiquetaValor, valoresDe, type ColumnaOrden, type Direccion, type Orden } from "./orden";
 
 interface Props {
@@ -120,8 +120,11 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
           )}
           {pedidos.map((p) => {
             const e = estadoDe(p.status); const ag = agenciaDe(p.agency); const t = tipoDe(p.content_type);
+            // Reloj del plazo: barrita de color a la izquierda de la fila y los
+            // días a la vista junto a la fecha del pedido. Ver `alertaDe`.
+            const a = alertaDe(p);
             return (
-              <TableRow key={p.id} className="cursor-pointer" onClick={() => onAbrir(p)}>
+              <TableRow key={p.id} className={`cursor-pointer border-l-2 ${a ? a.borde : "border-l-transparent"}`} onClick={() => onAbrir(p)}>
                 <TableCell className="font-medium whitespace-nowrap">
                   {/* La creadora lleva a su perfil de Maven, solo si quien mira
                       tiene el tab Creadoras y el pedido está vinculado. */}
@@ -132,7 +135,21 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                     </Link>
                   ) : p.creator_name}
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{f(p.requested_on)}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    {f(p.requested_on)}
+                    {a && (
+                      <span
+                        title={a.nivel === "vencido"
+                          ? `Pasó el plazo de ${DIAS_VENCIDO} días: abierto hace ${a.dias}.`
+                          : `Abierto hace ${a.dias} días. El plazo es de ${DIAS_VENCIDO}.`}
+                        className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${a.tono}`}
+                      >
+                        {a.dias} d
+                      </span>
+                    )}
+                  </span>
+                </TableCell>
                 <TableCell><Badge variant="outline" className={`rounded-full ${e.tono}`}>{e.corto}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap">
                   {/* El chatter abre su ficha (la misma del Messenger), desde
