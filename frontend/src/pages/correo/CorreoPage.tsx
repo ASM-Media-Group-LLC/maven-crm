@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -121,6 +122,7 @@ function fechaLarga(iso: string): string {
 
 export default function CorreoPage() {
   const { data: buzon, isLoading: cargandoBuzon, error: errorBuzon } = useMailbox();
+  const [params, setParams] = useSearchParams();
   const hayBuzon = !!buzon?.is_active;
 
   const [carpeta, setCarpeta] = useState("INBOX");
@@ -146,6 +148,19 @@ export default function CorreoPage() {
   const descargar = useDownloadAttachment();
   // La bandeja se actualiza sola cuando el sincronizador escribe (push).
   useMailRealtime(hayBuzon);
+
+  // `?to=` (y opcional `?asunto=`): abrir el compositor con el destinatario
+  // puesto. Lo usa la ficha de perfil del Messenger ("escribirle"). La URL se
+  // limpia después para que un refresh no reabra el compositor.
+  useEffect(() => {
+    const to = params.get("to");
+    if (!to || !hayBuzon) return;
+    setRedactar({ to, subject: params.get("asunto") ?? undefined });
+    const limpio = new URLSearchParams(params);
+    limpio.delete("to");
+    limpio.delete("asunto");
+    setParams(limpio, { replace: true });
+  }, [params, hayBuzon, setParams]);
 
   // Al cambiar de carpeta el mensaje abierto ya no corresponde: los números
   // de secuencia son por carpeta, así que dejarlo abriría OTRO correo. Y la

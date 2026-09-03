@@ -28,6 +28,10 @@ export interface KarmaProfile {
   avatar_url: string | null;
   avatar_seed: string | null;
   role: string;
+  /** Casilla de Maven si la tiene; si no, el correo con el que entra. */
+  email: string | null;
+  /** Quien mira tiene casilla activa y el módulo Correo: puede escribir desde Maven. */
+  viewer_can_mail: boolean;
   stars: KarmaStars;
   stars_count: number;
   special: boolean;
