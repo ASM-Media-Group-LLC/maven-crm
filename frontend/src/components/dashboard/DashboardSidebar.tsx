@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
+  LayoutDashboard, Users, UserPlus, Settings, ChevronRight,
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
@@ -167,7 +167,10 @@ const DashboardSidebar = () => {
     return precargarEnOcio(urlsVisibles.split("|"));
   }, [permisosCargando, urlsVisibles]);
 
-  const isCreatorSalesActive = pathname === "/dashboard2";
+  // El Dashboard Ventas ya no es un ítem aparte: para management ES el
+  // Dashboard (ver pages/Dashboard.tsx). /dashboard2 sigue respondiendo para
+  // los links guardados, y en ese caso el menú marca "Dashboard".
+  const enDashboardVentas = pathname === "/dashboard2";
 
   type HRItem = { title: string; url: string | null; submodule?: string };
   type HRSubGroup = { label: string; key: string; items: HRItem[] };
@@ -366,18 +369,11 @@ const DashboardSidebar = () => {
           ...allCreadoresItems.map((i) => ({ title: i.title, url: i.url })),
         ] as CI[])
       : []),
-    ...(canAccess("Creator Sales", "Dashboard")
-      ? ([
-          { kind: "separator" } as const,
-          { kind: "label", title: "Ventas" } as const,
-          { title: "Dashboard Ventas", url: "/dashboard2" },
-        ] as CI[])
-      : []),
   ];
   const isMenuActive =
     mainMenu.some((i) => pathname === i.url || pathname.startsWith(i.url + "/")) ||
     isCreadoresActive ||
-    isCreatorSalesActive;
+    enDashboardVentas;
 
   const operationsCollapsedItems: CI[] = operationsMenu.map((i) => ({
     title: i.title,
@@ -437,19 +433,6 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               )}
 
-              {/* Ventas — UNA pantalla: el Dashboard Ventas (antes Dashboard v2).
-                  Reportes, IA Ventas y Auditoría se retiraron: nadie los usaba
-                  y sus números ya viven acá. */}
-              {canAccess("Creator Sales", "Dashboard") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Dashboard Ventas">
-                    <button type="button" onClick={() => navigate("/dashboard2")} className={`${LINK_CLASS} ${isCreatorSalesActive ? ACTIVE_CLASS : ""} w-full text-left`}>
-                      <TrendingUp className="h-4 w-4 shrink-0" />
-                      <span>Dashboard Ventas</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
         </CollapsibleSidebarGroup>
 

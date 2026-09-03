@@ -27,7 +27,7 @@
 import type { ComponentType } from "react";
 import type { TranslationKey } from "@/lib/i18n";
 import {
-  LayoutDashboard, Users, UserPlus, Settings, TrendingUp, BarChart3, Bell,
+  LayoutDashboard, Users, UserPlus, Settings, BarChart3, Bell,
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText,
   ClipboardCheck, Map, Search, Headphones, Video, Users2, MessageCircle,
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
@@ -66,7 +66,7 @@ export interface NavCatalogEntry {
 
 export const NAV_CATALOG: NavCatalogEntry[] = [
   // ── Menú ──────────────────────────────────────────────────────────────
-  { title: "Dashboard", i18nKey: "nav.dashboard", url: "/dashboard", icon: LayoutDashboard, module: "Dashboard", section: "Menú", keywords: ["inicio", "home"] },
+  { title: "Dashboard", i18nKey: "nav.dashboard", url: "/dashboard", icon: LayoutDashboard, module: "Dashboard", section: "Menú", keywords: ["inicio", "home", "ventas", "ingresos", "dashboard v2", "dashboard ventas"] },
   { title: "Correo", url: "/correo", icon: Mail, module: "Correo", section: "Menú", keywords: ["email", "mail", "zoho"] },
   { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", section: "Menú", keywords: ["chat", "mensajes"] },
   { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", section: "Menú", keywords: ["sala", "video"] },
@@ -80,11 +80,6 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Creadoras · Listado", url: "/creadores", icon: Users, module: "Creadores", submodule: "Lista", section: "Creadoras", keywords: ["modelos", "roster"] },
   { title: "Creadoras · Onboarding", url: "/creadores/onboarding", icon: ClipboardCheck, module: "Creadores", submodule: "Onboarding", section: "Creadoras" },
   { title: "Creadoras · Offboarding", url: "/creadores/offboarding", icon: ClipboardCheck, module: "Creadores", submodule: "Offboarding", section: "Creadoras" },
-
-  // ── Ventas ────────────────────────────────────────────────────────────
-  // Dashboard Ventas (antes "Dashboard v2"): absorbió Ventas · Dashboard. Ya no
-  // es adminOnly — lo gatea el módulo Ventas, que es quien lo venía viendo.
-  { title: "Dashboard Ventas", url: "/dashboard2", icon: TrendingUp, module: "Creator Sales", submodule: "Dashboard", section: "Ventas", keywords: ["sales", "ingresos", "ventas", "dashboard v2"] },
 
   // ── Operaciones ───────────────────────────────────────────────────────
   { title: "Promolog", i18nKey: "nav.promolog", url: "/promolog", icon: Megaphone, module: "Promolog", section: "Operaciones", keywords: ["promos", "historias"] },
