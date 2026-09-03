@@ -4,7 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 
 export type AppRole =
   | "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer"
-  | "Team Leader" | "Closer Supervisor" | "Chatter Supervisor" | "coordinator_beta";
+  | "Team Leader" | "Closer Supervisor" | "Chatter Supervisor" | "coordinator_beta"
+  // Rol canónico del equipo de chat (24 personas). En role_groups es nivel
+  // member; su dashboard y sus módulos (Horarios, Rendimiento) se arman por
+  // identidad, pero el flag existe para que la UI pueda distinguirlo sin
+  // comparar strings sueltos.
+  | "Chatter";
 
 // Roles que en `role_groups` tienen is_supervisor_or_above = true SIN ser
 // admin/manager. La BD ya los trata como supervisores (RLS "Supervisors+ view
@@ -57,6 +62,8 @@ export const useUserRole = () => {
     isSupervisor: !!role && SUPERVISOR_ROLES.includes(role),
     isTeamLeader: role === "Team Leader",
     isSpammer: role === "spammer",
+    // "agent" es el nombre legacy del mismo rol (list_chatters acepta ambos).
+    isChatter: role === "Chatter" || role === "agent",
     isLoading,
   };
 };

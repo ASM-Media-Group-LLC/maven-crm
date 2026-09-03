@@ -3,7 +3,7 @@ import {
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
-  Volume2, VolumeX, Mail, Clapperboard, CalendarRange, Gift } from "lucide-react";
+  Volume2, VolumeX, Mail, Clapperboard, CalendarRange, CalendarDays, Gift } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -163,6 +163,7 @@ const DashboardSidebar = () => {
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Chatters · Rendimiento", url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento" as string | undefined },
+    { title: "Chatters · Horarios", url: "/chatters/horarios", icon: CalendarDays, module: "Chatters", submodule: "Horarios" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
   ];
