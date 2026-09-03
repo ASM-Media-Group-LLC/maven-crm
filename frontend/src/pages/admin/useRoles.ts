@@ -154,7 +154,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     ],
     ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Blu CRM", "Editar Banking", "Cambiar Plataforma"],
   ),
-  def("Menú", "Creator Sales", ["Dashboard", "Reportes", "IA Ventas", "Auditoría"]),
+  // Ventas quedó con UNA pantalla: el Dashboard Ventas (/dashboard2). Reportes,
+  // IA Ventas y Auditoría se retiraron en 09/2026 — sus números viven ahí.
+  def("Menú", "Creator Sales", ["Dashboard"]),
 
   // === Operaciones ===
   // Promolog: Promos (tabla) + Promobot (control del pipeline, gateado por rol).

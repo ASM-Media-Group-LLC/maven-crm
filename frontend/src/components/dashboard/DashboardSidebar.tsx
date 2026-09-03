@@ -141,16 +141,6 @@ const DashboardSidebar = () => {
     item.url === "/creadores" ? pathname === "/creadores" : pathname.startsWith(item.url)
   );
 
-  const creatorSalesSubItemsAll = [
-    { title: "Dashboard", url: "/sales-overview", submodule: "Dashboard" },
-    { title: "Reportes", url: "/salesdashboard", submodule: "Reportes" },
-    { title: "IA Ventas · Beta", url: "/aisales", submodule: "IA Ventas" },
-    { title: "Auditoría", url: "/sales-audit", submodule: "Auditoría" },
-  ];
-  const creatorSalesSubItems = creatorSalesSubItemsAll.filter((item) =>
-    canAccess("Creator Sales", item.submodule),
-  );
-
   const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined; muteChannel?: MuteChannel }[] = [
     { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined },
     { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", submodule: undefined },
@@ -169,7 +159,7 @@ const DashboardSidebar = () => {
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
-  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales";
+  const isCreatorSalesActive = pathname === "/dashboard2";
 
   type HRItem = { title: string; url: string | null; submodule?: string };
   type HRSubGroup = { label: string; key: string; items: HRItem[] };
@@ -368,11 +358,11 @@ const DashboardSidebar = () => {
           ...allCreadoresItems.map((i) => ({ title: i.title, url: i.url })),
         ] as CI[])
       : []),
-    ...(canAccess("Creator Sales")
+    ...(canAccess("Creator Sales", "Dashboard")
       ? ([
           { kind: "separator" } as const,
           { kind: "label", title: "Ventas" } as const,
-          ...creatorSalesSubItems.map((i) => ({ title: i.title, url: i.url })),
+          { title: "Dashboard Ventas", url: "/dashboard2" },
         ] as CI[])
       : []),
   ];
@@ -439,13 +429,15 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               )}
 
-              {/* Ventas — single link to dashboard; submenu vive como subtabs en la página */}
-              {canAccess("Creator Sales") && (
+              {/* Ventas — UNA pantalla: el Dashboard Ventas (antes Dashboard v2).
+                  Reportes, IA Ventas y Auditoría se retiraron: nadie los usaba
+                  y sus números ya viven acá. */}
+              {canAccess("Creator Sales", "Dashboard") && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Ventas">
-                    <button type="button" onClick={() => navigate("/sales-overview")} className={`${LINK_CLASS} ${isCreatorSalesActive ? ACTIVE_CLASS : ""} w-full text-left`}>
+                  <SidebarMenuButton asChild tooltip="Dashboard Ventas">
+                    <button type="button" onClick={() => navigate("/dashboard2")} className={`${LINK_CLASS} ${isCreatorSalesActive ? ACTIVE_CLASS : ""} w-full text-left`}>
                       <TrendingUp className="h-4 w-4 shrink-0" />
-                      <span>Ventas</span>
+                      <span>Dashboard Ventas</span>
                     </button>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

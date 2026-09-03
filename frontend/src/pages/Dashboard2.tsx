@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, endOfDay, differenceInCalendarDays } from "date-fns";
+import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, subMonths, endOfDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
 import { useDashboard2Summary } from "./sales-performance/useDashboard2Summary";
+import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
+import { useSalesMonthlyTotals } from "./sales-overview/useSalesTotals";
+import SalesKPICards from "./sales-overview/SalesKPICards";
+import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
+import CardDetailModal from "./sales-overview/CardDetailModal";
+import VentasTops from "./sales-performance/VentasTops";
 import { useDashboard2Daily } from "./sales-performance/useDashboard2Daily";
 import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
@@ -92,6 +98,9 @@ type SortDir = "asc" | "desc";
 // Capitaliza la 1ª letra (labels de mes).
 const cap = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
 
+// Meses del sparkline de la tarjeta "Comparativas".
+const SPARKLINE_MESES = 4;
+
 // Presets de rango rápido — mismos pills que Panel de Control.
 type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
 const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
@@ -123,6 +132,9 @@ const Dashboard2 = () => {
   // seleccionado / anterior / mes en curso) viven más abajo, tras definir los períodos.
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Tarjeta de ventas abierta en el modal de detalle (las 10 que venían de
+  // /sales-overview). null = cerrado.
+  const [tarjetaVentas, setTarjetaVentas] = useState<string | null>(null);
   const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
     mom: { key: "delta", dir: "desc" },
     compare: { key: "total", dir: "desc" },
@@ -377,6 +389,38 @@ const Dashboard2 = () => {
   // Resumen del período ANTERIOR (deltas MoM) y del MES EN CURSO (proyección), también
   // agregados server-side. React Query dedupe si alguna ventana coincide con otra.
   const { data: prevSummary = [] } = useDashboard2Summary(prevPeriod?.startStr, prevPeriod?.endStr, !!prevPeriod);
+
+  // Comparativa período vs anterior — es lo que alimenta las 10 tarjetas que
+  // antes vivían en Ventas · Dashboard (/sales-overview, ya retirado). No
+  // cuesta una request más: reusa los dos resúmenes que el dashboard ya trae.
+  const comparacion = usePeriodComparison(selSummary, prevSummary);
+
+  // Sparkline de la tarjeta "Comparativas": total por mes de los últimos 4
+  // meses (1 fila por mes, agregada server-side).
+  const { data: mensuales } = useSalesMonthlyTotals(SPARKLINE_MESES);
+  const sparklineVentas = useMemo(() => {
+    const porMes = new Map((mensuales ?? []).map((m) => [m.month, m.total_gross]));
+    const hoy = startOfDay(new Date());
+    return Array.from({ length: SPARKLINE_MESES }, (_, i) => {
+      const clave = format(startOfMonth(subMonths(hoy, SPARKLINE_MESES - 1 - i)), "yyyy-MM-dd");
+      return { value: porMes.get(clave) ?? 0 };
+    });
+  }, [mensuales]);
+
+  // Creadoras que lista el modal según la tarjeta clickeada.
+  const creadorasDeTarjeta = () => {
+    switch (tarjetaVentas) {
+      case "rising": return comparacion.rising;
+      case "at_risk": return comparacion.atRisk;
+      case "falling": return comparacion.falling;
+      case "high_potential": return comparacion.highPotential;
+      case "top10": return comparacion.top10;
+      case "alerts": return [...comparacion.atRisk, ...comparacion.falling];
+      case null: return [];
+      // gross / net / creators / comparatives / todas → la lista completa.
+      default: return comparacion.creators;
+    }
+  };
   const projWindow = useMemo(() => {
     const now = new Date();
     return {
@@ -773,7 +817,7 @@ const Dashboard2 = () => {
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
-                    Ventas OF
+                    Dashboard Ventas
                   </h1>
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
@@ -871,6 +915,24 @@ const Dashboard2 = () => {
 
                 {/* Resumen — KPI strip rediseñado + insights estratégicos */}
                 <TabsContent value="resumen" className="mt-4 space-y-5">
+
+              {/* ══════ VENTAS — las 10 tarjetas que venían de /sales-overview ══════ */}
+              {/* Eran el tab Ventas · Dashboard. Viven acá porque salen del MISMO
+                  resumen server-side que el resto del dashboard: el tab aparte
+                  duplicaba pantalla y consultas para mirar los mismos números. */}
+              {isLoading ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                  {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+                </div>
+              ) : !isError && hasData ? (
+                <div className="space-y-3">
+                  <SalesKPICards data={comparacion} onCardClick={setTarjetaVentas} />
+                  <SalesOperationalCards data={comparacion} onCardClick={setTarjetaVentas} sparklineData={sparklineVentas} />
+                </div>
+              ) : null}
+
+              {/* ══════ EQUIPO — cada rol por su objetivo ══════ */}
+              <VentasTops desde={selectedPeriod.startStr} hasta={selectedPeriod.endStr} />
 
               {/* ══════ EXECUTIVE KPI STRIP — 2 rows redesign ══════ */}
               {/* Row 1: 4 stat cards (Revenue Bruto + Creadoras
@@ -2862,6 +2924,14 @@ const Dashboard2 = () => {
                 </div>
               </div>
             )}
+
+            {/* Detalle de la tarjeta de ventas clickeada (lista de creadoras). */}
+            <CardDetailModal
+              open={!!tarjetaVentas}
+              onOpenChange={(abierto) => !abierto && setTarjetaVentas(null)}
+              cardType={tarjetaVentas ?? ""}
+              creators={creadorasDeTarjeta()}
+            />
           </main>
   );
 };

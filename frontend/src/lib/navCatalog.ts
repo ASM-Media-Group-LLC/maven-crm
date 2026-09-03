@@ -67,7 +67,6 @@ export interface NavCatalogEntry {
 export const NAV_CATALOG: NavCatalogEntry[] = [
   // ── Menú ──────────────────────────────────────────────────────────────
   { title: "Dashboard", i18nKey: "nav.dashboard", url: "/dashboard", icon: LayoutDashboard, module: "Dashboard", section: "Menú", keywords: ["inicio", "home"] },
-  { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard", adminOnly: true, section: "Menú" },
   { title: "Correo", url: "/correo", icon: Mail, module: "Correo", section: "Menú", keywords: ["email", "mail", "zoho"] },
   { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", section: "Menú", keywords: ["chat", "mensajes"] },
   { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", section: "Menú", keywords: ["sala", "video"] },
@@ -83,10 +82,9 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Creadoras · Offboarding", url: "/creadores/offboarding", icon: ClipboardCheck, module: "Creadores", submodule: "Offboarding", section: "Creadoras" },
 
   // ── Ventas ────────────────────────────────────────────────────────────
-  { title: "Ventas · Dashboard", url: "/sales-overview", icon: TrendingUp, module: "Creator Sales", submodule: "Dashboard", section: "Ventas", keywords: ["sales", "ingresos"] },
-  { title: "Ventas · Reportes", i18nKey: "nav.salesReport", url: "/salesdashboard", icon: TrendingUp, module: "Creator Sales", submodule: "Reportes", section: "Ventas" },
-  { title: "IA Ventas", i18nKey: "nav.aiSales", url: "/aisales", icon: Bot, module: "Creator Sales", submodule: "IA Ventas", section: "Ventas", keywords: ["sophie"] },
-  { title: "Ventas · Auditoría", url: "/sales-audit", icon: Shield, module: "Creator Sales", submodule: "Auditoría", section: "Ventas" },
+  // Dashboard Ventas (antes "Dashboard v2"): absorbió Ventas · Dashboard. Ya no
+  // es adminOnly — lo gatea el módulo Ventas, que es quien lo venía viendo.
+  { title: "Dashboard Ventas", url: "/dashboard2", icon: TrendingUp, module: "Creator Sales", submodule: "Dashboard", section: "Ventas", keywords: ["sales", "ingresos", "ventas", "dashboard v2"] },
 
   // ── Operaciones ───────────────────────────────────────────────────────
   { title: "Promolog", i18nKey: "nav.promolog", url: "/promolog", icon: Megaphone, module: "Promolog", section: "Operaciones", keywords: ["promos", "historias"] },

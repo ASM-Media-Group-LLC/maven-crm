@@ -68,10 +68,6 @@ const Dashboard2 = lazy(() => import("./pages/Dashboard2"));
 const PanelDeControl = lazy(() => import("./pages/PanelDeControl"));
 
 // Sales
-const SalesDashboard = lazy(() => import("./pages/SalesDashboard"));
-const SalesAudit = lazy(() => import("./pages/SalesAudit"));
-const SalesOverview = lazy(() => import("./pages/SalesOverview"));
-const AiSales = lazy(() => import("./pages/AiSales"));
 
 // Creadores
 const Creadores = lazy(() => import("./pages/Creadores"));
@@ -262,7 +258,10 @@ const App = () => (
                   routes. Only the full-screen video pages stay outside. */}
               <Route element={<ProtectedRoute><CallProvider><PersistentCallProvider><AppShell /></PersistentCallProvider></CallProvider></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
+                {/* Dashboard Ventas (antes "Dashboard v2"). Pasó de solo-admin al
+                    módulo Ventas: absorbió /sales-overview, que ya veían 7 roles.
+                    La URL no cambia para no romper links ni la PWA de nadie. */}
+                <Route path="/dashboard2" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><Dashboard2 /></PermissionRoute>} />
                 <Route path="/panel-de-control" element={<PermissionRoute module="Panel de control"><PanelDeControl /></PermissionRoute>} />
                 <Route path="/design-system" element={<DesignSystem />} />
                 <Route path="/docs" element={<Docs />} />
@@ -300,10 +299,6 @@ const App = () => (
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
                 {/* Sales Overview — sub-rutas eliminadas; ahora vive todo en modales */}
-                <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
-                <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />
-                <Route path="/sales-audit" element={<PermissionRoute module="Creator Sales" submodule="Auditoría"><SalesAudit /></PermissionRoute>} />
-                <Route path="/aisales" element={<PermissionRoute module="Creator Sales" submodule="IA Ventas"><AiSales /></PermissionRoute>} />
                 {/* Chatter Evaluator — submodule-gated so admins can give
                     chatters Evaluator-only access without exposing the
                     admin/workspace tooling. */}

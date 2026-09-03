@@ -12,7 +12,7 @@ const Index = () => {
             <Link to="/design-system">Design System</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/salesdashboard">Sales Dashboard</Link>
+            <Link to="/dashboard2">Dashboard Ventas</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link to="/dashboard">Dashboard</Link>
