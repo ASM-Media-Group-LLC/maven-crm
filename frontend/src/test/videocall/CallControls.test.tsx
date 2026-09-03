@@ -116,4 +116,24 @@ describe("CallControls", () => {
     render(<CallControls {...defaultProps} hideScreenShare={false} />);
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
   });
+  // La cancelación de ruido existía en el hook desde hace meses, pero NINGUNA
+  // pantalla la mostraba: Jhon la buscó en una llamada y no estaba. Ahora vive
+  // en el menú del micrófono; esto cuida que siga ahí y que el toque llegue.
+  it("la cancelación de ruido se activa desde el menú del micrófono", async () => {
+    const onToggleNoiseCancellation = vi.fn();
+    render(<CallControls {...defaultProps} onToggleNoiseCancellation={onToggleNoiseCancellation} />);
+    // El caret del micro es el primer botón de la barra (abre el popover de dispositivos).
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    const fila = await screen.findByRole("switch", { name: /cancelación de ruido/i });
+    expect(fila).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(fila);
+    expect(onToggleNoiseCancellation).toHaveBeenCalledTimes(1);
+  });
+
+  it("si la pantalla no ofrece el interruptor, el menú no lo dibuja", async () => {
+    render(<CallControls {...defaultProps} onToggleNoiseCancellation={undefined} />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("switch", { name: /cancelación de ruido/i })).toBeNull();
+  });
 });
