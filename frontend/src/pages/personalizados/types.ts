@@ -116,6 +116,7 @@ export const FLAGS: Array<{ id: string; label: string }> = [
   { id: "pago_parcial", label: "Pago parcial (debe saldo)" },
   { id: "entregado_al_user", label: "Entregado directo al fan" },
   { id: "urgente", label: "Urgente" },
+  { id: "revisar_monto", label: "Monto por revisar (venía imposible del sheet)" },
 ];
 export const flagDe = (id: string) => FLAGS.find((f) => f.id === id)?.label ?? id;
 

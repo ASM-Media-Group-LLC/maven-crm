@@ -16,7 +16,8 @@ export interface FiltrosPedidos {
   agencia: Agency | "";
   estado: Estado | "";
   creadora: string;   // creator_name exacto
-  chatter: string;    // chatter_id
+  chatter: string;    // chatter_name tal como figura en el pedido (hay chatters que
+                      // ya no tienen usuario en Maven: por id se perdían del filtro)
   mes: string;        // YYYY-MM sobre requested_on
   q: string;          // fan / descripción / creadora
 }
@@ -30,7 +31,7 @@ export function usePedidos(filtros: FiltrosPedidos) {
       if (filtros.agencia) q = q.eq("agency", filtros.agencia);
       if (filtros.estado) q = q.eq("status", filtros.estado);
       if (filtros.creadora) q = q.eq("creator_name", filtros.creadora);
-      if (filtros.chatter) q = q.eq("chatter_id", filtros.chatter);
+      if (filtros.chatter) q = q.eq("chatter_name", filtros.chatter);
       if (filtros.mes) {
         const [y, m] = filtros.mes.split("-").map(Number);
         const desde = `${filtros.mes}-01`;

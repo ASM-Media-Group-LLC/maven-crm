@@ -88,3 +88,47 @@ describe("aPedido + resolutores", () => {
     expect(p.paid_usd).toBe(250);   // entregado ⇒ cobrado
   });
 });
+
+// EL BUG (03/09/2026): el sheet traía "$ 5,500,000.00" como precio de un
+// personalizado (mediana real: $150) y entraba tal cual → el tablero mostraba
+// "En juego $5.5 millones". Un monto imposible ya no entra como plata.
+describe("montos imposibles del sheet", () => {
+  const FILA = [
+    "Danycatgaming\t28/07/26\tSolicitado\tBrayan Hernandez\tMats @matatert\t$ 12,250.00\t$ 5,500,000.00\tFALSE\tTRUE\tVideo\tMontando el dildo\t\t",
+    "Carocancino\t14/08/2026\tEntregado\tCamila Sogamoso\t@u116524439\t$1,038,970\t$1,000\tFALSE\tTRUE\tVideo\tVideo específico\t\t",
+    "Martinasmith\t29/04/2026\tEntregado\tVanessa Giraldo\t@u1\t$ 78,920.00\t$ 2,000.00\tTRUE\tFALSE\tVideo\tTres videos\t\t",
+  ].join("\n");
+  const filas = parseFilasSheet(FILA);
+  const ids = { creadoraId: () => null, chatterId: () => null };
+
+  it("avisa del precio imposible antes de importar", () => {
+    expect(filas[0].avisos.some((a) => /Precio imposible/.test(a))).toBe(true);
+    expect(filas[0].avisos.join(" ")).toContain("$5,500,000");
+  });
+
+  it("el precio imposible entra en blanco, marcado y con el valor original en las notas", () => {
+    const p = aPedido(filas[0], "plus", "Agosto 2026", ids);
+    expect(p.price_usd).toBeNull();
+    expect(p.paid_usd).toBeNull();
+    expect(p.flags).toContain("revisar_monto");
+    expect(p.notes).toContain("5,500,000");
+    // el gasto del fan de esa fila era plausible: se conserva
+    expect(p.fan_total_spent_usd).toBe(12250);
+  });
+
+  it("un gasto de fan imposible tampoco pasa, pero el precio bueno queda", () => {
+    const p = aPedido(filas[1], "massive", "Massive Aprobadas", ids);
+    expect(p.fan_total_spent_usd).toBeNull();
+    expect(p.price_usd).toBe(1000);
+    expect(p.paid_usd).toBe(1000);
+    expect(p.flags).toContain("revisar_monto");
+  });
+
+  it("montos altos pero reales (ballenas) pasan sin marca", () => {
+    const p = aPedido(filas[2], "plus", "PLUS Aprobadas", ids);
+    expect(p.fan_total_spent_usd).toBe(78920);
+    expect(p.price_usd).toBe(2000);
+    expect(p.flags).toEqual([]);
+    expect(p.notes).toBeNull();
+  });
+});
