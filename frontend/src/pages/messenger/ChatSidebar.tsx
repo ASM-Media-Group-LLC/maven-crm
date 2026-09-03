@@ -261,11 +261,11 @@ export default function ChatSidebar({
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
             <div className="flex flex-wrap gap-1.5 px-3 pb-1">
               {[
-                { key: "all", icon: Home, label: "Todos", badge: 0 },
-                { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
-                { key: "mentions", icon: AtSign, label: "Menciones", badge: mentionedIds.size },
-                { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
-                { key: "archived", icon: Archive, label: "Archivados", badge: archivedCount },
+                { key: "all", icon: Home, label: "Todos", badge: 0, canBadge: false },
+                { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal, canBadge: true },
+                { key: "mentions", icon: AtSign, label: "Menciones", badge: mentionedIds.size, canBadge: true },
+                { key: "pinned", icon: Star, label: "Fijados", badge: 0, canBadge: false },
+                { key: "archived", icon: Archive, label: "Archivados", badge: archivedCount, canBadge: true },
               ].map(item => {
                 const isActive = tab === item.key;
                 const Icon = item.icon;
@@ -282,9 +282,17 @@ export default function ChatSidebar({
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{item.label}</span>
-                    {item.badge > 0 && (
-                      <Badge className="h-4 min-w-4 px-1 text-[9px] bg-primary text-primary-foreground rounded-full font-bold">
-                        {item.badge > 99 ? "99+" : item.badge}
+                    {/* El hueco del badge se reserva SIEMPRE en los chips que pueden tenerlo
+                        (invisible cuando es 0). El conteo de Menciones llega async unos
+                        segundos después de montar (useMentionedConversations hace sus
+                        propias consultas): si el badge aparecía de golpe, el chip se
+                        ensanchaba y toda la fila flex-wrap se reacomodaba. */}
+                    {item.canBadge && (
+                      <Badge className={cn(
+                        "h-4 min-w-4 px-1 text-[9px] bg-primary text-primary-foreground rounded-full font-bold",
+                        item.badge === 0 && "invisible",
+                      )}>
+                        {item.badge > 99 ? "99+" : item.badge > 0 ? item.badge : 0}
                       </Badge>
                     )}
                   </button>
