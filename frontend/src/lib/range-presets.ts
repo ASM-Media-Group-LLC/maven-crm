@@ -27,3 +27,21 @@ export function rangeForPreset(preset: RangePreset, ref: Date): { from: Date; to
       return { from: today, to: endOfDay(today) };
   }
 }
+
+/**
+ * Los días (ISO `YYYY-MM-DD`) que hay entre dos fechas, inclusive. Los
+ * gráficos "día por día" tienen que cubrir el rango del calendario: con solo
+ * los días que tienen dato, una semana con 3 días dibujaba 3 barras y parecía
+ * un rango de 3 días. Devuelve [] si el rango es absurdo (>92 días), para que
+ * quien llame se quede con sus propios datos.
+ */
+export function diasEntre(desde: string, hasta: string): string[] {
+  const salida: string[] = [];
+  const fin = new Date(`${hasta}T12:00:00`);
+  // Mediodía: así ningún cambio de horario corre el día.
+  for (const t = new Date(`${desde}T12:00:00`); t <= fin; t.setDate(t.getDate() + 1)) {
+    salida.push(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
+    if (salida.length > 92) return [];
+  }
+  return salida;
+}

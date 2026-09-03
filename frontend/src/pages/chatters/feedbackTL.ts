@@ -95,6 +95,30 @@ export function useMutacionesFeedback() {
     onSuccess: invalidar,
   });
 
+  // Varios tipos de una sola vez: el supervisor elige y CONFIRMA, así que lo
+  // que eligió entra junto (un solo insert) y no queda a medias si se corta.
+  const registrarVarios = useMutation({
+    mutationFn: async (v: { identityId: string; dia: string; tipos: TipoFeedback[]; comentario?: string }) => {
+      if (v.tipos.length === 0) throw new Error("No elegiste ninguna opción");
+      const { data: sesion } = await supabase.auth.getUser();
+      const filas = v.tipos.map((tipo) => {
+        const cat = feedbackDe(tipo);
+        if (!cat) throw new Error(`Tipo de feedback desconocido: ${tipo}`);
+        return {
+          identity_id: v.identityId,
+          dia: v.dia,
+          tipo,
+          puntos: cat.puntos,
+          comentario: v.comentario?.trim() || null,
+          created_by: sesion.user?.id,
+        };
+      });
+      const { error } = await db.from("chatter_tl_feedback").insert(filas);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: invalidar,
+  });
+
   const borrar = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await db.from("chatter_tl_feedback").delete().eq("id", id);
@@ -103,5 +127,5 @@ export function useMutacionesFeedback() {
     onSuccess: invalidar,
   });
 
-  return { registrar, borrar };
+  return { registrar, registrarVarios, borrar };
 }

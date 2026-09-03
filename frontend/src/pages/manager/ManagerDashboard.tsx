@@ -2,19 +2,22 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, CalendarClock, Clock, DollarSign, Gauge,
-  Megaphone, Sparkles, Users,
+  Megaphone, MousePointerClick, Sparkles, Users,
 } from "lucide-react";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
+import { PRESET_CONFIG, diasEntre, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { cn } from "@/lib/utils";
+import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { usePromoPeriodScores } from "@/pages/promolog/usePromoPeriodScores";
+import { usePromoScoresRango } from "@/pages/promolog/usePromoPeriodScores";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useMisHoras, resumirHoras } from "@/hooks/useMisHoras";
 import { useMiObjetivo, useMisCreadoras, useMisNotasDelBot, type NotaDelBot } from "./useManagerDashboard";
 
 // TABLERO DEL MANAGER — su casa al entrar a Maven.
@@ -51,12 +54,20 @@ const OBJETIVOS: Record<string, string> = {
   ninguna: "sin métrica automática",
 };
 
-function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra }: {
+function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra, onClick }: {
   label: string; valor: string; pie?: React.ReactNode; icono: typeof Users;
   color: string; tinte: string; barra?: { pct: number; clase: string };
+  /** Si viene, la tarjeta es un botón (abre el detalle). */
+  onClick?: () => void;
 }) {
+  const Caja = onClick ? "button" : "div";
   return (
-    <div className={cn("relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 ring-1 ring-white/5 transition-transform hover:-translate-y-0.5", tinte)}>
+    <Caja
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={cn("relative w-full overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 text-left ring-1 ring-white/5 transition-transform hover:-translate-y-0.5",
+        onClick && "cursor-pointer hover:border-primary/40", tinte)}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
         <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", color)}>
@@ -70,7 +81,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra }: {
           <div className={cn("h-full rounded-full transition-[width] duration-700", barra.clase)} style={{ width: `${Math.min(100, Math.max(3, barra.pct))}%` }} />
         </div>
       )}
-    </div>
+    </Caja>
   );
 }
 
@@ -126,19 +137,29 @@ function PorQueEsaNota({ nota, meta }: { nota: NotaDelBot; meta: number | null }
   );
 }
 
-export default function ManagerDashboard() {
+export default function ManagerDashboard({ forzado = false }: {
+  /** true = lo eligió alguien a dedo desde el desplegable del título, así que
+   *  se muestra igual aunque no tenga roster (si no, un admin curioso
+   *  terminaba en el tablero genérico sin entender por qué). */
+  forzado?: boolean;
+} = {}) {
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
   const hasta = isoDia(rango.to);
-  const dias = Math.max(1, Math.round((rango.to.getTime() - rango.from.getTime()) / 86400000) + 1);
+
+  // Detalle de ingresos por modelo, abierto desde el KPI.
+  const [verIngresos, setVerIngresos] = useState(false);
 
   const { notas, cargando: notasCargando } = useMisNotasDelBot(desde, hasta);
+  const { dias: diasHubstaff, cargando: horasCargando } = useMisHoras(desde, hasta);
   const objetivo = useMiObjetivo();
   const { creadoras, cargando: creadorasCargando } = useMisCreadoras();
-  // Promolog: el score oficial por creadora de la ventana (mismo RPC que el
-  // leaderboard de Promolog), filtrado a las mías.
-  const promo = usePromoPeriodScores(Math.min(60, dias));
+  // Promolog: el score oficial por creadora (mismo RPC que el leaderboard de
+  // Promolog), filtrado a las mías y con las FECHAS DEL CALENDARIO. Antes iba
+  // con una ventana móvil de N días terminando hoy, así que "Ayer" contestaba
+  // con los promos de hoy y un rango viejo mostraba el mes corriente.
+  const promo = usePromoScoresRango(desde, hasta);
   const ingresos = useDashboard2Summary(desde, hasta);
 
   const idsMios = useMemo(() => new Set(creadoras.map((c) => c.id)), [creadoras]);
@@ -148,10 +169,37 @@ export default function ManagerDashboard() {
     [promo.data, idsMios],
   );
 
-  const facturado = useMemo(
-    () => (ingresos.data ?? []).filter((r) => r.creator_id && idsMios.has(r.creator_id)).reduce((s, r) => s + r.total, 0),
-    [ingresos.data, idsMios],
-  );
+  const horas = useMemo(() => resumirHoras(diasHubstaff), [diasHubstaff]);
+
+  // Una barra por CADA día del rango: con solo los días que tienen nota, una
+  // semana con 3 notas dibujaba 3 barras y parecía un rango de 3 días.
+  const barras = useMemo(() => {
+    const porFecha = new Map(notas.map((n) => [n.fecha, n]));
+    const fechas = diasEntre(desde, hasta);
+    return fechas.length > 0
+      ? fechas.map((fecha) => ({ fecha, nota: porFecha.get(fecha)?.nota ?? null }))
+      : notas.map((n) => ({ fecha: n.fecha, nota: n.nota }));
+  }, [notas, desde, hasta]);
+
+  // Ingresos de MIS modelos en el rango, por modelo y en total. Sale del mismo
+  // resumen que usa el Dashboard Ventas, filtrado a mi roster: así el detalle
+  // que abre el KPI está sincronizado con el calendario, sin otra consulta.
+  const aporte = useMemo(() => {
+    const nombrePorId = new Map(creadoras.map((c) => [c.id, c.nombre]));
+    const filas = (ingresos.data ?? [])
+      .filter((r) => r.creator_id && idsMios.has(r.creator_id))
+      .map((r) => ({
+        id: r.creator_id as string,
+        nombre: nombrePorId.get(r.creator_id as string) ?? r.artistic_name ?? r.blu_creator_name ?? "Sin nombre",
+        total: r.total,
+        subs: r.subs,
+        dias: r.days_with_data,
+      }))
+      .sort((a, b) => b.total - a.total);
+    const total = filas.reduce((s, r) => s + r.total, 0);
+    const subs = filas.reduce((s, r) => s + r.subs, 0);
+    return { filas, total, subs };
+  }, [ingresos.data, idsMios, creadoras]);
 
   const ultima = notas.length > 0 ? notas[notas.length - 1] : null;
   const promedio = notas.length > 0 ? notas.reduce((s, n) => s + n.nota, 0) / notas.length : null;
@@ -166,7 +214,7 @@ export default function ManagerDashboard() {
   // Un manager sin roster ni notas no tiene nada que mirar acá: 3 de los 5
   // roles `manager` están así. Antes de mostrarle una pantalla vacía, le
   // dejamos el tablero general.
-  if (!cargando && creadoras.length === 0 && notas.length === 0) {
+  if (!forzado && !cargando && creadoras.length === 0 && notas.length === 0) {
     return <DashboardContent />;
   }
 
@@ -179,7 +227,7 @@ export default function ManagerDashboard() {
               <Megaphone className="h-4 w-4 text-primary" />
             </span>
             <div>
-              <h1 className="font-display text-lg font-bold leading-tight tracking-tight">Tu roster</h1>
+              <SelectorDeTablero actual="roster" />
               <p className="text-[11px] text-muted-foreground">
                 {creadoras.length} creadora{creadoras.length === 1 ? "" : "s"} activa{creadoras.length === 1 ? "" : "s"}
                 {objetivo && <> · tu objetivo: {OBJETIVOS[objetivo.metrica] ?? objetivo.metrica}</>}
@@ -209,11 +257,11 @@ export default function ManagerDashboard() {
       <div className="space-y-4 p-4 md:p-6">
         {/* ── KPIs ── */}
         {cargando ? (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <Kpi
               label="Tu nota (bot)"
               valor={ultima ? ultima.nota.toFixed(1) : "—"}
@@ -226,21 +274,39 @@ export default function ManagerDashboard() {
             <Kpi
               label="Tus creadoras"
               valor={String(creadoras.length)}
-              pie="activas y asignadas a vos"
+              pie="hoy · lo único que no sigue al calendario"
               icono={Users} color="bg-sky-500" tinte="from-sky-500/10"
             />
             <Kpi
               label="Promocionaron"
               valor={pctPromo != null ? `${pctPromo}%` : "—"}
-              pie={promoMias.length > 0 ? `${promocionaron} de ${promoMias.length} en la ventana` : "sin datos de promolog"}
+              pie={promoMias.length > 0 ? `${promocionaron} de ${promoMias.length} en el rango` : promo.isLoading ? "cargando…" : "sin lectura de promolog en el rango"}
               icono={Megaphone} color="bg-amber-500" tinte="from-amber-500/10"
               barra={pctPromo != null ? { pct: pctPromo, clase: pctPromo >= 80 ? "bg-emerald-500" : "bg-amber-500" } : undefined}
             />
             <Kpi
-              label="Facturó tu roster"
-              valor={money(facturado)}
-              pie={ingresos.isLoading ? "cargando…" : "bruto de OF en el rango"}
+              label="Ingresos de tus modelos"
+              valor={money(aporte.total)}
+              pie={ingresos.isLoading
+                ? "cargando…"
+                : <>{money(aporte.subs)} en suscripciones · <span className="text-primary">ver el aporte de cada una</span></>}
               icono={DollarSign} color="bg-emerald-500" tinte="from-emerald-500/10"
+              onClick={() => setVerIngresos(true)}
+            />
+            <Kpi
+              label="Tus horas"
+              valor={horas.horas > 0 ? horas.horas.toFixed(1) : "—"}
+              pie={horas.diasTrabajados > 0
+                ? `${horas.diasTrabajados} día${horas.diasTrabajados === 1 ? "" : "s"} con registro de Hubstaff`
+                : horasCargando ? "cargando…" : "sin registro en el rango"}
+              icono={Clock} color="bg-sky-500" tinte="from-sky-500/10"
+            />
+            <Kpi
+              label="Productividad"
+              valor={horas.actividad != null ? `${horas.actividad}%` : "—"}
+              pie="actividad de teclado y mouse"
+              icono={MousePointerClick} color="bg-fuchsia-500" tinte="from-fuchsia-500/10"
+              barra={horas.actividad != null ? { pct: horas.actividad, clase: horas.actividad >= 60 ? "bg-emerald-500" : "bg-amber-500" } : undefined}
             />
           </div>
         )}
@@ -266,7 +332,7 @@ export default function ManagerDashboard() {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 lg:col-span-2">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <h2 className="text-sm font-semibold">Tus notas del rango</h2>
-              {notas.length > 0 && <Badge variant="outline" className="rounded-full text-[10px]">{notas.length} días</Badge>}
+              {notas.length > 0 && <Badge variant="outline" className="rounded-full text-[10px]">{notas.length} día{notas.length === 1 ? "" : "s"} con nota</Badge>}
             </div>
             <div className="p-4">
               {notasCargando ? (
@@ -277,16 +343,17 @@ export default function ManagerDashboard() {
                 // Una barra por día: la altura es la nota. Se lee la racha sin
                 // leer números.
                 <div className="flex h-28 items-end gap-1">
-                  {notas.map((n) => {
-                    const t = tonoNota(n.nota);
+                  {barras.map((b) => {
+                    const t = tonoNota(b.nota);
+                    const dia = format(new Date(`${b.fecha}T12:00:00`), "EEEE d MMM", { locale: es });
                     return (
-                      <div key={n.fecha} className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                        title={`${format(new Date(`${n.fecha}T12:00:00`), "EEEE d MMM", { locale: es })}: ${n.nota.toFixed(1)}`}>
-                        <span className={cn("text-[9px] tabular-nums", t.texto)}>{n.nota.toFixed(1)}</span>
-                        <div className={cn("w-full rounded-t transition-[height] duration-700", t.barra)}
-                          style={{ height: `${Math.max(4, (n.nota / 10) * 80)}px` }} />
+                      <div key={b.fecha} className="flex min-w-0 max-w-[56px] flex-1 flex-col items-center gap-1"
+                        title={b.nota != null ? `${dia}: ${b.nota.toFixed(1)}` : `${dia}: sin nota`}>
+                        <span className={cn("text-[9px] tabular-nums", t.texto)}>{b.nota != null ? b.nota.toFixed(1) : ""}</span>
+                        <div className={cn("w-full rounded-t transition-[height] duration-700", b.nota != null ? t.barra : "bg-white/[0.07]")}
+                          style={{ height: `${b.nota != null ? Math.max(4, (b.nota / 10) * 80) : 3}px` }} />
                         <span className="truncate text-[9px] text-muted-foreground">
-                          {format(new Date(`${n.fecha}T12:00:00`), "d", { locale: es })}
+                          {format(new Date(`${b.fecha}T12:00:00`), "d", { locale: es })}
                         </span>
                       </div>
                     );
@@ -324,7 +391,7 @@ export default function ManagerDashboard() {
                         {c.nombre}
                       </Link>
                       <p className="truncate text-[11px] text-muted-foreground">
-                        {p ? `${p.promo_days} de ${p.covered_days} días leídos con promo` : "sin lectura de promolog en la ventana"}
+                        {p ? `${p.promo_days} de ${p.covered_days} días leídos con promo` : "sin lectura de promolog en el rango"}
                         {p?.is_partial && " · cobertura parcial"}
                       </p>
                     </div>
@@ -352,6 +419,55 @@ export default function ManagerDashboard() {
           </footer>
         </section>
       </div>
+
+      {/* Aporte de cada modelo en el rango elegido. Se abre desde el KPI de
+          ingresos y usa EXACTAMENTE los mismos datos, así que nunca puede
+          contar distinto que la tarjeta. */}
+      <Dialog open={verIngresos} onOpenChange={setVerIngresos}>
+        <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-xl">
+          <header className="border-b border-white/5 px-5 py-4">
+            <DialogTitle className="text-base leading-tight">Ingresos por modelo</DialogTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {format(rango.from, "d MMM", { locale: es })} – {format(rango.to, "d MMM yyyy", { locale: es })} ·{" "}
+              {money(aporte.total)} en total, {money(aporte.subs)} en suscripciones
+            </p>
+          </header>
+          {aporte.filas.length === 0 ? (
+            <p className="px-5 py-10 text-center text-xs text-muted-foreground">
+              Sin ingresos registrados de tus modelos en este rango.
+            </p>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {aporte.filas.map((r) => {
+                const pct = aporte.total > 0 ? (100 * r.total) / aporte.total : 0;
+                return (
+                  <li key={r.id} className="px-5 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar name={r.nombre} size="xs" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium leading-tight">{r.nombre}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {money(r.subs)} en suscripciones · {r.dias} día{r.dias === 1 ? "" : "s"} con dato
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-sm font-bold tabular-nums leading-tight">{money(r.total)}</p>
+                        <p className="text-[10px] tabular-nums text-muted-foreground">{pct.toFixed(1)}% del total</p>
+                      </div>
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(2, pct)}%` }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <footer className="border-t border-white/5 px-5 py-2.5 text-[11px] text-muted-foreground">
+            Bruto de OnlyFans del rango elegido, por creadora. Cambiá el rango arriba y este detalle cambia con él.
+          </footer>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

@@ -10,13 +10,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Check, ChevronsUpDown, Link2, EyeOff, Loader2, PartyPopper } from "lucide-react";
 import { cn } from "@/lib/utils";
+import BluConciliacion from "./BluConciliacion";
 
 // Pantalla admin (subtab "Vincular BLU"): los ingresos que el micro blu-bridge importó
 // pero NO matchearon ningún perfil de Maven (creator_id NULL) quedan "huérfanos" — no
 // aparecen en el calendario. Acá se listan y se vinculan a una creadora (reasigna sus
 // ingresos históricos al toque) o se ignoran. Todo vía RPCs gateados a management.
 
-interface Orphan { blu_name: string; total_gross: number; days: number; first_date: string; last_date: string; }
+interface Orphan {
+  blu_name: string; total_gross: number; days: number; first_date: string; last_date: string;
+  /** De qué key de BLU vino (plus|massive). Si trae agencia, la cuenta es NUESTRA. */
+  agency: string | null;
+}
 interface CreatorOpt { id: string; name: string; artistic_name: string | null; status: string | null; }
 
 const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
@@ -55,6 +60,7 @@ const BluUnmatchedManager = () => {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["blu-orphans"] });
     qc.invalidateQueries({ queryKey: ["creator_daily_earnings"] }); // el calendario recoge la nueva vinculación
+    qc.invalidateQueries({ queryKey: ["blu-conciliacion"] });     // y el marcador de arriba
   };
 
   const handleMap = async (bluName: string) => {
@@ -80,7 +86,11 @@ const BluUnmatchedManager = () => {
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto p-6">
+    <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
+      {/* Arriba el marcador: cuántas creadoras ve BLU vs cuántas tiene Maven
+          activas, y qué falta para que cuadre. Abajo la herramienta para
+          cerrar la parte que se cierra vinculando. */}
+      <BluConciliacion />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -106,6 +116,7 @@ const BluUnmatchedManager = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre en BLU</TableHead>
+                  <TableHead>Agencia</TableHead>
                   <TableHead className="text-right">Ingreso total</TableHead>
                   <TableHead className="text-right">Días</TableHead>
                   <TableHead>Rango</TableHead>
@@ -119,6 +130,17 @@ const BluUnmatchedManager = () => {
                   return (
                     <TableRow key={o.blu_name}>
                       <TableCell className="font-mono text-sm">{o.blu_name}</TableCell>
+                      <TableCell>
+                        {/* La agencia la sella el bridge según con qué token trajo la
+                            cuenta: si dice algo, la creadora es nuestra y falta en Maven. */}
+                        {o.agency ? (
+                          <span className="rounded-full border border-emerald-500/30 px-2 py-0.5 text-[10px] capitalize text-emerald-500">
+                            {o.agency}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">sin agencia</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold">{money0(o.total_gross)}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{o.days}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{o.first_date} → {o.last_date}</TableCell>

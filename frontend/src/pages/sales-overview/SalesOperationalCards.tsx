@@ -23,17 +23,24 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       icon: BarChart3,
       bg: "bg-blue-500",
       content: (
-        <div className="h-12 w-full">
-          {sparklineData.length > 1 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sparklineData}>
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <span className="text-xs text-muted-foreground">Sin datos</span>
+        <>
+          <div className="h-12 w-full">
+            {sparklineData.length > 1 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <span className="text-xs text-muted-foreground">Sin datos</span>
+            )}
+          </div>
+          {/* La línea son los últimos meses cerrados, NO el rango del
+              calendario: sin este pie se lee como si fuera el período elegido. */}
+          {sparklineData.length > 1 && (
+            <p className="mt-0.5 text-[10px] text-muted-foreground">últimos {sparklineData.length} meses</p>
           )}
-        </div>
+        </>
       ),
     },
     {

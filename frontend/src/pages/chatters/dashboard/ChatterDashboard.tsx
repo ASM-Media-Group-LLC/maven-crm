@@ -20,6 +20,7 @@ import { TURNOS, diaSemanaDe, etiquetaDia, fechaDe, isoDe, lunesDe, sumarDias, u
 import { TurnoBadge } from "@/pages/chatters/horarios/MiSemana";
 import SemanaViva from "./SemanaViva";
 import { useResumenChatter, useVentasPorModelo } from "./useChatterDashboard";
+import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 
 // DASHBOARD DEL CHATTER. Lo que una persona del equipo de chat quiere ver al
 // entrar: su turno de hoy y sus creadoras, cómo le fue en el rango elegido
@@ -84,7 +85,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
       <header className="shrink-0 border-b border-white/10 bg-background/30 px-6 py-4 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{nombre ? `Hola, ${nombre}` : "Tu día"}</h1>
+            <SelectorDeTablero actual="chatter" titulo={nombre ? `Hola, ${nombre}` : "Tu día"} clase="text-2xl font-bold tracking-tight" />
             <p className="text-sm capitalize text-muted-foreground">{fechaLarga}</p>
           </div>
           <div className="flex items-center gap-2">

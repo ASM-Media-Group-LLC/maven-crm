@@ -643,6 +643,21 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
     }
   } catch (e) { console.error(`[blu-bridge:${acct.account}] set_kash_type error: ${e.message}`); }
 
+  // Sella la AGENCIA DE CADA CUENTA, esté vinculada a una creadora o no.
+  // `set_creator_kash_type_by_blu` (arriba) solo marca a las YA vinculadas, así
+  // que para una cuenta huérfana el dato se perdía y había que adivinar a mano
+  // si era nuestra. Y lo sabemos con certeza: la trajimos con la key de ESTA
+  // agencia. Con esto la conciliación Maven ↔ BLU deja de ser adivinanza.
+  // Best-effort, igual que el bloque anterior: si falla no tumba la corrida.
+  try {
+    if (bluNamesSeen.size) {
+      const { data: an, error: aErr } = await sb().rpc("blu_registrar_cuentas",
+        { p_blu_names: [...bluNamesSeen], p_agency: acct.account });
+      if (aErr) console.error(`[blu-bridge:${acct.account}] registrar_cuentas falló: ${aErr.message}`);
+      else console.log(`[blu-bridge:${acct.account}] agencia sellada en ${an} cuenta(s) de BLU.`);
+    }
+  } catch (e) { console.error(`[blu-bridge:${acct.account}] registrar_cuentas error: ${e.message}`); }
+
   // ── Fans (fan-reports:model): activeFans/newFans por creadora/día sobre TODO el rango.
   //    1 conexión WS, 1 call por modelo. Aislado: si falla, NO afecta los ingresos ya guardados.
   let fanRows = 0;

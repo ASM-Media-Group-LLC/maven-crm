@@ -19,6 +19,7 @@ import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
 import VentasTops from "./sales-performance/VentasTops";
+import SelectorDeTablero from "./dashboard/SelectorDeTablero";
 import { useDashboard2Daily } from "./sales-performance/useDashboard2Daily";
 import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
@@ -802,9 +803,7 @@ const Dashboard2 = () => {
             <div className="sticky top-0 z-20 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold text-foreground tracking-tight">
-                    Dashboard Ventas
-                  </h1>
+                  <SelectorDeTablero actual="ventas" />
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
                       <TooltipTrigger asChild>

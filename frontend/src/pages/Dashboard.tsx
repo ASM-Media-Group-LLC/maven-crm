@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { tableroDe } from "@/pages/dashboard/SelectorDeTablero";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -8,7 +10,15 @@ import { useRoleTier } from "@/hooks/useRoleTier";
 const ChatterDashboard = lazy(() => import("@/pages/chatters/dashboard/ChatterDashboard"));
 const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDashboard"));
 const ManagerDashboard = lazy(() => import("@/pages/manager/ManagerDashboard"));
+const CloserDashboard = lazy(() => import("@/pages/closers/dashboard/CloserDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
+
+// Roles que ven el tablero del ADMIN aunque no sean admin. Es una decisión de
+// producto por rol, no una capacidad: Jhon pidió que "operation sales puede
+// tener el mismo dashboard de admin". Requisito técnico: tienen que pasar
+// `blu_is_management` o la data del dashboard les llega vacía (Operations
+// Sales es nivel manager, así que pasa).
+const ROLES_TABLERO_VENTAS = ["Operations Sales"];
 
 const Cargando = () => (
   <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
@@ -30,11 +40,28 @@ const Cargando = () => (
 //    5 Creadoras, CS, Closers, RRHH), cada uno disponible en su módulo.
 //  · **El resto** → el genérico, hasta que tengan el suyo.
 const Dashboard = () => {
-  const { isChatter, isLoading } = useUserRole();
+  const { isChatter, role, isLoading } = useUserRole();
   const { canAccess, isLoading: permisosCargando } = usePermissions();
   const { tier, isLoading: tierCargando } = useRoleTier();
+  const [params] = useSearchParams();
 
   if (isLoading || permisosCargando || tierCargando) return <Cargando />;
+
+  // El admin puede pasearse por el tablero de cualquier departamento desde el
+  // desplegable del título (pedido de Jhon). Viaja en `?ver=` para que el link
+  // se pueda compartir y sobreviva un refresh. Solo admin: para el resto el
+  // parámetro se ignora y cada uno cae en el suyo por rol.
+  const elegido = tier === "admin" ? tableroDe(params.get("ver")) : null;
+  if (elegido && elegido !== "ventas") {
+    return (
+      <Suspense fallback={<Cargando />}>
+        {elegido === "equipo" ? <EquipoDashboard />
+          : elegido === "roster" ? <ManagerDashboard forzado />
+          : elegido === "pipeline" ? <CloserDashboard />
+          : <ChatterDashboard />}
+      </Suspense>
+    );
+  }
 
   // El chatter va primero: es el tablero más específico y ningún chatter
   // debería tener el permiso de ventas.
@@ -48,7 +75,7 @@ const Dashboard = () => {
   // responde `42501 forbidden: management only` y el front lo traga como "sin
   // datos". Regla que dio Jhon: "si no tiene permiso para ver data del
   // dashboard v2, dejalo así" — cada rol va a tener el suyo.
-  if (tier === "admin" && canAccess("Creator Sales", "Dashboard")) {
+  if ((tier === "admin" || ROLES_TABLERO_VENTAS.includes(role ?? "")) && canAccess("Creator Sales", "Dashboard")) {
     return <Suspense fallback={<Cargando />}><DashboardVentas /></Suspense>;
   }
 
@@ -67,6 +94,14 @@ const Dashboard = () => {
   // tablero cae al genérico en vez de mostrar una pantalla vacía.
   if (tier === "manager" && canAccess("Creadores")) {
     return <Suspense fallback={<Cargando />}><ManagerDashboard /></Suspense>;
+  }
+
+  // Closer: su pipeline (a quién contactar hoy con la cadencia re-anclada),
+  // lo que cerró, y sus horas y productividad de Hubstaff. Va después de las
+  // ramas de admin/manager para que un jefe con acceso a Closers siga viendo
+  // el tablero de su nivel.
+  if (canAccess("Closers")) {
+    return <Suspense fallback={<Cargando />}><CloserDashboard /></Suspense>;
   }
 
   return <DashboardContent />;

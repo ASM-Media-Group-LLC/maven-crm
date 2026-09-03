@@ -41,15 +41,26 @@ const dayKey = (d: Date) => new Date(d.getTime() - BOG_OFFSET_MS).toISOString().
  * deltas ▲/▼ (#106), diffeando en cliente contra la misma fuente RPC.
  */
 export function usePromoPeriodScores(windowDays = 7, endOffsetDays = 0) {
+  const to = new Date(Date.now() - endOffsetDays * 86400 * 1000);
+  const from = new Date(to.getTime() - (windowDays - 1) * 86400 * 1000);
+  return usePromoScoresRango(dayKey(from), dayKey(to));
+}
+
+/**
+ * Scores de un rango EXPLÍCITO (`YYYY-MM-DD` día Bogotá), para las pantallas
+ * que tienen calendario: el número tiene que ser el del rango elegido y no el
+ * de una ventana móvil que termina hoy. Pidiendo "Ayer", la ventana móvil
+ * contestaba con los promos de HOY (48% donde lo real era 39%).
+ */
+export function usePromoScoresRango(desde: string, hasta: string) {
   return useQuery({
-    queryKey: ["promo-period-scores", windowDays, endOffsetDays],
+    enabled: !!desde && !!hasta,
+    queryKey: ["promo-period-scores", desde, hasta],
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PromoPeriodScore[]> => {
-      const to = new Date(Date.now() - endOffsetDays * 86400 * 1000);
-      const from = new Date(to.getTime() - (windowDays - 1) * 86400 * 1000);
       const { data, error } = await (supabase as any).rpc("promo_creator_period_scores", {
-        p_from: dayKey(from),
-        p_to: dayKey(to),
+        p_from: desde,
+        p_to: hasta,
       });
       if (error) throw error;
       return ((data ?? []) as any[]).map((r) => ({

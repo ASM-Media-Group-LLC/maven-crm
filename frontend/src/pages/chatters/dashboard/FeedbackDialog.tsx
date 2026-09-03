@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { TIPOS_FEEDBACK, feedbackDe, useFeedbackDeChatter, useMutacionesFeedback } from "@/pages/chatters/feedbackTL";
+import { TIPOS_FEEDBACK, feedbackDe, useFeedbackDeChatter, useMutacionesFeedback, type TipoFeedback } from "@/pages/chatters/feedbackTL";
 
 // Popup del supervisor sobre un chatter: registra el feedback del día y lista
 // lo que ya hay. Se abre desde "Hoy en turno" haciendo clic en el nombre.
@@ -30,24 +30,32 @@ export default function FeedbackDialog({
   onClose: () => void;
 }) {
   const { feedback, cargando } = useFeedbackDeChatter(identityId, desde, hasta);
-  const { registrar, borrar } = useMutacionesFeedback();
+  const { registrarVarios, borrar } = useMutacionesFeedback();
   const [comentario, setComentario] = useState("");
-  const [elegido, setElegido] = useState<string | null>(null);
+  // Se elige y se CONFIRMA: tocar una opción ya no escribía nada en la nota
+  // sin querer. Se pueden marcar varias (o una sola).
+  const [seleccion, setSeleccion] = useState<TipoFeedback[]>([]);
 
-  const guardar = async (tipo: string) => {
-    if (!identityId) return;
-    setElegido(tipo);
+  const alternar = (tipo: TipoFeedback) =>
+    setSeleccion((s) => (s.includes(tipo) ? s.filter((t) => t !== tipo) : [...s, tipo]));
+
+  const puntosElegidos = seleccion.reduce((s, t) => s + (feedbackDe(t)?.puntos ?? 0), 0);
+  const fechaCorta = format(new Date(`${dia}T12:00:00`), "d MMM", { locale: es });
+
+  const confirmar = async () => {
+    if (!identityId || seleccion.length === 0) return;
     try {
-      await registrar.mutateAsync({ identityId, dia, tipo: tipo as never, comentario });
-      const cat = feedbackDe(tipo);
-      toast.success(`${cat?.label} registrado`, {
-        description: `${cat && cat.puntos > 0 ? "+" : ""}${cat?.puntos} a la nota de ${nombre} del ${format(new Date(`${dia}T12:00:00`), "d MMM", { locale: es })}`,
-      });
+      await registrarVarios.mutateAsync({ identityId, dia, tipos: seleccion, comentario });
+      toast.success(
+        seleccion.length === 1
+          ? `${feedbackDe(seleccion[0])?.label} registrado`
+          : `${seleccion.length} feedbacks registrados`,
+        { description: `${puntosElegidos > 0 ? "+" : ""}${puntosElegidos} a la nota de ${nombre} del ${fechaCorta}` },
+      );
+      setSeleccion([]);
       setComentario("");
     } catch (e) {
       toast.error("No se pudo registrar", { description: (e as Error).message });
-    } finally {
-      setElegido(null);
     }
   };
 
@@ -80,24 +88,33 @@ export default function FeedbackDialog({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {TIPOS_FEEDBACK.map((t) => {
                 const negativo = t.puntos < 0;
+                const marcado = seleccion.includes(t.tipo);
                 return (
                   <button
                     key={t.tipo}
                     type="button"
-                    disabled={registrar.isPending}
-                    onClick={() => void guardar(t.tipo)}
+                    role="checkbox"
+                    aria-checked={marcado}
+                    disabled={registrarVarios.isPending}
+                    onClick={() => alternar(t.tipo)}
                     title={t.ayuda}
                     className={cn(
-                      "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-50",
+                      "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-all disabled:opacity-50",
                       negativo
-                        ? "border-red-500/25 bg-red-500/5 hover:bg-red-500/10"
-                        : "border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/10",
+                        ? marcado
+                          ? "border-red-500/70 bg-red-500/15 ring-1 ring-red-500/40"
+                          : "border-red-500/25 bg-red-500/5 hover:bg-red-500/10"
+                        : marcado
+                          ? "border-emerald-500/70 bg-emerald-500/15 ring-1 ring-emerald-500/40"
+                          : "border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/10",
                     )}
                   >
-                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg",
-                      negativo ? "bg-red-500/15 text-red-400" : "bg-emerald-500/15 text-emerald-500")}>
-                      {elegido === t.tipo && registrar.isPending
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors",
+                      negativo
+                        ? marcado ? "bg-red-500 text-white" : "bg-red-500/15 text-red-400"
+                        : marcado ? "bg-emerald-500 text-white" : "bg-emerald-500/15 text-emerald-500")}>
+                      {marcado
+                        ? <Check className="h-3.5 w-3.5" />
                         : negativo ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -119,8 +136,35 @@ export default function FeedbackDialog({
               placeholder="Comentario (opcional) — se guarda con el feedback que elijas"
               className="mt-2 resize-none rounded-xl border-white/5 bg-background/40 text-sm"
             />
+
+            {/* Nada se escribe hasta confirmar, y antes de confirmar se ve
+                exactamente cuánto se le va a mover la nota. */}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                disabled={seleccion.length === 0 || registrarVarios.isPending}
+                onClick={() => void confirmar()}
+                className="gap-2"
+              >
+                {registrarVarios.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Confirmar
+                {seleccion.length > 1 && ` (${seleccion.length})`}
+              </Button>
+              {seleccion.length > 0 && (
+                <>
+                  <span className={cn("text-xs font-semibold tabular-nums",
+                    puntosElegidos < 0 ? "text-red-400" : puntosElegidos > 0 ? "text-emerald-500" : "text-muted-foreground")}>
+                    {puntosElegidos > 0 ? "+" : ""}{puntosElegidos} a la nota del {fechaCorta}
+                  </span>
+                  <button type="button" onClick={() => setSeleccion([])}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline">
+                    limpiar
+                  </button>
+                </>
+              )}
+            </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              No reemplaza la nota: se suma o se resta a la que ya calculó Maven para ese día.
+              Elegí una o varias opciones y confirmá. No reemplaza la nota: se suma o se resta a la que ya calculó Maven para ese día.
             </p>
           </div>
 

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
+import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/chatters/useChatterRendimiento";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
@@ -213,7 +214,7 @@ export default function EquipoDashboard() {
               <Users className="h-4.5 w-4.5 text-primary" />
             </span>
             <div>
-              <h1 className="font-display text-lg font-bold leading-tight tracking-tight">Tu equipo de chatters</h1>
+              <SelectorDeTablero actual="equipo" />
               <p className="text-[11px] text-muted-foreground">
                 {resumen.total > 0 ? `${resumen.total} chatters` : "Sin chatters en el rango"}
                 {resumen.cumplimiento != null && (
