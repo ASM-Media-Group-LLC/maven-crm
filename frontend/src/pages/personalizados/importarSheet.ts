@@ -54,6 +54,17 @@ export function parseTsv(texto: string): string[][] {
 
 const limpiar = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
 
+// Techos de realidad. En el sheet aparecieron celdas como "$ 5,500,000.00" de
+// precio (un personalizado sale $150 de mediana): entraban tal cual e inflaban
+// el "En juego" a millones. Un monto imposible NO entra como plata: la fila
+// queda marcada y el valor original se escribe en las notas.
+export const TECHO_PRECIO = 20_000;
+export const TECHO_GASTO_FAN = 500_000;
+export const FLAG_MONTO = "revisar_monto";
+
+const montoPlausible = (n: number | null, techo: number) => (n != null && n > techo ? null : n);
+const comoUsd = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+
 /** "$ 5,850.00" · "643,25" · "$ -" → número o null. */
 export function parseDinero(s: string | undefined): number | null {
   const t = limpiar(s).replace(/[$\s]/g, "");
@@ -128,6 +139,10 @@ export function parseFilasSheet(texto: string): FilaImportada[] {
     const requested_on = parseFecha(f[1]);
     if (!requested_on) avisos.push("Fecha ilegible (se usará la de hoy)");
     const normal = esCheck(f[7]); const buster = esCheck(f[8]);
+    const gastoCrudo = parseDinero(f[5]);
+    const precioCrudo = parseDinero(f[6]);
+    if (precioCrudo != null && precioCrudo > TECHO_PRECIO) avisos.push(`Precio imposible (${comoUsd(precioCrudo)}): entra en blanco y marcado`);
+    if (gastoCrudo != null && gastoCrudo > TECHO_GASTO_FAN) avisos.push(`Gasto del fan imposible (${comoUsd(gastoCrudo)}): entra en blanco y marcado`);
     out.push({
       fila: idx + 1,
       creator_name: creator,
@@ -135,8 +150,8 @@ export function parseFilasSheet(texto: string): FilaImportada[] {
       status: parseEstado(f[2]),
       chatter_name: limpiar(f[3]) || null,
       fan_handle: fan,
-      fan_total_spent_usd: parseDinero(f[5]),
-      price_usd: parseDinero(f[6]),
+      fan_total_spent_usd: gastoCrudo,
+      price_usd: precioCrudo,
       sale_channel: buster ? "buster" : normal ? "normal" : null,
       content_type: parseTipo(f[9]),
       description,
@@ -156,7 +171,13 @@ export interface Resolutores {
 /** Fila parseada → objeto listo para insertar en custom_requests. */
 export function aPedido(f: FilaImportada, agency: Agency, sourceRef: string, r: Resolutores) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const paid = f.status === "entregado" || f.status === "en_produccion" ? f.price_usd : null;
+  const precio = montoPlausible(f.price_usd, TECHO_PRECIO);
+  const gasto = montoPlausible(f.fan_total_spent_usd, TECHO_GASTO_FAN);
+  const montoRaro = precio !== f.price_usd || gasto !== f.fan_total_spent_usd;
+  const paid = f.status === "entregado" || f.status === "en_produccion" ? precio : null;
+  const notaMonto = montoRaro
+    ? `Monto por revisar: el sheet decía precio ${f.price_usd != null ? comoUsd(f.price_usd) : "—"} y gasto del fan ${f.fan_total_spent_usd != null ? comoUsd(f.fan_total_spent_usd) : "—"}. Se dejó en blanco por imposible.`
+    : null;
   return {
     agency,
     creator_id: r.creadoraId(f.creator_name),
@@ -171,12 +192,12 @@ export function aPedido(f: FilaImportada, agency: Agency, sourceRef: string, r: 
     sale_channel: f.sale_channel,
     description: f.description || "(sin descripción en el sheet)",
     duration_or_qty: f.duration_or_qty,
-    fan_total_spent_usd: f.fan_total_spent_usd,
-    price_usd: f.price_usd,
+    fan_total_spent_usd: gasto,
+    price_usd: precio,
     // Si ya se entregó o está en producción, en el sheet eso implicaba cobrado.
     paid_usd: paid,
-    flags: [] as string[],
-    notes: f.notes,
+    flags: montoRaro ? [FLAG_MONTO] : ([] as string[]),
+    notes: [f.notes, notaMonto].filter(Boolean).join("\n") || null,
     source: "sheet",
     source_ref: `${sourceRef} · fila ${f.fila}`,
   };

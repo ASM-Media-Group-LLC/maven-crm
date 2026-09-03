@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Gift, Plus, FileSpreadsheet, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
 import { AGENCIAS, ESTADOS, agenciaDe, usd, type Agency, type Estado, type Pedido } from "./types";
 import { FILTROS_VACIOS, useCatalogos, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
@@ -38,6 +38,15 @@ function mesesRecientes() {
   return out;
 }
 
+// Texto del disparador de un filtro: el nombre corto del filtro cuando está en
+// "todos" (antes decía "Todos los estados" y se recortaba a "Todos los…"), y el
+// valor elegido cuando hay filtro.
+function etiqueta(nombre: string, valor?: string | false | null) {
+  return valor
+    ? <span className="truncate text-foreground">{valor}</span>
+    : <span className="truncate text-muted-foreground">{nombre}</span>;
+}
+
 // PERSONALIZADOS: los pedidos de contenido personalizado que los fans compran
 // por chat, como tickets con ciclo de vida (reemplaza el sheet por pestañas).
 export default function PersonalizadosPage() {
@@ -51,7 +60,7 @@ export default function PersonalizadosPage() {
   const [abierto, setAbierto] = useState<Pedido | null>(null);
 
   const { data: pedidos = SIN_PEDIDOS, isLoading } = usePedidos(filtros);
-  const { creadoras, perfiles } = useCatalogos();
+  const { creadoras } = useCatalogos();
   const { puedeCrear, puedeGestionar } = usePermisosPersonalizados();
 
   const cambiarVista = (v: "tablero" | "tabla") => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
@@ -68,10 +77,13 @@ export default function PersonalizadosPage() {
     const set = new Set(pedidos.map((p) => p.creator_name));
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [pedidos]);
+  // Chatters del filtro: los NOMBRES que figuran en los pedidos. Por id se
+  // perdían los chatters que ya no tienen usuario en Maven (los históricos del
+  // sheet), y eran 227 pedidos imposibles de filtrar.
   const chattersConPedidos = useMemo(() => {
-    const ids = new Set(pedidos.map((p) => p.chatter_id).filter(Boolean) as string[]);
-    return perfiles.filter((p) => ids.has(p.id));
-  }, [pedidos, perfiles]);
+    const set = new Set(pedidos.map((p) => p.chatter_name).filter(Boolean) as string[]);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [pedidos]);
 
   // El drawer muestra siempre la versión fresca del pedido abierto.
   const abiertoFresco = abierto ? pedidos.find((p) => p.id === abierto.id) ?? abierto : null;
@@ -153,25 +165,25 @@ export default function PersonalizadosPage() {
             <Input value={filtros.q} onChange={(e) => patch({ q: e.target.value })} placeholder="Buscar fan, creadora, chatter, descripción…" className="pl-9 rounded-full h-9" />
           </div>
           <Select value={filtros.estado || TODOS} onValueChange={(v) => patch({ estado: (v === TODOS ? "" : v) as Estado | "" })}>
-            <SelectTrigger className="w-[150px] h-9 rounded-full"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-[142px] h-9 rounded-full">{etiqueta("Estado", filtros.estado && ESTADOS.find((e) => e.id === filtros.estado)?.label)}</SelectTrigger>
             <SelectContent><SelectItem value={TODOS}>Todos los estados</SelectItem>{ESTADOS.map((e) => <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={filtros.creadora || TODOS} onValueChange={(v) => patch({ creadora: v === TODOS ? "" : v })}>
-            <SelectTrigger className="w-[170px] h-9 rounded-full"><SelectValue placeholder="Creadora" /></SelectTrigger>
+            <SelectTrigger className="w-[168px] h-9 rounded-full">{etiqueta("Creadora", filtros.creadora)}</SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value={TODOS}>Todas las creadoras</SelectItem>
               {(creadorasConPedidos.length ? creadorasConPedidos : creadoras.map((c) => c.nombre)).map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filtros.chatter || TODOS} onValueChange={(v) => patch({ chatter: v === TODOS ? "" : v })}>
-            <SelectTrigger className="w-[160px] h-9 rounded-full"><SelectValue placeholder="Chatter" /></SelectTrigger>
+            <SelectTrigger className="w-[168px] h-9 rounded-full">{etiqueta("Chatter", filtros.chatter)}</SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value={TODOS}>Todos los chatters</SelectItem>
-              {chattersConPedidos.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+              {chattersConPedidos.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filtros.mes || TODOS} onValueChange={(v) => patch({ mes: v === TODOS ? "" : v })}>
-            <SelectTrigger className="w-[170px] h-9 rounded-full"><SelectValue placeholder="Mes" /></SelectTrigger>
+            <SelectTrigger className="w-[152px] h-9 rounded-full">{etiqueta("Mes", filtros.mes && meses.find((m) => m.v === filtros.mes)?.l)}</SelectTrigger>
             <SelectContent><SelectItem value={TODOS}>Todos los meses</SelectItem>{meses.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent>
           </Select>
           {hayFiltros && (

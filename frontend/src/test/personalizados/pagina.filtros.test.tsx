@@ -53,7 +53,9 @@ describe("PersonalizadosPage · filtros", () => {
     montar();
     await waitFor(() => expect(screen.getByText("Todavía no hay pedidos")).toBeInTheDocument());
 
-    const trigger = screen.getAllByRole("combobox").find((c) => c.textContent?.includes("Todos los estados"))!;
+    // El disparador dice el nombre corto del filtro ("Estado") mientras no hay
+    // nada elegido, y el valor elegido después.
+    const trigger = screen.getAllByRole("combobox").find((c) => c.textContent?.trim() === "Estado")!;
     expect(trigger).toBeTruthy();
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     const listbox = document.querySelector('[role="listbox"]')!;
@@ -65,6 +67,8 @@ describe("PersonalizadosPage · filtros", () => {
     // Con filtro y sin resultados se dibuja el tablero (columnas vacías), no el estado vacío.
     await waitFor(() => expect(screen.queryByText("Todavía no hay pedidos")).not.toBeInTheDocument());
     expect(screen.getAllByText("Nada acá").length).toBeGreaterThan(0);
+    // y el filtro queda a la vista en el disparador
+    await waitFor(() => expect(trigger.textContent?.trim()).toBe("Solicitado"));
     // Un par de consultas por catálogo + la filtrada: nada de bucles.
     expect(consultas).toBeLessThan(10);
   });

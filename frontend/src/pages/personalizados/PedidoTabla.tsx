@@ -45,7 +45,7 @@ export default function PedidoTabla({ pedidos, onAbrir }: Props) {
                 <TableCell><Badge variant="outline" className={`rounded-full ${e.tono}`}>{e.corto}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap">{p.chatter_name || "—"}</TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">@{p.fan_handle}</TableCell>
-                <TableCell>{t ? `${t.emoji} ${t.label}` : "—"}</TableCell>
+                <TableCell className="whitespace-nowrap">{t ? `${t.emoji} ${t.label}` : "—"}</TableCell>
                 <TableCell className="text-right font-medium">{usd(p.price_usd)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{usd(p.paid_usd)}</TableCell>
                 <TableCell>{p.sale_channel === "buster" ? "⚡ Buster" : p.sale_channel === "normal" ? "Normal" : "—"}</TableCell>
