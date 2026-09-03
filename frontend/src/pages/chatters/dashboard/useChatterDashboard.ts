@@ -49,6 +49,8 @@ export interface ResumenPeriodo {
   ventas: number;
   esperado: number;
   horas: number;
+  /** Promedio del % de actividad de Hubstaff (detalle.actividad_pct) en los días con dato. */
+  actividad: number | null;
   diasConVentas: number;
   mejorDia: DiaDeChatter | null;
   masivos: number;
@@ -65,6 +67,8 @@ export function useResumenChatter(identityId: string | null, desde: string, hast
     const ventas = filas.reduce((s, d) => s + Number(d.ventas ?? 0), 0);
     const esperado = filas.reduce((s, d) => s + Number(d.ventas_esperadas ?? 0), 0);
     const horas = filas.reduce((s, d) => s + Number(d.horas ?? 0), 0);
+    const conAct = filas.filter((d) => d.detalle?.actividad_pct != null);
+    const actividad = conAct.length ? conAct.reduce((s, d) => s + Number(d.detalle!.actividad_pct), 0) / conAct.length : null;
     const mejorDia = filas.reduce<DiaDeChatter | null>((m, d) => (d.ventas != null && (m == null || Number(d.ventas) > Number(m.ventas ?? 0)) ? d : m), null);
     const ms = masivos.data ?? [];
     const vistos = ms.reduce((s, m) => s + m.viewed, 0);
@@ -73,7 +77,7 @@ export function useResumenChatter(identityId: string | null, desde: string, hast
       diasConNota: conNota.length,
       diasDelPeriodo,
       notaPromedio: conNota.length ? conNota.reduce((s, d) => s + Number(d.nota), 0) / conNota.length : null,
-      ventas, esperado, horas,
+      ventas, esperado, horas, actividad,
       diasConVentas: filas.filter((d) => Number(d.ventas ?? 0) > 0).length,
       mejorDia,
       masivos: ms.length,
