@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { differenceInCalendarDays, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Target, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Sparkles, Target, TrendingUp } from "lucide-react";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,17 +14,19 @@ import { CHART_AXIS, CHART_COLOR, CHART_GRID } from "@/lib/chartTheme";
 import { MavenTooltip } from "@/components/charts/MavenTooltip";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
-import { money, tonoDeNota, useModelosDelDia, NOMBRE_FALTANTE } from "@/pages/chatters/useChatterRendimiento";
+import { money, tonoDeNota, useDiasDeChatter, useModelosDelDia, NOMBRE_FALTANTE } from "@/pages/chatters/useChatterRendimiento";
 import { useDescansos, useMiIdentidad, useNombres, useRoster } from "@/pages/chatters/horarios/useHorarios";
 import { diaSemanaDe, etiquetaDia, fechaDe, isoDe, lunesDe, sumarDias, urlCreadora } from "@/pages/chatters/horarios/types";
 import { TurnoBadge } from "@/pages/chatters/horarios/MiSemana";
-import CalendarioMovimiento from "./CalendarioMovimiento";
+import SemanaViva from "./SemanaViva";
 import { useResumenChatter, useVentasPorModelo } from "./useChatterDashboard";
 
 // DASHBOARD DEL CHATTER. Lo que una persona del equipo de chat quiere ver al
 // entrar: su turno de hoy y sus creadoras, cómo le fue en el rango elegido
 // (nota Maven, ventas BLU, horas), el mes día por día, y su descanso.
 // Todo sale de tablas que RLS ya le deja leer sobre sí misma.
+const SIN_DIAS: never[] = []; // default estable: un `[]` inline cambia por render
+
 export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const { data: perfil } = useMyProfile();
   const identidad = useMiIdentidad();
@@ -45,6 +47,8 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const miGrupo = miFila ? grupos.find((g) => g.id === miFila.group_id) ?? null : null;
   const misCreadoras = useMemo(() => creadoras.filter((c) => miFila && c.group_id === miFila.group_id), [creadoras, miFila]);
   const semanaHoy = lunesDe(hoy);
+  // La semana en curso se pide aparte: no depende del rango elegido arriba.
+  const diasSemana = useDiasDeChatter(yo, semanaHoy, sumarDias(semanaHoy, 6));
   const descansos = useDescansos(lunesDe(fechaDe(desde)), lunesDe(fechaDe(hasta)) > sumarDias(semanaHoy, 7) ? lunesDe(fechaDe(hasta)) : sumarDias(semanaHoy, 7));
   const misDescansos = (descansos.data ?? []).filter((d) => d.identity_id === yo);
   const descansoSemana = misDescansos.find((d) => d.week_start === semanaHoy) ?? null;
@@ -54,19 +58,12 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const nombre = perfil?.full_name?.split(" ")[0] ?? "";
   const fechaLarga = format(hoy, "EEEE d 'de' MMMM", { locale: es });
 
-  // Meses que abarca el rango (normalmente uno): un calendario por mes, máximo tres.
-  const meses = useMemo(() => {
-    const out: Date[] = []; const d = new Date(range.from.getFullYear(), range.from.getMonth(), 1);
-    while (d <= range.to && out.length < 3) { out.push(new Date(d)); d.setMonth(d.getMonth() + 1); }
-    return out;
-  }, [range]);
-
   const serie = useMemo(() => dias.map((d) => ({
     dia: d.dia, etiqueta: fechaDe(d.dia).getDate().toString(),
     ventas: Number(d.ventas ?? 0), esperado: Number(d.ventas_esperadas ?? 0), nota: d.nota,
   })), [dias]);
   const cumplimiento = resumen.esperado > 0 ? (100 * resumen.ventas) / resumen.esperado : null;
-  const diaDetalle = diaSel ? dias.find((d) => d.dia === diaSel) ?? null : null;
+  const diaDetalle = diaSel ? [...dias, ...(diasSemana.data ?? [])].find((d) => d.dia === diaSel) ?? null : null;
 
   const cardTitle = "text-base font-semibold";
 
@@ -107,7 +104,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
 
         {/* Fila 1: hoy (turno, creadoras, descanso) + ventas por día */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="border-primary/25 bg-gradient-to-br from-primary/15 via-accent/5 to-transparent transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/40">
             <CardHeader className="pb-3">
               <CardTitle className={cardTitle}>Hoy</CardTitle>
               <CardDescription>{miGrupo ? `${miGrupo.name} · ${miGrupo.agency === "plus" ? "Plus" : "Massive"}` : "Tu turno y tus creadoras"}</CardDescription>
@@ -173,28 +170,19 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <CardTitle className={cardTitle}>Calendario de movimiento</CardTitle>
-                  <CardDescription>Cada día con el color de su nota. Tocá uno para ver el detalle.</CardDescription>
+                  <CardTitle className={cardTitle}>Tu semana</CardTitle>
+                  <CardDescription>Cada día con su nota, sus ventas y cuánto de la meta cubriste. Tocá uno para el detalle.</CardDescription>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-success/50" />≥8</span>
-                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-warning/50" />6–8</span>
-                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-destructive/50" />&lt;6</span>
-                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-sm border border-dashed border-border" />descanso</span>
-                </div>
+                <Sparkles className="h-4 w-4 text-primary" />
               </div>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-6">
-              {meses.map((m) => (
-                <CalendarioMovimiento key={m.toISOString()} mes={m} dias={dias} descansos={misDescansos} desde={desde} hasta={hasta} diaSel={diaSel} onDia={setDiaSel} hoy={hoy} />
-              ))}
-              <div className="min-w-[220px] flex-1 border-l pl-6">
-                {diaSel ? (
+            <CardContent className="space-y-4">
+              <SemanaViva dias={diasSemana.data ?? SIN_DIAS} descansos={misDescansos} shift={miFila?.shift ?? null} hoy={hoy} diaSel={diaSel} onDia={setDiaSel} />
+              {diaSel && (
+                <div className="rounded-xl border bg-muted/20 p-4">
                   <DetalleDia dia={diaSel} fila={diaDetalle} identityId={yo} libre={misDescansos.some((r) => { const d = fechaDe(r.week_start); d.setDate(d.getDate() + r.weekday); return isoDe(d) === diaSel; })} />
-                ) : (
-                  <div className="flex h-full min-h-[120px] items-center text-sm text-muted-foreground">Elegí un día para ver qué vendiste, cuántas horas hiciste y cómo salió la nota.</div>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -213,7 +201,9 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                   <ol className="space-y-2">
                     {modelos.data.slice(0, 8).map((m, i) => (
                       <li key={m.blu_model_id} className="flex items-center gap-3 text-sm">
-                        <span className={cn("w-5 text-center font-display font-bold tabular-nums", i < 3 ? medalla[i] : "text-muted-foreground")}>{i + 1}</span>
+                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-display text-xs font-bold", i === 0 ? "border-amber-500/50 bg-amber-500/15" : i === 1 ? "border-slate-400/50 bg-slate-400/15" : i === 2 ? "border-amber-700/50 bg-amber-700/15" : "bg-muted/40")}>
+                          <span className={i < 3 ? medalla[i] : "text-muted-foreground"}>{i + 1}</span>
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="truncate font-medium">{m.model_name ?? `Modelo ${m.blu_model_id}`}</span>
@@ -240,7 +230,7 @@ function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: Retur
   const fecha = format(fechaDe(dia), "EEEE d 'de' MMMM", { locale: es });
   const faltan = fila?.detalle?.faltantes ?? [];
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 sm:grid-cols-[180px_1fr_1fr]">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Día</p>
         <p className="text-sm font-semibold capitalize leading-tight">{fecha}</p>
