@@ -386,7 +386,7 @@ export default function CoworkPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-foreground/80 truncate">{f.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien sin registro"}</span>
+                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien (sin registro: anterior al 3/9)"}</span>
                     {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
                   </div>
                 </div>
