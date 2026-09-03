@@ -1,4 +1,4 @@
-import { Crown, HeadphonesIcon, Megaphone, TrendingUp, Info } from "lucide-react";
+import { Crown, HeadphonesIcon, Megaphone, Minus, TrendingUp, Info } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -35,10 +35,17 @@ interface Fila {
 // Barra de proporción: hace el ranking legible de un vistazo, sin leer números.
 function Podio({ filas, tono, vacio }: { filas: Fila[]; tono: string; vacio: string }) {
   if (filas.length === 0) {
-    return <p className="px-4 py-8 text-center text-xs text-muted-foreground">{vacio}</p>;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5">
+          <Minus className="h-4 w-4 text-muted-foreground/60" />
+        </span>
+        <p className="text-xs text-muted-foreground">{vacio}</p>
+      </div>
+    );
   }
   return (
-    <ol className="divide-y divide-white/5">
+    <ol className="flex-1 divide-y divide-white/5">
       {filas.map((f, i) => (
         <li key={f.nombre} className={`relative px-4 py-2.5 ${i === 0 ? "bg-white/[0.03]" : ""}`}>
           <div className="flex items-center gap-3">
@@ -74,7 +81,7 @@ function Podio({ filas, tono, vacio }: { filas: Fila[]; tono: string; vacio: str
 }
 
 function Tarjeta({
-  titulo, ayuda, icono: Icono, acento, tono, filas, cargando, vacio,
+  titulo, ayuda, icono: Icono, acento, tono, filas, cargando, vacio, pie,
 }: {
   titulo: string;
   ayuda: string;
@@ -86,9 +93,11 @@ function Tarjeta({
   filas: Fila[];
   cargando: boolean;
   vacio: string;
+  /** Texto del pie. Cierra la tarjeta y explica de qué es la suma. */
+  pie?: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 backdrop-blur-sm">
+    <section className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 backdrop-blur-sm">
       <header className={`flex items-center gap-2 bg-gradient-to-r ${acento} px-4 py-3`}>
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10">
           <Icono className="h-4 w-4" />
@@ -104,11 +113,19 @@ function Tarjeta({
         </TooltipProvider>
       </header>
       {cargando ? (
-        <div className="space-y-2 p-4">
+        <div className="flex-1 space-y-2 p-4">
           {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
         </div>
       ) : (
         <Podio filas={filas} tono={tono} vacio={vacio} />
+      )}
+      {/* Pie pegado abajo: cierra la tarjeta y de paso dice de qué es la suma.
+          Sin esto, la tarjeta corta quedaba flotando y dejaba un hueco negro
+          al lado de la más larga. */}
+      {pie && (
+        <footer className="mt-auto border-t border-white/5 px-4 py-2 text-[11px] text-muted-foreground">
+          {pie}
+        </footer>
       )}
     </section>
   );
@@ -130,9 +147,10 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
   const maxCloser = Math.max(...tops.closers.map((c) => c.usd_mensual), 1);
 
   return (
-    // items-start: cada tarjeta mide lo que ocupan SUS filas. Con managers (2
-    // personas) al lado de chatters (5) el stretch dejaba media tarjeta vacía.
-    <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
+    // Las tres del MISMO alto: cada una llena su caja con el pie abajo y el
+    // vacío centrado. Con `items-start` (como estaba) la tarjeta corta dejaba
+    // un hueco negro al lado de la larga.
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Tarjeta
         titulo="Top chatters"
         ayuda="Ventas por modelo (chatter_model_daily), las DOS agencias. Los días son los que tienen dato importado; la serie arranca el 13/08/2026."
@@ -141,6 +159,7 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
         tono="bg-sky-500"
         cargando={cargando}
         vacio="Sin ventas de chatters en el rango."
+        pie={tops.chatters.length > 0 ? `Suma de estos ${tops.chatters.length}: ${money(tops.chatters.reduce((s, c) => s + c.ventas, 0))}` : undefined}
         filas={tops.chatters.map((c) => ({
           nombre: c.nombre,
           valor: money(c.ventas),
@@ -163,6 +182,7 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
         tono="bg-violet-500"
         cargando={cargando}
         vacio="Sin cierres en el rango."
+        pie={tops.closers.length > 0 ? `Suma de estos ${tops.closers.length}: ${money(tops.closers.reduce((s, c) => s + c.usd_mensual, 0))}/mes` : undefined}
         filas={tops.closers.map((c) => ({
           nombre: c.nombre,
           valor: `${money(c.usd_mensual)}/mes`,
@@ -180,6 +200,7 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
         tono="bg-amber-500"
         cargando={cargando}
         vacio="Sin datos de promoción en el rango."
+        pie={tops.managers.length > 0 ? `${tops.managers.reduce((s, m) => s + m.promocionaron, 0)} de ${tops.managers.reduce((s, m) => s + m.creadoras, 0)} creadoras promocionaron` : undefined}
         filas={tops.managers.map((m) => ({
           nombre: m.nombre,
           valor: `${m.pct_dias.toFixed(0)}%`,

@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
-import { money, rangoDeDias, useChatterPeriodo, type ChatterPeriodo } from "@/pages/chatters/useChatterRendimiento";
+import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/chatters/useChatterRendimiento";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { useDescansos, useNombres, useRoster } from "@/pages/chatters/horarios/useHorarios";
 import { TURNOS, diaSemanaDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
 
@@ -22,12 +24,6 @@ import { TURNOS, diaSemanaDe, lunesDe, type Shift } from "@/pages/chatters/horar
 // Rendimiento) y el roster de Horarios, que RLS ya le abre a nivel supervisor
 // con el módulo Chatters. Nada de esto pasa por `blu_is_management`, que es lo
 // que dejaba en blanco al Dashboard Ventas para este rol.
-
-const RANGOS = [
-  { dias: 1, label: "Ayer" },
-  { dias: 7, label: "7 días" },
-  { dias: 30, label: "30 días" },
-];
 
 // Cada turno con su color: el tablero se lee de un vistazo por bloques.
 const TURNO_ESTILO: Record<Shift, { icono: typeof Sun; texto: string; punto: string; tinte: string }> = {
@@ -93,12 +89,15 @@ function Persona({ nombre, extra }: { nombre: string; extra?: string }) {
 }
 
 export default function EquipoDashboard() {
-  const [dias, setDias] = useState(7);
   const [orden, setOrden] = useState<Orden>("nota");
+  // Mismo control de rango que el Dashboard Ventas: pills + calendario
+  // (pedido de Jhon). Arranca en "Esta semana" porque el roster y los
+  // descansos de Horarios son semanales.
+  const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
+  const [preset, setPreset] = useState<RangePreset | null>("this_week");
 
-  // El rango termina AYER a propósito: el día en curso está a medias y
-  // ensuciaría los promedios (ver rangoDeDias).
-  const { desde, hasta } = useMemo(() => rangoDeDias(dias), [dias]);
+  const desde = isoDia(rango.from);
+  const hasta = isoDia(rango.to);
   const periodo = useChatterPeriodo(desde, hasta);
   const { grupos, miembros, cargando: rosterCargando } = useRoster();
   const semana = useMemo(() => lunesDe(new Date()), []);
@@ -205,27 +204,39 @@ export default function EquipoDashboard() {
             <div>
               <h1 className="font-display text-lg font-bold leading-tight tracking-tight">Tu equipo de chatters</h1>
               <p className="text-[11px] text-muted-foreground">
-                {dias === 1 ? "Ayer" : `Últimos ${dias} días`} · hasta {hasta}
+                {resumen.total > 0 ? `${resumen.total} chatters` : "Sin chatters en el rango"}
                 {resumen.cumplimiento != null && (
                   <> · <span className={cn("font-medium", tono.texto)}>{resumen.cumplimiento}% de la meta</span></>
                 )}
               </p>
             </div>
           </div>
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-card/50 p-0.5">
-            {RANGOS.map((r) => (
-              <button
-                key={r.dias}
-                type="button"
-                onClick={() => setDias(r.dias)}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-                  dias === r.dias ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+              {PRESET_CONFIG.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => { setRango(rangeForPreset(p.key, new Date())); setPreset(p.key); }}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                    preset === p.key ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <DateRangePicker
+              from={rango.from}
+              to={rango.to}
+              onApply={(from, to) => {
+                if (!from || !to) return;   // "Todo" no aplica: el rango manda las consultas
+                setRango({ from, to });
+                setPreset(null);
+              }}
+              placeholder="Seleccionar rango"
+            />
           </div>
         </div>
       </div>

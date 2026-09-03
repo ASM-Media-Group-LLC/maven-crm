@@ -20,6 +20,10 @@ import {
   Activity,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+// Una sola definición de "Esta semana" (lunes → domingo de la semana EN CURSO)
+// para todo Maven: antes esta pantalla, Dashboard Ventas y DateRangePresets
+// tenían cada una su copia, o sea tres lugares donde podía divergir.
+import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import {
   BarChart,
   Bar,
@@ -785,36 +789,6 @@ const LeadDetailDialog = ({
 // Presets de rango rápido — botones a la izquierda del DateRangePicker.
 // "Hoy" es el default al entrar a la página (antes era el mes entero,
 // pero la mayoría del uso es check del día en curso).
-type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
-
-const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
-  { key: "yesterday", label: "Ayer" },
-  { key: "today", label: "Hoy" },
-  { key: "this_week", label: "Esta semana" },
-  { key: "this_month", label: "Este mes" },
-];
-
-function rangeForPreset(preset: RangePreset, ref: Date): DashboardRange {
-  const today = startOfDay(ref);
-  switch (preset) {
-    case "yesterday": {
-      const y = subDays(today, 1);
-      return { from: y, to: endOfDay(y) };
-    }
-    case "today":
-      return { from: today, to: endOfDay(today) };
-    case "this_week":
-      // weekStartsOn=1 (lunes) — convención local. Si Alvaro prefiere
-      // domingo después, lo cambiamos.
-      return {
-        from: startOfWeek(today, { weekStartsOn: 1 }),
-        to: endOfWeek(today, { weekStartsOn: 1 }),
-      };
-    case "this_month":
-      return { from: startOfMonth(today), to: endOfMonth(today) };
-  }
-}
-
 const PanelDeControl = () => {
   const today = startOfDay(new Date());
   // Default: Hoy (antes era el mes entero — la mayoría del uso es

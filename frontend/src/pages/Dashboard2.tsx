@@ -3,6 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, subMonths, endOfDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+// Una sola definición de "Esta semana" para todo Maven (lunes → domingo de la
+// semana EN CURSO). Antes esta pantalla, Panel de Control y DateRangePresets
+// tenían cada una su copia: tres lugares donde el rango podía divergir.
+import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,24 +105,6 @@ const cap = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
 // Meses del sparkline de la tarjeta "Comparativas".
 const SPARKLINE_MESES = 4;
 
-// Presets de rango rápido — mismos pills que Panel de Control.
-type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
-const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
-  { key: "yesterday", label: "Ayer" },
-  { key: "today", label: "Hoy" },
-  { key: "this_week", label: "Esta semana" },
-  { key: "this_month", label: "Este mes" },
-];
-function rangeForPreset(preset: RangePreset, ref: Date): { from: Date; to: Date } {
-  const today = startOfDay(ref);
-  switch (preset) {
-    case "yesterday": { const y = subDays(today, 1); return { from: y, to: endOfDay(y) }; }
-    case "this_week": return { from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfWeek(today, { weekStartsOn: 1 }) };
-    case "this_month": return { from: startOfMonth(today), to: endOfMonth(today) };
-    case "today":
-    default: return { from: today, to: endOfDay(today) };
-  }
-}
 
 // (Los 20 tonos arbitrarios PIE_COLORS se retiraron con el donut del 80/20:
 // el Pareto usa los tokens de serie de lib/chartTheme — auditoría #20.)
