@@ -37,6 +37,30 @@ function AvisoCobertura({ dias, diasConDatos }: { dias: number; diasConDatos: nu
   );
 }
 
+// Feedback del TL en el período: el neto de puntos, con el antes/después en el
+// tooltip. La columna Nota YA lo incluye — acá se muestra cuánto de esa nota es
+// feedback, que es lo que Jhon pidió ver ("que sea justo lo que el supervisor
+// puso ahí en esa nota").
+function FeedbackCelda({ fila }: { fila: ChatterPeriodo }) {
+  const pts = Number(fila.feedback_puntos ?? 0);
+  if (!fila.feedback_n) return <span className="text-muted-foreground">—</span>;
+  const base = fila.nota_base_promedio == null ? null : Number(fila.nota_base_promedio);
+  return (
+    <span
+      title={base != null
+        ? `Nota sin feedback ${base.toFixed(2)} → con feedback ${Number(fila.nota_promedio).toFixed(2)} · ${fila.feedback_n} registro${fila.feedback_n === 1 ? "" : "s"}`
+        : `${fila.feedback_n} registro${fila.feedback_n === 1 ? "" : "s"}`}
+      className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
+        pts < 0 ? "border-destructive/30 bg-destructive/10 text-destructive"
+        : pts > 0 ? "border-success/30 bg-success/10 text-success"
+        : "border-border text-muted-foreground")}
+    >
+      {pts > 0 ? "+" : ""}{pts}
+      <span className="text-[9px] font-normal opacity-70">· {fila.feedback_n}</span>
+    </span>
+  );
+}
+
 function NotaBadge({ nota, dias }: { nota: number | null; dias?: number }) {
   if (nota == null) {
     return <span className="text-xs text-muted-foreground">Sin datos</span>;
@@ -283,6 +307,7 @@ export default function ChatterRendimiento() {
                 <tr>
                   <th className="py-2.5 pl-4 pr-3 text-left font-medium">Chatter</th>
                   <th className="py-2.5 pr-3 text-left font-medium">Nota</th>
+                  <th className="py-2.5 pr-3 text-center font-medium" title="Puntos que el supervisor sumó o restó en el período. La Nota ya los incluye.">Feedback TL</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Ventas</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Esperado</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Horas</th>
@@ -316,6 +341,9 @@ export default function ChatterRendimiento() {
                         <td className="py-2.5 pr-3">
                           <NotaBadge nota={f.nota_promedio} dias={f.dias_con_nota || undefined} />
                         </td>
+                        <td className="py-2.5 pr-3 text-center">
+                          <FeedbackCelda fila={f} />
+                        </td>
                         <td className="py-2.5 pr-3 text-right tabular-nums">{money(f.ventas_total)}</td>
                         <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
                           {money(f.ventas_esperadas_total)}
@@ -331,7 +359,7 @@ export default function ChatterRendimiento() {
                       </tr>
                       {abiertoAca && (
                         <tr key={`${f.identity_id}-detalle`}>
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <Detalle fila={f} desde={desde} hasta={hasta} />
                           </td>
                         </tr>

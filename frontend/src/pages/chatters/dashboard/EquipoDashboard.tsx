@@ -12,7 +12,8 @@ import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/c
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { useDescansos, useNombres, useRoster } from "@/pages/chatters/horarios/useHorarios";
-import { TURNOS, diaSemanaDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
+import { TURNOS, diaSemanaDe, isoDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
+import FeedbackDialog from "./FeedbackDialog";
 
 // DASHBOARD DEL SUPERVISOR DE CHATTERS — su casa al entrar a Maven.
 //
@@ -78,18 +79,28 @@ function Kpi({
   );
 }
 
-function Persona({ nombre, extra }: { nombre: string; extra?: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 py-1 pl-1 pr-2.5 text-xs ring-1 ring-white/5 transition-colors hover:bg-white/10">
+// Clickeable cuando hay `onClick`: abre el feedback del TL de esa persona.
+function Persona({ nombre, extra, onClick }: { nombre: string; extra?: string; onClick?: () => void }) {
+  const contenido = (
+    <>
       <UserAvatar name={nombre} size="xs" />
       <span className="font-medium">{nombre}</span>
       {extra && <span className="text-muted-foreground">· {extra}</span>}
-    </span>
+    </>
+  );
+  const clases = "inline-flex items-center gap-1.5 rounded-full bg-white/5 py-1 pl-1 pr-2.5 text-xs ring-1 ring-white/5 transition-colors hover:bg-white/10";
+  if (!onClick) return <span className={clases}>{contenido}</span>;
+  return (
+    <button type="button" onClick={onClick} title="Registrar feedback" className={`${clases} hover:ring-primary/40`}>
+      {contenido}
+    </button>
   );
 }
 
 export default function EquipoDashboard() {
   const [orden, setOrden] = useState<Orden>("nota");
+  // Chatter cuyo feedback está abierto (clic en el nombre en "Hoy en turno").
+  const [feedbackDe, setFeedbackDe] = useState<{ id: string; nombre: string } | null>(null);
   // Mismo control de rango que el Dashboard Ventas: pills + calendario
   // (pedido de Jhon). Arranca en "Esta semana" porque el roster y los
   // descansos de Horarios son semanales.
@@ -306,7 +317,12 @@ export default function EquipoDashboard() {
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {gente.map((p) => (
-                          <Persona key={p.identity_id} nombre={nombres[p.identity_id] ?? "…"} extra={p.grupo} />
+                          <Persona
+                            key={p.identity_id}
+                            nombre={nombres[p.identity_id] ?? "…"}
+                            extra={p.grupo}
+                            onClick={() => setFeedbackDe({ id: p.identity_id, nombre: nombres[p.identity_id] ?? "Chatter" })}
+                          />
                         ))}
                       </div>
                     </div>
@@ -327,7 +343,10 @@ export default function EquipoDashboard() {
                 <p className="text-xs text-muted-foreground">Nadie descansa hoy.</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {hoy.libres.map((id) => <Persona key={id} nombre={nombres[id] ?? "…"} />)}
+                  {hoy.libres.map((id) => (
+                    <Persona key={id} nombre={nombres[id] ?? "…"}
+                      onClick={() => setFeedbackDe({ id, nombre: nombres[id] ?? "Chatter" })} />
+                  ))}
                 </div>
               )}
               {hoy.notas.length > 0 && (
@@ -399,6 +418,16 @@ export default function EquipoDashboard() {
           )}
         </section>
       </div>
+
+      {/* Feedback del TL: suma o resta a la nota del día. */}
+      <FeedbackDialog
+        identityId={feedbackDe?.id ?? null}
+        nombre={feedbackDe?.nombre ?? ""}
+        dia={isoDe(new Date())}
+        desde={desde}
+        hasta={hasta}
+        onClose={() => setFeedbackDe(null)}
+      />
     </main>
   );
 }
@@ -439,6 +468,13 @@ function Fila({ f, puesto, maxVentas }: { f: ChatterPeriodo; puesto: number | nu
             {f.dias_con_nota > 0 ? `${f.dias_con_nota} de ${f.dias_del_periodo} días con dato` : "sin datos en el rango"}
             {f.modelos_distintas > 0 && ` · ${f.modelos_distintas} modelo${f.modelos_distintas === 1 ? "" : "s"}`}
             {f.horas_total != null && ` · ${Math.round(Number(f.horas_total))} h`}
+            {/* El feedback del TL ya está dentro de la nota; acá se dice cuánto
+                de ella es feedback, para que nadie tenga que adivinarlo. */}
+            {!!f.feedback_n && (
+              <span className={Number(f.feedback_puntos) < 0 ? "text-red-400" : "text-emerald-500"}>
+                {" "}· feedback {Number(f.feedback_puntos) > 0 ? "+" : ""}{Number(f.feedback_puntos)}
+              </span>
+            )}
           </p>
         </div>
         <div className="text-right">

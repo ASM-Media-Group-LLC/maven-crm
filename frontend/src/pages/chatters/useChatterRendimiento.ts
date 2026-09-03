@@ -17,6 +17,7 @@ export interface ChatterPeriodo {
    *  el promedio del mes, y la pantalla tiene que poder decirlo. */
   dias_con_nota: number;
   dias_del_periodo: number;
+  /** Nota FINAL del período: la base ya ajustada por el feedback del TL. */
   nota_promedio: number | null;
   ventas_total: number | null;
   ventas_esperadas_total: number | null;
@@ -28,6 +29,12 @@ export interface ChatterPeriodo {
   masivos_vistos: number;
   masivos_comprados: number;
   masivos_generado: number;
+  /** Nota SIN el feedback del TL (para poder mostrar el antes/después). */
+  nota_base_promedio: number | null;
+  /** Neto de puntos que el TL sumó o restó en el período. */
+  feedback_puntos: number;
+  /** Cuántos registros de feedback componen ese neto. */
+  feedback_n: number;
 }
 
 export interface CoberturaDia {
