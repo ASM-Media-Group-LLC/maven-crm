@@ -2,12 +2,26 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // CORS inline (antes venía de ../_shared/whatsapp.ts). Se inlinea para que esta función sea
 // self-contained y se pueda desplegar como archivo único (idéntico comportamiento).
-const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? "https://maven.asmtech.ai";
-const whatsappCors = {
-  "Access-Control-Allow-Origin": CORS_ALLOW_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
-  "Vary": "Origin",
+// Maven vive en más de un dominio (el propio y el histórico, que sigue sirviendo
+// los links públicos ya enviados), así que el origen se elige por request contra
+// esta lista. Se mantiene inline y en el mismo orden que `_shared/cors.ts`.
+const ORIGENES_PERMITIDOS = [
+  "https://maven.asmtech.ai",
+  "https://maven.asmtech.me",
+  "https://www.maven-ai.me",
+  "https://maven-ai.me",
+  "http://localhost:5173",
+  "http://localhost:4173",
+];
+const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? ORIGENES_PERMITIDOS[0];
+const corsPara = (req: Request) => {
+  const origin = req.headers.get("origin") ?? "";
+  return {
+    "Access-Control-Allow-Origin": ORIGENES_PERMITIDOS.includes(origin) ? origin : CORS_ALLOW_ORIGIN,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
+    "Vary": "Origin",
+  };
 };
 
 // wa-inbox-open — Closers: abre (o crea) la conversación del inbox con un lead en
@@ -20,12 +34,6 @@ const whatsappCors = {
 // de leadgen (sin fila en closer_creators) cae al `phone` E.164 que manda el front
 // (validado). find-or-create de wa_contacts (por jid) + wa_conversations (contact+canal).
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
-  });
-}
 
 function toJid(e164: string): string | null {
   const digits = String(e164).replace(/[^0-9]/g, "");
@@ -74,7 +82,13 @@ async function syncAssigneeJoin(sb: any, conversationId: string, userId: string 
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  // `json` vive DENTRO del handler para resolver el CORS por request.
+  const json = (body: unknown, status = 200): Response =>
+    new Response(JSON.stringify(body), {
+      status, headers: { ...corsPara(req), "Content-Type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsPara(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

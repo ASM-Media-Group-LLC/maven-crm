@@ -290,3 +290,8 @@ verify_jwt = false  # lo llama LiveKit, que no puede mandar un JWT de Supabase; 
 
 [functions.web-push]
 verify_jwt = false  # auth propia: Bearer del usuario (subscribe/notify); valida adentro
+
+# Retención de Storage (promolog de creadoras no activas + qa-audio a 5 meses).
+# verify_jwt=false: la dispara un cron con X-Cron-Token, no una sesión de Maven.
+[functions.storage-retencion]
+verify_jwt = false

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { whatsappCors } from "../_shared/whatsapp.ts";
+import { whatsappCorsFor } from "../_shared/whatsapp.ts";
 
 // wa-inbox-send-media — envía un saliente con MEDIA (imagen/audio/video/documento)
 // desde la bandeja. El front sube el archivo a Storage y nos pasa la URL (firmada);
@@ -16,12 +16,6 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1 
 
 const VALID_TYPES = ["image", "audio", "video", "document", "gif", "sticker"];
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
-  });
-}
 
 async function sendMediaViaEvolution(
   instance: string,
@@ -58,7 +52,15 @@ async function sendMediaViaEvolution(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  // `json` vive DENTRO del handler para que los headers de CORS se resuelvan
+  // por request (Maven vive en más de un dominio).
+    const json = (body: unknown, status = 200): Response => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
+    });
+    };
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCorsFor(req) });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

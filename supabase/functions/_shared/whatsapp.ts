@@ -7,6 +7,7 @@
 // crudo a IncomingMessage.
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickAllowedOrigin } from "./cors.ts";
 
 export interface IncomingMessage {
   // ID del mensaje según el provider — usado para idempotencia.
@@ -239,12 +240,28 @@ export async function logEvent(
 // env var CORS_ALLOW_ORIGIN (p.ej. "*" o "http://localhost:8080" si en dev llamás
 // las edges desde localhost). Antes era "*" (abierto a cualquier sitio).
 const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? "https://maven.asmtech.ai";
+
+const CORS_HEADERS_COMUNES =
+  "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token";
+
+// Objeto estático: sirve para las funciones que solo las llaman crons, webhooks
+// y el gateway (a esas el CORS les da igual, no hay navegador del otro lado).
 export const whatsappCors = {
   "Access-Control-Allow-Origin": CORS_ALLOW_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
+  "Access-Control-Allow-Headers": CORS_HEADERS_COMUNES,
   "Vary": "Origin",
 };
+
+// Para las que SÍ llama el navegador: el origen se decide por request contra la
+// allowlist compartida (`_shared/cors.ts`), porque Maven vive en más de un
+// dominio y un valor fijo solo puede servir a uno.
+export function whatsappCorsFor(req: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": pickAllowedOrigin(req),
+    "Access-Control-Allow-Headers": CORS_HEADERS_COMUNES,
+    "Vary": "Origin",
+  };
+}
 
 // ----------------------------------------------------------------------------
 // sniffMimeFromBytes — detecta el MIME real mirando los magic bytes del

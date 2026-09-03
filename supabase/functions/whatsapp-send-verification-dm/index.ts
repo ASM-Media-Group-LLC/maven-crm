@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, whatsappCorsFor } from "../_shared/whatsapp.ts";
 
 // whatsapp-send-verification-dm — v2 INICIADA POR EL USUARIO: genera el código de
 // verificación y lo DEVUELVE para que el front lo muestre con un botón wa.me.
@@ -66,15 +66,17 @@ async function generateAndPersistCode(sb: SupabaseClient, userId: string, phone:
   return null;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...whatsappCors, "Content-Type": "application/json" },
-  });
-}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  // `json` vive DENTRO del handler para que los headers de CORS se resuelvan
+  // por request (Maven vive en más de un dominio).
+    const json = (body: unknown, status = 200): Response => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
+    });
+    };
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCorsFor(req) });
   if (!authorizeCronOrJwt(req)) return json({ ok: false, error: "unauthorized" }, 401);
 
   let body: RequestBody;

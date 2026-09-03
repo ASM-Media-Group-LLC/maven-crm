@@ -8,7 +8,7 @@ import {
   limpiarSustitutosSueltos,
   logEvent,
   redactPhones,
-  whatsappCors,
+  whatsappCorsFor,
 } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 import {
@@ -9433,13 +9433,13 @@ async function runAgent(req: AgentRequest): Promise<{
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: whatsappCors });
+    return new Response(null, { headers: whatsappCorsFor(req) });
   }
 
   if (!authorizeCronOrJwt(req)) {
     return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
       status: 401,
-      headers: { ...whatsappCors, "Content-Type": "application/json" },
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
     });
   }
 
@@ -9449,7 +9449,7 @@ serve(async (req) => {
   } catch {
     return new Response(JSON.stringify({ ok: false, error: "invalid_json" }), {
       status: 400,
-      headers: { ...whatsappCors, "Content-Type": "application/json" },
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
     });
   }
 
@@ -9468,12 +9468,12 @@ serve(async (req) => {
     const result = await Promise.race([runAgent(body), guarda]);
     return new Response(JSON.stringify(result), {
       status: result.ok ? 200 : 500,
-      headers: { ...whatsappCors, "Content-Type": "application/json" },
+      headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     return new Response(
       JSON.stringify({ ok: false, error: (e as Error).message }),
-      { status: 500, headers: { ...whatsappCors, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" } },
     );
   }
 });
