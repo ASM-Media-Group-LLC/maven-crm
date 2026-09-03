@@ -1,20 +1,32 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { Gift, Plus, FileSpreadsheet, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
+import { Gift, Plus, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
 import { AGENCIAS, ESTADOS, agenciaDe, usd, type Agency, type Estado, type Pedido } from "./types";
 import { FILTROS_VACIOS, useCatalogos, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
 import PedidoTablero from "./PedidoTablero";
 import PedidoTabla from "./PedidoTabla";
 import PedidoFormDialog from "./PedidoFormDialog";
-import PedidoDrawer from "./PedidoDrawer";
-import ImportarSheetDialog from "./ImportarSheetDialog";
+import PedidoFicha from "./PedidoFicha";
+import ProfileCard from "@/pages/messenger/components/ProfileCard";
+import { ordenarPedidos, type ColumnaOrden, type Orden } from "./orden";
 
 const VISTA_KEY = "maven.personalizados.vista";
 const AGENCIA_KEY = "maven.personalizados.agencia";
+const ORDEN_KEY = "maven.personalizados.orden";
+
+// El orden elegido en la tabla se recuerda: si alguien trabaja mirando "mayor
+// precio primero", no quiere volver a pedirlo cada vez que entra.
+const leerOrden = (): Orden | null => {
+  try {
+    const v = JSON.parse(localStorage.getItem(ORDEN_KEY) || "null");
+    return v && typeof v.col === "string" && (v.dir === "asc" || v.dir === "desc") ? (v as Orden) : null;
+  } catch { return null; }
+};
 
 const leerAgencia = (): Agency | "" => {
   try {
@@ -56,12 +68,15 @@ export default function PersonalizadosPage() {
   const [vista, setVista] = useState<"tablero" | "tabla">(() => (localStorage.getItem(VISTA_KEY) === "tabla" ? "tabla" : "tablero"));
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [editando, setEditando] = useState<Pedido | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const [abierto, setAbierto] = useState<Pedido | null>(null);
+  const [orden, setOrden] = useState<Orden | null>(leerOrden);
+  // Ficha de perfil del chatter (la misma del Messenger).
+  const [chatterEnFicha, setChatterEnFicha] = useState<string | null>(null);
 
   const { data: pedidos = SIN_PEDIDOS, isLoading } = usePedidos(filtros);
   const { creadoras } = useCatalogos();
-  const { puedeCrear, puedeGestionar } = usePermisosPersonalizados();
+  const { puedeCrear } = usePermisosPersonalizados();
+  const { canAccess } = usePermissions();
 
   const cambiarVista = (v: "tablero" | "tabla") => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
   const patch = (p: Partial<FiltrosPedidos>) => setFiltros((f) => ({ ...f, ...p }));
@@ -85,7 +100,34 @@ export default function PersonalizadosPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [pedidos]);
 
-  // El drawer muestra siempre la versión fresca del pedido abierto.
+  const cambiarOrden = (o: Orden | null) => {
+    setOrden(o);
+    try {
+      if (o) localStorage.setItem(ORDEN_KEY, JSON.stringify(o));
+      else localStorage.removeItem(ORDEN_KEY);
+    } catch { /* noop */ }
+  };
+  // "Ver solo…" del encabezado: cada columna escribe en su filtro (y agencia
+  // además guarda la preferencia, que es el contexto de trabajo).
+  const FILTRO_DE_COLUMNA: Partial<Record<ColumnaOrden, keyof FiltrosPedidos>> = {
+    status: "estado", content_type: "tipo", sale_channel: "canal", agency: "agencia",
+    creator_name: "creadora", chatter_name: "chatter",
+  };
+  const filtroDeColumna = (col: ColumnaOrden) => {
+    const clave = FILTRO_DE_COLUMNA[col];
+    return clave ? String(filtros[clave] ?? "") : "";
+  };
+  const filtrarColumna = (col: ColumnaOrden, valor: string) => {
+    const clave = FILTRO_DE_COLUMNA[col];
+    if (!clave) return;
+    if (clave === "agencia") elegirAgencia(valor as Agency | "");
+    else patch({ [clave]: valor } as Partial<FiltrosPedidos>);
+  };
+
+  // Lo que se dibuja, ya ordenado por la columna elegida (tabla y tablero).
+  const pedidosOrdenados = useMemo(() => ordenarPedidos(pedidos, orden), [pedidos, orden]);
+
+  // La ficha muestra siempre la versión fresca del pedido abierto.
   const abiertoFresco = abierto ? pedidos.find((p) => p.id === abierto.id) ?? abierto : null;
 
   // Resumen arriba: cuánto hay en juego y cuánto está pendiente de la creadora.
@@ -106,11 +148,6 @@ export default function PersonalizadosPage() {
           icon={<Gift className="h-5 w-5" />}
           actions={
             <div className="flex items-center gap-2">
-              {puedeGestionar && (
-                <Button variant="outline" size="sm" className="rounded-full gap-1.5" onClick={() => setImportOpen(true)}>
-                  <FileSpreadsheet className="h-4 w-4" /> Importar del sheet
-                </Button>
-              )}
               {puedeCrear && (
                 <Button size="sm" className="rounded-full gap-1.5" onClick={() => { setEditando(null); setNuevoOpen(true); }}>
                   <Plus className="h-4 w-4" /> Nuevo pedido
@@ -205,13 +242,22 @@ export default function PersonalizadosPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="h-14 w-14 rounded-3xl bg-primary/10 flex items-center justify-center"><Gift className="h-7 w-7 text-primary" /></div>
             <p className="font-medium">{agenciaActual ? `Todavía no hay pedidos de ${agenciaActual.label}` : "Todavía no hay pedidos"}</p>
-            <p className="text-sm text-muted-foreground max-w-sm">Creá el primero con "Nuevo pedido", o traé el historial del sheet con "Importar del sheet".</p>
+            <p className="text-sm text-muted-foreground max-w-sm">Creá el primero con "Nuevo pedido".</p>
             <Badge variant="outline" className="rounded-full">Solicitado → Aprobado → En producción → Listo → Entregado</Badge>
           </div>
         ) : vista === "tablero" ? (
-          <PedidoTablero pedidos={pedidos} onAbrir={setAbierto} />
+          <PedidoTablero pedidos={pedidosOrdenados} onAbrir={setAbierto} />
         ) : (
-          <PedidoTabla pedidos={pedidos} onAbrir={setAbierto} />
+          <PedidoTabla
+            pedidos={pedidosOrdenados}
+            onAbrir={setAbierto}
+            orden={orden}
+            onOrdenar={cambiarOrden}
+            filtroDe={filtroDeColumna}
+            onFiltrar={filtrarColumna}
+            onVerChatter={setChatterEnFicha}
+            puedeVerCreadora={canAccess("Creadores", "Perfil")}
+          />
         )}
       </div>
 
@@ -222,8 +268,8 @@ export default function PersonalizadosPage() {
         agenciaPorDefecto={filtros.agencia || "plus"}
         onCreado={(p) => setAbierto(p)}
       />
-      <PedidoDrawer pedido={abiertoFresco} onClose={() => setAbierto(null)} onEditar={(p) => setEditando(p)} />
-      <ImportarSheetDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ProfileCard userId={chatterEnFicha} onClose={() => setChatterEnFicha(null)} />
+      <PedidoFicha pedido={abiertoFresco} onClose={() => setAbierto(null)} onEditar={(p) => setEditando(p)} />
     </div>
   );
 }

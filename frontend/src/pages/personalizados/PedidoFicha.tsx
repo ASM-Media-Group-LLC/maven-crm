@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,11 @@ const SIN_ADJUNTOS: PedidoAdjunto[] = [];
 // Ficha del pedido: todo lo que en el sheet había que leer en una fila de 12
 // columnas, más lo que el sheet no podía: botones de estado con reglas,
 // adjuntos como archivos e historial de quién cambió qué y cuándo.
-export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
+//
+// Es un POPUP centrado (el Dialog de Maven ya trae el liquid glass: card
+// semiopaco + backdrop-blur + degradado del primary + ring blanco). Antes era
+// un panel lateral y tapaba la tabla del costado.
+export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
   const { puedeAprobar, puedeGestionar } = usePermisosPersonalizados();
   const { nombreDe } = useCatalogos();
   const { cambiarEstado, editar, borrar, subirAdjunto, borrarAdjunto } = useMutacionesPedidos();
@@ -112,9 +116,9 @@ export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
   const siguientes = SIGUIENTES[pedido.status].filter((s) => !SOLO_SUPERVISOR.includes(s) || puedeAprobar);
 
   return (
-    <Sheet open={!!pedido} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0">
-        <SheetHeader className="px-5 pt-5 pb-3 border-b border-border/60">
+    <Dialog open={!!pedido} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/60 space-y-0 text-left">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
@@ -124,18 +128,19 @@ export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
                 {pedido.sale_channel === "buster" && <Badge variant="outline" className="rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30">⚡ Hora Buster</Badge>}
                 {vencido && <Badge variant="outline" className="rounded-full bg-red-500/15 text-red-600 border-red-500/30">Vencido</Badge>}
               </div>
-              <SheetTitle className="text-lg leading-tight">{pedido.creator_name} <span className="text-muted-foreground font-normal">para</span> @{pedido.fan_handle}</SheetTitle>
+              <DialogTitle className="text-lg leading-tight">{pedido.creator_name} <span className="text-muted-foreground font-normal">para</span> @{pedido.fan_handle}</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                 <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{pedido.chatter_name || nombreDe(pedido.chatter_id) || "Sin chatter"}</span>
                 <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Pedido {fecha(pedido.requested_on)}</span>
                 {pedido.due_on && <span className={`inline-flex items-center gap-1 ${vencido ? "text-red-500 font-medium" : ""}`}>Entrega {fecha(pedido.due_on)}</span>}
               </p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0" onClick={() => onEditar(pedido)} title="Editar pedido">
+            {/* mr-7: deja libre la X de cerrar del Dialog (top-3 right-3). */}
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 mr-7" onClick={() => onEditar(pedido)} title="Editar pedido">
               <Pencil className="h-4 w-4" />
             </Button>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         <div className="px-5 py-4 space-y-5">
           {/* Acciones de estado */}
@@ -302,7 +307,7 @@ export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

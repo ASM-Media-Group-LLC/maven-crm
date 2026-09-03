@@ -32,6 +32,11 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return { supabase: { from: () => builder(), storage: { from: () => ({}) } } };
 });
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => () => {},
+  useLocation: () => ({ pathname: "/personalizados", search: "" }),
+  Link: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ explicitPermission: () => null, isLoading: false, canAccess: () => true }) }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => ({ isSupervisorOrAbove: true, isAdmin: true, tier: "admin" }) }));
