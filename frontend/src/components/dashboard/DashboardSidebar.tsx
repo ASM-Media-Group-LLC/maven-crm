@@ -26,7 +26,6 @@ import {
   SidebarGroup, SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useChannelSoundMuted, type MuteChannel } from "@/hooks/useChannelSoundMuted";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
@@ -111,7 +110,6 @@ const DashboardSidebar = () => {
   }, [pathname, isMobile, setOpenMobile]);
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { isAdmin } = useUserRole();
   const { canAccess } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
@@ -119,7 +117,6 @@ const DashboardSidebar = () => {
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
     { title: "Correo", url: "/correo", icon: Mail, module: "Correo" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
@@ -127,7 +124,7 @@ const DashboardSidebar = () => {
     { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
-  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module) && (item.url !== "/dashboard2" || isAdmin));
+  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
   const creadoresSubItems = [
     { title: "Dashboard", url: "/creadores/dashboard", submodule: "Dashboard" },

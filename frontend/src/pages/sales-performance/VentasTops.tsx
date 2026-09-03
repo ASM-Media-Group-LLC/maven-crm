@@ -135,7 +135,7 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
     <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
       <Tarjeta
         titulo="Top chatters"
-        ayuda="Ventas de BLU en el rango elegido. Los días son los que tienen dato importado."
+        ayuda="Ventas por modelo (chatter_model_daily), las DOS agencias. Los días son los que tienen dato importado; la serie arranca el 13/08/2026."
         icono={HeadphonesIcon}
         acento="from-sky-500/20 via-sky-500/5 to-transparent"
         tono="bg-sky-500"
@@ -144,7 +144,13 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
         filas={tops.chatters.map((c) => ({
           nombre: c.nombre,
           valor: money(c.ventas),
-          detalle: `${c.dias} día${c.dias === 1 ? "" : "s"}${c.fans ? ` · ${c.fans.toLocaleString("es")} fans` : ""}`,
+          // El reparto por agencia va A LA VISTA: el ranking anterior salía de
+          // una tabla que dejó de traer Plus y no había forma de notarlo.
+          detalle: [
+            `${c.dias} día${c.dias === 1 ? "" : "s"}`,
+            c.plus > 0 ? `Plus ${money(c.plus)}` : null,
+            c.massive > 0 ? `Massive ${money(c.massive)}` : null,
+          ].filter(Boolean).join(" · "),
           proporcion: c.ventas / maxChatter,
         }))}
       />

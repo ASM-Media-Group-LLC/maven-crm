@@ -1,12 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-/** Chatter de BLU: lo que vendió en el rango. */
+/** Chatter de BLU: lo que vendió en el rango, con el reparto por agencia.
+ *  Sale de `chatter_model_daily` (chatter × modelo × día) y NO de
+ *  `chatter_daily_sales`, que desde el 31/08/2026 llega sin casi nada de Plus
+ *  — ver la migración 20260904160000. */
 export interface TopChatter {
   nombre: string;
   ventas: number;
+  plus: number;
+  massive: number;
   mensajes: number | null;
-  fans: number | null;
   dias: number;
 }
 
