@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
+import { useTabTitleAlert } from "@/hooks/useTabTitleAlert";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
@@ -76,6 +77,10 @@ export function useMessengerNotifications() {
   const { notify } = useBrowserNotifications();
   const navigate = useNavigate();
   useNotificationPermission();
+  // Parpadeo del título de la pestaña (estilo Google Chat).
+  const alertTitle = useTabTitleAlert();
+  const alertTitleRef = useRef(alertTitle);
+  alertTitleRef.current = alertTitle;
 
   // La suscripción se arma una sola vez por user.id; el callback lee siempre el valor actual
   // vía refs (sin re-suscribir en cada cambio de settings/notify).
@@ -174,6 +179,11 @@ export function useMessengerNotifications() {
           const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null);
           const title = isGroup ? conv?.name || "Grupo" : senderName;
           const body = isGroup ? `${senderName}: ${preview}` : preview;
+
+          // Título de la pestaña parpadeando mientras no estés mirando (Google Chat).
+          alertTitleRef.current(
+            isGroup ? `💬 ${senderName} escribió en ${title}` : `💬 ${senderName} te escribió`
+          );
 
           // Sonido: respeta el ajuste global, el mute PROPIO de bandejas/chats
           // (WhatsApp+Telegram+Messenger, botón del sidebar) y se limita a 1 cada

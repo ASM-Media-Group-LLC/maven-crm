@@ -600,7 +600,9 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             isActive
               ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
               : "hover:bg-primary/5",
-            hasUnread && !isActive && "bg-primary/[0.04]",
+            // Sombreado del no-leído: 0.04 era casi invisible. Se sube un poco (no más:
+            // tiene que seguir siendo sutil al lado de la fila activa).
+            hasUnread && !isActive && "bg-primary/[0.09]",
             reorderOver && "ring-2 ring-primary/60 ring-inset"
           )}
         >

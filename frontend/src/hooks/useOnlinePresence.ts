@@ -5,6 +5,13 @@ import React from "react";
 
 export type UserStatus = "available" | "busy" | "dnd" | "away";
 
+/** Estado personalizado vigente: vacío si no hay texto o si ya expiró. */
+export function statusTextVigente(text?: string | null, expiresAt?: string | null): string {
+  if (!text) return "";
+  if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return "";
+  return text;
+}
+
 interface OnlinePresenceContextType {
   onlineUsers: Set<string>;
   isOnline: (userId: string) => boolean;
@@ -12,6 +19,11 @@ interface OnlinePresenceContextType {
   getStatus: (userId: string) => UserStatus | null;
   myStatus: UserStatus;
   setMyStatus: (status: UserStatus) => void;
+  /** Estado personalizado (texto libre) de cada persona conectada. */
+  getStatusText: (userId: string) => string;
+  myStatusText: string;
+  /** Guarda el estado personalizado (persiste en profiles y lo difunde en vivo). */
+  setMyStatusText: (text: string, expiresAt: string | null) => Promise<void>;
 }
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
@@ -21,21 +33,40 @@ const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
   getStatus: () => null,
   myStatus: "available",
   setMyStatus: () => {},
+  getStatusText: () => "",
+  myStatusText: "",
+  setMyStatusText: async () => {},
 });
 
 export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatus>>({});
+  const [statusTexts, setStatusTexts] = useState<Record<string, string>>({});
   const [myStatus, setMyStatusState] = useState<UserStatus>("available");
+  const [myStatusText, setMyStatusTextState] = useState("");
   const channelRef = useRef<any>(null);
   const myStatusRef = useRef<UserStatus>("available");
+  const myStatusTextRef = useRef("");
 
-  // Keep ref in sync
+  // Keep refs in sync
   myStatusRef.current = myStatus;
+  myStatusTextRef.current = myStatusText;
 
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
+
+  /** Publica mi presencia con el estado indicado (o el actual si no se pasa). */
+  const track = useCallback((status?: UserStatus) => {
+    const channel = channelRef.current;
+    if (!channel || !userIdRef.current) return;
+    void channel.track({
+      user_id: userIdRef.current,
+      online_at: new Date().toISOString(),
+      status: status ?? myStatusRef.current,
+      status_text: myStatusTextRef.current || null,
+    });
+  }, []);
 
   // Single channel subscription — depends only on user identity
   useEffect(() => {
@@ -51,13 +82,16 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       const state = presenceChannel.presenceState();
       const ids = new Set<string>();
       const statuses: Record<string, UserStatus> = {};
+      const texts: Record<string, string> = {};
       Object.entries(state).forEach(([key, presences]) => {
         ids.add(key);
         const latest = (presences as any[])?.[0];
         if (latest?.status) statuses[key] = latest.status as UserStatus;
+        if (latest?.status_text) texts[key] = latest.status_text as string;
       });
       setOnlineUsers(ids);
       setUserStatuses(statuses);
+      setStatusTexts(texts);
     };
 
     presenceChannel
@@ -71,6 +105,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
             online_at: new Date().toISOString(),
             // Si Maven se abre ya en segundo plano, no anunciar "Disponible".
             status: document.hidden ? "away" : myStatusRef.current,
+            status_text: myStatusTextRef.current || null,
           });
         }
       });
@@ -81,6 +116,29 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  // Mi estado personalizado guardado: se lee de profiles al entrar (sobrevive al
+  // refresh) y se vuelve a publicar en la presencia ya con el texto.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("status_text, status_expires_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const row = data as { status_text?: string | null; status_expires_at?: string | null };
+      const vigente = statusTextVigente(row.status_text, row.status_expires_at);
+      if (vigente) {
+        setMyStatusTextState(vigente);
+        myStatusTextRef.current = vigente;
+        track();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, track]);
+
   // Presencia HONESTA: "Disponible" solo mientras la pestaña está visible.
   // Al pasar a segundo plano (cambiar de app, bloquear el celular, otra pestaña) se
   // publica "away" SIN pisar el estado que la persona eligió; al volver se restaura.
@@ -90,14 +148,9 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   // untrack para que la presencia caiga de inmediato en vez de quedar colgada.
   useEffect(() => {
     if (!user?.id) return;
-    const trackAs = (status: UserStatus) => {
-      const channel = channelRef.current;
-      if (!channel) return;
-      void channel.track({ user_id: userIdRef.current, online_at: new Date().toISOString(), status });
-    };
-    const onVisibility = () => { trackAs(document.hidden ? "away" : myStatusRef.current); };
+    const onVisibility = () => { track(document.hidden ? "away" : myStatusRef.current); };
     const onPageHide = () => { void channelRef.current?.untrack(); };
-    const onPageShow = () => { trackAs(myStatusRef.current); };
+    const onPageShow = () => { track(myStatusRef.current); };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
@@ -106,21 +159,27 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
     };
-  }, [user?.id]);
+  }, [user?.id, track]);
 
   // When status changes, re-track without recreating channel
   const setMyStatus = useCallback((status: UserStatus) => {
     setMyStatusState(status);
     myStatusRef.current = status;
-    const channel = channelRef.current;
-    if (channel) {
-      channel.track({
-        user_id: userIdRef.current,
-        online_at: new Date().toISOString(),
-        status,
-      });
-    }
-  }, []);
+    track(status);
+  }, [track]);
+
+  const setMyStatusText = useCallback(async (text: string, expiresAt: string | null) => {
+    const clean = text.trim().slice(0, 64);
+    setMyStatusTextState(clean);
+    myStatusTextRef.current = clean;
+    track();
+    const uid = userIdRef.current;
+    if (!uid) return;
+    await supabase
+      .from("profiles")
+      .update({ status_text: clean || null, status_expires_at: clean ? expiresAt : null } as never)
+      .eq("id", uid);
+  }, [track]);
 
   const isOnline = useCallback(
     (userId: string) => onlineUsers.has(userId),
@@ -132,9 +191,19 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     [userStatuses]
   );
 
+  const getStatusText = useCallback(
+    (userId: string) => statusTexts[userId] || "",
+    [statusTexts]
+  );
+
   return React.createElement(
     OnlinePresenceContext.Provider,
-    { value: { onlineUsers, isOnline, userStatuses, getStatus, myStatus, setMyStatus } },
+    {
+      value: {
+        onlineUsers, isOnline, userStatuses, getStatus, myStatus, setMyStatus,
+        getStatusText, myStatusText, setMyStatusText,
+      },
+    },
     children
   );
 }
