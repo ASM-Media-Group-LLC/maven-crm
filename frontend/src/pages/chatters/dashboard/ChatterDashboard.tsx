@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { differenceInCalendarDays, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Moon, Sparkles, Sun, Sunset, Target, TrendingUp } from "lucide-react";
+import { Activity, ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Moon, Sparkles, Sun, Sunset, Target, TrendingUp } from "lucide-react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
       <main className="flex-1 space-y-6 overflow-auto p-6">
         {/* KPIs: mismos stat-chips que el dashboard general */}
         {cargando ? <Skeleton className="h-16 w-full rounded-xl" /> : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             <StatChip label="Nota Maven" icon={<Gauge className="h-3.5 w-3.5" />} value={resumen.notaPromedio == null ? "—" : resumen.notaPromedio.toFixed(1)}
               color={resumen.notaPromedio == null ? undefined : resumen.notaPromedio >= 8 ? "bg-success" : resumen.notaPromedio >= 6 ? "bg-warning" : "bg-destructive"}
               hint={resumen.notaPromedio == null ? "sin datos" : `${resumen.diasConNota} de ${diasDelPeriodo} días`} />
@@ -107,6 +107,8 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             <StatChip label="Vs. esperado" icon={<Target className="h-3.5 w-3.5" />} color={cumplimiento == null ? undefined : cumplimiento >= 100 ? "bg-success" : cumplimiento >= 70 ? "bg-warning" : "bg-destructive"}
               value={cumplimiento == null ? "—" : `${Math.round(cumplimiento)}%`} hint={resumen.esperado > 0 ? `meta ${money(resumen.esperado)}` : "sin meta"} />
             <StatChip label="Horas" icon={<Clock className="h-3.5 w-3.5" />} value={resumen.horas ? resumen.horas.toFixed(0) : "—"} hint="Hubstaff" />
+            <StatChip label="Productividad" icon={<Activity className="h-3.5 w-3.5" />} value={resumen.actividad == null ? "—" : `${Math.round(resumen.actividad)}%`}
+              color={resumen.actividad == null ? undefined : resumen.actividad >= 60 ? "bg-success" : resumen.actividad >= 40 ? "bg-warning" : "bg-destructive"} hint="actividad Hubstaff" />
             <StatChip label="Masivos" icon={<Megaphone className="h-3.5 w-3.5" />} value={resumen.masivos} hint={resumen.masivosConversion == null ? undefined : `${resumen.masivosConversion.toFixed(1)}% conversión`} />
             <StatChip label="Mejor día" icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success"
               value={resumen.mejorDia ? money(resumen.mejorDia.ventas) : "—"} hint={resumen.mejorDia ? format(fechaDe(resumen.mejorDia.dia), "EEE d", { locale: es }) : undefined} />
@@ -346,7 +348,7 @@ function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: Retur
           </div>
           <ul className="space-y-1 text-sm">
             <Componente etiqueta="Ventas" nota={fila.nota_ventas} peso="50%" />
-            <Componente etiqueta={`Tiempo${fila.horas != null ? ` · ${fila.horas.toFixed(1)} h` : ""}`} nota={fila.nota_tiempo} peso="30%" />
+            <Componente etiqueta={`Tiempo${fila.horas != null ? ` · ${fila.horas.toFixed(1)} h` : ""}${fila.detalle?.actividad_pct != null ? ` · ${Math.round(fila.detalle.actividad_pct)}% act.` : ""}`} nota={fila.nota_tiempo} peso="30%" />
             <Componente etiqueta="Cowork" nota={fila.nota_meet} peso="20%" />
           </ul>
           {faltan.length > 0 && <p className="text-xs text-warning">Calculada sin: {faltan.map((f) => NOMBRE_FALTANTE[f] ?? f).join(", ")}.</p>}

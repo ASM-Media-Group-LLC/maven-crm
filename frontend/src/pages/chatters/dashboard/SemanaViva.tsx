@@ -89,7 +89,7 @@ export default function SemanaViva({ dias, descansos, shift, hoy = new Date(), o
                   <div className="mt-auto space-y-1">
                     <div className="text-sm font-semibold tabular-nums">{money(d.ventas)}</div>
                     <div className="h-1 w-full rounded-full bg-background/60"><div className={cn("h-1 rounded-full", t.barra)} style={{ width: `${Math.min(100, Number(d.ventas_esperadas) > 0 ? (100 * Number(d.ventas ?? 0)) / Number(d.ventas_esperadas) : 0)}%` }} /></div>
-                    <div className="text-[10px] text-muted-foreground tabular-nums">{d.horas != null ? `${d.horas.toFixed(1)} h` : "sin horas"}</div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">{d.horas != null ? `${d.horas.toFixed(1)} h` : "sin horas"}{d.detalle?.actividad_pct != null ? ` · ${Math.round(d.detalle.actividad_pct)}%` : ""}</div>
                   </div>
                 </>
               ) : esHoy ? (
