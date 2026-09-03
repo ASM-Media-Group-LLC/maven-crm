@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -308,7 +309,7 @@ const buildPayload = (row: ChatterQaReport): ChatterQaEmailPayload => ({
   report: (row.report ?? {}) as ChatterQaEmailPayload["report"],
   evaluatedModels: row.evaluated_models ?? [],
   fanIndex: ((row.sampling as any)?.fan_index ?? {}) as ChatterQaEmailPayload["fanIndex"],
-  appUrl: typeof window !== "undefined" ? window.location.origin : "",
+  appUrl: getPublicBaseUrl(),
 });
 export const useSendChatterQaEmail = () => {
   const qc = useQueryClient();

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useNavigate } from "react-router-dom";
 import { Video, Plus, Link2, X, Users2, KeyRound, Copy, PhoneOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
 
   // El link que se comparte es /entrar/<código>: sirve con cuenta (entra directo)
   // y sin cuenta (pide entrada y espera que alguien la acepte).
-  const shareLink = (room: MeetRoom) => `${window.location.origin}/entrar/${room.code}`;
+  const shareLink = (room: MeetRoom) => `${getPublicBaseUrl()}/entrar/${room.code}`;
 
   const handleCreate = async () => {
     setCreating(true);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2, Play, Reply } from "lucide-react";
@@ -1333,7 +1334,7 @@ export const ChatPanel = ({ session }: Props) => {
 
   const handleCopyLink = async () => {
     try {
-      const url = `${window.location.origin}/chatter/${session.id}`;
+      const url = `${getPublicBaseUrl()}/chatter/${session.id}`;
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 1500);

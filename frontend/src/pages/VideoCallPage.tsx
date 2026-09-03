@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -97,7 +98,7 @@ export default function VideoCallPage() {
       );
       const json = await res.json();
       if (!res.ok || !json.room?.code) return null;
-      return `${window.location.origin}/entrar/${json.room.code}`;
+      return `${getPublicBaseUrl()}/entrar/${json.room.code}`;
     },
   });
 

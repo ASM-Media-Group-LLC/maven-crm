@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Video, Plus, KeyRound, Loader2, Copy, Link2, PhoneOff, ArrowRight, Pencil, Pin, PinOff, GripVertical } from "lucide-react";
@@ -16,7 +17,7 @@ import { parseJoinInput } from "@/lib/meetJoinInput";
 // tiene (sala de espera). Un link a /call/ directo dejaría al invitado externo
 // mirando la pantalla de login.
 function shareLink(room: MeetRoom) {
-  return `${window.location.origin}/entrar/${room.code}`;
+  return `${getPublicBaseUrl()}/entrar/${room.code}`;
 }
 
 // La llamada vive en /call/:roomName (VideoCallPage + livekit-token), igual que
