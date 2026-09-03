@@ -1,7 +1,13 @@
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export const MAX_FILES = 20;
-export const MAX_FILE_SIZE_MB = 350;
+// 1 GB por archivo (pedido de Jhon 03/09/2026; antes 350 MB). Tiene que ir
+// SIEMPRE igual al `file_size_limit` del bucket `chat-files` y no pasarse del
+// tope global de subida del proyecto (Settings → Storage), que es el que manda:
+// si el global fuera menor, Storage devuelve 413 aunque acá diga 1 GB.
+// Todo lo que pase de 6 MB sube por TUS reanudable, así que el tamaño no es
+// problema técnico; lo que pesa es el ancho de banda de quien sube y de quien baja.
+export const MAX_FILE_SIZE_MB = 1024;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const TUS_CHUNK_SIZE_BYTES = 6 * 1024 * 1024;
 

@@ -26,7 +26,7 @@ import ImageLightbox from "./ImageLightbox";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
 import { formatTime, formatDate, safeFileUrl } from "../utils";
 
-import { EMOJIS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 
 interface ThreadPanelProps {
@@ -141,7 +141,7 @@ export default function ThreadPanel({
   // Adjuntar = poner EN ESPERA con preview. Se envía al presionar Enviar.
   const stageFiles = useCallback((files: File[]) => {
     if (files.some((f) => f.size > MAX_FILE_SIZE_BYTES)) {
-      toast.error(`Archivo demasiado grande (máx ${MAX_FILE_SIZE_MB}MB)`);
+      toast.error(`Archivo demasiado grande (máx ${formatFileSize(MAX_FILE_SIZE_BYTES)})`);
     }
     const ok = files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES);
     if (!ok.length) return;
