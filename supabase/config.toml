@@ -295,3 +295,8 @@ verify_jwt = false  # auth propia: Bearer del usuario (subscribe/notify); valida
 # verify_jwt=false: la dispara un cron con X-Cron-Token, no una sesión de Maven.
 [functions.storage-retencion]
 verify_jwt = false
+
+# Contador de visitas por el dominio histórico. verify_jwt=false: la mayoría de
+# esas visitas son de gente sin cuenta en Maven (candidatos, invitados a Meet).
+[functions.dominio-legacy-hit]
+verify_jwt = false

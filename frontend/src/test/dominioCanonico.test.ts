@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { urlCanonica } from "@/lib/dominioCanonico";
+import { urlCanonica, esDominioHistorico } from "@/lib/dominioCanonico";
 
 // Maven se sirve en varios dominios y el canónico es app.maven-ai.me. Dos
 // orígenes sirviendo la app significan dos sesiones, dos PWA instaladas y
@@ -16,9 +16,18 @@ describe("dominio canónico", () => {
       .toBe("https://app.maven-ai.me/reset-password#access_token=abc&type=recovery");
   });
 
-  it("NO toca el dominio histórico: ahí viven los links públicos ya enviados", () => {
+  it("NO toca el dominio histórico mientras el interruptor esté apagado", () => {
+    // Se prende recién cuando el equipo está avisado: el día que redirija,
+    // todos se deslogean y hay que volver a aceptar las notificaciones.
     expect(urlCanonica("https://maven.asmtech.ai/chatter/sesion-123")).toBeNull();
     expect(urlCanonica("https://maven.asmtech.ai/entrar/ABC123")).toBeNull();
+  });
+
+  it("reconoce los dominios de la etapa anterior (para contar las visitas)", () => {
+    expect(esDominioHistorico("maven.asmtech.ai")).toBe(true);
+    expect(esDominioHistorico("maven.asmtech.me")).toBe(true);
+    expect(esDominioHistorico("app.maven-ai.me")).toBe(false);
+    expect(esDominioHistorico("localhost")).toBe(false);
   });
 
   it("no se redirige a sí mismo (nada de bucles)", () => {
