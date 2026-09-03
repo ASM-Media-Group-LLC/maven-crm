@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Gift, Plus, FileSpreadsheet, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
-import { AGENCIAS, ESTADOS, usd, type Agency, type Estado, type Pedido } from "./types";
+import { AGENCIAS, ESTADOS, agenciaDe, usd, type Agency, type Estado, type Pedido } from "./types";
 import { FILTROS_VACIOS, useCatalogos, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
 import PedidoTablero from "./PedidoTablero";
 import PedidoTabla from "./PedidoTabla";
@@ -14,7 +14,16 @@ import PedidoDrawer from "./PedidoDrawer";
 import ImportarSheetDialog from "./ImportarSheetDialog";
 
 const VISTA_KEY = "maven.personalizados.vista";
+const AGENCIA_KEY = "maven.personalizados.agencia";
+
+const leerAgencia = (): Agency | "" => {
+  try {
+    const v = localStorage.getItem(AGENCIA_KEY);
+    return AGENCIAS.some((a) => a.id === v) ? (v as Agency) : "";
+  } catch { return ""; }
+};
 const TODOS = "__todos__";
+const SIN_PEDIDOS: Pedido[] = []; // default estable: un `[]` inline cambia por render
 
 // Últimos 12 meses para el filtro, empezando por el actual.
 function mesesRecientes() {
@@ -32,20 +41,25 @@ function mesesRecientes() {
 // PERSONALIZADOS: los pedidos de contenido personalizado que los fans compran
 // por chat, como tickets con ciclo de vida (reemplaza el sheet por pestañas).
 export default function PersonalizadosPage() {
-  const [filtros, setFiltros] = useState<FiltrosPedidos>(FILTROS_VACIOS);
+  // La agencia se elige arriba (Plus / Massive / Ambas) y se recuerda: cada
+  // equipo trabaja casi siempre con la suya. El resto de filtros arranca vacío.
+  const [filtros, setFiltros] = useState<FiltrosPedidos>(() => ({ ...FILTROS_VACIOS, agencia: leerAgencia() }));
   const [vista, setVista] = useState<"tablero" | "tabla">(() => (localStorage.getItem(VISTA_KEY) === "tabla" ? "tabla" : "tablero"));
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [editando, setEditando] = useState<Pedido | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [abierto, setAbierto] = useState<Pedido | null>(null);
 
-  const { data: pedidos = [], isLoading } = usePedidos(filtros);
+  const { data: pedidos = SIN_PEDIDOS, isLoading } = usePedidos(filtros);
   const { creadoras, perfiles } = useCatalogos();
   const { puedeCrear, puedeGestionar } = usePermisosPersonalizados();
 
   const cambiarVista = (v: "tablero" | "tabla") => { setVista(v); try { localStorage.setItem(VISTA_KEY, v); } catch { /* noop */ } };
   const patch = (p: Partial<FiltrosPedidos>) => setFiltros((f) => ({ ...f, ...p }));
-  const hayFiltros = Object.values(filtros).some(Boolean);
+  const elegirAgencia = (a: Agency | "") => { patch({ agencia: a }); try { localStorage.setItem(AGENCIA_KEY, a); } catch { /* noop */ } };
+  // La agencia no cuenta como "filtro": es el contexto de trabajo, no algo que se limpia.
+  const hayFiltros = Object.entries(filtros).some(([k, v]) => k !== "agencia" && Boolean(v));
+  const agenciaActual = filtros.agencia ? agenciaDe(filtros.agencia) : null;
   const meses = useMemo(mesesRecientes, []);
 
   // Creadoras para el filtro: las que aparecen en los pedidos (con el catálogo
@@ -94,6 +108,29 @@ export default function PersonalizadosPage() {
           }
         />
 
+        {/* Agencia: Plus / Massive / Ambas. Cada equipo tiene su tablero. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center rounded-full border border-border/60 bg-card p-0.5" role="tablist" aria-label="Agencia">
+            {([{ id: "" as const, label: "Ambas" }, ...AGENCIAS] as Array<{ id: Agency | ""; label: string; tono?: string }>).map((a) => {
+              const activa = filtros.agencia === a.id;
+              return (
+                <button
+                  key={a.id || "ambas"} type="button" role="tab" aria-selected={activa}
+                  onClick={() => elegirAgencia(a.id)}
+                  className={`h-8 px-4 rounded-full text-sm font-medium transition-colors ${
+                    activa ? (a.tono ? `${a.tono} border` : "bg-secondary text-foreground") : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {agenciaActual ? `Pedidos de ${agenciaActual.label}. Los nuevos se crean en ${agenciaActual.label}.` : "Pedidos de las dos agencias."}
+          </span>
+        </div>
+
         {/* Resumen */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
@@ -115,10 +152,6 @@ export default function PersonalizadosPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={filtros.q} onChange={(e) => patch({ q: e.target.value })} placeholder="Buscar fan, creadora, chatter, descripción…" className="pl-9 rounded-full h-9" />
           </div>
-          <Select value={filtros.agencia || TODOS} onValueChange={(v) => patch({ agencia: (v === TODOS ? "" : v) as Agency | "" })}>
-            <SelectTrigger className="w-[130px] h-9 rounded-full"><SelectValue placeholder="Agencia" /></SelectTrigger>
-            <SelectContent><SelectItem value={TODOS}>Ambas agencias</SelectItem>{AGENCIAS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}</SelectContent>
-          </Select>
           <Select value={filtros.estado || TODOS} onValueChange={(v) => patch({ estado: (v === TODOS ? "" : v) as Estado | "" })}>
             <SelectTrigger className="w-[150px] h-9 rounded-full"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent><SelectItem value={TODOS}>Todos los estados</SelectItem>{ESTADOS.map((e) => <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>)}</SelectContent>
@@ -142,7 +175,7 @@ export default function PersonalizadosPage() {
             <SelectContent><SelectItem value={TODOS}>Todos los meses</SelectItem>{meses.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent>
           </Select>
           {hayFiltros && (
-            <Button variant="ghost" size="sm" className="rounded-full h-9 gap-1 text-muted-foreground" onClick={() => setFiltros(FILTROS_VACIOS)}>
+            <Button variant="ghost" size="sm" className="rounded-full h-9 gap-1 text-muted-foreground" onClick={() => setFiltros((f) => ({ ...FILTROS_VACIOS, agencia: f.agencia }))}>
               <X className="h-3.5 w-3.5" /> Limpiar
             </Button>
           )}
@@ -159,7 +192,7 @@ export default function PersonalizadosPage() {
         ) : pedidos.length === 0 && !hayFiltros ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="h-14 w-14 rounded-3xl bg-primary/10 flex items-center justify-center"><Gift className="h-7 w-7 text-primary" /></div>
-            <p className="font-medium">Todavía no hay pedidos</p>
+            <p className="font-medium">{agenciaActual ? `Todavía no hay pedidos de ${agenciaActual.label}` : "Todavía no hay pedidos"}</p>
             <p className="text-sm text-muted-foreground max-w-sm">Creá el primero con "Nuevo pedido", o traé el historial del sheet con "Importar del sheet".</p>
             <Badge variant="outline" className="rounded-full">Solicitado → Aprobado → En producción → Listo → Entregado</Badge>
           </div>

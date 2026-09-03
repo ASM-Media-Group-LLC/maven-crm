@@ -14,7 +14,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ESTADOS, SIGUIENTES, SOLO_SUPERVISOR, agenciaDe, estadoDe, flagDe, tipoDe, usd,
-  type Estado, type Pedido, type PedidoAdjunto,
+  type Estado, type Pedido, type PedidoAdjunto, type PedidoEvento,
 } from "./types";
 import { useCatalogos, useMutacionesPedidos, usePedidoAdjuntos, usePedidoEventos, usePermisosPersonalizados, urlFirmada } from "./usePersonalizados";
 
@@ -26,6 +26,13 @@ interface Props {
 
 const fecha = (d: string | null | undefined) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00` : d), "d MMM yyyy", { locale: es }) : "—");
 
+// Defaults ESTABLES para cuando la query está deshabilitada (drawer cerrado):
+// un `= []` inline sería un array nuevo por render y, como `adjuntos` es
+// dependencia de un efecto que setea estado, giraba en bucle infinito con la
+// ficha cerrada (la pestaña se congelaba al tocar cualquier filtro).
+const SIN_EVENTOS: PedidoEvento[] = [];
+const SIN_ADJUNTOS: PedidoAdjunto[] = [];
+
 // Ficha del pedido: todo lo que en el sheet había que leer en una fila de 12
 // columnas, más lo que el sheet no podía: botones de estado con reglas,
 // adjuntos como archivos e historial de quién cambió qué y cuándo.
@@ -33,8 +40,8 @@ export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
   const { puedeAprobar, puedeGestionar } = usePermisosPersonalizados();
   const { nombreDe } = useCatalogos();
   const { cambiarEstado, editar, borrar, subirAdjunto, borrarAdjunto } = useMutacionesPedidos();
-  const { data: eventos = [] } = usePedidoEventos(pedido?.id ?? null);
-  const { data: adjuntos = [] } = usePedidoAdjuntos(pedido?.id ?? null);
+  const { data: eventos = SIN_EVENTOS } = usePedidoEventos(pedido?.id ?? null);
+  const { data: adjuntos = SIN_ADJUNTOS } = usePedidoAdjuntos(pedido?.id ?? null);
 
   const [denegando, setDenegando] = useState(false);
   const [motivo, setMotivo] = useState("");
@@ -48,6 +55,10 @@ export default function PedidoDrawer({ pedido, onClose, onEditar }: Props) {
 
   // URLs firmadas (1h) para los adjuntos: el bucket es privado a propósito.
   useEffect(() => {
+    if (adjuntos.length === 0) {
+      setUrls((u) => (Object.keys(u).length ? {} : u));
+      return;
+    }
     let vivo = true;
     (async () => {
       const pares = await Promise.all(adjuntos.map(async (a) => [a.id, await urlFirmada(a.storage_path)] as const));
