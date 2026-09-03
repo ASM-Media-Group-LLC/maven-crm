@@ -187,12 +187,26 @@ export function supportsNoiseSuppression(): boolean {
 
 const NC_STORAGE_KEY = "call-noise-cancellation-enabled";
 
+/**
+ * ACTIVADA POR DEFECTO (03/09/2026, pedido de Jhon). Antes arrancaba apagada y
+ * solo se prendía si esta clave ya decía "true" — que hasta hoy no se podía
+ * tocar desde ninguna pantalla, así que en la práctica nadie la tenía.
+ *
+ * Por qué activada: el trabajo lo hace cada navegador (1–3 % de un núcleo) y
+ * al servidor le conviene —con la voz limpia y silencios de verdad, Opus con
+ * DTX manda menos paquetes; el ruido de fondo es lo más caro de codificar—.
+ * Por qué apagable y con memoria: a alguna voz suave o a algún micrófono raro
+ * RNNoise puede recortarle sílabas. Quien la apague una vez queda apagado en
+ * ese navegador; quien nunca tocó nada, la tiene puesta. Y si el motor no
+ * carga, la cadena cae a la puerta de antes: nunca sin audio.
+ */
 export function loadNCPreference(): boolean {
   try {
     const val = localStorage.getItem(NC_STORAGE_KEY);
+    if (val === null) return true;   // nunca eligió: activada
     return val === "true";
   } catch {
-    return false;
+    return true;
   }
 }
 
