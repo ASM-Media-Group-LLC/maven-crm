@@ -17,7 +17,7 @@ import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 
-import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { MAX_FILES, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 import { getDraft, setDraft } from "../drafts";
@@ -108,7 +108,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
     if (oversized.length > 0) {
       const names = oversized.map(f => f.name).join(", ");
-      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      toast.error(`Archivos demasiado grandes (máx ${formatFileSize(MAX_FILE_SIZE_BYTES)}): ${names}`);
       return;
     }
     const newPending: PendingFile[] = files.map(file => {
