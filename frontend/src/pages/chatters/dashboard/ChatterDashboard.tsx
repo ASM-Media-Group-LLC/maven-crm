@@ -32,8 +32,10 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const identidad = useMiIdentidad();
   const yo = identidad.data ?? null;
 
-  const [range, setRange] = useState<DateRange>(() => rangeForPreset("this_month", hoy));
-  const [preset, setPreset] = useState<RangePreset | null>("this_month");
+  // Rango inicial: los últimos 30 días. "Este mes" el día 3 deja el tablero
+  // casi vacío; 30 días siempre muestran trabajo.
+  const [range, setRange] = useState<DateRange>(() => { const r = rangeForPreset("today", hoy); return { from: fechaDe(sumarDias(isoDe(hoy), -29)), to: r.to }; });
+  const [preset, setPreset] = useState<RangePreset | null>(null);
   const desde = isoDe(range.from), hasta = isoDe(range.to);
   const diasDelPeriodo = differenceInCalendarDays(range.to, range.from) + 1;
   const [diaSel, setDiaSel] = useState<string | null>(null);
@@ -58,10 +60,19 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const nombre = perfil?.full_name?.split(" ")[0] ?? "";
   const fechaLarga = format(hoy, "EEEE d 'de' MMMM", { locale: es });
 
-  const serie = useMemo(() => dias.map((d) => ({
-    dia: d.dia, etiqueta: fechaDe(d.dia).getDate().toString(),
-    ventas: Number(d.ventas ?? 0), esperado: Number(d.ventas_esperadas ?? 0), nota: d.nota,
-  })), [dias]);
+  // La serie cubre TODOS los días del rango (los sin nota van en blanco): con
+  // "Este mes" el día 3 se ve el mes entero con lo que va, no dos barras
+  // flotando en un gráfico vacío.
+  const serie = useMemo(() => {
+    const porDia = new Map(dias.map((d) => [d.dia, d]));
+    const out: Array<{ dia: string; etiqueta: string; ventas: number | null; esperado: number | null }> = [];
+    for (let d = desde; d <= hasta; d = sumarDias(d, 1)) {
+      const f = porDia.get(d);
+      out.push({ dia: d, etiqueta: String(fechaDe(d).getDate()), ventas: f ? Number(f.ventas ?? 0) : null, esperado: f?.ventas_esperadas != null ? Number(f.ventas_esperadas) : null });
+    }
+    return out;
+  }, [dias, desde, hasta]);
+  const diasConDato = serie.filter((d) => d.ventas != null);
   const cumplimiento = resumen.esperado > 0 ? (100 * resumen.ventas) / resumen.esperado : null;
   const diaDetalle = diaSel ? [...dias, ...(diasSemana.data ?? [])].find((d) => d.dia === diaSel) ?? null : null;
 
@@ -149,24 +160,24 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="flex flex-col lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <CardTitle className={cardTitle}>Ventas por día</CardTitle>
                   <CardDescription>Verde: superaste lo esperado por tus modelos · azul: por debajo · línea punteada: la meta</CardDescription>
                 </div>
-                {serie.length > 0 && (
+                {diasConDato.length > 0 && (
                   <div className="flex gap-4 text-right">
-                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Promedio</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, serie.length))}<span className="text-xs font-normal text-muted-foreground">/día</span></p></div>
-                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sobre la meta</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{serie.filter((d) => d.esperado > 0 && d.ventas >= d.esperado).length}<span className="text-xs font-normal text-muted-foreground"> de {serie.length}</span></p></div>
+                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Promedio</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, diasConDato.length))}<span className="text-xs font-normal text-muted-foreground">/día</span></p></div>
+                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sobre la meta</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{diasConDato.filter((d) => (d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0)).length}<span className="text-xs font-normal text-muted-foreground"> de {diasConDato.length}</span></p></div>
                   </div>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              {serie.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">Sin días calculados en este rango.</p> : (
-                <div className="h-52">
+            <CardContent className="flex flex-1 flex-col">
+              {diasConDato.length === 0 ? <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-muted-foreground">Sin días calculados en este rango.</p> : (
+                <div className="min-h-[220px] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={serie} margin={{ top: 12, right: 8, left: -16, bottom: 0 }}>
                       <defs>
@@ -174,14 +185,14 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                         <linearGradient id="gMeta" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={1} /><stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.45} /></linearGradient>
                       </defs>
                       <CartesianGrid {...CHART_GRID} />
-                      <XAxis dataKey="etiqueta" {...CHART_AXIS} />
+                      <XAxis dataKey="etiqueta" {...CHART_AXIS} interval={serie.length > 16 ? 1 : 0} />
                       <YAxis {...CHART_AXIS} tickFormatter={(v) => `$${v}`} />
                       <Tooltip content={<MavenTooltip formatter={(v: number) => money(v)} labelFormatter={(l: string, p: Array<{ payload?: { dia: string } }>) => p?.[0]?.payload?.dia ?? l} />} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
                       <Bar dataKey="ventas" name="Ventas" radius={[6, 6, 0, 0]} maxBarSize={26}>
-                        {serie.map((d) => <Cell key={d.dia} fill={d.esperado > 0 && d.ventas >= d.esperado ? "url(#gMeta)" : "url(#gVentas)"} />)}
-                        <LabelList dataKey="ventas" position="top" formatter={(v: number) => (serie.length <= 14 && v > 0 ? `$${Math.round(v)}` : "")} style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                        {serie.map((d) => <Cell key={d.dia} fill={(d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0) ? "url(#gMeta)" : "url(#gVentas)"} />)}
+                        <LabelList dataKey="ventas" position="top" formatter={(v: number | null) => (v != null && diasConDato.length <= 16 && v > 0 ? `$${Math.round(v)}` : "")} style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
                       </Bar>
-                      <Line type="monotone" dataKey="esperado" name="Esperado" stroke={CHART_COLOR.ambar} strokeWidth={2} dot={false} strokeDasharray="5 4" />
+                      <Line type="monotone" dataKey="esperado" name="Esperado" stroke={CHART_COLOR.ambar} strokeWidth={2} dot={false} strokeDasharray="5 4" connectNulls />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
