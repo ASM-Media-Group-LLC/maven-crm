@@ -4,7 +4,7 @@
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  listGroups, createGroup, addGroupMembers, removeGroupMembers, zohoConfigured,
+  listGroups, createGroup, addGroupMembers, removeGroupMembers, addGroupAliases, zohoConfigured,
 } from "../_shared/zoho.ts";
 
 const corsHeaders = (req: Request) =>
@@ -173,7 +173,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = body?.action as string | undefined;
     const onlyRole = body?.role as string | undefined;
-    if (isCron && action !== "sync") return json(req, { error: "cron: solo sync" }, 403);
+    // El camino cron/trigger puede: sincronizar (idempotente) y LEER (diagnósticos).
+    // Lo que muta estructura (provision) sigue exigiendo JWT de admin.
+    const CRON_ALLOWED = new Set(["sync", "list", "zoho_groups", "zoho_group_raw"]);
+    if (isCron && !CRON_ALLOWED.has(action ?? "")) {
+      return json(req, { error: "cron: solo sync / list / zoho_groups / zoho_group_raw" }, 403);
+    }
 
     // ── Diagnósticos ──
     if (action === "zoho_whoami") {
@@ -187,6 +192,38 @@ Deno.serve(async (req) => {
       const r = await listGroups();
       return json(req, { ok: r.ok, status: r.status, error: r.error ?? null, count: r.data?.count ?? null,
         groups: (r.data?.groups ?? []).map((g) => ({ zgid: g.zgid, email: g.emailId, name: g.name, members: (g.mailGroupMemberList ?? []).length })) });
+    }
+
+    // Diagnóstico CRUDO: los objetos de grupo tal cual los devuelve Zoho (incluye
+    // campos que ZohoGroup no tipa, p. ej. alias de correo). body.q = substring a
+    // buscar en TODO el JSON del grupo (emailId, alias, nombre…); sin q devuelve
+    // las claves de cada grupo para descubrir dónde vive cada dato.
+    if (action === "zoho_group_raw") {
+      if (!zohoConfigured()) return json(req, { error: "Zoho no configurado" }, 400);
+      const r = await listGroups();
+      if (!r.ok) return json(req, { ok: false, error: r.error ?? null }, 502);
+      const q = String(body?.q ?? "").toLowerCase();
+      const all = (r.data?.groups ?? []) as unknown as Record<string, unknown>[];
+      const hit = q
+        ? all.filter((g) => JSON.stringify(g).toLowerCase().includes(q))
+        : all.map((g) => ({ emailId: g.emailId, keys: Object.keys(g) }));
+      return json(req, { ok: true, total: all.length, q, hit });
+    }
+
+    // ── ADD_ALIAS (solo admin JWT): suma direcciones alternativas a un grupo ──
+    // body: { role, aliases: ["hhrr@maven-ai.me"] }. Es una mutación estructural,
+    // así que NO está en CRON_ALLOWED: el cron/trigger no puede invocarla.
+    if (action === "add_alias") {
+      if (!zohoConfigured()) return json(req, { error: "Zoho no configurado" }, 400);
+      const rol = String(body?.role ?? "").trim();
+      const aliases: string[] = Array.isArray(body?.aliases)
+        ? body.aliases.map((a: unknown) => String(a).trim().toLowerCase()).filter(Boolean)
+        : [];
+      if (!rol || !aliases.length) return json(req, { error: "role y aliases[] son requeridos" }, 400);
+      const { data: m } = await admin.from("email_role_groups").select("zgid, group_email").eq("role", rol).maybeSingle();
+      if (!m?.zgid) return json(req, { error: `el rol "${rol}" no tiene grupo provisionado` }, 404);
+      const r = await addGroupAliases(m.zgid as string, aliases);
+      return json(req, { ok: r.ok, status: r.status ?? null, error: r.error ?? null, group: m.group_email, aliases });
     }
 
     // ── LIST: mapa + preview desired vs actual ──

@@ -323,3 +323,16 @@ export function removeGroupMembers(zgid: string | number, emails: string[]): Pro
     }),
   });
 }
+
+/** Agrega alias de correo a un grupo (mode addGroupAlias, body aliasList[]).
+ *  Los alias son gratis y solo SUMAN direcciones por las que el grupo recibe —
+ *  el emailId original sigue funcionando. Caso real: el rol se llama "HHRR" y el
+ *  grupo quedó sembrado como rrhh@ → la gente escribía a hhrr@ y rebotaba
+ *  (550 5.1.1 Invalid email recipients). Nota: GET /groups NO devuelve los alias,
+ *  así que la única confirmación fiable es la respuesta de este PUT. */
+export function addGroupAliases(zgid: string | number, aliases: string[]): Promise<ZohoResult> {
+  return zohoFetch(`/groups/${zgid}`, {
+    method: "PUT",
+    body: JSON.stringify({ mode: "addGroupAlias", aliasList: aliases }),
+  });
+}
