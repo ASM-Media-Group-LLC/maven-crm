@@ -9,6 +9,7 @@ import { es } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   admin: "destructive",
@@ -30,6 +31,7 @@ interface UsersTableProps {
 const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
 
   return (
     <div className="rounded-md border">
@@ -121,7 +123,24 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                       </TooltipTrigger>
                       <TooltipContent>Editar</TooltipContent>
                     </Tooltip>
-                    {/* Jerarquía (24/08): estas 3 solo se muestran si la RPC dijo que
+                    {/* Cambiar correo / crear casilla: TAMBIÉN sobre uno mismo.
+                        `manageable` es false en tu propia fila, así que un admin no
+                        podía asignarse su casilla y tenía que pedírselo a otro
+                        (reporte de Jhon: le pasó a Jacke). Cambiar el propio correo
+                        es benigno —mismo user_id y contraseña—, a diferencia de
+                        cambiarse el rol o borrarse, que siguen ocultos. El backend
+                        (`migrate_email`) ya permite el self-target. */}
+                    {(user.manageable || user.id === authUser?.id) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)}>
+                            <AtSign className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Cambiar correo / crear casilla</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {/* Jerarquía (24/08): estas solo se muestran si la RPC dijo que
                         puedes gestionar esa cuenta (nivel menor al tuyo y no eres tú).
                         Es UX — el candado real está en las edge functions. */}
                     {user.manageable && (
@@ -141,14 +160,6 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Reset contraseña</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)}>
-                              <AtSign className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Cambiar correo / crear casilla</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>

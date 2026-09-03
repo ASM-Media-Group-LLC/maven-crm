@@ -898,22 +898,24 @@ const Settings = () => {
   const prettyRole = role ? roleLabel[role] ?? role : "—";
 
   return (
-    <main className="flex flex-1 overflow-y-auto">
+    // En mobile el rail de 256px fijos no cabe (deja ~130px para el contenido):
+    // se apila como tira horizontal arriba y vuelve a ser columna desde md.
+    <main className="flex flex-col md:flex-row flex-1 overflow-y-auto">
       {/* Left rail — sits flush against the app sidebar (no outer max-w
           centring) so it reads as a proper desktop two-pane layout
           rather than a centred mobile card. */}
-      <aside className="sub-rail w-64 shrink-0 border-r bg-card/40 p-4">
-        <div className="sticky top-4">
+      <aside className="sub-rail w-full md:w-64 shrink-0 border-b md:border-b-0 md:border-r bg-card/40 p-3 md:p-4">
+        <div className="md:sticky md:top-4">
           {/* Header del rail — mismo tratamiento tipográfico que los
               headers de sección del sidebar principal (text-[11px],
               tracking-widest, foreground/70). */}
-          <div className="px-2 pb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
+          <div className="hidden md:block px-2 pb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
             {t("settings.connectedAs", { role: prettyRole })}
           </div>
           {/* Tabs — mismo lenguaje que la sidebar principal:
               sidebar-glass-hover en reposo + sidebar-glass-active cuando
               el tab está seleccionado (accent bar + bg gradient + glow). */}
-          <nav className="space-y-0.5">
+          <nav className="flex gap-1 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = active === tab.key;
@@ -922,7 +924,7 @@ const Settings = () => {
                   key={tab.key}
                   type="button"
                   onClick={() => setActive(tab.key)}
-                  className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover ${
+                  className={`flex w-auto md:w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm sidebar-glass-hover ${
                     isActive ? "sidebar-glass-active font-medium" : ""
                   }`}
                 >
@@ -936,7 +938,7 @@ const Settings = () => {
           {/* Cerrar sesión — última opción del rail, separada con border-t
               para señalar que es una acción (no un tab). Hover destructivo
               porque la sesión ya no vive como botón en la sidebar global. */}
-          <div className="mt-4 border-t border-border/60 pt-4">
+          <div className="mt-3 border-t border-border/60 pt-3 md:mt-4 md:pt-4">
             <button
               type="button"
               onClick={handleLogout}
@@ -1056,7 +1058,7 @@ const SettingsRightPane = ({
   }
 
   return (
-    <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
+    <section className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
       {active === "account" && <MyAccountTab />}
       {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
       {active === "resources" && showResources && <ResourcesTab t={t} />}

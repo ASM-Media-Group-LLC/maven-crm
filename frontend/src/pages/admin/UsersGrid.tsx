@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   admin: { icon: <Shield className="h-3 w-3" />, variant: "destructive" },
@@ -31,6 +32,7 @@ interface UsersGridProps {
 const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersGridProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -50,6 +52,13 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                     <DropdownMenuItem onClick={() => onEdit(user)}>
                       <Pencil className="h-4 w-4 mr-2" /> Editar
                     </DropdownMenuItem>
+                    {/* Cambiar correo / crear casilla: TAMBIÉN sobre uno mismo
+                        (`manageable` es false en tu propia fila). Ver UsersTable. */}
+                    {(user.manageable || user.id === authUser?.id) && (
+                      <DropdownMenuItem onClick={() => onMigrarCorreo(user)}>
+                        <AtSign className="h-4 w-4 mr-2" /> Cambiar correo / crear casilla
+                      </DropdownMenuItem>
+                    )}
                     {/* Jerarquía (24/08): solo sobre cuentas gestionables. UX; el
                         candado real vive en las edge functions. */}
                     {user.manageable && (
@@ -59,9 +68,6 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onResetPassword(user)}>
                           <KeyRound className="h-4 w-4 mr-2" /> Reset contraseña
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onMigrarCorreo(user)}>
-                          <AtSign className="h-4 w-4 mr-2" /> Cambiar correo / crear casilla
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" /> Eliminar

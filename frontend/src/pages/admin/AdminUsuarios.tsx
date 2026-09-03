@@ -16,6 +16,7 @@ import MigrarCorreoModal from "./MigrarCorreoModal";
 import AddUserModal, { type CredencialesCreadas } from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,12 @@ const AdminUsuarios = () => {
   const { users, isLoading, refetch, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
+  // En mobile la tabla es injugable: mide ~844px intrínsecos (6 columnas) y hay
+  // que barrerla en horizontal con la columna de acciones sticky encima. Las
+  // tarjetas (UsersGrid) ya existían para eso, así que en pantalla chica se
+  // fuerzan y se esconde el selector — elegir "lista" ahí solo empeora todo.
+  const isMobile = useIsMobile();
+  const vistaEfectiva = isMobile ? "grid" : view;
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -105,7 +112,7 @@ const AdminUsuarios = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
-            <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+            <header className="bg-background/30 backdrop-blur-xl px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-white/10 shrink-0">
               <button
                 type="button"
                 onClick={() => navigate("/settings")}
@@ -167,7 +174,7 @@ const AdminUsuarios = () => {
                     className="pl-9"
                   />
                 </div>
-                <div className="flex gap-1 border rounded-md p-0.5">
+                <div className="hidden sm:flex gap-1 border rounded-md p-0.5">
                   <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
                     <List className="h-4 w-4" />
                   </Button>
@@ -189,7 +196,7 @@ const AdminUsuarios = () => {
                       <Users className="h-12 w-12 mb-3 opacity-40" />
                       <p>No se encontraron usuarios</p>
                     </div>
-                  ) : view === "list" ? (
+                  ) : vistaEfectiva === "list" ? (
                     <UsersTable
                       users={filtered}
                       onEditRole={handleEditRole}
