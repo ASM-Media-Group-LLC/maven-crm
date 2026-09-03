@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users,
-  ChevronUp, MoreVertical, SwitchCamera, LayoutGrid, Info, Volume2, ChevronDown, Check, Cloud, Sparkles,
+  ChevronUp, MoreVertical, SwitchCamera, LayoutGrid, Info, Volume2, ChevronDown, Check, Cloud, Sparkles, AudioLines,
   type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -261,6 +261,39 @@ function useDevices(open: boolean) {
    día hay que agregar algo, que sea ADENTRO del panel.
    ────────────────────────────────────────────────────────────────────────── */
 
+/** Lo que se le dice a la persona al cambiar la cancelación de ruido. El
+ *  cambio es invisible (no hay nada que se vea distinto en la llamada), así que
+ *  sin aviso nadie sabe si el toque hizo algo. */
+function avisarNC(activada: boolean) {
+  if (activada) {
+    toast.success("Cancelación de ruido activada", { description: "Quita teclado, ventilador y voces de fondo mientras hablas.", id: "nc" });
+  } else {
+    toast.info("Cancelación de ruido desactivada", { description: "Tu micrófono sale tal cual.", id: "nc" });
+  }
+}
+
+/** Interruptor de la cancelación de ruido en el menú del micro (escritorio). */
+function FilaCancelacionRuido({ activa, onClick }: { activa: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activa}
+      onClick={() => { onClick(); avisarNC(!activa); }}
+      className={cn(
+        "mt-2 w-full h-10 px-3 rounded-lg flex items-center gap-2.5 text-sm transition-colors border",
+        activa ? "bg-primary/15 text-primary border-primary/30" : "text-foreground hover:bg-muted border-border",
+      )}
+    >
+      <AudioLines className="h-4 w-4 shrink-0" />
+      <span className="flex-1 text-left">Cancelación de ruido</span>
+      <span className={cn("text-[11px] font-medium rounded-full px-2 py-0.5", activa ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+        {activa ? "Activada" : "Desactivada"}
+      </span>
+    </button>
+  );
+}
+
 function FilaMenu({ icon: Icon, label, onClick, activa }: {
   icon: React.ElementType; label: string; onClick: () => void; activa?: boolean;
 }) {
@@ -315,7 +348,7 @@ function GrupoDispositivos({ titulo, icon: Icon, devices, selectedId, onSelect }
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
   currentAudioInputId, currentAudioOutputId, currentVideoInputId,
-  onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
+  onToggleMic, isNoiseCancellationOn, onToggleNoiseCancellation, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
@@ -390,6 +423,12 @@ export default function CallControls({
                   <DevicePill icon={Mic} tipo="micrófono" devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
+                {/* La cancelación de ruido vivía en el hook pero NINGUNA pantalla la
+                    mostraba: Jhon la buscó en una llamada y no estaba. Va acá, junto
+                    al micro, que es donde uno la busca. */}
+                {onToggleNoiseCancellation && (
+                  <FilaCancelacionRuido activa={!!isNoiseCancellationOn} onClick={onToggleNoiseCancellation} />
+                )}
               </PopoverContent>
             </Popover>
             <button
@@ -579,6 +618,11 @@ export default function CallControls({
                   <GrupoDispositivos titulo="Altavoz" icon={Volume2} devices={devices.audioOutputs}
                     selectedId={currentAudioOutputId} onSelect={(id) => cerrarY(() => onAudioOutputChange(id))()} />
                   <div className="h-px bg-border my-1" />
+                  {onToggleNoiseCancellation && (
+                    <FilaMenu icon={AudioLines} label={isNoiseCancellationOn ? "Cancelación de ruido: activada" : "Cancelación de ruido"}
+                      activa={!!isNoiseCancellationOn}
+                      onClick={cerrarY(() => { onToggleNoiseCancellation(); avisarNC(!isNoiseCancellationOn); })} />
+                  )}
                   <FilaMenu icon={Cloud} label="Difuminar fondo"
                     activa={backgroundEffect === "blur"}
                     onClick={cerrarY(onToggleBlurBackground)} />
