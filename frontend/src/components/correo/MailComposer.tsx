@@ -43,6 +43,8 @@ import { toast } from "sonner";
 import { useSendMail, useSaveServerDraft, useDeleteServerDraft } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
+import RecipientsField from "./RecipientsField";
+import { useSugerenciasDestinatarios } from "@/hooks/useSugerenciasDestinatarios";
 import {
   borrarBorrador,
   firmaContexto,
@@ -560,6 +562,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
 
   // Arranca del borrador guardado si lo hay; si no, de lo que traiga `inicial`
   // (una respuesta prellena Para/Asunto/cita).
+  // Compañeros + listas por rol + a quién ya le escribiste. Se comparte entre
+  // Para/Cc/Cco: una sola consulta para los tres campos.
+  const sugerencias = useSugerenciasDestinatarios();
   const [to, setTo] = useState(recuperado?.to ?? inicial?.to ?? "");
   const [cc, setCc] = useState(recuperado?.cc ?? inicial?.cc ?? "");
   const [bcc, setBcc] = useState(recuperado?.bcc ?? "");
@@ -865,20 +870,19 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               `focus-within` marca la fila activa: los inputs son pelados
               (sin el ring del componente Input) para que la fila se vea como
               una línea de Gmail, así que el foco tiene que verse en la fila. */}
-          <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
-            <label htmlFor="mail-to" className="w-12 shrink-0 text-sm text-muted-foreground">
+          <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+            <label htmlFor="mail-to" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
               Para
             </label>
-            <input
+            <RecipientsField
               id="mail-to"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={setTo}
               onBlur={() => setTocado((t) => ({ ...t, to: true }))}
               placeholder="nombre@empresa.com"
-              autoComplete="off"
-              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+              sugerencias={sugerencias}
             />
-            <div className="flex shrink-0 gap-2 text-sm text-muted-foreground">
+            <div className="flex shrink-0 gap-2 pt-2.5 text-sm text-muted-foreground">
               {!verCc && (
                 <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerCc(true)}>
                   Cc
@@ -893,24 +897,23 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           </div>
 
           {verCc && (
-            <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
-              <label htmlFor="mail-cc" className="w-12 shrink-0 text-sm text-muted-foreground">
+            <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+              <label htmlFor="mail-cc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
                 Cc
               </label>
-              <input
+              <RecipientsField
                 id="mail-cc"
                 value={cc}
-                onChange={(e) => setCc(e.target.value)}
+                onChange={setCc}
                 onBlur={() => setTocado((t) => ({ ...t, cc: true }))}
-                autoComplete="off"
-                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+                sugerencias={sugerencias}
               />
               <button
                 type="button"
                 title="Quitar Cc"
                 aria-label="Quitar Cc"
                 onClick={() => { setCc(""); setVerCc(false); }}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
+                className="shrink-0 pt-2.5 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -918,17 +921,16 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           )}
 
           {verBcc && (
-            <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
-              <label htmlFor="mail-bcc" className="w-12 shrink-0 text-sm text-muted-foreground">
+            <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+              <label htmlFor="mail-bcc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
                 Cco
               </label>
-              <input
+              <RecipientsField
                 id="mail-bcc"
                 value={bcc}
-                onChange={(e) => setBcc(e.target.value)}
+                onChange={setBcc}
                 onBlur={() => setTocado((t) => ({ ...t, bcc: true }))}
-                autoComplete="off"
-                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+                sugerencias={sugerencias}
               />
               {/* Plegar limpia el valor: una copia oculta olvidada en una fila
                   que ya no se ve es justo el accidente a evitar. */}
