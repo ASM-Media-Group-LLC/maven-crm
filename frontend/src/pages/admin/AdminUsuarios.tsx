@@ -56,10 +56,19 @@ const AdminUsuarios = () => {
   // así que buscar por él no expone nada nuevo. Ojo: si la edge function list_users
   // falla, useAdminUsers deja email en "" y solo queda la búsqueda por nombre.
   const filtered = useMemo(() => {
-    if (!search.trim()) return users;
     const q = norm(search);
-    return users.filter(
-      (u) => norm(u.full_name ?? "").includes(q) || norm(u.email).includes(q),
+    const base = q
+      ? users.filter((u) => norm(u.full_name ?? "").includes(q) || norm(u.email).includes(q))
+      : users;
+    // Alfabético por nombre; quien no tenga nombre cargado se ordena por su correo
+    // para que no queden todos amontonados al principio. localeCompare con "es"
+    // pone la ñ donde va y trata á/a como la misma letra.
+    return [...base].sort((a, b) =>
+      (a.full_name?.trim() || a.email).localeCompare(
+        b.full_name?.trim() || b.email,
+        "es",
+        { sensitivity: "base" },
+      ),
     );
   }, [users, search]);
 
