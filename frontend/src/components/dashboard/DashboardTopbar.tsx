@@ -48,7 +48,7 @@ const DashboardTopbar = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5 px-2">
                 <Clock className="h-4 w-4" />
-                <span className="text-xs font-medium tabular-nums">{getTimezoneAbbreviation(timezone)}</span>
+                <span className="hidden text-xs font-medium tabular-nums sm:inline">{getTimezoneAbbreviation(timezone)}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

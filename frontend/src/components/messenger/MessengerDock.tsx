@@ -218,7 +218,7 @@ function Burbuja({
             name={conversation.displayName}
             src={conversation.avatar_url || otro?.profile?.avatar_url}
             seed={otro?.profile?.avatar_seed}
-            className="h-12 w-12"
+            size="lg"
           />
         )}
       </button>

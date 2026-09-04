@@ -152,7 +152,7 @@ function FilaChat({
     >
       <div className="relative shrink-0">
         {isGroup ? (
-          <Avatar className="h-9 w-9">
+          <Avatar className="h-8 w-8">
             {conversation.avatar_url && (
               <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />
             )}
@@ -162,11 +162,12 @@ function FilaChat({
           </Avatar>
         ) : (
           <>
+            {/* El tamaño por `size` (ver la nota en DockChatWindow). */}
             <UserAvatar
               name={conversation.displayName}
               src={conversation.avatar_url || otro?.profile?.avatar_url}
               seed={otro?.profile?.avatar_seed}
-              className="h-9 w-9"
+              size="sm"
             />
             <span
               className={cn(
