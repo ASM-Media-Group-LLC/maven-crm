@@ -12,6 +12,8 @@ export interface PendingMessage {
   replyToId?: string;
   albumId?: string;
   isThreadReply?: boolean;
+  /** Formato del mensaje (TipTap JSON) para que sobreviva a un reintento offline. */
+  contentRich?: unknown;
   createdAt: string;
 }
 

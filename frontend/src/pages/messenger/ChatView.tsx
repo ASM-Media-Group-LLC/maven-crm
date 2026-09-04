@@ -20,7 +20,7 @@ interface ChatViewProps {
   messages: ChatMessage[];
   profiles: Record<string, UserProfile>;
   typingUsers: string[];
-  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string, isThreadReply?: boolean) => void;
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string, isThreadReply?: boolean, contentRich?: unknown) => void;
   onSendTyping: (isTyping: boolean) => void;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
