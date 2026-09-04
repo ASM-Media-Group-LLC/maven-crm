@@ -60,7 +60,7 @@ export default function ChatsPanel({
 
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return conversations.filter((c) => {
+    const filtradas = conversations.filter((c) => {
       if (q) {
         // Buscando se ignora la pestaña: escribir un nombre estando en "Grupos"
         // y que diga "sin resultados" cuando la persona existe es desconcertante.
@@ -70,6 +70,14 @@ export default function ChatsPanel({
       if (tab === "groups") return c.type === "group";
       return true;
     });
+    // SIN LEER PRIMERO. El panel es corto (7-8 filas visibles), así que lo
+    // pendiente tiene que estar arriba: `conversations` viene ordenado por
+    // recencia y eso dejaba una conversación vacía recién creada por encima de
+    // un grupo con mensajes nuevos. El sort de JS es estable, así que dentro de
+    // cada grupo se conserva el orden por recencia que ya traía.
+    return [...filtradas].sort(
+      (a, b) => Number(b.unreadCount > 0) - Number(a.unreadCount > 0),
+    );
   }, [conversations, tab, search]);
 
   // Buscar a CUALQUIERA del equipo, tenga chat o no. Antes el buscador solo
