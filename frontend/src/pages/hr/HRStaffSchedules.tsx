@@ -79,7 +79,7 @@ export default function HRStaffSchedules() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-6">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
           <CalendarClock className="h-5 w-5 text-primary" /> Horario del personal

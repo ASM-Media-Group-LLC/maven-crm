@@ -58,7 +58,12 @@ export default function CorreoConectarPage() {
   }, [params]);
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-24 text-center">
+    // El AppShell da `h-dvh` + `overflow-hidden` y cada página pone su propio
+    // scroll: sin este contenedor, lo que pasa de una pantalla queda recortado
+    // y no hay forma de llegar. `min-h-0` es imprescindible para que el hijo
+    // pueda encogerse dentro de la columna flex.
+    <main className="flex-1 min-h-0 overflow-y-auto">
+      <div className="mx-auto max-w-xl px-4 py-24 text-center">
       {!done && !failed && (
         <>
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
@@ -87,6 +92,7 @@ export default function CorreoConectarPage() {
           </Button>
         </>
       )}
-    </div>
+      </div>
+    </main>
   );
 }

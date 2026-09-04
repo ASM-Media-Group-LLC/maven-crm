@@ -87,7 +87,13 @@ export default function GrabacionesPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 md:p-6">
+    // El AppShell da `h-dvh` + `overflow-hidden` y CADA página pone su propio
+    // scroll. Sin este contenedor, con más de una pantalla de grabaciones el
+    // resto de la lista quedaba recortado y no había forma de llegar a él.
+    // `min-h-0` es imprescindible: sin eso el hijo no puede encogerse dentro
+    // de la columna flex y el overflow no se activa.
+    <main className="flex-1 min-h-0 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 md:p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
           <Clapperboard className="h-5 w-5 text-primary" />
@@ -262,6 +268,7 @@ export default function GrabacionesPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </main>
   );
 }

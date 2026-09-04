@@ -77,7 +77,12 @@ const InboxAnalyticsPage = () => {
   const chans = data?.by_channel ?? [];
 
   return (
-    <div className="space-y-4 px-6 py-5">
+    // El AppShell da `h-dvh` + `overflow-hidden` y cada página pone su propio
+    // scroll: sin este contenedor, lo que pasa de una pantalla queda recortado
+    // y no hay forma de llegar. `min-h-0` es imprescindible para que el hijo
+    // pueda encogerse dentro de la columna flex.
+    <main className="flex-1 min-h-0 overflow-y-auto">
+      <div className="space-y-4 px-6 py-5">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
@@ -197,7 +202,8 @@ const InboxAnalyticsPage = () => {
           </p>
         </>
       )}
-    </div>
+      </div>
+    </main>
   );
 };
 

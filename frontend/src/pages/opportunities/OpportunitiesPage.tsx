@@ -155,7 +155,12 @@ const OpportunitiesPage = () => {
   }, [opps, filter]);
 
   return (
-    <div className="space-y-4 px-6 py-5">
+    // El AppShell da `h-dvh` + `overflow-hidden` y cada página pone su propio
+    // scroll: sin este contenedor, lo que pasa de una pantalla queda recortado
+    // y no hay forma de llegar. `min-h-0` es imprescindible para que el hijo
+    // pueda encogerse dentro de la columna flex.
+    <main className="flex-1 min-h-0 overflow-y-auto">
+      <div className="space-y-4 px-6 py-5">
       <div className="flex items-center gap-2">
         <TrendingUp className="h-5 w-5 text-primary" />
         <div className="flex-1">
@@ -284,7 +289,8 @@ const OpportunitiesPage = () => {
         onOpenChange={(o) => { setFormOpen(o); if (!o) setEditing(null); }}
         onSaved={() => qc.invalidateQueries({ queryKey: ["monetization-opportunities"] })}
       />
-    </div>
+      </div>
+    </main>
   );
 };
 
