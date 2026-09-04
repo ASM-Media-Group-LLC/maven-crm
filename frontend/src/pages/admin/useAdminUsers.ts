@@ -118,14 +118,14 @@ export const useAdminUsers = () => {
   });
 
   // ⚠️ Acá había un contador de `employee` que SIEMPRE daba 0: ese rol ya no lo
-  // tiene nadie (hoy son Chatter, Closer +, Warming, Coordinador, Team Leader…).
-  // Lo reemplaza "sin rol", que además es accionable: son cuentas que entraron y
-  // quedaron sin permisos.
+  // tiene nadie. Lo reemplaza Chatter, que es el grupo más grande del equipo.
+  // Cuenta el rol "Chatter" exacto — ni "Chatter Supervisor" ni el legacy
+  // "agent" — para que el número cuadre con lo que dicen los badges de la tabla.
   const stats = {
     total: users.length,
     admins: users.filter((u) => u.role === "admin").length,
     managers: users.filter((u) => u.role === "manager").length,
-    sinRol: users.filter((u) => !u.role).length,
+    chatters: users.filter((u) => u.role === "Chatter").length,
   };
 
   return { users, isLoading, refetch, changeRole: changeRoleMutation.mutate, isChangingRole: changeRoleMutation.isPending, stats };

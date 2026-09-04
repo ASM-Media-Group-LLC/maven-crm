@@ -41,7 +41,7 @@ const AdminUsuarios = () => {
   const [view, setView] = useState<"list" | "grid">("list");
   // Las tarjetas de arriba eran decorativas. Ahora filtran: clic en "Admins" deja
   // sólo los admins, clic de nuevo (o en "Total") limpia.
-  const [filtroRol, setFiltroRol] = useState<"admins" | "managers" | "sinRol" | null>(null);
+  const [filtroRol, setFiltroRol] = useState<"admins" | "managers" | "chatters" | null>(null);
   // En mobile la tabla es injugable: mide ~844px intrínsecos (6 columnas) y hay
   // que barrerla en horizontal con la columna de acciones sticky encima. Las
   // tarjetas (UsersGrid) ya existían para eso, así que en pantalla chica se
@@ -67,7 +67,7 @@ const AdminUsuarios = () => {
     const porRol =
       filtroRol === "admins" ? users.filter((u) => u.role === "admin")
       : filtroRol === "managers" ? users.filter((u) => u.role === "manager")
-      : filtroRol === "sinRol" ? users.filter((u) => !u.role)
+      : filtroRol === "chatters" ? users.filter((u) => u.role === "Chatter")
       : users;
     const q = norm(search);
     const base = q
@@ -126,12 +126,12 @@ const AdminUsuarios = () => {
   };
 
   // "Employees" contaba un rol que ya no tiene nadie y salía siempre en 0. Lo
-  // reemplaza "Sin rol", que además es accionable. Cada tarjeta filtra la lista.
+  // reemplaza Chatters, el grupo más grande. Cada tarjeta filtra la lista.
   const kpis = [
     { key: null, label: "Total", value: String(stats.total), icon: Users, color: "bg-primary" },
     { key: "admins" as const, label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-destructive" },
     { key: "managers" as const, label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-warning" },
-    { key: "sinRol" as const, label: "Sin rol", value: String(stats.sinRol), icon: User, color: "bg-muted-foreground" },
+    { key: "chatters" as const, label: "Chatters", value: String(stats.chatters), icon: User, color: "bg-success" },
   ];
 
   // El tab "Roles" (CRUD de roles + permisos) se gatea con el permiso "Roles".
