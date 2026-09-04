@@ -341,6 +341,7 @@ export const PLANES = [
       "12 módulos completos",
       "Hasta 100 creadores",
       "25 usuarios del equipo",
+      "Correo propio hasta 25 usuarios",
       "AI Sales Chat incluido",
       "Messenger + Video Calls",
       "HR & Finanzas completo",
