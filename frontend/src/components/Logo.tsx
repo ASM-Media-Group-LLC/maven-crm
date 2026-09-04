@@ -30,10 +30,10 @@ const Marca = () => (
       viewBox="0 0 24 24"
       fill="none"
       stroke="hsl(var(--primary-foreground))"
-      strokeWidth="2.6"
+      strokeWidth="3.2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ width: "0.62em", height: "0.62em" }}
+      style={{ width: "0.72em", height: "0.72em" }}
     >
       <path d="M4 19V7l8 7 8-7v12" />
     </svg>

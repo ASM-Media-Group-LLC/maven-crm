@@ -400,7 +400,7 @@ const DashboardSidebar = () => {
   if (permisosCargando || permisosFallaron) {
     return (
       <Sidebar collapsible="icon">
-        <SidebarHeader className="flex h-14 items-center justify-start px-5 border-b border-border shrink-0">
+        <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
           <Logo size="sm" collapsed={collapsed} />
         </SidebarHeader>
         <SidebarContent className="gap-2 px-3 py-3">
@@ -427,7 +427,11 @@ const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="flex h-14 items-center justify-start px-5 border-b border-border shrink-0">
+      {/* `flex-row` explícito: SidebarHeader trae `flex flex-col` de base, así
+          que sin esto `items-center` centraba el logo HORIZONTALMENTE y quedaba
+          descuadrado con la lista del menú. Con px-5 la baldosa arranca en la
+          misma línea que los iconos de los items. */}
+      <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
         <Logo size="sm" collapsed={collapsed} />
       </SidebarHeader>
 
