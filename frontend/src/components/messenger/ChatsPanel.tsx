@@ -42,7 +42,7 @@ export default function ChatsPanel({
   onCerrar?: () => void;
 }) {
   const { user } = useAuth();
-  const { conversations, loading } = useChatShared();
+  const { conversations, loading, profiles, createDirectChat } = useChatShared();
   const { isOnline, getStatus } = useOnlinePresence();
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
@@ -60,6 +60,33 @@ export default function ChatsPanel({
       return true;
     });
   }, [conversations, tab, search]);
+
+  // Buscar a CUALQUIERA del equipo, tenga chat o no. Antes el buscador solo
+  // filtraba conversaciones existentes: alguien con quien nunca hablaste
+  // simplemente no aparecía y había que ir a Messenger a crear el chat.
+  // Se excluye a uno mismo y a quien ya salió arriba como chat directo, para no
+  // mostrar a la misma persona dos veces.
+  const personas = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    const yaConChat = new Set<string>();
+    for (const c of conversations) {
+      if (c.type !== "direct") continue;
+      for (const p of c.participants) if (p.user_id !== user?.id) yaConChat.add(p.user_id);
+    }
+    return Object.values(profiles)
+      .filter((p) => p.id !== user?.id && !yaConChat.has(p.id) &&
+        (p.full_name ?? "").toLowerCase().includes(q))
+      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""))
+      .slice(0, 8);
+  }, [search, profiles, conversations, user]);
+
+  const abrirConPersona = (userId: string) => {
+    // createDirectChat reusa la conversación si ya existía y si no la crea
+    // optimista, así que devuelve un id usable al instante.
+    const id = createDirectChat(userId);
+    if (id) onAbrirChat(id);
+  };
 
   return (
     <>
@@ -116,7 +143,7 @@ export default function ChatsPanel({
       <ScrollArea className="border-t" style={{ height: alto }}>
         {loading ? (
           <p className="p-4 text-center text-xs text-muted-foreground">Cargando…</p>
-        ) : visibles.length === 0 ? (
+        ) : visibles.length === 0 && personas.length === 0 ? (
           <p className="p-4 text-center text-xs text-muted-foreground">
             {search ? "Sin resultados" : tab === "unread" ? "No tienes mensajes sin leer" : "Sin conversaciones"}
           </p>
@@ -132,6 +159,23 @@ export default function ChatsPanel({
                 onClick={() => onAbrirChat(c.id)}
               />
             ))}
+
+            {personas.length > 0 && (
+              <>
+                <p className="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Otras personas
+                </p>
+                {personas.map((p) => (
+                  <FilaPersona
+                    key={p.id}
+                    perfil={p}
+                    online={isOnline(p.id)}
+                    estado={getStatus(p.id)}
+                    onClick={() => abrirConPersona(p.id)}
+                  />
+                ))}
+              </>
+            )}
           </div>
         )}
       </ScrollArea>
@@ -142,6 +186,39 @@ export default function ChatsPanel({
         </Button>
       </div>
     </>
+  );
+}
+
+/** Alguien del equipo con quien todavía no hay chat: al tocarlo se crea. */
+function FilaPersona({
+  perfil, online, estado, onClick,
+}: {
+  perfil: { id: string; full_name?: string | null; avatar_url?: string | null; avatar_seed?: string | null };
+  online: boolean;
+  estado: UserStatus | null;
+  onClick: () => void;
+}) {
+  const nombre = perfil.full_name || "Sin nombre";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60"
+    >
+      <div className="relative shrink-0">
+        <UserAvatar name={nombre} src={perfil.avatar_url} seed={perfil.avatar_seed ?? undefined} size="sm" />
+        <span
+          className={cn(
+            "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
+            getStatusColor(estado, online),
+          )}
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{nombre}</p>
+        <p className="truncate text-xs text-muted-foreground">Enviar mensaje</p>
+      </div>
+    </button>
   );
 }
 
