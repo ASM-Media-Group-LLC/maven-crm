@@ -32,6 +32,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // Un poco más de aire entre avisos apilados: con el vidrio, dos tarjetas
       // pegadas se leen como una sola.
       gap={10}
+      // El botón de cerrar, a la derecha y DENTRO de la tarjeta. De fábrica
+      // sonner lo pone a la izquierda y medio afuera; como la tarjeta recorta
+      // lo que sobresale (`overflow-hidden`, que necesita la barra de color),
+      // se veía como una muesca oscura comiéndose la esquina. A la derecha,
+      // además, es donde la gente lo busca.
+      style={{
+        "--toast-close-button-start": "auto",
+        "--toast-close-button-end": "8px",
+        "--toast-close-button-transform": "translate(0, 8px)",
+      } as React.CSSProperties}
       toastOptions={{
         classNames: {
           toast: [
@@ -40,36 +50,47 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toaster]:bg-card/70 group-[.toaster]:backdrop-blur-2xl",
             "group-[.toaster]:border-white/10 group-[.toaster]:text-foreground",
             "group-[.toaster]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9)]",
-            // La barra de color de la izquierda; cada tipo le pone el suyo.
+            // La barra de color de la izquierda.
             "group-[.toaster]:before:absolute group-[.toaster]:before:inset-y-2 group-[.toaster]:before:left-0",
             "group-[.toaster]:before:w-[3px] group-[.toaster]:before:rounded-r-full",
             "group-[.toaster]:before:bg-primary/70",
+            // ⚠️ EL COLOR POR TIPO VA ACÁ, con `data-[type=…]`, y no en
+            // `classNames.success`. Aprendido a la mala: puestos allá, la
+            // regla del tipo y la del color base caen en el MISMO elemento con
+            // la MISMA especificidad, así que gana la que Tailwind haya
+            // escrito más abajo en la hoja — y ganaba el azul del base. Un
+            // aviso de éxito con la barra azul: el color, que es lo que se lee
+            // antes que el texto, decía otra cosa.
+            //
+            // Van con las DOS variantes (`group-[.toaster]:data-[type=…]`): el
+            // base ya usa `group-[.toaster]:`, así que el atributo solo
+            // empataba y volvía a decidir el orden de la hoja. Con las dos, el
+            // selector del tipo suma clase + atributo + :is() y gana siempre.
+            "group-[.toaster]:data-[type=success]:before:bg-emerald-500",
+            "group-[.toaster]:data-[type=error]:before:bg-red-500",
+            "group-[.toaster]:data-[type=warning]:before:bg-amber-500",
+            "group-[.toaster]:data-[type=info]:before:bg-sky-500",
+            // Y el resplandor del mismo color, por la misma razón.
+            "group-[.toaster]:data-[type=success]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(16_185_129_/_0.75)]",
+            "group-[.toaster]:data-[type=error]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(239_68_68_/_0.8)]",
+            "group-[.toaster]:data-[type=warning]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(245_158_11_/_0.75)]",
+            "group-[.toaster]:data-[type=info]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(14_165_233_/_0.7)]",
           ].join(" "),
           title: "group-[.toast]:text-[13.5px] group-[.toast]:font-semibold group-[.toast]:leading-tight",
           description: "group-[.toast]:text-[12.5px] group-[.toast]:leading-snug group-[.toast]:text-muted-foreground",
-          icon: "group-[.toast]:mr-1 group-[.toast]:shrink-0 group-[.toast]:self-start",
+          // El hueco del ícono con tamaño FIJO: acá adentro va tanto un ícono
+          // de 20px como la cara de alguien, y sin acotar el hueco un avatar
+          // de 40 se montaba encima del texto.
+          icon: [
+            "group-[.toast]:mr-1.5 group-[.toast]:shrink-0 group-[.toast]:self-start",
+            "group-[.toast]:h-8 group-[.toast]:w-8 group-[.toast]:items-center group-[.toast]:justify-center",
+          ].join(" "),
           closeButton: [
             "group-[.toast]:bg-white/10 group-[.toast]:text-foreground/70 group-[.toast]:border-white/10",
             "group-[.toast]:backdrop-blur-md hover:group-[.toast]:bg-white/20 hover:group-[.toast]:text-foreground",
           ].join(" "),
           actionButton: "group-[.toast]:rounded-lg group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton: "group-[.toast]:rounded-lg group-[.toast]:bg-white/10 group-[.toast]:text-muted-foreground",
-          success: [
-            "group-[.toaster]:before:bg-emerald-500",
-            "group-[.toaster]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(16_185_129_/_0.75)]",
-          ].join(" "),
-          error: [
-            "group-[.toaster]:before:bg-red-500",
-            "group-[.toaster]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(239_68_68_/_0.8)]",
-          ].join(" "),
-          warning: [
-            "group-[.toaster]:before:bg-amber-500",
-            "group-[.toaster]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(245_158_11_/_0.75)]",
-          ].join(" "),
-          info: [
-            "group-[.toaster]:before:bg-sky-500",
-            "group-[.toaster]:shadow-[0_24px_60px_-24px_rgba(0,0,0,.9),0_0_70px_-28px_rgb(14_165_233_/_0.7)]",
-          ].join(" "),
         },
       }}
       {...props}

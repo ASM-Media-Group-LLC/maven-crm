@@ -18,13 +18,6 @@ import { cn } from "@/lib/utils";
 
 export type TonoAviso = "neutral" | "bien" | "ojo" | "mal";
 
-const ANILLO: Record<TonoAviso, string> = {
-  neutral: "ring-primary/60",
-  bien: "ring-emerald-500/70",
-  ojo: "ring-amber-500/70",
-  mal: "ring-red-500/70",
-};
-
 const PUNTO: Record<TonoAviso, string> = {
   neutral: "bg-primary",
   bien: "bg-emerald-500",
@@ -32,21 +25,29 @@ const PUNTO: Record<TonoAviso, string> = {
   mal: "bg-red-500",
 };
 
-/** El avatar del aviso: anillo del color del tono y un punto de estado, que es
- *  lo que lo hace leerse como "esto es de alguien" y no como un ícono más. */
+/** El avatar del aviso, con un punto del color del tono: eso es lo que lo
+ *  hace leerse como "esto es de alguien" y no como un ícono más.
+ *
+ *  ⚠️ DOS COSAS QUE YA SALIERON MAL ACÁ, NO DESHACER:
+ *
+ *  1. El anillo NO se pasa por `className`. `UserAvatar` lo dibuja por dentro
+ *     con su prop `ring` (y solo, cuando hay muñequito); un `ring-2` por
+ *     className aterriza en el envoltorio, que no es redondo, y sale un
+ *     CUADRADO de color alrededor de la cara. Se vio en producción.
+ *  2. El tamaño es `sm` (32px), el mismo que usa el hueco del ícono del
+ *     aviso. Con `md` (40px) la cara se sale del hueco y se monta encima del
+ *     texto — y con muñequito el avatar ya trae su propio anillo, así que
+ *     abulta todavía más.
+ *
+ *  El color del tono ya lo dice la barra izquierda del aviso; acá alcanza con
+ *  el punto. */
 function CaraDelAviso({ nombre, foto, seed, tono }: { nombre: string; foto?: string | null; seed?: string | null; tono: TonoAviso }) {
   return (
-    <span className="relative inline-flex shrink-0">
-      <UserAvatar
-        name={nombre}
-        src={foto ?? undefined}
-        seed={seed ?? undefined}
-        size="md"
-        className={cn("ring-2 ring-offset-2 ring-offset-transparent", ANILLO[tono])}
-      />
+    <span className="relative inline-flex h-8 w-8 shrink-0">
+      <UserAvatar name={nombre} src={foto ?? undefined} seed={seed ?? undefined} size="sm" ring />
       <span
         className={cn(
-          "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
+          "pointer-events-none absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
           PUNTO[tono],
         )}
       />
