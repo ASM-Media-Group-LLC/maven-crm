@@ -16,9 +16,11 @@ interface Permission {
 export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones"];
 
 export const usePermissions = () => {
-  const { role, isAdmin, isLoading: roleLoading } = useUserRole();
+  const { role, isAdmin, isLoading: roleLoading, isError: roleError, recargarRol } = useUserRole();
 
-  const { data: permissions = [], isLoading: permsLoading } = useQuery({
+  const {
+    data: permissionsData, isLoading: permsLoading, isError: permsError, refetch: recargarPermisos,
+  } = useQuery({
     queryKey: ["user-permissions", role],
     queryFn: async () => {
       if (!role) return [];
@@ -43,7 +45,11 @@ export const usePermissions = () => {
     },
     enabled: !!role && !isAdmin, // Admin gets full access, skip query
     staleTime: 5 * 60 * 1000,
+    // Igual que el rol: de esto depende todo lo que se ve, así que se reintenta
+    // más que el resto de la app (ver la nota en useUserRole).
   });
+
+  const permissions = permissionsData ?? [];
 
   // Modules everyone can reach unless an admin explicitly turned them
   // off in the role config. The check happens AFTER explicit perm
@@ -127,6 +133,19 @@ export const usePermissions = () => {
     explicitPermission,
     dataScope,
     isLoading: roleLoading || permsLoading,
+    /**
+     * No pudimos averiguar qué puede ver esta persona.
+     *
+     * ⚠️ Hay que mirarlo SIEMPRE antes de dibujar algo basado en `canAccess`.
+     * Cuando falla, `canAccess` cae a los módulos universales (Dashboard,
+     * Messenger, Cowork, Meet, Correo, Grabaciones) — que es lo correcto por
+     * seguridad, pero presentarlo como si fuera la verdad deja el menú
+     * recortado y parece que la sesión se cayó. Ojo: la consulta de permisos
+     * está deshabilitada mientras no haya rol, así que si el rol falla NINGUNA
+     * de las dos queda "cargando" y sin esto la app se cree lista.
+     */
+    hayError: roleError || permsError,
+    reintentar: () => { void recargarRol(); void recargarPermisos(); },
     permissions,
   };
 };

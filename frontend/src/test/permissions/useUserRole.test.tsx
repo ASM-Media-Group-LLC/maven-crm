@@ -135,6 +135,36 @@ describe("useUserRole", () => {
       // Assert: el hook no lanza; la query falla y isLoading se pone en false
       await waitFor(() => expect(result.current.isLoading).toBe(false));
     });
+
+    // Distinguir "fallo" de "no tiene rol" es lo que evita que un bache de red
+    // deje el menu con solo los modulos universales y parezca que la sesion se
+    // cayo. Si esto se rompe, vuelve ese bug.
+    it("marca isError cuando la consulta falla, sin confundirlo con no tener rol", async () => {
+      // Arrange
+      stub.setError("user_roles", { message: "DB error" });
+      const wrapper = makeWrapper(viewerAuth);
+
+      // Act
+      const { result } = renderHook(() => useUserRole(), { wrapper });
+
+      // Assert
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.role).toBeNull();
+      expect(result.current.isAdmin).toBe(false);
+    });
+
+    it("NO marca isError cuando la persona simplemente no tiene rol", async () => {
+      // Arrange: sin fila en user_roles y sin error
+      const wrapper = makeWrapper(viewerAuth);
+
+      // Act
+      const { result } = renderHook(() => useUserRole(), { wrapper });
+
+      // Assert
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.isError).toBe(false);
+      expect(result.current.role).toBeNull();
+    });
   });
 
   // -------------------------------------------------------------------------

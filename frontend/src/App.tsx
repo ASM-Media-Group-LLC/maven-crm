@@ -190,6 +190,19 @@ const queryClient = new QueryClient({
   },
 });
 
+// El ROL y los PERMISOS deciden qué ve cada persona: si su consulta falla, el
+// menú queda con solo los módulos universales y se siente como si la sesión se
+// hubiera caído. Un intento (el default de arriba) es poco para algo así, así
+// que estas dos van con 3 y espera creciente. Va acá y no dentro de los hooks
+// porque un `retry` en el useQuery pisa al del cliente, y las pruebas crean su
+// propio QueryClient con `retry: false` para no esperar de gusto.
+const REINTENTOS_CRITICOS = {
+  retry: 3,
+  retryDelay: (intento: number) => Math.min(500 * 2 ** intento, 8000),
+};
+queryClient.setQueryDefaults(["user-role"], REINTENTOS_CRITICOS);
+queryClient.setQueryDefaults(["user-permissions"], REINTENTOS_CRITICOS);
+
 // Subtle loading bar while a lazy chunk downloads. The previous full-
 // screen spinner blanked everything (sidebar, topbar, content) and made
 // every nav feel like a hard reload. This sits as a thin progress strip

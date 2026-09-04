@@ -32,7 +32,18 @@ const SUPERVISOR_ROLES: readonly string[] = [
 export const useUserRole = () => {
   const { user } = useAuth();
 
-  const { data: role, isLoading } = useQuery({
+  // ⚠️ `data === null` significa "esta persona NO tiene rol" (caso legítimo).
+  // `isError` significa "no pudimos averiguarlo". Antes las dos cosas acababan
+  // en el mismo `null` y la app se dibujaba como si no tuvieras permisos: el
+  // menú quedaba con solo los módulos universales y parecía que te había
+  // deslogueado. Quien consuma esto TIENE que mirar `isError`.
+  //
+  // Los reintentos de esta consulta se configuran en App.tsx con
+  // `setQueryDefaults(["user-role"])`: 3 intentos en vez de 1, porque de acá
+  // depende TODO lo que se ve. No se ponen ACÁ a propósito — un `retry` dentro
+  // del hook pisa al del QueryClient y dejaría las pruebas esperando los
+  // reintentos de verdad.
+  const { data: role, isLoading, isError, refetch } = useQuery({
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -65,5 +76,8 @@ export const useUserRole = () => {
     // "agent" es el nombre legacy del mismo rol (list_chatters acepta ambos).
     isChatter: role === "Chatter" || role === "agent",
     isLoading,
+    /** La consulta falló: NO sabemos el rol. Distinto de "no tiene rol". */
+    isError,
+    recargarRol: refetch,
   };
 };
