@@ -313,6 +313,16 @@ function FilaChat({
         </p>
       </div>
 
+      {/* El NÚMERO, no un punto: el contador del icono suma MENSAJES (igual que
+          el badge del menú y el chip "No leídos"), así que con un punto no había
+          forma de cuadrar un "4" en la nube contra una sola fila marcada —
+          parecía que el contador estaba roto cuando eran 4 mensajes de un mismo
+          grupo, tres de ellos llegados en la misma tanda. */}
+      {hasUnread && (
+        <span className="ml-1 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+          {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
+        </span>
+      )}
     </button>
   );
 }
