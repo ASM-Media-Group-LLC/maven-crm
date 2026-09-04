@@ -1106,3 +1106,48 @@
     .pt .pl-historias { grid-template-columns: repeat(2, 1fr); }
     .pt .pl-datos { grid-template-columns: 1fr; }
   }
+
+  /* ── Planes y "qué incluye" · documento comercial (/concept) ──────────────
+     No van en la portada: son las dos preguntas que hace alguien que ya se
+     interesó. */
+  .pt .planes { margin-top: 44px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); align-items: start; }
+  .pt .plan {
+    position: relative; display: flex; flex-direction: column; gap: 4px;
+    border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px;
+    background: var(--surface);
+    transition: transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s;
+  }
+  .pt .plan:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+  .pt .plan.destacado {
+    border-color: rgba(var(--azul-rgb), .45);
+    background: linear-gradient(165deg, rgba(var(--azul-rgb), .07), var(--surface) 60%);
+    box-shadow: 0 24px 60px -30px rgba(var(--azul-rgb), .8);
+  }
+  .pt .plan .etiqueta {
+    position: absolute; right: 18px; top: -10px;
+    font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--sobre-azul); background: var(--azul); border-radius: 999px; padding: 5px 9px;
+  }
+  .pt .plan h3 { font: 700 19px/1.2 Sora, sans-serif; margin: 0; }
+  .pt .plan .para { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+  .pt .plan .precio {
+    margin: 14px 0 0; padding-bottom: 16px; border-bottom: 1px solid var(--line);
+    font: 600 15px/1 Sora, sans-serif; color: var(--ink);
+  }
+  .pt .plan ul { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 9px; }
+  .pt .plan li { display: grid; grid-template-columns: 15px 1fr; gap: 9px; align-items: start; font-size: 13.5px; line-height: 1.45; color: var(--ink-soft); }
+  .pt .plan li svg { color: var(--verde); margin-top: 3px; }
+  .pt .plan .btn { margin-top: 22px; }
+  /* El botón va al pie aunque las listas tengan largos distintos. */
+  .pt .plan ul { margin-bottom: auto; }
+
+  /* ── Cómo se pone en marcha ───────────────────────────────────────────── */
+  .pt .pasos { margin-top: 44px; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .pt .paso { background: var(--ground); padding: 22px; }
+  .pt .paso .n {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 9px;
+    font: 700 12px/1 "JetBrains Mono", monospace; color: var(--azul-claro);
+    background: rgba(var(--azul-rgb), .14); border: 1px solid rgba(var(--azul-rgb), .3);
+  }
+  .pt .paso h4 { font: 600 15px/1.3 "Instrument Sans", sans-serif; margin: 13px 0 0; }
+  .pt .paso p { margin: 7px 0 0; font-size: 13px; line-height: 1.55; color: var(--muted); }

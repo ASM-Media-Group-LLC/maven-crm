@@ -32,7 +32,7 @@ const Login = lazy(() => import("./pages/Login"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Rare / public — kept lazy.
-const Concept = lazy(() => import("./pages/Concept"));
+const Concepto = lazy(() => import("./pages/portada/Concepto"));
 // SEGURIDAD: página de login de demo (roles de prueba + contraseña hardcodeada).
 // Solo en desarrollo: en prod no se rutea NI se bundlea (la rama queda muerta y
 // el chunk —con la contraseña— se elimina por tree-shaking en el build de prod).
@@ -244,7 +244,7 @@ const App = () => (
                   en la base): quien llega con un link viejo cae en el
                   formulario de demo, no en un formulario que no funciona. */}
               <Route path="/register" element={<Navigate to="/#demo" replace />} />
-              <Route path="/concept" element={<Concept />} />
+              <Route path="/concept" element={<Concepto />} />
               {import.meta.env.DEV && Credentials && <Route path="/credentials" element={<Credentials />} />}
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
