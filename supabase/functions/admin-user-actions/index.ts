@@ -520,6 +520,27 @@ Deno.serve(async (req) => {
       const first = partes[0] || "Usuario";
       const last = partes.slice(1).join(" ") || "Maven";
 
+      // 0) ¿La dirección ya es de otra cuenta? gotrue responde "Error updating
+      //    user" a secas, que no le dice nada a quien lo está usando. Caso real:
+      //    John Idrobo tenía DOS cuentas (una vieja con el @maven-ai.me y otra
+      //    nueva con el @unlok.me) y el destino estaba ocupado por la suya vieja.
+      //    Avisamos con nombre y propuesta en vez del error opaco.
+      const { data: duenoRaw } = await adminClient.rpc("auth_user_by_email", { _email: nuevo });
+      const dueno = (duenoRaw as { user_id: string; full_name: string }[] | null)?.[0];
+      if (dueno && dueno.user_id !== user_id) {
+        return new Response(JSON.stringify({
+          error: `La dirección ${nuevo} ya la usa otra cuenta de Maven (${dueno.full_name}). ` +
+            `Si son la misma persona con cuenta duplicada, hay que decidir cuál se queda: ` +
+            `la que ya tiene esa dirección conserva su casilla, su historial y sus vínculos.`,
+          reason: "email_ya_en_uso",
+          owner_user_id: dueno.user_id,
+          owner_name: dueno.full_name,
+        }), {
+          status: 409,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
       // 1) Cambiar el email de LOGIN (gotrue). email_confirm:true → sin mail de verificación.
       const { error: mailErr } = await adminClient.auth.admin.updateUserById(user_id as string, {
         email: nuevo,
