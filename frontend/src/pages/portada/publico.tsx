@@ -115,9 +115,13 @@ export const GUION: Record<Publico, Guion> = {
   },
 };
 
-/** Las opciones de "qué te interesa" del formulario. Las de agencia solo
- *  aparecen cuando la página se está contando para agencias: preguntar por
- *  Promolog a una empresa de logística es ruido. */
+/** Las opciones de "qué te interesa" del formulario.
+ *
+ *  Del lado de agencias está el detalle completo. Del lado de empresas va la
+ *  lista corta más "Promolog" y "Otras opciones de agencia": quien entra por
+ *  la puerta de empresas puede ser una agencia igual, y si no se nombran no
+ *  se entera de que existen. Esa última también es la puerta para lo que la
+ *  lista no incluye. */
 export const INTERESES: Record<Publico, string[]> = {
   empresas: [
     "Correo propio",
@@ -127,6 +131,11 @@ export const INTERESES: Record<Publico, string[]> = {
     "Ventas y pipeline",
     "Tickets",
     "Marca blanca",
+    // Estas dos van también del lado de empresas a propósito: quien entra
+    // por acá puede ser una agencia igual, y si no se nombran no se enteran
+    // de que existen. La segunda es la puerta para lo que no está listado.
+    "Promolog",
+    "Otras opciones de agencia",
     "Todo",
   ],
   agencias: [
@@ -141,6 +150,7 @@ export const INTERESES: Record<Publico, string[]> = {
     "Pedidos personalizados",
     "Parrilla de contenido",
     "Marca blanca",
+    "Otras opciones de agencia",
     "Todo",
   ],
 };
