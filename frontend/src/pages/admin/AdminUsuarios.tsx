@@ -22,6 +22,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
+// Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
+// lleno de apellidos acentuados (Suárez, Durán, Pinzón) y nadie los tipea con tilde.
+const norm = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
 const AdminUsuarios = () => {
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
@@ -47,10 +52,15 @@ const AdminUsuarios = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Nombre O correo: el correo ya se muestra en ambas vistas (UsersTable/UsersGrid),
+  // así que buscar por él no expone nada nuevo. Ojo: si la edge function list_users
+  // falla, useAdminUsers deja email en "" y solo queda la búsqueda por nombre.
   const filtered = useMemo(() => {
     if (!search.trim()) return users;
-    const q = search.toLowerCase();
-    return users.filter((u) => (u.full_name ?? "").toLowerCase().includes(q));
+    const q = norm(search);
+    return users.filter(
+      (u) => norm(u.full_name ?? "").includes(q) || norm(u.email).includes(q),
+    );
   }, [users, search]);
 
   const handleEditRole = (user: AdminUser) => {
@@ -168,7 +178,7 @@ const AdminUsuarios = () => {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder={activeTab === "usuarios" ? "Buscar por nombre..." : "Buscar rol..."}
+                    placeholder={activeTab === "usuarios" ? "Buscar por nombre o correo..." : "Buscar rol..."}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9"
