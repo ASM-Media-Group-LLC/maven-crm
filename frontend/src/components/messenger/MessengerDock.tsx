@@ -136,6 +136,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
               onAbrirChat={(id) => { setPanelAbierto(false); abrirChat(id); }}
               onNuevo={() => { setPanelAbierto(false); navigate("/messenger?nuevo=1"); }}
               onVerTodo={() => { setPanelAbierto(false); navigate("/messenger"); }}
+              onCerrar={() => setPanelAbierto(false)}
             />
           </div>
         </>

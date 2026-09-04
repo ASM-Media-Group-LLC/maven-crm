@@ -54,6 +54,7 @@ export default function MessagesBell() {
           onAbrirChat={(id) => { setOpen(false); abrirChat(id); }}
           onNuevo={() => { setOpen(false); navigate("/messenger?nuevo=1"); }}
           onVerTodo={() => { setOpen(false); navigate("/messenger"); }}
+          onCerrar={() => setOpen(false)}
         />
       </PopoverContent>
     </Popover>

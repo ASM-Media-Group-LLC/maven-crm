@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, PenSquare, Users } from "lucide-react";
+import { Search, PenSquare, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -29,13 +29,17 @@ const TABS: { id: Tab; label: string }[] = [
  * eso vive suelto y no dentro de ninguno de los dos.
  */
 export default function ChatsPanel({
-  alto = 380, onAbrirChat, onNuevo, onVerTodo,
+  alto = 380, onAbrirChat, onNuevo, onVerTodo, onCerrar,
 }: {
   /** Alto de la lista; el resto del panel es fijo. */
   alto?: number;
   onAbrirChat: (conversationId: string) => void;
   onNuevo: () => void;
   onVerTodo: () => void;
+  /** Cierra el panel. Si no se pasa, no se dibuja la X (el contenedor se
+   *  encarga). Existe porque cerrar clickeando afuera es un gesto invisible:
+   *  no se ve cómo salir. */
+  onCerrar?: () => void;
 }) {
   const { user } = useAuth();
   const { conversations, loading } = useChatShared();
@@ -61,12 +65,22 @@ export default function ChatsPanel({
     <>
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <p className="text-lg font-bold">Chats</p>
-        <Button
-          variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
-          title="Mensaje nuevo" onClick={onNuevo}
-        >
-          <PenSquare className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
+            title="Mensaje nuevo" onClick={onNuevo}
+          >
+            <PenSquare className="h-4 w-4" />
+          </Button>
+          {onCerrar && (
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
+              title="Cerrar" aria-label="Cerrar" onClick={onCerrar}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="px-3 pb-2">

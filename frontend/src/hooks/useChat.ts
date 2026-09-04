@@ -25,6 +25,10 @@ export function useChat() {
   const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
   const chatRealtimeRetryRef = useRef(0);
   const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Para quién ya se cargó la lista: distingue la primera carga (que sí muestra
+  // "Cargando…") de las recargas de fondo. Guarda el id y no un booleano para
+  // que al cambiar de cuenta vuelva a considerarse primera vez.
+  const cargadoParaRef = useRef<string | null>(null);
 
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
@@ -40,7 +44,14 @@ export function useChat() {
   const loadConversations = useCallback(async () => {
     if (!user) return;
 
-    setLoading(true);
+    // `loading` SOLO en la primera carga de esta sesión. Antes se prendía en
+    // cada llamada, y como hay un poll de 20s (+ visibilitychange + reconexión
+    // del realtime), la lista se reemplazaba por "Cargando…" tres veces por
+    // minuto: eso era el parpadeo de la nube que se veía como si se refrescara
+    // sola. Las recargas de fondo ahora entran calladas — se cambia el
+    // contenido, no el estado visible.
+    const primeraVez = cargadoParaRef.current !== user.id;
+    if (primeraVez) setLoading(true);
     try {
       const { data: participations } = await supabase
         .from("chat_participants")
@@ -162,8 +173,9 @@ export function useChat() {
       });
 
       setConversations(visible);
+      cargadoParaRef.current = user.id;
     } finally {
-      setLoading(false);
+      if (primeraVez) setLoading(false);
     }
   }, [user]);
 
