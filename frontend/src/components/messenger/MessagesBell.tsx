@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useChatShared } from "@/hooks/ChatProvider";
+import { useMessengerDock } from "./MessengerDock";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 import type { UserStatus } from "@/hooks/useOnlinePresence";
@@ -36,6 +37,7 @@ export default function MessagesBell() {
   const { user } = useAuth();
   const { conversations, loading } = useChatShared();
   const { canAccess } = usePermissions();
+  const { abrirChat } = useMessengerDock();
   const { isOnline, getStatus } = useOnlinePresence();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("all");
@@ -49,16 +51,23 @@ export default function MessagesBell() {
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase();
     return conversations.filter((c) => {
-      if (q && !c.displayName.toLowerCase().includes(q)) return false;
+      if (q) {
+        // Buscando se ignora la pestaña: escribir un nombre estando en "Grupos"
+        // y que diga "sin resultados" cuando la persona existe es desconcertante.
+        return c.displayName.toLowerCase().includes(q);
+      }
       if (tab === "unread") return c.unreadCount > 0;
       if (tab === "groups") return c.type === "group";
       return true;
     });
   }, [conversations, tab, search]);
 
+  // Como en Facebook: al tocar una conversación se abre la VENTANITA del
+  // muelle, no te saca de la pantalla en la que estás. (En el teléfono, o si
+  // ya estás en /messenger, el muelle navega en su lugar.)
   const abrir = (id: string) => {
     setOpen(false);
-    navigate(`/messenger?c=${id}`);
+    abrirChat(id);
   };
 
   // Sin acceso al Messenger no tiene sentido el icono (la ruta /messenger ya

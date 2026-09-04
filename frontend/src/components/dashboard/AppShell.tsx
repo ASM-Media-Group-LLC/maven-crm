@@ -5,11 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
-import ClariAiFab from "@/components/ClariAiFab";
 import { ChatProvider } from "@/hooks/ChatProvider";
+import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
-import { useUserRole } from "@/hooks/useUserRole";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
 import { useMessengerNotifications } from "@/hooks/useMessengerNotifications";
@@ -53,7 +52,6 @@ const ContentLoadingFallback = () => (
 );
 const AppShell = () => {
   const { popups } = useAnnouncementsByChannel();
-  const { isAdmin } = useUserRole();
   // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),
   // funcione donde funcione el usuario dentro de Maven (no solo en las bandejas).
   useWaInboxNotifications();
@@ -64,6 +62,7 @@ const AppShell = () => {
 
   return (
     <ChatProvider>
+    <MessengerDockProvider>
     <SidebarProvider>
       {/* h-dvh (no h-screen): en mobile el alto dinámico descuenta el teclado virtual y la
           barra del navegador, así el composer del Messenger no queda tapado. */}
@@ -77,9 +76,9 @@ const AppShell = () => {
           </Suspense>
         </div>
       </div>
-      {isAdmin && <ClariAiFab />}
       {popups.length > 0 && <AnnouncementPopup popups={popups} />}
     </SidebarProvider>
+    </MessengerDockProvider>
     </ChatProvider>
   );
 };
