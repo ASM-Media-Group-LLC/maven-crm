@@ -53,8 +53,23 @@ export function UserAvatar({
   const s = SIZES[size];
   const fallbackSeed = seed || null;
 
+  // El muñequito elegido lleva anillo siempre; `ring` lo fuerza para el resto.
+  const showRing = ring || (!src && !!fallbackSeed);
+
+  // ⚠️ El anillo se dibuja DENTRO del cuadrado, no por fuera.
+  //
+  // Antes eran dos envoltorios con `p-[2px]` ALREDEDOR del avatar, así que quien
+  // tiene muñequito medía 8px MÁS que quien tiene foto o iniciales del mismo
+  // `size`: en la lista del Messenger esas filas sobresalían y los nombres no
+  // alineaban. Y el tamaño que llegaba por `className` se aplicaba al ENVOLTORIO
+  // y no al avatar, que se quedaba en su `size` por defecto — un
+  // `className="h-7 w-7"` daba ~48px en un hueco de 28.
+  //
+  // Ahora el cuadrado exterior mide siempre lo que pidió quien lo usa (`size` o
+  // `className`) y el anillo se come 4px por dentro. Todos los avatares del
+  // mismo tamaño ocupan lo mismo, tengan muñequito o no.
   const core = (
-    <Avatar className={cn(s.avatar, !(ring || (!src && !!seed)) && className)}>
+    <Avatar className={showRing ? "h-full w-full" : cn(s.avatar, className)}>
       {src ? <AvatarImage src={src} alt={name ?? ""} /> : null}
       {fallbackSeed ? (
         <AvatarFallback className="bg-secondary p-0">
@@ -79,20 +94,17 @@ export function UserAvatar({
     </Avatar>
   );
 
-  // El muñequito elegido lleva anillo siempre; `ring` lo fuerza para el resto.
-  const showRing = ring || (!src && !!fallbackSeed);
-
   if (!showRing && !status) return core;
 
   return (
-    <div className={cn("relative inline-flex shrink-0", className)}>
+    <div className={cn("relative inline-flex shrink-0", s.avatar, className)}>
       {showRing ? (
-        <div className="rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
+        <div className="h-full w-full rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
           {/* ua-ring-gap: sobre una superficie translúcida (.glass-panel del
               muelle) este hueco opaco punzaba un disco sólido detrás del
               muñequito. La clase deja que el CSS lo vuelva transparente ahí;
               en el resto de la app no cambia nada. */}
-          <div className="ua-ring-gap rounded-full bg-background p-[2px]">{core}</div>
+          <div className="ua-ring-gap h-full w-full rounded-full bg-background p-[2px]">{core}</div>
         </div>
       ) : (
         core
