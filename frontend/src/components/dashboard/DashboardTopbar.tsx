@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Search, Globe, Check, Clock } from "lucide-react";
+import { Search, Globe, Check } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useTimezone, getTimezoneAbbreviation } from "@/hooks/useTimezone";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger,
@@ -18,7 +17,6 @@ import GlobalSearchCommand from "./GlobalSearchCommand";
 // formatean fechas (ver useTimezone.ts).
 const DashboardTopbar = () => {
   const { t, language, setLanguage } = useLanguage();
-  const { timezone, setTimezone, options: tzOptions } = useTimezone();
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -41,33 +39,6 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Timezone dropdown — al lado del idioma. Muestra el TZ
-              abreviado activo (ej "EDT", "ART") como hint visual para
-              que el user vea de un vistazo en qué zona está leyendo. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5 px-2">
-                <Clock className="h-4 w-4" />
-                <span className="hidden text-xs font-medium tabular-nums sm:inline">{getTimezoneAbbreviation(timezone)}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {tzOptions.map((tz) => (
-                <DropdownMenuItem
-                  key={tz.value}
-                  onClick={() => setTimezone(tz.value)}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex flex-col">
-                    <span className="text-sm">{tz.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{tz.offsetLabel}</span>
-                  </div>
-                  {timezone === tz.value && <Check className="h-4 w-4 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Language dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

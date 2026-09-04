@@ -1,71 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
-
-// useTimezone — preferencia global de zona horaria del usuario. Se guarda
-// en localStorage para que persista entre sesiones del mismo browser, y
-// se comparte vía storage events si abres Maven en varias tabs (cambio
-// en una tab refresca las demás).
+// useTimezone — zona horaria de Maven. NO es configurable.
 //
-// La lista de timezones es curada — sólo las que el equipo usa
-// efectivamente (Miami, LA, México, Madrid, Buenos Aires, Bogotá) +
-// UTC para devs/auditoría. Si el equipo crece a otra zona, agregar acá.
+// GMT-5 (America/Bogota) es la zona oficial del CRM: es la hora en la que opera
+// el equipo y en la que se leen todos los números. Antes cada quien podía elegir
+// la suya desde el topbar y, peor, el default era America/New_York — que es
+// GMT-5 en invierno pero GMT-4 en verano, así que media parte del año las
+// pantallas de Promolog mostraban una hora corrida para quien no lo hubiera
+// tocado nunca. Fijarla arregla eso además de simplificar.
 //
-// Default: el TZ del browser cuando el user nunca eligió manualmente.
+// Bogotá no tiene horario de verano: GMT-5 todo el año, sin excepciones.
 
-const STORAGE_KEY = "maven.timezone";
-
-export const TIMEZONE_OPTIONS: Array<{ value: string; label: string; offsetLabel: string }> = [
-  { value: "America/New_York", label: "Miami / Nueva York", offsetLabel: "EST/EDT" },
-  { value: "America/Los_Angeles", label: "Los Ángeles", offsetLabel: "PST/PDT" },
-  { value: "America/Mexico_City", label: "México", offsetLabel: "CST/CDT" },
-  { value: "America/Bogota", label: "Bogotá", offsetLabel: "COT" },
-  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires", offsetLabel: "ART" },
-  { value: "Europe/Madrid", label: "Madrid", offsetLabel: "CET/CEST" },
-  { value: "UTC", label: "UTC", offsetLabel: "UTC" },
-];
-
-export function getDefaultTimezone(): string {
-  // Si el user ya eligió, usar eso. Sino, intentar detectar del browser
-  // y matchear con uno de los TIMEZONE_OPTIONS. Sino, fallback a Miami
-  // que es el HQ del equipo.
-  try {
-    const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
-    if (stored && TIMEZONE_OPTIONS.some((o) => o.value === stored)) return stored;
-  } catch (_) { /* localStorage puede estar deshabilitado */ }
-
-  try {
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (TIMEZONE_OPTIONS.some((o) => o.value === browserTz)) return browserTz;
-  } catch (_) { /* Intl puede fallar en entornos viejos */ }
-
-  return "America/New_York";
-}
+/** La zona de Maven. Si algún día cambia, se cambia acá y en ningún otro lado. */
+export const ZONA_MAVEN = "America/Bogota";
 
 export function useTimezone() {
-  const [timezone, setTimezoneState] = useState<string>(() => getDefaultTimezone());
-
-  const setTimezone = useCallback((next: string) => {
-    setTimezoneState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-      // Dispatch storage event manualmente para que otras tabs/hooks
-      // que escuchan el mismo key se enteren del cambio (storage event
-      // nativo no dispara en la tab que hizo el set).
-      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY, newValue: next }));
-    } catch (_) { /* ignore */ }
-  }, []);
-
-  // Sync entre tabs + entre hooks de la misma tab.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue && e.newValue !== timezone) {
-        setTimezoneState(e.newValue);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [timezone]);
-
-  return { timezone, setTimezone, options: TIMEZONE_OPTIONS };
+  return { timezone: ZONA_MAVEN };
 }
 
 // ─── Format helpers ─────────────────────────────────────────────────
