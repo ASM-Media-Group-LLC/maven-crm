@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { resolveDeepLink } from "@/lib/notificationHelpers";
 import { useLanguage } from "@/hooks/useLanguage";
 import NotificationItem from "./NotificationItem";
+import { BOTON_TOPBAR } from "@/components/dashboard/topbarStyles";
 import type { Notification } from "@/hooks/useNotifications";
 
 export default function NotificationBell() {
@@ -50,10 +51,10 @@ export default function NotificationBell() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-muted-foreground">
-          <Bell className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className={BOTON_TOPBAR} title="Notificaciones">
+          <Bell className="h-[18px] w-[18px]" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
+            <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground ring-2 ring-background">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import MessagesBell from "@/components/messenger/MessagesBell";
+import { BOTON_TOPBAR } from "./topbarStyles";
 import GlobalSearchCommand from "./GlobalSearchCommand";
 
 // Topbar — search + timezone + language + notifications. El timezone
@@ -39,7 +40,7 @@ const DashboardTopbar = () => {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Timezone dropdown — al lado del idioma. Muestra el TZ
               abreviado activo (ej "EDT", "ART") como hint visual para
               que el user vea de un vistazo en qué zona está leyendo. */}
@@ -70,8 +71,8 @@ const DashboardTopbar = () => {
           {/* Language dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <Globe className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className={BOTON_TOPBAR}>
+                <Globe className="h-[18px] w-[18px]" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
