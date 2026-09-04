@@ -1,44 +1,44 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { BookOpen, Brain, Check, ChevronRight, Clock, Plug, Settings, Star, Zap } from "lucide-react";
 import "./portada.css";
 
 import { useRevelar } from "./useRevelar";
 import { SKINS, tokensDe } from "./skins";
-import Reemplaza from "./secciones/Reemplaza";
-import Messenger from "./secciones/Messenger";
-import Cowork from "./secciones/Cowork";
-import Promolog from "./secciones/Promolog";
-import Simulador from "./secciones/Simulador";
-import Modulos from "./secciones/Modulos";
-import CapaDeIA from "./secciones/CapaDeIA";
-import MarcaBlanca from "./secciones/MarcaBlanca";
-import Planes from "./secciones/Planes";
-import PedirDemo from "./secciones/PedirDemo";
+import { MODULOS, PLUGINS, OBJETIVOS, PLANES } from "./conceptoDatos";
 
-// DOCUMENTO COMERCIAL · ruta pública `/concept`.
+// DOCUMENTO DE CONCEPTO · ruta pública `/concept`.
 //
-// La versión anterior era de la v1 y publicaba tres cosas que no debía:
+// SOLO CAMBIÓ LA PIEL. El contenido es el de Álvaro, tal cual estaba: el
+// resumen ejecutivo, los plugins que se venden aparte, los 19 módulos con
+// todas sus sub-funciones, los objetivos comerciales y los tres planes con
+// sus precios. Está en `conceptoDatos.ts`, extraído del archivo viejo con un
+// script y no a mano, justamente para no cambiarle una línea.
 //
-//   1. TARIFAS que todavía no están decididas ($299 y $799 al mes, con
-//      niveles inventados en su momento). Una tarifa publicada es una tarifa
-//      que el comprador te cobra en la negociación.
-//   2. "12 módulos", cuando hoy hay 74 pantallas.
-//   3. El nombre de un PROVEEDOR nuestro, en la ficha de videollamadas. Eso
-//      no va en ninguna página pública.
+// Lo que se rehízo es cómo se ve: los mismos tokens, la misma tipografía y
+// las mismas tarjetas que la portada nueva, en vez del look de la v1. Así el
+// documento y la web se ven como la misma empresa.
 //
-// Y arriba de todo decía "Confidencial" — en una URL abierta, que es lo
-// contrario de confidencial. Ahora dice lo que es: un documento comercial.
-//
-// Se arma con las MISMAS secciones que la portada, a propósito: lo que ve el
-// comprador acá es lo que ve en la web, y cuando se agrega algo a una pieza
-// se agrega en las dos. Lo que esta página tiene de más son las dos preguntas
-// que hace quien ya se interesó: cuánto sale y cómo se pone en marcha.
+// Dos detalles de forma que sí cambiaron, y por qué:
+//  · El catálogo de módulos ahora son `<details>` nativos, abiertos por
+//    defecto igual que antes. La versión vieja montaba un acordeón de Radix
+//    con 17 items para algo que el navegador ya hace, y arrastraba esa
+//    librería al chunk de una página pública.
+//  · La ficha de videollamadas nombraba al proveedor que usamos. Eso no va
+//    en una página pública (pedido explícito), así que dice "nuestro propio
+//    servidor de video".
 
-const PASOS = [
-  ["1", "Se levanta tu espacio", "Con tu dominio, tu paleta y los roles que definas. Nadie más ve tus datos: cada empresa tiene el suyo."],
-  ["2", "Se migra el correo y lo que ya tenías", "Los buzones se sincronizan sin apagar el proveedor viejo, y las planillas que usabas entran importadas."],
-  ["3", "Se acompaña la primera semana", "Con el equipo adentro, ajustando permisos y avisos hasta que la operación corre sola."],
-  ["4", "Y sigue creciendo con ustedes", "Cada pantalla de Maven existe porque alguien la necesitaba una semana. Lo que le falte a tu operación se construye."],
+const CHIPS = [
+  { Icono: Settings, texto: "19 módulos" },
+  { Icono: Clock, texto: "Tiempo real" },
+  { Icono: Brain, texto: "IA integrada" },
+  { Icono: BookOpen, texto: "100% español" },
+] as const;
+
+const LINKS = [
+  ["#modulos", "Módulos"],
+  ["#marketing", "Marketing"],
+  ["#pricing", "Pricing"],
 ] as const;
 
 export default function Concepto() {
@@ -67,86 +67,215 @@ export default function Concepto() {
             Maven
           </Link>
           <div className="nav-links">
-            <a href="#reemplaza">Reemplaza</a>
-            <a href="#messenger">Messenger</a>
-            <a href="#cowork">Cowork</a>
-            <a href="#promolog">Promolog</a>
-            <a href="#modulos">Módulos</a>
-            <a href="#ia">IA</a>
-            <a href="#planes">Planes</a>
+            {LINKS.map(([href, texto]) => <a href={href} key={href}>{texto}</a>)}
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Link className="btn btn-fantasma" to="/">Ver la web</Link>
-            <a className="btn btn-primario" href="#demo">Pedir una demo</a>
-          </div>
+          <Link className="btn btn-fantasma" to="/">← Inicio</Link>
         </div>
       </nav>
 
-      <section className="hero" style={{ paddingBottom: 40 }}>
+      <section className="hero" style={{ paddingBottom: 56 }}>
         <div className="wrap">
-          <span className="eyebrow">documento comercial</span>
-          <h1 style={{ maxWidth: "22ch" }}>
-            Todo lo que hace Maven,<br />
-            <span className="resalte">en una sola lectura.</span>
+          <span className="chip-vivo">Concept Document — Confidencial</span>
+          <h1 style={{ maxWidth: "26ch" }}>
+            La plataforma operativa para{" "}
+            <span className="resalte">agencias de creadores</span>
           </h1>
           <p className="bajada">
-            Está pensado para una agencia de creadoras, que es donde Maven nació y donde se usa
-            todos los días. Adentro: qué reemplaza, cómo se ve cada pieza, qué hace la capa de
-            IA, cómo se pone en marcha y cómo se cobra.
+            Maven centraliza gestión de creadores, ventas, HR, finanzas, comunicación y más en un
+            solo ecosistema diseñado específicamente para la industria de creadores digitales.
           </p>
-          <div className="acciones">
-            <a className="btn btn-primario btn-lg" href="#demo">Pedir una demo</a>
-            <a className="btn btn-fantasma btn-lg" href="#planes">Ver los planes</a>
+          <div className="gracias">
+            {CHIPS.map(({ Icono, texto }) => (
+              <span className="gracia" key={texto}>
+                <Icono strokeWidth={2.2} aria-hidden="true" />
+                {texto}
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      <Reemplaza publico="agencias" />
-      <Messenger />
-      <Cowork />
-      <Promolog />
-      <Simulador />
-      <Modulos publico="agencias" />
-      <CapaDeIA />
-      <MarcaBlanca skin={SKINS[0].id} onElegir={() => {}} />
-
-      <section className="bloque" id="marcha" style={{ background: "rgba(255,255,255,.014)", borderBlock: "1px solid var(--line)" }}>
+      {/* ── Resumen ejecutivo ── */}
+      <section className="bloque" id="resumen" style={{ borderTop: "1px solid var(--line)" }}>
         <div className="wrap">
           <div className="cabeza">
-            <span className="eyebrow">cómo se pone en marcha</span>
-            <h2>Nadie tiene que dejar de trabajar para migrar.</h2>
+            <h2>Resumen ejecutivo</h2>
+          </div>
+          <div className="resumen">
             <p>
-              La plataforma entra por partes y el proveedor viejo se apaga cuando ya no hace
-              falta, no antes.
+              <strong>Maven</strong> es un ecosistema SaaS diseñado exclusivamente para agencias
+              que gestionan creadores de contenido digital. A diferencia de herramientas genéricas
+              como Notion, Slack o hojas de cálculo, Maven integra todos los procesos operativos
+              en una sola plataforma.
+            </p>
+            <p>
+              Desde la prospección y cierre de nuevos creadores, pasando por la gestión diaria de
+              contenido y ventas, hasta la nómina, facturación y recursos humanos del equipo —
+              Maven elimina la fragmentación y reduce el tiempo operativo significativamente.
+            </p>
+            <p>
+              La plataforma está construida con{" "}
+              <strong>inteligencia artificial integrada</strong>, mensajería en tiempo real,
+              videollamadas, y un sistema de permisos granular que permite a cada miembro del
+              equipo ver exactamente lo que necesita.
             </p>
           </div>
-          <div className="pasos">
-            {PASOS.map(([n, titulo, texto]) => (
-              <div className="paso" key={n}>
-                <span className="n">{n}</span>
-                <h4>{titulo}</h4>
-                <p>{texto}</p>
+        </div>
+      </section>
+
+      {/* ── Plugins ── */}
+      <section className="bloque" id="plugins" style={{ background: "rgba(255,255,255,.014)", borderBlock: "1px solid var(--line)" }}>
+        <div className="wrap">
+          <div className="cabeza">
+            <span className="eyebrow">
+              <Plug width={12} height={12} strokeWidth={2.4} aria-hidden="true" style={{ marginRight: 2 }} />
+              también vendidos por separado
+            </span>
+            <h2>Plugins disponibles.</h2>
+            <p>
+              Módulos que se integran a la plataforma o pueden adquirirse de forma independiente.
+            </p>
+          </div>
+
+          <div className="mapa">
+            {PLUGINS.map(({ icon: Icono, name, description }) => (
+              <div className="area" key={name} style={{ "--tinte": "rgba(var(--violeta-rgb), .1)", "--borde": "rgba(var(--violeta-rgb), .4)" } as React.CSSProperties}>
+                <div className="area-top">
+                  <span className="ico" style={{ background: "rgba(var(--violeta-rgb), .16)" }}>
+                    <Icono strokeWidth={2.2} stroke="var(--violeta)" aria-hidden="true" />
+                  </span>
+                  <h3>{name}</h3>
+                </div>
+                <p style={{ margin: "13px 0 0", fontSize: 13.5, lineHeight: 1.6, color: "var(--muted)" }}>
+                  {description}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <Planes />
-      <PedirDemo publico="agencias" />
+      {/* ── El catálogo de módulos ── */}
+      <section className="bloque" id="modulos">
+        <div className="wrap">
+          <div className="cabeza">
+            <span className="eyebrow">plataforma completa</span>
+            <h2>19 módulos integrados.</h2>
+            <p>
+              Cada módulo está diseñado para resolver una necesidad específica de las agencias de
+              creadores, con sub-funciones detalladas y flujos optimizados.
+            </p>
+          </div>
+
+          <div className="catalogo">
+            {MODULOS.map(({ icon: Icono, name, description, features }) => (
+              <details className="mod" key={name} open>
+                <summary>
+                  <span className="ico"><Icono strokeWidth={2.2} aria-hidden="true" /></span>
+                  <span className="quien">
+                    <b>{name}</b>
+                    <span>{description}</span>
+                  </span>
+                  <ChevronRight className="flechita" width={16} height={16} aria-hidden="true" />
+                </summary>
+                <ul>
+                  {features.map((f) => (
+                    <li key={f}>
+                      <Check width={13} height={13} strokeWidth={3} aria-hidden="true" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Objetivos de marketing ── */}
+      <section className="bloque ia" id="marketing" style={{ borderTop: "1px solid var(--line)" }}>
+        <div className="wrap">
+          <div className="cabeza">
+            <span className="eyebrow">estrategia comercial</span>
+            <h2>Objetivos de marketing.</h2>
+          </div>
+          <div className="ia-grid">
+            {OBJETIVOS.map(({ icon: Icono, title, description }) => (
+              <div className="agente" key={title}>
+                <span className="ico"><Icono strokeWidth={2.2} stroke="var(--violeta)" aria-hidden="true" /></span>
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ── */}
+      <section className="bloque" id="pricing" style={{ background: "rgba(255,255,255,.014)", borderBlock: "1px solid var(--line)" }}>
+        <div className="wrap">
+          <div className="cabeza">
+            <span className="eyebrow">planes y precios</span>
+            <h2>Pricing para agencias.</h2>
+            <p>Planes flexibles que crecen con tu agencia. Todos incluyen actualizaciones y soporte.</p>
+          </div>
+
+          <div className="planes">
+            {PLANES.map((plan) => (
+              <div className={`plan${plan.highlight ? " destacado" : ""}`} key={plan.name}>
+                {plan.highlight ? (
+                  <span className="etiqueta">
+                    <Star width={10} height={10} fill="currentColor" aria-hidden="true" /> más popular
+                  </span>
+                ) : null}
+                <h3>{plan.name}</h3>
+                <p className="precio">
+                  {plan.price}
+                  {plan.period ? <span className="periodo">{plan.period}</span> : null}
+                </p>
+                <p className="para">{plan.description}</p>
+                <ul>
+                  {plan.features.map((f) => (
+                    <li key={f}>
+                      <Check width={13} height={13} strokeWidth={3} aria-hidden="true" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link className={`btn ${plan.highlight ? "btn-primario" : "btn-fantasma"}`} to="/#demo">
+                  {plan.cta}
+                  <ChevronRight width={15} height={15} aria-hidden="true" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Cierre ── */}
+      <section className="cierre" id="cierre">
+        <div className="wrap">
+          <span className="tic-grande" style={{ margin: "0 auto 18px", position: "relative", background: "rgba(var(--azul-rgb), .14)", borderColor: "rgba(var(--azul-rgb), .4)" }}>
+            <Zap width={24} height={24} strokeWidth={2.2} stroke="var(--azul-claro)" aria-hidden="true" />
+          </span>
+          <h2>¿Listo para transformar tu agencia?</h2>
+          <p>
+            Agenda una demo personalizada y descubre cómo Maven puede optimizar cada proceso de tu
+            operación.
+          </p>
+          <div className="acciones">
+            <Link className="btn btn-primario btn-lg" to="/#demo">Solicitar demo</Link>
+            <Link className="btn btn-fantasma btn-lg" to="/">Volver al inicio</Link>
+          </div>
+        </div>
+      </section>
 
       <footer>
-        <div className="wrap foot">
-          <Link to="/" className="marca" style={{ fontSize: 15, textDecoration: "none" }}>
-            <i style={{ width: 22, height: 22 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff"
-                strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 19V7l8 7 8-7v12" />
-              </svg>
-            </i>
-            Maven
-          </Link>
-          <span>Documento comercial · las capturas son reconstrucciones con datos de ejemplo.</span>
+        <div className="wrap foot" style={{ justifyContent: "center", textAlign: "center" }}>
+          <span>
+            © {new Date().getFullYear()} Maven — Documento de concepto. Todos los precios son
+            referenciales y sujetos a cambios.
+          </span>
         </div>
       </footer>
     </div>
