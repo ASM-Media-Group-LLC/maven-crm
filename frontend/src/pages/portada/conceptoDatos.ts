@@ -169,7 +169,7 @@ export const MODULOS = [
       "Coworking virtual con salas temáticas",
       "Compartir pantalla con permisos",
       "Lobby de espera",
-      "Integración con LiveKit",
+      "Sobre nuestro propio servidor de video",
     ],
   },
   {
