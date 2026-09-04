@@ -1,0 +1,1004 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTADA DE MAVEN · la página pública de /
+   ───────────────────────────────────────────────────────────────────────────
+   TODO acá vive bajo `.pt`, el div raíz de la portada. No es cosmético: sin
+   el prefijo, reglas como `h1 { font-size: clamp(...) }` o `.btn { … }`
+   entran al CSS global de la app y le cambian la tipografía y los botones a
+   las 74 pantallas de adentro. Si agregás una regla, va con `.pt ` adelante.
+
+   El tema es oscuro y único, a propósito: la app vive en oscuro y la web
+   tiene que sentirse la misma cosa. Los tokens salen del producto
+   (ground 227 24% 7%, card 227 30% 12%, primary 211 100% 50%,
+   accent 271 91% 50%) pero se escriben en hex y no con los tokens de
+   Tailwind, para que la portada no cambie de color cuando alguien elige otra
+   paleta adentro de la app.
+
+   Este archivo lo importa `Portada.tsx`, que es una ruta lazy: el CSS viaja
+   en su propio chunk y no lo pagan las pantallas de adentro.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Sora ya la carga index.html. Instrument Sans (cuerpo) y JetBrains Mono
+   (horas, códigos, cifras) son de la portada nada más, así que se piden acá
+   y no en el HTML: quien entra logueado no las descarga. */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap");
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     MAVEN · página de inicio
+     Tema ÚNICO y a propósito: oscuro. No es una omisión — la app vive en
+     oscuro y la web tiene que sentirse la misma cosa. Los tokens salen del
+     producto: ground 227 24% 7%, card 227 30% 12%, primary 211 100% 50%,
+     accent 271 91% 50%. Todo color se pinta explícito, así que la página se
+     sostiene sobre cualquier fondo del visor.
+     ═══════════════════════════════════════════════════════════════════════ */
+  .pt {
+    --ground:      #0e1118;
+    --ground-deep: #090b10;
+    --surface:     #161a26;
+    --surface-2:   #1b2130;
+    --line:        rgba(255,255,255,.075);
+    --line-strong: rgba(255,255,255,.15);
+    --ink:         #f2f3f7;
+    --ink-soft:    #b9bfcd;
+    --muted:       #858da0;
+    --faint:       #5b6376;
+    --azul:        #0a84ff;
+    --azul-claro:  #4fa8ff;
+    --violeta:     #8b5cf6;
+    /* Los mismos tres, como triplete, para usarlos en rgba(). El selector de
+       marca blanca los reescribe en caliente sobre este mismo nodo. */
+    --azul-rgb:       10, 132, 255;
+    --azul-claro-rgb: 79, 168, 255;
+    --violeta-rgb:    139, 92, 246;
+    /* Color del texto sobre el botón principal. Existe por el skin Dorado:
+       blanco sobre amarillo no se lee. */
+    --sobre-azul:  #ffffff;
+    --verde:       #10b981;
+    --ambar:       #f59e0b;
+    --rosa:        #f43f7e;
+    --red:         #f45b5b;
+    --r:  16px;
+    --r-lg: 24px;
+    --ancho: 1180px;
+  }
+  .pt * { box-sizing: border-box; }
+
+  .pt {
+    min-height: 100vh;
+    /* Al cambiar de paleta, el fondo y los bordes viajan; los colores de
+       acento los animan los propios componentes. */
+    transition: color .35s ease, background-color .35s ease;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.6 "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+  .pt h1, .pt h2, .pt h3, .pt .display { font-family: Sora, "Instrument Sans", sans-serif; font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
+  .pt .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pt a { color: inherit; }
+
+  .pt .wrap { width: 100%; max-width: var(--ancho); margin: 0 auto; padding: 0 24px; }
+
+  /* Eyebrow: etiqueta de sección. Se usa donde hay algo que nombrar, no como
+     adorno repetido. */
+  .pt .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint);
+  }
+  .pt .eyebrow::before { content: ""; width: 18px; height: 1px; background: currentColor; }
+
+  /* ── Barra superior ───────────────────────────────────────────────────── */
+  .pt .nav {
+    position: sticky; top: 0; z-index: 60;
+    border-bottom: 1px solid transparent;
+    backdrop-filter: blur(18px);
+    transition: background .3s, border-color .3s;
+  }
+  .pt .nav.pegado { background: rgba(14,17,24,.82); border-bottom-color: var(--line); }
+  .pt .nav-in { display: flex; align-items: center; justify-content: space-between; height: 66px; gap: 20px; }
+  .pt .marca { display: flex; align-items: center; gap: 10px; font: 800 19px/1 Sora, sans-serif; letter-spacing: -.02em; }
+  .pt .marca i {
+    width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(140deg, var(--azul), #0060d0);
+    box-shadow: 0 0 22px -6px rgba(var(--azul-rgb),.8);
+  }
+  .pt .nav-links { display: none; gap: 28px; font-size: 14px; }
+  .pt .nav-links a { color: var(--muted); text-decoration: none; transition: color .2s; }
+  .pt .nav-links a:hover { color: var(--ink); }
+  @media (min-width: 900px) { .pt .nav-links { display: flex; } }
+
+  .pt .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 500 14px/1 "Instrument Sans", sans-serif; text-decoration: none; white-space: nowrap;
+    padding: 11px 18px; border-radius: 11px; border: 1px solid transparent; cursor: pointer;
+    transition: transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s, background .18s, border-color .18s;
+  }
+  .pt .btn-primario { background: var(--azul); color: var(--sobre-azul); box-shadow: 0 6px 24px -8px rgba(var(--azul-rgb),.9); }
+  .pt .btn-primario:hover { transform: translateY(-2px); box-shadow: 0 12px 34px -10px rgba(var(--azul-rgb),1); }
+  .pt .btn-fantasma { border-color: var(--line-strong); color: var(--ink); }
+  .pt .btn-fantasma:hover { background: rgba(255,255,255,.05); transform: translateY(-2px); }
+  .pt .btn-lg { padding: 14px 24px; font-size: 15px; border-radius: 13px; }
+  .pt .btn:focus-visible { outline: 2px solid var(--azul-claro); outline-offset: 3px; }
+
+  /* ── HERO ─────────────────────────────────────────────────────────────── */
+  .pt .hero { position: relative; padding: 74px 0 92px; overflow: hidden; }
+  /* El resplandor de fondo: dos manchas quietas, no un gradiente de lado a
+     lado. La luz sugiere una sala a oscuras con pantallas prendidas. */
+  .pt .hero::before, .pt .hero::after {
+    content: ""; position: absolute; border-radius: 50%; pointer-events: none;
+    filter: blur(90px); opacity: .5;
+  }
+  .pt .hero::before { width: 620px; height: 620px; top: -280px; left: -160px; background: radial-gradient(circle, rgba(var(--azul-rgb),.38), transparent 66%); }
+  .pt .hero::after { width: 520px; height: 520px; top: 40px; right: -220px; background: radial-gradient(circle, rgba(var(--violeta-rgb),.26), transparent 68%); }
+
+  /* El lienzo del pulso: detrás de todo el contenido del hero, sin capturar
+     clics. Se dibuja a resolución de pantalla pero con el DPR acotado a 2,
+     que a partir de ahí no se nota y sí se siente en el ventilador. */
+  .pt #pulso {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+    /* Se desvanece hacia abajo para entregarle la página a la franja de
+       números sin un corte duro. */
+    mask-image: linear-gradient(180deg, #000 55%, transparent);
+    -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  }
+
+  .pt .hero-grid { position: relative; display: grid; gap: 48px; align-items: center; }
+  @media (min-width: 1000px) { .pt .hero-grid { grid-template-columns: 1.02fr .98fr; gap: 56px; } }
+
+  .pt .chip-vivo {
+    display: inline-flex; align-items: center; gap: 9px;
+    font: 500 12px/1 "JetBrains Mono", monospace; letter-spacing: .04em;
+    color: var(--ink-soft); background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px 7px 11px;
+  }
+  .pt .punto { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 0 0 rgba(16,185,129,.7); animation: latir 2.4s ease-out infinite; }
+  @keyframes latir { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.55); } 70% { box-shadow: 0 0 0 9px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+
+  .pt h1 {
+    font-size: clamp(38px, 6.2vw, 66px); line-height: 1.02; margin: 22px 0 0;
+  }
+  .pt h1 .resalte {
+    background: linear-gradient(100deg, var(--azul-claro), var(--violeta) 82%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .pt .bajada { margin: 22px 0 0; font-size: 18px; line-height: 1.6; color: var(--ink-soft); max-width: 54ch; }
+  .pt .bajada b { color: var(--ink); font-weight: 600; }
+  .pt .acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .pt .pie-hero { margin: 20px 0 0; font-size: 13px; color: var(--faint); }
+
+  /* ── La cinta de operación: el corazón del hero ───────────────────────── */
+  .pt .consola {
+    border: 1px solid var(--line-strong); border-radius: var(--r-lg); overflow: hidden;
+    background: linear-gradient(180deg, var(--surface), var(--ground-deep));
+    box-shadow: 0 40px 90px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.03) inset;
+  }
+  .pt .consola-barra { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02); }
+  .pt .semaforo { display: flex; gap: 6px; }
+  .pt .semaforo i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.14); }
+  .pt .consola-titulo { font: 500 12px/1 "JetBrains Mono", monospace; color: var(--muted); letter-spacing: .05em; }
+  .pt .consola-reloj { margin-left: auto; font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); }
+
+  .pt .cinta { position: relative; height: 372px; overflow: hidden; padding: 6px 0; }
+  /* Difumina arriba y abajo para que la cinta parezca infinita. */
+  .pt .cinta::before, .pt .cinta::after { content: ""; position: absolute; inset-inline: 0; height: 56px; z-index: 2; pointer-events: none; }
+  .pt .cinta::before { top: 0; background: linear-gradient(180deg, var(--surface), transparent); }
+  .pt .cinta::after { bottom: 0; background: linear-gradient(0deg, var(--ground-deep), transparent); }
+  .pt .cinta-pista { animation: subir 34s linear infinite; }
+  .pt .cinta:hover .cinta-pista { animation-play-state: paused; }
+  @keyframes subir { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+
+  .pt .evento { display: grid; grid-template-columns: 62px 26px 1fr; align-items: start; gap: 10px; padding: 9px 16px; }
+  .pt .evento .hora { font: 400 11.5px/1.5 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .evento .ico { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; margin-top: -2px; }
+  .pt .evento .ico svg { width: 13px; height: 13px; }
+  .pt .evento .txt { font-size: 13.5px; line-height: 1.45; color: var(--ink-soft); min-width: 0; }
+  .pt .evento .txt b { color: var(--ink); font-weight: 600; }
+  .pt .evento .txt .quien { color: var(--faint); }
+  .pt .evento .plata { color: var(--verde); font-weight: 600; }
+
+  /* ── Franja de números ────────────────────────────────────────────────── */
+  .pt .cifras {
+    border-block: 1px solid var(--line);
+    background: rgba(255,255,255,.015);
+  }
+  .pt .cifras-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 760px) { .pt .cifras-grid { grid-template-columns: repeat(4, 1fr); } }
+  .pt .cifra { padding: 30px 24px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  @media (min-width: 760px) { .pt .cifra { border-bottom: 0; } .pt .cifra:last-child { border-right: 0; } }
+  .pt .cifra:nth-child(2n) { border-right: 0; }
+  @media (min-width: 760px) { .pt .cifra:nth-child(2n) { border-right: 1px solid var(--line); } }
+  .pt .cifra .n { font: 800 clamp(28px, 3.4vw, 40px)/1 Sora, sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .pt .cifra .q { margin: 9px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+
+  /* ── Secciones ────────────────────────────────────────────────────────── */
+  .pt section { position: relative; }
+  .pt .bloque { padding: 96px 0; }
+  .pt .cabeza { max-width: 62ch; }
+  .pt .cabeza h2 { font-size: clamp(28px, 3.8vw, 42px); line-height: 1.1; margin: 16px 0 0; }
+  .pt .cabeza p { margin: 16px 0 0; font-size: 17px; color: var(--ink-soft); }
+
+  /* ── Las 24 horas: una línea de tiempo de verdad ──────────────────────── */
+  /* Más angosta que el resto: la línea de tiempo se lee mejor en columna, y
+     así el texto no pasa de ~70 caracteres por renglón. */
+  .pt .dia { margin-top: 48px; position: relative; max-width: 880px; }
+  .pt .dia::before {
+    content: ""; position: absolute; left: 79px; top: 8px; bottom: 8px; width: 1px;
+    background: linear-gradient(180deg, transparent, var(--line-strong) 8%, var(--line-strong) 92%, transparent);
+  }
+  @media (max-width: 720px) { .pt .dia::before { left: 15px; } }
+  .pt .tramo { display: grid; grid-template-columns: 64px 32px 1fr; gap: 16px; align-items: start; padding: 14px 0; }
+  /* En mobile la hora sale de la columna izquierda y entra a la tarjeta. Ojo:
+     con `display:none` en el primer hijo, el segundo se corre a la columna 1 y
+     la tarjeta terminaba en la columna del nodo, de 32px de ancho. */
+  @media (max-width: 720px) {
+    .pt .tramo { grid-template-columns: 32px 1fr; gap: 12px; }
+    .pt .tramo .t-hora { display: none; }
+    .pt .t-caja::before {
+      content: attr(data-hora);
+      display: block; margin-bottom: 7px;
+      font: 500 11.5px/1 "JetBrains Mono", monospace; letter-spacing: .06em; color: var(--azul-claro);
+    }
+  }
+  .pt .t-hora { font: 500 13px/1.5 "JetBrains Mono", monospace; color: var(--muted); text-align: right; padding-top: 3px; }
+  .pt .t-nodo { display: grid; place-items: center; padding-top: 2px; }
+  .pt .t-nodo i {
+    width: 13px; height: 13px; border-radius: 50%; background: var(--ground);
+    border: 2px solid var(--faint); transition: border-color .3s, box-shadow .3s, transform .3s;
+  }
+  .pt .tramo.visto .t-nodo i { border-color: var(--azul); box-shadow: 0 0 0 5px rgba(var(--azul-rgb),.14); transform: scale(1.12); }
+  .pt .t-caja {
+    border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px;
+    background: var(--surface); opacity: 0; transform: translateY(14px);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.2,.7,.3,1), border-color .3s;
+  }
+  .pt .tramo.visto .t-caja { opacity: 1; transform: none; }
+  .pt .t-caja:hover { border-color: var(--line-strong); }
+  .pt .t-caja h3 { font: 600 15.5px/1.35 Sora, sans-serif; margin: 0; }
+  .pt .t-caja p { margin: 7px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+  .pt .t-caja .quien {
+    display: inline-block; margin-top: 11px;
+    font: 400 11px/1 "JetBrains Mono", monospace; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px;
+  }
+
+  /* ── Mapa de módulos ──────────────────────────────────────────────────── */
+  .pt .mapa { margin-top: 44px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+  .pt .area {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px;
+    background: var(--surface);
+    transition: transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s;
+  }
+  .pt .area::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(420px 160px at 12% -10%, var(--tinte, transparent), transparent 70%);
+  }
+  .pt .area:hover { transform: translateY(-4px); border-color: var(--borde, var(--line-strong)); }
+  .pt .area-top { display: flex; align-items: center; gap: 11px; }
+  .pt .area .ico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+  .pt .area .ico svg { width: 17px; height: 17px; }
+  .pt .area h3 { font: 700 16px/1.2 Sora, sans-serif; margin: 0; min-width: 0; }
+  .pt .area .cuenta { margin-left: auto; flex: none; white-space: nowrap; font: 500 11px/1 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .area ul { list-style: none; margin: 15px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .pt .area li { font-size: 12px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: rgba(255,255,255,.02); }
+
+  /* ── Capa de IA ───────────────────────────────────────────────────────── */
+  .pt .ia { background: linear-gradient(180deg, transparent, rgba(var(--violeta-rgb),.05) 40%, transparent); }
+  .pt .ia-grid { margin-top: 44px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+  .pt .agente {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px;
+    background: linear-gradient(165deg, var(--surface-2), var(--surface));
+    transition: transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s;
+  }
+  .pt .agente:hover { transform: translateY(-4px); border-color: rgba(var(--violeta-rgb),.4); }
+  .pt .agente .ico { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(var(--violeta-rgb),.15); }
+  .pt .agente .ico svg { width: 18px; height: 18px; }
+  .pt .agente h3 { font: 700 17px/1.25 Sora, sans-serif; margin: 16px 0 0; }
+  .pt .agente p { margin: 9px 0 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+  .pt .agente .dato { display: block; margin-top: auto; padding-top: 16px; font: 500 12px/1 "JetBrains Mono", monospace; color: var(--violeta); }
+
+  /* ── Marca blanca: los skins ──────────────────────────────────────────── */
+  .pt .skins { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .pt .skin {
+    display: flex; align-items: center; gap: 11px;
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px 12px 13px;
+    background: var(--surface); font-size: 14px;
+    font-family: inherit; color: inherit; cursor: pointer;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+  }
+  .pt .skin.quieta { cursor: default; }
+  .pt .skin:hover { transform: translateY(-3px); border-color: var(--line-strong); }
+  .pt .skin.quieta:hover { transform: none; }
+  /* La elegida queda marcada con SU propio color: es la prueba de que el
+     cambio pasó de verdad. */
+  .pt .skin[aria-pressed="true"] {
+    border-color: var(--azul); box-shadow: 0 0 0 1px var(--azul), 0 10px 30px -14px rgba(var(--azul-rgb), .8);
+  }
+  .pt .skin:focus-visible { outline: 2px solid var(--azul-claro); outline-offset: 3px; }
+
+  .pt .volver-skin {
+    display: inline-flex; align-items: center; gap: 7px; margin-top: 18px;
+    font: 400 12.5px/1 "Instrument Sans", sans-serif; color: var(--muted);
+    background: none; border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 14px; cursor: pointer; transition: color .2s, border-color .2s;
+  }
+  .pt .volver-skin:hover { color: var(--ink); border-color: var(--line-strong); }
+  .pt .skin .muestras { display: flex; }
+  .pt .skin .muestras i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--surface); margin-left: -6px; }
+  .pt .skin .muestras i:first-child { margin-left: 0; }
+
+  /* ── Infra ────────────────────────────────────────────────────────────── */
+  .pt .infra { margin-top: 40px; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .pt .pieza { background: var(--ground); padding: 22px; }
+  .pt .pieza .n { font: 700 24px/1 Sora, sans-serif; font-variant-numeric: tabular-nums; color: var(--azul-claro); }
+  .pt .pieza h4 { font: 600 14px/1.3 "Instrument Sans", sans-serif; margin: 10px 0 0; }
+  .pt .pieza p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+  /* ── Cierre ───────────────────────────────────────────────────────────── */
+  .pt .cierre { position: relative; overflow: hidden; padding: 76px 0 92px; text-align: center; }
+  .pt .cierre::before {
+    content: ""; position: absolute; width: 780px; height: 420px; left: 50%; top: 20px; translate: -50% 0;
+    background: radial-gradient(closest-side, rgba(var(--azul-rgb),.28), transparent 72%); filter: blur(60px); pointer-events: none;
+  }
+  .pt .cierre h2 { position: relative; font-size: clamp(30px, 4.6vw, 50px); line-height: 1.08; }
+  .pt .cierre p { position: relative; margin: 20px auto 0; max-width: 52ch; font-size: 17.5px; color: var(--ink-soft); }
+  .pt .cierre .acciones { position: relative; justify-content: center; margin-top: 34px; }
+
+  .pt footer { border-top: 1px solid var(--line); padding: 34px 0; }
+  .pt .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; font-size: 13px; color: var(--faint); }
+
+
+  /* ── Avatares ─────────────────────────────────────────────────────────────
+     Los mismos muñequitos que usa la app: dibujos deterministas, un seed por
+     persona. Van incrustados en la página, no pedidos a un servicio externo. */
+  .pt .pila { display: flex; align-items: center; }
+  .pt .pila img {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(160deg, var(--surface-2), var(--surface));
+    border: 2px solid var(--ground); margin-left: -9px;
+    transition: transform .22s cubic-bezier(.2,.7,.3,1);
+  }
+  .pt .pila img:first-child { margin-left: 0; }
+  .pt .pila:hover img { transform: translateY(-3px); }
+  /* Escalonado al pasar el mouse: la fila se levanta como una ola corta. */
+  .pt .pila:hover img:nth-child(2) { transition-delay: 40ms; }
+  .pt .pila:hover img:nth-child(3) { transition-delay: 80ms; }
+  .pt .pila:hover img:nth-child(4) { transition-delay: 120ms; }
+  .pt .pila:hover img:nth-child(5) { transition-delay: 160ms; }
+
+  .pt .sala-caras { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .pt .sala-caras .persona { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px 4px 4px; background: rgba(255,255,255,.02); }
+  .pt .sala-caras .persona img { width: 24px; height: 24px; border-radius: 50%; background: var(--surface-2); }
+  .pt .sala-caras .persona span { font-size: 12px; color: var(--ink-soft); }
+  .pt .sala-caras .persona .ok { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); }
+
+  .pt .evento .cara { width: 24px; height: 24px; border-radius: 50%; background: var(--surface-2); margin-top: -2px; }
+
+
+  /* ── Selector de público ──────────────────────────────────────────────────
+     La misma plataforma se le cuenta distinto a una empresa y a una agencia.
+     Cambia el guión de la consola, no las promesas. */
+  .pt .publico {
+    display: inline-flex; gap: 3px; margin-top: 26px; padding: 4px;
+    border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025);
+  }
+  .pt .publico button {
+    font: 500 13px/1 "Instrument Sans", sans-serif; color: var(--muted);
+    background: none; border: 0; border-radius: 9px; padding: 9px 14px; cursor: pointer;
+    transition: color .2s, background .2s, box-shadow .2s;
+  }
+  .pt .publico button:hover { color: var(--ink); }
+  .pt .publico button[aria-selected="true"] {
+    color: var(--ink); background: rgba(var(--azul-rgb),.16);
+    box-shadow: inset 0 0 0 1px rgba(var(--azul-rgb),.35);
+  }
+  .pt .publico button:focus-visible { outline: 2px solid var(--azul-claro); outline-offset: 2px; }
+
+  /* ── Lo que reemplaza ─────────────────────────────────────────────────────
+     Una fila por cambio. El "antes" apagado y el "después" con peso: la
+     jerarquía cuenta la historia sin necesidad de decirla. */
+  .pt .cambio { margin-top: 40px; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+  .pt .fila-cambio {
+    display: grid; grid-template-columns: 1fr 34px 1.75fr; gap: 16px; align-items: center;
+    background: var(--ground); padding: 20px 22px;
+    transition: background .25s;
+  }
+  .pt .fila-cambio:hover { background: var(--surface); }
+  @media (max-width: 780px) {
+    .pt .fila-cambio { grid-template-columns: 1fr; gap: 8px; padding: 18px; }
+    .pt .fila-cambio .flecha { transform: rotate(90deg); justify-self: start; }
+  }
+  .pt .antes { font-size: 14.5px; color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.2); }
+  .pt .flecha { color: var(--azul); font-size: 17px; text-align: center; }
+  .pt .despues b { display: block; font: 700 16px/1.3 Sora, sans-serif; }
+  .pt .despues em { display: block; margin-top: 5px; font-style: normal; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+
+
+  /* ── Maquetas de producto ─────────────────────────────────────────────────
+     Son la interfaz reconstruida en HTML, no capturas: se ve como Maven y no
+     expone datos de nadie. El marco de ventana se reusa entre las dos. */
+  .pt .marco {
+    border: 1px solid var(--line-strong); border-radius: var(--r-lg); overflow: hidden;
+    background: linear-gradient(180deg, var(--surface), var(--ground-deep));
+    box-shadow: 0 40px 90px -40px rgba(0,0,0,.95), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  .pt .marco-barra { display: flex; align-items: center; gap: 10px; padding: 11px 15px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02); }
+  .pt .marco-barra .tit { font: 500 12px/1 "JetBrains Mono", monospace; color: var(--muted); letter-spacing: .05em; }
+  .pt .marco-barra .der { margin-left: auto; display: flex; gap: 7px; align-items: center; }
+
+  .pt .con-mock { display: grid; gap: 34px; align-items: center; margin-top: 44px; }
+  @media (min-width: 1020px) {
+    .pt .con-mock { grid-template-columns: 1fr 1.28fr; gap: 44px; }
+    /* Invertido = la maqueta va primero, así que la columna ancha pasa a ser
+       la primera. Sin esto el simulador, que tiene tres paneles, se corta. */
+    .pt .con-mock.invertido { grid-template-columns: 1.28fr 1fr; }
+    .pt .con-mock.invertido > .marco { order: -1; }
+  }
+  .pt .con-mock .porques { display: grid; gap: 14px; }
+
+  /* Variante a lo ancho: para maquetas de tres paneles, que en media página
+     quedan con el texto cortado. La captura se lleva todo el ancho y los
+     porqués bajan a columnas. */
+  .pt .mock-ancho { display: block; margin-top: 44px; }
+  .pt .mock-ancho .porques { display: grid; margin-top: 26px; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 18px 28px; }
+  .pt .porque { display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; }
+  .pt .porque .tic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: rgba(16,185,129,.14); }
+  .pt .porque b { display: block; font: 600 14.5px/1.35 "Instrument Sans", sans-serif; }
+  .pt .porque span { display: block; margin-top: 3px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+
+  /* ── Maqueta del Messenger ────────────────────────────────────────────── */
+  .pt .msg { display: grid; grid-template-columns: 190px 1fr; min-height: 420px; }
+  @media (max-width: 640px) { .pt .msg { grid-template-columns: 1fr; } .pt .msg-lista { display: none; } }
+  .pt .msg-lista { border-right: 1px solid var(--line); padding: 8px; background: rgba(255,255,255,.012); }
+  .pt .msg-buscar { display: flex; align-items: center; gap: 7px; margin: 2px 4px 8px; padding: 7px 9px; border-radius: 9px; background: rgba(255,255,255,.04); font-size: 11.5px; color: var(--faint); }
+  .pt .msg-chat { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 10px; }
+  .pt .msg-chat.activo { background: rgba(var(--azul-rgb),.13); box-shadow: inset 0 0 0 1px rgba(var(--azul-rgb),.28); }
+  .pt .msg-chat img, .pt .msg-chat .grupo { width: 28px; height: 28px; border-radius: 50%; flex: none; background: var(--surface-2); }
+  .pt .msg-chat .grupo { display: grid; place-items: center; font: 600 10px/1 Sora, sans-serif; color: var(--azul-claro); background: rgba(var(--azul-rgb),.16); border-radius: 9px; }
+  .pt .msg-chat .quien { min-width: 0; flex: 1; }
+  .pt .msg-chat .quien b { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .msg-chat .quien span { display: block; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .msg-chat .badge { font: 600 10px/1 "JetBrains Mono", monospace; color: #fff; background: var(--azul); border-radius: 999px; padding: 3px 6px; }
+  .pt .msg-chat .mudo { color: var(--faint); font-size: 11px; }
+
+  .pt .msg-hilo { display: flex; flex-direction: column; }
+  .pt .msg-cabeza { display: flex; align-items: center; gap: 10px; padding: 11px 15px; border-bottom: 1px solid var(--line); }
+  .pt .msg-cabeza .grupo { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font: 600 11px/1 Sora, sans-serif; color: var(--azul-claro); background: rgba(var(--azul-rgb),.16); }
+  .pt .msg-cabeza b { font: 600 13.5px/1.2 "Instrument Sans", sans-serif; }
+  .pt .msg-cabeza small { display: block; font-size: 11px; color: var(--faint); }
+  .pt .msg-cuerpo { flex: 1; padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+  .pt .burbuja { display: grid; grid-template-columns: 26px 1fr; gap: 9px; max-width: 82%; }
+  .pt .burbuja img { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); }
+  .pt .burbuja .txt { border: 1px solid var(--line); border-radius: 4px 13px 13px 13px; background: var(--surface-2); padding: 9px 12px; font-size: 13px; line-height: 1.5; }
+  .pt .burbuja .nom { display: block; font-size: 11px; font-weight: 600; color: var(--azul-claro); margin-bottom: 3px; }
+  .pt .burbuja.mia { margin-left: auto; grid-template-columns: 1fr; max-width: 74%; }
+  .pt .burbuja.mia .txt { border-radius: 13px 4px 13px 13px; background: rgba(var(--azul-rgb),.16); border-color: rgba(var(--azul-rgb),.3); }
+  .pt .burbuja .pie { display: flex; align-items: center; gap: 5px; justify-content: flex-end; margin-top: 5px; font: 400 10px/1 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .burbuja .pie .vv { color: var(--azul-claro); font-size: 11px; letter-spacing: -3px; margin-left: 2px; }
+  .pt .reacciones { display: flex; gap: 5px; margin-top: 6px; }
+  .pt .reacciones span { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; background: rgba(255,255,255,.03); }
+  .pt .en-hilo { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11px; color: var(--azul-claro); }
+  .pt .album { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 7px; }
+  .pt .album i { display: block; aspect-ratio: 1; border-radius: 7px; background: linear-gradient(140deg, rgba(var(--azul-rgb),.22), rgba(var(--violeta-rgb),.18)); }
+  .pt .album i:last-child { display: grid; place-items: center; font: 600 11px/1 Sora, sans-serif; color: var(--ink-soft); background: rgba(255,255,255,.05); }
+  .pt .msg-composer { display: flex; align-items: center; gap: 10px; margin: 0 15px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.03); }
+  .pt .msg-composer .borrador { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .msg-composer .borrador em { font-style: normal; color: var(--ambar); font-size: 11px; }
+
+  /* ── Maqueta del simulador ────────────────────────────────────────────── */
+  .pt .sim { display: grid; grid-template-columns: 210px 1fr 280px; min-height: 430px; }
+  /* En pantallas medianas se cae el panel de sesiones, que es el más
+     decorativo de los tres; el chat y la evaluación son los que cuentan. */
+  @media (max-width: 900px) { .pt .sim { grid-template-columns: 1fr 240px; } .pt .sim-sesiones { display: none; } }
+  @media (max-width: 820px) { .pt .sim { grid-template-columns: 1fr; } .pt .sim-criterios { border-top: 1px solid var(--line); } }
+  .pt .sim-sesiones { border-right: 1px solid var(--line); padding: 10px; background: rgba(255,255,255,.012); }
+  .pt .sim-sesiones .rot { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 4px 6px 8px; }
+  .pt .sesion { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 9px; font-size: 12px; }
+  .pt .sesion.activa { background: rgba(var(--violeta-rgb),.14); box-shadow: inset 0 0 0 1px rgba(var(--violeta-rgb),.3); }
+  .pt .sesion i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .pt .sesion span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .pt .sim-chat { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+  .pt .sim-persona { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .pt .sim-persona .av { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(140deg, var(--rosa), var(--violeta)); }
+  .pt .sim-persona b { font: 600 13px/1.2 "Instrument Sans", sans-serif; }
+  .pt .sim-persona small { display: block; font-size: 10.5px; color: var(--faint); }
+  .pt .sim-persona .etiqueta { margin-left: auto; font: 500 10px/1 "JetBrains Mono", monospace; color: var(--rosa); border: 1px solid rgba(244,63,126,.3); border-radius: 999px; padding: 4px 8px; }
+  .pt .sim-cuerpo { flex: 1; padding: 13px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .pt .sim-b { max-width: 84%; border-radius: 13px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; }
+  .pt .sim-b.fan { background: var(--surface-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .pt .sim-b.cand { margin-left: auto; background: rgba(var(--violeta-rgb),.16); border: 1px solid rgba(var(--violeta-rgb),.3); border-top-right-radius: 4px; }
+  .pt .propina { display: flex; align-items: center; gap: 7px; align-self: center; font: 500 11.5px/1 "JetBrains Mono", monospace; color: var(--verde); border: 1px solid rgba(16,185,129,.3); background: rgba(16,185,129,.08); border-radius: 999px; padding: 6px 11px; }
+  .pt .sim-tools { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .pt .sim-tools span { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: rgba(255,255,255,.025); }
+
+  .pt .sim-criterios { padding: 12px; }
+  .pt .sim-criterios .rot { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 2px 4px 10px; }
+  .pt .crit { display: grid; grid-template-columns: 16px 1fr; gap: 8px; align-items: start; padding: 6px 4px; font-size: 12px; line-height: 1.4; }
+  .pt .crit i { width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 700; margin-top: 1px; }
+  .pt .crit .ok { background: rgba(16,185,129,.18); color: var(--verde); }
+  .pt .crit .medio { background: rgba(245,158,11,.18); color: var(--ambar); }
+  .pt .crit .no { background: rgba(244,91,91,.18); color: var(--red); }
+  .pt .veredicto { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .pt .veredicto .sello { display: block; font: 800 15px/1 Sora, sans-serif; color: var(--ambar); letter-spacing: .02em; }
+  .pt .veredicto p { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+
+
+  /* ── Maqueta de Cowork ────────────────────────────────────────────────── */
+  .pt .cw { display: grid; grid-template-columns: 196px 1fr; min-height: 440px; }
+  @media (max-width: 820px) { .pt .cw { grid-template-columns: 1fr; } .pt .cw-salas { display: none; } }
+  .pt .cw-salas { border-right: 1px solid var(--line); padding: 11px; background: rgba(255,255,255,.012); }
+  .pt .cw-salas .rot { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 3px 6px 9px; }
+  .pt .sala-fila { display: flex; align-items: center; gap: 9px; padding: 9px; border-radius: 10px; }
+  .pt .sala-fila.activa { background: rgba(var(--azul-claro-rgb),.13); box-shadow: inset 0 0 0 1px rgba(var(--azul-claro-rgb),.3); }
+  .pt .sala-fila .cam { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: rgba(var(--azul-claro-rgb),.14); flex: none; }
+  .pt .sala-fila .quien { min-width: 0; flex: 1; }
+  .pt .sala-fila .quien b { display: block; font-size: 12.5px; font-weight: 600; }
+  .pt .sala-fila .quien span { display: block; font-size: 10.5px; color: var(--faint); }
+  .pt .cw-salas .super { margin-top: 10px; padding: 9px; border: 1px dashed var(--line-strong); border-radius: 10px; font-size: 11px; color: var(--muted); text-align: center; }
+
+  .pt .cw-escena { display: flex; flex-direction: column; }
+  .pt .cw-cabeza { display: flex; align-items: center; gap: 10px; padding: 11px 15px; border-bottom: 1px solid var(--line); }
+  .pt .cw-cabeza b { font: 600 13.5px/1.2 "Instrument Sans", sans-serif; }
+  .pt .cw-cabeza small { display: block; font-size: 11px; color: var(--faint); }
+  .pt .grabando { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font: 500 10.5px/1 "JetBrains Mono", monospace; color: var(--red); border: 1px solid rgba(244,91,91,.3); border-radius: 999px; padding: 5px 9px; }
+  .pt .grabando i { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: latir 2s ease-out infinite; }
+
+  .pt .cw-grilla { flex: 1; padding: 13px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  @media (max-width: 620px) { .pt .cw-grilla { grid-template-columns: repeat(2, 1fr); } }
+  .pt .tile {
+    position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--line);
+    background: radial-gradient(120% 100% at 50% 0%, rgba(var(--azul-claro-rgb),.10), transparent 62%), var(--surface-2);
+    display: grid; place-items: center;
+  }
+  .pt .tile img { width: 46%; max-width: 66px; border-radius: 50%; background: rgba(255,255,255,.04); }
+  .pt .tile .nombre { position: absolute; left: 7px; bottom: 7px; display: flex; align-items: center; gap: 5px; font-size: 11px; background: rgba(9,11,16,.72); border-radius: 999px; padding: 3px 8px; backdrop-filter: blur(6px); }
+  .pt .tile .mudo-ico { color: var(--red); }
+  .pt .tile.hablando { border-color: rgba(16,185,129,.55); box-shadow: 0 0 0 1px rgba(16,185,129,.35), 0 0 26px -8px rgba(16,185,129,.5); }
+  .pt .tile.encuadre { border-color: rgba(245,158,11,.6); }
+  .pt .tile .aviso {
+    position: absolute; inset-inline: 7px; top: 7px; display: flex; align-items: center; gap: 6px;
+    font: 500 10px/1.3 "Instrument Sans", sans-serif; color: #0b1220;
+    background: var(--ambar); border-radius: 8px; padding: 5px 7px;
+  }
+  .pt .cw-controles { display: flex; align-items: center; gap: 7px; padding: 11px 15px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .pt .ctrl { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; background: rgba(255,255,255,.03); }
+  .pt .ctrl.on { color: var(--verde); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.08); }
+  .pt .ctrl.salir { margin-left: auto; color: var(--red); border-color: rgba(244,91,91,.3); background: rgba(244,91,91,.08); }
+
+  /* ── La llamada que sigue a la persona ────────────────────────────────── */
+  .pt .sigue { position: relative; }
+  /* El marco recorta su contenido; la flotante es hermana suya, no hija. */
+  .pt .sigue > .marco { overflow: hidden; }
+  /* La tarjeta flotante se apoya sobre la esquina de la ventana, como la
+     ventana del sistema que queda siempre al frente. */
+  .pt .pip {
+    position: absolute; right: -14px; bottom: -18px; width: 214px; z-index: 3;
+    border: 1px solid var(--line-strong); border-radius: 14px; overflow: hidden;
+    background: var(--ground-deep);
+    box-shadow: 0 26px 60px -18px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.05) inset;
+    animation: respira 6s ease-in-out infinite;
+  }
+  @media (max-width: 700px) { .pt .pip { position: static; width: 100%; margin-top: 14px; animation: none; } }
+  @keyframes respira { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .pt .pip-barra { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border-bottom: 1px solid var(--line); font: 500 10px/1 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .pip-barra .al-frente { margin-left: auto; color: var(--azul-claro); }
+  .pt .pip-caras { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 8px; }
+  .pt .pip-caras .mini { aspect-ratio: 4 / 3; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); }
+  .pt .pip-caras .mini img { width: 52%; max-width: 30px; border-radius: 50%; }
+  .pt .pip-pie { display: flex; gap: 5px; padding: 0 8px 9px; }
+  .pt .pip-pie span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; padding: 4px 0; }
+  .pt .pip-pie span.corta { color: var(--red); border-color: rgba(244,91,91,.3); }
+
+
+  /* ── Cowork · tablero del supervisor ─────────────────────────────────────
+     Reconstruido a partir de la pantalla real: NO es una grilla de caritas
+     como una videollamada, es un tablero de SALAS. Cada tarjeta trae su
+     previsualización, sus controles de escuchar/hablar y su código para
+     entrar. Eso es lo que se vende: una persona mirando nueve salas. */
+  .pt .cwx { display: grid; grid-template-columns: 236px 1fr; min-height: 520px; }
+  .pt .cwx-lado { border-right: 1px solid var(--line); background: rgba(255,255,255,.012); }
+  .pt .cwx-sesion { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .pt .cwx-sesion b { display: flex; align-items: center; gap: 6px; font: 700 13px/1.2 Sora, sans-serif; letter-spacing: .04em; }
+  .pt .cwx-sesion small { display: block; margin-top: 2px; font-size: 10.5px; color: var(--faint); }
+  .pt .cwx-sesion .iconos { display: flex; gap: 12px; margin-top: 10px; color: var(--faint); }
+  .pt .cwx-hub { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--ink-soft); }
+  .pt .cwx-hub .min { margin-left: auto; font-size: 10.5px; color: var(--azul-claro); }
+  .pt .cwx-grupo { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .pt .cwx-grupo .rot { display: flex; align-items: center; gap: 6px; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--ambar); }
+  .pt .cwx-grupo p { margin: 8px 0 0; font-size: 11.5px; color: var(--faint); }
+  .pt .cwx-vivo { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; font-size: 11.5px; }
+  .pt .cwx-vivo .sala-chip { margin-left: auto; font: 500 9.5px/1 "JetBrains Mono", monospace; color: var(--azul-claro); border: 1px solid rgba(var(--azul-claro-rgb),.3); border-radius: 999px; padding: 3px 6px; }
+
+  .pt .cwx-main { display: flex; flex-direction: column; min-width: 0; }
+  .pt .cwx-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 15px; border-bottom: 1px solid var(--line); }
+  .pt .cwx-top .rot { font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .pt .cwx-top .acciones-todas { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .pt .cwx-top .acciones-todas span { font-size: 11px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: rgba(255,255,255,.03); }
+  .pt .cwx-top .acciones-todas span:last-child { color: var(--azul-claro); border-color: rgba(var(--azul-claro-rgb),.3); }
+
+  .pt .cwx-grilla { padding: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 1120px) { .pt .cwx-grilla { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .pt .cwx-grilla { grid-template-columns: 1fr; } }
+  .pt .cwx-sala { border: 1px solid var(--line); border-radius: 13px; padding: 10px; background: rgba(255,255,255,.018); }
+  .pt .cwx-sala.con-gente { border-color: rgba(var(--azul-claro-rgb),.32); background: rgba(var(--azul-claro-rgb),.05); }
+  .pt .cwx-sala .cab { display: flex; align-items: center; gap: 7px; }
+  .pt .cwx-sala .cab b { font: 700 12.5px/1 Sora, sans-serif; letter-spacing: .05em; }
+  .pt .cwx-sala .cab .n-gente { margin-left: auto; font: 500 10px/1 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .cwx-sala .cab .accion { color: var(--faint); }
+  .pt .cwx-sala .comp { margin: 7px 0 0; font-size: 10.5px; color: var(--faint); }
+  .pt .cwx-sala .comp.si { color: var(--rosa); }
+  .pt .cwx-sala .pantalla {
+    margin-top: 8px; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; position: relative;
+    display: grid; place-items: center; background: #05070b; border: 1px solid var(--line);
+  }
+  .pt .cwx-sala .pantalla.vacia { background: rgba(255,255,255,.02); }
+  .pt .cwx-sala .pantalla .cara-cam { width: 40%; max-width: 54px; border-radius: 50%; opacity: .9; }
+  .pt .cwx-sala .pantalla .quien-cam { position: absolute; left: 6px; bottom: 6px; font-size: 9.5px; background: rgba(5,7,11,.78); border-radius: 6px; padding: 2px 6px; }
+  .pt .cwx-sala .pantalla .sin { font-size: 10.5px; color: var(--faint); text-align: center; line-height: 1.4; }
+  .pt .cwx-sala .par { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .pt .cwx-sala .par span { text-align: center; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; padding: 5px 0; }
+  .pt .cwx-sala .par span.activo { color: var(--verde); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.08); }
+  .pt .cwx-sala .par span.hablar { color: var(--rosa); border-color: rgba(244,63,126,.28); background: rgba(244,63,126,.07); }
+  .pt .cwx-sala .entrar { display: flex; gap: 6px; margin-top: 7px; }
+  .pt .cwx-sala .entrar b { flex: 1; text-align: center; font: 500 11px/1 "Instrument Sans", sans-serif; color: var(--ink-soft); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 0; }
+  .pt .cwx-sala .entrar i { width: 30px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; color: var(--rosa); font-style: normal; font-size: 11px; }
+  .pt .cwx-sala .codigo { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .18em; color: var(--faint); }
+
+  /* ── El Hub del supervisor y el chat, flotando sobre el tablero ────────── */
+  .pt .hub {
+    position: absolute; left: 50%; bottom: -26px; translate: -50% 0; width: 260px; z-index: 4;
+    border: 1px solid var(--line-strong); border-radius: 13px; overflow: hidden; background: var(--ground-deep);
+    box-shadow: 0 30px 70px -20px rgba(0,0,0,.95);
+  }
+  .pt .hub-barra { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--line); font: 500 10px/1 "JetBrains Mono", monospace; color: var(--ambar); }
+  .pt .hub-barra .ctrls { margin-left: auto; display: flex; gap: 6px; color: var(--faint); }
+  .pt .hub-tit { display: flex; align-items: center; padding: 7px 10px; font-size: 11px; }
+  .pt .hub-tit span { margin-left: auto; font-size: 10px; color: var(--faint); }
+  .pt .hub-escena { position: relative; margin: 0 10px; aspect-ratio: 4 / 3; border-radius: 9px; background: #2a2f3a; display: grid; place-items: center; }
+  .pt .hub-escena .yo { width: 54px; height: 54px; border-radius: 50%; background: var(--azul); display: grid; place-items: center; font: 700 16px/1 Sora, sans-serif; color: #fff; }
+  .pt .hub-escena .fl { position: absolute; top: 50%; translate: 0 -50%; color: var(--ink-soft); font-size: 15px; }
+  .pt .hub-escena .fl.izq { left: 6px; } .pt .hub-escena .fl.der { right: 6px; }
+  .pt .hub-escena .espera { position: absolute; bottom: 7px; inset-inline: 8px; text-align: center; font-size: 9.5px; color: var(--ink-soft); background: rgba(9,11,16,.75); border-radius: 6px; padding: 3px 0; }
+  .pt .hub-pie { display: flex; align-items: center; gap: 7px; padding: 8px 10px; font-size: 10px; color: var(--faint); }
+  .pt .hub-pie .sesion-chip { margin: 0 auto; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; color: var(--ink-soft); }
+  .pt .hub-ctrl { display: flex; justify-content: center; gap: 6px; padding: 0 10px 10px; }
+  .pt .hub-ctrl i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: rgba(255,255,255,.06); }
+  .pt .hub-ctrl i.off { background: rgba(244,91,91,.85); }
+
+  .pt .dm-flotante {
+    position: absolute; right: -10px; bottom: 6px; width: 218px; z-index: 5;
+    border: 1px solid var(--line-strong); border-radius: 13px; overflow: hidden; background: var(--ground-deep);
+    box-shadow: 0 26px 60px -18px rgba(0,0,0,.95);
+  }
+  @media (max-width: 1020px) { .pt .hub { position: static; translate: none; width: 100%; margin: 12px 0 0; } .pt .dm-flotante { position: static; width: 100%; margin: 12px 0 0; } }
+  .pt .dm-barra { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
+  .pt .dm-barra img { width: 18px; height: 18px; border-radius: 50%; }
+  .pt .dm-barra .ctrls { margin-left: auto; display: flex; gap: 6px; color: var(--faint); font-size: 10px; }
+  .pt .dm-vacio { padding: 22px 10px; text-align: center; font-size: 11px; color: var(--faint); }
+  .pt .dm-emojis { display: flex; gap: 3px; padding: 0 8px 6px; font-size: 11px; }
+  .pt .dm-input { display: flex; align-items: center; gap: 6px; margin: 0 8px 8px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 9px; font-size: 10.5px; color: var(--faint); }
+  .pt .dm-iconos { display: flex; gap: 8px; padding: 0 10px 9px; font-size: 10px; color: var(--faint); }
+
+  @media (max-width: 900px) {
+    .pt .cwx { grid-template-columns: 1fr; }
+    .pt .cwx-lado { display: none; }
+  }
+
+
+  /* ── Messenger · reconstruido de la pantalla real ─────────────────────────
+     Lo que faltaba en la primera versión: la cabecera con la presencia, los
+     chips de ACCESO RÁPIDO, las secciones plegables con su contador, la barra
+     de emojis sobre el composer y la fila de iconos con Scripts. */
+  .pt .mg { display: grid; grid-template-columns: 218px 1fr; min-height: 452px; }
+  .pt .mg-lista { border-right: 1px solid var(--line); background: rgba(255,255,255,.012); display: flex; flex-direction: column; min-width: 0; }
+  .pt .mg-presencia { display: flex; align-items: center; gap: 7px; padding: 10px 12px 8px; font-size: 11.5px; color: var(--ink-soft); }
+  .pt .mg-presencia .mas { margin-left: auto; color: var(--faint); }
+  .pt .mg-buscar { display: flex; align-items: center; gap: 7px; margin: 0 10px 10px; padding: 7px 9px; border-radius: 9px; background: rgba(255,255,255,.045); font-size: 11px; color: var(--faint); }
+  .pt .mg-rot { display: flex; align-items: center; gap: 5px; padding: 0 12px 7px; font: 500 9.5px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .pt .mg-rot .cuenta { margin-left: auto; }
+  .pt .mg-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 0 10px 12px; }
+  .pt .mg-chips span { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; background: rgba(255,255,255,.02); }
+  .pt .mg-chips span.on { color: var(--azul-claro); border-color: rgba(var(--azul-claro-rgb),.35); background: rgba(var(--azul-rgb),.1); }
+  .pt .mg-chips span b { margin-left: auto; font-size: 9.5px; color: #fff; background: var(--azul); border-radius: 999px; padding: 1px 5px; }
+
+  .pt .mg-fila { position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 0; }
+  .pt .mg-fila.on { background: rgba(var(--azul-rgb),.1); }
+  .pt .mg-fila.on::before { content: ""; position: absolute; left: 0; top: 5px; bottom: 5px; width: 3px; border-radius: 0 3px 3px 0; background: linear-gradient(180deg, var(--violeta), var(--azul)); }
+  .pt .mg-fila img, .pt .mg-fila .gr { width: 27px; height: 27px; border-radius: 50%; flex: none; background: var(--surface-2); }
+  .pt .mg-fila .gr { display: grid; place-items: center; }
+  .pt .mg-fila .quien { min-width: 0; flex: 1; }
+  .pt .mg-fila .quien b { display: block; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .mg-fila .quien span { display: block; font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .mg-fila .der { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
+  .pt .mg-fila .hora { font-size: 9.5px; color: var(--faint); }
+  .pt .mg-fila .nl { font: 700 9.5px/1 "JetBrains Mono", monospace; color: #fff; background: var(--azul); border-radius: 999px; padding: 2px 5px; }
+  .pt .mg-fila .mute { font-size: 9px; color: var(--faint); }
+  .pt .mg-mas { display: flex; align-items: center; gap: 7px; padding: 8px 12px; font-size: 11px; color: var(--faint); }
+
+  .pt .mg-hilo { display: flex; flex-direction: column; min-width: 0; }
+  .pt .mg-cab { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .pt .mg-cab img { width: 30px; height: 30px; border-radius: 50%; }
+  .pt .mg-cab b { font: 600 13px/1.2 "Instrument Sans", sans-serif; }
+  .pt .mg-cab small { display: block; font-size: 10.5px; color: var(--faint); }
+  .pt .mg-cab .der { margin-left: auto; display: flex; gap: 11px; color: var(--faint); }
+  .pt .mg-cuerpo { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 11px; }
+
+  .pt .mb { display: flex; gap: 8px; max-width: 78%; }
+  .pt .mb img { width: 25px; height: 25px; border-radius: 50%; flex: none; align-self: flex-end; }
+  .pt .mb .glob { border-radius: 13px 13px 13px 4px; background: var(--surface-2); border: 1px solid var(--line); padding: 8px 11px; font-size: 12.5px; line-height: 1.45; min-width: 0; }
+  .pt .mb .glob .nom { display: block; font-size: 10.5px; font-weight: 600; color: var(--violeta); margin-bottom: 3px; }
+  .pt .mb .hora { display: block; margin-top: 4px; font: 400 9.5px/1 "JetBrains Mono", monospace; color: var(--faint); text-align: right; }
+  .pt .mb.mia { margin-left: auto; }
+  .pt .mb.mia .glob { border-radius: 13px 13px 4px 13px; background: #253044; border-color: rgba(255,255,255,.09); }
+  .pt .mb.mia .hora .vv { color: var(--azul-claro); letter-spacing: -3px; margin-left: 3px; }
+  .pt .mb .album2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 6px; width: 168px; }
+  .pt .mb .album2 i { aspect-ratio: 1; border-radius: 6px; background: linear-gradient(140deg, rgba(var(--azul-rgb),.24), rgba(var(--violeta-rgb),.2)); }
+  .pt .mb .album2 i:last-child { display: grid; place-items: center; font: 600 10px/1 Sora, sans-serif; color: var(--ink-soft); background: rgba(255,255,255,.06); }
+  .pt .mb .reacc { display: flex; gap: 4px; margin-top: 6px; }
+  .pt .mb .reacc span { font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 6px; background: rgba(255,255,255,.03); }
+  .pt .mb .hilo-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 10.5px; color: var(--azul-claro); }
+
+  .pt .mg-emojis { display: flex; align-items: center; gap: 5px; padding: 7px 14px 0; font-size: 13px; }
+  .pt .mg-emojis .mas { font-size: 10px; color: var(--faint); border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; }
+  .pt .mg-input { margin: 8px 14px 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.03); font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .pt .mg-input em { font-style: normal; color: var(--ambar); font-size: 10.5px; margin-left: auto; white-space: nowrap; }
+  .pt .mg-iconos { display: flex; align-items: center; gap: 13px; padding: 9px 16px 13px; font-size: 11px; color: var(--faint); }
+  .pt .mg-iconos .scripts { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* Al final: si la query va arriba, `.mg-lista { display: flex }` la pisa y
+     en el teléfono la lista de conversaciones no se oculta. */
+  @media (max-width: 700px) {
+    .pt .mg { grid-template-columns: 1fr; }
+    .pt .mg-lista { display: none; }
+  }
+
+
+  /* ── Chatter Evaluator · reconstruido de la pantalla real ─────────────────
+     Son CUATRO columnas: criterios a la izquierda, sesiones, el chat al
+     centro con su fila de métricas, y la ficha del personaje a la derecha.
+     La primera versión tenía tres y le faltaban las métricas y la ficha, que
+     es justo lo que hace creíble al simulador. */
+  .pt .ev { display: grid; grid-template-columns: 178px 166px 1fr 246px; min-height: 520px; }
+
+  .pt .ev-top { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+  .pt .ev-top .fan { margin-left: auto; font: 500 10.5px/1 "JetBrains Mono", monospace; color: var(--faint); }
+
+  .pt .ev-criterios { border-right: 1px solid var(--line); padding: 11px; background: rgba(255,255,255,.012); display: flex; flex-direction: column; }
+  .pt .ev-criterios .rot { display: flex; align-items: center; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .pt .ev-criterios .rot span { margin-left: auto; }
+  .pt .ev-criterios .evaluando { margin: 7px 0 10px; font-size: 10.5px; color: var(--faint); }
+  .pt .ev-pct { display: flex; align-items: baseline; gap: 8px; }
+  .pt .ev-pct b { font: 800 26px/1 Sora, sans-serif; }
+  .pt .ev-pct .sello { margin-left: auto; font: 700 11px/1 Sora, sans-serif; color: var(--ambar); }
+  .pt .ev-cuenta { margin: 6px 0 11px; font-size: 9.5px; color: var(--faint); }
+  .pt .ev-crit { border: 1px solid var(--line); border-radius: 9px; padding: 7px 8px; margin-bottom: 6px; background: rgba(255,255,255,.02); }
+  .pt .ev-crit p { margin: 0 0 6px; font-size: 11px; line-height: 1.3; }
+  .pt .ev-crit .ops { display: flex; gap: 4px; }
+  .pt .ev-crit .ops span { flex: 1; text-align: center; font-size: 9.5px; color: var(--faint); border: 1px solid var(--line); border-radius: 6px; padding: 3px 0; }
+  .pt .ev-crit .ops span.si { color: var(--verde); border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.1); }
+  .pt .ev-crit .ops span.pc { color: var(--ambar); border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.1); }
+  .pt .ev-crit .ops span.no { color: var(--red); border-color: rgba(244,91,91,.35); background: rgba(244,91,91,.1); }
+  .pt .ev-enviar { margin-top: auto; text-align: center; font: 600 11.5px/1 "Instrument Sans", sans-serif; color: #fff; background: linear-gradient(100deg, var(--rosa), #f97316); border-radius: 9px; padding: 9px 0; }
+
+  .pt .ev-sesiones { border-right: 1px solid var(--line); padding: 11px; }
+  .pt .ev-sesiones .nueva { text-align: center; font: 600 11px/1 "Instrument Sans", sans-serif; color: var(--verde); border: 1px solid rgba(16,185,129,.3); background: rgba(16,185,129,.08); border-radius: 8px; padding: 7px 0; margin-bottom: 9px; }
+  .pt .ev-ses { display: flex; align-items: center; gap: 7px; padding: 7px; border-radius: 9px; }
+  .pt .ev-ses.on { background: rgba(244,63,126,.1); box-shadow: inset 0 0 0 1px rgba(244,63,126,.3); }
+  .pt .ev-ses img { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .pt .ev-ses .q { min-width: 0; }
+  .pt .ev-ses .q b { display: block; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .ev-ses .q span { display: block; font-size: 9.5px; color: var(--faint); }
+
+  .pt .ev-chat { display: flex; flex-direction: column; border-right: 1px solid var(--line); min-width: 0; }
+  .pt .ev-chat-cab { display: flex; align-items: center; gap: 9px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+  .pt .ev-chat-cab img { width: 28px; height: 28px; border-radius: 50%; }
+  .pt .ev-chat-cab b { font: 600 12.5px/1.2 "Instrument Sans", sans-serif; }
+  .pt .ev-chat-cab small { display: block; font-size: 10px; color: var(--faint); }
+  .pt .ev-metricas { margin-left: auto; display: flex; gap: 16px; }
+  .pt .ev-metricas div { text-align: center; }
+  .pt .ev-metricas .k { display: block; font: 500 8.5px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .pt .ev-metricas .v { display: block; margin-top: 4px; font: 600 11.5px/1 Sora, sans-serif; }
+  .pt .ev-metricas .v.corriendo { color: var(--verde); }
+  .pt .ev-stop { margin-left: 14px; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: rgba(244,91,91,.85); }
+  .pt .ev-cuerpo { flex: 1; padding: 12px 13px; display: flex; flex-direction: column; gap: 9px; }
+  .pt .ev-b { max-width: 78%; border-radius: 12px; padding: 8px 11px; font-size: 12px; line-height: 1.45; }
+  .pt .ev-b.fan { background: var(--surface-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .pt .ev-b.cand { margin-left: auto; background: rgba(var(--violeta-rgb),.16); border: 1px solid rgba(var(--violeta-rgb),.3); border-top-right-radius: 4px; }
+  .pt .ev-venta { align-self: center; display: inline-flex; align-items: center; gap: 6px; font: 500 10.5px/1 "JetBrains Mono", monospace; color: var(--verde); border: 1px solid rgba(16,185,129,.3); background: rgba(16,185,129,.08); border-radius: 999px; padding: 5px 10px; }
+  .pt .ev-emojis { display: flex; align-items: center; gap: 4px; padding: 7px 13px 0; font-size: 12px; }
+  .pt .ev-emojis .az { margin-left: auto; display: flex; gap: 4px; font-size: 9.5px; color: var(--faint); }
+  .pt .ev-emojis .az span { border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; }
+  .pt .ev-input { margin: 7px 13px 0; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.03); font-size: 11.5px; color: var(--faint); display: flex; align-items: center; }
+  .pt .ev-iconos { display: flex; align-items: center; gap: 12px; padding: 8px 15px 12px; font-size: 10.5px; color: var(--faint); }
+  .pt .ev-iconos .plata { color: var(--verde); font-weight: 600; }
+
+  .pt .ev-personaje { padding: 11px; overflow: hidden; }
+  .pt .ev-personaje .foto { width: 62px; height: 62px; border-radius: 50%; margin: 2px auto 0; display: block; background: linear-gradient(140deg, var(--rosa), var(--violeta)); }
+  .pt .ev-personaje h4 { margin: 8px 0 10px; text-align: center; font: 700 13px/1.2 Sora, sans-serif; }
+  .pt .ev-tarj { border: 1px solid var(--line); border-radius: 9px; padding: 8px; margin-bottom: 6px; background: rgba(255,255,255,.02); }
+  .pt .ev-tarj .tit { display: flex; align-items: center; gap: 5px; font: 500 9px/1 "JetBrains Mono", monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--azul-claro); }
+  .pt .ev-tarj .k { display: block; margin-top: 7px; font: 500 8.5px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .pt .ev-tarj .v { display: block; margin-top: 3px; font-size: 11px; line-height: 1.4; }
+  .pt .ev-tarj.rosa .tit { color: var(--rosa); }
+  .pt .ev-tarj.verde .tit { color: var(--verde); }
+
+  /* Van al final a propósito: una media query no le gana a una regla de la
+     misma especificidad escrita más abajo. Con las queries arriba, el panel
+     de criterios seguía visible en mobile y se comía la pantalla. */
+  @media (max-width: 1150px) {
+    .pt .ev { grid-template-columns: 178px 1fr 232px; }
+    .pt .ev-sesiones { display: none; }
+  }
+  @media (max-width: 860px) {
+    .pt .ev { grid-template-columns: 1fr; }
+    .pt .ev-criterios, .pt .ev-personaje { display: none; }
+  }
+
+  /* ── Aparición al hacer scroll ────────────────────────────────────────── */
+  .pt .revelar { opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.3,1); }
+  .pt .revelar.visto { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pt *, .pt *::before, .pt *::after { animation: none !important; transition: none !important; }
+    .pt .revelar, .pt .t-caja { opacity: 1 !important; transform: none !important; }
+  }
+
+
+  /* ── Las gracias del Messenger ────────────────────────────────────────────
+     Fila de fichitas para lo que es LINDO del chat (estrellas entre
+     compañeros, stickers, ventana flotante, el timbre). Va aparte de los
+     "porqués" de abajo, que son los argumentos serios: mezclarlos hacía que
+     lo divertido se leyera como ficha técnica. */
+  .pt .gracias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .pt .gracia {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--ink-soft);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px 7px 10px;
+    background: rgba(255,255,255,.025);
+    transition: transform .2s cubic-bezier(.2,.7,.3,1), border-color .2s, background .2s;
+  }
+  .pt .gracia:hover { transform: translateY(-2px); border-color: var(--line-strong); background: rgba(255,255,255,.05); }
+  .pt .gracia svg { width: 14px; height: 14px; flex: none; color: var(--azul-claro); }
+  .pt .gracia.violeta svg { color: var(--violeta); }
+  .pt .gracia.verde svg { color: var(--verde); }
+  .pt .gracia.ambar svg { color: var(--ambar); }
+  .pt .gracia.rosa svg { color: var(--rosa); }
+
+  /* ── Caras en las tarjetas de la capa de IA ───────────────────────────────
+     Seis íconos violetas iguales no dicen nada: lo que la IA hace, lo hace
+     SOBRE personas. Cada tarjeta muestra a quién le pasa la cosa. */
+  .pt .agente .escena { margin-top: 16px; }
+  .pt .agente .escena img { border-radius: 50%; background: var(--surface-2); }
+
+  /* Un agente hablándole a un equipo */
+  .pt .ag-equipo { display: flex; align-items: center; gap: 10px; }
+  .pt .ag-equipo .bot {
+    width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none;
+    background: rgba(var(--violeta-rgb),.18); border: 1px solid rgba(var(--violeta-rgb),.35);
+  }
+  .pt .ag-equipo .bot svg { width: 15px; height: 15px; color: var(--violeta); }
+  .pt .ag-equipo .flecha-mini { color: var(--faint); font-size: 12px; }
+
+  /* Persona + su número (nota, puntaje, calificación) */
+  .pt .ag-persona { display: flex; align-items: center; gap: 9px; }
+  .pt .ag-persona img { width: 26px; height: 26px; }
+  .pt .ag-persona .nom { font-size: 12.5px; color: var(--ink-soft); }
+  .pt .ag-persona .num {
+    margin-left: auto; font: 600 12px/1 "JetBrains Mono", monospace;
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px;
+  }
+  .pt .ag-persona .num.alto { color: var(--verde); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.08); }
+  .pt .ag-persona .num.medio { color: var(--ambar); border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.08); }
+  .pt .ag-persona + .ag-persona { margin-top: 7px; }
+
+  /* Dos cámaras, una con el aviso de encuadre */
+  .pt .ag-camaras { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pt .ag-cam {
+    position: relative; aspect-ratio: 4 / 3; border-radius: 10px; display: grid; place-items: center;
+    border: 1px solid var(--line); background: radial-gradient(120% 100% at 50% 0%, rgba(var(--azul-claro-rgb),.1), transparent 62%), var(--surface-2);
+  }
+  .pt .ag-cam img { width: 38%; max-width: 34px; }
+  .pt .ag-cam.ok { border-color: rgba(16,185,129,.45); }
+  .pt .ag-cam.fuera { border-color: rgba(245,158,11,.55); }
+  .pt .ag-cam .marca {
+    position: absolute; inset-inline: 5px; bottom: 5px; text-align: center;
+    font: 500 9px/1.3 "Instrument Sans", sans-serif; border-radius: 6px; padding: 3px 4px;
+  }
+  .pt .ag-cam.ok .marca { color: var(--verde); background: rgba(16,185,129,.14); }
+  .pt .ag-cam.fuera .marca { color: #0b1220; background: var(--ambar); }
+
+  /* Compromisos verificados: cara + cumplido / sin avance */
+  .pt .ag-linea { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+  .pt .ag-linea + .ag-linea { margin-top: 7px; }
+  .pt .ag-linea img { width: 24px; height: 24px; }
+  .pt .ag-linea .estado { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font: 500 11px/1 "JetBrains Mono", monospace; }
+  .pt .ag-linea .estado.si { color: var(--verde); }
+  .pt .ag-linea .estado.no { color: var(--red); }
+  .pt .ag-linea .estado svg { width: 12px; height: 12px; }
+
+  /* ── El formulario de demo ────────────────────────────────────────────────
+     Cierra la página: es la única acción que le pedimos a quien entra. Dos
+     columnas en escritorio (el argumento a la izquierda, la tarjeta a la
+     derecha) y una sola en angosto. */
+  .pt .demo { position: relative; overflow: hidden; padding: 84px 0 96px; border-top: 1px solid var(--line); }
+  .pt .demo::before {
+    content: ""; position: absolute; width: 820px; height: 460px; left: 50%; top: -60px; translate: -50% 0;
+    background: radial-gradient(closest-side, rgba(var(--azul-rgb),.22), transparent 72%);
+    filter: blur(70px); pointer-events: none;
+  }
+  .pt .demo-grid { position: relative; display: grid; gap: 40px; align-items: start; }
+  @media (min-width: 980px) { .pt .demo-grid { grid-template-columns: 1fr 1.05fr; gap: 56px; } }
+  .pt .demo h2 { font-size: clamp(28px, 4.2vw, 46px); line-height: 1.06; margin: 16px 0 0; }
+  .pt .demo .bajada { margin-top: 18px; }
+  .pt .demo-listo { display: grid; gap: 12px; margin-top: 28px; }
+  .pt .demo-listo div { display: grid; grid-template-columns: 22px 1fr; gap: 11px; align-items: start; font-size: 14px; color: var(--ink-soft); }
+  .pt .demo-listo svg { width: 16px; height: 16px; color: var(--verde); margin-top: 2px; }
+
+  .pt .tarjeta-form {
+    border: 1px solid var(--line-strong); border-radius: var(--r-lg); padding: 26px;
+    background: linear-gradient(180deg, var(--surface), var(--ground-deep));
+    box-shadow: 0 40px 90px -40px rgba(0,0,0,.95), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  .pt .campos { display: grid; gap: 14px; }
+  @media (min-width: 620px) { .pt .campos.dos { grid-template-columns: 1fr 1fr; } }
+  .pt .campo { display: grid; gap: 6px; min-width: 0; }
+  .pt .campo > span { font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .pt .campo > span em { font-style: normal; color: var(--rosa); }
+  .pt .campo input, .pt .campo select, .pt .campo textarea {
+    width: 100%; font: 400 14px/1.5 "Instrument Sans", sans-serif; color: var(--ink);
+    background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 11px;
+    padding: 11px 13px; transition: border-color .2s, background .2s, box-shadow .2s;
+  }
+  .pt .campo textarea { resize: vertical; min-height: 92px; }
+  .pt .campo select { appearance: none; cursor: pointer; }
+  .pt .campo input::placeholder, .pt .campo textarea::placeholder { color: var(--faint); }
+  .pt .campo input:hover, .pt .campo select:hover, .pt .campo textarea:hover { border-color: var(--line-strong); }
+  .pt .campo input:focus, .pt .campo select:focus, .pt .campo textarea:focus {
+    outline: none; border-color: var(--azul); background: rgba(var(--azul-rgb),.06);
+    box-shadow: 0 0 0 3px rgba(var(--azul-rgb),.16);
+  }
+  /* El campo trampa: fuera de la pantalla y fuera del recorrido del tabulador.
+     `display:none` NO sirve — hay bots que lo detectan y lo saltean. */
+  .pt .trampa { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .pt .elige { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pt .elige button {
+    font: 400 12.5px/1 "Instrument Sans", sans-serif; color: var(--muted); cursor: pointer;
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px;
+    transition: color .18s, background .18s, border-color .18s, transform .18s;
+  }
+  .pt .elige button:hover { color: var(--ink); transform: translateY(-1px); }
+  .pt .elige button[aria-pressed="true"] {
+    color: var(--ink); background: rgba(var(--azul-rgb),.14); border-color: rgba(var(--azul-rgb),.45);
+  }
+  .pt .elige button:focus-visible { outline: 2px solid var(--azul-claro); outline-offset: 2px; }
+
+  .pt .form-pie { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .pt .form-pie .btn { flex: 1; min-width: 180px; }
+  .pt .form-pie .nota { font-size: 12px; color: var(--faint); }
+  .pt .btn[disabled] { opacity: .6; cursor: progress; }
+  .pt .form-error {
+    margin-top: 14px; font-size: 13px; color: #ffb4b4;
+    border: 1px solid rgba(244,91,91,.35); background: rgba(244,91,91,.1);
+    border-radius: 11px; padding: 10px 13px;
+  }
+
+  /* El "gracias": ocupa el lugar de la tarjeta, no aparece debajo. Si el
+     formulario sigue ahí, la gente lo manda dos veces. */
+  .pt .gracias-panel { display: grid; place-items: center; text-align: center; padding: 34px 22px; }
+  .pt .gracias-panel .tic-grande {
+    width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(16,185,129,.14); border: 1px solid rgba(16,185,129,.4);
+  }
+  .pt .gracias-panel .tic-grande svg { width: 26px; height: 26px; color: var(--verde); }
+  .pt .gracias-panel h3 { font: 700 20px/1.2 Sora, sans-serif; margin: 18px 0 0; }
+  .pt .gracias-panel p { margin: 10px 0 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-soft); max-width: 42ch; }
+
+  /* El anillito del botón mientras se envía. */
+  .pt .girando { animation: girar 1s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }

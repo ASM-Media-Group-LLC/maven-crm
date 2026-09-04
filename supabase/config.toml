@@ -21,6 +21,12 @@ verify_jwt = false
 [functions.admin-user-actions]
 verify_jwt = false
 
+# Formulario de demo de la portada: lo llama gente SIN cuenta, así que no
+# puede pedir JWT. La función se defiende sola (campo trampa, tope por IP y
+# por correo, y solo escribe en su propia tabla).
+[functions.demo-request]
+verify_jwt = false
+
 [functions.livekit-token]
 verify_jwt = false
 

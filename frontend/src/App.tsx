@@ -27,9 +27,8 @@ import Logo from "@/components/Logo";
 // Only pages that are public, full-screen, or rarely visited stay
 // lazy (login forgot/reset, video calls, share tokens).
 
-const Landing = lazy(() => import("./pages/Landing"));
+const Portada = lazy(() => import("./pages/portada/Portada"));
 const Login = lazy(() => import("./pages/Login"));
-const Register = lazy(() => import("./pages/Register"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Rare / public — kept lazy.
@@ -239,9 +238,12 @@ const App = () => (
             <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={<Landing />} />
+              <Route path="/" element={<Portada />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              {/* El registro público está cerrado (ver `bloquear_alta_publica`
+                  en la base): quien llega con un link viejo cae en el
+                  formulario de demo, no en un formulario que no funciona. */}
+              <Route path="/register" element={<Navigate to="/#demo" replace />} />
               <Route path="/concept" element={<Concept />} />
               {import.meta.env.DEV && Credentials && <Route path="/credentials" element={<Credentials />} />}
               

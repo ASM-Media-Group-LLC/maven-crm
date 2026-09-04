@@ -601,7 +601,7 @@ const Concept = () => {
                     variant={tier.highlight ? "default" : "outline"}
                     asChild
                   >
-                    <Link to="/register">
+                    <Link to="/#demo">
                       {tier.cta} <ChevronRight className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -629,7 +629,7 @@ const Concept = () => {
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
-                  <Link to="/register">Solicitar demo</Link>
+                  <Link to="/#demo">Solicitar demo</Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild className="border-white/10 text-white hover:bg-white/10">
                   <Link to="/">Volver al inicio</Link>

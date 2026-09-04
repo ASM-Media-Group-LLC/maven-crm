@@ -194,6 +194,17 @@ Deno.serve(async (req) => {
           password: tempPassword,
           email_confirm: true,
           user_metadata: { full_name: fullName },
+          // SELLO DE ALTA LEGÍTIMA — no es cosmético.
+          //
+          // El guard `bloquear_alta_publica` en auth.users rechaza cualquier
+          // alta que no traiga este sello, y `app_metadata` solo lo puede
+          // escribir la API de admin: el endpoint público de registro ignora
+          // lo que el navegador manda ahí. Es lo que hace imposible que
+          // alguien se cree una cuenta desde afuera aunque tenga la clave
+          // anon (que está en el bundle, o sea que la tiene cualquiera).
+          //
+          // Si esto se saca, las altas del panel dejan de funcionar.
+          app_metadata: { alta: "admin" },
         });
         if (createError) return respuestaDeAltaFallida(createError);
         newUser = data;
@@ -229,6 +240,8 @@ Deno.serve(async (req) => {
             password: tempPassword,
             email_confirm: true,
             user_metadata: { full_name: fullName },
+            // El mismo sello que arriba: sin esto el guard rechaza el alta.
+            app_metadata: { alta: "admin" },
           });
           if (!createError) {
             newUser = data;

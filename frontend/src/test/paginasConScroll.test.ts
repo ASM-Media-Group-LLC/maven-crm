@@ -33,7 +33,7 @@ const SON_LAYOUT = new Set(["HRLayout"]);
 
 /** Páginas que NO viven dentro del AppShell: la ventana scrollea sola. */
 const FUERA_DEL_SHELL = new Set([
-  "Landing", "Login", "Register", "NotFound", "Concept", "ForgotPassword", "ResetPassword",
+  "Portada", "Login", "Register", "NotFound", "Concept", "ForgotPassword", "ResetPassword",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
 ]);
 
