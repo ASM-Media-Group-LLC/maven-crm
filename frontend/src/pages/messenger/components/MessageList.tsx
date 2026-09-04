@@ -26,6 +26,10 @@ interface MessageListProps {
   getReadByUsers: (messageId: string) => string[];
   getDeliveredByUsers: (messageId: string) => string[];
   totalParticipants: number;
+  /** Fondo del hilo. Lo usa la ventanita del muelle para dejarlo OPACO: el
+   *  resto de la ventana es de vidrio, pero texto largo sobre un fondo que
+   *  cambia según lo que quede debajo se vuelve ilegible al arrastrarla. */
+  className?: string;
   highlightedMsgId?: string | null;
   onOpenThread: (msg: ChatMessage) => void;
   getThreadCount: (messageId: string) => number;
@@ -69,7 +73,7 @@ export default function MessageList({
   loading, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
-  hasMore, loadingMore, onLoadMore,
+  hasMore, loadingMore, onLoadMore, className,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -210,7 +214,7 @@ export default function MessageList({
   }
 
   return (
-    <div className="flex-1 relative overflow-hidden">
+    <div className={cn("flex-1 relative overflow-hidden", className)}>
     <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (

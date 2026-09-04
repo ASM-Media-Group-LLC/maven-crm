@@ -126,7 +126,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPanelAbierto(false)} aria-hidden />
           <div
-            className="fixed z-50 flex w-[360px] flex-col overflow-hidden rounded-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/5"
+            className="glass-panel fixed z-50 flex w-[360px] flex-col overflow-hidden rounded-2xl text-popover-foreground"
             style={{ ...anclarPanel(360, 520), width: 360 }}
             role="dialog"
             aria-label="Chats"
@@ -159,7 +159,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setPanelAbierto((v) => !v)}
-            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-card text-foreground shadow-lg ring-1 ring-border/60 transition-shadow hover:shadow-xl"
+            className="glass-panel relative flex h-14 w-14 items-center justify-center rounded-full text-foreground transition-transform hover:scale-105 active:scale-95"
             title="Mensajes — arrastrame para moverme"
             aria-expanded={panelAbierto}
             aria-label="Mensajes"
@@ -201,7 +201,7 @@ function Burbuja({
       <button
         type="button"
         onClick={onOpen}
-        className="block rounded-full shadow-lg ring-2 ring-background transition-transform hover:scale-105"
+        className="block rounded-full shadow-[0_10px_28px_-8px_hsl(228_40%_6%_/_.45)] ring-1 ring-border/50 transition-transform hover:scale-105 active:scale-95"
         title={conversation.displayName}
         aria-label={`Abrir chat con ${conversation.displayName}`}
       >

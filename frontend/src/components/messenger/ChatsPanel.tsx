@@ -15,6 +15,12 @@ import type { ConversationWithDetails } from "@/pages/messenger/types";
 
 type Tab = "all" | "unread" | "groups";
 
+/** ⚠️ DICEBEAR: el muñequito llega envuelto en el anillo degradé de
+ *  UserAvatar (+4px por lado), así que mide 40px donde unas iniciales miden
+ *  32 y las filas quedaban dentadas. El hueco se reserva SIEMPRE de 40 y el
+ *  avatar se centra dentro, tenga muñequito o no. */
+const HUECO_AVATAR = "relative flex h-10 w-10 shrink-0 items-center justify-center";
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "unread", label: "No leídos" },
@@ -140,7 +146,7 @@ export default function ChatsPanel({
 
       {/* Altura FIJA, no max-h: radix necesita altura definida para que su
           viewport interno active el scrollbar (mismo detalle que la campana). */}
-      <ScrollArea className="border-t" style={{ height: alto }}>
+      <ScrollArea className="border-t border-border/40" style={{ height: alto }}>
         {loading ? (
           <p className="p-4 text-center text-xs text-muted-foreground">Cargando…</p>
         ) : visibles.length === 0 && personas.length === 0 ? (
@@ -180,7 +186,7 @@ export default function ChatsPanel({
         )}
       </ScrollArea>
 
-      <div className="border-t p-2">
+      <div className="border-t border-border/40 p-2">
         <Button variant="ghost" size="sm" className="w-full text-xs font-semibold text-primary" onClick={onVerTodo}>
           Ver todo en Messenger
         </Button>
@@ -203,14 +209,15 @@ function FilaPersona({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60"
+      className="group flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:scale-[.985]"
     >
-      <div className="relative shrink-0">
+      <div className={HUECO_AVATAR}>
         <UserAvatar name={nombre} src={perfil.avatar_url} seed={perfil.avatar_seed ?? undefined} size="sm" />
         <span
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
+            "presence-ring absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-popover",
             getStatusColor(estado, online),
+            online && "animate-presence-pulse motion-reduce:animate-none",
           )}
         />
       </div>
@@ -218,6 +225,11 @@ function FilaPersona({
         <p className="truncate text-sm font-medium">{nombre}</p>
         <p className="truncate text-xs text-muted-foreground">Enviar mensaje</p>
       </div>
+      {/* La acción se nombra al pasar por encima: deja claro que tocar acá
+          ABRE una conversación nueva, no busca dentro de una que ya existe. */}
+      <span className="shrink-0 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
+        Escribir
+      </span>
     </button>
   );
 }
@@ -239,9 +251,15 @@ function FilaChat({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60"
+      className="group relative flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:scale-[.985]"
     >
-      <div className="relative shrink-0">
+      {/* Lo no leído en el canto IZQUIERDO, donde entra la vista, y no en un
+          punto de 10px al final de la fila. Va junto al nombre en negrita y la
+          hora en color: tres señales que apuntan a lo mismo. */}
+      {hasUnread && (
+        <span className="pointer-events-none absolute inset-y-3 left-0.5 w-[3px] rounded-full bg-primary" />
+      )}
+      <div className={HUECO_AVATAR}>
         {isGroup ? (
           <Avatar className="h-8 w-8">
             {conversation.avatar_url && (
@@ -262,11 +280,12 @@ function FilaChat({
             />
             <span
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
+                "presence-ring absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-popover",
                 getStatusColor(
                   otro ? status(otro.user_id) : null,
                   otro ? online(otro.user_id) : false,
                 ),
+                otro && online(otro.user_id) && "animate-presence-pulse motion-reduce:animate-none",
               )}
             />
           </>
@@ -287,8 +306,6 @@ function FilaChat({
         </p>
       </div>
 
-      {/* Punto de no leído, como en Facebook: el número exacto vive en la lista grande. */}
-      {hasUnread && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />}
     </button>
   );
 }

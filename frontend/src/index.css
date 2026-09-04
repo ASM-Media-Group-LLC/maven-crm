@@ -887,3 +887,84 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   outline: 2px solid hsl(var(--ring)) !important;
   outline-offset: 2px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   VIDRIO DEL MUELLE FLOTANTE (Messenger)
+   Material de las superficies que flotan SOBRE el dashboard: panel de
+   chats, ventanita, botón del muelle y burbujas minimizadas.
+
+   Todo sale de TOKENS, así que sigue solo al usuario:
+     · el skin  → el tinte del vidrio y los acentos son hsl(var(--primary)),
+                  así que con Rojo Kash el vidrio se entibia y con Esmeralda
+                  se enfría, sin una sola línea extra;
+     · el tema  → --popover/--border ya cambian en claro/oscuro;
+     · OLED     → sube la opacidad: al 58% sobre negro puro el panel se
+                  volvía un parche gris y se pierde justo lo que OLED busca;
+     · contraste alto → el vidrio se APAGA. Quien lo prendió pidió
+                  legibilidad, no material.
+   ───────────────────────────────────────────────────────────────────── */
+.glass-panel {
+  background:
+    linear-gradient(hsl(var(--primary) / .05), hsl(var(--primary) / .05)),
+    hsl(var(--popover) / .70);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid hsl(0 0% 100% / .7);
+  /* El brillo de canto (inset) es lo que separa el vidrio del fondo sin
+     necesitar un borde grueso; la sombra va en dos capas — una ambiental
+     ancha y una de contacto corta. */
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .9),
+    0 24px 56px -16px hsl(228 40% 12% / .28),
+    0 2px 8px hsl(228 40% 12% / .12),
+    0 0 0 1px hsl(var(--border) / .5);
+}
+
+.dark .glass-panel {
+  background:
+    linear-gradient(hsl(var(--primary) / .07), hsl(var(--primary) / .07)),
+    hsl(var(--popover) / .58);
+  border-color: hsl(0 0% 100% / .10);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .14),
+    0 28px 64px -16px hsl(0 0% 0% / .62),
+    0 3px 10px hsl(0 0% 0% / .34);
+}
+
+.dark[data-oled] .glass-panel {
+  background:
+    linear-gradient(hsl(var(--primary) / .07), hsl(var(--primary) / .07)),
+    hsl(var(--popover) / .86);
+}
+
+/* Después de OLED a propósito: misma especificidad (0,3,0), gana el último. */
+:root[data-contrast="high"] .glass-panel {
+  background: hsl(var(--popover));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: hsl(var(--border));
+  box-shadow: 0 14px 34px -10px hsl(228 40% 4% / .45);
+}
+
+/* Sin backdrop-filter (Firefox con la aceleración apagada, GPU vieja):
+   sólido. Translúcido SIN blur no es vidrio, es texto sobre ruido.
+   Las dos reglas repiten la especificidad de arriba para poder ganarles. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel { background: hsl(var(--popover)); }
+  .dark .glass-panel { background: hsl(var(--popover)); }
+}
+
+/* ⚠️ MUÑEQUITOS DICEBEAR SOBRE VIDRIO.
+   UserAvatar envuelve el muñequito en un anillo degradé y deja un hueco de
+   2px pintado con bg-background — OPACO. Sobre el panel translúcido eso
+   punza un disco sólido detrás de cada muñequito (y solo de esos: las
+   iniciales no llevan anillo, así que se veía disparejo). Acá el hueco se
+   vuelve transparente y el vidrio pasa por debajo del anillo. */
+.glass-panel .ua-ring-gap { background: transparent; }
+
+/* El punto de presencia lleva un borde del color de la superficie para
+   recortarse del avatar. Sobre vidrio ese borde opaco se nota como un
+   mordisco: acá se hace translúcido. */
+.glass-panel .presence-ring { border-color: hsl(var(--popover) / .55); }
+.dark .glass-panel .presence-ring { border-color: hsl(var(--popover) / .5); }
+:root[data-contrast="high"] .glass-panel .presence-ring { border-color: hsl(var(--popover)); }

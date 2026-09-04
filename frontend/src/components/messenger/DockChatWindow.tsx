@@ -62,12 +62,12 @@ export default function DockChatWindow({
 
   return (
     <div
-      className="pointer-events-auto flex flex-col overflow-hidden rounded-t-xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5"
+      className="glass-panel pointer-events-auto flex flex-col overflow-hidden rounded-t-2xl"
       style={{ width: VENTANA_ANCHO, height: VENTANA_ALTO }}
       role="dialog"
       aria-label={`Chat con ${conversation.displayName}`}
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 bg-gradient-to-r from-primary/10 via-card to-card px-2.5 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-gradient-to-b from-primary/10 to-transparent px-2.5 py-2">
         <div className="relative shrink-0">
           {isGroup ? (
             <Avatar className="h-6 w-6">
@@ -92,7 +92,7 @@ export default function DockChatWindow({
               />
               <span
                 className={cn(
-                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-2 border-card",
+                  "presence-ring absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-2 border-card",
                   getStatusColor(
                     otro ? getStatus(otro.user_id) : null,
                     otro ? isOnline(otro.user_id) : false,
@@ -123,6 +123,7 @@ export default function DockChatWindow({
           Envolverlo en un div que no fuera flex le dejaba altura 0 y la ventana
           salía vacía aunque los mensajes estuvieran cargados. Igual que ChatView. */}
       <MessageList
+        className="bg-card/85"
         messages={messages}
         profiles={profiles}
         chatType={conversation.type}

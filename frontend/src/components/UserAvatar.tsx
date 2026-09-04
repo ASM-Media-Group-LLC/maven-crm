@@ -88,7 +88,11 @@ export function UserAvatar({
     <div className={cn("relative inline-flex shrink-0", className)}>
       {showRing ? (
         <div className="rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
-          <div className="rounded-full bg-background p-[2px]">{core}</div>
+          {/* ua-ring-gap: sobre una superficie translúcida (.glass-panel del
+              muelle) este hueco opaco punzaba un disco sólido detrás del
+              muñequito. La clase deja que el CSS lo vuelva transparente ahí;
+              en el resto de la app no cambia nada. */}
+          <div className="ua-ring-gap rounded-full bg-background p-[2px]">{core}</div>
         </div>
       ) : (
         core
