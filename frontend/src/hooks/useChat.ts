@@ -1066,10 +1066,46 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       if (status === "SUBSCRIBED") {
         void presenceChannel.track({ user_id: userId, typing: false });
       }
+      // ⚠️ SIN ESTO EL "ESTÁ ESCRIBIENDO" DEJABA DE FUNCIONAR EN SILENCIO.
+      //
+      // El canal de mensajes ya tenía vigilancia (scheduleMessagesReconnect) y
+      // se recuperaba solo; este NO tenía ninguna, así que cuando se caía —y se
+      // cae: los `track` de presencia devuelven "timed out" a menudo— nadie lo
+      // reconstruía. Medido en producción: la conversación seguía abierta, con
+      // sus canales de mensajes, reacciones y recibos vivos, pero el de
+      // escritura ya no estaba. A partir de ahí ni se anuncia ni se recibe nada
+      // hasta cambiar de conversación, que es lo que rehacía el efecto.
+      //
+      // Se engancha al MISMO temporizador que los mensajes porque los dos
+      // canales nacen y mueren en este efecto: al reconectar se rehacen juntos.
+      // Ojo: NO se engancha "CLOSED". La limpieza del efecto borra el
+      // temporizador ANTES de llamar a removeChannel, así que un CLOSED durante
+      // el desmontaje dejaría programado un reconecte huérfano que nadie
+      // cancela — y eso rehace el efecto después de haberlo desmontado.
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        scheduleMessagesReconnect();
+      }
     });
+
+    // ⚠️ Y además se comprueba que el canal SIGA AHÍ.
+    //
+    // No alcanza con reaccionar a los estados: se midió en producción que el
+    // canal de escritura desaparecía del cliente —ya no estaba en la lista de
+    // canales— con la conversación todavía abierta y sus canales de mensajes,
+    // reacciones y recibos vivos. Si se va sin avisar, ningún callback de
+    // estado se entera. Cada 15s se mira si sigue vivo y, si no, se rehace por
+    // el mismo camino que los mensajes. "joining" cuenta como vivo: recién
+    // suscrito todavía no llegó a "joined".
+    const vigilanteTyping = setInterval(() => {
+      const c = typingChannelRef.current;
+      const vivo = !!c && supabase.getChannels().includes(c)
+        && (c.state === "joined" || c.state === "joining");
+      if (!vivo) scheduleMessagesReconnect();
+    }, 15000);
 
     return () => {
       window.removeEventListener("focus", handleFocus);
+      clearInterval(vigilanteTyping);
       if (messagesRealtimeReconnectTimerRef.current) {
         clearTimeout(messagesRealtimeReconnectTimerRef.current);
         messagesRealtimeReconnectTimerRef.current = null;
@@ -1181,11 +1217,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   retryMessageRef.current = retryMessage;
 
   const sendTyping = useCallback(
-    async (isTyping: boolean) => {
+    (isTyping: boolean) => {
       if (!conversationId || !user) return;
       const channel = typingChannelRef.current;
       if (!channel) return;
-      await channel.track({ user_id: user.id, typing: isTyping });
+      // Sin `await`: el ack de un `track` de presencia tarda —y a veces devuelve
+      // "timed out"— aunque el estado sí se haya aplicado. Esperarlo solo servía
+      // para encadenar esperas en cada tecla. Se dispara y se olvida.
+      void channel.track({ user_id: user.id, typing: isTyping }).catch(() => {});
     },
     [conversationId, user]
   );
