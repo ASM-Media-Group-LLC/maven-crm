@@ -50,6 +50,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useAvisarme } from "@/lib/avisoPersona";
 import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode, useSaveAvatarSeed, useRemoveUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
@@ -109,6 +110,8 @@ const MyAccountTab = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const profileQ = useMyProfile();
+  // Los avisos de "esto cambió en TU cuenta" van con el muñequito propio.
+  const avisarme = useAvisarme();
   const upload = useUploadUserAvatar();
   const saveSeed = useSaveAvatarSeed();
   const removeAvatar = useRemoveUserAvatar();
@@ -123,7 +126,7 @@ const MyAccountTab = () => {
   const handleFile = async (file: File) => {
     try {
       await upload.mutateAsync(file);
-      toast.success(t("settings.photoUpdated"));
+      avisarme(t("settings.photoUpdated"));
     } catch (e) {
       toast.error(t("settings.couldNotUpload"), { description: (e as Error).message });
     } finally {
@@ -195,7 +198,7 @@ const MyAccountTab = () => {
                   onClick={async () => {
                     try {
                       await removeAvatar.mutateAsync();
-                      toast.success(t("settings.photoRemoved"), { description: t("settings.photoRemovedDesc") });
+                      avisarme(t("settings.photoRemoved"), t("settings.photoRemovedDesc"));
                     } catch (e) {
                       toast.error(t("settings.couldNotRemove"), { description: (e as Error).message });
                     }
@@ -247,7 +250,7 @@ const MyAccountTab = () => {
                     try {
                       await saveSeed.mutateAsync(seedDraft);
                       setSeedDraft(null);
-                      toast.success(t("settings.doodleSaved"));
+                      avisarme(t("settings.doodleSaved"));
                     } catch (e) {
                       toast.error(t("settings.couldNotSave"), { description: (e as Error).message });
                     }
@@ -355,6 +358,7 @@ const DEFAULT_CUSTOM_HUE = 265;
 //     temporada activa — el switch del skin de temporada (overlay).
 const AppearanceCard = () => {
   const { t } = useLanguage();
+  const avisarme = useAvisarme();
   const { theme, setTheme } = useTheme();
   const { skin, setSkin } = useSkin();
   const { prefs, setPrefs } = useUiPrefs();
@@ -435,7 +439,7 @@ const AppearanceCard = () => {
                 onClick={() => {
                   if (!customActive && skin === s.id) return;
                   setSkin(s.id);
-                  toast.success(t("settings.skinApplied"), { description: s.label });
+                  avisarme(t("settings.skinApplied"), s.label);
                 }}
               />
             ))}
@@ -458,7 +462,7 @@ const AppearanceCard = () => {
                 onClick={() => {
                   if (!customActive && skin === s.id) return;
                   setSkin(s.id);
-                  toast.success(t("settings.skinApplied"), { description: s.label });
+                  avisarme(t("settings.skinApplied"), s.label);
                 }}
               />
             ))}
@@ -473,7 +477,7 @@ const AppearanceCard = () => {
               onClick={() => {
                 if (customActive) return;
                 setPrefs({ customHue: prefs.customHue ?? DEFAULT_CUSTOM_HUE });
-                toast.success(t("settings.skinApplied"), { description: t("settings.skinCustom") });
+                avisarme(t("settings.skinApplied"), t("settings.skinCustom"));
               }}
             />
           </div>
@@ -573,6 +577,7 @@ const WhatsappPhoneCard = ({
   pushName: string | null;
   loading: boolean;
 }) => {
+  const avisarme = useAvisarme();
   const { t } = useLanguage();
   // El componente PhoneInput maneja value como "+<code> <number>". Al
   // hidratar desde el backend (que guarda "+573001234567" sin espacio)
@@ -598,7 +603,7 @@ const WhatsappPhoneCard = ({
     if (trimmed === "" || trimmed === "+") {
       try {
         await updateMut.mutateAsync(null);
-        toast.success(t("settings.waRemoved"));
+        avisarme(t("settings.waRemoved"));
         setDirty(false);
       } catch (e) {
         toast.error(t("settings.couldNotSave"), { description: (e as Error).message });
@@ -616,9 +621,7 @@ const WhatsappPhoneCard = ({
       await updateMut.mutateAsync(normalized);
       setValue(normalized);
       setDirty(false);
-      toast.success(t("settings.waSaved"), {
-        description: t("settings.waSavedDesc"),
-      });
+      avisarme(t("settings.waSaved"), t("settings.waSavedDesc"));
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes("duplicate") || msg.includes("unique")) {

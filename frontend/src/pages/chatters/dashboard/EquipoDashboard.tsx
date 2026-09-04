@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/chatters/useChatterRendimiento";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-presets";
+import { PRESET_CONFIG, diasEntre, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { useDescansos, useNombres, useRoster } from "@/pages/chatters/horarios/useHorarios";
 import { TURNOS, diaSemanaDe, isoDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
 import FeedbackDialog from "./FeedbackDialog";
@@ -113,7 +113,10 @@ export default function EquipoDashboard() {
   const periodo = useChatterPeriodo(desde, hasta);
   const { grupos, miembros, cargando: rosterCargando } = useRoster();
   const semana = useMemo(() => lunesDe(new Date()), []);
-  const descansos = useDescansos(semana, semana);
+  // Las semanas que toca el rango elegido. Antes se pedía solo la actual, así
+  // que mirando "ayer" a un lunes —o cualquier rango de otra semana— no se
+  // sabía quién descansaba.
+  const descansos = useDescansos(lunesDe(rango.from), lunesDe(rango.to));
   const nombres = useNombres([
     ...miembros.map((m) => m.identity_id),
     ...(descansos.data ?? []).map((d) => d.identity_id).filter(Boolean) as string[],
@@ -139,10 +142,9 @@ export default function EquipoDashboard() {
   // ── Hoy: quién trabaja y quién descansa ──────────────────────────────────
   const hoy = useMemo(() => {
     const wd = diaSemanaDe(new Date());
-    const libres = new Set(
-      (descansos.data ?? []).filter((d) => d.weekday === wd && d.identity_id).map((d) => d.identity_id as string),
-    );
-    const notas = new Set((descansos.data ?? []).filter((d) => d.weekday === wd && !d.identity_id && d.note).map((d) => d.note as string));
+    const deHoy = (descansos.data ?? []).filter((d) => d.week_start === semana && d.weekday === wd);
+    const libres = new Set(deHoy.filter((d) => d.identity_id).map((d) => d.identity_id as string));
+    const notas = new Set(deHoy.filter((d) => !d.identity_id && d.note).map((d) => d.note as string));
     const porTurno = new Map<Shift, Array<{ identity_id: string; grupo: string | undefined }>>();
     for (const m of miembros) {
       if (libres.has(m.identity_id)) continue;
@@ -151,14 +153,46 @@ export default function EquipoDashboard() {
       porTurno.set(m.shift, lista);
     }
     return { libres: [...libres], porTurno, notas: [...notas], enTurno: miembros.length - libres.size };
-  }, [descansos.data, miembros, grupos]);
+  }, [descansos.data, miembros, grupos, semana]);
+
+  // ── Quién descansó TODO el rango ─────────────────────────────────────────
+  // Pedido de Jhon: a quien descansó no se le pone nota, va el ícono de
+  // descanso. Con un rango de un día esto es "descansó ese día"; con una
+  // semana entra solo quien no trabajó ninguno de los días, porque a quien
+  // trabajó tres sí le corresponde su nota por esos tres.
+  //
+  // Se exige que HAYA descanso cargado para cada día del rango: si de algún
+  // día no sabemos nada, nadie queda marcado. Preferimos no poner el ícono
+  // antes que poner uno inventado.
+  const descansaronTodoElRango = useMemo(() => {
+    const dias: Array<{ semana: string; wd: number }> = [];
+    for (const d of diasEntre(desde, hasta)) {
+      const f = new Date(`${d}T12:00:00`);
+      dias.push({ semana: lunesDe(f), wd: diaSemanaDe(f) });
+    }
+    if (dias.length === 0) return new Set<string>();
+
+    const porDia = dias.map(({ semana: sem, wd }) =>
+      new Set(
+        (descansos.data ?? [])
+          .filter((r) => r.week_start === sem && r.weekday === wd && r.identity_id)
+          .map((r) => r.identity_id as string),
+      ),
+    );
+    // Intersección: quien aparece en todos los días del rango.
+    return porDia.reduce((acc, hoyLibres) => {
+      const siguen = new Set<string>();
+      for (const id of acc) if (hoyLibres.has(id)) siguen.add(id);
+      return siguen;
+    }, porDia[0]);
+  }, [descansos.data, desde, hasta]);
 
   // ── A quién empujar ──────────────────────────────────────────────────────
   // Tres motivos distintos, y se nombran: "flojo" y "sin datos" no son lo
   // mismo (ver chatter-dashboard-sin-datos: un 0 reparte notas injustas).
   const atencion = useMemo(() => {
     const flojos = filas.filter((f) => f.activo && f.nota_promedio != null && Number(f.nota_promedio) < 6 && f.dias_con_nota >= 2);
-    const sinDatos = filas.filter((f) => f.activo && f.dias_con_nota === 0);
+    const sinDatos = filas.filter((f) => f.activo && f.dias_con_nota === 0 && !descansaronTodoElRango.has(f.identity_id));
     const bajoMeta = filas.filter((f) => {
       if (!f.activo) return false;
       const p = pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0));
@@ -415,7 +449,10 @@ export default function EquipoDashboard() {
             <p className="px-4 py-8 text-center text-xs text-muted-foreground">Sin datos del equipo en este rango.</p>
           ) : (
             <ul className="divide-y divide-white/5">
-              {ordenadas.map((f) => <Fila key={f.identity_id} f={f} puesto={puestos.get(f.identity_id) ?? null} maxVentas={maxVentas} />)}
+              {ordenadas.map((f) => (
+                <Fila key={f.identity_id} f={f} puesto={puestos.get(f.identity_id) ?? null}
+                  maxVentas={maxVentas} descanso={descansaronTodoElRango.has(f.identity_id)} />
+              ))}
             </ul>
           )}
         </section>
@@ -444,7 +481,7 @@ function Motivo({ nombre, detalle, icono: Icono, clase }: { nombre: string; deta
   );
 }
 
-function Fila({ f, puesto, maxVentas }: { f: ChatterPeriodo; puesto: number | null; maxVentas: number }) {
+function Fila({ f, puesto, maxVentas, descanso }: { f: ChatterPeriodo; puesto: number | null; maxVentas: number; descanso: boolean }) {
   const cumplimiento = pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0));
   const nota = f.nota_promedio == null ? null : Number(f.nota_promedio);
   const tn = tonoNota(nota);
@@ -467,7 +504,9 @@ function Fila({ f, puesto, maxVentas }: { f: ChatterPeriodo; puesto: number | nu
             )}
           </p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {f.dias_con_nota > 0 ? `${f.dias_con_nota} de ${f.dias_del_periodo} días con dato` : "sin datos en el rango"}
+            {f.dias_con_nota > 0
+              ? `${f.dias_con_nota} de ${f.dias_del_periodo} días con dato`
+              : descanso ? "descansó" : "sin datos en el rango"}
             {f.modelos_distintas > 0 && ` · ${f.modelos_distintas} modelo${f.modelos_distintas === 1 ? "" : "s"}`}
             {f.horas_total != null && ` · ${Math.round(Number(f.horas_total))} h`}
             {/* El feedback del TL ya está dentro de la nota; acá se dice cuánto
@@ -487,12 +526,25 @@ function Fila({ f, puesto, maxVentas }: { f: ChatterPeriodo; puesto: number | nu
             </p>
           )}
         </div>
-        {/* La nota como anillo de color: el número importa, el color se lee antes. */}
-        <span className={cn("flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full ring-2", tn.anillo)}>
-          <span className={cn("font-display text-xs font-bold tabular-nums leading-none", tn.texto)}>
-            {nota == null ? "—" : nota.toFixed(1)}
+        {/* La nota como anillo de color: el número importa, el color se lee
+            antes. Y a quien descansó no se le pone nota: va el ícono de
+            descanso, porque un "—" al lado de los demás se lee como si
+            hubiera trabajado y no hubiera dato. */}
+        {descanso ? (
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-2 ring-white/10 bg-white/[0.03]"
+            title="Descansó en este rango"
+          >
+            <CalendarOff className="h-4 w-4 text-muted-foreground" />
+            <span className="sr-only">Descansó en este rango</span>
           </span>
-        </span>
+        ) : (
+          <span className={cn("flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full ring-2", tn.anillo)}>
+            <span className={cn("font-display text-xs font-bold tabular-nums leading-none", tn.texto)}>
+              {nota == null ? "—" : nota.toFixed(1)}
+            </span>
+          </span>
+        )}
       </div>
       {/* Proporción de ventas contra el mejor del rango: el ranking se ve sin leer. */}
       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/5">

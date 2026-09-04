@@ -1,5 +1,7 @@
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
 
 // AVISOS CON CARA.
@@ -81,3 +83,35 @@ export function avisarPersona({ nombre, foto, seed, titulo, detalle, tono = "neu
 }
 
 export { CaraDelAviso };
+
+/** Avisos sobre MI PROPIA cuenta: "skin aplicado", "foto actualizada",
+ *  "número guardado". Van con mi muñequito porque hablan de algo mío, no de
+ *  algo que hizo la plataforma sola — y ver tu propia cara confirma, sin
+ *  leer, que el cambio quedó en TU cuenta y no en otra.
+ *
+ *  Se usa como hook porque necesita el perfil:
+ *
+ *      const avisarme = useAvisarme();
+ *      avisarme("Skin aplicado", s.label);
+ *
+ *  Los ERRORES no pasan por acá: un fallo lo produjo la plataforma, y ahí el
+ *  ícono rojo dice más que una cara. */
+export function useAvisarme() {
+  const { user } = useAuth();
+  const perfil = useMyProfile();
+
+  return (titulo: string, detalle?: string, tono: TonoAviso = "bien") =>
+    avisarPersona({
+      nombre:
+        (user?.user_metadata?.full_name as string | undefined) ||
+        perfil.data?.full_name ||
+        "Tu cuenta",
+      foto: perfil.data?.avatar_url ?? null,
+      // Sin foto, el muñequito sale del seed que la persona eligió; si no
+      // eligió ninguno, del id, que es lo que usa el resto de la app.
+      seed: perfil.data?.avatar_seed ?? user?.id ?? null,
+      titulo,
+      detalle,
+      tono,
+    });
+}
