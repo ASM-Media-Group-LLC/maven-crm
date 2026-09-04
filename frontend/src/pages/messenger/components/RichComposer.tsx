@@ -57,6 +57,9 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
   onUpdateRef.current = onUpdate;
   const onPasteFilesRef = useRef(onPasteFiles);
   onPasteFilesRef.current = onPasteFiles;
+  // El editor se usa dentro de editorProps (que se captura al crearlo) → ref viva.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
 
   const editor = useEditor({
     extensions: [
@@ -74,6 +77,12 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       },
       // Enter envía (Shift+Enter = salto de línea), igual que antes del editor rico.
       handleKeyDown: (view, event) => {
+        // Cmd/Ctrl+Enter SIEMPRE envía: salida garantizada desde cualquier bloque.
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          onEnterRef.current();
+          return true;
+        }
         if (event.key === "Enter" && !event.shiftKey) {
           // Dentro de una LISTA, CITA o BLOQUE DE CÓDIGO, Enter tiene que hacer lo
           // suyo (siguiente viñeta / salto de línea), no enviar: si no, nunca se
@@ -81,9 +90,20 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
           // y en una viñeta vacía Enter sale de la lista. Fuera de esos bloques,
           // Enter envía como siempre.
           const { $from } = view.state.selection;
+          let dentroDeCita = false;
           for (let d = $from.depth; d > 0; d--) {
             const nombre = $from.node(d).type.name;
+            if (nombre === "blockquote") dentroDeCita = true;
             if (nombre === "listItem" || nombre === "codeBlock" || nombre === "blockquote") {
+              // En una CITA, TipTap no sale solo con un párrafo vacío (a diferencia de las
+              // listas): se quedaba encerrado para siempre y encima no se podía enviar.
+              // Con el párrafo vacío, Enter levanta el bloque y sale de la cita.
+              if (dentroDeCita && $from.parent.content.size === 0) {
+                event.preventDefault();
+                const ed = editorRef.current;
+                if (ed) ed.chain().focus().lift("blockquote").run();
+                return true;
+              }
               return false;
             }
           }
@@ -121,6 +141,8 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
     },
   }, [placeholder]);
 
+  editorRef.current = editor;
+
   useImperativeHandle(ref, () => ({
     focus: () => editor?.chain().focus().run(),
     clear: () => editor?.chain().clearContent(true).run(),
@@ -148,7 +170,16 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
     if (!v) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); }
     else {
       const conProtocolo = /^(https?:|mailto:)/i.test(v) ? v : `https://${v}`;
-      editor.chain().focus().extendMarkRange("link").setLink({ href: conProtocolo }).run();
+      if (editor.state.selection.empty) {
+        // Sin texto seleccionado, setLink no tenía a qué aplicarse y el botón "no hacía
+        // nada". Ahora se inserta la propia URL ya enlazada.
+        editor.chain().focus().insertContent({
+          type: "text", text: conProtocolo,
+          marks: [{ type: "link", attrs: { href: conProtocolo } }],
+        }).run();
+      } else {
+        editor.chain().focus().extendMarkRange("link").setLink({ href: conProtocolo }).run();
+      }
     }
     setLinkValue("");
     setLinkOpen(false);
