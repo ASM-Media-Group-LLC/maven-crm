@@ -640,7 +640,10 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     autofocus: inicial?.citar ? "start" : false,
     editorProps: {
       attributes: {
-        class: "focus:outline-none min-h-[220px] text-sm leading-relaxed",
+        // `break-words`: sin esto un texto largo sin espacios (una URL, un id) no
+        // tiene dónde partirse y el editor se sale de la hoja. Mismo bug que tenía
+        // el cajón del Messenger.
+        class: "focus:outline-none min-h-[220px] text-sm leading-relaxed break-words",
       },
     },
   });

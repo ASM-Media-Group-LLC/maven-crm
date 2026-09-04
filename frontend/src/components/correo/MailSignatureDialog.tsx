@@ -60,7 +60,8 @@ export function MailSignatureDialog({
     ],
     content: "",
     editorProps: {
-      attributes: { class: "focus:outline-none min-h-[120px] text-sm leading-relaxed" },
+      // `break-words` por lo mismo que el cuerpo del correo.
+      attributes: { class: "focus:outline-none min-h-[120px] text-sm leading-relaxed break-words" },
     },
   });
 
