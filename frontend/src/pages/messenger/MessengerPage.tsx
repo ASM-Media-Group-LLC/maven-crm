@@ -7,7 +7,8 @@ import NewChatModal from "./NewChatModal";
 
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import { ConversationWithDetails, ChatMessage } from "./types";
-import { useChat, useMessages } from "@/hooks/useChat";
+import { useChatShared } from "@/hooks/ChatProvider";
+import { useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
@@ -35,7 +36,7 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChat();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChatShared();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
   useNotificationPermission();
@@ -71,6 +72,15 @@ export default function MessengerPage() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, conversations, selectChat, setSearchParams]);
+
+  // Abrir el modal de "Mensaje nuevo" al llegar desde el desplegable de mensajes
+  // del topbar (/messenger?nuevo=1).
+  useEffect(() => {
+    if (!searchParams.get("nuevo")) return;
+    setNewChatOpen(true);
+    searchParams.delete("nuevo");
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
 

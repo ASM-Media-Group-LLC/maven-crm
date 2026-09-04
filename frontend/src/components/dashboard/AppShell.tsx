@@ -6,6 +6,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
 import ClariAiFab from "@/components/ClariAiFab";
+import { ChatProvider } from "@/hooks/ChatProvider";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -62,6 +63,7 @@ const AppShell = () => {
   useMessengerNotifications();
 
   return (
+    <ChatProvider>
     <SidebarProvider>
       {/* h-dvh (no h-screen): en mobile el alto dinámico descuenta el teclado virtual y la
           barra del navegador, así el composer del Messenger no queda tapado. */}
@@ -78,6 +80,7 @@ const AppShell = () => {
       {isAdmin && <ClariAiFab />}
       {popups.length > 0 && <AnnouncementPopup popups={popups} />}
     </SidebarProvider>
+    </ChatProvider>
   );
 };
 

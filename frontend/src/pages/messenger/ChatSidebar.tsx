@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails } from "./types";
+import { formatTime, truncate, getMessagePreview } from "./preview";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,23 +51,6 @@ interface ChatSidebarProps {
   onToggleMute: (id: string, muted: boolean) => void;
 }
 
-function formatTime(dateStr?: string) {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  if (diff < 86400000 && date.getDate() === now.getDate()) {
-    return date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-  }
-  if (diff < 172800000) return "Ayer";
-  // "14 jul", no "14/07": el formato numérico es ambiguo (¿día/mes o
-  // mes/día?) y el resto de la app ya usa el mes abreviado.
-  return date.toLocaleDateString("es", { day: "numeric", month: "short" });
-}
-
-function truncate(text: string, max: number) {
-  return text.length > max ? text.slice(0, max) + "…" : text;
-}
 
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
@@ -557,32 +541,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const status = otherParticipant ? getStatus(otherParticipant.user_id) : null;
   const hasUnread = conversation.unreadCount > 0;
 
-  const lastMsg = conversation.lastMessage;
-  const getMessagePreview = () => {
-    if (!lastMsg) return "Sin mensajes";
-    if (lastMsg.is_deleted) return "🚫 Mensaje eliminado";
-    if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
-    let body = "";
-    if (lastMsg.type === "file") {
-      const fn = lastMsg.file_name || "";
-      if (/^voice-note/i.test(fn)) body = "🎤 Nota de voz";
-      else if (/\.(webm|mp3|ogg|m4a|wav)(\?|$)/i.test(fn)) body = "🎵 Audio";
-      else body = `📎 ${fn || "Archivo"}`;
-    }
-    else if (lastMsg.type === "image") body = "📷 Foto";
-    else body = lastMsg.content || "";
-    if (isGroup && lastMsg.sender_id) {
-      const senderName = lastMsg.sender_id === user?.id
-        ? "Tú"
-        : (conversation.participants.find(p => p.user_id === lastMsg.sender_id)?.profile?.full_name?.split(" ")[0] || "");
-      if (senderName) return `${senderName}: ${body}`;
-    }
-    return body;
-  };
   // Borrador pendiente (estilo WhatsApp): si dejaste un mensaje a medias en este
   // chat, la lista lo recuerda. En el chat activo no hace falta — lo estás viendo.
   const draft = !isActive ? getDraft(user?.id, conversation.id) : "";
-  const lastMsgPreview = draft ? `✏️ Borrador: ${draft}` : getMessagePreview();
+  const lastMsgPreview = draft ? `✏️ Borrador: ${draft}` : getMessagePreview(conversation, user?.id);
 
   return (
     <ContextMenu>
