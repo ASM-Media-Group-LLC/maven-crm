@@ -260,7 +260,13 @@ export default function MessengerPage() {
         !activeChatId ? "hidden sm:flex" : "flex"
       )}>
         {activeConv ? (
-          <div className="flex-1">
+          // ⚠️ `min-w-0` NO es decorativo. Sin él, este hijo flex se niega a
+          // encogerse por debajo del ancho de su contenido: un texto largo sin
+          // espacios en el cajón hacía crecer el div, salirse de la columna y
+          // —al ir después en el DOM— dibujarse ENCIMA de la barra lateral en
+          // vez de bajar a un segundo renglón. La ventanita flotante del muelle
+          // no lo sufría porque ella sí recorta con overflow-hidden.
+          <div className="flex-1 min-w-0">
             {/* key por conversación: remonta ChatView al cambiar de chat para que el borrador,
                 la cita (replyTo) y el hilo abierto NO se fuguen a la conversación equivocada. */}
             <ChatView

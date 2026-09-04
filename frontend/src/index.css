@@ -871,6 +871,19 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   padding: .5rem; overflow-x: auto; font-size: .85em;
 }
 .msg-composer pre code { background: transparent; padding: 0; }
+/* ⚠️ CORTE DE PALABRA. Sin esto, un texto largo SIN espacios —una URL, un
+   identificador, o simplemente teclear sin parar— no tiene dónde partirse: el
+   contenteditable crece de ancho, se sale de su caja y termina dibujándose
+   encima del panel izquierdo del Messenger en vez de bajar a un segundo
+   renglón. `anywhere` permite cortar en cualquier punto; `break-word` es el
+   respaldo para navegadores que no lo soporten. Y `min-width: 0` para que,
+   dentro de un contenedor flex, el editor no pueda empujar al contenedor: sin
+   eso un hijo flex se niega a encogerse por debajo de su contenido. */
+.msg-composer {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
 .msg-composer p { margin: 0; }
 .msg-composer p + p { margin-top: .25rem; }
 
