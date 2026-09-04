@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import MentionAutocomplete from "./MentionAutocomplete";
-import { Smile, Paperclip, Send, X, Loader2, FileText, Mic } from "lucide-react";
+import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import RichComposer, { RichComposerHandle } from "./RichComposer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { ChatMessage, UserProfile } from "../types";
@@ -15,9 +15,8 @@ import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspac
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
-import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 
-import { MAX_FILES, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 import { getDraft, setDraft } from "../drafts";
@@ -34,7 +33,7 @@ export interface MessageInputHandle {
 
 interface MessageInputProps {
   conversationId: string;
-  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string) => void;
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string, albumId?: string, isThreadReply?: boolean, contentRich?: unknown) => void;
   onSendTyping: (isTyping: boolean) => void;
   replyTo: ChatMessage | null;
   profiles: Record<string, UserProfile>;
@@ -63,14 +62,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   const [uploadPercent, setUploadPercent] = useState(0);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<RichComposerHandle>(null);
+  // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
+  const [showToolbar, setShowToolbar] = useState(false);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<{ abort: () => void } | null>(null);
   const [messengerEmojis, setMessengerEmojis] = usePersistedEmojis("messenger", user?.id);
 
-  // Auto-grow del cajón (misma lógica que Chatter Evaluator/WhatsApp/Telegram).
-  useAutoGrowTextarea(inputRef, text);
 
   // GIF (Giphy mp4, URL externa estable) → se manda como archivo (Messenger no renderiza video
   // inline; el sticker sí porque es webp/imagen).
@@ -108,7 +107,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
     if (oversized.length > 0) {
       const names = oversized.map(f => f.name).join(", ");
-      toast.error(`Archivos demasiado grandes (máx ${formatFileSize(MAX_FILE_SIZE_BYTES)}): ${names}`);
+      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
       return;
     }
     const newPending: PendingFile[] = files.map(file => {
@@ -219,59 +218,48 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       }
       setPendingFiles([]);
       setText("");
+      composerRef.current?.clear();
       onCancelReply();
       setUploading(false);
       setUploadProgress("");
       setUploadPercent(0);
-      inputRef.current?.focus();
+      composerRef.current?.focus();
       return;
     }
 
     if (!text.trim()) return;
-    onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id);
+    // El texto plano SIEMPRE viaja en `content` (vista previa, búsqueda, menciones);
+    // el formato va aparte en content_rich, y es null si el mensaje no tiene formato.
+    const rich = composerRef.current?.getRich() ?? null;
+    onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id, undefined, undefined, rich);
     setText("");
+    composerRef.current?.clear();
     onCancelReply();
     onSendTyping(false);
-    inputRef.current?.focus();
+    composerRef.current?.focus();
   }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = Array.from(e.clipboardData.items);
-    const imageFiles = items
-      .filter(item => item.type.startsWith("image/"))
-      .map(item => {
-        const file = item.getAsFile();
-        if (!file) return null;
-        const ext = file.type.split("/")[1] || "png";
-        return new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
-      })
-      .filter((f): f is File => f !== null);
-
-    if (imageFiles.length > 0) {
-      e.preventDefault();
-      addFilesInternal(imageFiles);
-    }
-  }, [addFilesInternal]);
-
-  const handleTextChange = (val: string) => {
-    setText(val);
-    setCursorPosition(inputRef.current?.selectionStart || val.length);
+  // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
+  // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
+  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number) => {
+    setText(plain);
+    setCursorPosition(cursorPlain);
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
-  };
+  }, [onSendTyping]);
 
-  const handleMentionSelect = (newText: string, _userId: string) => {
-    setText(newText);
-    setCursorPosition(newText.length);
-    inputRef.current?.focus();
+  // Con editor rico no se puede reemplazar TODO el texto (borraría el formato):
+  // se borra solo el token "@algo" que está antes del cursor y se inserta la mención.
+  const handleMentionSelect = (_newText: string, userId: string) => {
+    const before = text.slice(0, cursorPosition);
+    const at = before.lastIndexOf("@");
+    const tokenLen = at === -1 ? 0 : cursorPosition - at;
+    const nombre = profiles[userId]?.full_name
+      || participants?.find((p) => p.user_id === userId)?.profile?.full_name
+      || "";
+    if (!nombre) return;
+    composerRef.current?.replaceMentionToken(tokenLen, `@${nombre} `);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -402,7 +390,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       {!isRecording && (
         <EmojiBar
           emojis={messengerEmojis}
-          onPick={(e) => { setText((v) => v + e); inputRef.current?.focus(); }}
+          onPick={(e) => composerRef.current?.insertText(e)}
           onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
           onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
         />
@@ -431,17 +419,18 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   onSelect={handleMentionSelect}
                 />
               )}
-              <Textarea
-                ref={inputRef}
-                placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
-                className="min-h-[42px] max-h-[160px] w-full resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 pr-12 text-sm"
-                rows={1}
-                value={text}
-                onChange={e => handleTextChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onSelect={e => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
-              />
+              <div className="w-full bg-primary/5 rounded-2xl px-4 py-2.5 pr-12">
+                <RichComposer
+                  ref={composerRef}
+                  initialContent={getDraft(user?.id, conversationId)}
+                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  showToolbar={showToolbar}
+                  disabled={uploading}
+                  onUpdate={handleComposerUpdate}
+                  onEnter={handleSend}
+                  onPasteFiles={addFilesInternal}
+                />
+              </div>
               <Button
                 size="icon"
                 onClick={handleSend}
@@ -453,6 +442,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               </Button>
             </div>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost" size="icon"
+                className={cn(
+                  "h-9 w-9 shrink-0 rounded-full hover:bg-primary/8",
+                  showToolbar ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setShowToolbar((v) => !v)}
+                title="Opciones de formato"
+              >
+                <Baseline className="h-5 w-5" />
+              </Button>
               <Button
                 variant="ghost" size="icon"
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
@@ -469,7 +469,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 disabled={uploading}
                 onUse={(s) => {
                   if (s.send_on_click) { onSendMessage(s.text, "text", undefined, undefined, replyTo?.id); onCancelReply(); }
-                  else { setText((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text); inputRef.current?.focus(); }
+                  else { composerRef.current?.insertText((text.trim() ? " " : "") + s.text); }
                 }}
               />
               <Button

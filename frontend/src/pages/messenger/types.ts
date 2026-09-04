@@ -27,6 +27,15 @@ export interface ChatParticipant {
   notifications_mode: "all" | "mentions" | "none";
 }
 
+/** Nodo del documento TipTap guardado en chat_messages.content_rich. */
+export interface RichNode {
+  type?: string;
+  text?: string;
+  content?: RichNode[];
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  attrs?: Record<string, unknown>;
+}
+
 export interface ChatMessage {
   id: string;
   conversation_id: string;
@@ -45,6 +54,9 @@ export interface ChatMessage {
   is_thread_reply?: boolean;
   is_edited: boolean;
   is_deleted: boolean;
+  /** Documento TipTap (JSON) con el formato. NULL/ausente = texto plano.
+   *  El texto plano SIEMPRE vive en `content` (vista previa, búsqueda, menciones). */
+  content_rich?: RichNode | null;
   created_at: string;
   updated_at: string;
   // Solo cliente (no viene de la BD): estado de envío de un mensaje propio optimista.

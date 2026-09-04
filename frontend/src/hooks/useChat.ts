@@ -829,6 +829,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
           content: p.content, type: p.type as ChatMessage["type"], file_url: p.fileUrl || null,
           file_name: p.fileName || null, file_size: null, reply_to_id: p.replyToId || null,
           album_id: p.albumId || null, is_thread_reply: !!p.isThreadReply,
+          content_rich: (p.contentRich as ChatMessage["content_rich"]) ?? null,
           is_edited: false, is_deleted: false, created_at: p.createdAt, updated_at: p.createdAt,
           _localStatus: "failed",
         }));
@@ -1076,7 +1077,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     async (p: {
       optimisticId: string; conversationId: string; content: string;
       type: ChatMessage["type"]; fileUrl?: string; fileName?: string; replyToId?: string;
-      albumId?: string; isThreadReply?: boolean;
+      albumId?: string; isThreadReply?: boolean; contentRich?: unknown;
     }) => {
       if (!user) return;
       setMessages((prev) => prev.map((m) => (m.id === p.optimisticId ? { ...m, _localStatus: "sending" } : m)));
@@ -1096,6 +1097,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         reply_to_id: p.replyToId || null,
         album_id: p.albumId || null,
         is_thread_reply: !!p.isThreadReply,
+        content_rich: (p.contentRich ?? null) as never,
       }).select().single();
 
       if (error || !data) {
@@ -1124,7 +1126,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       fileName?: string,
       replyToId?: string,
       albumId?: string,
-      isThreadReply?: boolean
+      isThreadReply?: boolean,
+      contentRich?: unknown
     ) => {
       if (!conversationId || !user) return;
       const optimisticId = crypto.randomUUID();
@@ -1134,13 +1137,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         id: optimisticId, conversation_id: conversationId, sender_id: user.id,
         content, type, file_url: fileUrl || null, file_name: fileName || null, file_size: null,
         reply_to_id: replyToId || null, album_id: albumId || null, is_thread_reply: !!isThreadReply,
+        content_rich: (contentRich as ChatMessage["content_rich"]) ?? null,
         is_edited: false, is_deleted: false,
         created_at: now, updated_at: now, _localStatus: "sending",
       };
       setMessages((prev) => [...prev, optimisticMsg]);
       // Persistir ANTES de intentar: si no se confirma (offline/error/recarga), sobrevive.
-      addPending(user.id, { optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, albumId, isThreadReply, createdAt: now });
-      await performSend({ optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, albumId, isThreadReply });
+      addPending(user.id, { optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, albumId, isThreadReply, contentRich, createdAt: now });
+      await performSend({ optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, albumId, isThreadReply, contentRich });
     },
     [conversationId, user, performSend]
   );

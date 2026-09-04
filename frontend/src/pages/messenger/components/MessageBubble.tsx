@@ -17,7 +17,8 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
-import { renderTextWithMentions, linkifyText } from "./MentionAutocomplete";
+import { renderTextWithMentions } from "./MentionAutocomplete";
+import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
 
@@ -139,6 +140,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     );
   }
 
+  const linkifyText = (text: string): React.ReactNode[] => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80 break-all">
+          {part}
+        </a>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
+  };
+
   const highlightText = (text: string) => {
     if (!highlight) {
       if (chatType === "group") {
@@ -194,7 +209,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             onClick={() => openLightbox(message.file_url!, "image")}
           />
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
+            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+              ? <RichText doc={message.content_rich} renderText={highlightText} />
+              : highlightText(message.content)}</p>
           )}
         </div>
       );
@@ -245,7 +262,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           })}
         </div>
         {message.content && message.content !== message.file_name && (
-          <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
+          <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+              ? <RichText doc={message.content_rich} renderText={highlightText} />
+              : highlightText(message.content)}</p>
         )}
       </div>
     );
@@ -303,7 +322,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             </div>
           </div>
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
+            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+              ? <RichText doc={message.content_rich} renderText={highlightText} />
+              : highlightText(message.content)}</p>
           )}
         </div>
       );
