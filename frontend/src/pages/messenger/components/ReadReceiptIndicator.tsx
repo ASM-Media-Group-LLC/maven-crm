@@ -10,24 +10,51 @@ interface ReadReceiptIndicatorProps {
   readByUsers: string[];
   profiles: Record<string, UserProfile>;
   totalParticipants: number;
-  /** Fondo sobre el que se pinta el check, para elegir colores que contrasten:
-   *  - "onPrimary": burbuja propia azul→violeta (Messenger). El "leído" en azul NO se veía
-   *    (azul sobre azul) → acá va dorado brillante (amber-300).
-   *  - "onSurface": fondo claro/card (hilos). Ahí el dorado claro no contrasta → dorado
-   *    más oscuro (amber-600). */
+  /** Fondo sobre el que se pinta el check:
+   *  - "onPrimary": la burbuja propia (degradé accent→primary, texto blanco).
+   *  - "onSurface": fondo claro/card (hilos). */
   variant?: "onPrimary" | "onSurface";
 }
 
-// Modelo WhatsApp (el color del "leído" cambia según el fondo, ver `variant`):
-//   ✓  tenue   = enviado (aún no le llegó a la otra persona)
-//   ✓✓ tenue   = entregado (le llegó a todos, nadie lo leyó aún)
-//   ✓✓ dorado  = leído (lo leyeron todos) — amber-300 sobre la burbuja azul, amber-600 sobre fondo claro
+// Modelo WhatsApp:
+//   ✓  tenue    = enviado (aún no le llegó a la otra persona)
+//   ✓✓ tenue    = entregado (le llegó a todos, nadie lo leyó aún)
+//   ✓✓ marcado + "Visto" = leído (lo leyeron todos)
+//
+// ⚠️ EL "LEÍDO" NO LLEVA UN COLOR PROPIO, y es a propósito.
+//
+// Antes era `amber-300` fijo, elegido cuando Maven no tenía skins. Con los diez
+// skins actuales la burbuja propia cambia de color, y medido contra el extremo
+// del degradé donde cae el check (`primary`, abajo a la derecha) el dorado da
+// 2,75:1 en el skin por DEFECTO —por debajo del mínimo de 3:1 para iconos— y
+// entre 3,1 y 4,3 en el resto, o sea raspando. Peor: el contraste solo mide
+// luminosidad, no tono; en `dorado`, `kash` y `atardecer` el ámbar tiene casi el
+// mismo tono que la burbuja y se lee como "el mismo color" aunque el número dé
+// 3,6.
+//
+// Tampoco se ata al color del skin: la burbuja ES un degradé accent→primary, así
+// que usar el accent garantiza un check invisible sobre su propio fondo — el
+// mismo error de origen con otro color.
+//
+// La solución es derivarlo de lo único que la burbuja ya garantiza legible: su
+// propio color de texto (blanco, 3,97-6,14:1 en los diez skins). El "leído" es
+// el texto a plena intensidad y con el trazo más grueso; lo demás va al 55%. Es
+// a prueba de skins POR CONSTRUCCIÓN: cualquier skin donde el mensaje se lea
+// deja el check legible, y un skin nuevo no puede reintroducir el problema.
+//
+// El grosor no es decorativo: sin él la diferencia sería solo de opacidad, y
+// quien no distinga colores (o mire de reojo) no la vería.
+//
+// Y encima del color y del grosor va la PALABRA "Visto", que es la señal que no
+// admite interpretación: no depende del skin, ni del tema, ni de distinguir dos
+// tonos de blanco, ni de acordarse de qué significan una o dos palomitas. El
+// tooltip con los nombres se queda para el detalle de quién lo leyó.
 export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUsers, profiles, totalParticipants, variant = "onPrimary" }: ReadReceiptIndicatorProps) {
   if (!isMe) return null;
 
   const palette = variant === "onSurface"
-    ? { dim: "text-muted-foreground", read: "text-amber-600" }
-    : { dim: "text-primary-foreground/50", read: "text-amber-300" };
+    ? { dim: "text-muted-foreground", read: "text-foreground" }
+    : { dim: "text-white/55", read: "text-white" };
 
   const othersCount = Math.max(totalParticipants - 1, 1);
   const readCount = readByUsers.length;
@@ -48,10 +75,16 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex">
+          <span className={cn("inline-flex items-center gap-0.5", allRead && palette.read)}>
+            {allRead && <span className="text-[10px] font-semibold leading-none">Visto</span>}
             {sentOnly
               ? <Check className={cn("h-3 w-3", palette.dim)} />
-              : <CheckCheck className={cn("h-3 w-3", allRead ? palette.read : palette.dim)} />}
+              : (
+                <CheckCheck
+                  className={cn("h-3 w-3", allRead ? palette.read : palette.dim)}
+                  strokeWidth={allRead ? 3 : 2}
+                />
+              )}
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-xs">{label}</TooltipContent>
