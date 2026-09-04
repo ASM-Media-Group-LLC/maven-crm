@@ -59,6 +59,18 @@ import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 type TabKey = "account" | "admin" | "resources";
 
+// Qué tab del rail izquierdo es dueño de cada ?sub=. Sirve para abrir Settings
+// en el tab correcto cuando se entra por URL directa o se refresca la página.
+const SUB_TO_TAB: Record<string, TabKey> = {
+  usuarios: "admin",
+  auditoria: "admin",
+  reportes: "admin",
+  "api-keys": "admin",
+  "design-system": "resources",
+  docs: "resources",
+  roadmap: "resources",
+};
+
 interface TabDef {
   key: TabKey;
   label: string;
@@ -860,7 +872,7 @@ const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
 
 const Settings = () => {
   const { t } = useLanguage();
-  const { canAccess } = usePermissions();
+  const { canAccess, isLoading: permisosCargando } = usePermissions();
   const { isAdmin, role } = useUserRole();
   const { signOut } = useAuth();
   const { toast: notifyToast } = useToast();
@@ -883,7 +895,25 @@ const Settings = () => {
     ...(showResources ? [{ key: "resources" as const, label: t("sidebar.resources") || "Recursos", icon: Palette }] : []),
   ];
 
-  const [active, setActive] = useState<TabKey>("account");
+  // Arranca en el tab dueño del ?sub= del URL. Sin esto, refrescar estando en
+  // Administración → Usuarios te devolvía a Mi cuenta: el rail siempre nacía en
+  // "account" sin mirar la URL.
+  // Del router, NO de window.location: con MemoryRouter (tests, y cualquier
+  // navegación interna) window.location no refleja la URL de la app.
+  const [subInicial] = useSearchParams();
+  const [active, setActive] = useState<TabKey>(
+    () => SUB_TO_TAB[subInicial.get("sub") ?? ""] ?? "account",
+  );
+
+  // Si el ?sub= apuntaba a un tab que este rol no puede ver, volvemos a Mi
+  // cuenta. Esperamos a que los permisos terminen de cargar: durante la carga
+  // showAdmin es false para todos y esto echaría también a los admins.
+  useEffect(() => {
+    if (permisosCargando) return;
+    if ((active === "admin" && !showAdmin) || (active === "resources" && !showResources)) {
+      setActive("account");
+    }
+  }, [permisosCargando, active, showAdmin, showResources]);
 
   // Pretty role label — "Admin" / "Manager" / etc, falls back to the
   // raw role string when nothing matches.
@@ -995,7 +1025,18 @@ const SettingsRightPane = ({
   // (ej. Mi cuenta) — el sub-param es del scope de Administración pero
   // no se invalidaba al salir de ahí. Sólo limpiamos cuando hay un sub
   // activo para no escribir al URL en cada render.
+  // ⚠️ El ref NO es opcional. Un useEffect corre SIEMPRE después del primer
+  // render, no sólo cuando cambian sus deps — así que al entrar por URL directa
+  // (o al refrescar) este effect se disparaba en el montaje y borraba el ?sub=
+  // antes de que nadie lo leyera: entrabas a Administración → Usuarios,
+  // refrescabas, y aterrizabas en Mi cuenta. Saltearse la primera corrida deja
+  // el limpiado sólo para los cambios de tab de verdad.
+  const yaMonto = useRef(false);
   useEffect(() => {
+    if (!yaMonto.current) {
+      yaMonto.current = true;
+      return;
+    }
     if (sub) {
       const next = new URLSearchParams(searchParams);
       next.delete("sub");
