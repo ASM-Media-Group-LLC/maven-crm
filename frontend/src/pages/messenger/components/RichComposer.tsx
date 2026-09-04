@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -46,6 +46,11 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
   initialContent, placeholder, showToolbar, disabled, onUpdate, onEnter, onPasteFiles,
 }, ref) => {
   const [linkOpen, setLinkOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+  // Posición del cursor ANTES de abrir el panel del enlace: ahí el foco se va sí
+  // o sí (hay que poder escribir la URL), así que la guardamos para volver a ella
+  // al aplicar. El panel de color no la necesita: nunca se lleva el foco.
+  const selGuardadaRef = useRef<{ from: number; to: number } | null>(null);
   const [linkValue, setLinkValue] = useState("");
 
   // El editor de TipTap se crea UNA vez, así que sus editorProps capturan los
@@ -164,21 +169,52 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
   const btn = (active: boolean) =>
     cn("h-7 w-7 rounded-md text-muted-foreground hover:text-foreground", active && "bg-primary/15 text-primary");
 
+  // Al hacer clic, el botón se llevaba el foco del editor. Con una SELECCIÓN el
+  // navegador la conserva (por eso negrita/cursiva/subrayado sí funcionaban),
+  // pero un CURSOR VACÍO se pierde al desenfocar y ProseMirror lo recupera al
+  // PRINCIPIO del documento: la viñeta, la cita o el bloque de código se
+  // aplicaban arriba de todo en vez de donde estaba el cursor. Mismo arreglo que
+  // el chip de emoji del Chatter Evaluator: no dejar que el botón tome el foco.
+  const sinRobarFoco = (e: ReactMouseEvent) => e.preventDefault();
+
+  const guardarSeleccion = () => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    selGuardadaRef.current = { from, to };
+  };
+
+  // OJO al devolver el foco tras cerrar un popover: `editor.chain().focus()`
+  // dispara una transacción que REPONE la selección, y reponer la selección
+  // BORRA las marcas pendientes de ProseMirror (el formato elegido para el texto
+  // que todavía no se escribió). Por eso elegir un color no pintaba nada: se
+  // aplicaba y acto seguido se descartaba. `editor.view.focus()` enfoca sin
+  // transacción y las conserva.
+
+  /** Cadena que arranca donde estaba el cursor antes de abrir el popover. */
+  const cadenaEnSeleccion = () => {
+    const c = editor!.chain().focus();
+    const s = selGuardadaRef.current;
+    return s ? c.setTextSelection(s) : c;
+  };
+
   const aplicarLink = () => {
     if (!editor) return;
     const v = linkValue.trim();
-    if (!v) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); }
+    // El campo de la URL necesita el foco para poder escribir, así que la posición
+    // del cursor ya no sirve: usamos la que guardamos al abrir el popover.
+    const sel = selGuardadaRef.current;
+    if (!v) { cadenaEnSeleccion().extendMarkRange("link").unsetLink().run(); }
     else {
       const conProtocolo = /^(https?:|mailto:)/i.test(v) ? v : `https://${v}`;
-      if (editor.state.selection.empty) {
+      if (!sel || sel.from === sel.to) {
         // Sin texto seleccionado, setLink no tenía a qué aplicarse y el botón "no hacía
         // nada". Ahora se inserta la propia URL ya enlazada.
-        editor.chain().focus().insertContent({
+        cadenaEnSeleccion().insertContent({
           type: "text", text: conProtocolo,
           marks: [{ type: "link", attrs: { href: conProtocolo } }],
         }).run();
       } else {
-        editor.chain().focus().extendMarkRange("link").setLink({ href: conProtocolo }).run();
+        cadenaEnSeleccion().extendMarkRange("link").setLink({ href: conProtocolo }).run();
       }
     }
     setLinkValue("");
@@ -189,50 +225,60 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
     <div>
       {showToolbar && editor && (
         <div className="flex flex-wrap items-center gap-0.5 px-1 pb-1.5 mb-1.5 border-b border-border/60">
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("bold"))} title="Negrita"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bold"))} title="Negrita"
             onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("italic"))} title="Cursiva"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("italic"))} title="Cursiva"
             onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("underline"))} title="Subrayado"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("underline"))} title="Subrayado"
             onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon className="h-3.5 w-3.5" /></Button>
 
-          <Popover>
+          <Popover open={colorOpen} onOpenChange={setColorOpen}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("textStyle"))} title="Color de texto">
+              <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("textStyle"))} title="Color de texto">
                 <Baseline className="h-3.5 w-3.5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-2" side="top" align="start">
+            {/* El panel NO se lleva el foco (ni al abrir, ni al cerrar, ni al tocar
+                un color): el editor lo conserva todo el tiempo, así que elegir un
+                color se comporta igual que el botón de negrita. Si el foco se va y
+                vuelve, ProseMirror descarta el formato pendiente —el que se aplica
+                al texto que todavía no se escribió— y el color no pintaba nada. */}
+            <PopoverContent className="w-auto p-2" side="top" align="start"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              onCloseAutoFocus={(e) => e.preventDefault()}>
               <div className="flex gap-1.5">
                 {COLORES.map((c) => (
-                  <button key={c} type="button" title={c} onClick={() => editor.chain().focus().setColor(c).run()}
+                  <button key={c} type="button" title={c} onMouseDown={sinRobarFoco}
+                    onClick={() => { editor.chain().focus().setColor(c).run(); setColorOpen(false); }}
                     className="h-5 w-5 rounded-full border border-border" style={{ backgroundColor: c }} />
                 ))}
               </div>
               <button type="button" className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={() => editor.chain().focus().unsetColor().run()}>Quitar color</button>
+                onMouseDown={sinRobarFoco}
+                onClick={() => { editor.chain().focus().unsetColor().run(); setColorOpen(false); }}>Quitar color</button>
             </PopoverContent>
           </Popover>
 
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("strike"))} title="Tachado"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("strike"))} title="Tachado"
             onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough className="h-3.5 w-3.5" /></Button>
 
           <span className="mx-1 h-4 w-px bg-border" />
 
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("bulletList"))} title="Lista con viñetas"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bulletList"))} title="Lista con viñetas"
             onClick={() => editor.chain().focus().toggleBulletList().run()}><List className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("orderedList"))} title="Lista numerada"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("orderedList"))} title="Lista numerada"
             onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("blockquote"))} title="Cita"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("blockquote"))} title="Cita"
             onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote className="h-3.5 w-3.5" /></Button>
 
           <Popover open={linkOpen} onOpenChange={(o) => { setLinkOpen(o); if (o) setLinkValue(editor.getAttributes("link").href || ""); }}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("link"))} title="Enlace">
+              <Button type="button" onMouseDown={(e) => { sinRobarFoco(e); guardarSeleccion(); }} variant="ghost" size="icon" className={btn(editor.isActive("link"))} title="Enlace">
                 <Link2 className="h-3.5 w-3.5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[260px] p-2" side="top" align="start">
+            <PopoverContent className="w-[260px] p-2" side="top" align="start"
+              onCloseAutoFocus={(e) => { e.preventDefault(); editor.view.focus(); }}>
               <Input autoFocus value={linkValue} placeholder="https://…" className="h-8 text-xs"
                 onChange={(e) => setLinkValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarLink(); } }} />
@@ -245,11 +291,11 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
 
           <span className="mx-1 h-4 w-px bg-border" />
 
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("code"))} title="Código"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("code"))} title="Código"
             onClick={() => editor.chain().focus().toggleCode().run()}><Code className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(editor.isActive("codeBlock"))} title="Bloque de código"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("codeBlock"))} title="Bloque de código"
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}><SquareCode className="h-3.5 w-3.5" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={btn(false)} title="Limpiar formato"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(false)} title="Limpiar formato"
             onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}><RemoveFormatting className="h-3.5 w-3.5" /></Button>
         </div>
       )}
