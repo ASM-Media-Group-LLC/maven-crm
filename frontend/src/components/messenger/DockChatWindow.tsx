@@ -114,32 +114,34 @@ export default function DockChatWindow({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <MessageList
-          messages={messages}
-          profiles={profiles}
-          chatType={conversation.type}
-          currentUserId={user?.id}
-          searchQuery=""
-          loading={loading}
-          onReply={setReplyTo}
-          onCopy={(c) => navigator.clipboard?.writeText(c)}
-          onEdit={editMessage}
-          onDelete={deleteMessage}
-          onRetry={retryMessage}
-          getReactionsForMessage={getReactionsForMessage}
-          onToggleReaction={toggleReaction}
-          getReadByUsers={getReadBy}
-          getDeliveredByUsers={getDeliveredBy}
-          totalParticipants={conversation.participants.length}
-          // Los hilos son de la pantalla grande: en 336px no entra el panel.
-          onOpenThread={() => navigate(`/messenger?c=${conversation.id}`)}
-          getThreadCount={() => 0}
-          hasMore={hasMore}
-          loadingMore={loadingMore}
-          onLoadMore={loadOlderMessages}
-        />
-      </div>
+      {/* MessageList va como hijo DIRECTO de la columna flex: su raíz ya es
+          `flex-1 relative overflow-hidden` y su scroller es `absolute inset-0`.
+          Envolverlo en un div que no fuera flex le dejaba altura 0 y la ventana
+          salía vacía aunque los mensajes estuvieran cargados. Igual que ChatView. */}
+      <MessageList
+        messages={messages}
+        profiles={profiles}
+        chatType={conversation.type}
+        currentUserId={user?.id}
+        searchQuery=""
+        loading={loading}
+        onReply={setReplyTo}
+        onCopy={(c) => navigator.clipboard?.writeText(c)}
+        onEdit={editMessage}
+        onDelete={deleteMessage}
+        onRetry={retryMessage}
+        getReactionsForMessage={getReactionsForMessage}
+        onToggleReaction={toggleReaction}
+        getReadByUsers={getReadBy}
+        getDeliveredByUsers={getDeliveredBy}
+        totalParticipants={conversation.participants.length}
+        // Los hilos son de la pantalla grande: en 336px no entra el panel.
+        onOpenThread={() => navigate(`/messenger?c=${conversation.id}`)}
+        getThreadCount={() => 0}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadOlderMessages}
+      />
 
       <div className="shrink-0 border-t border-border/60">
         <MessageInput

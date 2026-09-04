@@ -96,7 +96,14 @@ export function useMuelleFlotante() {
       const dx = ev.clientX - d.startX;
       const dy = ev.clientY - d.startY;
       if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      d.moved = true;
+      if (!d.moved) {
+        // Recién acá (pasado el umbral) bloqueamos la selección de texto: al
+        // arrastrar por encima del dashboard iba pintando de azul media
+        // pantalla. No se hace en pointerdown para no romper el clic normal.
+        d.moved = true;
+        document.body.style.userSelect = "none";
+        window.getSelection()?.removeAllRanges();
+      }
       ev.preventDefault();
       setPos(clampToViewport({ x: d.origX + dx, y: d.origY + dy }));
     };
@@ -104,6 +111,7 @@ export function useMuelleFlotante() {
     const soltar = () => {
       const d = dragRef.current;
       dragRef.current = null;
+      document.body.style.userSelect = "";
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
       window.removeEventListener("pointercancel", soltar);

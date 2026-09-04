@@ -11,6 +11,7 @@ import { useMuelleFlotante, FAB_SIZE, MARGIN } from "@/hooks/useMuelleFlotante";
 import ClariAiFab from "@/components/ClariAiFab";
 import { useUserRole } from "@/hooks/useUserRole";
 import DockChatWindow, { VENTANA_ANCHO } from "./DockChatWindow";
+import ChatsPanel from "./ChatsPanel";
 import type { ConversationWithDetails } from "@/pages/messenger/types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   // ids abiertos; el primero es el más a la derecha (pegado al muelle).
   const [abiertas, setAbiertas] = useState<string[]>([]);
   const [minimizadas, setMinimizadas] = useState<string[]>([]);
+  const [panelAbierto, setPanelAbierto] = useState(false);
 
   const enMessenger = location.pathname.startsWith("/messenger");
   const puedeMessenger = canAccess("Messenger");
@@ -118,6 +120,27 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {/* Panel de chats pegado al muelle. El botón NO navega: desde acá se
+          manda un mensaje sin salir de la pantalla, que es lo que se pidió. */}
+      {mostrarMessenger && panelAbierto && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPanelAbierto(false)} aria-hidden />
+          <div
+            className="fixed z-50 flex w-[360px] flex-col overflow-hidden rounded-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/5"
+            style={{ ...anclarPanel(360, 520), width: 360 }}
+            role="dialog"
+            aria-label="Chats"
+          >
+            <ChatsPanel
+              alto={330}
+              onAbrirChat={(id) => { setPanelAbierto(false); abrirChat(id); }}
+              onNuevo={() => { setPanelAbierto(false); navigate("/messenger?nuevo=1"); }}
+              onVerTodo={() => { setPanelAbierto(false); navigate("/messenger"); }}
+            />
+          </div>
+        </>
+      )}
+
       {/* La COLUMNA: burbujas arriba, Mensajes al medio, Clari abajo
           (flex-col-reverse: el primer hijo queda abajo). Se arrastra entera; el
           umbral de 5px distingue mover de hacer clic. Si no hay nada que
@@ -134,10 +157,11 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
         {mostrarMessenger && (
           <button
             type="button"
-            onClick={() => navigate("/messenger")}
+            onClick={() => setPanelAbierto((v) => !v)}
             className="relative flex h-14 w-14 items-center justify-center rounded-full bg-card text-foreground shadow-lg ring-1 ring-border/60 transition-shadow hover:shadow-xl"
             title="Mensajes — arrastrame para moverme"
-            aria-label="Abrir Messenger"
+            aria-expanded={panelAbierto}
+            aria-label="Mensajes"
           >
             <MessageCircle className="h-6 w-6" />
             {sinLeer > 0 && (
