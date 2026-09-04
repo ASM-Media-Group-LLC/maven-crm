@@ -1243,12 +1243,23 @@ export function useLiveKit() {
       await room.localParticipant.setMicrophoneEnabled(false);
       await room.localParticipant.setCameraEnabled(false);
 
+      // LA INTENCIÓN de cancelación de ruido se fija ACÁ, entre o no con el
+      // micro encendido. Antes solo se fijaba dentro de `if (shouldEnableMic)`:
+      // quien entraba silenciado —que es SIEMPRE el caso en Cowork, y lo normal
+      // en un Meet— arrancaba con la cancelación en falso, y al prender el micro
+      // después `reapplyNC` no hacía nada porque miraba esa bandera. Resultado:
+      // el interruptor decía "Desactivada" con la preferencia en "true", y en
+      // Cowork la cancelación no se aplicaba nunca. El procesador en sí se
+      // engancha cuando hay un track de micro: ahora si entra encendido, o en
+      // `reapplyNC` cuando lo prenda.
+      const ncDeseado = loadNCPreference() && supportsNoiseSuppression();
+      ncEnabledRef.current = ncDeseado;
+      setIsNoiseCancellationOn(ncDeseado);
+
       if (shouldEnableMic) {
         await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
         // Apply noise cancellation if saved preference is on
-        if (loadNCPreference() && supportsNoiseSuppression()) {
-          ncEnabledRef.current = true;
-          setIsNoiseCancellationOn(true);
+        if (ncDeseado) {
           try {
             await wait(80);
             const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
