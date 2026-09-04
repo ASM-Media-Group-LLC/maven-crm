@@ -419,7 +419,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   onSelect={handleMentionSelect}
                 />
               )}
-              <div className="w-full bg-primary/5 rounded-2xl px-4 py-2.5 pr-12">
+              <div className="msg-composer-wrap w-full bg-primary/5 rounded-2xl px-4 py-2.5 pr-12 focus-within:ring-1 focus-within:ring-primary/30">
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraft(user?.id, conversationId)}

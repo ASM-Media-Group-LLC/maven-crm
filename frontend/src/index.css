@@ -873,3 +873,17 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .msg-composer pre code { background: transparent; padding: 0; }
 .msg-composer p { margin: 0; }
 .msg-composer p + p { margin-top: .25rem; }
+
+/* Foco del compositor del Messenger.
+   El modo alto contraste (:root[data-contrast="high"]) le pone un contorno a TODO
+   lo que recibe foco. Antes el cajón ERA un <textarea>, así que el contorno seguía
+   la caja redondeada y se veía bien. Con el editor rico el contenteditable va DENTRO
+   de esa caja, y el contorno dibujaba un recuadro adentro de otro (se veía feo).
+   Se mueve el indicador al contenedor, que es la caja que la persona ve: el foco
+   sigue siendo perfectamente visible, que es lo que la accesibilidad pide. */
+:root[data-contrast="high"] .msg-composer:focus,
+:root[data-contrast="high"] .msg-composer:focus-visible { outline: none !important; }
+:root[data-contrast="high"] .msg-composer-wrap:focus-within {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 2px;
+}
