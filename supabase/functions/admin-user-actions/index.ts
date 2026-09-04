@@ -274,6 +274,18 @@ Deno.serve(async (req) => {
           friendly = "Email inválido.";
         } else if (/rate limit/i.test(raw)) {
           friendly = "Demasiados intentos seguidos, espera un minuto y vuelve a intentar.";
+        } else if (/database error/i.test(raw)) {
+          // Así envuelve GoTrue CUALQUIER error de la base al crear el
+          // usuario, y el texto crudo no le dice nada a quien está dando el
+          // alta. Pasó de verdad: un trigger nuestro en auth.users rechazaba
+          // todas las altas y en pantalla se leía "Database error creating
+          // new user", en inglés. El detalle técnico viaja en `raw`.
+          friendly = "La base rechazó el alta. No es algo que puedas arreglar desde acá: avisale al equipo técnico con la hora exacta.";
+        } else if (raw && !/[áéíóúñ¿¡]/i.test(raw)) {
+          // Cualquier otro mensaje del servidor de auth viene en inglés. Que
+          // no llegue crudo a la pantalla: el detalle queda en `raw` para
+          // depurar.
+          friendly = "No se pudo crear el usuario.";
         }
         return new Response(JSON.stringify({ error: friendly, raw }), {
           status: 400,

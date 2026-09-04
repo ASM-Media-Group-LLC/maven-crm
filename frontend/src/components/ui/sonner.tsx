@@ -1,5 +1,6 @@
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
+import { IconoSistema } from "@/lib/avisoPersona";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
@@ -29,6 +30,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       closeButton
+      // EL MUÑEQUITO DEL SISTEMA, PARA TODA LA APP.
+      //
+      // Pedido de Jhon: que el muñequito no sea solo cuando el aviso es de una
+      // persona — que el sistema tenga el suyo. Puesto acá una vez, lo usan
+      // los ~100 archivos que disparan avisos sin tocar ninguno.
+      //
+      // El tilde/cruz no se pierde: va en una insignia chiquita sobre el
+      // muñequito, porque el color solo no alcanza para decir qué pasó.
+      // Y los avisos de una persona pasan su propio `icon`, que gana a esto.
+      icons={{
+        success: <IconoSistema tono="bien" />,
+        error: <IconoSistema tono="mal" />,
+        warning: <IconoSistema tono="ojo" />,
+        info: <IconoSistema tono="neutral" />,
+      }}
       // Un poco más de aire entre avisos apilados: con el vidrio, dos tarjetas
       // pegadas se leen como una sola.
       gap={10}

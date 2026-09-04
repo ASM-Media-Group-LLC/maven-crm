@@ -20,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { avisarPersona } from "@/lib/avisoPersona";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 // Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
@@ -101,12 +102,16 @@ const AdminUsuarios = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
-    onError: (e: Error) => {
+    // OJO: el `onError` de la mutación y el de cada `mutate` corren LOS DOS.
+    // El alta trae el suyo, con la cara de quien se estaba creando, así que
+    // acá se saltea o salen dos avisos del mismo error.
+    onError: (e: Error, variables) => {
       if (e instanceof SessionExpiredError) {
         toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
-      } else {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
+        return;
       }
+      if ((variables as { action?: string } | undefined)?.action === "create_user") return;
+      toast({ title: "No se pudo completar la acción", description: e.message, variant: "destructive" });
     },
   });
 
@@ -251,7 +256,10 @@ const AdminUsuarios = () => {
                       onRemoveRole={(user) => {
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
-                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                          { onSuccess: () => avisarPersona({
+                            nombre: user.full_name || "Sin nombre", foto: user.avatar_url, seed: user.avatar_seed,
+                            titulo: "Rol quitado", detalle: user.full_name || undefined, tono: "ojo",
+                          }) }
                         );
                       }}
                     />
@@ -266,7 +274,10 @@ const AdminUsuarios = () => {
                       onRemoveRole={(user) => {
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
-                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                          { onSuccess: () => avisarPersona({
+                            nombre: user.full_name || "Sin nombre", foto: user.avatar_url, seed: user.avatar_seed,
+                            titulo: "Rol quitado", detalle: user.full_name || undefined, tono: "ojo",
+                          }) }
                         );
                       }}
                     />
@@ -288,7 +299,13 @@ const AdminUsuarios = () => {
                       if (selectedUser) {
                         adminAction.mutate(
                           { action: "update_profile", user_id: selectedUser.id, first_name: data.first_name, last_name: data.last_name, role: data.role, ai_daily_quota_override: data.ai_daily_quota_override },
-                          { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
+                          { onSuccess: () => {
+                            setEditOpen(false);
+                            avisarPersona({
+                              nombre: selectedUser.full_name || "Sin nombre", foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
+                              titulo: "Usuario actualizado", detalle: selectedUser.full_name || undefined, tono: "bien",
+                            });
+                          } }
                         );
                       }
                     }}
@@ -322,7 +339,12 @@ const AdminUsuarios = () => {
                           { onSuccess: (res) => {
                             setDeleteOpen(false);
                             const freed = (res as { mailbox_removed?: string | null } | undefined)?.mailbox_removed;
-                            toast({ title: "Usuario eliminado", description: freed ? `Se liberó el puesto de correo (${freed}).` : undefined });
+                            avisarPersona({
+                              nombre: selectedUser.full_name || "Sin nombre", foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
+                              titulo: `${selectedUser.full_name || "El usuario"} quedó eliminado`,
+                              detalle: freed ? `Se liberó el puesto de correo (${freed}).` : undefined,
+                              tono: "ojo",
+                            });
                           } }
                         );
                       }
@@ -342,9 +364,24 @@ const AdminUsuarios = () => {
                 }}
                 credenciales={credenciales}
                 onConfirm={(data) => {
+                  // El nombre de quien se está creando, para que el aviso —y
+                  // sobre todo el de error— hable de esa persona y no de
+                  // "Error" a secas. Todavía no tiene avatar en la base, así
+                  // que el muñequito sale del nombre.
+                  const quien = [data.first_name, data.last_name].filter(Boolean).join(" ").trim() || "el usuario";
                   adminAction.mutate(
                     { action: "create_user", ...data },
                     {
+                      onError: (e: Error) => {
+                        if (e instanceof SessionExpiredError) return; // ya lo avisa el onError general
+                        avisarPersona({
+                          nombre: quien,
+                          titulo: `No se pudo crear a ${quien}`,
+                          detalle: e.message,
+                          tono: "mal",
+                          duracion: 9000,
+                        });
+                      },
                       onSuccess: (res) => {
                         // El modal NO se cierra: pasa a la vista de entrega
                         // con el correo generado y la contraseña temporal,

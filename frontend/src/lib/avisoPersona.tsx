@@ -1,5 +1,7 @@
+import { AlertTriangle, Check, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/UserAvatar";
+import { dicebearSistemaUri } from "@/lib/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
@@ -17,6 +19,15 @@ import { cn } from "@/lib/utils";
 // plataforma, no una persona".
 
 export type TonoAviso = "neutral" | "bien" | "ojo" | "mal";
+
+/** El glifo de la insignia del sistema: es lo que dice qué pasó cuando el
+ *  color no alcanza (y para quien no lo distingue, nunca alcanza). */
+const GLIFO: Record<TonoAviso, typeof Check> = {
+  neutral: Info,
+  bien: Check,
+  ojo: AlertTriangle,
+  mal: X,
+};
 
 const PUNTO: Record<TonoAviso, string> = {
   neutral: "bg-primary",
@@ -81,6 +92,37 @@ export function avisarPersona({ nombre, foto, seed, titulo, detalle, tono = "neu
     duration: duracion,
     icon: <CaraDelAviso nombre={nombre} foto={foto} seed={seed} tono={tono} />,
   });
+}
+
+/** El ícono de los avisos del SISTEMA: el robot de Maven con una insignia
+ *  chiquita que dice si salió bien, mal o si es un aviso.
+ *
+ *  Por qué la insignia y no solo el color: el muñequito da el "esto lo dice
+ *  Maven", pero el tilde o la cruz es lo que dice QUÉ pasó, y eso no puede
+ *  depender de distinguir un verde de un rojo. Va sobre el muñequito, chica,
+ *  como el punto de presencia de las personas.
+ *
+ *  Se monta una vez en el `Toaster` (prop `icons`), así que TODOS los avisos
+ *  de tipo de la app lo usan sin tocar los ~100 archivos que los disparan. */
+export function IconoSistema({ tono }: { tono: TonoAviso }) {
+  const Glifo = GLIFO[tono];
+  return (
+    <span className="relative inline-flex h-8 w-8 shrink-0">
+      <span className="h-full w-full rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
+        <span className="ua-ring-gap grid h-full w-full place-items-center rounded-full bg-background p-[2px]">
+          <img src={dicebearSistemaUri()} alt="" className="h-full w-full rounded-full" draggable={false} />
+        </span>
+      </span>
+      <span
+        className={cn(
+          "pointer-events-none absolute -bottom-0.5 -right-0.5 grid h-3.5 w-3.5 place-items-center rounded-full border-2 border-card text-[7px] text-white",
+          PUNTO[tono],
+        )}
+      >
+        <Glifo strokeWidth={4} className="h-2 w-2" aria-hidden="true" />
+      </span>
+    </span>
+  );
 }
 
 export { CaraDelAviso };

@@ -4,7 +4,7 @@
 // debe usarse en adelante. El muñequito es un SVG determinista de DiceBear
 // generado en el cliente: mismo seed → mismo dibujo, sin llamadas externas.
 import { createAvatar } from "@dicebear/core";
-import { adventurer } from "@dicebear/collection";
+import { adventurer, bottts } from "@dicebear/collection";
 
 /** La primera LETRA (o dígito) de un texto, salteando emojis y símbolos.
  *
@@ -52,5 +52,27 @@ export function dicebearUri(seed: string): string {
     backgroundColor: [],
   }).toDataUri();
   diceCache.set(seed, uri);
+  return uri;
+}
+
+/** EL MUÑEQUITO DEL SISTEMA.
+ *
+ *  Los avisos que NO son de una persona —"guardado", "no se pudo", "revisá
+ *  esto"— también llevan muñequito, pero no puede ser una cara: sería
+ *  atribuirle a alguien algo que hizo la plataforma. Va un robot, que es
+ *  exactamente lo que es, y siempre el MISMO (seed fijo) para que la gente lo
+ *  reconozca como "esto lo dice Maven" — el mismo personaje que en WhatsApp
+ *  firma como Maven Asistente.
+ *
+ *  Se genera una sola vez y queda en el mismo cache que el resto. */
+export function dicebearSistemaUri(): string {
+  const clave = "sistema:maven";
+  const hit = diceCache.get(clave);
+  if (hit) return hit;
+  const uri = createAvatar(bottts, {
+    seed: "maven-asistente",
+    backgroundColor: [],
+  }).toDataUri();
+  diceCache.set(clave, uri);
   return uri;
 }
