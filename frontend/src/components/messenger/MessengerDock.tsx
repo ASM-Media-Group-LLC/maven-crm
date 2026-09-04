@@ -75,8 +75,9 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
     return m;
   }, [conversations]);
 
+  // CHATS sin leer, igual que la nube del topbar (ver MessagesBell).
   const sinLeer = useMemo(
-    () => conversations.reduce((s, c) => s + c.unreadCount, 0),
+    () => conversations.filter((c) => c.unreadCount > 0).length,
     [conversations],
   );
 
