@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import StatChip from "@/components/StatChip";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
@@ -30,10 +30,18 @@ const norm = (s: string) =>
 const AdminUsuarios = () => {
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
+  // Esta pantalla vive en dos lados: embebida en Settings (?sub=usuarios) y con
+  // ruta propia (/admin/usuarios). Embebida, Settings ya pone su "Volver al
+  // menú" arriba, así que el botón propio quedaba duplicado — dos flechas de
+  // volver apiladas diciendo casi lo mismo.
+  const embebidaEnSettings = useLocation().pathname === "/settings";
   const { canAccess } = usePermissions();
   const { users, isLoading, refetch, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
+  // Las tarjetas de arriba eran decorativas. Ahora filtran: clic en "Admins" deja
+  // sólo los admins, clic de nuevo (o en "Total") limpia.
+  const [filtroRol, setFiltroRol] = useState<"admins" | "managers" | "sinRol" | null>(null);
   // En mobile la tabla es injugable: mide ~844px intrínsecos (6 columnas) y hay
   // que barrerla en horizontal con la columna de acciones sticky encima. Las
   // tarjetas (UsersGrid) ya existían para eso, así que en pantalla chica se
@@ -56,10 +64,15 @@ const AdminUsuarios = () => {
   // así que buscar por él no expone nada nuevo. Ojo: si la edge function list_users
   // falla, useAdminUsers deja email en "" y solo queda la búsqueda por nombre.
   const filtered = useMemo(() => {
+    const porRol =
+      filtroRol === "admins" ? users.filter((u) => u.role === "admin")
+      : filtroRol === "managers" ? users.filter((u) => u.role === "manager")
+      : filtroRol === "sinRol" ? users.filter((u) => !u.role)
+      : users;
     const q = norm(search);
     const base = q
-      ? users.filter((u) => norm(u.full_name ?? "").includes(q) || norm(u.email).includes(q))
-      : users;
+      ? porRol.filter((u) => norm(u.full_name ?? "").includes(q) || norm(u.email).includes(q))
+      : porRol;
     // Alfabético por nombre; quien no tenga nombre cargado se ordena por su correo
     // para que no queden todos amontonados al principio. localeCompare con "es"
     // pone la ñ donde va y trata á/a como la misma letra.
@@ -70,7 +83,7 @@ const AdminUsuarios = () => {
         { sensitivity: "base" },
       ),
     );
-  }, [users, search]);
+  }, [users, search, filtroRol]);
 
   const handleEditRole = (user: AdminUser) => {
     setSelectedUser(user);
@@ -112,11 +125,13 @@ const AdminUsuarios = () => {
     setMigrarCorreoOpen(true);
   };
 
+  // "Employees" contaba un rol que ya no tiene nadie y salía siempre en 0. Lo
+  // reemplaza "Sin rol", que además es accionable. Cada tarjeta filtra la lista.
   const kpis = [
-    { label: "Total", value: String(stats.total), icon: Users, color: "bg-primary" },
-    { label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-destructive" },
-    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-warning" },
-    { label: "Employees", value: String(stats.employees), icon: User, color: "bg-primary" },
+    { key: null, label: "Total", value: String(stats.total), icon: Users, color: "bg-primary" },
+    { key: "admins" as const, label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-destructive" },
+    { key: "managers" as const, label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-warning" },
+    { key: "sinRol" as const, label: "Sin rol", value: String(stats.sinRol), icon: User, color: "bg-muted-foreground" },
   ];
 
   // El tab "Roles" (CRUD de roles + permisos) se gatea con el permiso "Roles".
@@ -132,14 +147,16 @@ const AdminUsuarios = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
             <header className="bg-background/30 backdrop-blur-xl px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-white/10 shrink-0">
-              <button
-                type="button"
-                onClick={() => navigate("/settings")}
-                className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Volver a Settings
-              </button>
+              {!embebidaEnSettings && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/settings")}
+                  className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver a Settings
+                </button>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-xl font-semibold">Gestión de Usuarios</h1>
@@ -164,7 +181,15 @@ const AdminUsuarios = () => {
               {/* KPIs — estáticas (la tabla detallada vive abajo) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {kpis.map((kpi) => (
-                  <StatChip key={kpi.label} label={kpi.label} value={kpi.value} icon={<kpi.icon className="h-3.5 w-3.5" />} color={kpi.color} />
+                  <StatChip
+                    key={kpi.label}
+                    label={kpi.label}
+                    value={kpi.value}
+                    icon={<kpi.icon className="h-3.5 w-3.5" />}
+                    color={kpi.color}
+                    onClick={() => setFiltroRol((prev) => (prev === kpi.key ? null : kpi.key))}
+                    className={filtroRol === kpi.key ? "border-primary ring-1 ring-primary/40" : undefined}
+                  />
                 ))}
               </div>
 

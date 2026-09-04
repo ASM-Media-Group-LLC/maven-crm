@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -78,10 +78,9 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                 </DropdownMenu>
               </div>
               <div className="flex flex-col items-center text-center gap-3">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={user.avatar_url ?? ""} />
-                  <AvatarFallback className="text-lg">{(user.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                </Avatar>
+                {/* Igual que en UsersTable: el muñequito vive en avatar_seed y un
+                    Avatar crudo nunca lo dibujaba. */}
+                <UserAvatar name={user.full_name} src={user.avatar_url} seed={user.avatar_seed} size="xl" />
                 <div>
                   <p className="font-semibold">{user.full_name || "Sin nombre"}</p>
                   {user.email ? (
@@ -118,8 +117,10 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                 ) : (
                   <span className="text-muted-foreground text-sm">Sin rol</span>
                 )}
-                {/* Linked employee badge */}
-                {user.linked_employee ? (
+                {/* Ficha HR: sólo si la hay. El "Sin ficha HR" salía en TODAS las
+                    tarjetas (hoy no hay un solo perfil vinculado) y era un renglón
+                    de ruido por persona. */}
+                {user.linked_employee && (
                   <button
                     onClick={() => navigate(`/hr/empleado/${user.linked_employee!.id}`)}
                     className="flex items-center gap-1 text-xs text-primary hover:underline"
@@ -127,8 +128,6 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                     <ExternalLink className="h-3 w-3" />
                     {user.linked_employee.first_name} {user.linked_employee.last_name}
                   </button>
-                ) : (
-                  <span className="text-muted-foreground text-xs">Sin ficha HR</span>
                 )}
               </div>
             </CardContent>
