@@ -18,8 +18,13 @@ type Tab = "all" | "unread" | "groups";
 /** ⚠️ DICEBEAR: el muñequito llega envuelto en el anillo degradé de
  *  UserAvatar (+4px por lado), así que mide 40px donde unas iniciales miden
  *  32 y las filas quedaban dentadas. El hueco se reserva SIEMPRE de 40 y el
- *  avatar se centra dentro, tenga muñequito o no. */
-const HUECO_AVATAR = "relative flex h-10 w-10 shrink-0 items-center justify-center";
+ *  avatar se centra dentro, tenga muñequito o no.
+ *
+ *  ⚠️ El punto de presencia NO puede colgarse de este hueco: con iniciales
+ *  (32px dentro de 40) quedaba 4px despegado, flotando en la esquina de la
+ *  caja. Va dentro de ANCLA_AVATAR, que se ajusta al avatar real. */
+const HUECO_AVATAR = "flex h-10 w-10 shrink-0 items-center justify-center";
+const ANCLA_AVATAR = "relative inline-flex";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "all", label: "Todos" },
@@ -212,14 +217,16 @@ function FilaPersona({
       className="group flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:scale-[.985]"
     >
       <div className={HUECO_AVATAR}>
+        <span className={ANCLA_AVATAR}>
         <UserAvatar name={nombre} src={perfil.avatar_url} seed={perfil.avatar_seed ?? undefined} size="sm" />
         <span
           className={cn(
-            "presence-ring absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-popover",
+            "presence-ring absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
             getStatusColor(estado, online),
             online && "animate-presence-pulse motion-reduce:animate-none",
           )}
         />
+        </span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{nombre}</p>
@@ -270,7 +277,7 @@ function FilaChat({
             </AvatarFallback>
           </Avatar>
         ) : (
-          <>
+          <span className={ANCLA_AVATAR}>
             {/* El tamaño por `size` (ver la nota en DockChatWindow). */}
             <UserAvatar
               name={conversation.displayName}
@@ -280,7 +287,7 @@ function FilaChat({
             />
             <span
               className={cn(
-                "presence-ring absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-popover",
+                "presence-ring absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
                 getStatusColor(
                   otro ? status(otro.user_id) : null,
                   otro ? online(otro.user_id) : false,
@@ -288,7 +295,7 @@ function FilaChat({
                 otro && online(otro.user_id) && "animate-presence-pulse motion-reduce:animate-none",
               )}
             />
-          </>
+          </span>
         )}
       </div>
 
