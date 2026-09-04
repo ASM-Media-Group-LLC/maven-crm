@@ -266,7 +266,13 @@ function FilaChat({
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/60 active:scale-[.985]"
+      className={cn(
+        "group relative flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors active:scale-[.985]",
+        // Fondo en lo NO LEÍDO, no solo el canto y la negrita: mismo valor que
+        // la lista grande del Messenger (0.16), que se subió dos veces hasta que
+        // se notó de verdad sobre el fondo oscuro.
+        hasUnread ? "bg-primary/[0.16] hover:bg-primary/[0.22]" : "hover:bg-muted/60",
+      )}
     >
       {/* Lo no leído en el canto IZQUIERDO, donde entra la vista, y no en un
           punto de 10px al final de la fila. Va junto al nombre en negrita y la
