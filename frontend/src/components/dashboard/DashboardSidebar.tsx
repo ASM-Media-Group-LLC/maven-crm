@@ -3,7 +3,7 @@ import {
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
-  Volume2, VolumeX, Mail, Clapperboard, CalendarRange, CalendarDays, Gift } from "lucide-react";
+  Volume2, VolumeX, Mail, Clapperboard, CalendarRange, CalendarDays, Gift, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,7 +111,7 @@ const DashboardSidebar = () => {
   }, [pathname, isMobile, setOpenMobile]);
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { canAccess, isLoading: permisosCargando } = usePermissions();
+  const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount } = useSidebarBadges();
@@ -388,6 +388,42 @@ const DashboardSidebar = () => {
   // padre apagado en sus propias subpaginas que no estan en el menu
   // (historial, admin, workspace).
   const operationsActiveUrl = pickActiveUrl(operationsMenu.map((i) => i.url), pathname);
+
+  // Mientras no sepamos qué puede ver, NO se dibuja un menú recortado.
+  //
+  // `canAccess` cae a los módulos universales (Dashboard, Correo, Messenger,
+  // Cowork, Meet, Grabaciones) cuando falta el rol — correcto por seguridad,
+  // pero mostrarlo como si fuera el menú de la persona es lo que hacía pensar
+  // que la sesión se había caído: desaparecían Operaciones, Finanzas, RRHH y
+  // Panel de Control de golpe. Cargando se muestran huesos; si falló, se dice
+  // qué pasó y se puede reintentar sin recargar la página.
+  if (permisosCargando || permisosFallaron) {
+    return (
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="flex h-14 items-center justify-start px-5 border-b border-border shrink-0">
+          <Logo size="sm" collapsed={collapsed} />
+        </SidebarHeader>
+        <SidebarContent className="gap-2 px-3 py-3">
+          {permisosFallaron ? (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/40 p-3">
+              <p className="text-xs font-medium">No pudimos cargar tu menú</p>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Fue la conexión, no tu cuenta. Sigues con la sesión abierta.
+              </p>
+              <Button size="sm" variant="secondary" className="h-7 w-full gap-1.5 text-xs" onClick={reintentarPermisos}>
+                <RefreshCw className="h-3 w-3" />
+                Reintentar
+              </Button>
+            </div>
+          ) : (
+            Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="h-8 animate-pulse rounded-md bg-muted/50" />
+            ))
+          )}
+        </SidebarContent>
+      </Sidebar>
+    );
+  }
 
   return (
     <Sidebar collapsible="icon">
