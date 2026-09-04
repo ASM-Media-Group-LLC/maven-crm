@@ -73,8 +73,20 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
         class: "msg-composer focus:outline-none min-h-[24px] max-h-[160px] overflow-y-auto text-sm",
       },
       // Enter envía (Shift+Enter = salto de línea), igual que antes del editor rico.
-      handleKeyDown: (_view, event) => {
+      handleKeyDown: (view, event) => {
         if (event.key === "Enter" && !event.shiftKey) {
+          // Dentro de una LISTA, CITA o BLOQUE DE CÓDIGO, Enter tiene que hacer lo
+          // suyo (siguiente viñeta / salto de línea), no enviar: si no, nunca se
+          // puede escribir el segundo punto de una lista. TipTap ya sabe hacerlo,
+          // y en una viñeta vacía Enter sale de la lista. Fuera de esos bloques,
+          // Enter envía como siempre.
+          const { $from } = view.state.selection;
+          for (let d = $from.depth; d > 0; d--) {
+            const nombre = $from.node(d).type.name;
+            if (nombre === "listItem" || nombre === "codeBlock" || nombre === "blockquote") {
+              return false;
+            }
+          }
           event.preventDefault();
           onEnterRef.current();
           return true;
