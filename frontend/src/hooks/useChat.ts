@@ -1042,20 +1042,41 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     };
     window.addEventListener("focus", handleFocus);
 
-    // Typing indicator via presence
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      if (messagesRealtimeReconnectTimerRef.current) {
+        clearTimeout(messagesRealtimeReconnectTimerRef.current);
+        messagesRealtimeReconnectTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, user?.id, messagesRealtimeVersion]);
+
+  // ── Indicador "está escribiendo" — canal de presencia SEPARADO ──────────
+  //
+  // ⚠️ Vive en su PROPIO efecto, con deps [conversationId, user?.id] y NADA
+  // más. Antes compartía el efecto de los mensajes, que se remonta cada vez que
+  // `messagesRealtimeVersion` cambia (una reconexión de red, por ejemplo). En
+  // cada remonte el canal se borraba y se recreaba con EL MISMO topic
+  // (`typing-<conv>`, sin versión, a diferencia de `messages-<conv>-<n>`), y
+  // supabase-js dedupea por topic: la recreación colisionaba con el que se
+  // estaba yendo y el nuevo entraba en un ciclo join→ok→close. Medido en los
+  // frames del websocket. Desde su propio efecto se monta UNA vez por
+  // conversación y se queda unido.
+  useEffect(() => {
+    const userId = user?.id;
+    if (!conversationId || !userId) return;
+
     const presenceChannel = supabase
-      .channel(`typing-${conversationId}`,
-        {
-          config: { presence: { key: userId } },
-        })
+      .channel(`typing-${conversationId}`, {
+        config: { presence: { key: userId } },
+      })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
         Object.values(state).forEach((presences: any) => {
-          presences.forEach((p: any) => {
-            if (p.typing && p.user_id !== userId) {
-              typing.push(p.user_id);
-            }
+          presences.forEach((pres: any) => {
+            if (pres.typing && pres.user_id !== userId) typing.push(pres.user_id);
           });
         });
         setTypingUsers(typing);
@@ -1066,57 +1087,16 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       if (status === "SUBSCRIBED") {
         void presenceChannel.track({ user_id: userId, typing: false });
       }
-      // ⚠️ SIN ESTO EL "ESTÁ ESCRIBIENDO" DEJABA DE FUNCIONAR EN SILENCIO.
-      //
-      // El canal de mensajes ya tenía vigilancia (scheduleMessagesReconnect) y
-      // se recuperaba solo; este NO tenía ninguna, así que cuando se caía —y se
-      // cae: los `track` de presencia devuelven "timed out" a menudo— nadie lo
-      // reconstruía. Medido en producción: la conversación seguía abierta, con
-      // sus canales de mensajes, reacciones y recibos vivos, pero el de
-      // escritura ya no estaba. A partir de ahí ni se anuncia ni se recibe nada
-      // hasta cambiar de conversación, que es lo que rehacía el efecto.
-      //
-      // Se engancha al MISMO temporizador que los mensajes porque los dos
-      // canales nacen y mueren en este efecto: al reconectar se rehacen juntos.
-      // Ojo: NO se engancha "CLOSED". La limpieza del efecto borra el
-      // temporizador ANTES de llamar a removeChannel, así que un CLOSED durante
-      // el desmontaje dejaría programado un reconecte huérfano que nadie
-      // cancela — y eso rehace el efecto después de haberlo desmontado.
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        scheduleMessagesReconnect();
-      }
     });
 
-    // ⚠️ Y además se comprueba que el canal SIGA AHÍ.
-    //
-    // No alcanza con reaccionar a los estados: se midió en producción que el
-    // canal de escritura desaparecía del cliente —ya no estaba en la lista de
-    // canales— con la conversación todavía abierta y sus canales de mensajes,
-    // reacciones y recibos vivos. Si se va sin avisar, ningún callback de
-    // estado se entera. Cada 15s se mira si sigue vivo y, si no, se rehace por
-    // el mismo camino que los mensajes. "joining" cuenta como vivo: recién
-    // suscrito todavía no llegó a "joined".
-    const vigilanteTyping = setInterval(() => {
-      const c = typingChannelRef.current;
-      const vivo = !!c && supabase.getChannels().includes(c)
-        && (c.state === "joined" || c.state === "joining");
-      if (!vivo) scheduleMessagesReconnect();
-    }, 15000);
-
     return () => {
-      window.removeEventListener("focus", handleFocus);
-      clearInterval(vigilanteTyping);
-      if (messagesRealtimeReconnectTimerRef.current) {
-        clearTimeout(messagesRealtimeReconnectTimerRef.current);
-        messagesRealtimeReconnectTimerRef.current = null;
-      }
-      supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
       if (typingChannelRef.current === presenceChannel) {
         typingChannelRef.current = null;
       }
+      setTypingUsers([]);
     };
-  }, [conversationId, user?.id, messagesRealtimeVersion]);
+  }, [conversationId, user?.id]);
 
   // Envío real, compartido por sendMessage y el reintento. Marca 'sending'; en éxito reemplaza
   // el optimista por la fila real (o lo quita si el realtime ya lo insertó) y limpia la cola
