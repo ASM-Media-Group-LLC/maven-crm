@@ -70,7 +70,7 @@ export default function DockChatWindow({
       <div className="flex shrink-0 items-center gap-2 border-b border-border/60 bg-gradient-to-r from-primary/10 via-card to-card px-2.5 py-2">
         <div className="relative shrink-0">
           {isGroup ? (
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-6 w-6">
               {conversation.avatar_url && (
                 <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />
               )}
@@ -80,11 +80,15 @@ export default function DockChatWindow({
             </Avatar>
           ) : (
             <>
+              {/* ⚠️ El tamaño va por `size`, NO por className: con muñequito
+                  DiceBear el className se aplica al ENVOLTORIO y el avatar
+                  interno se queda en su tamaño por defecto (40px) + anillo, se
+                  salía del hueco y pisaba el nombre. */}
               <UserAvatar
                 name={conversation.displayName}
                 src={conversation.avatar_url || otro?.profile?.avatar_url}
                 seed={otro?.profile?.avatar_seed}
-                className="h-7 w-7"
+                size="xs"
               />
               <span
                 className={cn(

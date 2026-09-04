@@ -6,4 +6,4 @@
  * los agrupa visualmente y hace que se lean como una barra de acciones.
  */
 export const BOTON_TOPBAR =
-  "relative h-9 w-9 shrink-0 rounded-full bg-muted/70 text-foreground hover:bg-muted hover:text-foreground";
+  "relative h-9 w-9 shrink-0 rounded-full bg-foreground/10 text-foreground hover:bg-foreground/[0.18] hover:text-foreground";
