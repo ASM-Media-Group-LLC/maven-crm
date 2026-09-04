@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -48,6 +48,16 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState("");
 
+  // El editor de TipTap se crea UNA vez, así que sus editorProps capturan los
+  // callbacks del PRIMER render. Sin estas refs, Enter llamaba a un handleSend
+  // viejo que creía que el texto estaba vacío y no enviaba nada.
+  const onEnterRef = useRef(onEnter);
+  onEnterRef.current = onEnter;
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const onPasteFilesRef = useRef(onPasteFiles);
+  onPasteFilesRef.current = onPasteFiles;
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false }),
@@ -66,7 +76,7 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       handleKeyDown: (_view, event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          onEnter();
+          onEnterRef.current();
           return true;
         }
         return false;
@@ -83,19 +93,19 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
             return new File([f], `pasted-image-${Date.now()}.${ext}`, { type: f.type });
           })
           .filter((f): f is File => f !== null);
-        if (files.length > 0) { event.preventDefault(); onPasteFiles(files); return true; }
+        if (files.length > 0) { event.preventDefault(); onPasteFilesRef.current(files); return true; }
         return false;
       },
     },
     onUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdate(plain, antes.length);
+      onUpdateRef.current(plain, antes.length);
     },
     onSelectionUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdate(plain, antes.length);
+      onUpdateRef.current(plain, antes.length);
     },
   }, [placeholder]);
 

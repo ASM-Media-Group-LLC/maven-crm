@@ -140,6 +140,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     );
   }
 
+  // Mensaje del SISTEMA (alguien entró/salió, cambio de nombre del grupo…): no es
+  // un mensaje de nadie, así que no lleva burbuja ni avatar ni acciones. Va centrado,
+  // en gris y cursiva. Antes se dibujaba como burbuja normal y parecía enviado por
+  // quien hizo la acción ("Jhon Lopez eliminó a X" salía como si Jhon lo hubiera escrito).
+  if (message.type === "system") {
+    return (
+      <div ref={ref} className="flex justify-center px-1 my-2">
+        <span className="max-w-[80%] text-center text-[11px] italic leading-snug text-muted-foreground">
+          {message.content}
+        </span>
+      </div>
+    );
+  }
+
   const linkifyText = (text: string): React.ReactNode[] => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
