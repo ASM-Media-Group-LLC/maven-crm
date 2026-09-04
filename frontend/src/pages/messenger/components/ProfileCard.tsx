@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { avisarPersona } from "@/lib/avisoPersona";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Loader2, Heart, Check, Mail, PenLine, MessageCircle } from "lucide-react";
@@ -277,7 +278,23 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
   const invalid = !!data && (data as unknown as { error?: string }).error != null;
 
   const handleSend = () => {
-    if (userId && data && !data.viewer_has_sent && !isKarmaLegend(data)) sendKarma.mutate(userId);
+    if (!userId || !data || data.viewer_has_sent || isKarmaLegend(data)) return;
+    sendKarma.mutate(userId, {
+      // El karma es de una persona a otra: el aviso lleva la cara de quien lo
+      // recibió, que es lo que hace que se entienda sin leerlo.
+      onSuccess: (nueva) => {
+        const estrellas = nueva?.stars_count ?? data.stars_count;
+        const quien = data.name ?? "esta persona";
+        avisarPersona({
+          nombre: quien, foto: data.avatar_url, seed: data.avatar_seed,
+          titulo: `Le mandaste karma a ${quien}`,
+          detalle: estrellas ? `Ahora tiene ${estrellas} de 5 estrellas` : undefined,
+          tono: "bien",
+          id: `karma-${userId}`,
+        });
+      },
+      onError: () => toast.error("No se pudo mandar el karma"),
+    });
   };
 
   // Escribirle: se va al correo de Maven con el destinatario ya puesto.

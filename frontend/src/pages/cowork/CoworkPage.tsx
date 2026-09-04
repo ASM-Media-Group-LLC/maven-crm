@@ -5,6 +5,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
+import { avisarPersona } from "@/lib/avisoPersona";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -589,7 +590,7 @@ function fechaCorta(iso: string | null | undefined): string {
 
 function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | null }) {
   const navigate = useNavigate();
-  const [quien, setQuien] = useState<string | null>(null);
+  const [quien, setQuien] = useState<{ nombre: string; foto: string | null; seed: string | null } | null>(null);
 
   // Quién la finalizó, con nombre. Antes esta pantalla decía "la finalizó el
   // supervisor" y te mandaba al dashboard a los 50 ms: nadie llegaba a leerla,
@@ -599,13 +600,27 @@ function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | n
     const uid = session?.ended_by;
     if (!uid) return;
     let vivo = true;
-    supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle()
-      .then(({ data }) => { if (vivo) setQuien(data?.full_name ?? null); });
+    supabase.from("profiles").select("full_name, avatar_url, avatar_seed").eq("id", uid).maybeSingle()
+      .then(({ data }) => {
+        if (!vivo || !data?.full_name) return;
+        setQuien({ nombre: data.full_name, foto: data.avatar_url ?? null, seed: data.avatar_seed ?? null });
+      });
     return () => { vivo = false; };
   }, [session?.ended_by]);
 
   useEffect(() => {
-    toast.info(quien ? `La sesión la finalizó ${quien}` : "La sesión fue finalizada", { id: "sesion-finalizada" });
+    // Con nombre va con su cara; sin nombre no hay a quién mostrarle la cara,
+    // así que queda el aviso de sistema. Mismo id: el segundo reemplaza al
+    // primero cuando llega el nombre, en vez de apilarse.
+    if (quien) {
+      avisarPersona({
+        nombre: quien.nombre, foto: quien.foto, seed: quien.seed,
+        titulo: "Sesión finalizada", detalle: `La finalizó ${quien.nombre}`,
+        id: "sesion-finalizada",
+      });
+    } else {
+      toast.info("La sesión fue finalizada", { id: "sesion-finalizada" });
+    }
   }, [quien]);
 
   return (
@@ -618,7 +633,7 @@ function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | n
         <h2 className="text-lg font-semibold text-foreground">Esta sesión ha finalizado</h2>
         <p className="text-sm text-muted-foreground">
           {session?.ended_by
-            ? <>La finalizó <span className="text-foreground font-medium">{quien ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at)}` : ""}.</>
+            ? <>La finalizó <span className="text-foreground font-medium">{quien?.nombre ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at)}` : ""}.</>
             : "La finalizó un supervisor."}
           {" "}Los enlaces y códigos de esta sesión ya no sirven: pide el de la sesión nueva.
         </p>
