@@ -19,7 +19,7 @@ interface ReadReceiptIndicatorProps {
 // Modelo WhatsApp:
 //   ✓  tenue    = enviado (aún no le llegó a la otra persona)
 //   ✓✓ tenue    = entregado (le llegó a todos, nadie lo leyó aún)
-//   ✓✓ marcado + "Visto" = leído (lo leyeron todos)
+//   ✓✓ marcado  = leído (lo leyeron todos)
 //
 // ⚠️ EL "LEÍDO" NO LLEVA UN COLOR PROPIO, y es a propósito.
 //
@@ -43,12 +43,11 @@ interface ReadReceiptIndicatorProps {
 // deja el check legible, y un skin nuevo no puede reintroducir el problema.
 //
 // El grosor no es decorativo: sin él la diferencia sería solo de opacidad, y
-// quien no distinga colores (o mire de reojo) no la vería.
+// quien no distinga colores (o mire de reojo) no la vería. Dos señales.
 //
-// Y encima del color y del grosor va la PALABRA "Visto", que es la señal que no
-// admite interpretación: no depende del skin, ni del tema, ni de distinguir dos
-// tonos de blanco, ni de acordarse de qué significan una o dos palomitas. El
-// tooltip con los nombres se queda para el detalle de quién lo leyó.
+// Se probó agregar la palabra "Visto" al lado y el owner la descartó: ensucia el
+// pie de cada burbuja propia. La palabra sigue estando donde no molesta — en el
+// tooltip, que además dice QUIÉN lo leyó.
 export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUsers, profiles, totalParticipants, variant = "onPrimary" }: ReadReceiptIndicatorProps) {
   if (!isMe) return null;
 
@@ -75,8 +74,7 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={cn("inline-flex items-center gap-0.5", allRead && palette.read)}>
-            {allRead && <span className="text-[10px] font-semibold leading-none">Visto</span>}
+          <span className="inline-flex">
             {sentOnly
               ? <Check className={cn("h-3 w-3", palette.dim)} />
               : (
