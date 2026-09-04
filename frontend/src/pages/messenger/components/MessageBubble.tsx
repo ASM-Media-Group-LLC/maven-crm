@@ -412,7 +412,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
     return (
       <p className="text-[13px] whitespace-pre-wrap break-words leading-relaxed">
-        {highlightText(message.content || "")}
+        {message.content_rich
+          ? <RichText doc={message.content_rich} renderText={highlightText} />
+          : highlightText(message.content || "")}
       </p>
     );
   };
