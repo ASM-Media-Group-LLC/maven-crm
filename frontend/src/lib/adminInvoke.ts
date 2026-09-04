@@ -14,23 +14,40 @@ export class ForbiddenError extends Error {
   }
 }
 
+/** ¿Ya no hay sesión? Única señal válida para decir "expiró". */
+async function sesionPerdida(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  return !data?.session?.access_token;
+}
+
 /**
- * Invokes a Supabase edge function with proper session validation and
- * error classification (401 → SessionExpiredError, 403 → ForbiddenError).
+ * Llama a una edge function de administración con la sesión validada y los
+ * errores clasificados (sesión expirada / sin permisos / error real).
+ *
+ * ⚠️ ESTA FUNCIÓN SACABA A LA GENTE DE MAVEN. Dos motivos, los dos arreglados:
+ *
+ * 1. Forzaba `refreshSession()` en CADA acción de administración. Con rotación
+ *    de tokens eso revoca el anterior, así que si otra pestaña —o el refresco
+ *    automático de esta— todavía tenía el viejo, su siguiente intento moría con
+ *    "Refresh Token Not Found" y la sesión se caía. supabase-js ya refresca solo
+ *    cuando hace falta y coordina las pestañas con un candado: no hay que
+ *    ayudarlo.
+ * 2. Llamaba a `signOut()` ante cualquier 401 —o ante un mensaje que
+ *    CONTUVIERA "Unauthorized"—. Un 401 de NUESTRA edge function no prueba que
+ *    la sesión esté muerta: puede ser su propia validación, un arranque en frío
+ *    o `verify_jwt` mal configurado (ya nos pasó). Se cerraba la sesión por un
+ *    error del servidor.
  */
 export async function adminInvoke<T = Record<string, unknown>>(
   functionName: string,
   body: Record<string, unknown>
 ): Promise<T> {
-  // 1. Refresh session to get a fresh token (avoids stale/expired sessions)
-  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-  if (refreshError || !refreshData?.session?.access_token) {
-    // Fallback: check existing session
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session?.access_token) {
-      await supabase.auth.signOut();
-      throw new SessionExpiredError();
-    }
+  // 1. ¿Hay sesión? `getSession()` lee de local y refresca solo si el token ya
+  // venció, que es exactamente lo que se necesita. Si no hay nada, no se llama
+  // a signOut: no queda sesión que cerrar y el aviso lo da el error.
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.access_token) {
+    throw new SessionExpiredError();
   }
 
   // 2. Call the edge function
@@ -60,8 +77,11 @@ export async function adminInvoke<T = Record<string, unknown>>(
     const msg = bodyMsg ?? baseMsg;
 
     if (status === 401 || msg.includes("Unauthorized")) {
-      await supabase.auth.signOut();
-      throw new SessionExpiredError();
+      // Se comprueba la sesión de VERDAD antes de darla por perdida.
+      if (await sesionPerdida()) throw new SessionExpiredError();
+      // Sesión viva y la función devolvió 401: es un problema del servidor, no
+      // de la persona. Se muestra el error real en vez de echarla.
+      throw new Error(msg);
     }
     if (status === 403 || msg.includes("Forbidden")) {
       throw new ForbiddenError(msg);
@@ -73,8 +93,8 @@ export async function adminInvoke<T = Record<string, unknown>>(
   if (data?.error) {
     const errMsg: string = data.error;
     if (errMsg.includes("Unauthorized")) {
-      await supabase.auth.signOut();
-      throw new SessionExpiredError();
+      if (await sesionPerdida()) throw new SessionExpiredError();
+      throw new Error(errMsg);
     }
     if (errMsg.includes("Forbidden") || errMsg.includes("admin role required")) {
       throw new ForbiddenError(errMsg);
