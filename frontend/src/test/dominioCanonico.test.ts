@@ -16,11 +16,20 @@ describe("dominio canónico", () => {
       .toBe("https://app.maven-ai.me/reset-password#access_token=abc&type=recovery");
   });
 
-  it("NO toca el dominio histórico mientras el interruptor esté apagado", () => {
-    // Se prende recién cuando el equipo está avisado: el día que redirija,
-    // todos se deslogean y hay que volver a aceptar las notificaciones.
-    expect(urlCanonica("https://maven.asmtech.ai/chatter/sesion-123")).toBeNull();
-    expect(urlCanonica("https://maven.asmtech.ai/entrar/ABC123")).toBeNull();
+  it("el dominio histórico ya redirige, y los links públicos siguen llegando a su pantalla", () => {
+    // Interruptor encendido el 04/09/2026. Lo que hace que apagarlo sea seguro
+    // es esto: la ruta se preserva, así que los links que andan por bandejas
+    // ajenas —el candidato del evaluador, el invitado a una reunión— caen en la
+    // misma pantalla del canónico en vez de en un 404.
+    expect(urlCanonica("https://maven.asmtech.ai/chatter/sesion-123"))
+      .toBe("https://app.maven-ai.me/chatter/sesion-123");
+    expect(urlCanonica("https://maven.asmtech.ai/entrar/ABC123"))
+      .toBe("https://app.maven-ai.me/entrar/ABC123");
+    // El otro histórico, y con query + hash (ahí viajan los tokens).
+    expect(urlCanonica("https://maven.asmtech.me/reset-password#access_token=abc&type=recovery"))
+      .toBe("https://app.maven-ai.me/reset-password#access_token=abc&type=recovery");
+    expect(urlCanonica("https://maven.asmtech.ai/call/meet_abc?mic=off"))
+      .toBe("https://app.maven-ai.me/call/meet_abc?mic=off");
   });
 
   it("reconoce los dominios de la etapa anterior (para contar las visitas)", () => {

@@ -31,10 +31,17 @@ const A_REDIRIGIR = new Set(["maven-ai.me", "www.maven-ai.me"]);
  *  el interruptor de abajo está en true. */
 const HISTORICOS = new Set(["maven.asmtech.ai", "maven.asmtech.me"]);
 
-/** ⚠️ Pasar a `true` SOLO después de avisarle al equipo: el día que redirija,
- *  todos se deslogean (la sesión vive por dominio) y hay que volver a aceptar
- *  las notificaciones. */
-const REDIRIGIR_HISTORICO = false;
+/** Encendido el 04/09/2026 a la 1am, a pedido de Jhon: el dominio histórico
+ *  queda SOLO como redirección. Se esperó a tener datos: ese día el aviso de
+ *  mudanza movió a la gente sola —el cruce fue a las 11am y para la tarde el
+ *  canónico duplicaba al viejo (30 personas contra 21)— y la hora se eligió
+ *  con casi nadie trabajando, porque al redirigir todos se deslogean (la
+ *  sesión vive por dominio) y hay que volver a aceptar las notificaciones.
+ *
+ *  Los links públicos que andan por bandejas ajenas siguen funcionando: la
+ *  redirección preserva ruta, query y hash, así que /chatter/abc del dominio
+ *  viejo cae en /chatter/abc del canónico. */
+const REDIRIGIR_HISTORICO = true;
 
 /**
  * URL equivalente en el dominio canónico, o null si no hay que redirigir.
