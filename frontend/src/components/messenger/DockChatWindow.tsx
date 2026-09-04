@@ -10,7 +10,7 @@ import { useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
-import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
+import { getStatusColor, getStatusLabel } from "@/pages/messenger/components/StatusPicker";
 import MessageList from "@/pages/messenger/components/MessageList";
 import MessageInput from "@/pages/messenger/components/MessageInput";
 import type { ChatMessage, ConversationWithDetails } from "@/pages/messenger/types";
@@ -39,7 +39,7 @@ export default function DockChatWindow({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profiles, markConversationRead } = useChatShared();
-  const { isOnline, getStatus } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusText } = useOnlinePresence();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
 
   const alLlegarMensaje = useCallback(() => {
@@ -47,7 +47,7 @@ export default function DockChatWindow({
   }, [markConversationRead, conversation.id]);
 
   const {
-    messages, loading, hasMore, loadingMore, loadOlderMessages,
+    messages, loading, hasMore, loadingMore, loadOlderMessages, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
   } = useMessages(conversation.id, alLlegarMensaje);
 
@@ -55,10 +55,32 @@ export default function DockChatWindow({
   const { getReadBy, getDeliveredBy } = useReadReceipts(conversation.id, messages);
 
   const isGroup = conversation.type === "group";
+
+  // Mismo texto que el header de la pantalla grande (ChatHeader): si hay dos
+  // formas de decir "está escribiendo" se terminan desincronizando.
+  //
+  // El subtítulo se dibuja SIEMPRE —presencia cuando nadie escribe— para que al
+  // aparecer el aviso no salte el alto de la cabecera cada vez que alguien
+  // teclea. En 460px de ventana ese brinco se nota.
+  const nombresEscribiendo = typingUsers
+    .map((id) => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
+    .join(", ");
+  const escribiendo = nombresEscribiendo
+    ? `${nombresEscribiendo} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
+    : null;
   const otro = useMemo(
     () => (isGroup ? undefined : conversation.participants.find((p) => p.user_id !== user?.id)),
     [isGroup, conversation.participants, user?.id],
   );
+
+  // Presencia para cuando nadie escribe: en un grupo, cuántos son; en un DM, el
+  // estado de la otra persona (su texto propio si lo puso, si no la etiqueta).
+  const idOtro = otro?.user_id;
+  const subtituloPresencia = isGroup
+    ? `${conversation.participants.length} miembros`
+    : idOtro
+      ? (getStatusText(idOtro) || getStatusLabel(getStatus(idOtro), isOnline(idOtro)))
+      : "";
 
   return (
     <div
@@ -102,7 +124,15 @@ export default function DockChatWindow({
             </>
           )}
         </div>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold">{conversation.displayName}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold leading-tight">{conversation.displayName}</p>
+          <p className={cn(
+            "truncate text-[10px] leading-tight",
+            escribiendo ? "text-primary animate-pulse" : "text-muted-foreground",
+          )}>
+            {escribiendo ?? subtituloPresencia}
+          </p>
+        </div>
         <Button
           variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
           title="Abrir en Messenger"
