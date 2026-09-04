@@ -24,8 +24,10 @@ export default function MessagesBell() {
   const { abrirChat } = useMessengerDock();
   const [open, setOpen] = useState(false);
 
+  // CHATS sin leer, no mensajes: un grupo con cuatro mensajes seguidos cuenta 1.
+  // El número de mensajes se ve en la fila, al abrir el panel.
   const total = useMemo(
-    () => conversations.reduce((s, c) => s + c.unreadCount, 0),
+    () => conversations.filter((c) => c.unreadCount > 0).length,
     [conversations],
   );
 

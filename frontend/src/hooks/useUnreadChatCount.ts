@@ -3,8 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
- * Returns the total number of unread chat messages across all conversations.
- * Uses a single server-side function instead of N+1 queries.
+ * Cuántas CONVERSACIONES tienen mensajes sin leer — no cuántos mensajes.
+ *
+ * Es la unidad de Facebook y de Google Chat, y la que pidió el owner: un grupo
+ * con cuatro mensajes seguidos cuenta 1, no 4. Antes sumaba mensajes y el
+ * número no cuadraba con lo que se ve en la lista (cuatro mensajes de un mismo
+ * grupo se leen como una sola conversación pendiente). El desglose por mensajes
+ * vive DENTRO de cada fila de la lista, que es donde tiene sentido.
+ *
+ * Resuelto con una sola llamada al servidor en vez de N+1 consultas.
  */
 export function useUnreadChatCount() {
   const { user } = useAuth();
@@ -19,7 +26,7 @@ export function useUnreadChatCount() {
 
     if (error || !data) { setCount(0); return; }
 
-    const total = (data as any[]).reduce((sum, row) => sum + (row.unread_count || 0), 0);
+    const total = (data as any[]).filter((row) => (row.unread_count || 0) > 0).length;
     setCount(total);
   }, [user]);
 

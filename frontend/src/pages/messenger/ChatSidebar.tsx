@@ -140,7 +140,10 @@ export default function ChatSidebar({
   const dmOcultosNoLeidos = useMemo(() => dmRecorte.ocultos.filter(c => c.unreadCount > 0).length, [dmRecorte.ocultos]);
   const sortedGroups = useMemo(() => sorted.filter(c => c.type === "group"), [sorted]);
 
-  const unreadTotal = useMemo(() => conversations.reduce((s, c) => s + c.unreadCount, 0), [conversations]);
+  // Cuenta CONVERSACIONES, no mensajes: el chip filtra conversaciones, y así el
+  // número coincide con el del icono del topbar y con las filas que quedan al
+  // activarlo. El desglose por mensajes está en el badge de cada fila.
+  const unreadTotal = useMemo(() => conversations.filter((c) => c.unreadCount > 0).length, [conversations]);
   const archivedCount = useMemo(() => conversations.filter(c => isArchived(c.id)).length, [conversations, isArchived]);
 
   const contacts = useMemo(() => {
