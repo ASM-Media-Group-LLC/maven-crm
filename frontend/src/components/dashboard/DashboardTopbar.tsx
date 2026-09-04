@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import MessagesBell from "@/components/messenger/MessagesBell";
 import GlobalSearchCommand from "./GlobalSearchCommand";
 
 // Topbar — search + timezone + language + notifications. El timezone
@@ -84,6 +85,9 @@ const DashboardTopbar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Mensajes (la nube) — a la izquierda de la campana, como Facebook */}
+          <MessagesBell />
 
           {/* Notifications */}
           <NotificationBell />

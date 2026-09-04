@@ -16,15 +16,24 @@ export default function NotificationBell() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { canAccess } = usePermissions();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, archiveNotification } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, archiveNotification } = useNotifications();
+
+  // Los mensajes del Messenger YA NO alumbran acá: tienen su propia campana (la
+  // nube, a la izquierda). Eran el 95% de todo lo que llegaba —17.901 de 18.877
+  // en 30 días— y tapaban las notificaciones de verdad: vencimientos de
+  // closers, evaluaciones, asignaciones. En /notificaciones se siguen viendo,
+  // esa página es el archivo completo.
+  const esMensaje = (n: Notification) =>
+    n.module_origin === "messenger" && n.type === "chat_message";
 
   // En la campana del topbar solo mostramos las NO LEÍDAS. Las leídas
   // siguen accesibles en /notificaciones (la página completa). Sin este
   // filtro, las leídas se quedaban en la lista y daban la sensación de
   // que la campana no se "limpiaba" al verlas.
   const unread = notifications.filter(
-    (n) => n.status === "new" || (!n.status && !n.is_read),
+    (n) => !esMensaje(n) && (n.status === "new" || (!n.status && !n.is_read)),
   );
+  const unreadCount = unread.length;
 
   const handleClick = (n: Notification) => {
     if (n.status === "new" || (!n.status && !n.is_read)) {
