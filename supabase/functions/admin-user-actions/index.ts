@@ -194,16 +194,14 @@ Deno.serve(async (req) => {
           password: tempPassword,
           email_confirm: true,
           user_metadata: { full_name: fullName },
-          // SELLO DE ALTA LEGÍTIMA — no es cosmético.
-          //
-          // El guard `bloquear_alta_publica` en auth.users rechaza cualquier
-          // alta que no traiga este sello, y `app_metadata` solo lo puede
-          // escribir la API de admin: el endpoint público de registro ignora
-          // lo que el navegador manda ahí. Es lo que hace imposible que
-          // alguien se cree una cuenta desde afuera aunque tenga la clave
-          // anon (que está en el bundle, o sea que la tiene cualquiera).
-          //
-          // Si esto se saca, las altas del panel dejan de funcionar.
+          // Sello de "esta alta la hizo un admin". Hoy NO lo exige nadie:
+          // el guard que lo pedía en la base rompía las altas legítimas y se
+          // sacó (ver migración 20260904230000). Se deja porque marca el
+          // origen del alta y porque `app_metadata` sólo lo puede escribir la
+          // API de admin — el registro público ignora lo que manda el
+          // navegador—, así que sirve si alguna vez se rehace el candado bien
+          // (con un CONSTRAINT TRIGGER diferido, y probándolo creando un
+          // usuario de verdad antes de dejarlo puesto).
           app_metadata: { alta: "admin" },
         });
         if (createError) return respuestaDeAltaFallida(createError);
@@ -240,7 +238,7 @@ Deno.serve(async (req) => {
             password: tempPassword,
             email_confirm: true,
             user_metadata: { full_name: fullName },
-            // El mismo sello que arriba: sin esto el guard rechaza el alta.
+            // El mismo sello que arriba (informativo, ver comentario).
             app_metadata: { alta: "admin" },
           });
           if (!createError) {

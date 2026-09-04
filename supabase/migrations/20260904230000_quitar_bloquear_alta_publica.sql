@@ -1,0 +1,29 @@
+-- SE SACA EL CANDADO DE ALTAS. Estaba rompiendo las altas legítimas.
+--
+-- `bloquear_alta_publica` (migración 20260904220000) sólo dejaba pasar altas
+-- con `app_metadata.alta = "admin"`, el sello que pone la API de admin. La
+-- suposición era que GoTrue escribe ese app_metadata en el MISMO INSERT; en
+-- producción no pasa así, así que el trigger rechazaba TODAS las altas,
+-- incluidas las del panel de control.
+--
+-- Andrea lo reportó como "Database error creating new user" —así envuelve
+-- GoTrue cualquier error de base— y estuvo roto ~18 horas: entre el
+-- 2026-09-04 08:26 UTC y este arreglo no se pudo crear ni un usuario.
+--
+-- LECCIÓN, que es la parte que importa: el guard se probó por el camino MALO
+-- (dos intentos de registro público, los dos rechazados) y NO por el camino
+-- bueno, porque probar el bueno significaba crear un usuario de verdad. Un
+-- guard que no se probó por el camino bueno es un guard que bloquea el camino
+-- bueno.
+--
+-- El registro público se cierra en su lugar correcto: el toggle "Allow new
+-- users to sign up" del panel de Supabase, que GoTrue respeta sin pasar por
+-- la base y sin tocar la API de admin. En el frontend ya no existe la
+-- pantalla de registro y /register redirige al formulario de demo.
+--
+-- Si algún día se quiere volver a cerrarlo desde la base, el camino sería un
+-- CONSTRAINT TRIGGER DEFERRABLE (que corre al COMMIT, cuando el app_metadata
+-- ya está escrito) — y probándolo creando un usuario real por el panel ANTES
+-- de dejarlo puesto.
+drop trigger if exists bloquear_alta_publica on auth.users;
+drop function if exists public.bloquear_alta_publica();
