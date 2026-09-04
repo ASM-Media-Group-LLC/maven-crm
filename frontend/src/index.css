@@ -937,13 +937,23 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     hsl(var(--popover) / .86);
 }
 
-/* Después de OLED a propósito: misma especificidad (0,3,0), gana el último. */
+/* Alto contraste: el vidrio NO se apaga, se espesa. Va después de OLED a
+   propósito (misma especificidad 0,3,0, gana el último).
+
+   Primero lo apagaba del todo, y era pasarse: lo que ese modo protege es la
+   legibilidad del TEXTO, y a 92% de opacidad el fondo que se cuela es como
+   mucho un 8% de algo ya borroso — el contraste del texto no se mueve en la
+   práctica. Lo que sí importa acá es el BORDE: queda al valor pleno de
+   --border (que el propio modo ya sube) para que el canto del panel se
+   recorte duro contra lo que haya detrás, que es de lo que se trata. */
 :root[data-contrast="high"] .glass-panel {
-  background: hsl(var(--popover));
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  background:
+    linear-gradient(hsl(var(--primary) / .05), hsl(var(--primary) / .05)),
+    hsl(var(--popover) / .92);
   border-color: hsl(var(--border));
-  box-shadow: 0 14px 34px -10px hsl(228 40% 4% / .45);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .14),
+    0 14px 34px -10px hsl(228 40% 4% / .5);
 }
 
 /* Sin backdrop-filter (Firefox con la aceleración apagada, GPU vieja):
