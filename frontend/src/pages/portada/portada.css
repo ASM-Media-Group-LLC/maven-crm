@@ -993,7 +993,7 @@
   /* El "gracias": ocupa el lugar de la tarjeta, no aparece debajo. Si el
      formulario sigue ahí, la gente lo manda dos veces. */
   .pt .gracias-panel { display: grid; place-items: center; text-align: center; padding: 34px 22px; }
-  .pt .gracias-panel .tic-grande {
+  .pt .tic-grande, .pt .gracias-panel .tic-grande {
     width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
     background: rgba(16,185,129,.14); border: 1px solid rgba(16,185,129,.4);
   }
@@ -1110,7 +1110,7 @@
   /* ── Planes y "qué incluye" · documento comercial (/concept) ──────────────
      No van en la portada: son las dos preguntas que hace alguien que ya se
      interesó. */
-  .pt .planes { margin-top: 44px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); align-items: start; }
+  .pt .planes { margin-top: 44px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); align-items: stretch; }
   .pt .plan {
     position: relative; display: flex; flex-direction: column; gap: 4px;
     border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px;
@@ -1151,3 +1151,52 @@
   }
   .pt .paso h4 { font: 600 15px/1.3 "Instrument Sans", sans-serif; margin: 13px 0 0; }
   .pt .paso p { margin: 7px 0 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
+
+  /* ── Documento de concepto (/concept) ─────────────────────────────────────
+     Mismo lenguaje que la portada, pero es un DOCUMENTO: se lee de arriba a
+     abajo, el cuerpo va más angosto y el catálogo de módulos es plegable. */
+  .pt .resumen {
+    margin-top: 40px; max-width: 78ch;
+    border: 1px solid var(--line); border-radius: var(--r-lg); padding: 28px 30px;
+    background: linear-gradient(165deg, var(--surface-2), var(--surface));
+  }
+  .pt .resumen p { margin: 0 0 14px; font-size: 15px; line-height: 1.7; color: var(--ink-soft); }
+  .pt .resumen p:last-child { margin-bottom: 0; }
+  .pt .resumen strong { color: var(--ink); font-weight: 600; }
+
+  /* Un módulo del catálogo. Plegable de verdad, con <details>: abierto por
+     defecto como estaba, y sin una línea de JS para algo que el navegador ya
+     sabe hacer. */
+  .pt .mod {
+    border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;
+    background: var(--surface); transition: border-color .25s;
+  }
+  .pt .mod + .mod { margin-top: 10px; }
+  .pt .mod:hover { border-color: var(--line-strong); }
+  .pt .mod > summary {
+    display: flex; align-items: center; gap: 13px; padding: 15px 18px; cursor: pointer;
+    list-style: none; transition: background .2s;
+  }
+  .pt .mod > summary::-webkit-details-marker { display: none; }
+  .pt .mod > summary:hover { background: rgba(255,255,255,.025); }
+  .pt .mod > summary:focus-visible { outline: 2px solid var(--azul-claro); outline-offset: -3px; }
+  .pt .mod[open] > summary { background: rgba(255,255,255,.03); border-bottom: 1px solid var(--line); }
+  .pt .mod summary .ico {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none;
+    background: rgba(var(--azul-rgb), .14);
+  }
+  .pt .mod summary .ico svg { width: 17px; height: 17px; color: var(--azul-claro); }
+  .pt .mod summary .quien { min-width: 0; flex: 1; }
+  .pt .mod summary .quien b { display: block; font: 700 15.5px/1.25 Sora, sans-serif; }
+  .pt .mod summary .quien span { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .pt .mod summary .flechita { flex: none; color: var(--faint); transition: transform .25s; }
+  .pt .mod[open] summary .flechita { transform: rotate(90deg); }
+  .pt .mod ul { list-style: none; margin: 0; padding: 15px 18px 17px; display: grid; gap: 9px; }
+  @media (min-width: 720px) { .pt .mod ul { grid-template-columns: 1fr 1fr; gap: 9px 24px; } }
+  .pt .mod li { display: grid; grid-template-columns: 15px 1fr; gap: 9px; align-items: start; font-size: 13.5px; line-height: 1.45; color: var(--ink-soft); }
+  .pt .mod li svg { color: var(--verde); margin-top: 3px; flex: none; }
+
+  .pt .catalogo { margin-top: 40px; }
+
+  /* El importe de un plan: el documento SÍ los muestra. */
+  .pt .plan .periodo { font: 400 13px/1 "Instrument Sans", sans-serif; color: var(--faint); margin-left: 3px; }
