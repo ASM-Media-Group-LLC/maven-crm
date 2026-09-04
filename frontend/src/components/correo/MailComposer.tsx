@@ -865,12 +865,12 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mail-composer flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Destinatarios estilo Gmail: filas finas, Cc/Cco plegados.
               `focus-within` marca la fila activa: los inputs son pelados
               (sin el ring del componente Input) para que la fila se vea como
               una línea de Gmail, así que el foco tiene que verse en la fila. */}
-          <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+          <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
             <label htmlFor="mail-to" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
               Para
             </label>
@@ -897,7 +897,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           </div>
 
           {verCc && (
-            <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+            <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
               <label htmlFor="mail-cc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
                 Cc
               </label>
@@ -921,7 +921,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           )}
 
           {verBcc && (
-            <div className="flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+            <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
               <label htmlFor="mail-bcc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
                 Cco
               </label>
@@ -946,7 +946,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
             </div>
           )}
 
-          <div className="flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
+          <div className="mail-composer-row flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
             <label htmlFor="mail-subject" className="sr-only">
               Asunto
             </label>
@@ -973,7 +973,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               blanco en Gmail/Outlook, y las tintas de la paleta (incluido el
               negro) están pensadas para ese fondo. Con editor oscuro, elegir
               negro dejaba el texto invisible al escribir. */}
-          <div className="flex-1 bg-white px-5 py-4">
+          <div className="mail-composer-row flex-1 bg-white px-5 py-4">
             <div
               className={cn(
                 "text-[#1f2937]",

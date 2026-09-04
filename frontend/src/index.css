@@ -888,6 +888,21 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   outline-offset: 2px;
 }
 
+/* Mismo caso en el compositor de correo (Para/Cc/Cco/Asunto y el cuerpo rico).
+   Ahí los campos son "pelados" a propósito (la fila es la caja que se ve, estilo
+   Gmail), así que el outline global del modo alto contraste dibujaba un recuadro
+   flotando adentro de la fila, y en el cuerpo uno más chico que la hoja blanca.
+   Se apaga en el campo y se pinta la fila entera; `outline-offset` negativo lo
+   deja pegado al borde de la fila en vez de sobresalir sobre la de al lado. */
+:root[data-contrast="high"] .mail-composer input:focus,
+:root[data-contrast="high"] .mail-composer input:focus-visible,
+:root[data-contrast="high"] .mail-composer .ProseMirror:focus,
+:root[data-contrast="high"] .mail-composer .ProseMirror:focus-visible { outline: none !important; }
+:root[data-contrast="high"] .mail-composer .mail-composer-row:focus-within {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: -2px;
+}
+
 /* ─────────────────────────────────────────────────────────────────────
    VIDRIO DEL MUELLE FLOTANTE (Messenger)
    Material de las superficies que flotan SOBRE el dashboard: panel de
