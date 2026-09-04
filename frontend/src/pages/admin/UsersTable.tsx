@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, KeyRound, UserCog, X, ExternalLink, AtSign } from "lucide-react";
@@ -33,6 +33,11 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
   const { toast } = useToast();
   const { user: authUser } = useAuth();
 
+  // La columna "Ficha HR" mostraba "Sin ficha HR" en TODAS las filas (hoy no hay
+  // un solo perfil vinculado a un empleado), gastando ancho sin informar nada.
+  // No se saca la feature: la columna aparece en cuanto exista una vinculación.
+  const hayFichasHR = users.some((u) => u.linked_employee);
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -41,20 +46,21 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
             <TableHead>Usuario</TableHead>
             <TableHead>Correo</TableHead>
             <TableHead>Rol</TableHead>
-            <TableHead>Ficha HR</TableHead>
+            {hayFichasHR && <TableHead>Ficha HR</TableHead>}
             <TableHead>Fecha de registro</TableHead>
             <TableHead className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {users.map((user) => (
-            <TableRow key={user.id}>
+            <TableRow key={user.id} className="group/fila">
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar_url ?? ""} />
-                    <AvatarFallback>{(user.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  {/* UserAvatar y no un Avatar crudo: acá se perdía el muñequito
+                      DiceBear de las 15 personas que eligieron uno (vive en
+                      profiles.avatar_seed, no en avatar_url) y las iniciales salían
+                      de un [0] que parte por la mitad los nombres con emoji. */}
+                  <UserAvatar name={user.full_name} src={user.avatar_url} seed={user.avatar_seed} size="sm" />
                   <span className="font-medium">{user.full_name || "Sin nombre"}</span>
                 </div>
               </TableCell>
@@ -84,9 +90,13 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                   <Badge variant={roleBadgeVariant[user.role] ?? "outline"} className="inline-flex items-center gap-1 pr-1">
                     {user.role}
                     {user.manageable && (
+                      // Quitar el rol es destructivo y vivía siempre visible dentro
+                      // del badge, en una tabla densa: fácil de pegarle sin querer.
+                      // Ahora aparece sólo al pasar el mouse por la fila.
                       <button
                         onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
-                        className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                        title={`Quitar el rol ${user.role} a ${user.full_name ?? "esta persona"}`}
+                        className="ml-0.5 rounded-full p-0.5 opacity-0 transition-opacity hover:bg-black/10 focus-visible:opacity-100 group-hover/fila:opacity-100 dark:hover:bg-white/20"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -96,19 +106,21 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                   <span className="text-muted-foreground text-sm">Sin rol</span>
                 )}
               </TableCell>
-              <TableCell>
-                {user.linked_employee ? (
-                  <button
-                    onClick={() => navigate(`/hr/empleado/${user.linked_employee!.id}`)}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    {user.linked_employee.first_name} {user.linked_employee.last_name}
-                  </button>
-                ) : (
-                  <span className="text-muted-foreground text-xs">Sin ficha HR</span>
-                )}
-              </TableCell>
+              {hayFichasHR && (
+                <TableCell>
+                  {user.linked_employee ? (
+                    <button
+                      onClick={() => navigate(`/hr/empleado/${user.linked_employee!.id}`)}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      {user.linked_employee.first_name} {user.linked_employee.last_name}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">—</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className="text-muted-foreground">
                 {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
               </TableCell>

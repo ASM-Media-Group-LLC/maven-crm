@@ -12,6 +12,8 @@ export interface AdminUser {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  /** Muñequito DiceBear elegido en Settings. Sin esto la lista cae a iniciales. */
+  avatar_seed: string | null;
   email: string;
   created_at: string;
   role: AppRole | null;
@@ -29,7 +31,7 @@ export const useAdminUsers = () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, avatar_url, created_at, ai_daily_quota_override");
+        .select("id, full_name, avatar_url, avatar_seed, created_at, ai_daily_quota_override");
 
       if (profilesError) throw profilesError;
 
@@ -83,6 +85,7 @@ export const useAdminUsers = () => {
         id: p.id,
         full_name: p.full_name,
         avatar_url: p.avatar_url,
+        avatar_seed: (p as { avatar_seed?: string | null }).avatar_seed ?? null,
         email: emailsMap.get(p.id) || "",
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
@@ -114,11 +117,15 @@ export const useAdminUsers = () => {
     },
   });
 
+  // ⚠️ Acá había un contador de `employee` que SIEMPRE daba 0: ese rol ya no lo
+  // tiene nadie (hoy son Chatter, Closer +, Warming, Coordinador, Team Leader…).
+  // Lo reemplaza "sin rol", que además es accionable: son cuentas que entraron y
+  // quedaron sin permisos.
   const stats = {
     total: users.length,
     admins: users.filter((u) => u.role === "admin").length,
     managers: users.filter((u) => u.role === "manager").length,
-    employees: users.filter((u) => u.role === "employee").length,
+    sinRol: users.filter((u) => !u.role).length,
   };
 
   return { users, isLoading, refetch, changeRole: changeRoleMutation.mutate, isChangingRole: changeRoleMutation.isPending, stats };
