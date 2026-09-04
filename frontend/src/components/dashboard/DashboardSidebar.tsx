@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { precargarRuta, precargarEnOcio } from "@/lib/prefetchRutas";
 import Logo from "@/components/Logo";
@@ -401,7 +401,13 @@ const DashboardSidebar = () => {
     return (
       <Sidebar collapsible="icon">
         <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
+          <Link
+          to="/dashboard"
+          aria-label="Ir al Dashboard"
+          className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           <Logo size="sm" collapsed={collapsed} />
+        </Link>
         </SidebarHeader>
         <SidebarContent className="gap-2 px-3 py-3">
           {permisosFallaron ? (
@@ -432,7 +438,13 @@ const DashboardSidebar = () => {
           descuadrado con la lista del menú. Con px-5 la baldosa arranca en la
           misma línea que los iconos de los items. */}
       <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
-        <Logo size="sm" collapsed={collapsed} />
+        <Link
+          to="/dashboard"
+          aria-label="Ir al Dashboard"
+          className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Logo size="sm" collapsed={collapsed} />
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="gap-3 py-1">
