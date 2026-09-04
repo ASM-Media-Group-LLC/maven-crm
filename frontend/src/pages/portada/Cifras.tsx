@@ -6,29 +6,11 @@ import { useEffect, useRef, useState } from "react";
 // compra es esto. Y hablan de lo que el comprador se AHORRA — suscripciones
 // que deja de pagar, licencias por asiento que no paga — no de ficha técnica.
 // Todos en cifras: mezclar "Cero" con "74" se lee descuidado.
+//
+// Qué números van depende del público: a una agencia se le cuentan las
+// planillas que deja de pegar, no solo las suscripciones. Vienen del guión.
 
-const CIFRAS = [
-  {
-    hasta: 7,
-    prefijo: "",
-    pie: "suscripciones que dejas de pagar: correo, chat, video, oficina virtual, tickets, personas y ventas",
-  },
-  {
-    hasta: 0,
-    prefijo: "$",
-    pie: "en licencias por asiento de terceros — el correo, el video y la transcripción corren sobre servicios propios",
-  },
-  {
-    hasta: 1,
-    prefijo: "",
-    pie: "sesión para todo el equipo, con una sola contraseña y una sola factura",
-  },
-  {
-    hasta: 74,
-    prefijo: "",
-    pie: "pantallas, del correo a la nómina, sin salir de la misma sesión",
-  },
-] as const;
+
 
 /** Un número que cuenta hacia arriba la primera vez que entra en pantalla.
  *  Con `prefers-reduced-motion` aparece directamente en su valor final: la
@@ -66,19 +48,19 @@ function Numero({ hasta, prefijo }: { hasta: number; prefijo: string }) {
   }, [hasta]);
 
   return (
-    <p className="n" ref={ref}>
+    <p className="n" ref={ref} key={hasta}>
       {prefijo}
       {Math.round(valor).toLocaleString("es-CO")}
     </p>
   );
 }
 
-export default function Cifras() {
+export default function Cifras({ cifras }: { cifras: { hasta: number; prefijo: string; pie: string }[] }) {
   return (
     <section className="cifras">
       <div className="wrap">
         <div className="cifras-grid">
-          {CIFRAS.map((c) => (
+          {cifras.map((c) => (
             <div className="cifra" key={c.pie}>
               <Numero hasta={c.hasta} prefijo={c.prefijo} />
               <p className="q">{c.pie}</p>

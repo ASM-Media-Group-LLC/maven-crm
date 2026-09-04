@@ -12,7 +12,7 @@ import { useEffect } from "react";
 
 const SELECTOR = ".tramo, .cabeza, .area, .agente, .skin, .pieza, .fila-cambio, .porque, .marco";
 
-export function useRevelar(raiz: React.RefObject<HTMLElement>) {
+export function useRevelar(raiz: React.RefObject<HTMLElement>, clave?: string) {
   useEffect(() => {
     const nodo = raiz.current;
     if (!nodo) return;
@@ -29,6 +29,9 @@ export function useRevelar(raiz: React.RefObject<HTMLElement>) {
     );
 
     nodo.querySelectorAll<HTMLElement>(SELECTOR).forEach((el, i) => {
+      // Ya apareció: no se vuelve a observar ni se le pone `.revelar`, o al
+      // cambiar de público la mitad de la página parpadearía de nuevo.
+      if (el.classList.contains("visto")) return;
       // Los tramos de la línea de tiempo tienen su propia transición (el nodo
       // del riel se enciende junto con la tarjeta), así que no llevan
       // `.revelar`: se les agrega solo la clase `visto`.
@@ -41,5 +44,7 @@ export function useRevelar(raiz: React.RefObject<HTMLElement>) {
     });
 
     return () => ojo.disconnect();
-  }, [raiz]);
+    // `clave` cambia cuando aparecen secciones nuevas (cambio de público) y
+    // hay que observarlas: sin esto se quedaban sin animar.
+  }, [raiz, clave]);
 }

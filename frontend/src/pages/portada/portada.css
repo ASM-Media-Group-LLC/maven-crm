@@ -103,10 +103,12 @@
     background: linear-gradient(140deg, var(--azul), #0060d0);
     box-shadow: 0 0 22px -6px rgba(var(--azul-rgb),.8);
   }
-  .pt .nav-links { display: none; gap: 28px; font-size: 14px; }
+  .pt .nav-links { display: none; gap: 22px; font-size: 14px; white-space: nowrap; }
   .pt .nav-links a { color: var(--muted); text-decoration: none; transition: color .2s; }
   .pt .nav-links a:hover { color: var(--ink); }
-  @media (min-width: 900px) { .pt .nav-links { display: flex; } }
+  /* Con el guión de agencias son nueve enlaces: por debajo de esto no
+     entran en una línea y la barra se partía en dos. */
+  @media (min-width: 1060px) { .pt .nav-links { display: flex; } }
 
   .pt .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -1002,3 +1004,105 @@
   /* El anillito del botón mientras se envía. */
   .pt .girando { animation: girar 1s linear infinite; }
   @keyframes girar { to { transform: rotate(360deg); } }
+
+  /* ── Promolog · reconstruido de la pantalla real ───────────────────────────
+     Dos piezas, porque son las dos que se venden juntas: el CALENDARIO del
+     mes (quién publicó cada día y cuánto entró) y la FICHA de una entrada,
+     donde se ve la evidencia leída por el agente y el dinero de los días
+     alrededor de la promo.
+
+     Ojo: los importes y los handles son inventados. La franja de la ventana
+     lo dice, porque un calendario con plata se lee como real. */
+  .pt .pl { display: grid; grid-template-columns: 1.15fr 1fr; min-height: 520px; }
+  .pt .pl-izq { border-right: 1px solid var(--line); min-width: 0; }
+
+  .pt .pl-tabs { display: flex; gap: 3px; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .pt .pl-tabs span { font-size: 11px; color: var(--faint); border-radius: 8px; padding: 5px 9px; }
+  .pt .pl-tabs span.on { color: var(--ink); background: rgba(var(--azul-rgb), .14); box-shadow: inset 0 0 0 1px rgba(var(--azul-rgb), .35); }
+
+  .pt .pl-quien { display: flex; align-items: center; gap: 9px; padding: 11px 13px; }
+  .pt .pl-quien img { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); }
+  .pt .pl-quien b { font: 600 12.5px/1.2 "Instrument Sans", sans-serif; }
+  .pt .pl-quien small { display: block; font-size: 10.5px; color: var(--faint); }
+  .pt .pl-quien .mes { margin-left: auto; font: 500 10.5px/1 "JetBrains Mono", monospace; color: var(--muted); }
+
+  .pt .pl-sem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; padding: 0 12px 5px; }
+  .pt .pl-sem span { font: 500 9px/1 "JetBrains Mono", monospace; letter-spacing: .08em; color: var(--faint); text-align: center; }
+  .pt .pl-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; padding: 0 12px 12px; }
+  .pt .pl-dia {
+    position: relative; min-height: 52px; border-radius: 7px; padding: 5px 5px 6px;
+    border: 1px solid var(--line); background: rgba(255,255,255,.015);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .pt .pl-dia.si { border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.06); }
+  .pt .pl-dia.no { border-color: rgba(244,91,91,.28); background: rgba(244,91,91,.06); }
+  .pt .pl-dia.fuera { opacity: .35; }
+  .pt .pl-dia .n { font: 500 10px/1 "JetBrains Mono", monospace; color: var(--ink-soft); }
+  .pt .pl-dia .plata { font: 600 10px/1 "JetBrains Mono", monospace; color: var(--verde); }
+  .pt .pl-dia .tick { position: absolute; right: 4px; top: 4px; font-size: 9px; }
+  .pt .pl-dia .barra { margin-top: auto; height: 3px; border-radius: 2px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .pt .pl-dia .barra i { display: block; height: 100%; border-radius: 2px; }
+  .pt .pl-dia .ratio { font: 400 8.5px/1 "JetBrains Mono", monospace; color: var(--faint); text-align: right; }
+  .pt .pl-dia.top::after { content: "🔥"; position: absolute; left: 4px; bottom: 16px; font-size: 8px; }
+
+  .pt .pl-leyenda { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 13px 12px; font-size: 10px; color: var(--faint); }
+  .pt .pl-leyenda span { display: inline-flex; align-items: center; gap: 4px; }
+  .pt .pl-leyenda i { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* La ficha de una entrada */
+  .pt .pl-ficha { padding: 12px 13px; min-width: 0; }
+  .pt .pl-ficha .cab { display: flex; align-items: center; gap: 8px; }
+  .pt .pl-ficha .cab img { width: 26px; height: 26px; border-radius: 50%; }
+  .pt .pl-ficha .cab b { font: 600 12px/1.2 "Instrument Sans", sans-serif; }
+  .pt .pl-ficha .cab span { font-size: 10.5px; color: var(--faint); }
+  .pt .pl-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; margin: 11px 0 0; }
+  .pt .pl-datos div { font-size: 10.5px; color: var(--faint); }
+  .pt .pl-datos b { color: var(--ink-soft); font-weight: 600; }
+  .pt .pl-datos .si { color: var(--verde); }
+
+  .pt .pl-plata {
+    margin-top: 12px; border: 1px solid rgba(245,158,11,.28); border-radius: 11px;
+    padding: 10px; background: rgba(245,158,11,.05);
+  }
+  .pt .pl-plata .rot { font: 500 9px/1 "JetBrains Mono", monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--ambar); }
+  .pt .pl-plata .dias { display: flex; gap: 5px; margin-top: 9px; }
+  .pt .pl-plata .pl-dchip {
+    flex: 1; text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 2px;
+    background: rgba(255,255,255,.02);
+  }
+  .pt .pl-plata .pl-dchip small { display: block; font: 400 8px/1.2 "JetBrains Mono", monospace; color: var(--faint); }
+  .pt .pl-plata .pl-dchip b { display: block; margin-top: 3px; font: 600 11px/1 "JetBrains Mono", monospace; }
+  .pt .pl-plata .pl-dchip.promo { border-color: rgba(245,158,11,.5); background: rgba(245,158,11,.12); }
+  .pt .pl-plata .pl-dchip.promo b { color: var(--ambar); }
+  .pt .pl-plata .desglose { display: flex; gap: 6px; margin-top: 8px; }
+  .pt .pl-plata .desglose span { font: 400 9.5px/1 "JetBrains Mono", monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; }
+
+  .pt .pl-notas { margin-top: 11px; font-size: 10.5px; line-height: 1.5; color: var(--muted); border-left: 2px solid var(--line-strong); padding-left: 9px; }
+
+  .pt .pl-ev { margin-top: 12px; }
+  .pt .pl-ev .rot { display: flex; align-items: center; gap: 6px; font: 500 9px/1 "JetBrains Mono", monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); }
+  .pt .pl-ev .rot .promociono { margin-left: auto; color: var(--verde); border: 1px solid rgba(16,185,129,.3); background: rgba(16,185,129,.08); border-radius: 999px; padding: 3px 7px; text-transform: none; letter-spacing: 0; }
+  .pt .pl-historias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 9px; }
+  .pt .pl-historia { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: rgba(255,255,255,.02); }
+  .pt .pl-historia .foto {
+    position: relative; width: 100%; height: 116px;
+    background:
+      radial-gradient(60% 45% at 50% 32%, rgba(255,255,255,.16), transparent 70%),
+      linear-gradient(160deg, rgba(var(--azul-rgb), .38), rgba(var(--violeta-rgb), .32));
+  }
+  .pt .pl-historia .foto b { position: absolute; left: 4px; top: 4px; font: 500 8px/1 "JetBrains Mono", monospace; color: #fff; background: rgba(9,11,16,.6); border-radius: 4px; padding: 2px 4px; }
+  .pt .pl-historia .foto em { position: absolute; right: 4px; bottom: 4px; font-style: normal; font: 500 8px/1 "JetBrains Mono", monospace; color: #fff; background: rgba(9,11,16,.6); border-radius: 4px; padding: 2px 4px; }
+  .pt .pl-historia .sino { display: flex; gap: 3px; padding: 4px; }
+  .pt .pl-historia .sino span { flex: 1; text-align: center; font-size: 8.5px; border-radius: 5px; padding: 3px 0; border: 1px solid var(--line); color: var(--faint); }
+  .pt .pl-historia .sino span.si { color: var(--verde); border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.1); }
+  .pt .pl-historia .sino span.no { color: var(--red); border-color: rgba(244,91,91,.35); background: rgba(244,91,91,.1); }
+  .pt .pl-historia p { margin: 0; padding: 0 5px 6px; font-size: 8.5px; line-height: 1.35; color: var(--faint); }
+
+  @media (max-width: 1000px) {
+    .pt .pl { grid-template-columns: 1fr; }
+    .pt .pl-izq { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+  @media (max-width: 560px) {
+    .pt .pl-historias { grid-template-columns: repeat(2, 1fr); }
+    .pt .pl-datos { grid-template-columns: 1fr; }
+  }

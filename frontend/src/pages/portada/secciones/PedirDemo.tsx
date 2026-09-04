@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Publico } from "../guiones";
+import { INTERESES } from "../publico";
 
 // PEDIR UNA DEMO.
 //
@@ -22,26 +23,23 @@ import type { Publico } from "../guiones";
 
 const TAMANOS = ["1 a 10 personas", "11 a 50", "51 a 200", "más de 200"];
 
-const INTERESES = [
-  "Correo propio",
-  "Messenger",
-  "Cowork y reuniones",
-  "Personas y nómina",
-  "Ventas y pipeline",
-  "Simulador de contratación",
-  "Marca blanca",
-  "Todo",
-];
-
 type Estado = "escribiendo" | "enviando" | "listo";
 
 export default function PedirDemo({ publico }: { publico: Publico }) {
   const [estado, setEstado] = useState<Estado>("escribiendo");
   const [error, setError] = useState<string | null>(null);
   const [interes, setInteres] = useState<string[]>([]);
+  const opciones = INTERESES[publico];
 
   const alternar = (i: string) =>
     setInteres((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
+
+  // Si cambia el público cambian las opciones, y lo que había marcado puede
+  // ya no existir. Se descartan las que no están en la lista nueva en vez de
+  // mandar al correo un interés que la persona no ve en pantalla.
+  useEffect(() => {
+    setInteres((prev) => prev.filter((i) => INTERESES[publico].includes(i)));
+  }, [publico]);
 
   const enviar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -155,7 +153,7 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
                 <div className="campo">
                   <span>Qué te interesa</span>
                   <div className="elige">
-                    {INTERESES.map((i) => (
+                    {opciones.map((i) => (
                       <button
                         type="button"
                         key={i}

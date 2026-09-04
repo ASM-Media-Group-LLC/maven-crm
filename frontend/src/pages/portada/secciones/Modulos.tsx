@@ -1,6 +1,7 @@
 import {
   BarChart3, Mail, MessageCircle, MessagesSquare, Phone, Layers, UserRound, Video,
 } from "lucide-react";
+import type { Publico } from "../guiones";
 
 // EL MAPA DE MÓDULOS.
 //
@@ -45,21 +46,43 @@ const AREAS = [
     titulo: "Mensajería externa", cuenta: "12 pantallas",
     items: ["Bandeja compartida", "Multi-línea", "Agentes por grupo", "Canales de mensajería", "Analítica", "Visibilidad por dueño"],
   },
-  {
-    Icono: Layers, color: "#f59e0b", fondo: "rgba(245,158,11,.16)",
-    tinte: "rgba(245,158,11,.12)", borde: "rgba(245,158,11,.45)",
-    titulo: "Desempeño del equipo", cuenta: "8 pantallas",
-    items: ["Rendimiento diario", "Evaluación de conversaciones", "Feedback del líder", "Tablero propio por persona", "Capacitación"],
-  },
-  {
-    Icono: UserRound, color: "#10b981", fondo: "rgba(16,185,129,.16)",
-    tinte: "rgba(16,185,129,.12)", borde: "rgba(16,185,129,.45)",
-    titulo: "Cartera y clientes", cuenta: "9 pantallas",
-    items: ["Alta y baja", "Ficha y lineamientos", "Calendario de contenido", "Pedidos a medida", "Hitos", "Ingresos por cuenta"],
-  },
 ] as const;
 
-export default function Modulos() {
+/** Las dos últimas áreas se nombran distinto según quién esté leyendo: son
+ *  las mismas pantallas, pero a una agencia no se le habla de "clientes"
+ *  cuando lo que tiene es una cartera de creadoras con promoción. */
+const AREAS_FINALES = {
+  empresas: [
+    {
+      Icono: Layers, color: "#f59e0b", fondo: "rgba(245,158,11,.16)",
+      tinte: "rgba(245,158,11,.12)", borde: "rgba(245,158,11,.45)",
+      titulo: "Desempeño del equipo", cuenta: "8 pantallas",
+      items: ["Rendimiento diario", "Evaluación de conversaciones", "Feedback del líder", "Tablero propio por persona", "Capacitación"],
+    },
+    {
+      Icono: UserRound, color: "#10b981", fondo: "rgba(16,185,129,.16)",
+      tinte: "rgba(16,185,129,.12)", borde: "rgba(16,185,129,.45)",
+      titulo: "Cartera y clientes", cuenta: "9 pantallas",
+      items: ["Alta y baja", "Ficha y lineamientos", "Calendario de contenido", "Pedidos a medida", "Hitos", "Ingresos por cuenta"],
+    },
+  ],
+  agencias: [
+    {
+      Icono: Layers, color: "#f59e0b", fondo: "rgba(245,158,11,.16)",
+      tinte: "rgba(245,158,11,.12)", borde: "rgba(245,158,11,.45)",
+      titulo: "Chatters y desempeño", cuenta: "8 pantallas",
+      items: ["Turnos y descansos", "Nota diaria por rol", "Evaluación de conversaciones", "Feedback del líder", "Simulador de contratación"],
+    },
+    {
+      Icono: UserRound, color: "#10b981", fondo: "rgba(16,185,129,.16)",
+      tinte: "rgba(16,185,129,.12)", borde: "rgba(16,185,129,.45)",
+      titulo: "Creadoras y promoción", cuenta: "9 pantallas",
+      items: ["Alta y reingreso", "Ficha y lineamientos", "Promolog", "Parrilla de contenido", "Pedidos personalizados", "Ingresos por cuenta"],
+    },
+  ],
+} as const;
+
+export default function Modulos({ publico }: { publico: Publico }) {
   return (
     <section className="bloque" id="modulos">
       <div className="wrap">
@@ -75,7 +98,7 @@ export default function Modulos() {
         </div>
 
         <div className="mapa">
-          {AREAS.map(({ Icono, color, fondo, tinte, borde, titulo, cuenta, items }) => (
+          {[...AREAS, ...AREAS_FINALES[publico]].map(({ Icono, color, fondo, tinte, borde, titulo, cuenta, items }) => (
             <div
               className="area"
               key={titulo}

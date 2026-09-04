@@ -4,6 +4,8 @@
 // apagado; a la derecha lo que lo sustituye, con peso tipográfico. La
 // jerarquía cuenta la historia sin tener que escribir "mejor que".
 
+import type { Publico } from "../guiones";
+
 const CAMBIOS = [
   [
     "Correo de la suite de oficina",
@@ -25,14 +27,39 @@ const CAMBIOS = [
     "Cowork",
     "Oficina virtual con salas, presencia honesta, cancelación de ruido, fondos virtuales, detector de encuadre y un tablero donde el supervisor ve todas las salas a la vez.",
   ],
-  [
-    "Planilla de horarios y turnos",
-    "Horarios, asistencia y nómina",
-    "Turnos y descansos por semana, banco de horas, vacaciones y permisos, organigrama y costo por persona — conectado con lo que cada uno produjo.",
-  ],
 ] as const;
 
-export default function Reemplaza() {
+/** Las dos últimas filas cambian con el público: a una agencia el dolor no es
+ *  la planilla de turnos, son las planillas de promoción y de ingresos por
+ *  cuenta que hoy se pegan a mano. */
+const CIERRE: Record<Publico, readonly (readonly [string, string, string])[]> = {
+  empresas: [
+    [
+      "Planilla de horarios y turnos",
+      "Horarios, asistencia y nómina",
+      "Turnos y descansos por semana, banco de horas, vacaciones y permisos, organigrama y costo por persona — conectado con lo que cada uno produjo.",
+    ],
+  ],
+  agencias: [
+    [
+      "Planilla de turnos de chatters",
+      "Horarios, rendimiento y nómina",
+      "Turnos y descansos por semana, la nota diaria de cada chatter con su objetivo, banco de horas y costo por persona — cruzado con lo que produjo.",
+    ],
+    [
+      "Planilla de promoción y capturas en el chat",
+      "Promolog",
+      "Cada cuenta revisada sola, con la evidencia guardada y los ingresos del día de la promoción al lado. Sin perseguir a nadie por una captura.",
+    ],
+    [
+      "Hoja de cálculo de ingresos por cuenta",
+      "Ingresos y cartera",
+      "Lo que factura cada cuenta, por día y por responsable, importado solo. Y la ficha de la creadora con sus lineamientos, sus pedidos y sus hitos.",
+    ],
+  ],
+};
+
+export default function Reemplaza({ publico }: { publico: Publico }) {
   return (
     <section className="bloque" id="reemplaza">
       <div className="wrap">
@@ -47,7 +74,7 @@ export default function Reemplaza() {
         </div>
 
         <div className="cambio">
-          {CAMBIOS.map(([antes, despues, detalle]) => (
+          {[...CAMBIOS, ...CIERRE[publico]].map(([antes, despues, detalle]) => (
             <div className="fila-cambio" key={despues}>
               <span className="antes">{antes}</span>
               <span className="flecha" aria-hidden="true">→</span>

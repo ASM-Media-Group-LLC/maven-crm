@@ -8,6 +8,7 @@ import Cifras from "./Cifras";
 import { useRevelar } from "./useRevelar";
 import { Pila } from "./gente";
 import { PIES, type Publico } from "./guiones";
+import { GUION } from "./publico";
 import { SKINS, tokensDe } from "./skins";
 
 import Reemplaza from "./secciones/Reemplaza";
@@ -18,6 +19,7 @@ import UnDia from "./secciones/UnDia";
 import Modulos from "./secciones/Modulos";
 import CapaDeIA from "./secciones/CapaDeIA";
 import MarcaBlanca from "./secciones/MarcaBlanca";
+import Promolog from "./secciones/Promolog";
 import PedirDemo from "./secciones/PedirDemo";
 
 // LA PORTADA DE MAVEN · ruta pública `/`.
@@ -46,17 +48,6 @@ import PedirDemo from "./secciones/PedirDemo";
 // El CSS vive en `portada.css` y TODO está encerrado bajo `.pt`. Si agregás
 // una regla, va con `.pt ` adelante o se le escapa al resto de la app.
 
-const LINKS = [
-  ["#reemplaza", "Lo que reemplaza"],
-  ["#messenger", "Messenger"],
-  ["#simulador", "Simulador"],
-  ["#cowork", "Cowork"],
-  ["#dia", "El día"],
-  ["#modulos", "Módulos"],
-  ["#ia", "La capa de IA"],
-  ["#marca", "Marca blanca"],
-] as const;
-
 /** El logo, dibujado a mano y no con el componente de la app: adentro el logo
  *  cambia con la paleta que eligió cada persona, y la portada tiene que
  *  verse siempre igual para quien todavía no es cliente. */
@@ -84,8 +75,9 @@ export default function Portada() {
   // blanca y no una preferencia del visitante.
   const [skin, setSkin] = useState(SKINS[0].id);
   const paleta = SKINS.find((s) => s.id === skin) ?? SKINS[0];
+  const guion = GUION[publico];
 
-  useRevelar(raiz);
+  useRevelar(raiz, publico);
 
   useEffect(() => {
     const alScrollear = () => setPegado(window.scrollY > 12);
@@ -102,7 +94,7 @@ export default function Portada() {
         <div className="wrap nav-in">
           <Marca />
           <div className="nav-links">
-            {LINKS.map(([href, texto]) => <a href={href} key={href}>{texto}</a>)}
+            {guion.links.map(([href, texto]) => <a href={href} key={href}>{texto}</a>)}
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Link className="btn btn-fantasma" to="/login">Entrar</Link>
@@ -126,13 +118,9 @@ export default function Portada() {
             </span>
             <h1>
               Reemplaza siete suscripciones<br />
-              <span className="resalte">por una sola sesión.</span>
+              <span className="resalte">{guion.remate}</span>
             </h1>
-            <p className="bajada">
-              Correo con tu dominio, chat interno, oficina virtual, reuniones con grabación,
-              tickets, recursos humanos y finanzas. Con una <b>capa de IA que supervisa,
-              califica y avisa</b> sin que nadie tenga que estar mirando.
-            </p>
+            <p className="bajada">{guion.bajada}</p>
 
             <div className="publico" role="tablist" aria-label="Elegir público">
               <button
@@ -162,13 +150,14 @@ export default function Portada() {
         </div>
       </section>
 
-      <Cifras />
-      <Reemplaza />
+      <Cifras cifras={guion.cifras} />
+      <Reemplaza publico={publico} />
       <Messenger />
-      <Simulador />
       <Cowork />
+      {guion.promolog ? <Promolog /> : null}
+      {guion.simulador ? <Simulador /> : null}
       <UnDia />
-      <Modulos />
+      <Modulos publico={publico} />
       <CapaDeIA />
       <MarcaBlanca skin={skin} onElegir={setSkin} />
 
