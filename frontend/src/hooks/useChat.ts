@@ -67,8 +67,12 @@ export function useChat() {
       const lastReadMap: Record<string, string | null> = {};
       participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
 
-      // Batch: conversations, all participants, and recent messages in parallel
-      const [convsResult, allParticipantsResult, recentMsgsResult] = await Promise.all([
+      // Batch: conversations, all participants, and the last message of each chat.
+      // get_last_messages devuelve UNA fila por conversación (LATERAL sobre el
+      // índice). Antes esto era un lote global de los N*2 mensajes más nuevos +
+      // una petición suelta por cada chat que no apareciera: 11,4 peticiones por
+      // refresco medidas en prod, y los chats de más se quedaban sin vista previa.
+      const [convsResult, allParticipantsResult, lastMsgsResult] = await Promise.all([
         supabase
           .from("chat_conversations")
           .select("*")
@@ -78,12 +82,7 @@ export function useChat() {
           .from("chat_participants")
           .select("*")
           .in("conversation_id", convIds),
-        supabase
-          .from("chat_messages")
-          .select("*")
-          .in("conversation_id", convIds)
-          .order("created_at", { ascending: false })
-          .limit(convIds.length * 2 > 1000 ? 1000 : convIds.length * 2),
+        supabase.rpc("get_last_messages", { _user_id: user.id }),
       ]);
 
       const convs = convsResult.data;
@@ -94,30 +93,11 @@ export function useChat() {
         return;
       }
 
-      // Build last-message map from batch result (first occurrence per conv = latest)
+      // Un chat sin mensajes simplemente no viene en la respuesta y se queda sin
+      // vista previa, igual que antes.
       const lastMessageMap: Record<string, ChatMessage> = {};
-      if (recentMsgsResult.data) {
-        for (const msg of recentMsgsResult.data as ChatMessage[]) {
-          if (!lastMessageMap[msg.conversation_id]) {
-            lastMessageMap[msg.conversation_id] = msg;
-          }
-        }
-      }
-
-      // For any conversations missing from batch, fetch individually
-      const missingConvIds = convIds.filter(id => !lastMessageMap[id]);
-      if (missingConvIds.length > 0 && missingConvIds.length <= 20) {
-        const fallbackResults = await Promise.all(
-          missingConvIds.map(convId =>
-            supabase.from("chat_messages").select("*")
-              .eq("conversation_id", convId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-          )
-        );
-        fallbackResults.forEach(({ data }, i) => {
-          if (data?.[0]) lastMessageMap[missingConvIds[i]] = data[0] as ChatMessage;
-        });
+      for (const msg of (lastMsgsResult.data ?? []) as ChatMessage[]) {
+        lastMessageMap[msg.conversation_id] = msg;
       }
 
       // Server-side unread counts — single RPC call
