@@ -160,8 +160,18 @@ export default function ChatsPanel({
       </div>
 
       {/* Altura FIJA, no max-h: radix necesita altura definida para que su
-          viewport interno active el scrollbar (mismo detalle que la campana). */}
-      <ScrollArea className="border-t border-border/40" style={{ height: alto }}>
+          viewport interno active el scrollbar (mismo detalle que la campana).
+
+          [&_[data-radix-scroll-area-viewport]>div]:!block — Radix envuelve el
+          contenido en un div con `display: table`, que se ensancha hasta el
+          texto más largo de cualquier fila (una vista previa sin espacios, por
+          ejemplo). La fila entera quedaba más ancha que la nube y el contador
+          de no leídos, que va al final, salía recortado por el borde derecho
+          (05/09). Mismo arreglo que ya lleva la lista grande del Messenger. */}
+      <ScrollArea
+        className="border-t border-border/40 [&_[data-radix-scroll-area-viewport]>div]:!block"
+        style={{ height: alto }}
+      >
         {loading ? (
           <p className="p-4 text-center text-xs text-muted-foreground">Cargando…</p>
         ) : visibles.length === 0 && personas.length === 0 ? (
