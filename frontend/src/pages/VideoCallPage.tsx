@@ -8,6 +8,7 @@ import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
 import { LlamadaEnVentanaFlotante } from "@/components/LlamadaEnVentanaFlotante";
 import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
+import { useQuienesEstanEnLaSala } from "@/hooks/useQuienesEstanEnLaSala";
 import MeetGuestGate from "./meet/MeetGuestGate";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
@@ -116,6 +117,13 @@ export default function VideoCallPage() {
     enabled: !!user?.id,
   });
 
+  // Quién ya está adentro, para la sala de espera. Solo mientras la persona
+  // sigue afuera: al entrar lo ve en la llamada misma.
+  const quienesEstan = useQuienesEstanEnLaSala(
+    roomName,
+    !!user && !joined && !coworkRedirecting,
+  );
+
   const handleLeave = () => {
     window.close();
     setTimeout(() => {
@@ -164,6 +172,9 @@ export default function VideoCallPage() {
         roomName={roomName}
         displayName={userName}
         callDisplayName={callDisplayName}
+        // Si la consulta falla (edge caída, sin red) el bloque no se dibuja:
+        // decir "nadie ha llegado" sin saberlo sería mentir.
+        quienesEstan={quienesEstan.fallo ? undefined : { personas: quienesEstan.personas, cargando: quienesEstan.cargando }}
         onJoin={(opts) => {
           setJoinOpts(opts);
           setJoined(true);

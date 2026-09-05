@@ -8,6 +8,8 @@ import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/trac
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "./BackgroundSelector";
+import QuienesEstan from "./QuienesEstan";
+import type { PersonaEnSala } from "@/hooks/useQuienesEstanEnLaSala";
 
 
 interface PreJoinLobbyProps {
@@ -15,6 +17,8 @@ interface PreJoinLobbyProps {
   displayName: string;
   callDisplayName?: string;
   onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string; audioOutputDeviceId?: string; backgroundEffect?: BackgroundEffect }) => void;
+  /** Quién ya está adentro (como en Google Meet). Sin esto, el bloque no se dibuja. */
+  quienesEstan?: { personas: PersonaEnSala[]; cargando?: boolean };
 }
 
 
@@ -44,7 +48,7 @@ async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string
   }
 }
 
-export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin }: PreJoinLobbyProps) {
+export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin, quienesEstan }: PreJoinLobbyProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
@@ -534,6 +538,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           </h1>
           {callDisplayName && (
             <p className="text-sm text-muted-foreground">{callDisplayName}</p>
+          )}
+
+          {quienesEstan && (
+            <QuienesEstan personas={quienesEstan.personas} cargando={quienesEstan.cargando} />
           )}
 
           <button
