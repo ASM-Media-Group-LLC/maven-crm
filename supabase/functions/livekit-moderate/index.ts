@@ -87,6 +87,23 @@ interface LkParticipant { identity: string; name?: string; tracks?: LkTrack[]; p
 // El identity de un usuario de Maven es `<uuid>` o `<uuid>_<sufijo>` (y
 // `<uuid>__preview` / `__monitor` en Cowork). Los invitados de Meet son
 // `guest_<uuid>` y no tienen cuenta.
+interface LkParticipantEnSala extends LkParticipant {
+  kind?: string | number;
+  metadata?: string;
+  permission?: { hidden?: boolean } & Record<string, unknown>;
+}
+
+// El nombre visible: LiveKit lo lleva en `name`; el token de Maven además lo
+// repite dentro de `metadata` (JSON con {name}). Cualquiera de los dos sirve.
+function nombreDeLiveKit(p: LkParticipantEnSala): string | null {
+  if (p.name?.trim()) return p.name.trim();
+  try {
+    const meta = p.metadata ? JSON.parse(p.metadata) : null;
+    if (typeof meta?.name === "string" && meta.name.trim()) return meta.name.trim();
+  } catch { /* metadata que no es JSON */ }
+  return null;
+}
+
 function userIdFromIdentity(identity: string): string | null {
   if (identity.startsWith("guest_")) return null;
   const head = identity.split("_")[0];
@@ -117,6 +134,65 @@ serve(async (req) => {
     const lkUrl = Deno.env.get("LIVEKIT_URL")!;
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const lkSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
+
+    // ═══ ¿QUIÉN ESTÁ ADENTRO? (sala de espera, antes de entrar) ═══
+    // Como en Google Meet: antes de unirte ves quién ya llegó. Solo LECTURA y
+    // solo de lo que cualquiera vería al entrar (nombre y foto), así que alcanza
+    // con tener cuenta en Maven y el nombre de la sala — no exige ser anfitrión,
+    // por eso va ANTES del chequeo de moderación. Al que pregunta no se le
+    // devuelve a sí mismo (puede estar ya adentro desde otra pestaña).
+    if (action === "quienesEstan") {
+      const res = await twirp(lkUrl, lkKey, lkSecret, room, "ListParticipants", { room });
+      // Sala que todavía no existe en LiveKit = nadie adentro, no es un error.
+      if (!res.ok && res.status === 404) return json(req, { personas: [] });
+      if (!res.ok) return err(req, `LiveKit ListParticipants ${res.status}`, 502);
+
+      const participantes = ((res.data?.participants ?? []) as LkParticipantEnSala[]).filter((p) => {
+        if (p.permission?.hidden) return false;               // grabadora (egress) y similares
+        if (p.kind && p.kind !== "STANDARD" && p.kind !== 0) return false;
+        if (/__(monitor|preview)$/.test(p.identity)) return false; // Cowork: el supervisor mirando
+        return true;
+      });
+
+      // Una persona con dos pestañas abiertas es UNA persona.
+      const porUsuario = new Map<string, LkParticipantEnSala>();
+      const invitados: LkParticipantEnSala[] = [];
+      for (const p of participantes) {
+        const uid = userIdFromIdentity(p.identity);
+        if (!uid) { invitados.push(p); continue; }
+        if (uid === userId) continue;
+        if (!porUsuario.has(uid)) porUsuario.set(uid, p);
+      }
+
+      const ids = [...porUsuario.keys()];
+      const perfiles = new Map<string, { full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>();
+      if (ids.length) {
+        const { data } = await admin.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids);
+        for (const f of data ?? []) perfiles.set(f.id, f);
+      }
+
+      const personas = [
+        ...ids.map((uid) => {
+          const perfil = perfiles.get(uid);
+          const p = porUsuario.get(uid)!;
+          return {
+            id: uid,
+            nombre: perfil?.full_name || nombreDeLiveKit(p) || "Alguien de Maven",
+            foto: perfil?.avatar_url ?? null,
+            seed: perfil?.avatar_seed ?? null,
+            invitado: false,
+          };
+        }),
+        ...invitados.map((p) => ({
+          id: p.identity,
+          nombre: nombreDeLiveKit(p) || "Invitado",
+          foto: null,
+          seed: null,
+          invitado: true,
+        })),
+      ];
+      return json(req, { personas });
+    }
 
     // ── Autorización ────────────────────────────────────────────────────
     // Silenciar a alguien lo puede hacer CUALQUIERA que esté en la llamada, como
