@@ -389,7 +389,7 @@ export default function ParrillaPage() {
         onError: (e: any) => {
           if (String(e.message).includes("conflict")) {
             toast.error("Otra persona guardó esta parrilla mientras la editabas", {
-              description: "Recargá la página para ver su versión antes de volver a guardar.",
+              description: "Recarga la página para ver su versión antes de volver a guardar.",
               duration: 10000,
             });
           } else {

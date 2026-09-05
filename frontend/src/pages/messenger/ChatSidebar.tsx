@@ -60,7 +60,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
-  const { isOnline, getStatus } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const { results: globalResults, searching: globalSearching, search: globalSearch, clearResults: clearGlobalResults } = useGlobalSearch();
@@ -451,6 +451,7 @@ export default function ChatSidebar({
                 {contacts.map(p => {
                   const online = isOnline(p.id);
                   const status = getStatus(p.id);
+                  const colorPersonal = getStatusColorPersonal(p.id);
                   return (
                     <button
                       key={p.id}
@@ -467,7 +468,7 @@ export default function ChatSidebar({
                         />
                         <span className={cn(
                           "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[1.5px] border-card",
-                          getStatusColor(status, online)
+                          getStatusColor(status, online, colorPersonal)
                         )} />
                       </div>
                       <span className={cn(
@@ -534,7 +535,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const { user } = useAuth();
   const [reorderOver, setReorderOver] = useState(false);
   const isGroup = conversation.type === "group";
-  const { isOnline, getStatus } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const isMuted = conversation.participants.find(p => p.user_id === user?.id)?.is_muted ?? false;
   const handleToggleMute = () => onToggleMute(conversation.id, !isMuted);
 
@@ -543,6 +544,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
     : null;
   const online = otherParticipant ? isOnline(otherParticipant.user_id) : false;
   const status = otherParticipant ? getStatus(otherParticipant.user_id) : null;
+  const colorPersonal = otherParticipant ? getStatusColorPersonal(otherParticipant.user_id) : null;
   const hasUnread = conversation.unreadCount > 0;
 
   // Borrador pendiente (estilo WhatsApp): si dejaste un mensaje a medias en este
@@ -605,7 +607,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             {!isGroup && (
               <span className={cn(
                 "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
-                getStatusColor(status, online)
+                getStatusColor(status, online, colorPersonal)
               )} />
             )}
           </div>

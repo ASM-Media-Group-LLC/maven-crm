@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { UserStatus } from "@/hooks/useOnlinePresence";
+import { UserStatus, useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor, getStatusLabel } from "./components/StatusPicker";
 
 interface NewChatModalProps {
@@ -30,6 +30,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
   const { user } = useAuth();
   const isOnline = isOnlineFn || (() => false);
   const getStatus = getStatusFn || (() => null);
+  const { getStatusColorPersonal } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
@@ -120,7 +121,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
                   <span
                     className={cn(
                       "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",
-                      getStatusColor(getStatus(profile.id), online)
+                      getStatusColor(getStatus(profile.id), online, getStatusColorPersonal(profile.id))
                     )}
                   />
                 </div>

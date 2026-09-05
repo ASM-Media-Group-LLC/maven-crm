@@ -39,7 +39,7 @@ export default function DockChatWindow({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profiles, markConversationRead } = useChatShared();
-  const { isOnline, getStatus, getStatusText } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
 
   const alLlegarMensaje = useCallback(() => {
@@ -128,6 +128,7 @@ export default function DockChatWindow({
                   getStatusColor(
                     otro ? getStatus(otro.user_id) : null,
                     otro ? isOnline(otro.user_id) : false,
+                    otro ? getStatusColorPersonal(otro.user_id) : null,
                   ),
                 )}
               />

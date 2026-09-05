@@ -226,7 +226,7 @@ export default function CloserDashboard() {
           ) : pipeline.vencidos.length === 0 ? (
             <p className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              {leads.length === 0 ? "Todavía no tenés leads asignadas." : "Ningún seguimiento vencido. Al día."}
+              {leads.length === 0 ? "Todavía no tienes leads asignadas." : "Ningún seguimiento vencido. Al día."}
             </p>
           ) : (
             <ul className="divide-y divide-white/5">

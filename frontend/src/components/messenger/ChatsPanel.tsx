@@ -55,7 +55,7 @@ export default function ChatsPanel({
 }) {
   const { user } = useAuth();
   const { conversations, loading, profiles, createDirectChat } = useChatShared();
-  const { isOnline, getStatus } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const { quienEscribe } = useTypingInbox();
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
@@ -188,6 +188,7 @@ export default function ChatsPanel({
                 online={isOnline}
                 status={getStatus}
                 escribiendo={!!quienEscribe(c.id)}
+                colorPersonal={getStatusColorPersonal}
                 onClick={() => onAbrirChat(c.id)}
               />
             ))}
@@ -203,6 +204,7 @@ export default function ChatsPanel({
                     perfil={p}
                     online={isOnline(p.id)}
                     estado={getStatus(p.id)}
+                    colorPersonal={getStatusColorPersonal(p.id)}
                     onClick={() => abrirConPersona(p.id)}
                   />
                 ))}
@@ -223,11 +225,12 @@ export default function ChatsPanel({
 
 /** Alguien del equipo con quien todavía no hay chat: al tocarlo se crea. */
 function FilaPersona({
-  perfil, online, estado, onClick,
+  perfil, online, estado, colorPersonal, onClick,
 }: {
   perfil: { id: string; full_name?: string | null; avatar_url?: string | null; avatar_seed?: string | null };
   online: boolean;
   estado: UserStatus | null;
+  colorPersonal: string | null;
   onClick: () => void;
 }) {
   const nombre = perfil.full_name || "Sin nombre";
@@ -243,7 +246,7 @@ function FilaPersona({
         <span
           className={cn(
             "presence-ring absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-popover",
-            getStatusColor(estado, online),
+            getStatusColor(estado, online, colorPersonal),
             online && "animate-presence-pulse motion-reduce:animate-none",
           )}
         />
@@ -263,13 +266,14 @@ function FilaPersona({
 }
 
 function FilaChat({
-  conversation, userId, online, status, escribiendo, onClick,
+  conversation, userId, online, status, escribiendo, colorPersonal, onClick,
 }: {
   conversation: ConversationWithDetails;
   userId: string | undefined;
   online: (id: string) => boolean;
   status: (id: string) => UserStatus | null;
   escribiendo: boolean;
+  colorPersonal: (id: string) => string | null;
   onClick: () => void;
 }) {
   const isGroup = conversation.type === "group";
@@ -319,6 +323,7 @@ function FilaChat({
                 getStatusColor(
                   otro ? status(otro.user_id) : null,
                   otro ? online(otro.user_id) : false,
+                  otro ? colorPersonal(otro.user_id) : null,
                 ),
                 otro && online(otro.user_id) && "animate-presence-pulse motion-reduce:animate-none",
               )}

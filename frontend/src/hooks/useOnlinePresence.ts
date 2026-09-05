@@ -3,7 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import React from "react";
 
-export type UserStatus = "available" | "busy" | "dnd" | "away";
+/** "No molestar" se quitó: pintaba el mismo rojo que "Ocupado" y no tenía
+ *  ningún efecto funcional. "offline" es aparecer como desconectado (solo
+ *  admins lo pueden elegir). */
+export type UserStatus = "available" | "busy" | "away" | "offline";
 
 /** Estado personalizado vigente: vacío si no hay texto o si ya expiró. */
 export function statusTextVigente(text?: string | null, expiresAt?: string | null): string {
@@ -23,7 +26,10 @@ interface OnlinePresenceContextType {
   getStatusText: (userId: string) => string;
   myStatusText: string;
   /** Guarda el estado personalizado (persiste en profiles y lo difunde en vivo). */
-  setMyStatusText: (text: string, expiresAt: string | null, luz?: UserStatus) => Promise<void>;
+  setMyStatusText: (text: string, expiresAt: string | null, luz?: UserStatus, color?: string | null) => Promise<void>;
+  /** Color del puntito elegido a mano, o null si usa el del estado. */
+  getStatusColorPersonal: (userId: string) => string | null;
+  myStatusColor: string | null;
 }
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
@@ -36,6 +42,8 @@ const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
   getStatusText: () => "",
   myStatusText: "",
   setMyStatusText: async () => {},
+  getStatusColorPersonal: () => null,
+  myStatusColor: null,
 });
 
 export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
@@ -45,13 +53,17 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const [statusTexts, setStatusTexts] = useState<Record<string, string>>({});
   const [myStatus, setMyStatusState] = useState<UserStatus>("available");
   const [myStatusText, setMyStatusTextState] = useState("");
+  const [myStatusColor, setMyStatusColorState] = useState<string | null>(null);
+  const [statusColors, setStatusColors] = useState<Record<string, string>>({});
   const channelRef = useRef<any>(null);
   const myStatusRef = useRef<UserStatus>("available");
   const myStatusTextRef = useRef("");
+  const myStatusColorRef = useRef<string | null>(null);
 
   // Keep refs in sync
   myStatusRef.current = myStatus;
   myStatusTextRef.current = myStatusText;
+  myStatusColorRef.current = myStatusColor;
 
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
@@ -65,6 +77,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       online_at: new Date().toISOString(),
       status: status ?? myStatusRef.current,
       status_text: myStatusTextRef.current || null,
+      status_color: myStatusColorRef.current || null,
     });
   }, []);
 
@@ -83,15 +96,20 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       const ids = new Set<string>();
       const statuses: Record<string, UserStatus> = {};
       const texts: Record<string, string> = {};
+      const colors: Record<string, string> = {};
       Object.entries(state).forEach(([key, presences]) => {
-        ids.add(key);
         const latest = (presences as any[])?.[0];
+        // "Desconectado" tiene que serlo de verdad: si solo cambiáramos el color
+        // seguiría contando en "X en línea", y el estado sería mentira.
+        if (latest?.status !== "offline") ids.add(key);
         if (latest?.status) statuses[key] = latest.status as UserStatus;
         if (latest?.status_text) texts[key] = latest.status_text as string;
+        if (latest?.status_color) colors[key] = latest.status_color as string;
       });
       setOnlineUsers(ids);
       setUserStatuses(statuses);
       setStatusTexts(texts);
+      setStatusColors(colors);
     };
 
     presenceChannel
@@ -128,12 +146,13 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("status, status_text, status_expires_at")
+        .select("status, status_color, status_text, status_expires_at")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled || !data) return;
       const row = data as {
         status?: string | null;
+        status_color?: string | null;
         status_text?: string | null;
         status_expires_at?: string | null;
       };
@@ -143,15 +162,20 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       const caduco = !!row.status_text && !vigente;
       const luz = (!caduco && row.status ? (row.status as UserStatus) : "available");
 
+      const color = caduco ? null : (row.status_color ?? null);
       if (luz !== "available") {
         setMyStatusState(luz);
         myStatusRef.current = luz;
+      }
+      if (color) {
+        setMyStatusColorState(color);
+        myStatusColorRef.current = color;
       }
       if (vigente) {
         setMyStatusTextState(vigente);
         myStatusTextRef.current = vigente;
       }
-      if (luz !== "available" || vigente) track();
+      if (luz !== "available" || vigente || color) track();
     })();
     return () => { cancelled = true; };
   }, [user?.id, track]);
@@ -186,9 +210,13 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     const uid = userIdRef.current;
     if (!uid) return;
     // Sin await: la presencia ya salió, esto es solo para que sobreviva al refresh.
+    // Elegir del menú limpia el color personalizado: si no, el puntito se
+    // quedaría con el color viejo y el menú parecería no hacer nada.
+    setMyStatusColorState(null);
+    myStatusColorRef.current = null;
     void supabase
       .from("profiles")
-      .update({ status } as never)
+      .update({ status, status_color: null } as never)
       .eq("id", uid);
   }, [track]);
 
@@ -199,6 +227,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     text: string,
     expiresAt: string | null,
     luz?: UserStatus,
+    color?: string | null,
   ) => {
     const clean = text.trim().slice(0, 64);
     setMyStatusTextState(clean);
@@ -206,6 +235,10 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     if (luz) {
       setMyStatusState(luz);
       myStatusRef.current = luz;
+    }
+    if (color !== undefined) {
+      setMyStatusColorState(color);
+      myStatusColorRef.current = color;
     }
     track();
     const uid = userIdRef.current;
@@ -216,6 +249,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         status_text: clean || null,
         status_expires_at: clean ? expiresAt : null,
         ...(luz ? { status: luz } : {}),
+        ...(color !== undefined ? { status_color: color } : {}),
       } as never)
       .eq("id", uid);
   }, [track]);
@@ -235,12 +269,18 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     [statusTexts]
   );
 
+  const getStatusColorPersonal = useCallback(
+    (userId: string) => statusColors[userId] || null,
+    [statusColors]
+  );
+
   return React.createElement(
     OnlinePresenceContext.Provider,
     {
       value: {
         onlineUsers, isOnline, userStatuses, getStatus, myStatus, setMyStatus,
         getStatusText, myStatusText, setMyStatusText,
+        getStatusColorPersonal, myStatusColor,
       },
     },
     children

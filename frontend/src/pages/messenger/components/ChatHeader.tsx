@@ -49,7 +49,7 @@ export default function ChatHeader({
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatHeaderProps) {
   const { user } = useAuth();
-  const { isOnline, getStatus, getStatusText } = useOnlinePresence();
+  const { isOnline, getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
 
   const isGroup = conversation.type === "group";
   const isAdmin = isGroup && conversation.participants.some(
@@ -94,6 +94,7 @@ export default function ChatHeader({
   const otherProfile = otherUserId ? profiles[otherUserId] : null;
   const online = otherUserId ? isOnline(otherUserId) : false;
   const status = otherUserId ? getStatus(otherUserId) : null;
+  const colorPersonal = otherUserId ? getStatusColorPersonal(otherUserId) : null;
   // Estado personalizado de la otra persona (texto libre): si lo tiene, manda sobre
   // la etiqueta fija ("Disponible"/"Ausente"), como en Google Chat.
   const statusText = otherUserId ? getStatusText(otherUserId) : "";
@@ -214,7 +215,7 @@ export default function ChatHeader({
           {!isGroup && (
             <span className={cn(
               "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card z-10",
-              getStatusColor(status, online)
+              getStatusColor(status, online, colorPersonal)
             )} />
           )}
         </div>

@@ -328,7 +328,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 className={`flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed py-7 transition-colors ${soltando ? "border-primary bg-primary/10" : "border-white/15 bg-background/20 hover:border-primary/40 hover:bg-white/5"}`}
               >
                 <ImagePlus className="h-5 w-5 text-muted-foreground/70" />
-                <span className="text-xs text-muted-foreground">Soltá los archivos acá o hacé clic para elegirlos</span>
+                <span className="text-xs text-muted-foreground">Suelta los archivos aquí o haz clic para elegirlos</span>
                 <span className="text-[11px] text-muted-foreground/60">Las referencias del fan y la entrega de la creadora</span>
               </button>
             ) : (

@@ -375,7 +375,7 @@ export default function ManagerDashboard({ forzado = false }: {
           {creadorasCargando || promo.isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-11 rounded-lg" />)}</div>
           ) : creadoras.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">No tenés creadoras asignadas.</p>
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">No tienes creadoras asignadas.</p>
           ) : (
             <ul className="divide-y divide-white/5">
               {/* Primero las que llevan más sin promocionar: son las que hay

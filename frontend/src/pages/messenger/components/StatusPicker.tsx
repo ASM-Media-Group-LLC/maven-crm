@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Circle, MinusCircle, Clock, MessageSquareText, X } from "lucide-react";
+import { Circle, MinusCircle, Clock, CircleOff, MessageSquareText, X } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -11,13 +11,30 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOnlinePresence, UserStatus } from "@/hooks/useOnlinePresence";
+import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<UserStatus, { label: string; color: string; icon: typeof Circle }> = {
+const STATUS_CONFIG: Record<UserStatus, { label: string; color: string; icon: typeof Circle; soloAdmin?: boolean }> = {
   available: { label: "Disponible", color: "text-success", icon: Circle },
   busy: { label: "Ocupado", color: "text-destructive", icon: MinusCircle },
-  dnd: { label: "No molestar", color: "text-destructive", icon: MinusCircle },
   away: { label: "Ausente", color: "text-warning", icon: Clock },
+  // Aparecer como desconectado. Es de verdad: quien lo elige deja de contar en
+  // "X en línea" (ver useOnlinePresence), no solo cambia de color.
+  offline: { label: "Desconectado", color: "text-muted-foreground", icon: CircleOff, soloAdmin: true },
+};
+
+/** Paleta del estado personalizado. Sin nombres a propósito: el texto que
+ *  escribe la persona ya dice qué significa. Son colores fijos, no tokens del
+ *  skin, porque es una elección explícita y tiene que verse igual siempre. */
+export const COLORES_ESTADO: Record<string, string> = {
+  verde: "bg-emerald-500",
+  amarillo: "bg-amber-400",
+  naranja: "bg-orange-500",
+  rojo: "bg-rose-500",
+  rosa: "bg-pink-400",
+  morado: "bg-violet-500",
+  azul: "bg-sky-500",
+  gris: "bg-slate-400",
 };
 
 const MAX_LEN = 64;
@@ -30,12 +47,18 @@ const EXPIRY_OPTIONS: { key: string; label: string; resolve: () => string | null
   { key: "week", label: "En una semana", resolve: () => new Date(Date.now() + 7 * 86400_000).toISOString() },
 ];
 
-export function getStatusColor(status: UserStatus | null, isOnline: boolean): string {
+/** @param colorPersonal clave de COLORES_ESTADO elegida en el estado
+ *                        personalizado; si viene, manda sobre el estado. */
+export function getStatusColor(
+  status: UserStatus | null,
+  isOnline: boolean,
+  colorPersonal?: string | null,
+): string {
   if (!isOnline) return "bg-muted-foreground/30";
+  if (colorPersonal && COLORES_ESTADO[colorPersonal]) return COLORES_ESTADO[colorPersonal];
   switch (status) {
     case "available": return "bg-success";
     case "busy": return "bg-destructive";
-    case "dnd": return "bg-destructive";
     case "away": return "bg-warning";
     default: return "bg-success";
   }
@@ -47,7 +70,8 @@ export function getStatusLabel(status: UserStatus | null, isOnline: boolean): st
 }
 
 export default function StatusPicker() {
-  const { myStatus, setMyStatus, myStatusText, setMyStatusText } = useOnlinePresence();
+  const { myStatus, setMyStatus, myStatusText, setMyStatusText, myStatusColor } = useOnlinePresence();
+  const { isAdmin } = useUserRole();
   const config = STATUS_CONFIG[myStatus];
   const Icon = config.icon;
 
@@ -55,12 +79,14 @@ export default function StatusPicker() {
   const [draft, setDraft] = useState("");
   const [expiry, setExpiry] = useState("never");
   const [luz, setLuz] = useState<UserStatus>("available");
+  const [color, setColor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const abrirDialogo = () => {
     setDraft(myStatusText);
     setExpiry("never");
     setLuz(myStatus);
+    setColor(myStatusColor);
     setOpen(true);
   };
 
@@ -69,7 +95,7 @@ export default function StatusPicker() {
     const resolver = EXPIRY_OPTIONS.find((o) => o.key === expiry)?.resolve ?? (() => null);
     // Texto y luz se guardan JUNTOS: escribir "EN LUNCH" y quedar en verde era
     // justo el desajuste que se veía en producción.
-    await setMyStatusText(draft, resolver(), luz);
+    await setMyStatusText(draft, resolver(), luz, color);
     setSaving(false);
     setOpen(false);
   };
@@ -77,7 +103,7 @@ export default function StatusPicker() {
   const quitar = async () => {
     setSaving(true);
     // Quitar el estado devuelve también la luz a Disponible.
-    await setMyStatusText("", null, "available");
+    await setMyStatusText("", null, "available", null);
     setSaving(false);
     setOpen(false);
   };
@@ -87,14 +113,20 @@ export default function StatusPicker() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2.5 text-xs rounded-full bg-primary/5 hover:bg-primary/8 max-w-[180px]">
-            <Icon className={cn("h-3 w-3 fill-current shrink-0", config.color)} />
+            {myStatusColor && COLORES_ESTADO[myStatusColor] ? (
+              <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", COLORES_ESTADO[myStatusColor])} />
+            ) : (
+              <Icon className={cn("h-3 w-3 fill-current shrink-0", config.color)} />
+            )}
             {/* Con estado personalizado, el chip muestra ESE texto (como Google Chat)
                 y el puntito lleva la luz que se eligió junto al texto. */}
             <span className="text-muted-foreground truncate">{myStatusText || config.label}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[200px] rounded-2xl">
-          {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][]).map(([key, cfg]) => {
+          {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][])
+            .filter(([, cfg]) => !cfg.soloAdmin || isAdmin)
+            .map(([key, cfg]) => {
             const ItemIcon = cfg.icon;
             return (
               <DropdownMenuItem
@@ -149,32 +181,44 @@ export default function StatusPicker() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Color de tu lucecita</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][]).map(([key, cfg]) => {
-                  const OpcionIcon = cfg.icon;
-                  const activa = luz === key;
+              <Label className="text-xs text-muted-foreground">Color de tu estado</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                {Object.entries(COLORES_ESTADO).map(([clave, clase]) => {
+                  const activo = color === clave;
                   return (
                     <button
-                      key={key}
+                      key={clave}
                       type="button"
-                      onClick={() => setLuz(key)}
-                      aria-pressed={activa}
+                      onClick={() => setColor(clave)}
+                      aria-label={clave}
+                      aria-pressed={activo}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                        activa
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted",
+                        "h-6 w-6 rounded-full transition-transform",
+                        clase,
+                        activo
+                          ? "ring-2 ring-offset-2 ring-primary ring-offset-background scale-110"
+                          : "hover:scale-110",
                       )}
-                    >
-                      <OpcionIcon className={cn("h-3 w-3 fill-current shrink-0", cfg.color)} />
-                      {cfg.label}
-                    </button>
+                    />
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setColor(null)}
+                  aria-pressed={color === null}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                    color === null
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  Sin color
+                </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Es el puntito que ven junto a tu foto. Si estás en descanso, ponelo en Ausente.
+                Es el puntito que ven junto a tu foto. Sin color usa el de tu estado
+                ({STATUS_CONFIG[luz].label.toLowerCase()}).
               </p>
             </div>
 

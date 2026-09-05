@@ -164,7 +164,7 @@ export default function FeedbackDialog({
               )}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Elegí una o varias opciones y confirmá. No reemplaza la nota: se suma o se resta a la que ya calculó Maven para ese día.
+              Elige una o varias opciones y confirma. No reemplaza la nota: se suma o se resta a la que ya calculó Maven para ese día.
             </p>
           </div>
 
