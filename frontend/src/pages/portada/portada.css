@@ -150,10 +150,17 @@
   @media (min-width: 1000px) { .pt .hero-grid { grid-template-columns: 1.02fr .98fr; gap: 56px; } }
 
   .pt .chip-vivo {
-    display: inline-flex; align-items: center; gap: 9px;
-    font: 500 12px/1 "JetBrains Mono", monospace; letter-spacing: .04em;
+    display: inline-flex; align-items: center; gap: 9px; max-width: 100%;
+    font: 500 12px/1.3 "JetBrains Mono", monospace; letter-spacing: .04em;
     color: var(--ink-soft); background: rgba(255,255,255,.04);
     border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px 7px 11px;
+  }
+  /* En un teléfono el texto baja a dos líneas: la pila NO se encoge (los
+     muñequitos se montaban sobre el texto) y sobran los dos últimos. */
+  .pt .chip-vivo .pila { flex: none; }
+  @media (max-width: 480px) {
+    .pt .chip-vivo { font-size: 11px; padding-right: 12px; }
+    .pt .chip-vivo .pila img:nth-child(n + 4) { display: none; }
   }
   .pt .punto { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 0 0 rgba(16,185,129,.7); animation: latir 2.4s ease-out infinite; }
   @keyframes latir { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.55); } 70% { box-shadow: 0 0 0 9px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
@@ -678,6 +685,9 @@
     box-shadow: 0 26px 60px -18px rgba(0,0,0,.95);
   }
   @media (max-width: 1020px) { .pt .hub { position: static; translate: none; width: 100%; margin: 12px 0 0; } .pt .dm-flotante { position: static; width: 100%; margin: 12px 0 0; } }
+  /* Mientras el hub flota (sobresale 26px + sombra), los porqués de abajo
+     arrancan más lejos: si no, el hub tapaba el primer título de la fila. */
+  @media (min-width: 1021px) { .pt .sigue + .porques { margin-top: 64px; } }
   .pt .dm-barra { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
   .pt .dm-barra img { width: 18px; height: 18px; border-radius: 50%; }
   .pt .dm-barra .ctrls { margin-left: auto; display: flex; gap: 6px; color: var(--faint); font-size: 10px; }

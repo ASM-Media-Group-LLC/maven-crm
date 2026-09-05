@@ -33,17 +33,21 @@ export default defineConfig(({ mode }) => ({
     mode === "production" && VitePWA({
       registerType: "prompt",
       injectRegister: false,
-      includeAssets: ["favicon.ico"],
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: {
-        name: "MAVEN Messenger",
-        short_name: "MAVEN",
-        description: "All in one platform for Creators' management",
+        name: "Maven",
+        short_name: "Maven",
+        description: "Correo, chat, oficina virtual y operación, en una sola sesión.",
         theme_color: "#1a1a2e",
         background_color: "#0f0f23",
         display: "standalone",
         start_url: "/",
+        // La baldosa de la marca (la misma del logo). Antes el único icono era
+        // el .ico de 64px con el nombre recortado, y al instalar Maven en el
+        // teléfono quedaba borroso.
         icons: [
-          { src: "/favicon.ico", sizes: "64x64", type: "image/x-icon" },
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
       workbox: {

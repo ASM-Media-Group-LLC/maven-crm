@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,6 +52,12 @@ const ContentLoadingFallback = () => (
   </div>
 );
 const AppShell = () => {
+  // El <title> estático de index.html es el de la portada (para Google y las
+  // tarjetas de WhatsApp/LinkedIn). Adentro de la app la pestaña dice "Maven".
+  useEffect(() => {
+    document.title = "Maven";
+  }, []);
+
   const { popups } = useAnnouncementsByChannel();
   // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),
   // funcione donde funcione el usuario dentro de Maven (no solo en las bandejas).

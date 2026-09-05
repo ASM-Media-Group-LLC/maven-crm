@@ -86,6 +86,12 @@ export default function Portada() {
     return () => window.removeEventListener("scroll", alScrollear);
   }, []);
 
+  // El título de la pestaña: el mismo que el <title> estático, por si se entra
+  // desde adentro de la app, donde la pestaña dice solo "Maven".
+  useEffect(() => {
+    document.title = "Maven — Reemplaza siete suscripciones por una sola sesión";
+  }, []);
+
   // La portada es la única pantalla pública, y va en oscuro sí o sí: el
   // `data-theme` del visitante no debe poder dejarla ilegible.
   return (
