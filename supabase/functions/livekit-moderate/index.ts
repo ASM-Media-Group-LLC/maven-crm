@@ -14,6 +14,7 @@ import { corsFor } from "../_shared/cors.ts";
 // sesión de Cowork, o quien inició una llamada 1:1.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -196,6 +197,23 @@ serve(async (req) => {
       if (!target) return err(req, "Esa persona ya no está en la llamada", 404);
 
       const muted = await muteAudioOf(target);
+
+      // Y que la sala se entere de quién silenció a quién (pedido de Jhon,
+      // 05/09): el silenciado ve "X te silenció" y los demás "X silenció a Y".
+      if (muted > 0) {
+        const targetUserId = userIdFromIdentity(target.identity);
+        await enviarAvisoASala(room, {
+          clase: "silenciado",
+          objetivo: {
+            identity: target.identity,
+            uuid: targetUserId,
+            nombre: targetUserId
+              ? await nombreDeUsuario(admin, targetUserId, target.name || "Alguien")
+              : (target.name || "Un invitado"),
+          },
+          por: { uuid: userId, nombre: await nombreDeUsuario(admin, userId) },
+        });
+      }
       return json(req, { ok: true, muted });
     }
 
@@ -213,6 +231,12 @@ serve(async (req) => {
           if (isHost) continue; // no silenciamos a otro anfitrión
         }
         muted += await muteAudioOf(p);
+      }
+      if (muted > 0) {
+        await enviarAvisoASala(room, {
+          clase: "silenciados-todos",
+          por: { uuid: userId, nombre: await nombreDeUsuario(admin, userId) },
+        });
       }
       return json(req, { ok: true, muted });
     }

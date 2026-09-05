@@ -18,6 +18,7 @@ import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/trac
 import { toast } from "sonner";
 import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase } from "@/integrations/supabase/client";
+import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
@@ -58,7 +59,7 @@ export interface LKChatMessage {
 }
 
 interface DataMessage {
-  type: "chat" | "hand" | "reaction" | "moderation" | "chat-history";
+  type: "chat" | "hand" | "reaction" | "moderation" | "chat-history" | "aviso";
   payload: any;
 }
 
@@ -1074,7 +1075,12 @@ export function useLiveKit() {
       });
       room.on(RoomEvent.ParticipantDisconnected, (p) => {
         console.info("[LiveKit] Participant disconnected:", p.identity, p.name);
-        if (avisaEntradasYSalidas(room.name)) playLeaveSound();
+        if (avisaEntradasYSalidas(room.name)) {
+          playLeaveSound();
+          // Y un aviso con la cara de quien se fue (pedido de Jhon, 05/09):
+          // el sonido solo dice "alguien"; el popup dice quién.
+          void avisarSalidaDeLlamada(p, room);
+        }
         refreshParticipants();
       });
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
@@ -1105,7 +1111,10 @@ export function useLiveKit() {
         if (!participant?.isLocal) return;
         if (pub?.source !== Track.Source.Microphone) return;
         if (Date.now() - meSilencieYoRef.current < 1500) return; // fui yo
+        // Con id: si enseguida llega el aviso del servidor con nombre y cara
+        // ("Jhon silenció tu micrófono"), reemplaza a este en vez de apilarse.
         toast.info("Alguien silenció tu micrófono", {
+          id: ID_AVISO_ME_SILENCIARON,
           description: "Puedes volver a activarlo cuando quieras.",
           duration: 8000,
         });
@@ -1208,6 +1217,11 @@ export function useLiveKit() {
                 )
               );
             }, 15000);
+          }
+          if (msg.type === "aviso") {
+            // Avisos del SERVIDOR (silenciado, grabación): llegan sin
+            // remitente. Si trae remitente lo mandó un cliente: se ignora.
+            if (!participant) void mostrarAvisoDeSala(msg.payload, room.localParticipant.identity);
           }
           // El tipo "moderation" del canal de datos se ELIMINÓ: mutear y expulsar
           // los ejecuta ahora el servidor (edge livekit-moderate). Obedecer una
