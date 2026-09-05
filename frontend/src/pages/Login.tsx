@@ -130,7 +130,7 @@ const Login = () => {
               gente a una puerta que no abre. Quien no tiene cuenta y quiere
               probar Maven pide una demo desde la portada. */}
           <Link to="/#demo" className="text-white/40 hover:text-white hover:underline">
-            ¿Todavía no usas Maven? Pedí una demo
+            ¿Todavía no usas Maven? Pide una demo
           </Link>
         </div>
       </div>
