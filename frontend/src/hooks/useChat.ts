@@ -1043,39 +1043,98 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   // estaba yendo y el nuevo entraba en un ciclo join→ok→close. Medido en los
   // frames del websocket. Desde su propio efecto se monta UNA vez por
   // conversación y se queda unido.
+  // ⚠️ Y SE VUELVE A UNIR SOLO. Un canal de presencia se puede quedar `closed`
+  // sin que el navegador se entere: pasa cada vez que el servidor corta el
+  // socket por límite de presencia (`ClientPresenceRateLimitReached`, todavía
+  // ~50/hora mientras el equipo termina de tomar el bundle con el freno).
+  // Medido en prod el 05/09: el canal en estado "closed", `track()` devolviendo
+  // "timed out", el `.catch()` tragándoselo, y `presenceState()` sirviendo
+  // caché vieja. Para el usuario: el "escribiendo" andaba en el primer mensaje
+  // y ya nunca más, hasta cambiar de chat o recargar.
+  //
+  // Al rearmar hay que ESPERAR el removeChannel antes de crear el nuevo: el
+  // topic es el mismo (`typing-<conv>`) y supabase-js dedupea por topic, así
+  // que recrear encima del que se está yendo mete el ciclo join→ok→close que
+  // ya nos comimos en #1603.
   useEffect(() => {
     const userId = user?.id;
     if (!conversationId || !userId) return;
 
-    const presenceChannel = supabase
-      .channel(`typing-${conversationId}`, {
-        config: { presence: { key: userId } },
-      })
-      .on("presence", { event: "sync" }, () => {
-        const state = presenceChannel.presenceState();
-        const typing: string[] = [];
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((pres: any) => {
-            if (pres.typing && pres.user_id !== userId) typing.push(pres.user_id);
-          });
-        });
-        setTypingUsers(typing);
-      });
+    let cancelado = false;
+    let canalActual: ReturnType<typeof supabase.channel> | null = null;
+    let reintentoTimer: ReturnType<typeof setTimeout> | null = null;
+    let intentos = 0;
 
-    typingChannelRef.current = presenceChannel;
-    // Canal nuevo: se olvida lo último anunciado, si no el freno creería que ya
-    // avisó `true` en un canal que ya no existe y se quedaría mudo.
-    ultimoTypingRef.current = { valor: false, en: 0 };
-    presenceChannel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        void presenceChannel.track({ user_id: userId, typing: false });
+    const montar = () => {
+      if (cancelado) return;
+
+      const presenceChannel = supabase
+        .channel(`typing-${conversationId}`, {
+          config: { presence: { key: userId } },
+        })
+        .on("presence", { event: "sync" }, () => {
+          const state = presenceChannel.presenceState();
+          const typing: string[] = [];
+          Object.values(state).forEach((presences: any) => {
+            presences.forEach((pres: any) => {
+              if (pres.typing && pres.user_id !== userId) typing.push(pres.user_id);
+            });
+          });
+          setTypingUsers(typing);
+        });
+
+      canalActual = presenceChannel;
+      typingChannelRef.current = presenceChannel;
+      // Canal nuevo: se olvida lo último anunciado, si no el freno creería que ya
+      // avisó `true` en un canal que ya no existe y se quedaría mudo.
+      ultimoTypingRef.current = { valor: false, en: 0 };
+
+      presenceChannel.subscribe((status) => {
+        // Un canal que ya reemplazamos puede seguir avisando: no debe rearmar.
+        if (cancelado || canalActual !== presenceChannel) return;
+
+        if (status === "SUBSCRIBED") {
+          intentos = 0;
+          void presenceChannel.track({ user_id: userId, typing: false });
+          return;
+        }
+
+        if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setTypingUsers([]);
+          const espera = Math.min(1000 * 2 ** intentos, 30_000);
+          intentos += 1;
+          if (reintentoTimer) clearTimeout(reintentoTimer);
+          reintentoTimer = setTimeout(() => {
+            reintentoTimer = null;
+            void rearmar(presenceChannel);
+          }, espera);
+        }
+      });
+    };
+
+    const rearmar = async (viejo: ReturnType<typeof supabase.channel>) => {
+      if (cancelado || canalActual !== viejo) return;
+      canalActual = null;
+      if (typingChannelRef.current === viejo) typingChannelRef.current = null;
+      try {
+        await supabase.removeChannel(viejo);
+      } catch {
+        /* ya se estaba yendo */
       }
-    });
+      if (cancelado) return;
+      montar();
+    };
+
+    montar();
 
     return () => {
-      supabase.removeChannel(presenceChannel);
-      if (typingChannelRef.current === presenceChannel) {
-        typingChannelRef.current = null;
+      cancelado = true;
+      if (reintentoTimer) clearTimeout(reintentoTimer);
+      const ultimo = canalActual;
+      canalActual = null;
+      if (ultimo) {
+        supabase.removeChannel(ultimo);
+        if (typingChannelRef.current === ultimo) typingChannelRef.current = null;
       }
       setTypingUsers([]);
     };
@@ -1203,7 +1262,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     (isTyping: boolean) => {
       if (!conversationId || !user) return;
       const channel = typingChannelRef.current;
-      if (!channel) return;
+      // No alcanza con que el canal exista: uno `closed` acepta el track igual y
+      // devuelve "timed out" sin avisar. El efecto de arriba lo vuelve a unir.
+      if (!channel || channel.state !== "joined") return;
 
       const ahora = Date.now();
       const ultimo = ultimoTypingRef.current;
@@ -1211,10 +1272,22 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       const recien = ahora - ultimo.en < REFRESCO_TYPING_MS;
       if (sinCambio && (recien || !isTyping)) return;
 
+      const previo = ultimo;
       ultimoTypingRef.current = { valor: isTyping, en: ahora };
-      // Sin `await`: el ack de un `track` de presencia tarda —y a veces devuelve
-      // "timed out"— aunque el estado sí se haya aplicado.
-      void channel.track({ user_id: user.id, typing: isTyping }).catch(() => {});
+      // Si el track NO entró hay que deshacer la anotación. Si no, el freno cree
+      // que ya avisó y no lo vuelve a intentar: así se quedaba pegado en
+      // "escribiendo" para siempre del lado del otro.
+      const deshacerSiFalla = () => {
+        if (ultimoTypingRef.current.en === ahora) ultimoTypingRef.current = previo;
+      };
+      // Sin `await`: el ack de un `track` de presencia tarda, y bloquear acá
+      // trabaría el tecleo.
+      void channel
+        .track({ user_id: user.id, typing: isTyping })
+        .then((res) => {
+          if (res !== "ok") deshacerSiFalla();
+        })
+        .catch(deshacerSiFalla);
     },
     [conversationId, user]
   );
