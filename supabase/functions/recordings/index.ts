@@ -204,10 +204,20 @@ Deno.serve(async (req) => {
       } catch (e) {
         // Si LiveKit no arrancó el egress, la fila no puede quedar
         // aparentando una grabación en curso.
+        const crudo = (e as Error).message ?? "";
         await admin.from("meeting_recordings")
-          .update({ status: "failed", error: (e as Error).message?.slice(0, 300) })
+          .update({ status: "failed", error: crudo.slice(0, 300) })
           .eq("id", fila.id);
-        return json(req, { error: `no se pudo iniciar la grabación: ${(e as Error).message}` }, 502);
+        // 503 = "no egress available": el grabador ya está con OTRA sala. Con
+        // el techo de CPU actual solo cabe una grabación a la vez (05/09: las
+        // dos fallas de la semana fueron exactamente esto). Que la persona lo
+        // lea así y no como un error de red.
+        const ocupado = /503|no egress available|service unavailable/i.test(crudo);
+        return json(req, {
+          error: ocupado
+            ? "El grabador está ocupado con otra reunión. Solo puede grabar una a la vez; intenta cuando termine la otra."
+            : `No se pudo iniciar la grabación: ${crudo}`,
+        }, ocupado ? 409 : 502);
       }
     }
 

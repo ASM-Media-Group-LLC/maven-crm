@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useRecordings, RecordingRow } from "@/hooks/useRecordings";
+import { UserAvatar } from "@/components/UserAvatar";
+import { motivoDeFallo } from "@/lib/grabacionMotivoFallo";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +47,7 @@ const fechaCorta = (iso: string) =>
   new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function GrabacionesPage() {
-  const { rows, usage, myUserId, loading, download, view, remove } = useRecordings();
+  const { rows, grabadores, usage, myUserId, loading, download, view, remove } = useRecordings();
   const { isAdmin } = useUserRole();
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
@@ -156,6 +158,8 @@ export default function GrabacionesPage() {
             const dur = formatDur(r.duration_seconds);
             const mia = r.started_by === myUserId;
             const ocupado = trabajando === r.id;
+            const grabador = grabadores[r.started_by];
+            const nombreGrabador = mia ? "Tú" : (grabador?.full_name || "Alguien del equipo");
             return (
               <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                 <div className={cn(
@@ -195,6 +199,20 @@ export default function GrabacionesPage() {
                       </>
                     )}
                   </div>
+                  {/* Quién grabó, con su cara: pedido de Jhon (05/09) — la
+                      lista tenía fecha y peso, pero no decía de quién era. */}
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="grabo">
+                    <UserAvatar name={grabador?.full_name ?? nombreGrabador} src={grabador?.avatar_url} seed={grabador?.avatar_seed} size="xs" />
+                    <span className="truncate">
+                      {r.status === "recording" ? "Está grabando" : r.status === "failed" ? "Intentó grabar" : "Grabó"}{" "}
+                      <span className="font-medium text-foreground">{nombreGrabador}</span>
+                    </span>
+                  </div>
+                  {r.status === "failed" && (
+                    <p className="mt-1 text-xs leading-snug text-destructive/90" title={r.error ?? undefined}>
+                      {motivoDeFallo(r.error)}
+                    </p>
+                  )}
                 </div>
 
                 {r.status === "ready" && (
