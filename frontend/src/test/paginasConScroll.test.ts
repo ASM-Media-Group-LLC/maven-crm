@@ -33,11 +33,30 @@ const SON_LAYOUT = new Set(["HRLayout"]);
 
 /** Páginas que NO viven dentro del AppShell: la ventana scrollea sola. */
 const FUERA_DEL_SHELL = new Set([
-  "Portada", "Concepto", "Login", "NotFound", "ForgotPassword", "ResetPassword",
+  "Portada", "Privacidad", "Concepto", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
 ]);
 
-const tieneScroll = (src: string) => /overflow-y-auto|overflow-auto|overflow-y-scroll/.test(src);
+/** El scroll de un MODAL no es el scroll de la página.
+ *
+ *  ⚠️ Antes esto buscaba el overflow suelto en cualquier parte del archivo, y por
+ *  eso dejó pasar /chatters/horarios: la página no tenía contenedor de scroll,
+ *  pero el guard encontró el `overflow-y-auto` de un <DialogContent> dentro de
+ *  Equipo.tsx (a un salto de import) y la dio por cubierta. El test pasaba en
+ *  verde con el bug en vivo.
+ *
+ *  Se descarta por ETIQUETA, no por cercanía: borrar la etiqueta de apertura de
+ *  los contenedores de superposición deja fuera su className y nada más. Probé
+ *  antes con una ventana de 200 caracteres hacia atrás y daba falsos positivos
+ *  (HROrganigrama tiene su scroll, pero arriba hay un <SelectContent>).
+ *
+ *  Tampoco se pide `min-h-0` junto al overflow, aunque sea lo recomendado: media
+ *  base usa `flex-1 overflow-y-auto` sin él y funciona — exigirlo marcaba 75
+ *  páginas sanas. */
+const SIN_SUPERPOSICIONES = /<(?:Dialog|AlertDialog|Sheet|Drawer|Popover|DropdownMenu|ContextMenu|HoverCard|Command|Select)Content\b[^>]*>|<CommandList\b[^>]*>/g;
+
+const tieneScroll = (src: string) =>
+  /overflow-(?:y-)?auto|overflow-y-scroll/.test(src.replace(SIN_SUPERPOSICIONES, ""));
 
 /** Muchas páginas son una cáscara: el contenido (y el scroll) vive en un
  *  componente aparte. Se sigue el rastro de los imports locales —hasta dos
@@ -54,6 +73,11 @@ function cubreElScroll(ruta: string, saltos = 2, vistos = new Set<string>()): bo
   const carpeta = ruta.slice(0, ruta.lastIndexOf("/"));
   return [...src.matchAll(/from "((?:\.\/|@\/)[^"]+)"/g)]
     .map((m) => m[1])
+    // ⚠️ Los primitivos de shadcn NO cuentan: un <Tooltip>, un <Select> o un
+    // <Command> traen su propio scroll interno, y seguirlos daba por cubierta a
+    // cualquier página que importara uno. Así se coló ChatterRendimiento, que
+    // solo tiene overflow-x.
+    .filter((r) => !r.startsWith("@/components/ui/"))
     .some((r) => {
       const base = r.startsWith("@/") ? `/frontend/src/${r.slice(2)}` : `${carpeta}/${r.slice(2)}`;
       const limpio = base.replace(/\/\.\//g, "/");

@@ -277,7 +277,7 @@ export default function ChatterRendimiento() {
   }, [activos]);
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           {puedeVolver && (

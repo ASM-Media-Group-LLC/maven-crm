@@ -34,7 +34,8 @@ export const COLORES_ESTADO: Record<string, string> = {
   rosa: "bg-pink-400",
   morado: "bg-violet-500",
   azul: "bg-sky-500",
-  gris: "bg-slate-400",
+  // Nada de gris: se confundía con el puntito de "desconectado".
+  turquesa: "bg-teal-400",
 };
 
 const MAX_LEN = 64;

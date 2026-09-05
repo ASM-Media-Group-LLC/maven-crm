@@ -44,7 +44,9 @@ export default function HorariosPage() {
     .filter(([v]) => (v === "mia" ? puedeMia : esSupervisor));
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
+    // El AppShell recorta (h-dvh + overflow-hidden), así que el scroll lo pone
+    // la página. Sin esto la tabla crecía hacia abajo y no había forma de bajarla.
+    <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
       <div className="px-4 md:px-6 pt-4 md:pt-6 pb-8 space-y-4">
         <PageHeader
           title="Horarios"
