@@ -35,7 +35,8 @@ interface Props {
   showToolbar: boolean;
   disabled?: boolean;
   /** plain = texto completo; cursorPlain = offset del cursor EN texto plano (para @menciones). */
-  onUpdate: (plain: string, cursorPlain: number) => void;
+  /** `cambioDeTexto` distingue escribir de solo mover el cursor. */
+  onUpdate: (plain: string, cursorPlain: number, cambioDeTexto: boolean) => void;
   onEnter: () => void;
   onPasteFiles: (files: File[]) => void;
 }
@@ -134,15 +135,19 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
         return false;
       },
     },
+    // El tercer argumento dice si CAMBIÓ EL TEXTO o solo se movió el cursor.
+    // Las dos cosas hacen falta (las @menciones necesitan la posición del cursor
+    // aunque no se escriba), pero solo la primera es "estar escribiendo": sin
+    // distinguirlas, hacer clic en el cajón ya te anunciaba como escribiendo.
     onUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdateRef.current(plain, antes.length);
+      onUpdateRef.current(plain, antes.length, true);
     },
     onSelectionUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdateRef.current(plain, antes.length);
+      onUpdateRef.current(plain, antes.length, false);
     },
   }, [placeholder]);
 

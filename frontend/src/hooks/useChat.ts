@@ -1083,6 +1083,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       });
 
     typingChannelRef.current = presenceChannel;
+    // Canal nuevo: se olvida lo último anunciado, si no el freno creería que ya
+    // avisó `true` en un canal que ya no existe y se quedaría mudo.
+    ultimoTypingRef.current = { valor: false, en: 0 };
     presenceChannel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
         void presenceChannel.track({ user_id: userId, typing: false });
@@ -1196,14 +1199,41 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   );
   retryMessageRef.current = retryMessage;
 
+  // ⚠️⚠️ FRENO OBLIGATORIO. NO publicar presencia por cada cambio.
+  //
+  // Esto mandaba un `track()` POR CADA TECLA. Supabase corta al cliente que se
+  // pasa de mensajes de presencia y le corta EL SOCKET ENTERO —no solo este
+  // canal— y el aviso nunca llega al navegador: `ClientPresenceRateLimitReached`
+  // en los realtime_logs, ~110 por hora en la hora pico del 04/09. Por eso el
+  // "está escribiendo" andaba un momento y después se moría, y por eso el canal
+  // aparecía cerrado sin explicación. Mismo incidente que dejó ciego al tablero
+  // de Cowork en agosto.
+  //
+  // La presencia es CON ESTADO: una vez anunciado `typing:true` queda así hasta
+  // que se anuncie `false`. O sea que un tecleo entero necesita exactamente DOS
+  // mensajes, no uno por letra. Solo se publica cuando el valor CAMBIA.
+  //
+  // El refresco cada 8s es la única concesión: si un `track` se perdiera, el
+  // otro lado se quedaría viendo "escribiendo" para siempre (o nada). Es como
+  // mucho un mensaje cada 8 segundos, muy por debajo de cualquier límite.
+  const ultimoTypingRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
+  const REFRESCO_TYPING_MS = 8000;
+
   const sendTyping = useCallback(
     (isTyping: boolean) => {
       if (!conversationId || !user) return;
       const channel = typingChannelRef.current;
       if (!channel) return;
+
+      const ahora = Date.now();
+      const ultimo = ultimoTypingRef.current;
+      const sinCambio = ultimo.valor === isTyping;
+      const recien = ahora - ultimo.en < REFRESCO_TYPING_MS;
+      if (sinCambio && (recien || !isTyping)) return;
+
+      ultimoTypingRef.current = { valor: isTyping, en: ahora };
       // Sin `await`: el ack de un `track` de presencia tarda —y a veces devuelve
-      // "timed out"— aunque el estado sí se haya aplicado. Esperarlo solo servía
-      // para encadenar esperas en cada tecla. Se dispara y se olvida.
+      // "timed out"— aunque el estado sí se haya aplicado.
       void channel.track({ user_id: user.id, typing: isTyping }).catch(() => {});
     },
     [conversationId, user]

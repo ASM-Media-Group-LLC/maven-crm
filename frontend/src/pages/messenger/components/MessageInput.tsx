@@ -241,9 +241,12 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
   // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
   // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
-  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number) => {
+  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number, cambioDeTexto = true) => {
     setText(plain);
     setCursorPosition(cursorPlain);
+    // Mover el cursor NO es escribir: sin esta guarda, hacer clic en el cajón ya
+    // le anunciaba "está escribiendo" a la otra persona.
+    if (!cambioDeTexto) return;
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
