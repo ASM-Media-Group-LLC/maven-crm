@@ -344,7 +344,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             {pendingFiles.map((pf, i) => (
               <div key={i} className="relative shrink-0 group/file">
                 {pf.preview ? (
-                  <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-2xl" />
+                  <img src={pf.preview} alt={pf.file.name} decoding="async" className="h-16 w-16 object-cover rounded-2xl" />
                 ) : (
                   <div className="h-16 w-16 rounded-2xl bg-primary/5 flex flex-col items-center justify-center gap-1">
                     <FileText className="h-5 w-5 text-muted-foreground" />

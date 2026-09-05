@@ -120,7 +120,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
              eliminado, mismo criterio que Chatter Evaluator. */
           <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-rose-500/10 border border-rose-500/25">
             {deletedArchive.type === "image" && deletedArchive.file_url ? (
-              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} className="rounded-lg max-w-full max-h-48 object-cover" />
+              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : deletedArchive.file_url ? (
               <a href={deletedArchive.file_url} target="_blank" rel="noopener noreferrer" className="text-xs underline break-all">
                 {deletedArchive.file_name || "Archivo"}
@@ -219,6 +219,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           <img
             src={message.file_url!}
             alt={message.file_name || "image"}
+            decoding="async"
             className="rounded-2xl max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(message.file_url!, "image")}
           />
@@ -264,6 +265,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 <img
                   src={img.file_url!}
                   alt={img.file_name || "image"}
+                  decoding="async"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
                 />
                 {isLast && (
@@ -295,6 +297,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         <img
           src={message.file_url!}
           alt="GIF"
+          decoding="async"
           className="rounded-2xl max-w-full max-h-52 object-contain cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => openLightbox(message.file_url!, "image")}
         />

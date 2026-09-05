@@ -219,6 +219,7 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
         <img
           src={src}
           alt={alt || ""}
+          decoding="async"
           className={`max-w-[90vw] max-h-[90vh] object-contain select-none ${mediaTransition}`}
           style={{
             transform: `scale(${scale}) rotate(${rotation}deg) translate(${position.x / scale}px, ${position.y / scale}px)`,

@@ -261,7 +261,7 @@ export default function ThreadPanel({
         return (
           <div className="rounded-lg px-2 py-1.5 bg-rose-500/10 border border-rose-500/25">
             {arch.type === "image" && arch.file_url ? (
-              <img src={arch.file_url} alt={arch.file_name || "imagen"} className="rounded-lg max-w-full max-h-48 object-cover" />
+              <img src={arch.file_url} alt={arch.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : arch.file_url ? (
               <a href={safeFileUrl(arch.file_url)} target="_blank" rel="noopener noreferrer" className="text-[12px] underline break-all">
                 {arch.file_name || "Archivo"}
@@ -281,6 +281,7 @@ export default function ThreadPanel({
           <img
             src={msg.file_url!}
             alt={msg.file_name || "image"}
+            decoding="async"
             className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(msg.file_url!, "image")}
           />
@@ -518,7 +519,7 @@ export default function ThreadPanel({
             {pendingFiles.map((pf, i) => (
               <div key={`${pf.file.name}-${i}`} className="relative">
                 {pf.preview ? (
-                  <img src={pf.preview} alt={pf.file.name} className="h-14 w-14 rounded-lg object-cover border border-border" />
+                  <img src={pf.preview} alt={pf.file.name} decoding="async" className="h-14 w-14 rounded-lg object-cover border border-border" />
                 ) : (
                   <div className="h-14 w-[124px] rounded-lg border border-border bg-muted/40 flex items-center gap-1.5 px-2">
                     <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />

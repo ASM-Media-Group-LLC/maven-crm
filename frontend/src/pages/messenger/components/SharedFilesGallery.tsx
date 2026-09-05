@@ -209,7 +209,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
                         rel="noopener noreferrer"
                         className="aspect-square rounded-lg overflow-hidden bg-muted hover:opacity-80 transition-opacity"
                       >
-                        <img src={img.file_url || ""} alt={img.file_name || ""} className="w-full h-full object-cover" />
+                        <img src={img.file_url || ""} alt={img.file_name || ""} decoding="async" loading="lazy" className="w-full h-full object-cover" />
                       </a>
                     ))}
                   </div>
