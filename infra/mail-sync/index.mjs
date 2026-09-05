@@ -49,6 +49,14 @@ const HOT_FOLDERS = (process.env.HOT_FOLDERS || "INBOX,Notification")
 const STARTUP_STAGGER_MS = Number(process.env.STARTUP_STAGGER_MS || 6_000);
 // Cada cuánto se relee mail_credentials (altas/bajas de casillas).
 const CREDS_REFRESH_MS = Number(process.env.CREDS_REFRESH_MS || 300_000);
+// Piso de reconciliación por carpeta. El barrido normal solo ESCRIBE en
+// Postgres cuando algo cambió de verdad; este piso es la red de seguridad para
+// el caso raro en que el estado local y el del proveedor se desalineen (por
+// ejemplo si el mark_seen del front, que es fire-and-forget, no llegó a IMAP).
+// Antes esta reconciliación corría en CADA barrido: 5,6 peticiones por carpeta
+// aunque no hubiera pasado nada, y el 99,92% de los barridos no trae correo
+// (medido 04/09 sobre edge_logs: 163 correos guardados, 1.213.688 peticiones).
+const RECONCILIAR_MS = Number(process.env.RECONCILIAR_MS || 900_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
 const PER_FOLDER_INIT = Number(process.env.PER_FOLDER_INIT || 50);
 // Techo del cuerpo guardado. Un correo de 5 MB de HTML no aporta nada.
@@ -125,6 +133,14 @@ class CuentaSync {
     // Corta la espera del IDLE en cuanto el servidor avisa correo nuevo
     // (lo setea el handler "exists"; lo consume el ciclo). Ver más abajo.
     this.despertar = null;
+    // clave de carpeta → { uidvalidity, last_uid }. Se llena de una sola vez
+    // por barrido (cargarEstado) en vez de un SELECT por carpeta.
+    this.estadoCarpetas = new Map();
+    // clave → huella de las banderas del último barrido, para no reescribir
+    // en Postgres cuando nadie leyó ni llegó nada.
+    this.firmaBanderas = new Map();
+    // clave → cuándo se reconcilió por última vez (piso RECONCILIAR_MS).
+    this.ultimaReconciliacion = new Map();
   }
 
   log(...args) {
@@ -248,8 +264,25 @@ class CuentaSync {
     }
   }
 
+  /** UNA lectura de mail_sync_state para TODAS las carpetas de la casilla.
+   *  Antes cada carpeta hacía su propio SELECT (215.342 peticiones en 24 h)
+   *  para leer una fila que este worker es el único que escribe. */
+  async cargarEstado() {
+    const { data } = await db
+      .from("mail_sync_state")
+      .select("folder, uidvalidity, last_uid")
+      .eq("user_id", this.cred.user_id);
+    this.estadoCarpetas = new Map(
+      (data ?? []).map((r) => [
+        r.folder,
+        { uidvalidity: Number(r.uidvalidity), last_uid: Number(r.last_uid) },
+      ]),
+    );
+  }
+
   async barrerTodo() {
     this.estado = "barriendo";
+    await this.cargarEstado();
     const buzones = await this.client.list();
     // Se recuerda clave→path de las carpetas seleccionables para que el barrido
     // caliente abra por el path real del servidor (INBOX puede venir localizado).
@@ -271,6 +304,7 @@ class CuentaSync {
    *  pedir una carpeta inexistente tiraría todo el ciclo a backoff. */
   async barrerCalientes() {
     if (!this.carpetas) return; // aún no corrió el barrido completo
+    await this.cargarEstado();
     for (const clave of HOT_FOLDERS) {
       if (this.detenida) return;
       const path = this.carpetas.get(clave);
@@ -287,17 +321,14 @@ class CuentaSync {
       const uidNext = Number(mb.uidNext ?? 1);
       const exists = mb.exists ?? 0;
 
-      const { data: st } = await db
-        .from("mail_sync_state")
-        .select("uidvalidity, last_uid")
-        .eq("user_id", this.cred.user_id)
-        .eq("folder", clave)
-        .maybeSingle();
+      const st = this.estadoCarpetas?.get(clave) ?? null;
 
       let desdeUid = 0;
+      let renacio = false;
       if (st && Number(st.uidvalidity) === uidValidity) {
         desdeUid = Number(st.last_uid);
       } else if (st) {
+        renacio = true;
         // La carpeta "renació" (uidvalidity cambió): los UID viejos ya no
         // significan nada. Se tira lo cacheado de esa generación y se
         // resincroniza — es el contrato de IMAP, no una rareza nuestra.
@@ -310,6 +341,7 @@ class CuentaSync {
       }
 
       let maxUid = desdeUid;
+      let nuevos = 0;
 
       if (exists > 0 && uidNext - 1 > desdeUid) {
         // Primera vez: solo los últimos N (nadie necesita el 2019 entero
@@ -327,21 +359,41 @@ class CuentaSync {
           const uid = Number(msg.uid);
           if (uid <= desdeUid) continue; // '*' puede devolver el último igual
           await this.guardarMensaje(clave, uidValidity, uid, msg);
+          nuevos++;
           if (uid > maxUid) maxUid = uid;
         }
       }
 
       // Banderas de lo reciente: si alguien leyó desde otro lado (o el
       // propio mark_seen), el punto azul de la caché tiene que apagarse.
-      await this.refrescarBanderas(clave, uidValidity, exists);
+      const tocaReconciliar =
+        Date.now() - (this.ultimaReconciliacion.get(clave) ?? 0) >= RECONCILIAR_MS;
+      const cambiaronBanderas = await this.refrescarBanderas(
+        clave,
+        uidValidity,
+        exists,
+        tocaReconciliar,
+      );
+      const huboCambio = nuevos > 0 || cambiaronBanderas || renacio;
 
-      await db.from("mail_sync_state").upsert({
-        user_id: this.cred.user_id,
-        folder: clave,
-        uidvalidity: uidValidity,
-        last_uid: maxUid,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id,folder" });
+      // Nada nuevo, nada que reconciliar → no hay nada que escribir. Este
+      // return es el que ahorra el grueso del tráfico: el conteo, el upsert de
+      // mail_folders y el de mail_sync_state corrían en CADA barrido de CADA
+      // carpeta aunque el buzón estuviera idéntico.
+      if (!huboCambio && !tocaReconciliar) return;
+
+      if (maxUid !== desdeUid || renacio) {
+        await db.from("mail_sync_state").upsert({
+          user_id: this.cred.user_id,
+          folder: clave,
+          uidvalidity: uidValidity,
+          last_uid: maxUid,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id,folder" });
+        // La copia en memoria queda al día para el próximo barrido y para el
+        // camino de push, que sincroniza INBOX sin releer el estado.
+        this.estadoCarpetas.set(clave, { uidvalidity: uidValidity, last_uid: maxUid });
+      }
 
       // Los conteos salen de la CACHÉ, no del STATUS del servidor: el
       // servidor cuenta también los avisos ocultos y el badge mentiría.
@@ -358,13 +410,19 @@ class CuentaSync {
         unread: unread ?? 0,
         synced_at: new Date().toISOString(),
       }, { onConflict: "user_id,folder" });
+      this.ultimaReconciliacion.set(clave, Date.now());
     } finally {
       lock.release();
     }
   }
 
-  async refrescarBanderas(clave, uidValidity, exists) {
-    if (exists === 0) return;
+  /** Devuelve si escribió algo. La LECTURA por IMAP se hace siempre (es la
+   *  única forma de enterarse de que alguien leyó desde otro cliente); lo que
+   *  se evita es escribir en Postgres cuando las banderas quedaron idénticas a
+   *  las del barrido anterior. `forzar` salta esa comparación: es el piso de
+   *  reconciliación, por si una escritura anterior se perdió. */
+  async refrescarBanderas(clave, uidValidity, exists, forzar = false) {
+    if (exists === 0) return false;
     const desde = Math.max(1, exists - PER_FOLDER_INIT + 1);
     const vistos = [];
     const noVistos = [];
@@ -372,6 +430,9 @@ class CuentaSync {
       const uid = Number(msg.uid);
       (msg.flags?.has("\\Seen") ? vistos : noVistos).push(uid);
     }
+    const firma = `${uidValidity}|${vistos.join(",")}|${noVistos.join(",")}`;
+    if (!forzar && this.firmaBanderas.get(clave) === firma) return false;
+    this.firmaBanderas.set(clave, firma);
     if (vistos.length) {
       await db.from("mail_messages")
         .update({ unread: false })
@@ -390,6 +451,7 @@ class CuentaSync {
         .in("uid", noVistos)
         .eq("unread", false);
     }
+    return true;
   }
 
   async guardarMensaje(clave, uidValidity, uid, msg) {
