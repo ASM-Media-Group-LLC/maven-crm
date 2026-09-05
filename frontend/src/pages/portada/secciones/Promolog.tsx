@@ -62,13 +62,12 @@ const HISTORIAS = [
   { ok: true, verdicto: "Menciona la plataforma y deja el enlace fijado arriba." },
 ];
 
+// Tres + "arma el ranking solo". El calendario del mes, la evidencia y el Sí/No a mano
+// están DIBUJADOS en la maqueta de arriba; repetirlos en texto alargaba sin sumar.
 const PORQUES = [
   ["Lo lee un agente, no una planilla", "Cada historia se revisa sola: si hay enlace, mención o llamado a la acción, queda marcada como promoción — y si no, también, con el motivo escrito."],
   ["El dinero al lado de la publicación", "Lo que entró el día de la promoción y los días de alrededor, en la misma ficha. Ahí se ve si la publicación movió algo o solo llenó una casilla."],
-  ["El mes completo de un vistazo", "Quién publicó cada día, los mejores días del mes y el porcentaje de calidad — sin abrir una cuenta por una."],
-  ["La evidencia queda guardada", "La captura de cada historia se archiva con su veredicto. Seis meses después se puede mostrar por qué se dijo que sí o que no."],
   ["Si alguien deja de publicar, alguien se entera", "El responsable recibe el aviso el mismo día, sin que nadie tenga que ir a revisar cuenta por cuenta."],
-  ["Y se puede corregir a mano", "Si el agente se equivocó, una persona dice sí o no y queda registrado quién lo cambió."],
 ] as const;
 
 const color = (pct: number) => (pct >= 65 ? "var(--verde)" : pct >= 30 ? "var(--ambar)" : "var(--rosa)");

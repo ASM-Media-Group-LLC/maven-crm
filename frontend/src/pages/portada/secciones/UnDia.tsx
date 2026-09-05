@@ -7,6 +7,8 @@ import { GENTE, Cara } from "../gente";
 // secuencia real, hay que sacarle las horas — numerar por numerar es la clase
 // de decoración que se nota.
 
+// Cinco paradas, no ocho: 11:00 se pisaba con 09:15 y 17:00 con la nota de las 19:00, y la
+// limpieza de las 02:00 es mantenimiento. Con ocho la sección medía 1.850px sola.
 const TRAMOS = [
   {
     hora: "07:00",
@@ -21,23 +23,11 @@ const TRAMOS = [
     quien: "Seguimiento automático",
   },
   {
-    hora: "11:00",
-    titulo: "Cortes por franja",
-    texto: "Un supervisor virtual pide avances, registra quién respondió y arma el pulso del día para la dirección, sin que nadie tenga que perseguir a nadie.",
-    quien: "Supervisión conversacional",
-  },
-  {
     hora: "14:30",
     titulo: "Oficina virtual",
     texto: "El equipo entra a las salas. Un detector avisa si alguien quedó fuera de cámara, la cancelación de ruido limpia el audio y el supervisor ve todas las salas a la vez.",
     quien: "Cowork · servidor propio",
     caras: true,
-  },
-  {
-    hora: "17:00",
-    titulo: "Resumen a cada responsable",
-    texto: "Cada líder recibe cómo viene su equipo: qué se cumplió, qué no, y dónde hay algo detenido hace demasiado.",
-    quien: "Resumen por rol",
   },
   {
     hora: "19:00",
@@ -50,12 +40,6 @@ const TRAMOS = [
     titulo: "Conciliación de los números",
     texto: "Los puentes con las plataformas externas traen los datos del día y los reparten por responsable y por equipo. A la mañana cada uno abre su tablero y ya está todo.",
     quien: "Integraciones",
-  },
-  {
-    hora: "02:00",
-    titulo: "Retención y limpieza",
-    texto: "Las grabaciones vencidas se borran, los archivos huérfanos se recogen y el almacenamiento se mantiene acotado sin que nadie lo administre.",
-    quien: "Procesos programados",
   },
 ] as const;
 

@@ -71,8 +71,9 @@ export default function Privacidad() {
             <h3>Tus derechos</h3>
             <p>
               Puedes pedirnos en cualquier momento ver, corregir o borrar lo que tenemos tuyo.
-              Respóndele al correo con el que te contestamos y lo resolvemos en el acto. Si nunca
-              te escribimos, usa el mismo formulario de la portada y dinos qué necesitas.
+              Escríbenos a{" "}
+              <a href="mailto:jhon.lopez@maven-ai.me">jhon.lopez@maven-ai.me</a> y lo resolvemos
+              en el acto.
             </p>
 
             <h3>Cookies y rastreo</h3>
@@ -80,6 +81,13 @@ export default function Privacidad() {
               La portada no usa cookies de seguimiento ni herramientas de analítica de terceros. Lo
               único que se guarda en tu navegador es lo necesario para que la sesión de Maven
               funcione una vez que entras con tu cuenta.
+            </p>
+
+            <h3>Quién responde por esto</h3>
+            <p>
+              Maven, a través de{" "}
+              <a href="mailto:jhon.lopez@maven-ai.me">jhon.lopez@maven-ai.me</a>. Es la misma
+              persona que te contesta la demo.
             </p>
 
             <p className="legal-fecha">Última actualización: septiembre de 2026.</p>
@@ -95,6 +103,7 @@ export default function Privacidad() {
           <nav className="foot-links" aria-label="Enlaces del pie">
             <Link to="/">Portada</Link>
             <Link to="/login">Entrar</Link>
+            <a href="mailto:jhon.lopez@maven-ai.me">Contacto</a>
           </nav>
         </div>
       </footer>

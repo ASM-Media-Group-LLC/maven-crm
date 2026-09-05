@@ -386,6 +386,7 @@
   .pt .legal { max-width: 68ch; margin-top: 40px; }
   .pt .legal h3 { font-size: 17px; margin: 30px 0 8px; }
   .pt .legal p { margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--ink-soft); }
+  .pt .legal a { color: var(--azul-claro); text-decoration: underline; text-underline-offset: 3px; }
   .pt .legal-fecha { margin-top: 36px !important; font-size: 13px !important; color: var(--faint) !important; }
 
 

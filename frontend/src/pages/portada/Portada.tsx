@@ -181,6 +181,7 @@ export default function Portada() {
             <Link to="/login">Entrar</Link>
             <a href="#demo">Pedir una demo</a>
             <Link to="/privacidad">Privacidad</Link>
+            <a href="mailto:jhon.lopez@maven-ai.me">Contacto</a>
           </nav>
           <div className="foot-legal">
             <span>© {new Date().getFullYear()} Maven · Todos los derechos reservados</span>

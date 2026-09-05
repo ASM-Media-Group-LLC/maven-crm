@@ -27,11 +27,11 @@ const GRACIAS = [
   { Icono: MessageSquareQuote, clase: "", texto: "Modo solo lectura" },
 ];
 
+// Cuatro, no más: lo que ya se VE en la maqueta (hilos, álbum, reacciones) no se repite en texto.
 const PORQUES = [
   ["El visto no miente", "Un tilde es enviado, dos es leído — y la presencia se pone en ausente cuando dejas la pestaña, en lugar de mostrarte disponible mientras almuerzas."],
   ["Los borradores sobreviven", "Escribes medio mensaje, te llaman, cambias de conversación y vuelves: sigue ahí. Cada conversación guarda el suyo."],
   ["Grupos con candado", "Quién puede escribir, quién puede agregar gente y quién puede editar el grupo se define por separado. Como en un grupo de trabajo de verdad."],
-  ["Hilos, álbumes y reacciones", "Diez fotos entran como un álbum, no como diez mensajes. Y una discusión larga se responde en un hilo, sin tapar el canal."],
   ["Nada se borra sin dejar rastro", "Un mensaje eliminado desaparece para el equipo, pero un administrador puede ver qué decía. En un chat de trabajo eso no es opcional."],
 ] as const;
 

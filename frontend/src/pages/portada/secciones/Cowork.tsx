@@ -30,13 +30,12 @@ const SALAS: Sala[] = [
   { n: "TARDE 3", gente: 0, codigo: "MEXS5Y" },
 ];
 
+// Tres + "la llamada te sigue". Lo que la maqueta ya muestra (pantallas en vivo) o que ya
+// dijeron las cifras y el mapa de módulos (sin instalar nada, grabaciones) no vuelve acá.
 const PORQUES = [
   ["Escuchar sin entrar", "Se oye lo que pasa en una sala sin abrir la puerta, y se habla a una o a todas con un botón. El equipo no siente que alguien se metió."],
   ["Cada sala con su código", "Se comparte un código y la persona entra directo, sin invitaciones ni calendarios. Las salas se crean y se cierran en el momento."],
-  ["Se ve quién comparte pantalla", "El tablero lista las pantallas en vivo y de qué sala son. Mirar el trabajo de alguien no requiere pedirle que lo muestre otra vez."],
   ["El chat va encima", "Desde el mismo tablero se busca a alguien y se le escribe en una ventanita, sin salir de la sesión ni abrir otra pestaña."],
-  ["Todo en el navegador", "Cancelación de ruido, fondos virtuales y aviso de encuadre, sin instalar nada y sin pagar asientos de otra herramienta."],
-  ["Queda grabado si hace falta", "Con retención automática: las grabaciones se borran solas al vencer el plazo, sin que nadie tenga que acordarse."],
 ] as const;
 
 function TarjetaSala({ s }: { s: Sala }) {

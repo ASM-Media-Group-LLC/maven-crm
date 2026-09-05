@@ -33,11 +33,11 @@ const SESIONES = [
   { seed: "sofia", nombre: "Candidata 4", pie: "sin empezar" },
 ] as const;
 
+// Cuatro. El historial se ve en la lista de sesiones de la maqueta ("7 d · apta").
 const PORQUES = [
   ["Se prueba antes de contratar", "El candidato atiende un chat que se comporta como el real, con objeciones, cambios de tema y pedidos fuera de límite. Lo que hace ahí es lo que va a hacer con un cliente."],
   ["La rúbrica la defines tú", "Los criterios son tuyos y se editan. La evaluación sale como aprobado, a criterio o no apto, con la cita textual de dónde se ganó o se perdió cada punto."],
   ["Sin tocar una cuenta real", "Todo pasa contra un perfil ficticio y un catálogo de prueba. Nadie le entrega una cuenta que factura a alguien que todavía no demostró nada."],
-  ["El historial queda", "Cada sesión se guarda con su conversación y su evaluación. Seis meses después se puede ver por qué se contrató a alguien, y comparar candidatos con la misma vara."],
   ["También sirve para entrenar", "El mismo simulador se usa con el equipo que ya está adentro: se practica una objeción difícil sin arriesgar una venta de verdad."],
 ] as const;
 
