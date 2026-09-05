@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { publicarTecleo } from "@/hooks/useTypingInbox";
+import {
+  publicarTecleo,
+  publicarTecleoEnConversacion,
+  topicTecleoConversacion,
+  TTL_TECLEO_MS,
+} from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ChatConversation,
@@ -773,8 +778,8 @@ export function useMessages(
   onNewMessage?: (msg: ChatMessage) => void,
   /** A quién avisarle del tecleo para que se vea en la LISTA (sidebar y
    *  nubecita). Solo conversaciones directas: en grupos se pasa [] — ver
-   *  useTypingInbox. El chat abierto y la ventanita no lo usan, van por
-   *  presencia. */
+   *  useTypingInbox. El chat abierto y la ventanita NO lo usan: van por
+   *  `typing-conv-<id>`, que con un solo aviso llega a todos los miembros. */
   destinatariosDelTecleo?: string[],
 ) {
   const { user } = useAuth();
@@ -784,7 +789,6 @@ export function useMessages(
   const [loadingMore, setLoadingMore] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
-  const typingChannelRef = useRef<any>(null);
   const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
   const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
@@ -1041,120 +1045,121 @@ export function useMessages(
     };
   }, [conversationId, user?.id, messagesRealtimeVersion]);
 
-  // ── Indicador "está escribiendo" — canal de presencia SEPARADO ──────────
+  // UN freno para las dos rutas. A 3s son 0,33 avisos/s por persona: lejísimos
+  // del uno-por-tecla que cortó el socket en #1605.
   //
-  // ⚠️ Vive en su PROPIO efecto, con deps [conversationId, user?.id] y NADA
-  // más. Antes compartía el efecto de los mensajes, que se remonta cada vez que
-  // `messagesRealtimeVersion` cambia (una reconexión de red, por ejemplo). En
-  // cada remonte el canal se borraba y se recreaba con EL MISMO topic
-  // (`typing-<conv>`, sin versión, a diferencia de `messages-<conv>-<n>`), y
-  // supabase-js dedupea por topic: la recreación colisionaba con el que se
-  // estaba yendo y el nuevo entraba en un ciclo join→ok→close. Medido en los
-  // frames del websocket. Desde su propio efecto se monta UNA vez por
-  // conversación y se queda unido.
-  // ⚠️ Y SE VUELVE A UNIR SOLO. Un canal de presencia se puede quedar `closed`
-  // sin que el navegador se entere: pasa cada vez que el servidor corta el
-  // socket por límite de presencia (`ClientPresenceRateLimitReached`, todavía
-  // ~50/hora mientras el equipo termina de tomar el bundle con el freno).
-  // Medido en prod el 05/09: el canal en estado "closed", `track()` devolviendo
-  // "timed out", el `.catch()` tragándoselo, y `presenceState()` sirviendo
-  // caché vieja. Para el usuario: el "escribiendo" andaba en el primer mensaje
-  // y ya nunca más, hasta cambiar de chat o recargar.
+  // A diferencia del freno de presencia que había antes, este casi no puede
+  // hacer daño si se desincroniza: al no refrescar, el aviso caduca solo por el
+  // TTL del receptor. El efecto de abajo lo reinicia en cada conversación.
+  const REFRESCO_TYPING_MS = 3000;
+  const ultimoAvisoRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
+
+  // ── Indicador "está escribiendo" — BROADCAST, no presencia ───────────────
   //
-  // Al rearmar hay que ESPERAR el removeChannel antes de crear el nuevo: el
-  // topic es el mismo (`typing-<conv>`) y supabase-js dedupea por topic, así
-  // que recrear encima del que se está yendo mete el ciclo join→ok→close que
-  // ya nos comimos en #1603.
+  // Esto era un canal de PRESENCIA (`typing-<conv>`) y fue el origen de cuatro
+  // incidentes seguidos: #1603 (recrear el mismo topic mientras el viejo se
+  // iba), #1605 (una publicación por tecla → Supabase corta el SOCKET ENTERO),
+  // #1611 (el canal quedaba `closed` sin avisar) y #1613 (el freno se
+  // desincronizaba en cada rejoin). Y aun con todo eso arreglado, en prod
+  // seguía llegando tarde o directamente no llegando.
+  //
+  // Lo que lo decidió fue una comparación limpia: cuando la LISTA pasó a
+  // broadcast (#1614) empezó a funcionar perfecto, mientras la cabecera
+  // —misma pantalla, misma red, misma conversación— seguía fallando. Así que
+  // la presencia se va y queda un solo mecanismo.
+  //
+  // Con broadcast NO hay estado de cliente que mantener sincronizado: ni
+  // `track()`, ni `presenceState()`, ni un freno que pueda mentir. Llega el
+  // aviso y caduca por TTL.
+  //
+  // ⚠️ Aun así hace falta rearmar, y por una razón que NO es la de #1611:
+  // `closed` es TERMINAL en realtime-js. Su `_onClose` hace `rejoinTimer.reset()`,
+  // deja `state='closed'` y saca el canal de `socket.channels`; y `_onError`
+  // retorna temprano si `_isClosed()`. O sea que NADIE lo vuelve a unir, ni
+  // siquiera cuando el socket reconecta (el rejoin automático cubre `errored`,
+  // no `closed`). Y sin pasar callback a `subscribe()` ni nos enteraríamos: los
+  // handlers que traducen a CLOSED se registran DENTRO de subscribe y solo si
+  // hay callback.
+  //
+  // Rearmar acá sí es seguro, a diferencia de lo que costó #1603: ya no hay
+  // estado de cliente que reconciliar, y como `_onClose` YA sacó el canal del
+  // array, el `supabase.channel(mismo topic)` del remonte devuelve un objeto
+  // NUEVO — no el zombi en `leaving` que envenenaba el topic.
+  const [versionTecleo, setVersionTecleo] = useState(0);
+
   useEffect(() => {
     const userId = user?.id;
     if (!conversationId || !userId) return;
 
+    // Conversación nueva: el freno arranca limpio. Sin esto, cambiar de chat
+    // antes de 3s se traga el primer aviso del chat nuevo — justo el síntoma de
+    // #1613, y ahora en las dos rutas a la vez porque el freno es compartido.
+    ultimoAvisoRef.current = { valor: false, en: 0 };
+
     let cancelado = false;
-    let canalActual: ReturnType<typeof supabase.channel> | null = null;
-    let reintentoTimer: ReturnType<typeof setTimeout> | null = null;
-    let intentos = 0;
+    let reintento: ReturnType<typeof setTimeout> | null = null;
+    const vencimientos = new Map<string, ReturnType<typeof setTimeout>>();
 
-    const montar = () => {
-      if (cancelado) return;
+    const quitar = (quien: string) => {
+      setTypingUsers((prev) => (prev.includes(quien) ? prev.filter((u) => u !== quien) : prev));
+    };
 
-      const presenceChannel = supabase
-        .channel(`typing-${conversationId}`, {
-          config: { presence: { key: userId } },
-        })
-        .on("presence", { event: "sync" }, () => {
-          const state = presenceChannel.presenceState();
-          const typing: string[] = [];
-          Object.values(state).forEach((presences: any) => {
-            presences.forEach((pres: any) => {
-              if (pres.typing && pres.user_id !== userId) typing.push(pres.user_id);
-            });
-          });
-          setTypingUsers(typing);
-        });
+    const canal = supabase
+      .channel(topicTecleoConversacion(conversationId))
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const quien = (payload as { u?: string } | undefined)?.u;
+        const escribiendo = (payload as { t?: boolean } | undefined)?.t;
+        if (!quien || quien === userId) return;
 
-      canalActual = presenceChannel;
-      typingChannelRef.current = presenceChannel;
-      // Canal nuevo: no hay nada anunciado ni nada que anunciar.
-      typingDeseadoRef.current = false;
-      typingPublicadoRef.current = { valor: false, en: 0 };
-      ultimoBuzonRef.current = { valor: false, en: 0 };
+        const anterior = vencimientos.get(quien);
+        if (anterior) clearTimeout(anterior);
+        vencimientos.delete(quien);
 
-      presenceChannel.subscribe((status) => {
-        // Un canal que ya reemplazamos puede seguir avisando: no debe rearmar.
-        if (cancelado || canalActual !== presenceChannel) return;
-
-        if (status === "SUBSCRIBED") {
-          intentos = 0;
-          // Un canal recién unido no tiene presencia nuestra, así que lo
-          // publicado se da por perdido y se vuelve a anunciar lo DESEADO. Si
-          // el rejoin fue un parpadeo de red mientras alguien escribía, el
-          // indicador sobrevive en vez de apagarse; y el freno queda contando
-          // desde lo que de verdad se publicó.
-          typingPublicadoRef.current = { valor: false, en: 0 };
-          conciliarTypingRef.current();
+        if (!escribiendo) {
+          quitar(quien);
           return;
         }
 
-        if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setTypingUsers([]);
-          const espera = Math.min(1000 * 2 ** intentos, 30_000);
-          intentos += 1;
-          if (reintentoTimer) clearTimeout(reintentoTimer);
-          reintentoTimer = setTimeout(() => {
-            reintentoTimer = null;
-            void rearmar(presenceChannel);
-          }, espera);
-        }
+        setTypingUsers((prev) => (prev.includes(quien) ? prev : [...prev, quien]));
+        vencimientos.set(
+          quien,
+          setTimeout(() => {
+            vencimientos.delete(quien);
+            quitar(quien);
+          }, TTL_TECLEO_MS),
+        );
       });
-    };
 
-    const rearmar = async (viejo: ReturnType<typeof supabase.channel>) => {
-      if (cancelado || canalActual !== viejo) return;
-      canalActual = null;
-      if (typingChannelRef.current === viejo) typingChannelRef.current = null;
-      try {
-        await supabase.removeChannel(viejo);
-      } catch {
-        /* ya se estaba yendo */
-      }
+    canal.subscribe((status) => {
       if (cancelado) return;
-      montar();
-    };
-
-    montar();
+      if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setTypingUsers([]);
+        if (reintento) clearTimeout(reintento);
+        reintento = setTimeout(() => {
+          reintento = null;
+          setVersionTecleo((v) => v + 1);
+        }, 1000);
+      }
+    });
 
     return () => {
       cancelado = true;
-      if (reintentoTimer) clearTimeout(reintentoTimer);
-      const ultimo = canalActual;
-      canalActual = null;
-      if (ultimo) {
-        supabase.removeChannel(ultimo);
-        if (typingChannelRef.current === ultimo) typingChannelRef.current = null;
+      if (reintento) clearTimeout(reintento);
+      vencimientos.forEach((t) => clearTimeout(t));
+      vencimientos.clear();
+      // Si me estaba anunciando como "escribiendo", avisar que ya NO antes de
+      // soltar el canal. Si no, del otro lado quedo pegado hasta que venza el
+      // TTL. (El caso que no cubre nadie es la pestaña que muere de golpe: ahí
+      // el TTL es la única red, y son 5s como mucho.)
+      if (ultimoAvisoRef.current.valor) {
+        publicarTecleoEnConversacion(conversationId, userId, false);
+        publicarTecleo(destinatariosRef.current, conversationId, userId, false);
+        ultimoAvisoRef.current = { valor: false, en: 0 };
       }
+      supabase.removeChannel(canal);
       setTypingUsers([]);
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, versionTecleo]);
 
   // Envío real, compartido por sendMessage y el reintento. Marca 'sending'; en éxito reemplaza
   // el optimista por la fila real (o lo quita si el realtime ya lo insertó) y limpia la cola
@@ -1271,96 +1276,29 @@ export function useMessages(
   // El refresco cada 8s es la única concesión: si un `track` se perdiera, el
   // otro lado se quedaría viendo "escribiendo" para siempre (o nada). Es como
   // mucho un mensaje cada 8 segundos, muy por debajo de cualquier límite.
-  // DOS estados separados, y esa separación es el arreglo:
-  //
-  //  · `typingDeseadoRef` = lo que el compositor QUIERE anunciar ahora.
-  //  · `typingPublicadoRef` = lo que el servidor CONFIRMÓ, y cuándo.
-  //
-  // Antes había uno solo y se anotaba POR ADELANTADO, antes del ack. Eso mentía
-  // en cuanto algo salía distinto de lo previsto, y el caso que lo rompía a
-  // diario es este: realtime-js vuelve a unir el canal por su cuenta (backoff
-  // 1/2/5/10s) y re-dispara el callback de SUBSCRIBED SIN pasar por el montaje.
-  // Ese callback publicaba un `false` fijo → el servidor quedaba en false y el
-  // freno seguía creyendo que ya había anunciado `true`, así que se tragaba
-  // todas las teclas siguientes hasta que venciera el refresco. Se sentía como
-  // "tarda un montón en detectar que empecé a escribir".
-  //
-  // Ahora `typingPublicadoRef` SOLO se escribe cuando el track devuelve "ok",
-  // así que no puede mentir: si la publicación falla, la próxima tecla reintenta.
-  // En un ref: cambia con cada render de la página, y meterlo en las deps
-  // recrearía sendTyping y con él handleComposerUpdate en cada pintada.
+  // A quién avisarle, en un ref: cambia con cada render de la página, y meterlo
+  // en las deps recrearía sendTyping y con él handleComposerUpdate en cada
+  // pintada.
   const destinatariosRef = useRef<string[]>([]);
   destinatariosRef.current = destinatariosDelTecleo ?? [];
 
-  const typingDeseadoRef = useRef(false);
-  const typingPublicadoRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
-  const typingEnVueloRef = useRef(false);
-  const conciliarTypingRef = useRef<() => void>(() => {});
-  // Latido mientras se teclea. A 3s son 0,33 mensajes/s por persona: lejísimos
-  // del uno-por-tecla que cortó el socket en #1605, y acota a 3s cualquier
-  // desincronización futura en vez de a 8.
-  const REFRESCO_TYPING_MS = 3000;
-
-  const conciliarTyping = useCallback(() => {
-    const channel = typingChannelRef.current;
-    const userId = user?.id;
-    if (!channel || !userId || channel.state !== "joined") return;
-    if (typingEnVueloRef.current) return; // al aterrizar se vuelve a mirar
-
-    const deseado = typingDeseadoRef.current;
-    const pub = typingPublicadoRef.current;
-    if (pub.valor === deseado && Date.now() - pub.en < REFRESCO_TYPING_MS) return;
-
-    typingEnVueloRef.current = true;
-    void channel
-      .track({ user_id: userId, typing: deseado })
-      .then((res) => {
-        if (res === "ok") typingPublicadoRef.current = { valor: deseado, en: Date.now() };
-      })
-      .catch(() => {})
-      .finally(() => {
-        typingEnVueloRef.current = false;
-        // Solo se reintenta si la intención CAMBIÓ mientras el track volaba (no
-        // si falló): así no hay bucle caliente contra un canal que rechaza.
-        if (typingDeseadoRef.current !== deseado) {
-          setTimeout(() => conciliarTypingRef.current(), 0);
-        }
-      });
-  }, [user?.id]);
-
-  conciliarTypingRef.current = conciliarTyping;
-
-  // Freno propio del buzón, con la MISMA cadencia que la presencia. Es aparte
-  // a propósito: el buzón no depende de que el canal de presencia esté unido
-  // (va por HTTP), así que un canal caído no debe dejar la lista muda. Y no
-  // puede hacer daño si se desincroniza: sin refresco, el aviso caduca solo por
-  // el TTL del receptor — "no se ve", nunca "se ve pegado".
-  const ultimoBuzonRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
-
-  const avisarAlBuzon = useCallback(
-    (isTyping: boolean) => {
-      const userId = user?.id;
-      const destinatarios = destinatariosRef.current;
-      if (!userId || !conversationId || destinatarios.length === 0) return;
-
-      const ahora = Date.now();
-      const ultimo = ultimoBuzonRef.current;
-      if (ultimo.valor === isTyping && ahora - ultimo.en < REFRESCO_TYPING_MS) return;
-
-      ultimoBuzonRef.current = { valor: isTyping, en: ahora };
-      publicarTecleo(destinatarios, conversationId, userId, isTyping);
-    },
-    [conversationId, user?.id]
-  );
-
   const sendTyping = useCallback(
     (isTyping: boolean) => {
-      if (!conversationId || !user) return;
-      typingDeseadoRef.current = isTyping;
-      conciliarTyping();  // presencia → chat abierto y ventanita del muelle
-      avisarAlBuzon(isTyping); // broadcast → sidebar y nubecita
+      const userId = user?.id;
+      if (!conversationId || !userId) return;
+
+      const ahora = Date.now();
+      const ultimo = ultimoAvisoRef.current;
+      if (ultimo.valor === isTyping && ahora - ultimo.en < REFRESCO_TYPING_MS) return;
+      ultimoAvisoRef.current = { valor: isTyping, en: ahora };
+
+      // A quien tenga ABIERTA la conversación (cabecera y ventanita del muelle):
+      // un solo aviso, y sirve igual para un grupo de treinta.
+      publicarTecleoEnConversacion(conversationId, userId, isTyping);
+      // A los BUZONES de cada persona (lista lateral y nubecita): solo DMs.
+      publicarTecleo(destinatariosRef.current, conversationId, userId, isTyping);
     },
-    [conversationId, user, conciliarTyping, avisarAlBuzon]
+    [conversationId, user?.id]
   );
 
   const editMessage = useCallback(

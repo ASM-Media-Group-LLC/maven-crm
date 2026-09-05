@@ -3,16 +3,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
- * Buzón de tecleo: cómo se entera la LISTA de que alguien está escribiendo.
+ * Tecleo del Messenger: de acá sale TODO el "está escribiendo".
  *
- * El chat abierto y la ventanita del muelle ya lo saben por el canal de
- * presencia `typing-<conversationId>` de useChat, pero ese canal SOLO existe
- * para la conversación abierta. Para pintarlo también en el sidebar y en la
- * nubecita haría falta uno por conversación (media 9, máximo 49, por 70
- * personas) — que es exactamente el patrón que hizo que Supabase cortara el
- * socket en #1605.
+ * Antes había un canal de PRESENCIA por conversación (`typing-<conversationId>`)
+ * y fue el origen de cuatro incidentes seguidos (#1603, #1605, #1611, #1613);
+ * aun arreglado seguía llegando tarde o no llegando, así que se borró. Hoy hay
+ * dos topics y los dos van por broadcast:
  *
- * En vez de eso, UN canal por PERSONA:
+ *   · `typing-conv-<convId>`  → lo escucha quien tiene la conversación ABIERTA
+ *     (cabecera del chat y ventanita del muelle). UN aviso llega a todos los
+ *     miembros, así que cubre grupos. Ese canal vive en useChat/useMessages.
+ *   · `typing-inbox-<userId>` → el buzón de cada persona, que alimenta la LISTA
+ *     (sidebar y nubecita). Solo DMs. Ese vive acá.
+ *
+ * Uno por PERSONA y uno por conversación ABIERTA — nunca uno por cada
+ * conversación de la lista (media 9, máximo 49, por 70 personas): eso último es
+ * exactamente el patrón que hizo que Supabase cortara el socket en #1605.
+ *
+ * Lo que comparten las dos rutas:
  *
  *  · Quien escribe manda un broadcast por HTTP al buzón del otro. El emisor
  *    NUNCA se suscribe ni hace join: `httpSend` POSTea al endpoint REST y
@@ -22,11 +30,10 @@ import { useAuth } from "@/hooks/useAuth";
  *  · Cada quien escucha solo su propio buzón: 1 canal nuevo por usuario, con
  *    topic propio, un solo dueño y montado una vez en el AppShell.
  *
- * NO se toca `typing-<conv>` ni `online-users` ni ningún canal por
- * conversación.
+ * NO se toca `online-users`, que sigue siendo presencia y ahí está bien.
  *
  * ⚠️ El receptor caduca cada aviso por su cuenta (TTL). Eso es lo que permite
- * que esto NO tenga que garantizar entrega ni reconexión: si se pierde un
+ * que esto NO tenga que garantizar ENTREGA: si se pierde un
  * `false`, o el canal se cae, el peor caso es "no se ve" — nunca "se ve pegado
  * para siempre", que es el modo de falla que sí dolería en una lista.
  */
@@ -37,9 +44,17 @@ import { useAuth } from "@/hooks/useAuth";
  *  teclea, y manda un `false` explícito al parar. Esto es la red de seguridad
  *  para cuando ese `false` no llega: un poco más que el latido, para no apagar
  *  el indicador de alguien que sí sigue escribiendo. */
-const TTL_TECLEO_MS = 5000;
+export const TTL_TECLEO_MS = 5000;
 
+/** Buzón de UNA persona: le llegan los avisos de todas sus conversaciones.
+ *  Lo usa la LISTA (sidebar y nubecita). Solo DMs. */
 const topicBuzon = (userId: string) => `typing-inbox-${userId}`;
+
+/** Canal de UNA conversación: le llegan los avisos de quien la tenga abierta.
+ *  Lo usa la CABECERA del chat abierto y la ventanita del muelle. Un solo aviso
+ *  sirve para todos los miembros, así que acá sí entran los grupos. */
+export const topicTecleoConversacion = (conversationId: string) =>
+  `typing-conv-${conversationId}`;
 
 type AvisoTecleo = { c: string; u: string; t: boolean };
 
@@ -51,15 +66,28 @@ type AvisoTecleo = { c: string; u: string; t: boolean };
 // Los objetos de canal se cachean y JAMÁS se suscriben. Son inertes para el
 // socket: `channel()` los deja en el array local y dedupea por topic, y como
 // nunca pasan de `closed` no programan rejoin ni entran en el ciclo join/close.
+// clave = topic. Nunca se suscriben: solo se usan para httpSend.
 const canalesBuzon = new Map<string, ReturnType<typeof supabase.channel>>();
 
-function buzonDe(userId: string) {
-  let canal = canalesBuzon.get(userId);
+function canalInerte(topic: string) {
+  let canal = canalesBuzon.get(topic);
   if (!canal) {
-    canal = supabase.channel(topicBuzon(userId));
-    canalesBuzon.set(userId, canal);
+    canal = supabase.channel(topic);
+    canalesBuzon.set(topic, canal);
   }
   return canal;
+}
+
+/** Avisa a quien tenga ABIERTA esa conversación. Un solo POST, sirva para un DM
+ *  o para un grupo de treinta. Lo lee el canal de `useMessages`. */
+export function publicarTecleoEnConversacion(
+  conversationId: string,
+  userId: string,
+  escribiendo: boolean,
+) {
+  void canalInerte(topicTecleoConversacion(conversationId))
+    .httpSend("typing", { c: conversationId, u: userId, t: escribiendo } satisfies AvisoTecleo)
+    .catch(() => {});
 }
 
 /** Avisa a los destinatarios que `userId` está (o dejó de estar) escribiendo
@@ -73,7 +101,7 @@ export function publicarTecleo(
 ) {
   for (const peer of destinatarios) {
     if (!peer || peer === userId) continue;
-    void buzonDe(peer)
+    void canalInerte(topicBuzon(peer))
       .httpSend("typing", { c: conversationId, u: userId, t: escribiendo } satisfies AvisoTecleo)
       .catch(() => {});
   }
@@ -96,10 +124,14 @@ export function TypingInboxProvider({ children }: { children: ReactNode }) {
   const [tecleando, setTecleando] = useState<Record<string, string>>({});
   const temporizadores = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
+  const [versionBuzon, setVersionBuzon] = useState(0);
+
   useEffect(() => {
     const userId = user?.id;
     if (!userId) return;
 
+    let cancelado = false;
+    let reintento: ReturnType<typeof setTimeout> | null = null;
     const timers = temporizadores.current;
 
     const quitar = (convId: string) => {
@@ -138,15 +170,33 @@ export function TypingInboxProvider({ children }: { children: ReactNode }) {
         );
       });
 
-    canal.subscribe();
+    // Con callback A PROPÓSITO: `closed` es TERMINAL en realtime-js (su
+    // `_onClose` saca el canal de socket.channels y `_onError` ni lo mira, así
+    // que el rejoin automático NO lo cubre), y sin callback ni nos
+    // enteraríamos: los handlers que traducen a CLOSED se registran DENTRO de
+    // subscribe y solo si hay callback. Este buzón vive montado toda la sesión,
+    // así que quedarse mudo acá sería para el resto del día.
+    canal.subscribe((status) => {
+      if (cancelado) return;
+      if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setTecleando({});
+        if (reintento) clearTimeout(reintento);
+        reintento = setTimeout(() => {
+          reintento = null;
+          setVersionBuzon((v) => v + 1);
+        }, 1000);
+      }
+    });
 
     return () => {
+      cancelado = true;
+      if (reintento) clearTimeout(reintento);
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
       supabase.removeChannel(canal);
       setTecleando({});
     };
-  }, [user?.id]);
+  }, [user?.id, versionBuzon]);
 
   const quienEscribe = useCallback(
     (conversationId: string) => tecleando[conversationId] ?? null,
