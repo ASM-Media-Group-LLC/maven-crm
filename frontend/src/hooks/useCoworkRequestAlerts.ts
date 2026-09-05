@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 
 // Aviso de manos levantadas para el coordinador, EN CUALQUIER PARTE DE MAVEN.
@@ -53,7 +54,9 @@ export function useCoworkRequestAlerts() {
       vistas.current = actuales;
       if (!nuevas.length) return;
 
-      playCoordinatorRequestSound();
+      // Mismo motivo que el ding de mensajes: este hook está montado por
+      // encima del router, así que cada pestaña abierta lo tocaba.
+      if (sonarUnaVezEntrePestanas("cowork-pedido", 1500)) playCoordinatorRequestSound();
 
       const [{ user_id, room_id }] = nuevas;
       const { data: perfil } = await supabase

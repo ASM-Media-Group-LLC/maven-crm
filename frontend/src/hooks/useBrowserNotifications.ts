@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { playMessageNotification } from "@/lib/notificationSound";
+import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 
 /** Request notification permission on mount */
 export function useNotificationPermission() {
@@ -12,8 +13,17 @@ export function useNotificationPermission() {
 
 /** Tono de mensaje nuevo (Pulso). Unificado para Messenger, bandeja de
  *  WhatsApp y bandeja de Telegram — todos pasan por acá. Sintetizado, sin
- *  archivo (antes: /sounds/message.wav). */
+ *  archivo (antes: /sounds/message.wav).
+ *
+ *  Suena UNA vez aunque haya varias pestañas abiertas: estos avisos nacen de
+ *  hooks montados por encima del router, así que todas las pestañas reciben el
+ *  mismo evento de realtime y todas sonaban.
+ *
+ *  Los 1500 ms NO son una cadencia nueva: es exactamente el mismo anti-ráfaga
+ *  que useMessengerNotifications ya aplicaba DENTRO de una pestaña
+ *  (`lastSoundRef`). Lo único que cambia es que ahora se comparte entre ellas. */
 export function playNotificationSound() {
+  if (!sonarUnaVezEntrePestanas("mensaje", 1500)) return;
   playMessageNotification();
 }
 
