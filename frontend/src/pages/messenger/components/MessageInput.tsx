@@ -29,16 +29,18 @@ interface PendingFile {
 
 // Cuánto sigue diciendo "está escribiendo" después de la última tecla.
 //
-// Estaba en 2s y era DEMASIADO CORTO: cualquier pausa para pensar lo apagaba, así
-// que del otro lado se veían destellos sueltos y el indicador solo quedaba fijo
-// cuando ya estabas rematando el mensaje de corrido. Se reportó como "casi lo
-// detecta cuando ya voy a mandar el mensaje" — y NO era latencia: medido en
-// prod el 05/09, de la tecla a la presencia publicada hay 166 ms (6 ms hasta el
-// track, 98 ms hasta el ack del servidor).
+// OJO con la historia, porque este número engaña. La lentitud que se reportó
+// ("casi lo detecta cuando ya voy a mandar el mensaje") NO era latencia — medido
+// en prod el 05/09, de la tecla a la presencia publicada hay 166 ms — ni era que
+// este timer fuera corto. Era que el freno de useChat se desincronizaba en cada
+// reconexión y se tragaba las teclas; este timer, al publicar `false`, era lo
+// único que lo desatascaba. Por eso subirlo a 5s empeoró LAS DOS puntas: tardaba
+// más en apagar Y más en volver a detectar.
 //
-// 5s es lo que usan WhatsApp y Messenger. De paso publica MENOS presencia, no
-// más: aguanta las pausas en vez de apagar y volver a prender.
-const APAGAR_ESCRIBIENDO_MS = 5000;
+// Arreglada la desincronización de raíz, este número ya es solo estética: cuánto
+// aguanta el indicador una pausa para pensar. 3s es el punto medio entre no
+// parpadear y no quedarse colgado.
+const APAGAR_ESCRIBIENDO_MS = 3000;
 
 export interface MessageInputHandle {
   addFiles: (files: File[]) => void;
@@ -233,6 +235,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       setText("");
       composerRef.current?.clear();
       onCancelReply();
+      // El camino de texto ya apagaba el "escribiendo" al terminar; este no, y
+      // quedaba anunciado con el cajón vacío hasta que venciera el timer.
+      clearTimeout(typingTimeout.current);
+      onSendTyping(false);
       setUploading(false);
       setUploadProgress("");
       setUploadPercent(0);
@@ -248,6 +254,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     setText("");
     composerRef.current?.clear();
     onCancelReply();
+    // clear() dispara onUpdate y re-arma el timer; hay que matarlo o dentro de
+    // 3s dispara un `false` de más sobre el mensaje siguiente.
+    clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
   }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading]);

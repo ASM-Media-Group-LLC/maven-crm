@@ -1085,9 +1085,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
       canalActual = presenceChannel;
       typingChannelRef.current = presenceChannel;
-      // Canal nuevo: se olvida lo último anunciado, si no el freno creería que ya
-      // avisó `true` en un canal que ya no existe y se quedaría mudo.
-      ultimoTypingRef.current = { valor: false, en: 0 };
+      // Canal nuevo: no hay nada anunciado ni nada que anunciar.
+      typingDeseadoRef.current = false;
+      typingPublicadoRef.current = { valor: false, en: 0 };
 
       presenceChannel.subscribe((status) => {
         // Un canal que ya reemplazamos puede seguir avisando: no debe rearmar.
@@ -1095,7 +1095,13 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
         if (status === "SUBSCRIBED") {
           intentos = 0;
-          void presenceChannel.track({ user_id: userId, typing: false });
+          // Un canal recién unido no tiene presencia nuestra, así que lo
+          // publicado se da por perdido y se vuelve a anunciar lo DESEADO. Si
+          // el rejoin fue un parpadeo de red mientras alguien escribía, el
+          // indicador sobrevive en vez de apagarse; y el freno queda contando
+          // desde lo que de verdad se publicó.
+          typingPublicadoRef.current = { valor: false, en: 0 };
+          conciliarTypingRef.current();
           return;
         }
 
@@ -1255,41 +1261,67 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   // El refresco cada 8s es la única concesión: si un `track` se perdiera, el
   // otro lado se quedaría viendo "escribiendo" para siempre (o nada). Es como
   // mucho un mensaje cada 8 segundos, muy por debajo de cualquier límite.
-  const ultimoTypingRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
-  const REFRESCO_TYPING_MS = 8000;
+  // DOS estados separados, y esa separación es el arreglo:
+  //
+  //  · `typingDeseadoRef` = lo que el compositor QUIERE anunciar ahora.
+  //  · `typingPublicadoRef` = lo que el servidor CONFIRMÓ, y cuándo.
+  //
+  // Antes había uno solo y se anotaba POR ADELANTADO, antes del ack. Eso mentía
+  // en cuanto algo salía distinto de lo previsto, y el caso que lo rompía a
+  // diario es este: realtime-js vuelve a unir el canal por su cuenta (backoff
+  // 1/2/5/10s) y re-dispara el callback de SUBSCRIBED SIN pasar por el montaje.
+  // Ese callback publicaba un `false` fijo → el servidor quedaba en false y el
+  // freno seguía creyendo que ya había anunciado `true`, así que se tragaba
+  // todas las teclas siguientes hasta que venciera el refresco. Se sentía como
+  // "tarda un montón en detectar que empecé a escribir".
+  //
+  // Ahora `typingPublicadoRef` SOLO se escribe cuando el track devuelve "ok",
+  // así que no puede mentir: si la publicación falla, la próxima tecla reintenta.
+  const typingDeseadoRef = useRef(false);
+  const typingPublicadoRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
+  const typingEnVueloRef = useRef(false);
+  const conciliarTypingRef = useRef<() => void>(() => {});
+  // Latido mientras se teclea. A 3s son 0,33 mensajes/s por persona: lejísimos
+  // del uno-por-tecla que cortó el socket en #1605, y acota a 3s cualquier
+  // desincronización futura en vez de a 8.
+  const REFRESCO_TYPING_MS = 3000;
+
+  const conciliarTyping = useCallback(() => {
+    const channel = typingChannelRef.current;
+    const userId = user?.id;
+    if (!channel || !userId || channel.state !== "joined") return;
+    if (typingEnVueloRef.current) return; // al aterrizar se vuelve a mirar
+
+    const deseado = typingDeseadoRef.current;
+    const pub = typingPublicadoRef.current;
+    if (pub.valor === deseado && Date.now() - pub.en < REFRESCO_TYPING_MS) return;
+
+    typingEnVueloRef.current = true;
+    void channel
+      .track({ user_id: userId, typing: deseado })
+      .then((res) => {
+        if (res === "ok") typingPublicadoRef.current = { valor: deseado, en: Date.now() };
+      })
+      .catch(() => {})
+      .finally(() => {
+        typingEnVueloRef.current = false;
+        // Solo se reintenta si la intención CAMBIÓ mientras el track volaba (no
+        // si falló): así no hay bucle caliente contra un canal que rechaza.
+        if (typingDeseadoRef.current !== deseado) {
+          setTimeout(() => conciliarTypingRef.current(), 0);
+        }
+      });
+  }, [user?.id]);
+
+  conciliarTypingRef.current = conciliarTyping;
 
   const sendTyping = useCallback(
     (isTyping: boolean) => {
       if (!conversationId || !user) return;
-      const channel = typingChannelRef.current;
-      // No alcanza con que el canal exista: uno `closed` acepta el track igual y
-      // devuelve "timed out" sin avisar. El efecto de arriba lo vuelve a unir.
-      if (!channel || channel.state !== "joined") return;
-
-      const ahora = Date.now();
-      const ultimo = ultimoTypingRef.current;
-      const sinCambio = ultimo.valor === isTyping;
-      const recien = ahora - ultimo.en < REFRESCO_TYPING_MS;
-      if (sinCambio && (recien || !isTyping)) return;
-
-      const previo = ultimo;
-      ultimoTypingRef.current = { valor: isTyping, en: ahora };
-      // Si el track NO entró hay que deshacer la anotación. Si no, el freno cree
-      // que ya avisó y no lo vuelve a intentar: así se quedaba pegado en
-      // "escribiendo" para siempre del lado del otro.
-      const deshacerSiFalla = () => {
-        if (ultimoTypingRef.current.en === ahora) ultimoTypingRef.current = previo;
-      };
-      // Sin `await`: el ack de un `track` de presencia tarda, y bloquear acá
-      // trabaría el tecleo.
-      void channel
-        .track({ user_id: user.id, typing: isTyping })
-        .then((res) => {
-          if (res !== "ok") deshacerSiFalla();
-        })
-        .catch(deshacerSiFalla);
+      typingDeseadoRef.current = isTyping;
+      conciliarTyping();
     },
-    [conversationId, user]
+    [conversationId, user, conciliarTyping]
   );
 
   const editMessage = useCallback(
