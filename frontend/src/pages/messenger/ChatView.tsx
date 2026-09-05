@@ -92,10 +92,21 @@ export default function ChatView({
   const deletedIds = useMemo(() => messages.filter((m) => m.is_deleted).map((m) => m.id), [messages]);
   const deletedArchive = useDeletedMessages(deletedIds);
 
+  // Un hilo lo forman SOLO los mensajes enviados desde el panel del hilo
+  // (is_thread_reply). Una cita de "Responder" también lleva reply_to_id, pero es
+  // otra cosa: se ve inline en el timeline y no abre ningún hilo. Sin este filtro,
+  // responder a alguien le colgaba un "1 respuesta" al mensaje citado y aparecía
+  // un hilo que nadie pidió. Medido en prod el 05/09: de 445 mensajes con
+  // reply_to_id, 231 son hilos de verdad y 214 son citas inline.
+  const esDelHilo = useCallback(
+    (m: ChatMessage, parentId: string) => m.reply_to_id === parentId && !!m.is_thread_reply,
+    []
+  );
+
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];
-    return messages.filter(m => m.reply_to_id === threadParent.id);
-  }, [threadParent, messages]);
+    return messages.filter(m => esDelHilo(m, threadParent.id));
+  }, [threadParent, messages, esDelHilo]);
 
   const handleSendThreadReply = useCallback((content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string) => {
     if (!threadParent) return;
@@ -104,22 +115,22 @@ export default function ChatView({
   }, [threadParent, onSendMessage]);
 
   const getThreadCount = useCallback((messageId: string) => {
-    return messages.filter(m => m.reply_to_id === messageId).length;
-  }, [messages]);
+    return messages.filter(m => esDelHilo(m, messageId)).length;
+  }, [messages, esDelHilo]);
 
   const [seenThreadCounts, setSeenThreadCounts] = useState<Record<string, number>>({});
 
   const getUnreadThreadCount = useCallback((messageId: string) => {
-    const total = messages.filter(m => m.reply_to_id === messageId).length;
+    const total = messages.filter(m => esDelHilo(m, messageId)).length;
     const seen = seenThreadCounts[messageId] || 0;
     return Math.max(0, total - seen);
-  }, [messages, seenThreadCounts]);
+  }, [messages, seenThreadCounts, esDelHilo]);
 
   const handleOpenThreadWithTracking = useCallback((msg: ChatMessage) => {
     const parentId = msg.reply_to_id
       ? (messages.find(m => m.id === msg.reply_to_id) ? msg.reply_to_id : msg.id)
       : msg.id;
-    const count = messages.filter(m => m.reply_to_id === parentId).length;
+    const count = messages.filter(m => esDelHilo(m, parentId)).length;
     setSeenThreadCounts(prev => ({ ...prev, [parentId]: count }));
 
     closeSidePanels("thread");
@@ -128,7 +139,7 @@ export default function ChatView({
       if (parent) { setThreadParent(parent); return; }
     }
     setThreadParent(msg);
-  }, [messages, closeSidePanels]);
+  }, [messages, closeSidePanels, esDelHilo]);
 
   const handleSearchResultClick = useCallback((messageId: string) => {
     setHighlightedMsgId(messageId);

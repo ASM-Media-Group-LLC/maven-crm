@@ -27,6 +27,19 @@ interface PendingFile {
   type: "image" | "file";
 }
 
+// Cuánto sigue diciendo "está escribiendo" después de la última tecla.
+//
+// Estaba en 2s y era DEMASIADO CORTO: cualquier pausa para pensar lo apagaba, así
+// que del otro lado se veían destellos sueltos y el indicador solo quedaba fijo
+// cuando ya estabas rematando el mensaje de corrido. Se reportó como "casi lo
+// detecta cuando ya voy a mandar el mensaje" — y NO era latencia: medido en
+// prod el 05/09, de la tecla a la presencia publicada hay 166 ms (6 ms hasta el
+// track, 98 ms hasta el ack del servidor).
+//
+// 5s es lo que usan WhatsApp y Messenger. De paso publica MENOS presencia, no
+// más: aguanta las pausas en vez de apagar y volver a prender.
+const APAGAR_ESCRIBIENDO_MS = 5000;
+
 export interface MessageInputHandle {
   addFiles: (files: File[]) => void;
 }
@@ -249,7 +262,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (!cambioDeTexto) return;
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
+    typingTimeout.current = setTimeout(() => onSendTyping(false), APAGAR_ESCRIBIENDO_MS);
   }, [onSendTyping]);
 
   // Con editor rico no se puede reemplazar TODO el texto (borraría el formato):
