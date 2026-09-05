@@ -97,6 +97,14 @@ services:
           address: 127.0.0.1:16379
         logging:
           level: info
+        # Cuánta CPU "cobra" cada grabación al decidir si acepta el trabajo.
+        # Por defecto RoomComposite cuesta 4 = UNA grabación a la vez con el
+        # tope de abajo; las dos fallas "503 Service Unavailable" de la
+        # semana del 05/09 fueron dos coordinadores de Cowork grabando a la
+        # vez. Una grabación real consume 1,5-2,5 CPU, así que 2 es honesto.
+        # Con tope 6 → hasta 3 grabaciones simultáneas.
+        cpu_cost:
+          room_composite_cpu_cost: 2
     volumes:
       # El disco del VPS, decisión de Jhon: viable SOLO porque el
       # vencimiento a 90 días no tiene excepciones (espacio acotado).
@@ -114,12 +122,21 @@ services:
     deploy:
       resources:
         limits:
-          # OJO: 4 no es capricho — el egress de LiveKit exige minimumCpu=4
-          # para RoomComposite; con menos se registra pero RECHAZA los trabajos
-          # y el server responde 503 "no egress available" (pasó el 21/08 con
-          # cpus:3). Es un TECHO, no reserva: en reposo consume ~0.
-          cpus: "4"
-          memory: 2g
+          # OJO: el egress acepta un trabajo solo si le queda CPU "libre"
+          # según su costo (arriba, room_composite_cpu_cost: 2). Con menos
+          # de ese costo se registra pero RECHAZA los trabajos y el server
+          # responde 503 "no egress available" (pasó el 21/08 con cpus:3 y
+          # costo 4). Es un TECHO, no reserva: en reposo consume ~0.
+          #
+          # 6 de las 8 CPU de la máquina: caben 3 grabaciones y quedan 2 para
+          # LiveKit y el resto de Maven — el grabador NUNCA debe poder comerse
+          # el audio de una llamada en vivo. Memoria a 4g porque cada
+          # grabación es un Chrome componiendo (~1 GB cada uno).
+          # PENDIENTE (Jhon): medir en Dokploy una mañana de Cowork con dos
+          # grabaciones a la vez; si el egress roza las 6 CPU, la palanca
+          # siguiente ya es máquina.
+          cpus: "6"
+          memory: 4g
 
   # Descargas firmadas + borrado de los MP4 (ver rec-server/rec-server.mjs).
   # Dominio en Dokploy: rec.asmtech.ai -> este contenedor :8080.
