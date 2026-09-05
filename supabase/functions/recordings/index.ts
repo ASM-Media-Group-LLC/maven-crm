@@ -23,6 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // BOOT_ERROR real en prod el 21/08: la funcion nunca llego a servir.
 import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
+import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
@@ -200,6 +201,13 @@ Deno.serve(async (req) => {
           .update({ egress_id: info.egressId, storage_key: archivo })
           .eq("id", fila.id);
 
+        // Como en Google Meet: TODOS se enteran de que se empezó a grabar y de
+        // quién lo hizo, no solo por el punto rojo (pedido de Jhon, 05/09).
+        await enviarAvisoASala(room_name, {
+          clase: "grabando",
+          por: { uuid: user.id, nombre: await nombreDeUsuario(admin, user.id) },
+        });
+
         return json(req, { ok: true, recording_id: fila.id });
       } catch (e) {
         // Si LiveKit no arrancó el egress, la fila no puede quedar
@@ -278,6 +286,11 @@ Deno.serve(async (req) => {
       await admin.from("meeting_recordings")
         .update({ status: "ready", size_bytes: size, duration_seconds: dur })
         .eq("id", rec.id);
+
+      await enviarAvisoASala(rec.room_name, {
+        clase: "grabacion-detenida",
+        por: { uuid: user.id, nombre: await nombreDeUsuario(admin, user.id) },
+      });
 
       // Destinatarios elegidos al parar + siempre quien la inició.
       const destinatarios = [...new Set([...(recipients ?? []), rec.started_by])];
