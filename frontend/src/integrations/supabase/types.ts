@@ -17716,6 +17716,10 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: string
       }
+      get_mentioned_conversations: {
+        Args: { _nombre: string; _nombre_pila: string; _user_id: string }
+        Returns: { conversation_id: string }[]
+      }
       get_last_messages: {
         Args: { _user_id: string }
         Returns: Database["public"]["Tables"]["chat_messages"]["Row"][]

@@ -32,72 +32,30 @@ export function useMentionedConversations(
     }
     const firstName = name.split(" ")[0];
 
-    // First, get the user's last_read_at per conversation
-    const { data: participants, error: partErr } = await supabase
-      .from("chat_participants")
-      .select("conversation_id, last_read_at")
-      .eq("user_id", user.id)
-      .in("conversation_id", stableConvIds);
+    // UNA consulta para todas las conversaciones.
+    //
+    // Antes esto era un bucle SECUENCIAL con 1-2 consultas por chat, y se
+    // re-disparaba con cada INSERT que llevara "@" en toda la organización y
+    // con cada cambio de last_read_at (o sea, cada vez que abrís un chat).
+    // Medido en prod: 60 peticiones en 25 segundos en una sola pestaña.
+    //
+    // La RPC hace el mismo filtro (no borrados, de otra persona, posteriores a
+    // last_read_at, y que nombren a @nombre o @pila) del lado del servidor.
+    // Usa position() en vez de ilike a propósito: un nombre con % o _ no puede
+    // convertirse en comodín.
+    const { data, error } = await supabase.rpc("get_mentioned_conversations", {
+      _user_id: user.id,
+      _nombre: name,
+      _nombre_pila: firstName,
+    });
 
-    if (partErr) {
-      console.error("[useMentionedConversations] participants query error:", partErr);
+    if (error) {
+      console.error("[useMentionedConversations] mentions query error:", error);
       setMentionedIds(new Set());
       return;
     }
 
-    const lastReadMap = new Map<string, string | null>();
-    (participants || []).forEach((p: any) => {
-      lastReadMap.set(p.conversation_id, p.last_read_at);
-    });
-
-    const allMatchedConvIds = new Set<string>();
-
-    // For each conversation, only find mentions AFTER last_read_at
-    for (const convId of stableConvIds) {
-      const lastRead = lastReadMap.get(convId);
-
-      let q1 = supabase
-        .from("chat_messages")
-        .select("id")
-        .eq("conversation_id", convId)
-        .eq("is_deleted", false)
-        .neq("sender_id", user.id)
-        .ilike("content", `%@${name}%`)
-        .limit(1);
-
-      if (lastRead) {
-        q1 = q1.gt("created_at", lastRead);
-      }
-
-      const { data: d1 } = await q1;
-      if (d1 && d1.length > 0) {
-        allMatchedConvIds.add(convId);
-        continue; // already matched, skip firstName query
-      }
-
-      // Query 2: @firstName
-      if (firstName.toLowerCase() !== name.toLowerCase()) {
-        let q2 = supabase
-          .from("chat_messages")
-          .select("id")
-          .eq("conversation_id", convId)
-          .eq("is_deleted", false)
-          .neq("sender_id", user.id)
-          .ilike("content", `%@${firstName}%`)
-          .limit(1);
-
-        if (lastRead) {
-          q2 = q2.gt("created_at", lastRead);
-        }
-
-        const { data: d2 } = await q2;
-        if (d2 && d2.length > 0) {
-          allMatchedConvIds.add(convId);
-        }
-      }
-    }
-
-    setMentionedIds(allMatchedConvIds);
+    setMentionedIds(new Set((data ?? []).map((r) => r.conversation_id as string)));
   }, [user, currentUserName, stableConvIds]);
 
   // Refresh when dependencies change
