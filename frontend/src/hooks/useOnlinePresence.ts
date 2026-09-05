@@ -23,7 +23,7 @@ interface OnlinePresenceContextType {
   getStatusText: (userId: string) => string;
   myStatusText: string;
   /** Guarda el estado personalizado (persiste en profiles y lo difunde en vivo). */
-  setMyStatusText: (text: string, expiresAt: string | null) => Promise<void>;
+  setMyStatusText: (text: string, expiresAt: string | null, luz?: UserStatus) => Promise<void>;
 }
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
@@ -116,25 +116,42 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
-  // Mi estado personalizado guardado: se lee de profiles al entrar (sobrevive al
-  // refresh) y se vuelve a publicar en la presencia ya con el texto.
+  // Mi estado guardado: se lee de profiles al entrar (sobrevive al refresh) y se
+  // vuelve a publicar en la presencia con el texto Y la luz.
+  //
+  // ⚠️ La luz también se guarda desde que existe la columna `status`. Antes vivía
+  // SOLO en la presencia, o sea en memoria, y se reiniciaba a verde en cada
+  // recarga: por eso se veía gente con "EN LUNCH" y el puntito en verde.
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
     void (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("status_text, status_expires_at")
+        .select("status, status_text, status_expires_at")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled || !data) return;
-      const row = data as { status_text?: string | null; status_expires_at?: string | null };
+      const row = data as {
+        status?: string | null;
+        status_text?: string | null;
+        status_expires_at?: string | null;
+      };
       const vigente = statusTextVigente(row.status_text, row.status_expires_at);
+      // El texto caducó → la luz que lo acompañaba también. Si no, quedaría un
+      // "Ocupado" colgado sin la frase que lo explicaba.
+      const caduco = !!row.status_text && !vigente;
+      const luz = (!caduco && row.status ? (row.status as UserStatus) : "available");
+
+      if (luz !== "available") {
+        setMyStatusState(luz);
+        myStatusRef.current = luz;
+      }
       if (vigente) {
         setMyStatusTextState(vigente);
         myStatusTextRef.current = vigente;
-        track();
       }
+      if (luz !== "available" || vigente) track();
     })();
     return () => { cancelled = true; };
   }, [user?.id, track]);
@@ -166,18 +183,40 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     setMyStatusState(status);
     myStatusRef.current = status;
     track(status);
+    const uid = userIdRef.current;
+    if (!uid) return;
+    // Sin await: la presencia ya salió, esto es solo para que sobreviva al refresh.
+    void supabase
+      .from("profiles")
+      .update({ status } as never)
+      .eq("id", uid);
   }, [track]);
 
-  const setMyStatusText = useCallback(async (text: string, expiresAt: string | null) => {
+  /** Guarda el estado personalizado. La `luz` es opcional para no romper a quien
+   *  llame con dos argumentos; cuando viene, texto y luz se fijan JUNTOS, que es
+   *  lo que pide el diálogo ("EN LUNCH" + amarillo). */
+  const setMyStatusText = useCallback(async (
+    text: string,
+    expiresAt: string | null,
+    luz?: UserStatus,
+  ) => {
     const clean = text.trim().slice(0, 64);
     setMyStatusTextState(clean);
     myStatusTextRef.current = clean;
+    if (luz) {
+      setMyStatusState(luz);
+      myStatusRef.current = luz;
+    }
     track();
     const uid = userIdRef.current;
     if (!uid) return;
     await supabase
       .from("profiles")
-      .update({ status_text: clean || null, status_expires_at: clean ? expiresAt : null } as never)
+      .update({
+        status_text: clean || null,
+        status_expires_at: clean ? expiresAt : null,
+        ...(luz ? { status: luz } : {}),
+      } as never)
       .eq("id", uid);
   }, [track]);
 

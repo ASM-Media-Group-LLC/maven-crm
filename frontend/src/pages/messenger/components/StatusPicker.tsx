@@ -54,25 +54,30 @@ export default function StatusPicker() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [expiry, setExpiry] = useState("never");
+  const [luz, setLuz] = useState<UserStatus>("available");
   const [saving, setSaving] = useState(false);
 
   const abrirDialogo = () => {
     setDraft(myStatusText);
     setExpiry("never");
+    setLuz(myStatus);
     setOpen(true);
   };
 
   const guardar = async () => {
     setSaving(true);
     const resolver = EXPIRY_OPTIONS.find((o) => o.key === expiry)?.resolve ?? (() => null);
-    await setMyStatusText(draft, resolver());
+    // Texto y luz se guardan JUNTOS: escribir "EN LUNCH" y quedar en verde era
+    // justo el desajuste que se veía en producción.
+    await setMyStatusText(draft, resolver(), luz);
     setSaving(false);
     setOpen(false);
   };
 
   const quitar = async () => {
     setSaving(true);
-    await setMyStatusText("", null);
+    // Quitar el estado devuelve también la luz a Disponible.
+    await setMyStatusText("", null, "available");
     setSaving(false);
     setOpen(false);
   };
@@ -83,8 +88,8 @@ export default function StatusPicker() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2.5 text-xs rounded-full bg-primary/5 hover:bg-primary/8 max-w-[180px]">
             <Icon className={cn("h-3 w-3 fill-current shrink-0", config.color)} />
-            {/* Con estado personalizado, el chip muestra ESE texto (como Google Chat);
-                el color del puntito sigue siendo el del estado fijo. */}
+            {/* Con estado personalizado, el chip muestra ESE texto (como Google Chat)
+                y el puntito lleva la luz que se eligió junto al texto. */}
             <span className="text-muted-foreground truncate">{myStatusText || config.label}</span>
           </Button>
         </DropdownMenuTrigger>
@@ -140,6 +145,36 @@ export default function StatusPicker() {
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Lo ven los demás junto a tu nombre en el chat.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Color de tu lucecita</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][]).map(([key, cfg]) => {
+                  const OpcionIcon = cfg.icon;
+                  const activa = luz === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setLuz(key)}
+                      aria-pressed={activa}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                        activa
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border text-muted-foreground hover:bg-muted",
+                      )}
+                    >
+                      <OpcionIcon className={cn("h-3 w-3 fill-current shrink-0", cfg.color)} />
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Es el puntito que ven junto a tu foto. Si estás en descanso, ponelo en Ausente.
               </p>
             </div>
 
