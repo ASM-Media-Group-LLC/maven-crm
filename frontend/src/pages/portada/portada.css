@@ -225,8 +225,10 @@
   .pt section { position: relative; }
   .pt .bloque { padding: 96px 0; }
   .pt .cabeza { max-width: 62ch; }
-  .pt .cabeza h2 { font-size: clamp(28px, 3.8vw, 42px); line-height: 1.1; margin: 16px 0 0; }
-  .pt .cabeza p { margin: 16px 0 0; font-size: 17px; color: var(--ink-soft); }
+  /* Un escalón por debajo del hero (66px): con todos los titulares al mismo
+     tamaño ninguno mandaba, y la página se sentía como ocho portadas seguidas. */
+  .pt .cabeza h2 { font-size: clamp(26px, 3.1vw, 36px); line-height: 1.12; margin: 16px 0 0; }
+  .pt .cabeza p { margin: 14px 0 0; font-size: 16.5px; color: var(--ink-soft); }
 
   /* ── Las 24 horas: una línea de tiempo de verdad ──────────────────────── */
   /* Más angosta que el resto: la línea de tiempo se lee mejor en columna, y
@@ -356,8 +358,35 @@
   .pt .cierre p { position: relative; margin: 20px auto 0; max-width: 52ch; font-size: 17.5px; color: var(--ink-soft); }
   .pt .cierre .acciones { position: relative; justify-content: center; margin-top: 34px; }
 
-  .pt footer { border-top: 1px solid var(--line); padding: 34px 0; }
-  .pt .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; font-size: 13px; color: var(--faint); }
+  /* ── Franja de CTA a mitad de página ─────────────────────────────────────
+     Entre el hero y el formulario había 9.000px sin un solo botón. */
+  .pt .cta-medio { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .pt .cta-medio .wrap { display: flex; align-items: center; justify-content: space-between; gap: 28px; flex-wrap: wrap; padding-top: 60px; padding-bottom: 60px; }
+  .pt .cta-medio h3 { margin: 12px 0 6px; font-size: 26px; line-height: 1.15; }
+  .pt .cta-medio p { margin: 0; color: var(--ink-soft); font-size: 16px; max-width: 52ch; }
+  .pt .cta-medio .acciones { margin: 0; }
+
+  /* ── Pie ──────────────────────────────────────────────────────────────── */
+  .pt footer { border-top: 1px solid var(--line); padding: 34px 0 28px; }
+  .pt .foot { display: grid; grid-template-columns: 1fr auto; gap: 18px 40px; align-items: center; font-size: 13px; color: var(--faint); }
+  .pt .foot-marca { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .pt .foot-marca span { color: var(--muted); font-size: 13.5px; }
+  .pt .foot-links { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; }
+  .pt .foot-links a { color: var(--muted); text-decoration: none; transition: color .2s; }
+  .pt .foot-links a:hover { color: var(--ink); }
+  .pt .foot-legal { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 16px; }
+  @media (max-width: 640px) { .pt .foot { grid-template-columns: 1fr; } }
+
+  /* Aviso bajo el botón del formulario: quien deja su correo tiene que saber
+     qué pasa con él antes de apretar. */
+  .pt .form-priv { grid-column: 1 / -1; margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: var(--faint); }
+  .pt .form-priv a { color: var(--muted); }
+
+  /* ── Texto legal (aviso de privacidad) ───────────────────────────────── */
+  .pt .legal { max-width: 68ch; margin-top: 40px; }
+  .pt .legal h3 { font-size: 17px; margin: 30px 0 8px; }
+  .pt .legal p { margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--ink-soft); }
+  .pt .legal-fecha { margin-top: 36px !important; font-size: 13px !important; color: var(--faint) !important; }
 
 
   /* ── Avatares ─────────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ import Reemplaza from "./secciones/Reemplaza";
 import Messenger from "./secciones/Messenger";
 import Simulador from "./secciones/Simulador";
 import Cowork from "./secciones/Cowork";
+import CtaMedio from "./secciones/CtaMedio";
 import UnDia from "./secciones/UnDia";
 import Modulos from "./secciones/Modulos";
 import CapaDeIA from "./secciones/CapaDeIA";
@@ -160,6 +161,7 @@ export default function Portada() {
       <Reemplaza publico={publico} />
       <Messenger />
       <Cowork />
+      <CtaMedio />
       {guion.promolog ? <Promolog /> : null}
       {guion.simulador ? <Simulador /> : null}
       <UnDia />
@@ -171,8 +173,19 @@ export default function Portada() {
 
       <footer>
         <div className="wrap foot">
-          <Marca chico />
-          <span>Correo, chat, oficina virtual y operación, en una sola sesión.</span>
+          <div className="foot-marca">
+            <Marca chico />
+            <span>Correo, chat, oficina virtual y operación, en una sola sesión.</span>
+          </div>
+          <nav className="foot-links" aria-label="Enlaces del pie">
+            <Link to="/login">Entrar</Link>
+            <a href="#demo">Pedir una demo</a>
+            <Link to="/privacidad">Privacidad</Link>
+          </nav>
+          <div className="foot-legal">
+            <span>© {new Date().getFullYear()} Maven · Todos los derechos reservados</span>
+            <span>Servidores propios · Datos en tu dominio · Sin instalar nada</span>
+          </div>
         </div>
       </footer>
     </div>

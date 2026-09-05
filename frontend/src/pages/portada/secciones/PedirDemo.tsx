@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Check, Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -188,6 +189,11 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
                 </button>
                 <span className="nota">Te contestamos al correo. Nada más.</span>
               </div>
+              <p className="form-priv">
+                Al enviar aceptas que usemos estos datos solo para contestarte. No los
+                compartimos ni te suscribimos a nada.{" "}
+                <Link to="/privacidad">Aviso de privacidad</Link>
+              </p>
 
               {error ? <p className="form-error" role="alert">{error}</p> : null}
             </form>

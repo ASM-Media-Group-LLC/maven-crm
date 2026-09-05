@@ -34,7 +34,9 @@ function Numero({ hasta, prefijo }: { hasta: number; prefijo: string }) {
         const DURACION = 1500;
         const t0 = performance.now();
         const paso = (t: number) => {
-          const p = Math.min(1, (t - t0) / DURACION);
+          // El primer timestamp de rAF puede ser anterior a t0: sin el
+          // Math.max, p salía negativo y la cifra arrancaba en "-0" o "-1".
+          const p = Math.max(0, Math.min(1, (t - t0) / DURACION));
           // Frena al final, como un contador de verdad.
           setValor(hasta * (1 - Math.pow(1 - p, 3)));
           if (p < 1) manija = requestAnimationFrame(paso);
