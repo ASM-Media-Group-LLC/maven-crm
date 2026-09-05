@@ -18,7 +18,12 @@ export interface RecordingRow {
   size_bytes: number | null;
   status: "recording" | "processing" | "ready" | "failed" | "deleted";
   expires_at: string | null;
+  /** Por qué falló (texto técnico de la edge). La página lo traduce. */
+  error?: string | null;
 }
+
+/** Quién grabó, para la cara y el nombre en la lista. */
+export interface PerfilGrabador { id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }
 
 export interface RecordingsUsage {
   total_recordings: number;
@@ -49,8 +54,24 @@ export async function invokeRecordings(
   return json as Record<string, unknown>;
 }
 
+const COLUMNAS = "id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at, error";
+
+/** Trae nombre y cara de quienes grabaron, una sola consulta para toda la
+ *  lista. Si falla, la lista sigue: solo se pierde el "Grabó X". */
+async function cargarGrabadores(filas: RecordingRow[]): Promise<Record<string, PerfilGrabador>> {
+  const ids = [...new Set(filas.map((r) => r.started_by).filter(Boolean))];
+  if (ids.length === 0) return {};
+  try {
+    const { data } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids);
+    return Object.fromEntries(((data as PerfilGrabador[] | null) ?? []).map((p) => [p.id, p]));
+  } catch {
+    return {};
+  }
+}
+
 export function useRecordings() {
   const [rows, setRows] = useState<RecordingRow[]>([]);
+  const [grabadores, setGrabadores] = useState<Record<string, PerfilGrabador>>({});
   const [usage, setUsage] = useState<RecordingsUsage | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +82,7 @@ export function useRecordings() {
     const [lista, uso] = await Promise.all([
       supabase
         .from("meeting_recordings")
-        .select("id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at")
+        .select(COLUMNAS)
         .is("deleted_at", null)
         .order("started_at", { ascending: false })
         .limit(200),
@@ -71,6 +92,7 @@ export function useRecordings() {
     setRows(filas);
     setUsage((uso.data as RecordingsUsage | null) ?? null);
     setLoading(false);
+    void cargarGrabadores(filas).then(setGrabadores);
 
     // Dos arreglos que solo se pueden hacer del lado del servidor, los dos al
     // abrir la lista porque es cuando a alguien le importa:
@@ -90,7 +112,7 @@ export function useRecordings() {
         if (res?.actualizadas || res?.cerradas) {
           const { data } = await supabase
             .from("meeting_recordings")
-            .select("id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at")
+            .select(COLUMNAS)
             .is("deleted_at", null)
             .order("started_at", { ascending: false })
             .limit(200);
@@ -126,5 +148,5 @@ export function useRecordings() {
     await refresh();
   }, [refresh]);
 
-  return { rows, usage, myUserId, loading, refresh, download, view, remove };
+  return { rows, grabadores, usage, myUserId, loading, refresh, download, view, remove };
 }
