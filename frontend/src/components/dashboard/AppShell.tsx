@@ -6,6 +6,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
 import { ChatProvider } from "@/hooks/ChatProvider";
+import { TypingInboxProvider } from "@/hooks/useTypingInbox";
 import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
@@ -61,6 +62,10 @@ const AppShell = () => {
   useMessengerNotifications();
 
   return (
+    // El buzón de tecleo va POR FUERA del ChatProvider: este árbol contiene las
+    // dos superficies que lo consumen — la nubecita (DashboardTopbar) y el
+    // sidebar del Messenger (el Outlet) — y así se monta una sola vez.
+    <TypingInboxProvider>
     <ChatProvider>
     <MessengerDockProvider>
     <SidebarProvider>
@@ -80,6 +85,7 @@ const AppShell = () => {
     </SidebarProvider>
     </MessengerDockProvider>
     </ChatProvider>
+    </TypingInboxProvider>
   );
 };
 

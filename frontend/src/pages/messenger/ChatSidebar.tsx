@@ -31,6 +31,7 @@ import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
 import { getDraft } from "./drafts";
+import { useTypingInbox } from "@/hooks/useTypingInbox";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -547,7 +548,15 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   // Borrador pendiente (estilo WhatsApp): si dejaste un mensaje a medias en este
   // chat, la lista lo recuerda. En el chat activo no hace falta — lo estás viendo.
   const draft = !isActive ? getDraft(user?.id, conversation.id) : "";
-  const lastMsgPreview = draft ? `✏️ Borrador: ${draft}` : getMessagePreview(conversation, user?.id);
+  // Precedencia estilo WhatsApp: escribiendo > borrador > último mensaje. Se
+  // sustituye el TEXTO del <p> que ya existe (ya trae truncate), así que no hay
+  // renglón nuevo ni salto de alto ni el agujero de min-w-0 de #1602.
+  const escribiendo = !!useTypingInbox().quienEscribe(conversation.id);
+  const lastMsgPreview = escribiendo
+    ? "escribiendo…"
+    : draft
+      ? `✏️ Borrador: ${draft}`
+      : getMessagePreview(conversation, user?.id);
 
   return (
     <ContextMenu>
@@ -622,7 +631,9 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             <div className="flex items-center justify-between">
               <p className={cn(
                 "text-xs truncate",
-                hasUnread ? "text-foreground font-medium" : "text-muted-foreground"
+                escribiendo
+                  ? "text-primary font-medium"
+                  : hasUnread ? "text-foreground font-medium" : "text-muted-foreground"
               )}>
                 {truncate(lastMsgPreview, 38)}
               </p>

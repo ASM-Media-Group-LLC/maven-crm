@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { publicarTecleo } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ChatConversation,
@@ -767,7 +768,15 @@ export function useChat() {
 
 const PAGE_SIZE = 50;
 
-export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
+export function useMessages(
+  conversationId: string | null,
+  onNewMessage?: (msg: ChatMessage) => void,
+  /** A quién avisarle del tecleo para que se vea en la LISTA (sidebar y
+   *  nubecita). Solo conversaciones directas: en grupos se pasa [] — ver
+   *  useTypingInbox. El chat abierto y la ventanita no lo usan, van por
+   *  presencia. */
+  destinatariosDelTecleo?: string[],
+) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1088,6 +1097,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       // Canal nuevo: no hay nada anunciado ni nada que anunciar.
       typingDeseadoRef.current = false;
       typingPublicadoRef.current = { valor: false, en: 0 };
+      ultimoBuzonRef.current = { valor: false, en: 0 };
 
       presenceChannel.subscribe((status) => {
         // Un canal que ya reemplazamos puede seguir avisando: no debe rearmar.
@@ -1277,6 +1287,11 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   //
   // Ahora `typingPublicadoRef` SOLO se escribe cuando el track devuelve "ok",
   // así que no puede mentir: si la publicación falla, la próxima tecla reintenta.
+  // En un ref: cambia con cada render de la página, y meterlo en las deps
+  // recrearía sendTyping y con él handleComposerUpdate en cada pintada.
+  const destinatariosRef = useRef<string[]>([]);
+  destinatariosRef.current = destinatariosDelTecleo ?? [];
+
   const typingDeseadoRef = useRef(false);
   const typingPublicadoRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
   const typingEnVueloRef = useRef(false);
@@ -1315,13 +1330,37 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   conciliarTypingRef.current = conciliarTyping;
 
+  // Freno propio del buzón, con la MISMA cadencia que la presencia. Es aparte
+  // a propósito: el buzón no depende de que el canal de presencia esté unido
+  // (va por HTTP), así que un canal caído no debe dejar la lista muda. Y no
+  // puede hacer daño si se desincroniza: sin refresco, el aviso caduca solo por
+  // el TTL del receptor — "no se ve", nunca "se ve pegado".
+  const ultimoBuzonRef = useRef<{ valor: boolean; en: number }>({ valor: false, en: 0 });
+
+  const avisarAlBuzon = useCallback(
+    (isTyping: boolean) => {
+      const userId = user?.id;
+      const destinatarios = destinatariosRef.current;
+      if (!userId || !conversationId || destinatarios.length === 0) return;
+
+      const ahora = Date.now();
+      const ultimo = ultimoBuzonRef.current;
+      if (ultimo.valor === isTyping && ahora - ultimo.en < REFRESCO_TYPING_MS) return;
+
+      ultimoBuzonRef.current = { valor: isTyping, en: ahora };
+      publicarTecleo(destinatarios, conversationId, userId, isTyping);
+    },
+    [conversationId, user?.id]
+  );
+
   const sendTyping = useCallback(
     (isTyping: boolean) => {
       if (!conversationId || !user) return;
       typingDeseadoRef.current = isTyping;
-      conciliarTyping();
+      conciliarTyping();  // presencia → chat abierto y ventanita del muelle
+      avisarAlBuzon(isTyping); // broadcast → sidebar y nubecita
     },
-    [conversationId, user, conciliarTyping]
+    [conversationId, user, conciliarTyping, avisarAlBuzon]
   );
 
   const editMessage = useCallback(

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useChatShared } from "@/hooks/ChatProvider";
 import { useOnlinePresence, type UserStatus } from "@/hooks/useOnlinePresence";
+import { useTypingInbox } from "@/hooks/useTypingInbox";
 import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 import { formatTime, truncate, getMessagePreview } from "@/pages/messenger/preview";
 import type { ConversationWithDetails } from "@/pages/messenger/types";
@@ -55,6 +56,7 @@ export default function ChatsPanel({
   const { user } = useAuth();
   const { conversations, loading, profiles, createDirectChat } = useChatShared();
   const { isOnline, getStatus } = useOnlinePresence();
+  const { quienEscribe } = useTypingInbox();
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
 
@@ -175,6 +177,7 @@ export default function ChatsPanel({
                 userId={user?.id}
                 online={isOnline}
                 status={getStatus}
+                escribiendo={!!quienEscribe(c.id)}
                 onClick={() => onAbrirChat(c.id)}
               />
             ))}
@@ -250,12 +253,13 @@ function FilaPersona({
 }
 
 function FilaChat({
-  conversation, userId, online, status, onClick,
+  conversation, userId, online, status, escribiendo, onClick,
 }: {
   conversation: ConversationWithDetails;
   userId: string | undefined;
   online: (id: string) => boolean;
   status: (id: string) => UserStatus | null;
+  escribiendo: boolean;
   onClick: () => void;
 }) {
   const isGroup = conversation.type === "group";
@@ -322,8 +326,13 @@ function FilaChat({
             {formatTime(conversation.lastMessage?.created_at)}
           </span>
         </div>
-        <p className={cn("truncate text-xs", hasUnread ? "font-medium text-foreground" : "text-muted-foreground")}>
-          {truncate(getMessagePreview(conversation, userId), 40)}
+        <p className={cn(
+          "truncate text-xs",
+          escribiendo
+            ? "font-medium text-primary"
+            : hasUnread ? "font-medium text-foreground" : "text-muted-foreground",
+        )}>
+          {escribiendo ? "escribiendo…" : truncate(getMessagePreview(conversation, userId), 40)}
         </p>
       </div>
 

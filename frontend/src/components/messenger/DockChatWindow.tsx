@@ -46,10 +46,20 @@ export default function DockChatWindow({
     markConversationRead(conversation.id);
   }, [markConversationRead, conversation.id]);
 
+  // A quién avisarle del tecleo para que se vea en la LISTA. Solo DMs: en un
+  // grupo serían N POST por persona que teclea, y no vale el fan-out.
+  const destinatariosDelTecleo = useMemo(
+    () =>
+      conversation.type === "direct"
+        ? conversation.participants.map((p) => p.user_id).filter((id) => id !== user?.id)
+        : [],
+    [conversation.type, conversation.participants, user?.id],
+  );
+
   const {
     messages, loading, hasMore, loadingMore, loadOlderMessages, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
-  } = useMessages(conversation.id, alLlegarMensaje);
+  } = useMessages(conversation.id, alLlegarMensaje, destinatariosDelTecleo);
 
   const { toggleReaction, getReactionsForMessage } = useReactions(conversation.id);
   const { getReadBy, getDeliveredBy } = useReadReceipts(conversation.id, messages);

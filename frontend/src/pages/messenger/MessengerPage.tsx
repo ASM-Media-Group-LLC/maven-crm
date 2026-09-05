@@ -98,11 +98,21 @@ export default function MessengerPage() {
     }
   }, [markConversationRead]);
 
+  // A quién avisarle del tecleo para que se vea en la LISTA. Solo DMs: en un
+  // grupo serían N POST por persona que teclea, y no vale el fan-out.
+  const destinatariosDelTecleo = useMemo(
+    () =>
+      activeConv?.type === "direct"
+        ? activeConv.participants.map((p) => p.user_id).filter((id) => id !== user?.id)
+        : [],
+    [activeConv, user?.id],
+  );
+
   const {
     messages, loading: msgsLoading, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
     hasMore, loadingMore, loadOlderMessages,
-  } = useMessages(activeChatId, handleNewMessage);
+  } = useMessages(activeChatId, handleNewMessage, destinatariosDelTecleo);
 
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
 
