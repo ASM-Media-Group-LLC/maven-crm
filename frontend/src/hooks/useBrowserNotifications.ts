@@ -23,8 +23,7 @@ export function useNotificationPermission() {
  *  que useMessengerNotifications ya aplicaba DENTRO de una pestaña
  *  (`lastSoundRef`). Lo único que cambia es que ahora se comparte entre ellas. */
 export function playNotificationSound() {
-  if (!sonarUnaVezEntrePestanas("mensaje", 1500)) return;
-  playMessageNotification();
+  sonarUnaVezEntrePestanas("mensaje", 1500, () => playMessageNotification());
 }
 
 /** Show a browser notification when the tab is hidden */

@@ -56,7 +56,7 @@ export function useCoworkRequestAlerts() {
 
       // Mismo motivo que el ding de mensajes: este hook está montado por
       // encima del router, así que cada pestaña abierta lo tocaba.
-      if (sonarUnaVezEntrePestanas("cowork-pedido", 1500)) playCoordinatorRequestSound();
+      sonarUnaVezEntrePestanas("cowork-pedido", 1500, () => playCoordinatorRequestSound());
 
       const [{ user_id, room_id }] = nuevas;
       const { data: perfil } = await supabase
