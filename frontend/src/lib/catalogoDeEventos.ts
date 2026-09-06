@@ -11,10 +11,17 @@
 //   in_app → la campana (/notificaciones) y el aviso dentro de Maven (sonido,
 //            tarjeta del navegador en escritorio).
 //   push   → el celular con Maven cerrada (requiere activar el push en Canales).
+//   email  → el correo de la cuenta. OPT-IN: viene apagado en todos los eventos
+//            (Jhon, 06/09/2026). Solo lo que genera el servidor (los avisos que
+//            pasan por push_notify_enqueue): no aplica a cada mensaje del chat,
+//            al "correo nuevo" ni a lo que solo detecta el cliente.
 // Un evento sin un canal es porque ese canal no existe para él (los mensajes de
 // la bandeja de WhatsApp no entran a la campana; el correo nuevo solo se avisa
 // al celular). Ahí la celda queda vacía, no "Pronto".
-export type CanalDeAviso = "in_app" | "push";
+export type CanalDeAviso = "in_app" | "push" | "email";
+
+/** Canales que vienen encendidos sin fila (el correo es opt-in). */
+export const CANAL_ENCENDIDO_POR_DEFECTO: Record<CanalDeAviso, boolean> = { in_app: true, push: true, email: false };
 
 export interface EventoDeAviso {
   type: string;
@@ -63,13 +70,13 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
         type: "cowork_llamado",
         label: "Llamado de atención en mi sala",
         descripcion: "Solo si soy host: cámara apagada, mal encuadre, sin luz o sin compartir pantalla.",
-        canales: ["push"],
+        canales: ["push", "email"],
       },
       {
         type: "cowork_pedido_host",
         label: "Alguien pide supervisor",
-        descripcion: "Solo si soy host de una sesión activa.",
-        canales: ["in_app"],
+        descripcion: "Solo si soy host de la sesión.",
+        canales: ["in_app", "push", "email"],
       },
     ],
   },
@@ -81,7 +88,7 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
         type: "inbox_asignacion",
         label: "Me asignaron una conversación",
         descripcion: "WhatsApp y Telegram. Solo cuando la asigna otra persona.",
-        canales: ["push"],
+        canales: ["push", "email"],
       },
       {
         type: "inbox_mensaje",
@@ -95,13 +102,13 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
     modulo: "Closers",
     permiso: "Closers",
     eventos: [
-      { type: "closer_assigned", label: "Lead asignada", canales: ["in_app", "push"] },
-      { type: "closer_contact_overdue", label: "Contacto vencido", canales: ["in_app", "push"] },
+      { type: "closer_assigned", label: "Lead asignada", canales: ["in_app", "push", "email"] },
+      { type: "closer_contact_overdue", label: "Contacto vencido", canales: ["in_app", "push", "email"] },
       {
         type: "closer_contact_decision",
         label: "Decisión pendiente",
         descripcion: "Después de 6 contactos hechos.",
-        canales: ["in_app", "push"],
+        canales: ["in_app", "push", "email"],
       },
     ],
   },
@@ -109,17 +116,17 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
     modulo: "Evaluador",
     permiso: "Evaluator",
     eventos: [
-      { type: "chatter_evaluation", label: "Evaluación de chatter lista", canales: ["in_app", "push"] },
+      { type: "chatter_evaluation", label: "Evaluación de chatter lista", canales: ["in_app", "push", "email"] },
     ],
   },
   {
     modulo: "Creadoras",
     permiso: "Creadores",
     eventos: [
-      { type: "onboarding_inactivity", label: "Inactividad en onboarding", canales: ["in_app", "push"] },
-      { type: "onboarding_complete", label: "Onboarding completado", canales: ["in_app", "push"] },
-      { type: "verification_approved", label: "Verificación aprobada", canales: ["in_app", "push"] },
-      { type: "verification_rejected", label: "Verificación rechazada", canales: ["in_app", "push"] },
+      { type: "onboarding_inactivity", label: "Inactividad en onboarding", canales: ["in_app", "push", "email"] },
+      { type: "onboarding_complete", label: "Onboarding completado", canales: ["in_app", "push", "email"] },
+      { type: "verification_approved", label: "Verificación aprobada", canales: ["in_app", "push", "email"] },
+      { type: "verification_rejected", label: "Verificación rechazada", canales: ["in_app", "push", "email"] },
     ],
   },
 ];

@@ -5,7 +5,7 @@ import NotificacionesEnEsteDispositivo from "./NotificacionesEnEsteDispositivo";
 
 const CHANNELS = [
   { key: "in_app", label: "In-app", desc: "Notificaciones dentro de la plataforma", icon: Bell, active: true },
-  { key: "email", label: "Email", desc: "Recibir notificaciones por correo electrónico", icon: Mail, active: false },
+  { key: "email", label: "Email", desc: "Al correo de tu cuenta. Viene apagado: se prende evento por evento en la pestaña Eventos.", icon: Mail, active: true },
   { key: "push", label: "Push", desc: "Notificaciones push para app móvil", icon: Smartphone, active: false },
   { key: "digest", label: "Resumen periódico", desc: "Recibir un digest con el resumen de actividad", icon: FileText, active: false, linkTab: "resumenes" },
 ] as const;
