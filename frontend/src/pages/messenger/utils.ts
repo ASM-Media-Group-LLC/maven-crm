@@ -33,3 +33,19 @@ export function formatDate(d: string) {
   if (date.toDateString() === yesterday.toDateString()) return "Ayer";
   return date.toLocaleDateString("es", { day: "numeric", month: "short" });
 }
+
+// "Ver miembros solo admins": quién puede ver la lista completa de un grupo.
+// Vive acá y no en cada pantalla porque el candado ya se coló una vez (#1373):
+// cada vía nueva que muestre miembros tiene que preguntarle a ESTA función.
+export function puedeVerLaListaDeMiembros(
+  conversation: {
+    type: "direct" | "group";
+    members_visibility?: "all" | "admins" | null;
+    participants: { user_id: string; role?: string }[];
+  },
+  userId?: string,
+): boolean {
+  if (conversation.type !== "group") return true;
+  if (conversation.members_visibility !== "admins") return true;
+  return conversation.participants.some(p => p.user_id === userId && p.role === "admin");
+}

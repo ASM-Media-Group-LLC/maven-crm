@@ -54,12 +54,14 @@ interface MessageInputProps {
   profiles: Record<string, UserProfile>;
   onCancelReply: () => void;
   participants?: { user_id: string; profile?: UserProfile }[];
+  /** Grupo con la lista de miembros oculta: el buscador de @ va a ciegas. */
+  aCiegas?: boolean;
   chatType?: string;
 }
 
 const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   conversationId, onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
-  participants, chatType,
+  participants, chatType, aCiegas,
 }, ref) => {
   const { user } = useAuth();
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -444,6 +446,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   participants={participants}
                   currentUserId={user?.id}
                   onSelect={handleMentionSelect}
+                  aCiegas={aCiegas}
                 />
               )}
               <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-2xl px-4 py-2.5 pr-12 focus-within:ring-1 focus-within:ring-primary/30">

@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import AvatarUpload from "./AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getInitials } from "../utils";
+import { getInitials, puedeVerLaListaDeMiembros } from "../utils";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -56,7 +56,7 @@ export default function ChatHeader({
     p => p.user_id === user?.id && p.role === "admin"
   );
   // "Ver miembros solo admins": a un no-admin le ocultamos la lista y el conteo.
-  const canSeeMembers = !isGroup || conversation.members_visibility !== "admins" || isAdmin;
+  const canSeeMembers = puedeVerLaListaDeMiembros(conversation, user?.id);
   // "Editar info solo admins": quién puede cambiar nombre/foto del grupo (default 'admins').
   const canEditInfo = isAdmin || (conversation.info_permission ?? "admins") === "all";
   // Click en el nombre abre el panel SOLO si puedes verlo (admin siempre; no-admin solo si

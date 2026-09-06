@@ -10,7 +10,9 @@ import { describe, it, expect } from "vitest";
 import {
   candidatosParaMencion,
   detectarTokenDeMencion,
+  LETRAS_MINIMAS_A_CIEGAS,
 } from "@/pages/messenger/components/MentionAutocomplete";
+import { puedeVerLaListaDeMiembros } from "@/pages/messenger/utils";
 
 const persona = (id: string, full_name: string) => ({ user_id: id, profile: { id, full_name } as never });
 
@@ -77,5 +79,55 @@ describe("detectarTokenDeMencion", () => {
   it("sin arroba antes del cursor, nada", () => {
     expect(detectarTokenDeMencion("hola que tal", 12)).toBeNull();
     expect(detectarTokenDeMencion("hola @Gra ", 10)).toBeNull();
+  });
+});
+
+// Grupo con "Ver miembros: solo admins". Se puede mencionar, pero no pasear la
+// lista: hasta que no hay 2 letras, el buscador no contesta nada.
+describe("buscador a ciegas (lista de miembros oculta)", () => {
+  const gente = [persona("a", "Grace Gelves M."), persona("b", "Katherin Ferrer")];
+
+  it("con el @ solo, no enseña a nadie", () => {
+    expect(candidatosParaMencion(gente, "yo", "", true)).toEqual([]);
+  });
+
+  it("con una sola letra, tampoco", () => {
+    expect(candidatosParaMencion(gente, "yo", "g", true)).toEqual([]);
+    expect(LETRAS_MINIMAS_A_CIEGAS).toBe(2);
+  });
+
+  it("con dos letras ya busca, y sigue ordenando igual", () => {
+    expect(candidatosParaMencion(gente, "yo", "gr", true).map(p => p.user_id)).toEqual(["a"]);
+    expect(candidatosParaMencion(gente, "yo", "fe", true).map(p => p.user_id)).toEqual(["b"]);
+  });
+
+  it("sin el candado, el @ solo sigue mostrando a todos", () => {
+    expect(candidatosParaMencion(gente, "yo", "", false)).toHaveLength(2);
+  });
+});
+
+describe("puedeVerLaListaDeMiembros", () => {
+  const grupo = (visibilidad: "all" | "admins" | undefined, rolMio: string) => ({
+    type: "group" as const,
+    members_visibility: visibilidad,
+    participants: [{ user_id: "yo", role: rolMio }, { user_id: "otro", role: "member" }],
+  });
+
+  it("un DM nunca tiene candado", () => {
+    expect(puedeVerLaListaDeMiembros({ type: "direct", participants: [] }, "yo")).toBe(true);
+  });
+
+  it("sin el candado, cualquiera ve la lista", () => {
+    expect(puedeVerLaListaDeMiembros(grupo("all", "member"), "yo")).toBe(true);
+    expect(puedeVerLaListaDeMiembros(grupo(undefined, "member"), "yo")).toBe(true);
+  });
+
+  it("con el candado, solo el admin del grupo", () => {
+    expect(puedeVerLaListaDeMiembros(grupo("admins", "member"), "yo")).toBe(false);
+    expect(puedeVerLaListaDeMiembros(grupo("admins", "admin"), "yo")).toBe(true);
+  });
+
+  it("sin sesión, no ve la lista", () => {
+    expect(puedeVerLaListaDeMiembros(grupo("admins", "admin"), undefined)).toBe(false);
   });
 });

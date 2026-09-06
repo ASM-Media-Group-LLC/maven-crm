@@ -38,6 +38,8 @@ interface ThreadPanelProps {
   onSendReply: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string) => void;
   onClose: () => void;
   participants?: { user_id: string; profile?: UserProfile }[];
+  /** Grupo con la lista de miembros oculta: el buscador de @ va a ciegas. */
+  aCiegas?: boolean;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
@@ -50,7 +52,7 @@ interface ThreadPanelProps {
 }
 
 export default function ThreadPanel({
-  parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants,
+  parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants, aCiegas,
   onEditMessage, onDeleteMessage, getReactionsForMessage, onToggleReaction,
   getReadByUsers, getDeliveredByUsers, totalParticipants, deletedArchive,
 }: ThreadPanelProps) {
@@ -596,6 +598,7 @@ export default function ThreadPanel({
                     participants={participants}
                     currentUserId={currentUserId}
                     onSelect={handleMentionSelect}
+                    aCiegas={aCiegas}
                   />
                 )}
                 <Textarea

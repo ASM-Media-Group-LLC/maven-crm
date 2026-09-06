@@ -14,6 +14,7 @@ import { getStatusColor, getStatusLabel } from "@/pages/messenger/components/Sta
 import MessageList from "@/pages/messenger/components/MessageList";
 import MessageInput from "@/pages/messenger/components/MessageInput";
 import type { ChatMessage, ConversationWithDetails } from "@/pages/messenger/types";
+import { puedeVerLaListaDeMiembros } from "@/pages/messenger/utils";
 import { cn } from "@/lib/utils";
 
 export const VENTANA_ANCHO = 336;
@@ -199,6 +200,7 @@ export default function DockChatWindow({
           onCancelReply={() => setReplyTo(null)}
           participants={conversation.participants}
           chatType={conversation.type}
+          aCiegas={!puedeVerLaListaDeMiembros(conversation, user?.id)}
         />
       </div>
     </div>

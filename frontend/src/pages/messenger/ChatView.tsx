@@ -13,6 +13,7 @@ import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
 import ProfileCard from "./components/ProfileCard";
 import { useDeletedMessages } from "./useDeletedMessages";
+import { puedeVerLaListaDeMiembros } from "./utils";
 import { Upload, Megaphone } from "lucide-react";
 
 interface ChatViewProps {
@@ -55,6 +56,9 @@ export default function ChatView({
   // Grupo "anuncios": solo admins escriben. Un no-admin ve un aviso en vez del composer.
   const amAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const announcementLocked = conversation.type === "group" && conversation.msg_permission === "admins" && !amAdmin;
+  // Lista de miembros oculta: el buscador de @ no enseña a nadie hasta que se
+  // teclean 2 letras, así se puede mencionar sin poder pasear el roster.
+  const mencionesACiegas = !puedeVerLaListaDeMiembros(conversation, user?.id);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -269,6 +273,7 @@ export default function ChatView({
           onCancelReply={() => setReplyTo(null)}
           participants={conversation.participants}
           chatType={conversation.type}
+          aCiegas={mencionesACiegas}
         />
       )}
 
@@ -301,6 +306,7 @@ export default function ChatView({
               deletedArchive={deletedArchive}
               onClose={() => setThreadParent(null)}
               participants={conversation.participants}
+              aCiegas={mencionesACiegas}
               onEditMessage={onEditMessage}
               onDeleteMessage={onDeleteMessage}
               getReactionsForMessage={getReactionsForMessage}

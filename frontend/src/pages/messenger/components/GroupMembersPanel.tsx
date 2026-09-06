@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { puedeVerLaListaDeMiembros } from "../utils";
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
@@ -50,7 +51,7 @@ export default function GroupMembersPanel({
   const canAddMembers = isAdmin || addPerm === "all";
   // Puede ver la lista de miembros: admin, o cualquiera si members_visibility='all'.
   // (Guarda extra: normalmente un no-admin sin permiso ni llega a abrir el panel.)
-  const canViewMembers = isAdmin || membersVis !== "admins";
+  const canViewMembers = puedeVerLaListaDeMiembros(conversation, user?.id);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const updateSetting = async (
     field: "msg_permission" | "members_visibility" | "info_permission" | "add_permission",

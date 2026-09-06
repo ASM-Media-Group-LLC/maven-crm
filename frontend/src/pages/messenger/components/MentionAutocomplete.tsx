@@ -10,6 +10,8 @@ interface MentionAutocompleteProps {
   participants: { user_id: string; profile?: UserProfile }[];
   currentUserId?: string;
   onSelect: (mention: string, userId: string) => void;
+  /** Grupo con la lista de miembros oculta: buscador a ciegas (ver `candidatosParaMencion`). */
+  aCiegas?: boolean;
 }
 
 export interface TokenDeMencion {
@@ -46,14 +48,26 @@ export function useMentionDetection(text: string, cursorPos: number) {
 // la lista scrollea, así que el tope es solo un freno para grupos enormes.
 const TOPE_DE_LA_LISTA = 50;
 
+// Cuántas letras hay que teclear antes de que el buscador a ciegas conteste.
+export const LETRAS_MINIMAS_A_CIEGAS = 2;
+
 // Antes se cortaba en 6 SIN ordenar: en "Coordinadores PLUS" (28 personas)
 // teclear "@" mostraba 6 nombres en el orden en que estaban en la base y el
 // resto simplemente no existía — de ahí el "no puedo mencionar a fulano".
+//
+// `aCiegas` = el grupo tiene la lista de miembros oculta (members_visibility
+// 'admins') y quien escribe no es admin. Ahí teclear "@" solo no enseña a
+// nadie: hay que escribir al menos LETRAS_MINIMAS_A_CIEGAS letras del nombre,
+// así se puede mencionar a alguien que ya se conoce sin poder pasear el roster.
+// ⚠️ Es un freno, no un candado: con 20 y pico de personas, alguien insistente
+// saca la lista probando pares de letras. Decisión tomada a sabiendas (06/09).
 export function candidatosParaMencion<T extends { user_id: string; profile?: UserProfile }>(
   participants: T[],
   currentUserId: string | undefined,
   query: string,
+  aCiegas = false,
 ): T[] {
+  if (aCiegas && query.length < LETRAS_MINIMAS_A_CIEGAS) return [];
   return participants
     .filter(p => p.user_id !== currentUserId && p.profile?.full_name)
     .map(p => ({ p, nombre: p.profile!.full_name!.toLowerCase() }))
@@ -160,15 +174,15 @@ export function renderTextWithMentions(
 }
 
 export default function MentionAutocomplete({
-  text, cursorPosition, participants, currentUserId, onSelect,
+  text, cursorPosition, participants, currentUserId, onSelect, aCiegas = false,
 }: MentionAutocompleteProps) {
   const mentionQuery = useMentionDetection(text, cursorPosition);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(
-    () => (mentionQuery ? candidatosParaMencion(participants, currentUserId, mentionQuery.query) : []),
-    [mentionQuery, participants, currentUserId],
+    () => (mentionQuery ? candidatosParaMencion(participants, currentUserId, mentionQuery.query, aCiegas) : []),
+    [mentionQuery, participants, currentUserId, aCiegas],
   );
 
   useEffect(() => { setSelectedIndex(0); }, [mentionQuery?.query]);
@@ -211,6 +225,16 @@ export default function MentionAutocomplete({
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
   }, [filtered, selectedIndex, handleSelect]);
+
+  // Sin la pista, teclear "@" en un grupo con la lista oculta no hace NADA y
+  // parece roto. El aviso no dice ningún nombre, así que no destapa el roster.
+  if (mentionQuery && aCiegas && mentionQuery.query.length < LETRAS_MINIMAS_A_CIEGAS) {
+    return (
+      <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border border-border rounded-xl shadow-lg z-50 px-3 py-2 text-xs text-muted-foreground">
+        Escribe {LETRAS_MINIMAS_A_CIEGAS} letras del nombre para buscar
+      </div>
+    );
+  }
 
   if (!mentionQuery || filtered.length === 0) return null;
 
