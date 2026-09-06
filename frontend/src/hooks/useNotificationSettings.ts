@@ -15,6 +15,8 @@ export interface NotificationSettings {
   dnd_start_time: string | null;
   dnd_end_time: string | null;
   dnd_allow_critical: boolean;
+  /** Opt-in a Web Push con Maven cerrada (mensajes, llamados, asignaciones). */
+  push_enabled: boolean;
   digest_enabled: boolean;
   digest_frequency: string;
   digest_time: string;
@@ -32,6 +34,7 @@ const DEFAULTS: Omit<NotificationSettings, "id" | "user_id"> = {
   dnd_start_time: null,
   dnd_end_time: null,
   dnd_allow_critical: true,
+  push_enabled: false,
   digest_enabled: false,
   digest_frequency: "daily",
   digest_time: "09:00",

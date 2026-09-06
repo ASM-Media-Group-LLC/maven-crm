@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { marcarPushEnEsteDispositivo } from "@/lib/pushDispositivo";
 
 // Suscribe el navegador a Web Push para recibir llamadas entrantes con Maven
 // CERRADO o en otra pestaña. La suscripción se guarda en `push_subscriptions`
@@ -9,6 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 // Best-effort: si el navegador no soporta push, el usuario niega el permiso, o
 // las claves VAPID no están configuradas, no pasa nada — el modal in-app sigue
 // cubriendo el caso "Maven abierto".
+//
+// Al suscribir con éxito deja la bandera `maven:push:<userId>` (lib/pushDispositivo):
+// con ella, useMessengerNotifications no duplica el aviso que ya da el service
+// worker cuando el usuario activó push_enabled.
 
 /** La VAPID public key viene en base64url; `applicationServerKey` la quiere
  *  como bytes. */
@@ -19,6 +24,16 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+/** `navigator.serviceWorker.ready` no resuelve NUNCA si no hay service worker
+ *  (dev en localhost, navegador sin soporte): con tope para no dejar la promesa
+ *  colgada. En prod el SW se registra en los primeros segundos. */
+function esperarServiceWorker(ms: number): Promise<ServiceWorkerRegistration | null> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((r) => setTimeout(() => r(null), ms)),
+  ]);
 }
 
 async function callWebPush<T>(action: string, body: Record<string, unknown>): Promise<T> {
@@ -56,9 +71,14 @@ export function usePushSubscription() {
         if (Notification.permission === "default") {
           await Notification.requestPermission();
         }
-        if (cancelled || Notification.permission !== "granted") return;
+        if (cancelled) return;
+        if (Notification.permission !== "granted") {
+          marcarPushEnEsteDispositivo(user.id, false);
+          return;
+        }
 
-        const reg = await navigator.serviceWorker.ready;
+        const reg = await esperarServiceWorker(15000);
+        if (!reg || cancelled) return;
 
         // 3. Reusar la suscripción si ya existe; si no, crearla con la VAPID key.
         let sub = await reg.pushManager.getSubscription();
@@ -75,8 +95,10 @@ export function usePushSubscription() {
         await callWebPush("subscribe", {
           subscription: { endpoint: j.endpoint, keys: j.keys },
         });
+        marcarPushEnEsteDispositivo(user.id, true);
       } catch {
         /* push no disponible: el modal in-app sigue funcionando */
+        marcarPushEnEsteDispositivo(user.id, false);
       }
     })();
 

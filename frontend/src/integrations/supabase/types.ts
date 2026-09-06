@@ -9525,6 +9525,7 @@ export type Database = {
           digest_frequency: string
           digest_time: string
           dnd_allow_critical: boolean
+          push_enabled: boolean
           dnd_enabled: boolean
           dnd_end_time: string | null
           dnd_start_time: string | null
@@ -9545,6 +9546,7 @@ export type Database = {
           digest_frequency?: string
           digest_time?: string
           dnd_allow_critical?: boolean
+          push_enabled?: boolean
           dnd_enabled?: boolean
           dnd_end_time?: string | null
           dnd_start_time?: string | null
@@ -9565,6 +9567,7 @@ export type Database = {
           digest_frequency?: string
           digest_time?: string
           dnd_allow_critical?: boolean
+          push_enabled?: boolean
           dnd_enabled?: boolean
           dnd_end_time?: string | null
           dnd_start_time?: string | null

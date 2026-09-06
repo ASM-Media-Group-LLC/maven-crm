@@ -7,9 +7,11 @@ import { useTabTitleAlert } from "@/hooks/useTabTitleAlert";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
+  playNotificationSound,
   useBrowserNotifications,
   useNotificationPermission,
 } from "@/hooks/useBrowserNotifications";
+import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
 
 // Etiqueta legible cuando el mensaje no trae texto.
 const MEDIA_LABEL: Record<string, string> = {
@@ -63,6 +65,8 @@ function mentionsMe(content: string | null, myName: string | null): boolean {
  *       - la conversación está SILENCIADA para mí (chat_participants.is_muted), o
  *       - los ajustes del usuario lo impiden (maestro de notificaciones, No-molestar; el
  *         sonido además respeta sound_enabled).
+ *     Y si este dispositivo tiene Web Push activo (push_enabled + suscripción), la
+ *     tarjeta del navegador la pone el service worker: acá queda solo el sonido.
  *
  * La RLS de chat_messages (SELECT: is_chat_participant) limita el realtime a mis
  * conversaciones, así que todo INSERT que llega es de un chat propio.
@@ -194,6 +198,14 @@ export function useMessengerNotifications() {
             !getChannelSoundMuted("messenger", userId) &&
             now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
+
+          // Con push activo en ESTE dispositivo y el opt-in del usuario, la tarjeta
+          // con la pestaña oculta la muestra el service worker (sw-push.js): acá
+          // solo sonido y título, o llegarían dos avisos por mensaje.
+          if (s.push_enabled === true && tienePushEnEsteDispositivo(userId)) {
+            if (soundOk) playNotificationSound();
+            return;
+          }
 
           notifyRef.current(
             title,

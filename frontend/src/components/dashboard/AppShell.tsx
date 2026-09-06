@@ -13,6 +13,7 @@ import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
 import { useMessengerNotifications } from "@/hooks/useMessengerNotifications";
+import { useNavegarDesdeNotificacion } from "@/hooks/useNavegarDesdeNotificacion";
 
 // Persistent shell for protected pages. Mounting Sidebar + Topbar (plus
 // global overlays like the ClariAi FAB and announcement popups) at the
@@ -66,6 +67,9 @@ const AppShell = () => {
   // Messenger interno global: ack "entregado" (✓✓ gris aunque no estés en /messenger) +
   // sonido y notificación del navegador al llegar un mensaje (salvo conversación silenciada).
   useMessengerNotifications();
+  // Al tocar una notificación push, el service worker enfoca esta ventana y le
+  // pide navegar a la conversación (postMessage "abrir-url").
+  useNavegarDesdeNotificacion();
 
   return (
     // El buzón de tecleo va POR FUERA del ChatProvider: este árbol contiene las
