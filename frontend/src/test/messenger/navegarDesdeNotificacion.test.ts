@@ -18,6 +18,7 @@ describe("rutaSegura", () => {
       "/inbox?c=abc",
       "/telegram/bandeja?c=abc",
       "/cowork?session=abc",
+      "/correo",
       "/messenger",
     ]) {
       expect(rutaSegura({ type: TIPO_ABRIR_URL, url })).toBe(url);

@@ -7,7 +7,7 @@
 //   Llamada entrante (action "notify_call"):
 //     { type: "incoming_call", callId, room, callType: "video"|"audio", caller }
 //   Aviso (action "notify", lo dispara un trigger de Postgres):
-//     { type: "chat_message"|"cowork_llamado"|"inbox_asignacion",
+//     { type: "chat_message"|"cowork_llamado"|"inbox_asignacion"|"correo_nuevo",
 //       title, body, tag, url, conversationId?, messageId? }
 //
 // Regla de los avisos: si hay una ventana de Maven VISIBLE, no se muestra nada
@@ -80,11 +80,12 @@ function mostrarAviso(data) {
       .then(function (previas) {
         var count = 1;
         var body = data.body || "";
-        // Ráfaga en el mismo chat: una sola tarjeta que va contando.
-        if (data.type === "chat_message" && previas.length) {
+        // Ráfaga en el mismo chat (o varios correos seguidos en el mismo buzón):
+        // una sola tarjeta que va contando.
+        if ((data.type === "chat_message" || data.type === "correo_nuevo") && previas.length) {
           var prev = (previas[0] && previas[0].data) || {};
           count = (prev.count || 1) + 1;
-          body = count + " mensajes nuevos";
+          body = count + (data.type === "correo_nuevo" ? " correos nuevos" : " mensajes nuevos");
         }
         return self.registration.showNotification(data.title, {
           body: body,

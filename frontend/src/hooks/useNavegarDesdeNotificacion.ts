@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 // contra una lista de secciones: un mensaje raro de otro origen no puede
 // mandarnos a cualquier parte.
 export const TIPO_ABRIR_URL = "abrir-url";
-const RUTAS_PERMITIDAS = /^\/(messenger|inbox|telegram|cowork)(\?|\/|$)/;
+const RUTAS_PERMITIDAS = /^\/(messenger|inbox|telegram|cowork|correo)(\?|\/|$)/;
 
 export function rutaSegura(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;

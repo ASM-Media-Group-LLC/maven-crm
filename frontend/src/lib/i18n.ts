@@ -430,7 +430,7 @@ const translations = {
   "pwa.actualizar.titulo": { es: "Nueva versión disponible", en: "New version available" },
   "pwa.actualizar.boton": { es: "Recargar", en: "Reload" },
   "push.dispositivo.titulo": { es: "Notificaciones en este dispositivo", en: "Notifications on this device" },
-  "push.dispositivo.descripcion": { es: "Mensajes, llamados y asignaciones aunque Maven esté cerrada. Se activa por dispositivo.", en: "Messages, call-outs and assignments even when Maven is closed. Enabled per device." },
+  "push.dispositivo.descripcion": { es: "Mensajes, correos nuevos, llamados y asignaciones aunque Maven esté cerrada. Se activa por dispositivo.", en: "Messages, new emails, call-outs and assignments even when Maven is closed. Enabled per device." },
   "push.dispositivo.activas": { es: "Activas", en: "On" },
   "push.dispositivo.inactivas": { es: "Inactivas", en: "Off" },
   "push.dispositivo.bloqueadas": { es: "Bloqueadas en el navegador", en: "Blocked in the browser" },
