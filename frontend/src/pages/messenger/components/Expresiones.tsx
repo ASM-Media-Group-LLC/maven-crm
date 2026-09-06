@@ -19,6 +19,7 @@ export default function Expresiones({
   onSticker,
   disabled,
   className,
+  iconClassName,
 }: {
   /** Los emojis frecuentes del usuario (los de la barra de escritorio). */
   favoritos: string[];
