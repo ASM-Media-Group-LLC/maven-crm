@@ -235,26 +235,31 @@ export default function NotaDeVoz({
     // la ventanita flotante la burbuja es más angosta que eso, así que la onda
     // se salía por el borde. Con ancho PREFERIDO + tope al contenedor, en el
     // chat grande mide 260 y en la flotante cede lo que haga falta.
-    <div className="flex items-center gap-2 w-[260px] max-w-full min-w-0">
-      <button
-        type="button"
-        onClick={() => void alternar()}
-        aria-label={sonando ? "Pausar" : "Reproducir"}
-        className={cn(
-          "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95",
-          esMio ? "bg-primary-foreground/20 hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90",
-        )}
-      >
-        {cargando ? <Loader2 className="h-4 w-4 animate-spin" />
-          : sonando ? <Pause className="h-4 w-4" />
-          : <Play className="h-4 w-4 ml-0.5" />}
-      </button>
+    <div className="w-[260px] max-w-full min-w-0">
+      {/* ⚠️ Los TRES controles van en la MISMA línea, y el reloj cuelga aparte.
+          Antes el reloj vivía dentro de la columna del medio: esa columna medía
+          43px contra los 36 del botón, así que con items-center la fila se
+          centraba por la columna y la onda quedaba 7,5px MÁS ARRIBA que el play
+          y que el ×velocidad (medido en prod el 06/09). Se veía torcido. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void alternar()}
+          aria-label={sonando ? "Pausar" : "Reproducir"}
+          className={cn(
+            "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95",
+            esMio ? "bg-primary-foreground/20 hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90",
+          )}
+        >
+          {cargando ? <Loader2 className="h-4 w-4 animate-spin" />
+            : sonando ? <Pause className="h-4 w-4" />
+            : <Play className="h-4 w-4 ml-0.5" />}
+        </button>
 
-      <div className="flex-1 min-w-0">
         <div
           onClick={buscar}
           role="presentation"
-          className="flex h-7 min-w-0 items-center gap-px cursor-pointer"
+          className="flex-1 flex h-7 min-w-0 items-center gap-px cursor-pointer"
           title="Clic para moverte por el audio"
         >
           {alturas.map((h, i) => (
@@ -270,23 +275,31 @@ export default function NotaDeVoz({
             />
           ))}
         </div>
-        <div className={cn("text-[10px] tabular-nums", esMio ? "text-primary-foreground/70" : "text-muted-foreground")}>
-          {reloj(sonando || transcurrido > 0 ? transcurrido : duracion)}
-        </div>
+
+        <button
+          type="button"
+          onClick={cambiarVelocidad}
+          aria-label={`Velocidad ${velocidad}x`}
+          className={cn(
+            "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-opacity",
+            velocidad === 1 && !sonando ? "opacity-40" : "opacity-100",
+            esMio ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/15 text-primary",
+          )}
+        >
+          {velocidad}×
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={cambiarVelocidad}
-        aria-label={`Velocidad ${velocidad}x`}
-        className={cn(
-          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-opacity",
-          velocidad === 1 && !sonando ? "opacity-40" : "opacity-100",
-          esMio ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/15 text-primary",
-        )}
-      >
-        {velocidad}×
-      </button>
+      {/* El hueco de la izquierda se calca del botón (w-9) y del gap-2 de arriba
+          en vez de un padding a mano, para que el reloj no se corra si alguno
+          de los dos cambia. `leading-none` porque `text-[10px]` NO toca el
+          interlineado: heredaba los 15px de la burbuja y engordaba la fila. */}
+      <div className="flex gap-2">
+        <span className="w-9 shrink-0" aria-hidden="true" />
+        <span className={cn("text-[10px] leading-none tabular-nums", esMio ? "text-primary-foreground/70" : "text-muted-foreground")}>
+          {reloj(sonando || transcurrido > 0 ? transcurrido : duracion)}
+        </span>
+      </div>
 
       <audio ref={audioRef} preload="none" className="hidden" />
     </div>
