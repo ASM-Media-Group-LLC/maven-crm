@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Square, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import NotaDeVoz from "./NotaDeVoz";
 
 const MAX_DURATION_SEC = 300; // 5 minutes max
 
@@ -185,9 +186,10 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
         <>
           <div className="flex items-center gap-2 flex-1">
             <span className="text-sm font-mono text-foreground">{formatTime(duration)}</span>
-            {previewUrl && (
-              <audio src={previewUrl} controls className="h-8 flex-1 max-w-[200px]" />
-            )}
+            {/* El nativo NO sirve acá: es el mismo .webm de MediaRecorder que en
+                el chat, sin duración en la cabecera, así que la barra saldría
+                clavada al final. */}
+            {previewUrl && <NotaDeVoz src={previewUrl} />}
           </div>
           <Button size="icon" className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground" onClick={handleSend}>
             <Send className="h-3.5 w-3.5" />

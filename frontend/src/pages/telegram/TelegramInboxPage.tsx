@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
+import NotaDeVoz from "@/pages/messenger/components/NotaDeVoz";
 
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
@@ -843,7 +844,13 @@ const TelegramInboxPage = () => {
                                 </div>
                               )}
                               {mediaShown && (m.msg_type === "voice" || m.msg_type === "audio") && (
-                                <audio controls src={m.media_url as string} className="mb-1 w-56 max-w-full" />
+                                <div className="mb-1">
+                                  {/* Mismo reproductor que el Messenger: onda,
+                                      arrastre y velocidad. Los .ogg de Telegram
+                                      sí traen duración, pero el aspecto tiene
+                                      que ser el mismo en toda la app. */}
+                                  <NotaDeVoz src={m.media_url as string} />
+                                </div>
                               )}
                               {mediaShown && m.msg_type === "document" && (
                                 <a href={m.media_url as string} target="_blank" rel="noreferrer" className="mb-1 flex items-center gap-1.5 underline">
