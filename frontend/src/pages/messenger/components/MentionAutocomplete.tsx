@@ -12,20 +12,66 @@ interface MentionAutocompleteProps {
   onSelect: (mention: string, userId: string) => void;
 }
 
-export function useMentionDetection(text: string, cursorPos: number) {
-  // Detect if cursor is inside an @mention trigger
-  const mentionQuery = useMemo(() => {
-    const beforeCursor = text.slice(0, cursorPos);
-    const match = beforeCursor.match(/@(\w*)$/);
-    if (!match) return null;
-    return {
-      query: match[1].toLowerCase(),
-      startIndex: match.index!,
-      endIndex: cursorPos,
-    };
-  }, [text, cursorPos]);
+export interface TokenDeMencion {
+  query: string;
+  startIndex: number;
+  endIndex: number;
+}
 
-  return mentionQuery;
+// El "@algo" que está justo antes del cursor, si lo hay.
+//   \p{L} en vez de \w: con \w, teclear la tilde de "@Durán" o "@Mejía"
+//   rompía el token y la lista se cerraba a mitad del nombre.
+//   El "@" tiene que ir al principio o después de un espacio/paréntesis: si no,
+//   escribir un correo ("jhon@maven-ai.me") abría el buscador de personas.
+const TOKEN_DE_MENCION = /(?:^|[\s(])@([\p{L}\p{N}_]*)$/u;
+
+export function detectarTokenDeMencion(text: string, cursorPos: number): TokenDeMencion | null {
+  const beforeCursor = text.slice(0, cursorPos);
+  const match = beforeCursor.match(TOKEN_DE_MENCION);
+  if (!match) return null;
+  // match.index apunta al espacio de adelante (si lo hubo), no a la arroba.
+  const startIndex = match.index! + (match[0].length - match[1].length - 1);
+  return {
+    query: match[1].toLowerCase(),
+    startIndex,
+    endIndex: cursorPos,
+  };
+}
+
+export function useMentionDetection(text: string, cursorPos: number) {
+  return useMemo(() => detectarTokenDeMencion(text, cursorPos), [text, cursorPos]);
+}
+
+// Cuántos nombres puede llegar a listar. No es "los primeros N que haya":
+// la lista scrollea, así que el tope es solo un freno para grupos enormes.
+const TOPE_DE_LA_LISTA = 50;
+
+// Antes se cortaba en 6 SIN ordenar: en "Coordinadores PLUS" (28 personas)
+// teclear "@" mostraba 6 nombres en el orden en que estaban en la base y el
+// resto simplemente no existía — de ahí el "no puedo mencionar a fulano".
+export function candidatosParaMencion<T extends { user_id: string; profile?: UserProfile }>(
+  participants: T[],
+  currentUserId: string | undefined,
+  query: string,
+): T[] {
+  return participants
+    .filter(p => p.user_id !== currentUserId && p.profile?.full_name)
+    .map(p => ({ p, nombre: p.profile!.full_name!.toLowerCase() }))
+    .filter(({ nombre }) => nombre.includes(query))
+    .map(c => ({
+      ...c,
+      // Primero el que empieza por lo tecleado, después el que tiene un
+      // APELLIDO que empieza así, y al final el que solo lo lleva por dentro:
+      // teclear "ja" pone a Jackeline antes que a Alejandra.
+      rango: c.nombre.startsWith(query)
+        ? 0
+        : c.nombre.split(/\s+/).some(palabra => palabra.startsWith(query))
+          ? 1
+          : 2,
+    }))
+    .sort((a, b) => (a.rango !== b.rango ? a.rango - b.rango : a.nombre.localeCompare(b.nombre, "es")))
+    .slice(0, TOPE_DE_LA_LISTA)
+    .map(({ p }) => p);
 }
 
 export function insertMention(text: string, startIndex: number, endIndex: number, displayName: string): string {
@@ -120,18 +166,18 @@ export default function MentionAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filtered = useMemo(() => {
-    if (!mentionQuery) return [];
-    return participants
-      .filter(p => p.user_id !== currentUserId && p.profile?.full_name)
-      .filter(p => {
-        const name = p.profile!.full_name!.toLowerCase();
-        return name.includes(mentionQuery.query);
-      })
-      .slice(0, 6);
-  }, [mentionQuery, participants, currentUserId]);
+  const filtered = useMemo(
+    () => (mentionQuery ? candidatosParaMencion(participants, currentUserId, mentionQuery.query) : []),
+    [mentionQuery, participants, currentUserId],
+  );
 
   useEffect(() => { setSelectedIndex(0); }, [mentionQuery?.query]);
+
+  // La lista ya no se corta en 6, así que las flechas tienen que arrastrar el
+  // scroll: si no, el resaltado se va abajo del borde y parece que no hay más.
+  useEffect(() => {
+    (listRef.current?.children[selectedIndex] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   const handleSelect = useCallback((participant: typeof filtered[0]) => {
     if (!mentionQuery) return;
