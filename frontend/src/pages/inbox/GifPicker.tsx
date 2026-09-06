@@ -81,7 +81,11 @@ export function GifPanel({ onPick, activo, rellenar }: { onPick: (mp4Url: string
   return (
     <div className={rellenar ? "flex h-full min-h-0 flex-col" : undefined}>
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("gif.search")} className="mb-2 h-9 shrink-0" />
-        <div className={rellenar ? "grid min-h-0 flex-1 grid-cols-2 gap-1.5 overflow-y-auto content-start" : "grid max-h-72 grid-cols-2 gap-1.5 overflow-y-auto"}>
+        {/* El que scrollea es el contenedor; la grilla adentro mide lo que miden sus
+            filas. Cuando la grilla era a la vez el scroll de alto fijo, las filas se
+            encogían y los GIF salían como tiras. */}
+        <div className={rellenar ? "min-h-0 flex-1 overflow-y-auto" : "max-h-72 overflow-y-auto"}>
+        <div className="grid grid-cols-2 gap-1.5">
           {loading && (
             <div className="col-span-2 flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -106,6 +110,7 @@ export function GifPanel({ onPick, activo, rellenar }: { onPick: (mp4Url: string
               <img src={g.preview} alt="" className="h-24 w-full object-cover" loading="lazy" />
             </button>
           ))}
+        </div>
         </div>
         <p className="mt-1 shrink-0 text-center text-[10px] text-muted-foreground">vía GIPHY</p>
     </div>

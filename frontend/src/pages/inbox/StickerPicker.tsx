@@ -117,7 +117,8 @@ export function StickerPanel({ onPick, activo, rellenar }: { onPick: (url: strin
           </Button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onUpload} />
         </div>
-        <div className={rellenar ? "grid min-h-0 flex-1 grid-cols-3 gap-1.5 overflow-y-auto content-start" : "grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto"}>
+        <div className={rellenar ? "min-h-0 flex-1 overflow-y-auto" : "max-h-72 overflow-y-auto"}>
+        <div className="grid grid-cols-3 gap-1.5">
           {isLoading && (
             <div className="col-span-3 flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           )}
@@ -143,6 +144,7 @@ export function StickerPanel({ onPick, activo, rellenar }: { onPick: (url: strin
               </button>
             </div>
           ))}
+        </div>
         </div>
     </div>
   );
