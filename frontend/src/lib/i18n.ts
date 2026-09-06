@@ -421,7 +421,7 @@ const translations = {
   "pwa.instalar.iosPaso2": { es: "Desliza la lista hacia abajo y elige «Añadir a pantalla de inicio»", en: "Scroll the list down and choose “Add to Home Screen”" },
   "pwa.instalar.iosPaso3": { es: "Toca «Añadir» arriba a la derecha", en: "Tap “Add” in the top right" },
   "pwa.instalar.iosPaso4": { es: "Abre Maven desde el icono nuevo de tu pantalla de inicio", en: "Open Maven from the new icon on your Home Screen" },
-  "pwa.instalar.iosSoloSafari": { es: "Si no te aparece la opción, abre este enlace en Safari y repite los pasos.", en: "If the option doesn't show up, open this link in Safari and repeat the steps." },
+  "pwa.instalar.iosSoloSafari": { es: "¿No aparece «Añadir a pantalla de inicio»? Pasa en Brave y otros navegadores: en esa misma lista toca «Abrir en Safari» y repite los pasos allí.", en: "Don't see “Add to Home Screen”? It happens in Brave and other browsers: in that same list tap “Open in Safari” and repeat the steps there." },
   "pwa.instalar.copiarEnlace": { es: "Copiar enlace", en: "Copy link" },
   "pwa.instalar.enlaceCopiado": { es: "Enlace copiado", en: "Link copied" },
   "pwa.instalar.posponer": { es: "Ahora no", en: "Not now" },
