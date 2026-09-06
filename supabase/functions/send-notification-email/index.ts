@@ -76,6 +76,14 @@ Deno.serve(async (req) => {
         // No es un JWT decodificable — lo frena el getUser de abajo.
       }
     }
+    // Triggers de Postgres (pg_net, avisos por correo de Ajustes → Eventos): no
+    // tienen JWT propio. Llegan con el anon key de Bearer —para pasar el
+    // verify_jwt del gateway— y el token interno en X-Cron-Token, igual que
+    // los crons de la bandeja llaman a sus edges.
+    const cronToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+    if (!isServiceCall && cronToken && req.headers.get("X-Cron-Token") === cronToken) {
+      isServiceCall = true;
+    }
     if (!isServiceCall) {
       const authClient = createClient(
         Deno.env.get("SUPABASE_URL")!,

@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Settings, Bell, Radio, Layers, BarChart3, FileText, Moon, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { TABS, TAB_POR_DEFECTO, tabDesdeUrl, type TabId } from "./notificaciones/tabs";
 import { Button } from "@/components/ui/button";
 import GeneralTab from "./notificaciones/GeneralTab";
 import CanalesTab from "./notificaciones/CanalesTab";
@@ -9,15 +9,6 @@ import EventosTab from "./notificaciones/EventosTab";
 import PrioridadTab from "./notificaciones/PrioridadTab";
 import ResumenesTab from "./notificaciones/ResumenesTab";
 import NoMolestarTab from "./notificaciones/NoMolestarTab";
-
-const TABS = [
-  { id: "general", label: "General", icon: Settings },
-  { id: "canales", label: "Canales", icon: Radio },
-  { id: "eventos", label: "Eventos", icon: Bell },
-  { id: "prioridad", label: "Prioridad", icon: BarChart3 },
-  { id: "resumenes", label: "Resúmenes", icon: FileText },
-  { id: "no-molestar", label: "No Molestar", icon: Moon },
-] as const;
 
 const TAB_CONTENT: Record<string, React.FC> = {
   general: GeneralTab,
@@ -29,7 +20,15 @@ const TAB_CONTENT: Record<string, React.FC> = {
 };
 
 const NotificacionesSettings = () => {
-  const [activeTab, setActiveTab] = useState("general");
+  // La pestaña va en la URL (?tab=…) para sobrevivir al refresco; ver tabs.ts.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = tabDesdeUrl(searchParams.get("tab"));
+  const setActiveTab = (tab: TabId) => {
+    const siguiente = new URLSearchParams(searchParams);
+    if (tab === TAB_POR_DEFECTO) siguiente.delete("tab");
+    else siguiente.set("tab", tab);
+    setSearchParams(siguiente, { replace: true });
+  };
   const navigate = useNavigate();
   const ActiveComponent = TAB_CONTENT[activeTab];
 

@@ -38,7 +38,7 @@ describe("catálogo de eventos", () => {
   it("incluye los kinds que los triggers de Postgres mandan al celular", () => {
     // push_chat_message (chat_message), push_correo_nuevo, push_cowork_llamado,
     // push_inbox_asignacion. Si se agrega un trigger nuevo, va acá y en el catálogo.
-    for (const kind of ["chat_message", "correo_nuevo", "cowork_llamado", "inbox_asignacion"]) {
+    for (const kind of ["chat_message", "correo_nuevo", "cowork_llamado", "cowork_pedido_host", "inbox_asignacion"]) {
       expect(eventoDelTipo(kind)?.canales, kind).toContain("push");
     }
   });
@@ -49,6 +49,17 @@ describe("catálogo de eventos", () => {
       "closer_contact_decision", "onboarding_inactivity", "verification_approved",
     ]) {
       expect(eventoDelTipo(t)?.canales, t).toContain("in_app");
+    }
+  });
+
+  it("el correo es opt-in y solo para lo que genera el servidor", () => {
+    // Sin canal correo: cada mensaje del chat, el "correo nuevo" y lo que solo detecta el cliente.
+    for (const t of ["chat_message", "correo_nuevo", "inbox_mensaje"]) {
+      expect(eventoDelTipo(t)?.canales, t).not.toContain("email");
+    }
+    // Con canal correo: lo que pasa por push_notify_enqueue (que también resuelve el correo).
+    for (const t of ["cowork_llamado", "cowork_pedido_host", "inbox_asignacion", "closer_assigned", "chatter_evaluation", "onboarding_inactivity"]) {
+      expect(eventoDelTipo(t)?.canales, t).toContain("email");
     }
   });
 
@@ -77,13 +88,21 @@ describe("canalActivoEn (espejo de notif_canal_activo en Postgres)", () => {
     notification_type: "closer_assigned",
     channel_in_app: true,
     channel_push: true,
+    channel_email: false,
     is_enabled: true,
     ...extra,
   });
 
-  it("sin fila, todo encendido", () => {
+  it("sin fila: En Maven y Celular encendidos, Correo apagado", () => {
     expect(canalActivoEn([], "closer_assigned", "in_app")).toBe(true);
     expect(canalActivoEn([], "closer_assigned", "push")).toBe(true);
+    expect(canalActivoEn([], "closer_assigned", "email")).toBe(false);
+  });
+
+  it("el correo solo se prende con channel_email = true; null sigue apagado", () => {
+    expect(canalActivoEn([fila({ channel_email: true })], "closer_assigned", "email")).toBe(true);
+    expect(canalActivoEn([fila({ channel_email: null })], "closer_assigned", "email")).toBe(false);
+    expect(canalActivoEn([fila({ channel_email: true, is_enabled: false })], "closer_assigned", "email")).toBe(false);
   });
 
   it("apaga un canal sin tocar el otro", () => {
@@ -97,5 +116,6 @@ describe("canalActivoEn (espejo de notif_canal_activo en Postgres)", () => {
     expect(canalActivoEn([fila({ is_enabled: false })], "closer_assigned", "in_app")).toBe(false);
     expect(canalActivoEn([fila({ is_enabled: false })], "closer_assigned", "push")).toBe(false);
     expect(canalActivoEn([fila({ channel_in_app: null, channel_push: null, is_enabled: null })], "closer_assigned", "push")).toBe(true);
+    expect(canalActivoEn([fila({ channel_in_app: null, channel_push: null, is_enabled: null })], "closer_assigned", "in_app")).toBe(true);
   });
 });

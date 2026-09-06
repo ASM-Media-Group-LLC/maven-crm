@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -50,6 +50,9 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
   const { isCanalActivo } = useNotificationPreferences();
+  // En ref: el handler de realtime vive en un efecto con deps fijas.
+  const isCanalActivoRef = useRef(isCanalActivo);
+  isCanalActivoRef.current = isCanalActivo;
   const { settings: notifSettings } = useNotificationSettings();
 
   const query = useQuery({
@@ -101,6 +104,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           // Only add if it's for this user or role-targeted
           if (n.user_id === uid || (n.user_id === null && n.role_target)) {
             qc.invalidateQueries({ queryKey: ["notifications"] });
+
+            // Ajustes → Eventos → "En Maven" apagado para este tipo: la fila se
+            // guarda igual (de ella salen el push y el correo), pero acá ni se
+            // muestra ni suena.
+            if (n.type && !isCanalActivoRef.current(n.type, "in_app")) return;
 
             // Play sound if enabled and not in DND
             if (notifSettings.sound_enabled && !notifSettings.dnd_enabled) {
