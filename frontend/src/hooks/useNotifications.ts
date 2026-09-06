@@ -49,7 +49,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const uid = user?.id;
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
-  const { isTypeEnabled } = useNotificationPreferences();
+  const { isCanalActivo } = useNotificationPreferences();
   const { settings: notifSettings } = useNotificationSettings();
 
   const query = useQuery({
@@ -129,10 +129,9 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
       return false;
     }
-    // Preference filter (opt-out model)
-    if (n.module_origin && n.type) {
-      if (!isTypeEnabled(n.module_origin, n.type)) return false;
-    }
+    // Preferencia por tipo (opt-out). El servidor ya no crea la fila cuando el
+    // in-app de ese tipo está apagado; esto tapa las que quedaron de antes.
+    if (n.type && !isCanalActivo(n.type, "in_app")) return false;
     return true;
   });
 

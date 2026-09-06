@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { useTabTitleAlert } from "@/hooks/useTabTitleAlert";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
   playNotificationSound,
@@ -92,6 +93,9 @@ export function useMessengerNotifications() {
   // vía refs (sin re-suscribir en cada cambio de settings/notify).
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const { isCanalActivo } = useNotificationPreferences();
+  const prefRef = useRef(isCanalActivo);
+  prefRef.current = isCanalActivo;
   const settingsCargandoRef = useRef(settingsCargando);
   settingsCargandoRef.current = settingsCargando;
   const notifyRef = useRef(notify);
@@ -157,6 +161,8 @@ export function useMessengerNotifications() {
           // (2) Notificación — condicional. Maestro apagado o No-molestar (según horario) → nada.
           const s = settingsRef.current;
           if (s.notifications_enabled === false || isDndActiveNow(s)) return;
+          // Ajustes → Notificaciones → Eventos → Messenger (el push lo decide el servidor).
+          if (!prefRef.current("chat_message", "in_app")) return;
 
           // Mute + modo de notificación de la conversación (mi fila) + tipo/nombre en 1 query.
           const { data: part } = await supabase

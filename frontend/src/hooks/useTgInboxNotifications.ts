@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
@@ -46,6 +47,9 @@ export function useTgInboxNotifications() {
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const { isCanalActivo } = useNotificationPreferences();
+  const prefRef = useRef(isCanalActivo);
+  prefRef.current = isCanalActivo;
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   const lastSoundRef = useRef(0);
@@ -83,6 +87,8 @@ export function useTgInboxNotifications() {
 
           const s = settingsRef.current;
           if (s.notifications_enabled === false || s.dnd_enabled) return;
+          // Ajustes → Notificaciones → Eventos → Bandeja.
+          if (!prefRef.current("inbox_mensaje", "in_app")) return;
 
           // Nombre del peer (best-effort; la RLS limita a conversaciones visibles).
           let title = "Nuevo mensaje de Telegram";

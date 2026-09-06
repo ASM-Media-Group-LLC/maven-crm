@@ -131,37 +131,3 @@ export const STATUS_OPTIONS = [
   { value: "read", label: "Leída" },
   { value: "archived", label: "Archivada" },
 ] as const;
-
-// ─── Notification types by module (for preferences) ───────────
-export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label: string }[]> = {
-  Creadores: [
-    { type: "onboarding_complete", label: "Onboarding completado" },
-    { type: "verification_pending", label: "Verificación pendiente" },
-    { type: "document_missing", label: "Documento faltante" },
-    { type: "onboarding_inactivity", label: "Inactividad en onboarding" },
-    { type: "verification_approved", label: "Verificación aprobada" },
-    { type: "verification_rejected", label: "Verificación rechazada" },
-  ],
-  HR: [
-    { type: "absence_request", label: "Solicitud de ausencia" },
-    { type: "contract_expiring", label: "Contrato por vencer" },
-    { type: "incident_created", label: "Incidente creado" },
-  ],
-  Finanzas: [
-    { type: "invoice_created", label: "Factura creada" },
-    { type: "payment_pending", label: "Pago pendiente" },
-    { type: "payroll_ready", label: "Nómina lista" },
-  ],
-  Tickets: [
-    { type: "ticket_assigned", label: "Ticket asignado" },
-    { type: "ticket_escalated", label: "Ticket escalado" },
-  ],
-  Closers: [
-    { type: "closer_assigned", label: "Lead asignada" },
-    { type: "closer_contact_overdue", label: "Contacto vencido" },
-    { type: "closer_contact_decision", label: "Decisión pendiente (6 contactos hechos)" },
-  ],
-  Comunicación: [
-    { type: "announcement", label: "Anuncio publicado" },
-  ],
-};

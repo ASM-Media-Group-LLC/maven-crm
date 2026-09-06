@@ -1,15 +1,38 @@
+import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { CanalDeAviso } from "@/lib/catalogoDeEventos";
 
+// Preferencias por evento (Ajustes → Notificaciones → Eventos).
+//
+// Modelo opt-out: sin fila, todo encendido. Una fila apaga o prende cada canal
+// (in_app / push) de un tipo de evento. La misma regla vive en el servidor
+// (notif_canal_activo, migración 20260906160000): acá se usa para lo que decide
+// el cliente (el filtro de la campana, el sonido y la tarjeta dentro de Maven) y
+// allá para lo que decide la base (crear la fila de la campana, mandar el push).
 export interface NotificationPreference {
   id: string;
   user_id: string;
   module: string;
   notification_type: string;
-  channel_in_app: boolean;
-  channel_email: boolean;
-  is_enabled: boolean;
+  channel_in_app: boolean | null;
+  channel_push: boolean | null;
+  is_enabled: boolean | null;
+  updated_at: string | null;
+}
+
+/** Regla pura, espejo de `notif_canal_activo` en Postgres. */
+export function canalActivoEn(
+  prefs: readonly Pick<NotificationPreference, "notification_type" | "channel_in_app" | "channel_push" | "is_enabled">[],
+  type: string,
+  canal: CanalDeAviso,
+): boolean {
+  const pref = prefs.find((p) => p.notification_type === type);
+  if (!pref) return true;
+  if (pref.is_enabled === false) return false;
+  const valor = canal === "push" ? pref.channel_push : pref.channel_in_app;
+  return valor !== false;
 }
 
 export function useNotificationPreferences() {
@@ -21,7 +44,7 @@ export function useNotificationPreferences() {
     queryFn: async (): Promise<NotificationPreference[]> => {
       const { data, error } = await supabase
         .from("notification_preferences")
-        .select("*")
+        .select("id, user_id, module, notification_type, channel_in_app, channel_push, is_enabled, updated_at")
         .order("module");
       if (error) throw error;
       return (data ?? []) as NotificationPreference[];
@@ -29,68 +52,68 @@ export function useNotificationPreferences() {
     enabled: !!user,
   });
 
+  const prefs = useMemo(() => query.data ?? [], [query.data]);
+
+  // Cambia UN canal de UN tipo sin pisar el otro canal: la fila se completa con
+  // lo que ya había (o con "encendido", que es el default sin fila).
   const upsertPreference = useMutation({
-    mutationFn: async (pref: {
+    mutationFn: async (cambio: {
       module: string;
       notification_type: string;
       channel_in_app?: boolean;
-      channel_email?: boolean;
-      is_enabled?: boolean;
+      channel_push?: boolean;
     }) => {
+      const actual = prefs.find((p) => p.notification_type === cambio.notification_type);
       const { error } = await supabase
         .from("notification_preferences")
         .upsert(
           {
             user_id: user!.id,
-            module: pref.module,
-            notification_type: pref.notification_type,
-            channel_in_app: pref.channel_in_app ?? true,
-            channel_email: pref.channel_email ?? false,
-            is_enabled: pref.is_enabled ?? true,
-          } as any,
-          { onConflict: "user_id,module,notification_type" }
+            module: cambio.module,
+            notification_type: cambio.notification_type,
+            channel_in_app: cambio.channel_in_app ?? actual?.channel_in_app ?? true,
+            channel_push: cambio.channel_push ?? actual?.channel_push ?? true,
+            is_enabled: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,module,notification_type" },
         );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notification-preferences"] }),
   });
 
-  const toggleModule = useMutation({
-    mutationFn: async ({ module, enabled }: { module: string; enabled: boolean }) => {
-      // Get all types for this module from existing preferences
-      const existing = (query.data ?? []).filter((p) => p.module === module);
-      if (existing.length > 0) {
-        const { error } = await supabase
-          .from("notification_preferences")
-          .update({ is_enabled: enabled } as any)
-          .eq("module", module);
-        if (error) throw error;
-      }
+  // Varios tipos de golpe (el interruptor "Todo" de un módulo).
+  const upsertVarias = useMutation({
+    mutationFn: async (filas: {
+      module: string;
+      notification_type: string;
+      channel_in_app: boolean;
+      channel_push: boolean;
+    }[]) => {
+      if (!filas.length) return;
+      const ahora = new Date().toISOString();
+      const { error } = await supabase
+        .from("notification_preferences")
+        .upsert(
+          filas.map((f) => ({ user_id: user!.id, ...f, is_enabled: true, updated_at: ahora })),
+          { onConflict: "user_id,module,notification_type" },
+        );
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notification-preferences"] }),
   });
 
-  // Helper: check if a notification type is enabled (opt-out model: enabled by default)
-  const isTypeEnabled = (module: string, notificationType: string): boolean => {
-    const pref = (query.data ?? []).find(
-      (p) => p.module === module && p.notification_type === notificationType
-    );
-    if (!pref) return true; // Default: enabled
-    return pref.is_enabled && pref.channel_in_app;
-  };
-
-  const isModuleEnabled = (module: string): boolean => {
-    const prefs = (query.data ?? []).filter((p) => p.module === module);
-    if (prefs.length === 0) return true; // Default: enabled
-    return prefs.some((p) => p.is_enabled);
-  };
+  const isCanalActivo = useCallback(
+    (type: string, canal: CanalDeAviso) => canalActivoEn(prefs, type, canal),
+    [prefs],
+  );
 
   return {
-    preferences: query.data ?? [],
+    preferences: prefs,
     isLoading: query.isLoading,
     upsertPreference,
-    toggleModule,
-    isTypeEnabled,
-    isModuleEnabled,
+    upsertVarias,
+    isCanalActivo,
   };
 }
