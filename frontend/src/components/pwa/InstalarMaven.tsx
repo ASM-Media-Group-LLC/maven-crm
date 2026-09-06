@@ -50,21 +50,26 @@ export default function InstalarMaven({
     cuerpo = <p className="text-[13px] text-muted-foreground">{t("pwa.instalar.yaInstalada")}</p>;
   } else if (plataforma === "escritorio") {
     cuerpo = <p className="text-[13px] text-muted-foreground">{t("pwa.instalar.soloTelefono")}</p>;
-  } else if (plataforma === "ios-safari") {
-    cuerpo = (
-      <ol className="space-y-1.5">
-        <Paso n={1} icono={<Share className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso1")} />
-        <Paso n={2} icono={<SquarePlus className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso2")} />
-      </ol>
-    );
-  } else if (plataforma === "ios-otro") {
+  } else if (plataforma === "ios-safari" || plataforma === "ios-otro") {
+    // Los mismos cuatro pasos para Safari, Brave y Chrome en iPhone: desde iOS
+    // 16.4 cualquier navegador puede añadir a la pantalla de inicio desde su
+    // menú Compartir, y Brave ni siquiera se distingue de Safari por el UA. Lo
+    // que fallaba no era el navegador sino que "Toca Compartir" no decía DÓNDE.
     cuerpo = (
       <div className="space-y-2">
-        <p className="text-[13px] text-muted-foreground">{t("pwa.instalar.iosSoloSafari")}</p>
-        <Button size="sm" variant="secondary" className="h-8 gap-1.5" onClick={copiarEnlace}>
-          {copiado ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copiado ? t("pwa.instalar.enlaceCopiado") : t("pwa.instalar.copiarEnlace")}
-        </Button>
+        <ol className="space-y-1.5">
+          <Paso n={1} icono={<Share className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso1")} />
+          <Paso n={2} icono={<SquarePlus className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso2")} />
+          <Paso n={3} icono={<Check className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso3")} />
+          <Paso n={4} icono={<Smartphone className="h-3.5 w-3.5" />} texto={t("pwa.instalar.iosPaso4")} />
+        </ol>
+        <p className="text-xs text-muted-foreground">{t("pwa.instalar.iosSoloSafari")}</p>
+        {plataforma === "ios-otro" && (
+          <Button size="sm" variant="secondary" className="h-8 gap-1.5" onClick={copiarEnlace}>
+            {copiado ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copiado ? t("pwa.instalar.enlaceCopiado") : t("pwa.instalar.copiarEnlace")}
+          </Button>
+        )}
       </div>
     );
   } else if (puedeInstalarNativo) {
