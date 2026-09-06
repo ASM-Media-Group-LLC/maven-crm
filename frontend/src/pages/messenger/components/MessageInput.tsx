@@ -457,16 +457,16 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
              + adjunta · el cajón lleva dentro, a la derecha, emojis/GIF/stickers ·
              cámara · y a la derecha del todo el micrófono, que pasa a Enviar cuando
              hay texto o adjuntos. Formato y Scripts quedan solo en escritorio. */
-          <div className="flex items-end gap-1.5">
+          <div className="flex items-end gap-1">
             <Button
               variant="ghost" size="icon"
-              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+              className="h-10 w-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               title="Adjuntar archivo"
               aria-label="Adjuntar archivo"
             >
-              {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
+              {uploading ? <Loader2 className="h-7 w-7 animate-spin" /> : <Plus className="h-7 w-7" strokeWidth={2.25} />}
             </Button>
             <div className="relative min-w-0 flex-1">
               {chatType === "group" && participants && (
@@ -479,7 +479,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   aCiegas={aCiegas}
                 />
               )}
-              <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-[22px] px-4 py-2.5 pr-11 focus-within:ring-1 focus-within:ring-primary/30">
+              <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-[22px] px-4 py-2.5 pr-[76px] focus-within:ring-1 focus-within:ring-primary/30">
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraft(user?.id, conversationId)}
@@ -491,24 +491,40 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   onPasteFiles={addFilesInternal}
                 />
               </div>
+              {/* Dentro del cajón, a la derecha: emojis/GIF/stickers y, al lado, formato.
+                  bottom-1.5 = (44 − 32) / 2: centrados en el cajón de una línea; si el
+                  texto crece se quedan abajo, como en WhatsApp. */}
               <Expresiones
-                className="absolute bottom-[3px] right-1 h-8 w-8"
+                className="absolute bottom-1.5 right-[42px] h-8 w-8 text-foreground/90"
+                iconClassName="h-[23px] w-[23px]"
                 favoritos={messengerEmojis}
                 onEmoji={(e) => composerRef.current?.insertText(e)}
                 onGif={sendGifUrl}
                 onSticker={sendStickerUrl}
                 disabled={uploading}
               />
+              <Button
+                variant="ghost" size="icon"
+                className={cn(
+                  "absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full hover:bg-primary/8",
+                  showToolbar ? "bg-primary/15 text-primary" : "text-foreground/90",
+                )}
+                onClick={() => setShowToolbar((v) => !v)}
+                title="Opciones de formato"
+                aria-label="Opciones de formato"
+              >
+                <Baseline className="h-[22px] w-[22px]" strokeWidth={2.1} />
+              </Button>
             </div>
             <Button
               variant="ghost" size="icon"
-              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+              className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
               onClick={() => cameraInputRef.current?.click()}
               disabled={uploading}
               title="Cámara"
               aria-label="Cámara"
             >
-              <Camera className="h-6 w-6" />
+              <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
             </Button>
             {text.trim() || pendingFiles.length > 0 ? (
               <Button
@@ -524,12 +540,12 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             ) : (
               <Button
                 variant="ghost" size="icon"
-                className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+                className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
                 onClick={() => setIsRecording(true)}
                 title="Grabar nota de voz"
                 aria-label="Grabar nota de voz"
               >
-                <Mic className="h-6 w-6" />
+                <Mic className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
             )}
           </div>

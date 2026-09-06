@@ -27,6 +27,8 @@ export default function Expresiones({
   onSticker: (url: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Clases del icono (tamaño/trazo). Dentro del cajón del teléfono va más grande. */
+  iconClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("emojis");
@@ -43,7 +45,7 @@ export default function Expresiones({
           aria-label="Emojis, GIF y stickers"
           data-testid="expresiones"
         >
-          <Smile className="h-5 w-5" />
+          <Smile className={cn("h-5 w-5", iconClassName)} strokeWidth={2.1} />
         </Button>
       </PopoverTrigger>
       {/* Alto FIJO: cada pestaña rellena el mismo espacio y scrollea adentro. Con
