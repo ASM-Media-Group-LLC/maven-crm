@@ -431,7 +431,8 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
                   void supabase
                     .from("chatter_sessions" as never)
                     .update({ read_by_examiner_at: new Date().toISOString() } as never)
-                    .eq("id", s.id as never);
+                    .eq("id", s.id as never)
+                    .then(() => {}, () => {});
                 }
                 onSelect(s.id);
               }}

@@ -214,13 +214,26 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     // quedaría con el color viejo y el menú parecería no hacer nada.
     setMyStatusColorState(null);
     myStatusColorRef.current = null;
+    // Elegir del menú manda: se limpia también el estado personalizado. Si no,
+    // el chip sigue mostrando el texto viejo y parece que el menú no hiciera
+    // nada — pasar de "EN LUNCH" a Ausente y ver "EN LUNCH" otra vez.
+    setMyStatusTextState("");
+    myStatusTextRef.current = "";
+
     // Los CUATRO estados sobreviven a la recarga, "Desconectado" incluido: quien
     // se pone invisible espera seguir invisible después de un F5, no reaparecer
     // conectado sin haber hecho nada.
+    //
+    // ⚠️ EL `.then()` NO ES DECORATIVO. El query builder de supabase-js es
+    // PEREZOSO: la petición HTTP solo sale cuando alguien lo consume (`await` o
+    // `.then`). Con un `void` suelto se construye la consulta y NUNCA se envía,
+    // sin error ni aviso. Ese era el bug: el estado del menú no se guardaba
+    // nunca, mientras el del diálogo sí, porque aquel usa `await`.
     void supabase
       .from("profiles")
-      .update({ status, status_color: null } as never)
-      .eq("id", uid);
+      .update({ status, status_color: null, status_text: null, status_expires_at: null } as never)
+      .eq("id", uid)
+      .then(() => {}, () => {});
   }, [track]);
 
   /** Guarda el estado personalizado. La `luz` es opcional para no romper a quien

@@ -978,7 +978,8 @@ export const ChatPanel = ({ session }: Props) => {
       void supabase
         .from("chatter_sessions" as never)
         .update({ typing_fan: false, typing_fan_at: null } as never)
-        .eq("id", session.id as never);
+        .eq("id", session.id as never)
+        .then(() => {}, () => {});
     } catch (e) {
       toast.error("No se pudo enviar", { description: (e as Error).message });
       setInput(content); // restore
@@ -1010,7 +1011,8 @@ export const ChatPanel = ({ session }: Props) => {
         typing_fan: true,
         typing_fan_at: new Date().toISOString(),
       } as never)
-      .eq("id", session.id as never);
+      .eq("id", session.id as never)
+      .then(() => {}, () => {});
   };
   const cancelTypingFan = () => {
     lastTypingWriteRef.current = 0;
@@ -1018,7 +1020,8 @@ export const ChatPanel = ({ session }: Props) => {
     void supabase
       .from("chatter_sessions" as never)
       .update({ typing_fan: false, typing_fan_at: null } as never)
-      .eq("id", session.id as never);
+      .eq("id", session.id as never)
+      .then(() => {}, () => {});
   };
   const handleInputChange = (val: string) => {
     setInput(val);
@@ -1232,7 +1235,8 @@ export const ChatPanel = ({ session }: Props) => {
       void supabase
         .from("chatter_sessions" as never)
         .update({ typing_fan: false, typing_fan_at: null } as never)
-        .eq("id", session.id as never);
+        .eq("id", session.id as never)
+        .then(() => {}, () => {});
     } catch (e) {
       toast.error("No se pudo enviar", { description: (e as Error).message });
       throw e; // el composer mantiene texto + adjuntos
