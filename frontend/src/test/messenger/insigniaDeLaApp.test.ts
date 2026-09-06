@@ -21,3 +21,28 @@ describe("insignia de la app", () => {
     await expect(actualizarInsignia(2, roto)).resolves.toBeUndefined();
   });
 });
+
+describe("cerrarNotificacionesDeChat", () => {
+  it("cierra solo las del chat pedido y solo las de chats", async () => {
+    const { cerrarNotificacionesDeChat } = await import("@/lib/insigniaDeLaApp");
+    const cerrar = vi.fn();
+    const notifs = [
+      { tag: "chat-abc", close: cerrar },
+      { tag: "cowork-llamado-1", close: vi.fn() },
+    ];
+    const reg = {
+      getNotifications: vi.fn(async (f?: { tag?: string }) => notifs.filter((n) => !f?.tag || n.tag === f.tag)),
+    };
+    Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: async () => reg }, configurable: true });
+    await cerrarNotificacionesDeChat("abc");
+    expect(reg.getNotifications).toHaveBeenCalledWith({ tag: "chat-abc" });
+    expect(cerrar).toHaveBeenCalledTimes(1);
+    expect(notifs[1].close).not.toHaveBeenCalled();
+    // @ts-expect-error limpiar stub
+    delete navigator.serviceWorker;
+  });
+  it("sin service worker no lanza", async () => {
+    const { cerrarNotificacionesDeChat } = await import("@/lib/insigniaDeLaApp");
+    await expect(cerrarNotificacionesDeChat("x")).resolves.toBeUndefined();
+  });
+});

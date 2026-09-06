@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
+import { cerrarNotificacionesDeChat } from "@/lib/insigniaDeLaApp";
 import {
   ChatConversation,
   ChatMessage,
@@ -724,6 +725,8 @@ export function useChat() {
 
     if (!user) return;
 
+    // Leído = sus avisos del sistema se van del centro de notificaciones.
+    void cerrarNotificacionesDeChat(conversationId);
     supabase
       .from("chat_participants")
       .update({ last_read_at: new Date().toISOString() })
@@ -873,6 +876,7 @@ export function useMessages(
 
       // Mark as read
       if (user) {
+        void cerrarNotificacionesDeChat(conversationId);
         supabase
           .from("chat_participants")
           .update({ last_read_at: new Date().toISOString() })
@@ -989,6 +993,7 @@ export function useMessages(
           if (newMsg.sender_id !== userId) {
             onNewMessageRef.current?.(newMsg);
             if (document.hasFocus()) {
+              void cerrarNotificacionesDeChat(conversationId);
               supabase
                 .from("chat_participants")
                 .update({ last_read_at: new Date().toISOString() })
@@ -1046,6 +1051,7 @@ export function useMessages(
 
     // Mark as read when window regains focus
     const handleFocus = () => {
+      void cerrarNotificacionesDeChat(conversationId);
       supabase
         .from("chat_participants")
         .update({ last_read_at: new Date().toISOString() })
