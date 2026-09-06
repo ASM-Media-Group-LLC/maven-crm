@@ -922,7 +922,16 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           Linear) y el nombre tiene su línea completa, más limpio. */}
       <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/70 p-2">
         <div className="shrink-0" title="Sesión activa" aria-label="Sesión activa">
-          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed} size="md" status="online" />
+          {/* El del sidebar DESPLEGADO. Va aparte del de arriba (el plegado):
+              son dos avatares distintos y los dos tienen que seguir el estado. */}
+          <UserAvatar
+            name={fullName}
+            src={avatarUrl}
+            seed={profileQ.data?.avatar_seed}
+            size="md"
+            status="online"
+            statusClassName={getStatusColor(myStatus, myStatus !== "offline", myStatusColor)}
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">{fullName}</div>
