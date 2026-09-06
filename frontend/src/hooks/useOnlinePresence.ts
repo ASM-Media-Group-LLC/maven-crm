@@ -214,13 +214,12 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     // quedaría con el color viejo y el menú parecería no hacer nada.
     setMyStatusColorState(null);
     myStatusColorRef.current = null;
-    // "Desconectado" NO se guarda: dura lo que dura la sesión. Persistirlo es
-    // una trampa — te olvidás de que estás invisible, nadie te ve conectado y no
-    // te enterás hasta que alguien se queja. Los otros tres sí sobreviven a la
-    // recarga porque describen cómo estás, no te esconden.
+    // Los CUATRO estados sobreviven a la recarga, "Desconectado" incluido: quien
+    // se pone invisible espera seguir invisible después de un F5, no reaparecer
+    // conectado sin haber hecho nada.
     void supabase
       .from("profiles")
-      .update({ status: status === "offline" ? null : status, status_color: null } as never)
+      .update({ status, status_color: null } as never)
       .eq("id", uid);
   }, [track]);
 
