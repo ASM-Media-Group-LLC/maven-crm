@@ -46,16 +46,19 @@ export default function Expresiones({
           <Smile className="h-5 w-5" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" side="top" collisionPadding={8} className="w-[calc(100vw-1.5rem)] max-w-md p-2">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid w-full grid-cols-3 h-8">
+      {/* Alto FIJO: cada pestaña rellena el mismo espacio y scrollea adentro. Con
+          alto libre el panel saltaba al cambiar de pestaña (emojis largo, GIF con
+          spinner, stickers según cuántos haya). */}
+      <PopoverContent align="start" side="top" collisionPadding={8} className="flex h-[360px] w-[calc(100vw-1.5rem)] max-w-md flex-col p-2">
+        <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="grid h-8 w-full shrink-0 grid-cols-3">
             <TabsTrigger value="emojis" className="text-xs">Emojis</TabsTrigger>
             <TabsTrigger value="gif" className="text-xs">GIF</TabsTrigger>
             <TabsTrigger value="stickers" className="text-xs">Stickers</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="emojis" className="mt-2">
-            <div className="max-h-64 overflow-y-auto pr-1">
+          <TabsContent value="emojis" className="mt-2 min-h-0 flex-1">
+            <div className="h-full overflow-y-auto pr-1">
               {favoritos.length > 0 && (
                 <section className="mb-2">
                   <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-muted-foreground">Frecuentes</p>
@@ -83,12 +86,12 @@ export default function Expresiones({
             </div>
           </TabsContent>
 
-          <TabsContent value="gif" className="mt-2">
-            <GifPanel activo={open && tab === "gif"} onPick={(url) => { onGif(url); setOpen(false); }} />
+          <TabsContent value="gif" className="mt-2 min-h-0 flex-1">
+            <GifPanel rellenar activo={open && tab === "gif"} onPick={(url) => { onGif(url); setOpen(false); }} />
           </TabsContent>
 
-          <TabsContent value="stickers" className="mt-2">
-            <StickerPanel activo={open && tab === "stickers"} onPick={(url) => { onSticker(url); setOpen(false); }} />
+          <TabsContent value="stickers" className="mt-2 min-h-0 flex-1">
+            <StickerPanel rellenar activo={open && tab === "stickers"} onPick={(url) => { onSticker(url); setOpen(false); }} />
           </TabsContent>
         </Tabs>
       </PopoverContent>

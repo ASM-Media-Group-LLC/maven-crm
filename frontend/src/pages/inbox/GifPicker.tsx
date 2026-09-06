@@ -29,7 +29,11 @@ interface GifPickerProps {
  *  popover de escritorio de abajo y el panel unificado del teléfono
  *  (messenger/components/Expresiones). `activo` = está a la vista: recién ahí
  *  carga trending y busca. */
-export function GifPanel({ onPick, activo }: { onPick: (mp4Url: string) => void; activo: boolean }) {
+export function GifPanel({ onPick, activo, rellenar }: { onPick: (mp4Url: string) => void; activo: boolean;
+  /** Ocupar todo el alto del contenedor (la grilla scrollea adentro). Lo usa el
+   *  panel del teléfono, que tiene alto fijo para no saltar entre pestañas. */
+  rellenar?: boolean;
+}) {
   const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GifItem[]>([]);
@@ -75,9 +79,9 @@ export function GifPanel({ onPick, activo }: { onPick: (mp4Url: string) => void;
   }, [q, activo]);
 
   return (
-    <>
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("gif.search")} className="mb-2 h-9" />
-        <div className="grid max-h-72 grid-cols-2 gap-1.5 overflow-y-auto">
+    <div className={rellenar ? "flex h-full min-h-0 flex-col" : undefined}>
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("gif.search")} className="mb-2 h-9 shrink-0" />
+        <div className={rellenar ? "grid min-h-0 flex-1 grid-cols-2 gap-1.5 overflow-y-auto content-start" : "grid max-h-72 grid-cols-2 gap-1.5 overflow-y-auto"}>
           {loading && (
             <div className="col-span-2 flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -103,8 +107,8 @@ export function GifPanel({ onPick, activo }: { onPick: (mp4Url: string) => void;
             </button>
           ))}
         </div>
-        <p className="mt-1 text-center text-[10px] text-muted-foreground">vía GIPHY</p>
-    </>
+        <p className="mt-1 shrink-0 text-center text-[10px] text-muted-foreground">vía GIPHY</p>
+    </div>
   );
 }
 

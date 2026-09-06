@@ -62,7 +62,10 @@ const STICKERS_QUERY = {
 /** El contenido del selector (subir + galería), sin popover: lo usa el popover
  *  de escritorio de abajo y el panel unificado del teléfono
  *  (messenger/components/Expresiones). `activo` = está a la vista. */
-export function StickerPanel({ onPick, activo }: { onPick: (url: string) => void; activo: boolean }) {
+export function StickerPanel({ onPick, activo, rellenar }: { onPick: (url: string) => void; activo: boolean;
+  /** Ocupar todo el alto del contenedor (la galería scrollea adentro). */
+  rellenar?: boolean;
+}) {
   const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -106,15 +109,15 @@ export function StickerPanel({ onPick, activo }: { onPick: (url: string) => void
   };
 
   return (
-    <>
-        <div className="mb-2 flex items-center justify-between">
+    <div className={rellenar ? "flex h-full min-h-0 flex-col" : undefined}>
+        <div className="mb-2 flex shrink-0 items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">{t("sticker.title")}</span>
           <Button variant="outline" size="sm" className="h-7 text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />} {t("sticker.upload")}
           </Button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onUpload} />
         </div>
-        <div className="grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto">
+        <div className={rellenar ? "grid min-h-0 flex-1 grid-cols-3 gap-1.5 overflow-y-auto content-start" : "grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto"}>
           {isLoading && (
             <div className="col-span-3 flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           )}
@@ -141,7 +144,7 @@ export function StickerPanel({ onPick, activo }: { onPick: (url: string) => void
             </div>
           ))}
         </div>
-    </>
+    </div>
   );
 }
 
