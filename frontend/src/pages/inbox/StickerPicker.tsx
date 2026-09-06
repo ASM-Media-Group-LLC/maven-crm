@@ -59,24 +59,21 @@ const STICKERS_QUERY = {
   gcTime: 1000 * 60 * 60,    // 1 h
 };
 
-export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
+/** El contenido del selector (subir + galería), sin popover: lo usa el popover
+ *  de escritorio de abajo y el panel unificado del teléfono
+ *  (messenger/components/Expresiones). `activo` = está a la vista. */
+export function StickerPanel({ onPick, activo }: { onPick: (url: string) => void; activo: boolean }) {
   const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: stickers = [], isLoading } = useQuery({
     ...STICKERS_QUERY,
-    enabled: open,
+    enabled: activo,
     refetchOnWindowFocus: false,
   });
-  // Prefetch al pasar el mouse / enfocar el botón: al hacer clic ya está en caché
-  // (mata el delay de la primera apertura). Cache compartida entre todas las
-  // superficies (mismo queryKey), así que la 2ª+ apertura es instantánea.
-  const prefetchStickers = () => { void qc.prefetchQuery(STICKERS_QUERY); };
-
   const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -109,14 +106,7 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title={t("sticker.title")} disabled={disabled}
-          onMouseEnter={prefetchStickers} onFocus={prefetchStickers}>
-          <Sticker className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" side="top" className="w-80 p-2">
+    <>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">{t("sticker.title")}</span>
           <Button variant="outline" size="sm" className="h-7 text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
@@ -135,7 +125,7 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
             <div key={s.id} className="group relative">
               <button
                 type="button"
-                onClick={() => { onPick(s.url); setOpen(false); }}
+                onClick={() => onPick(s.url)}
                 className="block w-full overflow-hidden rounded-md p-1 hover:bg-muted"
               >
                 <img src={s.url} alt="" className="h-20 w-full object-contain" loading="lazy" />
@@ -151,6 +141,26 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
             </div>
           ))}
         </div>
+    </>
+  );
+}
+
+export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
+  const { t } = useLanguage();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  // Prefetch al pasar el mouse / enfocar el botón: al hacer clic ya está en caché.
+  const prefetchStickers = () => { void qc.prefetchQuery(STICKERS_QUERY); };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title={t("sticker.title")} disabled={disabled}
+          onMouseEnter={prefetchStickers} onFocus={prefetchStickers}>
+          <Sticker className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-80 p-2">
+        <StickerPanel activo={open} onPick={(url) => { onPick(url); setOpen(false); }} />
       </PopoverContent>
     </Popover>
   );

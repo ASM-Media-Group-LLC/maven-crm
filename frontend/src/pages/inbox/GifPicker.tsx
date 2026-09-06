@@ -25,9 +25,12 @@ interface GifPickerProps {
   disabled?: boolean;
 }
 
-export function GifPicker({ onPick, disabled }: GifPickerProps) {
+/** El contenido del selector (buscador + grilla), sin popover: lo usa el
+ *  popover de escritorio de abajo y el panel unificado del teléfono
+ *  (messenger/components/Expresiones). `activo` = está a la vista: recién ahí
+ *  carga trending y busca. */
+export function GifPanel({ onPick, activo }: { onPick: (mp4Url: string) => void; activo: boolean }) {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GifItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,21 +68,15 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
 
   // Debounce de la búsqueda; al abrir, carga trending.
   useEffect(() => {
-    if (!open) return;
+    if (!activo) return;
     if (tRef.current) window.clearTimeout(tRef.current);
     tRef.current = window.setTimeout(() => load(q), 350);
     return () => { if (tRef.current) window.clearTimeout(tRef.current); };
-  }, [q, open]);
+  }, [q, activo]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title={t("gif.sendTitle")} disabled={disabled}>
-          <Film className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" side="top" className="w-80 p-2">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("gif.search")} className="mb-2 h-9" autoFocus />
+    <>
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("gif.search")} className="mb-2 h-9" />
         <div className="grid max-h-72 grid-cols-2 gap-1.5 overflow-y-auto">
           {loading && (
             <div className="col-span-2 flex justify-center py-6">
@@ -99,7 +96,7 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
             <button
               key={g.id}
               type="button"
-              onClick={() => { onPick(g.mp4); setOpen(false); setQ(""); }}
+              onClick={() => { onPick(g.mp4); setQ(""); }}
               className="overflow-hidden rounded-md border border-transparent transition hover:border-primary"
             >
               <img src={g.preview} alt="" className="h-24 w-full object-cover" loading="lazy" />
@@ -107,6 +104,22 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
           ))}
         </div>
         <p className="mt-1 text-center text-[10px] text-muted-foreground">vía GIPHY</p>
+    </>
+  );
+}
+
+export function GifPicker({ onPick, disabled }: GifPickerProps) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title={t("gif.sendTitle")} disabled={disabled}>
+          <Film className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-80 p-2">
+        <GifPanel activo={open} onPick={(url) => { onPick(url); setOpen(false); }} />
       </PopoverContent>
     </Popover>
   );

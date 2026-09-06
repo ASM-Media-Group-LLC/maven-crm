@@ -14,6 +14,7 @@ import VoiceNoteRecorder from "./VoiceNoteRecorder";
 import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
+import Expresiones from "./Expresiones";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
@@ -421,14 +422,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       )}
 
       {/* Barra de emojis ARRIBA (personalizable, scope "messenger"). Reemplaza el popover.
-          En el teléfono es una sola fila que se desliza (ver EmojiBar). */}
+          Solo en escritorio: en el teléfono los emojis, GIF y stickers van en UN botón
+          (Expresiones), como WhatsApp. Decisión de Jhon (06/09/2026). */}
       {!isRecording && (
-        <EmojiBar
-          emojis={messengerEmojis}
-          onPick={(e) => composerRef.current?.insertText(e)}
-          onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
-          onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
-        />
+        <div className="hidden md:block">
+          <EmojiBar
+            emojis={messengerEmojis}
+            onPick={(e) => composerRef.current?.insertText(e)}
+            onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+            onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
+          />
+        </div>
       )}
 
       {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +
@@ -498,8 +502,19 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
               </Button>
-              <GifPicker onPick={sendGifUrl} disabled={uploading} />
-              <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              {/* Teléfono: un solo botón (emojis + GIF + stickers). Escritorio: los dos de siempre. */}
+              <Expresiones
+                className="md:hidden"
+                favoritos={messengerEmojis}
+                onEmoji={(e) => composerRef.current?.insertText(e)}
+                onGif={sendGifUrl}
+                onSticker={sendStickerUrl}
+                disabled={uploading}
+              />
+              <div className="hidden md:contents">
+                <GifPicker onPick={sendGifUrl} disabled={uploading} />
+                <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              </div>
               <ScriptsButton
                 surface="messenger"
                 disabled={uploading}
