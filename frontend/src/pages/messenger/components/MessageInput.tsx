@@ -337,10 +337,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   return (
     // Borde inferior en el iPhone instalado: el área segura son 34 pt, pero el
     // indicador de inicio ocupa solo los últimos ~13; con 12 pt menos la barra
-    // queda pegada abajo como en Android y no choca con el gesto (18 pt menos: el
-    // indicador mide 5 pt a 8 del borde; los botones quedan a 16 de él). En Android y
+    // queda pegada abajo como en Android y no choca con el gesto (24 pt menos: quedan
+    // 10 pt, justo por encima del indicador de inicio, que mide 5 pt a 8 del borde). En Android y
     // escritorio el inset es 0 y esto vale 0.
-    <div className="shrink-0 bg-primary/[0.03] pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-18px))]">
+    <div className="shrink-0 bg-primary/[0.03] pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-24px))]">
       {/* Reply bar */}
       {replyTo && (
         <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 animate-fade-in">
@@ -433,7 +433,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +
           Enviar a la derecha. NO se tocó la lógica de envío/voz/menciones/upload. */}
-      <div className="px-3 pt-2.5 pb-1 md:pb-2.5">
+      <div className="px-3 pt-2.5 pb-0.5 md:pb-2.5">
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
         {isRecording ? (
           <VoiceNoteRecorder
