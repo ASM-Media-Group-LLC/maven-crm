@@ -65,6 +65,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 }, ref) => {
   const senderName = profileName(profiles[message.sender_id]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Táctil: las acciones (reaccionar, ⋮) salen al tocar la burbuja. Siempre
+  // visibles ocupaban 64 px al lado de CADA mensaje y el chat se veía atiborrado.
+  const [accionesTactiles, setAccionesTactiles] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
   const [showAllImages, setShowAllImages] = useState(false);
@@ -454,16 +457,23 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           </div>
         )}
 
-        <div className={cn("relative max-w-[70%]", isMe ? "order-first" : "")}>
-          {/* Hover actions — M3 tonal */}
-          {/* En touch (hover:none) las acciones quedan SIEMPRE visibles; en mouse se
-              revelan al hover como antes. Sin esto, en la PWA del celular responder/
-              reaccionar/editar/eliminar eran inalcanzables. */}
+        <div
+          className={cn("group/burbuja relative max-w-[78%] md:max-w-[70%]", isMe ? "order-first" : "")}
+          data-acciones={accionesTactiles ? "1" : "0"}
+          onClick={() => setAccionesTactiles((v) => !v)}
+        >
+          {/* Acciones — M3 tonal. Con mouse se revelan al pasar por encima; en
+              táctil (hover:none) aparecen al tocar la burbuja y se esconden al
+              volver a tocar (siempre visibles atiborraban el chat del celular). */}
           <div className={cn(
             "absolute top-0 transition-opacity z-10 flex items-center gap-0.5",
-            "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
+            "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
+            "[@media(hover:none)]:opacity-0 [@media(hover:none)]:pointer-events-none",
+            "[@media(hover:none)]:group-data-[acciones=1]/burbuja:opacity-100 [@media(hover:none)]:group-data-[acciones=1]/burbuja:pointer-events-auto",
             isMe ? "-left-16" : "-right-16"
-          )}>
+          )}
+            onClick={(e) => e.stopPropagation()}
+          >
             <ReactionPicker onSelect={onToggleReaction} className="bg-primary/10 border-0 rounded-full shadow-none" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

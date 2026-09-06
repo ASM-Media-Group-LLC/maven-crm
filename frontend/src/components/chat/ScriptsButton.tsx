@@ -118,7 +118,7 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEdit(null); setQ(""); } }}>
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs text-muted-foreground" disabled={disabled} title="Scripts (frases hechas)">
-          <MessageSquareText className="h-4 w-4" /> Scripts
+          <MessageSquareText className="h-4 w-4" /> <span className="hidden sm:inline">Scripts</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-80 p-2">

@@ -1,4 +1,5 @@
 import InstalarMaven from "@/components/pwa/InstalarMaven";
+import { esTactil } from "@/lib/plataformaPwa";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
@@ -564,16 +565,21 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
       ? `✏️ Borrador: ${draft}`
       : getMessagePreview(conversation, user?.id);
 
+  // En el teléfono la fila NO es arrastrable: iOS trata el primer toque sobre un
+  // elemento `draggable` como intento de arrastre y hacía falta tocar dos veces
+  // para abrir el chat. Reordenar fijados es de escritorio (el agarre ya era
+  // `hidden sm:block`).
+  const arrastrable = !esTactil();
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <button
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={() => { setReorderOver(false); onDragEnd(); }}
-          onDragOver={canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(true); } : undefined}
-          onDragLeave={canReorderDrop ? () => setReorderOver(false) : undefined}
-          onDrop={canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(false); onReorderDrop?.(); } : undefined}
+          draggable={arrastrable}
+          onDragStart={arrastrable ? onDragStart : undefined}
+          onDragEnd={arrastrable ? () => { setReorderOver(false); onDragEnd(); } : undefined}
+          onDragOver={arrastrable && canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(true); } : undefined}
+          onDragLeave={arrastrable && canReorderDrop ? () => setReorderOver(false) : undefined}
+          onDrop={arrastrable && canReorderDrop ? (e) => { e.preventDefault(); setReorderOver(false); onReorderDrop?.(); } : undefined}
           onClick={onClick}
           className={cn(
             "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",

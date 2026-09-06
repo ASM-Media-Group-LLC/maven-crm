@@ -4,6 +4,8 @@ import "./index.css";
 // Captura `beforeinstallprompt` (Android/escritorio Chrome) ANTES de montar React:
 // el evento dispara durante la carga y un useEffect ya llega tarde.
 import "./lib/promptDeInstalacion";
+// Mide cuánto le falta a 100dvh para llegar al borde inferior en la PWA de iPhone.
+import "./lib/altoDeLaApp";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 

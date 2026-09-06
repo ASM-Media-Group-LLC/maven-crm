@@ -51,6 +51,9 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   // En /messenger la parte de Messenger del muelle desaparece: ya estás ahí.
   // Clari se queda, que no tiene nada que ver.
   const mostrarMessenger = puedeMessenger && !enMessenger && !isMobile;
+  // En el teléfono, dentro del Messenger, el botón de Clari se montaba sobre la
+  // barra del composer (grabar nota de voz quedaba debajo). Ahí no va.
+  const mostrarClari = isAdmin && !(isMobile && enMessenger);
 
   const abrirChat = useCallback((id: string) => {
     // En el teléfono las ventanitas no tienen sentido: vamos a la pantalla.
@@ -148,13 +151,13 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           umbral de 5px distingue mover de hacer clic. Si no hay nada que
           mostrar no se dibuja, para no dejar un contenedor invisible que
           capture punteros. */}
-      {(isAdmin || mostrarMessenger) && (
+      {(mostrarClari || mostrarMessenger) && (
       <div
         className="fixed z-50 flex touch-none cursor-grab flex-col-reverse items-center gap-2 active:cursor-grabbing"
         style={estiloContenedor}
         {...arrastreProps}
       >
-        {isAdmin && <ClariAiFab anclarPanel={anclarPanel} />}
+        {mostrarClari && <ClariAiFab anclarPanel={anclarPanel} />}
 
         {mostrarMessenger && (
           <button

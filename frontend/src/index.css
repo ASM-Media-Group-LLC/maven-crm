@@ -1021,3 +1021,10 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
+
+/* Alto real de la app (ver lib/altoDeLaApp.ts): 100dvh más lo que falte para
+   llegar al borde inferior en la PWA instalada de iPhone. En todo lo demás la
+   variable vale 0 y esto es exactamente h-dvh. */
+.alto-de-la-app {
+  height: calc(100dvh + var(--compensacion-alto, 0px));
+}

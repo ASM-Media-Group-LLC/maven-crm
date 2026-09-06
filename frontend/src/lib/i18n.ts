@@ -442,6 +442,7 @@ const translations = {
   "push.dispositivo.ayudaBloqueadoAndroid": { es: "Chrome → candado o ⋮ junto a la dirección → Permisos → Notificaciones → Permitir.", en: "Chrome → lock or ⋮ next to the address → Permissions → Notifications → Allow." },
   "push.dispositivo.ayudaBloqueadoIos": { es: "Ajustes del iPhone → Notificaciones → Maven → Permitir notificaciones.", en: "iPhone Settings → Notifications → Maven → Allow Notifications." },
   "push.dispositivo.ayudaBloqueadoEscritorio": { es: "Haz clic en el candado de la barra de direcciones → Notificaciones → Permitir.", en: "Click the lock in the address bar → Notifications → Allow." },
+  "push.dispositivo.ayudaEmergenteAndroid": { es: "¿El aviso solo aparece al bajar la barra de notificaciones y no como ventana emergente? Es un ajuste de Android: Ajustes → Notificaciones → Maven (o Chrome → Notificaciones de sitios) → activa «Emergente» o «Mostrar en pantalla».", en: "Does the alert only show when you pull down the notification shade, not as a pop-up? It's an Android setting: Settings → Notifications → Maven (or Chrome → Site notifications) → turn on “Pop on screen”." },
   "push.dispositivo.exito": { es: "Avisos activados en este dispositivo", en: "Alerts turned on for this device" },
   "push.dispositivo.error": { es: "No se pudo activar. Intenta de nuevo.", en: "Couldn't turn it on. Try again." },
 } as const;

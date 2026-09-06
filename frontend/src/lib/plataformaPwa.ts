@@ -65,6 +65,15 @@ export function posponerInstalacion(ahora = Date.now()): void {
   }
 }
 
+/** Pantalla táctil sin mouse (teléfono, tableta). */
+export function esTactil(win: Window = window): boolean {
+  try {
+    return win.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+}
+
 /** ¿Este navegador puede suscribirse a push AHORA? iOS solo instalada. */
 export function puedeActivarPushAqui(p: Plataforma, instalada: boolean, win: Window = window): boolean {
   if ((p === "ios-safari" || p === "ios-otro") && !instalada) return false;

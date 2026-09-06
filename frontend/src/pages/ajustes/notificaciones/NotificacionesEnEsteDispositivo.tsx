@@ -68,10 +68,15 @@ export default function NotificacionesEnEsteDispositivo() {
           </Button>
         )}
         {estado === "activo" && (
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" disabled={ocupado} onClick={() => void desactivar()}>
-            {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellOff className="h-3.5 w-3.5" />}
-            {t("push.dispositivo.desactivar")}
-          </Button>
+          <div className="space-y-2">
+            {plataforma === "android" && (
+              <p className="text-xs text-muted-foreground">{t("push.dispositivo.ayudaEmergenteAndroid")}</p>
+            )}
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" disabled={ocupado} onClick={() => void desactivar()}>
+              {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellOff className="h-3.5 w-3.5" />}
+              {t("push.dispositivo.desactivar")}
+            </Button>
+          </div>
         )}
       </div>
     </div>
