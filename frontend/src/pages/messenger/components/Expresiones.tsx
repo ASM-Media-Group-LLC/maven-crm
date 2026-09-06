@@ -54,10 +54,12 @@ export default function Expresiones({
           spinner, stickers según cuántos haya). */}
       <PopoverContent align="start" side="top" collisionPadding={8} className="flex h-[360px] w-[calc(100vw-1.5rem)] max-w-md flex-col p-2">
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-          <TabsList className="grid h-8 w-full shrink-0 grid-cols-3">
-            <TabsTrigger value="emojis" className="text-xs">Emojis</TabsTrigger>
-            <TabsTrigger value="gif" className="text-xs">GIF</TabsTrigger>
-            <TabsTrigger value="stickers" className="text-xs">Stickers</TabsTrigger>
+          {/* h-9 con p-1 deja 28 px para las pestañas (text-xs + py-1.5 = 28): con h-8
+              la pastilla activa se salía del contenedor por arriba y por abajo. */}
+          <TabsList className="grid h-9 w-full shrink-0 grid-cols-3">
+            <TabsTrigger value="emojis" className="py-1.5 text-xs">Emojis</TabsTrigger>
+            <TabsTrigger value="gif" className="py-1.5 text-xs">GIF</TabsTrigger>
+            <TabsTrigger value="stickers" className="py-1.5 text-xs">Stickers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="emojis" className="mt-2 min-h-0 flex-1">
