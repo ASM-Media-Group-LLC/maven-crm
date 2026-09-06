@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import {
@@ -59,6 +60,9 @@ export function useWaInboxNotifications() {
   // de settings/notify vía refs (sin re-suscribir en cada cambio).
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const { isCanalActivo } = useNotificationPreferences();
+  const prefRef = useRef(isCanalActivo);
+  prefRef.current = isCanalActivo;
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   // Anti-spam del sonido: en ráfagas no disparamos un beep por cada mensaje.
@@ -109,6 +113,8 @@ export function useWaInboxNotifications() {
           const s = settingsRef.current;
           // Maestro apagado o No-molestar → no avisar (ni sonido ni popup).
           if (s.notifications_enabled === false || s.dnd_enabled) return;
+          // Ajustes → Notificaciones → Eventos → Bandeja.
+          if (!prefRef.current("inbox_mensaje", "in_app")) return;
 
           // Nombre del contacto (best-effort). La RLS garantiza que solo resuelve
           // conversaciones visibles para el usuario; si falla, título genérico.

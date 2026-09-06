@@ -5,6 +5,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 
 // Aviso de manos levantadas para el coordinador, EN CUALQUIER PARTE DE MAVEN.
 //
@@ -21,6 +22,11 @@ export function useCoworkRequestAlerts() {
   const { user } = useAuth();
   const { canAccess } = usePermissions();
   const { notify } = useBrowserNotifications();
+  // Ajustes → Notificaciones → Eventos. En ref porque el revisar() de abajo
+  // vive dentro de un efecto con deps fijas.
+  const { isCanalActivo } = useNotificationPreferences();
+  const prefRef = useRef(isCanalActivo);
+  prefRef.current = isCanalActivo;
   // null = todavía no sabemos qué había; la primera lectura solo toma la foto.
   // Sin esto, entrar a Maven con solicitudes viejas abiertas dispararía el
   // sonido de golpe por cosas que ya se conocían.
@@ -53,6 +59,7 @@ export function useCoworkRequestAlerts() {
       const nuevas = (abiertas ?? []).filter((r) => !vistas.current!.has(r.id));
       vistas.current = actuales;
       if (!nuevas.length) return;
+      if (!prefRef.current("cowork_pedido_host", "in_app")) return;
 
       // Mismo motivo que el ding de mensajes: este hook está montado por
       // encima del router, así que cada pestaña abierta lo tocaba.

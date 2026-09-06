@@ -6,11 +6,14 @@ import { useNavigate } from "react-router-dom";
 // para que navegue por dentro (sin recargar la app). Este hook la escucha.
 // Va montado en AppShell: vale para cualquier ruta protegida.
 //
-// La url viene del SW, y el SW la recibe del servidor, pero igual se valida
-// contra una lista de secciones: un mensaje raro de otro origen no puede
-// mandarnos a cualquier parte.
+// La url viene del SW, y el SW la recibe del servidor, pero igual se valida:
+// solo rutas internas absolutas ("/closers?id=…"). Nada con esquema ni
+// protocolo-relativo ("//otro.sitio"): un mensaje raro de otro origen no puede
+// sacarnos de Maven. Antes era una lista de 5 secciones; desde que los avisos
+// de la campana (Closers, Creadoras, Evaluador…) también llegan al celular, el
+// destino puede ser cualquier página de la app.
 export const TIPO_ABRIR_URL = "abrir-url";
-const RUTAS_PERMITIDAS = /^\/(messenger|inbox|telegram|cowork|correo)(\?|\/|$)/;
+const RUTAS_PERMITIDAS = /^\/(?![\/\\])[^\s]{0,2000}$/;
 
 export function rutaSegura(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
