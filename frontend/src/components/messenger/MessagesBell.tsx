@@ -1,3 +1,4 @@
+import { contarChatsSinLeer } from "@/lib/insigniaDeLaApp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
@@ -26,10 +27,7 @@ export default function MessagesBell() {
 
   // CHATS sin leer, no mensajes: un grupo con cuatro mensajes seguidos cuenta 1.
   // El número de mensajes se ve en la fila, al abrir el panel.
-  const total = useMemo(
-    () => conversations.filter((c) => c.unreadCount > 0).length,
-    [conversations],
-  );
+  const total = useMemo(() => contarChatsSinLeer(conversations), [conversations]);
 
   // Sin acceso al Messenger no tiene sentido el icono (la ruta /messenger ya
   // está detrás del mismo permiso).

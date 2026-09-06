@@ -149,7 +149,7 @@ export default function ChatHeader({
   return (
     <div className="shrink-0 bg-primary/[0.03]">
       <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5">
-        <Button variant="ghost" size="icon" aria-label="Volver a la lista de chats" className="sm:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
+        <Button variant="ghost" size="icon" aria-label="Volver a la lista de chats" className="md:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
 

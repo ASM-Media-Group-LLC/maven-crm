@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import {
   useNotificationPermission,
 } from "@/hooks/useBrowserNotifications";
 import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
+import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
 
 // Etiqueta legible cuando el mensaje no trae texto.
 const MEDIA_LABEL: Record<string, string> = {
@@ -100,6 +101,10 @@ export function useMessengerNotifications() {
   const myNameRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
+  // Este canal no tenía reconexión de ningún tipo: al volver del segundo plano se
+  // recrea (el nombre ya es aleatorio, no hay zombi del mismo topic).
+  const [version, setVersion] = useState(0);
+  useReanudarAlVolver(() => setVersion((v) => v + 1));
 
   useEffect(() => {
     if (!userId) return;
@@ -220,5 +225,5 @@ export function useMessengerNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, version]);
 }

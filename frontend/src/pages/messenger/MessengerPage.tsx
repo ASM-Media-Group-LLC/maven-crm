@@ -237,10 +237,12 @@ export default function MessengerPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar */}
+      {/* Sidebar. El corte lista→chat es `md` (768), el MISMO umbral de useIsMobile
+          y del Sheet del sidebar: con `sm` (640), entre 640 y 767 px se veían dos
+          columnas de 280 px con el menú ya en modo teléfono. */}
       <div className={cn(
-        "w-full sm:w-[280px] md:w-[320px] lg:w-[340px] shrink-0 transition-all",
-        activeChatId ? "hidden sm:flex sm:flex-col" : "flex flex-col"
+        "w-full md:w-[320px] lg:w-[340px] shrink-0 transition-all",
+        activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
       )}>
         <ChatSidebar
           conversations={conversations}
@@ -265,7 +267,7 @@ export default function MessengerPage() {
       {/* Chat view */}
       <div className={cn(
         "flex-1 min-w-0",
-        !activeChatId ? "hidden sm:flex" : "flex"
+        !activeChatId ? "hidden md:flex" : "flex"
       )}>
         {activeConv ? (
           // ⚠️ `min-w-0` NO es decorativo. Sin él, este hijo flex se niega a

@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useChat } from "./useChat";
+import { actualizarInsignia, contarChatsSinLeer } from "@/lib/insigniaDeLaApp";
 
 /**
  * UNA sola instancia de `useChat()` para toda la app.
@@ -23,6 +24,12 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const chat = useChat();
+  // El numerito sobre el icono de la app instalada (Badging API): chats sin
+  // leer, igual que la nube. Al desmontar (cerrar sesión) se limpia.
+  useEffect(() => {
+    void actualizarInsignia(contarChatsSinLeer(chat.conversations));
+  }, [chat.conversations]);
+  useEffect(() => () => { void actualizarInsignia(0); }, []);
   return <ChatContext.Provider value={chat}>{children}</ChatContext.Provider>;
 }
 

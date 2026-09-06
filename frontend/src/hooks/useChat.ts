@@ -7,6 +7,7 @@ import {
   TTL_TECLEO_MS,
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
+import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
 import {
   ChatConversation,
   ChatMessage,
@@ -29,6 +30,10 @@ export function useChat() {
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
+  // Al volver a primer plano tras >30 s oculto (teléfono bloqueado, otra app), el
+  // socket suele estar muerto y el canal en CLOSED: se recrea (topic con versión
+  // nueva) y SUBSCRIBED vuelve a cargar la lista.
+  useReanudarAlVolver(() => setChatRealtimeVersion((v) => v + 1));
   const chatRealtimeRetryRef = useRef(0);
   const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Para quién ya se cargó la lista: distingue la primera carga (que sí muestra
@@ -229,6 +234,9 @@ export function useChat() {
       }, delay);
     };
 
+    // El removeChannel del cleanup dispara CLOSED: sin este guard programaría
+    // un reconnect zombi del canal que acabamos de cerrar a propósito.
+    let cancelado = false;
     const channel = supabase
       .channel(`chat-realtime-${user.id}-${chatRealtimeVersion}`)
       .on(
@@ -419,6 +427,7 @@ export function useChat() {
         }
       )
       .subscribe((status) => {
+        if (cancelado) return;
         if (status === "SUBSCRIBED") {
           chatRealtimeRetryRef.current = 0;
           if (chatRealtimeReconnectTimerRef.current) {
@@ -428,7 +437,9 @@ export function useChat() {
           void loadConversations();
         }
 
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        // CLOSED también: es terminal (el socket murió en segundo plano y nadie lo
+        // vuelve a levantar); antes solo se atendían ERROR y TIMED_OUT.
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           scheduleConversationsReload(true);
           scheduleChannelReconnect();
         }
@@ -458,6 +469,7 @@ export function useChat() {
       }
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
+      cancelado = true;
       supabase.removeChannel(channel);
     };
   }, [user, loadConversations, chatRealtimeVersion]);
@@ -792,6 +804,12 @@ export function useMessages(
   const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
   const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
+  // Al volver del segundo plano: canal nuevo + recarga para traer lo que llegó
+  // mientras el socket estaba muerto (el canal de mensajes no recarga solo).
+  useReanudarAlVolver(() => {
+    setMessagesRealtimeVersion((v) => v + 1);
+    void loadMessagesRef.current?.();
+  });
   const messagesRealtimeRetryRef = useRef(0);
   const messagesRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref for loadOlderMessages to avoid stale closure on `messages`
@@ -936,6 +954,7 @@ export function useMessages(
       }, delay);
     };
 
+    let cancelado = false;
     const channel = supabase
       .channel(`messages-${conversationId}-${messagesRealtimeVersion}`)
       .on(
@@ -1011,6 +1030,7 @@ export function useMessages(
         }
       )
       .subscribe((status) => {
+        if (cancelado) return;
         if (status === "SUBSCRIBED") {
           messagesRealtimeRetryRef.current = 0;
           if (messagesRealtimeReconnectTimerRef.current) {
@@ -1019,7 +1039,7 @@ export function useMessages(
           }
         }
 
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           scheduleMessagesReconnect();
         }
       });
@@ -1041,6 +1061,7 @@ export function useMessages(
         clearTimeout(messagesRealtimeReconnectTimerRef.current);
         messagesRealtimeReconnectTimerRef.current = null;
       }
+      cancelado = true;
       supabase.removeChannel(channel);
     };
   }, [conversationId, user?.id, messagesRealtimeVersion]);

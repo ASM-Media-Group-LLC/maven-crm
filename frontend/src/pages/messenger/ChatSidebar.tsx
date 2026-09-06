@@ -245,7 +245,7 @@ export default function ChatSidebar({
           y se comía el borde derecho (timestamps, badge de no-leídos). Forzarlo a block lo
           clampa al ancho del viewport y deja que truncate/min-w-0 funcionen. */}
       <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
-        <div className="pb-6">
+        <div className="pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
           {/* Solo en teléfono y solo si Maven no está instalada; en iPhone el push
               de mensajes no existe sin instalarla. Se puede posponer 7 días. */}
           <InstalarMaven variante="banner" className="mx-3 mb-2" />
