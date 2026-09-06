@@ -33,6 +33,8 @@ import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSideb
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { cn } from "@/lib/utils";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-xl px-3 py-3 text-sm sidebar-glass-hover";
 
@@ -834,6 +836,7 @@ const DashboardSidebar = () => {
 // el usuario lo pone en modo icon-only.
 const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   const { user } = useAuth();
+  const { myStatus, myStatusColor } = useOnlinePresence();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { t } = useLanguage();
@@ -872,7 +875,16 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
     return (
       <div className="flex flex-col items-center gap-2">
         <div title="Sesión activa" aria-label="Sesión activa">
-          <UserAvatar name={fullName} src={avatarUrl} seed={profileQ.data?.avatar_seed} size="sm" status="online" />
+          <UserAvatar
+            name={fullName}
+            src={avatarUrl}
+            seed={profileQ.data?.avatar_seed}
+            size="sm"
+            status="online"
+            /* Antes iba SIEMPRE en verde (`status="online"` fijo), así que no
+               coincidía con el estado que uno mismo eligió en el Messenger. */
+            statusClassName={getStatusColor(myStatus, myStatus !== "offline", myStatusColor)}
+          />
         </div>
         {mounted && (
           <Button

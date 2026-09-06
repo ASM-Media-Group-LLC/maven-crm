@@ -206,19 +206,24 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const setMyStatus = useCallback((status: UserStatus) => {
     setMyStatusState(status);
     myStatusRef.current = status;
-    track(status);
-    const uid = userIdRef.current;
-    if (!uid) return;
-    // Sin await: la presencia ya salió, esto es solo para que sobreviva al refresh.
-    // Elegir del menú limpia el color personalizado: si no, el puntito se
-    // quedaría con el color viejo y el menú parecería no hacer nada.
+
+    // ⚠️ LIMPIAR ANTES DE PUBLICAR. `track()` arma el mensaje con lo que haya en
+    // los refs EN ESE INSTANTE: si se limpian después, la presencia que sale a
+    // los demás todavía lleva el texto y el color viejos, y del otro lado se
+    // sigue viendo el estado anterior hasta que esa persona recargue.
+    //
+    // Elegir del menú manda: se va el texto personalizado y su color. Si no,
+    // pasar de "EN LUNCH" a Ausente dejaba el chip mostrando "EN LUNCH" y
+    // parecía que el menú no hiciera nada.
     setMyStatusColorState(null);
     myStatusColorRef.current = null;
-    // Elegir del menú manda: se limpia también el estado personalizado. Si no,
-    // el chip sigue mostrando el texto viejo y parece que el menú no hiciera
-    // nada — pasar de "EN LUNCH" a Ausente y ver "EN LUNCH" otra vez.
     setMyStatusTextState("");
     myStatusTextRef.current = "";
+
+    track(status);
+
+    const uid = userIdRef.current;
+    if (!uid) return;
 
     // Los CUATRO estados sobreviven a la recarga, "Desconectado" incluido: quien
     // se pone invisible espera seguir invisible después de un F5, no reaparecer

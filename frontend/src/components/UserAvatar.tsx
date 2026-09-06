@@ -38,6 +38,10 @@ export interface UserAvatarProps {
   /** Anillo degradé azul→violeta para elementos destacados. */
   ring?: boolean;
   status?: keyof typeof STATUS_COLORS | null;
+  /** Clase de color del puntito, para cuando la manda otro sistema (el estado
+   *  del Messenger, que tiene su propia paleta y colores personalizados). Gana
+   *  sobre `status`, que se sigue usando para decidir SI se dibuja el punto. */
+  statusClassName?: string | null;
   className?: string;
 }
 
@@ -48,6 +52,7 @@ export function UserAvatar({
   size = "md",
   ring = false,
   status = null,
+  statusClassName = null,
   className,
 }: UserAvatarProps) {
   const s = SIZES[size];
@@ -114,7 +119,7 @@ export function UserAvatar({
           className={cn(
             "absolute bottom-0 right-0 rounded-full border-background",
             s.dot,
-            STATUS_COLORS[status],
+            statusClassName || STATUS_COLORS[status],
             status === "online" && "animate-presence-pulse motion-reduce:animate-none",
           )}
         />

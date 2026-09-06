@@ -1,37 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Pause, Play } from "lucide-react";
+import { Loader2, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Reproductor de notas de voz.
+ * Nota de voz, estilo WhatsApp: onda, arrastre y velocidad.
  *
- * ⚠️ POR QUÉ NO USAMOS EL `<audio controls>` NATIVO. MediaRecorder graba WebM en
- * modo streaming y NO escribe el elemento `Duration` en la cabecera. Verificado
- * sobre un archivo real de producción: es un WebM válido (`1a 45 df a3`), códec
- * `A_OPUS`, muxer Chrome, y el elemento EBML `Duration` (0x4489) no está. Sin
- * duración el control nativo no puede calcular el progreso, así que dibuja la
- * barra al final y se queda ahí.
+ * ⚠️ POR QUÉ NO USA UN `<audio>`. MediaRecorder graba WebM en modo streaming y
+ * NO escribe el elemento `Duration` en la cabecera. Verificado sobre archivos
+ * reales de producción: WebM válido (`1a 45 df a3`), códec `A_OPUS`, muxer
+ * Chrome, `Segment` de tamaño desconocido, sin `Duration` (0x4489) y sin `Cues`.
+ * El elemento `<audio>` con esos archivos **nunca pasa de `readyState 0`**: no
+ * dispara `loadedmetadata`, `duration` queda en `NaN`, la barra no avanza y no
+ * se puede arrastrar. Pasa igual abriendo el .webm directo en Chrome, así que
+ * no es cosa de Maven. El truco de "buscar al infinito" tampoco lo destraba.
  *
- * No es un problema de Maven: abriendo el .webm directo en Chrome, su propio
- * visor hace exactamente lo mismo. Y el truco conocido de "buscar al infinito
- * para forzar el cálculo" tampoco sirve acá: probado sobre dos archivos, el
- * elemento ni siquiera llega a `loadedmetadata` (readyState 0, duration NaN).
+ * Pero los bytes están perfectos: `decodeAudioData` los decodifica sin
+ * problema y devuelve la duración exacta (21,6 s en el archivo de prueba).
+ * O sea que el problema es el ELEMENTO, no el audio.
  *
- * La salida es no depender del metadato: la duración YA la sabemos al grabar
- * (el grabador la cuenta). Va en el nombre del archivo para las notas nuevas y,
- * para las viejas, se lee del texto del mensaje, que siempre tuvo el formato
- * "🎤 Nota de voz (M:SS)".
+ * Por eso esto va por Web Audio: se decodifica una vez al primer play y a
+ * partir de ahí tenemos duración exacta, reloj propio, arrastre real, velocidad
+ * y la onda dibujada con las muestras de verdad.
  */
 
-/** Segundos a partir del nombre (`voice-note-123-18s.webm`) o del texto
- *  (`🎤 Nota de voz (0:18)`). Devuelve 0 si no se puede saber. */
+/** Segundos desde el nombre (`voice-note-123-18s.webm`) o desde el texto
+ *  (`🎤 Nota de voz (0:18)`). Solo se usa para mostrar algo ANTES de decodificar;
+ *  una vez decodificado manda la duración real. */
 export function duracionDeLaNota(fileName?: string | null, contenido?: string | null): number {
   const porNombre = fileName?.match(/-(\d+)s\.[a-z0-9]+$/i);
   if (porNombre) return Number(porNombre[1]);
-
   const porTexto = contenido?.match(/\((\d+):([0-5]\d)\)/);
   if (porTexto) return Number(porTexto[1]) * 60 + Number(porTexto[2]);
-
   return 0;
 }
 
@@ -39,6 +38,71 @@ const reloj = (seg: number) => {
   const s = Math.max(0, Math.floor(seg));
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 };
+
+const BARRAS = 38;
+const VELOCIDADES = [1, 1.5, 2] as const;
+
+/** Un AudioContext para toda la app: el navegador limita cuántos se pueden abrir. */
+let contexto: AudioContext | null = null;
+function ctx(): AudioContext | null {
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return null;
+    if (!contexto) contexto = new AC();
+    if (contexto.state === "suspended") void contexto.resume().catch(() => {});
+    return contexto;
+  } catch {
+    return null;
+  }
+}
+
+/** Cachés de módulo: una nota que ya se escuchó no se vuelve a bajar ni a
+ *  decodificar, y dos burbujas del mismo audio comparten trabajo. */
+const buffers = new Map<string, AudioBuffer>();
+const enVuelo = new Map<string, Promise<AudioBuffer>>();
+
+async function cargar(url: string): Promise<AudioBuffer> {
+  const ya = buffers.get(url);
+  if (ya) return ya;
+  const pendiente = enVuelo.get(url);
+  if (pendiente) return pendiente;
+
+  const tarea = (async () => {
+    const ac = ctx();
+    if (!ac) throw new Error("sin audio");
+    const datos = await (await fetch(url)).arrayBuffer();
+    const buf = await ac.decodeAudioData(datos);
+    buffers.set(url, buf);
+    enVuelo.delete(url);
+    return buf;
+  })();
+  enVuelo.set(url, tarea);
+  return tarea;
+}
+
+/** Picos para dibujar la onda, sacados de las muestras reales. */
+function picos(buf: AudioBuffer, n: number): number[] {
+  const datos = buf.getChannelData(0);
+  const porBarra = Math.floor(datos.length / n) || 1;
+  const salida: number[] = [];
+  let max = 0.0001;
+  for (let i = 0; i < n; i++) {
+    let pico = 0;
+    const desde = i * porBarra;
+    // Se muestrea de a saltos: recorrer un minuto entero muestra por muestra
+    // congelaría la pintura y no cambia el dibujo.
+    for (let j = desde; j < desde + porBarra; j += 32) {
+      const v = Math.abs(datos[j] || 0);
+      if (v > pico) pico = v;
+    }
+    salida.push(pico);
+    if (pico > max) max = pico;
+  }
+  return salida.map((p) => Math.max(0.12, p / max));
+}
+
+/** Solo una nota suena a la vez, como en WhatsApp. */
+let pararLaQueSuena: (() => void) | null = null;
 
 export default function NotaDeVoz({
   src,
@@ -51,107 +115,178 @@ export default function NotaDeVoz({
   contenido?: string | null;
   esMio?: boolean;
 }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [sonando, setSonando] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [transcurrido, setTranscurrido] = useState(0);
+  const [duracion, setDuracion] = useState(() => duracionDeLaNota(fileName, contenido));
+  const [onda, setOnda] = useState<number[] | null>(null);
+  const [velocidad, setVelocidad] = useState<number>(1);
 
-  // La duración conocida manda. Solo si no la hay se mira la del archivo, que
-  // en las notas de voz casi siempre es NaN o Infinity.
-  const conocida = duracionDeLaNota(fileName, contenido);
-  const [duracionArchivo, setDuracionArchivo] = useState(0);
-  const total = conocida || duracionArchivo;
+  const fuenteRef = useRef<AudioBufferSourceNode | null>(null);
+  const arranqueRef = useRef(0);   // ctx.currentTime cuando arrancó
+  const desdeRef = useRef(0);      // offset dentro del audio
+  const rafRef = useRef<number | null>(null);
+  const velocidadRef = useRef(1);
+  velocidadRef.current = velocidad;
 
-  const alternar = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (a.paused) void a.play().catch(() => {});
-    else a.pause();
+  const parar = useCallback((reiniciar: boolean) => {
+    const f = fuenteRef.current;
+    if (f) {
+      f.onended = null;
+      try { f.stop(); } catch { /* ya paró */ }
+      fuenteRef.current = null;
+    }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (pararLaQueSuena) pararLaQueSuena = null;
+    setSonando(false);
+    if (reiniciar) { desdeRef.current = 0; setTranscurrido(0); }
   }, []);
 
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    const avance = () => setTranscurrido(a.currentTime);
-    const arranca = () => setSonando(true);
-    const para = () => setSonando(false);
-    const termina = () => { setSonando(false); setTranscurrido(0); a.currentTime = 0; };
-    const meta = () => { if (Number.isFinite(a.duration)) setDuracionArchivo(a.duration); };
+  useEffect(() => () => parar(true), [parar]);
 
-    a.addEventListener("timeupdate", avance);
-    a.addEventListener("play", arranca);
-    a.addEventListener("pause", para);
-    a.addEventListener("ended", termina);
-    a.addEventListener("loadedmetadata", meta);
-    a.addEventListener("durationchange", meta);
-    return () => {
-      a.removeEventListener("timeupdate", avance);
-      a.removeEventListener("play", arranca);
-      a.removeEventListener("pause", para);
-      a.removeEventListener("ended", termina);
-      a.removeEventListener("loadedmetadata", meta);
-      a.removeEventListener("durationchange", meta);
+  const tocar = useCallback((buf: AudioBuffer, desde: number) => {
+    const ac = ctx();
+    if (!ac) return;
+    if (pararLaQueSuena) pararLaQueSuena();
+
+    const fuente = ac.createBufferSource();
+    fuente.buffer = buf;
+    fuente.playbackRate.value = velocidadRef.current;
+    fuente.connect(ac.destination);
+    fuente.start(0, Math.min(desde, buf.duration));
+    fuenteRef.current = fuente;
+    arranqueRef.current = ac.currentTime;
+    desdeRef.current = desde;
+    setSonando(true);
+    pararLaQueSuena = () => parar(false);
+
+    fuente.onended = () => {
+      // `stop()` también dispara onended; solo interesa el final natural.
+      if (fuenteRef.current === fuente) parar(true);
     };
-  }, []);
 
-  const progreso = total > 0 ? Math.min(100, (transcurrido / total) * 100) : 0;
+    const tic = () => {
+      const ac2 = ctx();
+      if (!ac2 || fuenteRef.current !== fuente) return;
+      const t = desdeRef.current + (ac2.currentTime - arranqueRef.current) * velocidadRef.current;
+      setTranscurrido(Math.min(t, buf.duration));
+      rafRef.current = requestAnimationFrame(tic);
+    };
+    rafRef.current = requestAnimationFrame(tic);
+  }, [parar]);
 
-  /** Buscar es "lo mejor que se pueda": sin duración en el archivo, el navegador
-   *  puede negarse. Si no funciona, al menos la barra sigue avanzando sola. */
-  const buscar = (e: React.MouseEvent<HTMLDivElement>) => {
-    const a = audioRef.current;
-    if (!a || total <= 0) return;
+  const alternar = useCallback(async () => {
+    if (sonando) {
+      // Pausa: se guarda dónde íbamos para reanudar ahí.
+      const ac = ctx();
+      if (ac && fuenteRef.current) {
+        desdeRef.current += (ac.currentTime - arranqueRef.current) * velocidadRef.current;
+      }
+      parar(false);
+      return;
+    }
+    const yaEsta = buffers.get(src);
+    if (yaEsta) { tocar(yaEsta, desdeRef.current); return; }
+    setCargando(true);
+    try {
+      const buf = await cargar(src);
+      setDuracion(buf.duration);          // la real manda sobre la del nombre
+      setOnda(picos(buf, BARRAS));
+      tocar(buf, desdeRef.current);
+    } catch {
+      /* si no se puede, el botón simplemente no arranca */
+    } finally {
+      setCargando(false);
+    }
+  }, [sonando, src, parar, tocar]);
+
+  const cambiarVelocidad = useCallback(() => {
+    const siguiente = VELOCIDADES[(VELOCIDADES.indexOf(velocidad as 1) + 1) % VELOCIDADES.length];
+    setVelocidad(siguiente);
+    const f = fuenteRef.current;
+    const ac = ctx();
+    if (f && ac) {
+      // Se fija el punto actual antes de cambiar el ritmo, si no el cálculo del
+      // reloj arrastraría el tiempo ya reproducido a la velocidad nueva.
+      desdeRef.current += (ac.currentTime - arranqueRef.current) * velocidadRef.current;
+      arranqueRef.current = ac.currentTime;
+      f.playbackRate.value = siguiente;
+    }
+  }, [velocidad]);
+
+  const buscar = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (duracion <= 0) return;
     const caja = e.currentTarget.getBoundingClientRect();
     const proporcion = Math.min(1, Math.max(0, (e.clientX - caja.left) / caja.width));
-    try {
-      a.currentTime = proporcion * total;
-      setTranscurrido(proporcion * total);
-    } catch {
-      /* el navegador no deja buscar en este archivo */
-    }
-  };
+    const destino = proporcion * duracion;
+    setTranscurrido(destino);
+    const buf = buffers.get(src);
+    if (!buf) { desdeRef.current = destino; return; }
+    if (sonando) { parar(false); tocar(buf, destino); }
+    else desdeRef.current = destino;
+  }, [duracion, src, sonando, parar, tocar]);
+
+  const progreso = duracion > 0 ? Math.min(1, transcurrido / duracion) : 0;
+  const alturas = onda ?? Array.from({ length: BARRAS }, (_, i) => 0.3 + 0.25 * Math.sin(i));
 
   return (
-    <div className="flex items-center gap-2 min-w-[210px]">
-      <div className={cn(
-        "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
-        esMio ? "bg-primary-foreground/15" : "bg-primary/10",
-      )}>
-        <Mic className="h-4 w-4" />
-      </div>
-
+    <div className="flex items-center gap-2.5 min-w-[230px] max-w-[300px]">
       <button
         type="button"
-        onClick={alternar}
+        onClick={() => void alternar()}
         aria-label={sonando ? "Pausar" : "Reproducir"}
         className={cn(
-          "h-8 w-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
-          esMio ? "bg-primary-foreground/20 hover:bg-primary-foreground/30" : "bg-primary/15 hover:bg-primary/25",
+          "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95",
+          esMio ? "bg-primary-foreground/20 hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90",
         )}
       >
-        {sonando ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
+        {cargando ? <Loader2 className="h-4 w-4 animate-spin" />
+          : sonando ? <Pause className="h-4 w-4" />
+          : <Play className="h-4 w-4 ml-0.5" />}
       </button>
 
       <div className="flex-1 min-w-0">
         <div
           onClick={buscar}
           role="presentation"
-          className={cn(
-            "h-1.5 w-full rounded-full cursor-pointer",
-            esMio ? "bg-primary-foreground/25" : "bg-primary/15",
-          )}
+          className="flex h-7 items-center gap-[2px] cursor-pointer"
+          title="Clic para moverte por el audio"
         >
-          <div
-            className={cn("h-full rounded-full transition-[width] duration-100", esMio ? "bg-primary-foreground" : "bg-primary")}
-            style={{ width: `${progreso}%` }}
-          />
+          {alturas.map((h, i) => {
+            const pasado = i / BARRAS < progreso;
+            return (
+              <span
+                key={i}
+                className={cn(
+                  "flex-1 rounded-full transition-colors",
+                  pasado
+                    ? (esMio ? "bg-primary-foreground" : "bg-primary")
+                    : (esMio ? "bg-primary-foreground/30" : "bg-primary/25"),
+                )}
+                style={{ height: `${Math.round(h * 100)}%` }}
+              />
+            );
+          })}
         </div>
-        <div className={cn("mt-1 text-[10px] tabular-nums", esMio ? "text-primary-foreground/70" : "text-muted-foreground")}>
-          {reloj(transcurrido)}{total > 0 && ` / ${reloj(total)}`}
+        <div className={cn("text-[10px] tabular-nums", esMio ? "text-primary-foreground/70" : "text-muted-foreground")}>
+          {reloj(sonando || transcurrido > 0 ? transcurrido : duracion)}
         </div>
       </div>
 
-      {/* Sin `controls`: el nativo es justamente el que no sabe dibujar esto. */}
-      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
+      <button
+        type="button"
+        onClick={cambiarVelocidad}
+        aria-label={`Velocidad ${velocidad}x`}
+        className={cn(
+          "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-colors",
+          velocidad === 1 ? "opacity-0 pointer-events-none" : "",
+          esMio ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/15 text-primary",
+          // El 1x se muestra igual al pasar el ratón, para poder volver.
+          "group-hover/nota:opacity-100",
+        )}
+      >
+        {velocidad}×
+      </button>
     </div>
   );
 }
