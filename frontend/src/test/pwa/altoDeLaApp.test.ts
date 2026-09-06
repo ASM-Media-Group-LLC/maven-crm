@@ -11,8 +11,11 @@ describe("compensacionDeAlto", () => {
   it("si no falta nada, 0", () => {
     expect(compensacionDeAlto({ screenHeight: 852, innerHeight: 852, esIos: true, standalone: true })).toBe(0);
   });
-  it("apaisado o faltante enorme: no tocar", () => {
-    expect(compensacionDeAlto({ screenHeight: 852, innerHeight: 393, esIos: true, standalone: true })).toBe(0);
+  it("teclado abierto (faltante enorme): medida no plausible → null, se conserva la anterior", () => {
+    expect(compensacionDeAlto({ screenHeight: 852, innerHeight: 393, esIos: true, standalone: true })).toBeNull();
+  });
+  it("faltante negativo (ventana más alta que la pantalla medida): 0", () => {
+    expect(compensacionDeAlto({ screenHeight: 393, innerHeight: 852, esIos: true, standalone: true })).toBe(0);
   });
   it("fuera de iOS standalone nunca compensa", () => {
     expect(compensacionDeAlto({ screenHeight: 852, innerHeight: 793, esIos: false, standalone: true })).toBe(0);
