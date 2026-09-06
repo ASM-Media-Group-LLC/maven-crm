@@ -312,7 +312,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       "audio/mpeg": "mp3",
     };
     const ext = mimeToExt[blob.type] || "webm";
-    const fileName = `voice-note-${Date.now()}.${ext}`;
+    // Los segundos van en el nombre a propósito: el .webm de MediaRecorder no
+    // trae duración, así que esta es la única fuente fiable para el reproductor.
+    const fileName = `voice-note-${Date.now()}-${Math.round(durationSec)}s.${ext}`;
     const path = `${user.id}/${fileName}`;
     const { error } = await supabase.storage.from("chat-files").upload(path, blob, {
       contentType: blob.type,

@@ -21,6 +21,7 @@ import { renderTextWithMentions } from "./MentionAutocomplete";
 import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
+import NotaDeVoz from "./NotaDeVoz";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -349,12 +350,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
     if (isVoiceNote || (message.type === "file" && isAudioFile)) {
       return (
-        <div className="flex items-center gap-2 min-w-[200px]">
-          <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-primary/10")}>
-            <Mic className="h-4 w-4" />
-          </div>
-          <audio src={message.file_url!} controls className="h-8 flex-1" preload="metadata" />
-        </div>
+        <NotaDeVoz
+          src={message.file_url!}
+          fileName={message.file_name}
+          contenido={message.content}
+          esMio={isMe}
+        />
       );
     }
 

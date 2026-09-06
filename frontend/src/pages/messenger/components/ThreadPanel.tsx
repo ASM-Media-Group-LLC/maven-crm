@@ -28,6 +28,7 @@ import { formatTime, formatDate, safeFileUrl } from "../utils";
 
 import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
+import NotaDeVoz from "./NotaDeVoz";
 
 interface ThreadPanelProps {
   parentMessage: ChatMessage;
@@ -316,7 +317,7 @@ export default function ThreadPanel({
           <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-primary/10">
             <Mic className="h-3.5 w-3.5" />
           </div>
-          <audio src={msg.file_url!} controls className="h-7 flex-1" preload="metadata" />
+          <NotaDeVoz src={msg.file_url!} fileName={msg.file_name} contenido={msg.content} />
         </div>
       );
     }
