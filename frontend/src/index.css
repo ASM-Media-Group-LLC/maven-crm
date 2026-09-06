@@ -1006,3 +1006,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .glass-panel .presence-ring { border-color: hsl(var(--popover) / .55); }
 .dark .glass-panel .presence-ring { border-color: hsl(var(--popover) / .5); }
 :root[data-contrast="high"] .glass-panel .presence-ring { border-color: hsl(var(--popover)); }
+
+/* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
+   así que van sin condición y no cambian nada en escritorio. Con
+   viewport-fit=cover (index.html) el contenido de la PWA instalada en iPhone
+   pasa por debajo del reloj: la topbar, el Sheet del menú y el composer del
+   Messenger las usan. */
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
+/* Notch en horizontal: que nada quede debajo. */
+#root {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}

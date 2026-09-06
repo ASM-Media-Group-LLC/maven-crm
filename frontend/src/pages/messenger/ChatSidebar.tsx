@@ -1,3 +1,4 @@
+import InstalarMaven from "@/components/pwa/InstalarMaven";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
@@ -245,6 +246,9 @@ export default function ChatSidebar({
           clampa al ancho del viewport y deja que truncate/min-w-0 funcionen. */}
       <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
         <div className="pb-6">
+          {/* Solo en teléfono y solo si Maven no está instalada; en iPhone el push
+              de mensajes no existe sin instalarla. Se puede posponer 7 días. */}
+          <InstalarMaven variante="banner" className="mx-3 mb-2" />
           {/* Quick access section */}
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
             <div className="flex flex-wrap gap-1.5 px-3 pb-1">

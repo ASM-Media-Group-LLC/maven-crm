@@ -1,6 +1,9 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+// Captura `beforeinstallprompt` (Android/escritorio Chrome) ANTES de montar React:
+// el evento dispara durante la carga y un useEffect ya llega tarde.
+import "./lib/promptDeInstalacion";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 

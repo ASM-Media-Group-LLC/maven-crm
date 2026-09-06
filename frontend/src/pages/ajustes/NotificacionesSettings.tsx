@@ -38,7 +38,7 @@ const NotificacionesSettings = () => {
       <div className="flex-1 min-h-0 overflow-hidden">
       <div className="h-full flex flex-col">
         {/* Fixed Header */}
-        <div className="shrink-0 border-b border-border bg-background px-6 py-4">
+        <div className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -57,8 +57,11 @@ const NotificacionesSettings = () => {
           </div>
         </div>
 
-        {/* Content: Sidebar + Tab Content */}
-        <div className="flex-1 overflow-hidden flex">
+        {/* Content: Sidebar + Tab Content. En teléfono la fila pasa a columna: las
+            pestañas horizontales arriba y el contenido debajo. Con `flex` (fila)
+            las pestañas y el contenido quedaban lado a lado y el contenido se iba
+            fuera de la pantalla — en el celular no se veía NADA de la pestaña. */}
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
           {/* Vertical Tabs - Desktop */}
           <nav className="hidden md:flex shrink-0 w-48 border-r border-border bg-muted/30 flex-col py-2">
             {TABS.map(({ id, label, icon: Icon }) => (
@@ -100,7 +103,7 @@ const NotificacionesSettings = () => {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 min-h-0 overflow-auto p-4 md:p-6">
             <div className="max-w-3xl">
               <ActiveComponent />
             </div>

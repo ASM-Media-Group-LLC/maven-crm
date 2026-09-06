@@ -1,4 +1,42 @@
 // This file is only imported dynamically in production (see main.tsx)
+import { toast } from "sonner";
+import { getTranslation, type Language } from "./lib/i18n";
+
+/** El aviso "Nueva versión disponible" como toast del design system (el mismo
+ *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
+ *  horario y sin caducar hasta que la persona recargue. <Sonner /> monta con la
+ *  app (App.tsx); si el SW avisa antes —raro—, se reintenta tres veces y al
+ *  final cae al banner viejo en DOM, que siempre existe. */
+function mostrarAvisoDeActualizacion(titulo: string, boton: string, recargar: () => void, intento = 0) {
+  if (document.querySelector("[data-sonner-toaster]")) {
+    toast(titulo, { id: "pwa-update", duration: Infinity, action: { label: boton, onClick: recargar } });
+    return;
+  }
+  if (intento < 3) {
+    setTimeout(() => mostrarAvisoDeActualizacion(titulo, boton, recargar, intento + 1), 1000);
+    return;
+  }
+  bannerDeRespaldo(titulo, boton, recargar);
+}
+
+function bannerDeRespaldo(titulo: string, boton: string, recargar: () => void) {
+  if (document.getElementById("pwa-update-banner")) return; // no duplicar
+  const banner = document.createElement("div");
+  banner.id = "pwa-update-banner";
+  banner.style.cssText =
+    "position:fixed;bottom:calc(16px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);z-index:99999;" +
+    "background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:8px;" +
+    "display:flex;align-items:center;gap:12px;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,.4)";
+  const span = document.createElement("span");
+  span.textContent = titulo;
+  const btn = document.createElement("button");
+  btn.id = "pwa-reload-btn";
+  btn.textContent = boton;
+  btn.style.cssText = "background:#6366f1;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px";
+  btn.addEventListener("click", recargar);
+  banner.append(span, btn);
+  document.body.appendChild(banner);
+}
 
 export async function initPWA() {
   const isInIframe = (() => {
@@ -37,25 +75,20 @@ export async function initPWA() {
         if (r) setInterval(() => { r.update().catch(() => {}); }, 60 * 60 * 1000);
       },
       onNeedRefresh() {
-        if (document.getElementById("pwa-update-banner")) return; // no duplicar
-        const banner = document.createElement("div");
-        banner.id = "pwa-update-banner";
-        banner.style.cssText =
-          "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;" +
-          "background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:8px;" +
-          "display:flex;align-items:center;gap:12px;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,.4)";
-        banner.innerHTML =
-          '<span>Nueva versión disponible</span>' +
-          '<button id="pwa-reload-btn" style="background:#6366f1;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px">Recargar</button>';
-        document.body.appendChild(banner);
-        document.getElementById("pwa-reload-btn")?.addEventListener("click", () => {
-          // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
-          // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
-          // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
-          // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
-          // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
+        const lang: Language = localStorage.getItem("app-language") === "en" ? "en" : "es";
+        // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
+        // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
+        // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
+        // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
+        // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
+        const recargar = () => {
           updateSW(true).catch(() => window.location.reload());
-        });
+        };
+        mostrarAvisoDeActualizacion(
+          getTranslation("pwa.actualizar.titulo", lang),
+          getTranslation("pwa.actualizar.boton", lang),
+          recargar,
+        );
       },
       onOfflineReady() {},
     });

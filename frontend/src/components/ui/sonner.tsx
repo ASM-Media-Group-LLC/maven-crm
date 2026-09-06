@@ -48,6 +48,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // Un poco más de aire entre avisos apilados: con el vidrio, dos tarjetas
       // pegadas se leen como una sola.
       gap={10}
+      // Sobre la barra de inicio del iPhone instalado (vale 16px donde no hay
+      // área segura).
+      offset="calc(16px + env(safe-area-inset-bottom, 0px))"
       // El botón de cerrar, a la derecha y DENTRO de la tarjeta. De fábrica
       // sonner lo pone a la izquierda y medio afuera; como la tarjeta recorta
       // lo que sobresale (`overflow-hidden`, que necesita la barra de color),

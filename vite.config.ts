@@ -41,13 +41,27 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#1a1a2e",
         background_color: "#0f0f23",
         display: "standalone",
-        start_url: "/",
+        // id/scope fijos para que el navegador reconozca la misma app entre
+        // deploys. start_url: la app instalada abre el dashboard (o el login si
+        // no hay sesión), no la portada de marketing.
+        id: "/",
+        scope: "/",
+        start_url: "/dashboard",
+        lang: "es",
         // La baldosa de la marca (la misma del logo). Antes el único icono era
         // el .ico de 64px con el nombre recortado, y al instalar Maven en el
         // teléfono quedaba borroso.
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+        ],
+        shortcuts: [
+          {
+            name: "Messenger",
+            short_name: "Chat",
+            url: "/messenger",
+            icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+          },
         ],
       },
       workbox: {

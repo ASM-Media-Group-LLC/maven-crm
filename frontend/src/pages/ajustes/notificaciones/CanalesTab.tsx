@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Mail, Smartphone, FileText, CheckCircle2 } from "lucide-react";
+import NotificacionesEnEsteDispositivo from "./NotificacionesEnEsteDispositivo";
 
 const CHANNELS = [
   { key: "in_app", label: "In-app", desc: "Notificaciones dentro de la plataforma", icon: Bell, active: true },
@@ -19,7 +20,10 @@ const CanalesTab = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
-        {CHANNELS.map(({ key, label, desc, icon: Icon, active }) => (
+        {CHANNELS.map(({ key, label, desc, icon: Icon, active }) => key === "push" ? (
+          // Web Push de verdad, por dispositivo (ver el componente).
+          <NotificacionesEnEsteDispositivo key="push" />
+        ) : (
           <div
             key={key}
             className="flex items-center justify-between rounded-md px-3 py-3 hover:bg-muted/50 transition-colors"

@@ -26,6 +26,10 @@ export const ALLOWED_ORIGINS = [
   "https://maven-ai.me",
   "http://localhost:5173", // Vite dev
   "http://localhost:4173", // Vite preview
+  // El preview por IP: pwa.ts no registra el service worker cuando el host es
+  // "localhost", así que para probar push en local el build se abre en
+  // 127.0.0.1:4173 — y sin este origen la edge le negaba hasta la public key.
+  "http://127.0.0.1:4173",
 ];
 
 export function pickAllowedOrigin(req: Request): string {

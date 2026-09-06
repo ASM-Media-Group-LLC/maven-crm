@@ -1,30 +1,28 @@
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { marcarPushEnEsteDispositivo } from "@/lib/pushDispositivo";
+import { esMovil } from "@/lib/plataformaPwa";
+import {
+  marcarPushEnEsteDispositivo,
+  obtenerVapidPublicKey,
+  suscribirEsteDispositivo,
+} from "@/lib/pushDispositivo";
 
-// Suscribe el navegador a Web Push para recibir llamadas entrantes con Maven
-// CERRADO o en otra pestaña. La suscripción se guarda en `push_subscriptions`
-// (vía edge web-push) y el service worker (sw-push.js) muestra la notificación.
+// Suscribe el navegador a Web Push en silencio al entrar, para las llamadas
+// entrantes con Maven CERRADO o en otra pestaña (y, con el opt-in del usuario,
+// para los mensajes). La suscripción se guarda en `push_subscriptions` (vía la
+// edge web-push) y el service worker (sw-push.js) muestra la notificación.
 //
 // Best-effort: si el navegador no soporta push, el usuario niega el permiso, o
 // las claves VAPID no están configuradas, no pasa nada — el modal in-app sigue
 // cubriendo el caso "Maven abierto".
 //
+// En el teléfono NO pide el permiso al entrar (ver esMovil abajo); si ya está
+// concedido —porque la persona tocó "Activar en este dispositivo"— sí se
+// suscribe, y así una suscripción caída se repara sola en la próxima entrada.
+//
 // Al suscribir con éxito deja la bandera `maven:push:<userId>` (lib/pushDispositivo):
 // con ella, useMessengerNotifications no duplica el aviso que ya da el service
 // worker cuando el usuario activó push_enabled.
-
-/** La VAPID public key viene en base64url; `applicationServerKey` la quiere
- *  como bytes. */
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(b64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
 
 /** `navigator.serviceWorker.ready` no resuelve NUNCA si no hay service worker
  *  (dev en localhost, navegador sin soporte): con tope para no dejar la promesa
@@ -34,14 +32,6 @@ function esperarServiceWorker(ms: number): Promise<ServiceWorkerRegistration | n
     navigator.serviceWorker.ready,
     new Promise<null>((r) => setTimeout(() => r(null), ms)),
   ]);
-}
-
-async function callWebPush<T>(action: string, body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("web-push", {
-    body: { action, ...body },
-  });
-  if (error) throw error;
-  return data as T;
 }
 
 export function usePushSubscription() {
@@ -64,11 +54,15 @@ export function usePushSubscription() {
       try {
         // 1. ¿El push está configurado (VAPID)? Se pregunta ANTES de pedir el
         //    permiso: si no hay claves, no molestamos con el prompt.
-        const { publicKey } = await callWebPush<{ publicKey?: string }>("public_key", {});
+        const publicKey = await obtenerVapidPublicKey();
         if (!publicKey || cancelled) return;
 
-        // 2. Permiso (solo si nunca se decidió; si está "denied", no insistimos).
+        // 2. Permiso. Solo si nunca se decidió (si está "denied", no insistimos),
+        //    y solo en escritorio: en iPhone el prompt sin gesto no aparece o se
+        //    pierde para siempre, y en Android sin gesto Chrome lo silencia. En
+        //    el teléfono lo pide el botón de Ajustes (usePushDispositivo).
         if (Notification.permission === "default") {
+          if (esMovil()) return;
           await Notification.requestPermission();
         }
         if (cancelled) return;
@@ -81,21 +75,8 @@ export function usePushSubscription() {
         if (!reg || cancelled) return;
 
         // 3. Reusar la suscripción si ya existe; si no, crearla con la VAPID key.
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey),
-          });
-        }
-        if (cancelled) return;
-
-        const j = sub.toJSON();
-        if (!j.endpoint || !j.keys) return;
-        await callWebPush("subscribe", {
-          subscription: { endpoint: j.endpoint, keys: j.keys },
-        });
-        marcarPushEnEsteDispositivo(user.id, true);
+        await suscribirEsteDispositivo({ reg, publicKey });
+        if (!cancelled) marcarPushEnEsteDispositivo(user.id, true);
       } catch {
         /* push no disponible: el modal in-app sigue funcionando */
         marcarPushEnEsteDispositivo(user.id, false);

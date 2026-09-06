@@ -1,10 +1,17 @@
 import { useEffect, useRef, useCallback } from "react";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
+import { esMovil } from "@/lib/plataformaPwa";
 
-/** Request notification permission on mount */
+/** Pide el permiso de notificaciones al montar — SOLO en escritorio.
+ *  En el teléfono no: en iPhone el permiso solo vale pedido tras un toque y con
+ *  la app instalada (y un prompt automático quema la única oportunidad); en
+ *  Android sin gesto Chrome lo degrada a un aviso silencioso. Ahí lo pide el
+ *  botón "Activar en este dispositivo" (Ajustes → Notificaciones → Canales).
+ *  Lo llaman cuatro hooks/páginas; el gate va acá para cubrirlos todos. */
 export function useNotificationPermission() {
   useEffect(() => {
+    if (esMovil()) return;
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }

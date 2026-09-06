@@ -12,7 +12,6 @@ import { useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
-import { useNotificationPermission } from "@/hooks/useBrowserNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { useCall } from "@/components/CallProvider";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
@@ -39,7 +38,6 @@ export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChatShared();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
-  useNotificationPermission();
   const { initiateCall } = useCall();
   const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();

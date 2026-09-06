@@ -62,19 +62,22 @@ const Notificaciones = () => {
       <div className="h-full flex flex-col">
         {/* Fixed Header + Filters */}
         <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-4 py-4 md:px-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              <h1 className="text-xl font-bold">Notificaciones</h1>
+          {/* En teléfono los botones van solo con icono (el texto aparece desde sm) y
+              la fila puede partirse: a 390 px el engranaje —que es la única puerta a
+              la configuración— quedaba fuera de la pantalla. */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Bell className="h-5 w-5 shrink-0 text-primary" />
+              <h1 className="truncate text-xl font-bold">Notificaciones</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => markAllAsRead.mutate()}>
-                <CheckCheck className="h-3 w-3" /> Marcar todas leídas
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-xs" title="Marcar todas leídas" aria-label="Marcar todas leídas" onClick={() => markAllAsRead.mutate()}>
+                <CheckCheck className="h-3 w-3" /> <span className="hidden sm:inline">Marcar todas leídas</span>
               </Button>
-              <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => archiveAll.mutate()}>
-                <Archive className="h-3 w-3" /> Archivar todas
+              <Button variant="outline" size="sm" className="gap-1 text-xs" title="Archivar todas" aria-label="Archivar todas" onClick={() => archiveAll.mutate()}>
+                <Archive className="h-3 w-3" /> <span className="hidden sm:inline">Archivar todas</span>
               </Button>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate("/ajustes/notificaciones")}>
+              <Button variant="outline" size="sm" className="gap-1" title="Configuración de notificaciones" aria-label="Configuración de notificaciones" onClick={() => navigate("/ajustes/notificaciones")}>
                 <Settings className="h-3.5 w-3.5" />
               </Button>
             </div>
