@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import MentionAutocomplete from "./MentionAutocomplete";
-import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline } from "lucide-react";
+import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline, Plus, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RichComposer, { RichComposerHandle } from "./RichComposer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,6 +15,7 @@ import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspac
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import Expresiones from "./Expresiones";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
@@ -83,6 +84,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   const composerRef = useRef<RichComposerHandle>(null);
   // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
   const [showToolbar, setShowToolbar] = useState(false);
+  // Teléfono: fila única estilo WhatsApp (+ · cajón con expresiones · cámara · mic/enviar).
+  const isMobile = useIsMobile();
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<{ abort: () => void } | null>(null);
@@ -424,8 +428,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       {/* Barra de emojis ARRIBA (personalizable, scope "messenger"). Reemplaza el popover.
           Solo en escritorio: en el teléfono los emojis, GIF y stickers van en UN botón
           (Expresiones), como WhatsApp. Decisión de Jhon (06/09/2026). */}
-      {!isRecording && (
-        <div className="hidden md:block">
+      {!isRecording && !isMobile && (
+        <div>
           <EmojiBar
             emojis={messengerEmojis}
             onPick={(e) => composerRef.current?.insertText(e)}
@@ -437,8 +441,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +
           Enviar a la derecha. NO se tocó la lógica de envío/voz/menciones/upload. */}
-      <div className="px-3 pt-2.5 pb-0.5 md:pb-2.5">
+      <div className={cn("px-3 pt-2.5", isMobile ? "pb-0.5" : "pb-2.5")}>
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
+        {/* Cámara del teléfono: `capture` abre la cámara directo en iOS/Android. */}
+        <input ref={cameraInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="image/*,video/*" capture="environment" />
         {isRecording ? (
           <VoiceNoteRecorder
             isRecording={isRecording}
@@ -446,7 +452,90 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             onSend={handleVoiceNoteSend}
             onCancel={() => setIsRecording(false)}
           />
+        ) : isMobile ? (
+          /* ---- TELÉFONO: una fila, como WhatsApp (decisión de Jhon 06/09/2026) ----
+             + adjunta · el cajón lleva dentro, a la derecha, emojis/GIF/stickers ·
+             cámara · y a la derecha del todo el micrófono, que pasa a Enviar cuando
+             hay texto o adjuntos. Formato y Scripts quedan solo en escritorio. */
+          <div className="flex items-end gap-1.5">
+            <Button
+              variant="ghost" size="icon"
+              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title="Adjuntar archivo"
+              aria-label="Adjuntar archivo"
+            >
+              {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
+            </Button>
+            <div className="relative min-w-0 flex-1">
+              {chatType === "group" && participants && (
+                <MentionAutocomplete
+                  text={text}
+                  cursorPosition={cursorPosition}
+                  participants={participants}
+                  currentUserId={user?.id}
+                  onSelect={handleMentionSelect}
+                  aCiegas={aCiegas}
+                />
+              )}
+              <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-[22px] px-4 py-2.5 pr-11 focus-within:ring-1 focus-within:ring-primary/30">
+                <RichComposer
+                  ref={composerRef}
+                  initialContent={getDraft(user?.id, conversationId)}
+                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  showToolbar={showToolbar}
+                  disabled={uploading}
+                  onUpdate={handleComposerUpdate}
+                  onEnter={handleSend}
+                  onPasteFiles={addFilesInternal}
+                />
+              </div>
+              <Expresiones
+                className="absolute bottom-[3px] right-1 h-8 w-8"
+                favoritos={messengerEmojis}
+                onEmoji={(e) => composerRef.current?.insertText(e)}
+                onGif={sendGifUrl}
+                onSticker={sendStickerUrl}
+                disabled={uploading}
+              />
+            </div>
+            <Button
+              variant="ghost" size="icon"
+              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={uploading}
+              title="Cámara"
+              aria-label="Cámara"
+            >
+              <Camera className="h-6 w-6" />
+            </Button>
+            {text.trim() || pendingFiles.length > 0 ? (
+              <Button
+                size="icon"
+                onClick={handleSend}
+                className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
+                disabled={uploading}
+                title="Enviar"
+                aria-label="Enviar"
+              >
+                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost" size="icon"
+                className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+                onClick={() => setIsRecording(true)}
+                title="Grabar nota de voz"
+                aria-label="Grabar nota de voz"
+              >
+                <Mic className="h-6 w-6" />
+              </Button>
+            )}
+          </div>
         ) : (
+          /* ---- ESCRITORIO: texto al medio, acciones abajo (formato · adjuntar · GIF ·
+             sticker · Scripts · mic) + Enviar dentro del cajón. Sin cambios. ---- */
           <div className="space-y-2">
             <div className="relative">
               {chatType === "group" && participants && (
@@ -502,19 +591,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
               </Button>
-              {/* Teléfono: un solo botón (emojis + GIF + stickers). Escritorio: los dos de siempre. */}
-              <Expresiones
-                className="md:hidden"
-                favoritos={messengerEmojis}
-                onEmoji={(e) => composerRef.current?.insertText(e)}
-                onGif={sendGifUrl}
-                onSticker={sendStickerUrl}
-                disabled={uploading}
-              />
-              <div className="hidden md:contents">
-                <GifPicker onPick={sendGifUrl} disabled={uploading} />
-                <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
-              </div>
+              <GifPicker onPick={sendGifUrl} disabled={uploading} />
+              <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
               <ScriptsButton
                 surface="messenger"
                 disabled={uploading}
