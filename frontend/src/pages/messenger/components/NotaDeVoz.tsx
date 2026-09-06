@@ -231,7 +231,11 @@ export default function NotaDeVoz({
   const alturas = onda ?? Array.from({ length: BARRAS }, (_, i) => 0.35 + 0.2 * Math.sin(i * 1.7));
 
   return (
-    <div className="flex items-center gap-2.5 min-w-[235px] max-w-[300px]">
+    // ⚠️ `w-[260px] max-w-full`, NUNCA `min-w-[...]`: min-w impide encoger, y en
+    // la ventanita flotante la burbuja es más angosta que eso, así que la onda
+    // se salía por el borde. Con ancho PREFERIDO + tope al contenedor, en el
+    // chat grande mide 260 y en la flotante cede lo que haga falta.
+    <div className="flex items-center gap-2 w-[260px] max-w-full min-w-0">
       <button
         type="button"
         onClick={() => void alternar()}
@@ -250,7 +254,7 @@ export default function NotaDeVoz({
         <div
           onClick={buscar}
           role="presentation"
-          className="flex h-7 items-center gap-[2px] cursor-pointer"
+          className="flex h-7 min-w-0 items-center gap-px cursor-pointer"
           title="Clic para moverte por el audio"
         >
           {alturas.map((h, i) => (
