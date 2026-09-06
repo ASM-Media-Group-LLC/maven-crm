@@ -470,7 +470,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
             "[@media(hover:none)]:opacity-0 [@media(hover:none)]:pointer-events-none",
             "[@media(hover:none)]:group-data-[acciones=1]/burbuja:opacity-100 [@media(hover:none)]:group-data-[acciones=1]/burbuja:pointer-events-auto",
-            isMe ? "-left-16" : "-right-16"
+            // Con mouse, al costado de la burbuja. En táctil, ENCIMA de la esquina:
+            // al costado se salían de la pantalla y dejaban un scroll lateral.
+            isMe
+              ? "-left-16 [@media(hover:none)]:left-0 [@media(hover:none)]:-top-7"
+              : "-right-16 [@media(hover:none)]:right-0 [@media(hover:none)]:-top-7"
           )}
             onClick={(e) => e.stopPropagation()}
           >

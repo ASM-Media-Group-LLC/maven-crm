@@ -97,7 +97,9 @@ export const EmojiBar = ({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1 border-t bg-card/50 px-2 py-1.5">
+      {/* En teléfono (hasta md) es UNA fila que se desliza de lado: partida en dos
+          filas se comía medio chat, y sin scroll se salía por la derecha. */}
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide border-t bg-card/50 px-2 py-1.5 md:flex-wrap md:overflow-visible">
         {emojis.map((e) => (
           <button
             key={e}
@@ -108,7 +110,7 @@ export const EmojiBar = ({
             // OTRO emoji) en vez de enviar el mensaje.
             onMouseDown={(ev) => ev.preventDefault()}
             onClick={() => handleClickEmoji(e)}
-            className={`relative rounded p-0.5 text-xl leading-none transition-colors hover:bg-muted ${
+            className={`relative shrink-0 rounded p-0.5 text-xl leading-none transition-colors hover:bg-muted ${
               editMode ? "ring-1 ring-rose-500/40 hover:ring-rose-500" : ""
             }`}
             title={editMode ? "Click para eliminar" : `Insertar ${e}`}

@@ -215,7 +215,7 @@ export default function MessageList({
 
   return (
     <div className={cn("flex-1 relative overflow-hidden", className)}>
-    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (
           <div className="flex justify-center py-3">

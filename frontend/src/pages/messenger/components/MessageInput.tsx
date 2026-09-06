@@ -416,17 +416,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       )}
 
       {/* Barra de emojis ARRIBA (personalizable, scope "messenger"). Reemplaza el popover.
-          Solo desde md: el teléfono ya trae teclado de emojis y la fila entera se
-          salía por la derecha de la pantalla. */}
+          En el teléfono es una sola fila que se desliza (ver EmojiBar). */}
       {!isRecording && (
-        <div className="hidden md:block">
-          <EmojiBar
-            emojis={messengerEmojis}
-            onPick={(e) => composerRef.current?.insertText(e)}
-            onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
-            onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
-          />
-        </div>
+        <EmojiBar
+          emojis={messengerEmojis}
+          onPick={(e) => composerRef.current?.insertText(e)}
+          onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+          onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
+        />
       )}
 
       {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +

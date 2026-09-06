@@ -101,10 +101,14 @@ function mostrarAviso(data) {
         });
       })
       .then(function () {
-        // Punto en el icono de la app (Android/iOS instalada). El conteo exacto
-        // lo pone la app al abrirse.
+        // Número en el icono de la app (Android/iOS instalada): tantas como
+        // tarjetas haya sin abrir. Sin número, iOS lo dibujaba como un punto (o
+        // nada) y pisaba el conteo que la app había dejado. Al abrirse, la app
+        // vuelve a poner el conteo exacto de chats sin leer.
         if (self.navigator && self.navigator.setAppBadge) {
-          return self.navigator.setAppBadge().catch(function () {});
+          return self.registration.getNotifications().then(function (todas) {
+            return self.navigator.setAppBadge(Math.max(1, todas.length)).catch(function () {});
+          });
         }
       });
   });

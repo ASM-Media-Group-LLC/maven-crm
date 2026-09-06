@@ -29,6 +29,7 @@ import Logo from "@/components/Logo";
 
 const Portada = lazy(() => import("./pages/portada/Portada"));
 const Privacidad = lazy(() => import("./pages/portada/Privacidad"));
+const DiagnosticoPantalla = lazy(() => import("./pages/DiagnosticoPantalla"));
 const Login = lazy(() => import("./pages/Login"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -254,6 +255,8 @@ const App = () => (
               {/* Public routes */}
               <Route path="/" element={<Portada />} />
               <Route path="/privacidad" element={<Privacidad />} />
+              {/* Medidas del dispositivo para depurar la PWA en teléfonos (pública). */}
+              <Route path="/diagnostico-pantalla" element={<DiagnosticoPantalla />} />
               <Route path="/login" element={<Login />} />
               {/* El registro público está cerrado (ver `bloquear_alta_publica`
                   en la base): quien llega con un link viejo cae en el

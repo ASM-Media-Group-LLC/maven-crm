@@ -35,6 +35,8 @@ const SON_LAYOUT = new Set(["HRLayout"]);
 const FUERA_DEL_SHELL = new Set([
   "Portada", "Privacidad", "Concepto", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
+  // Medidas del dispositivo para depurar la PWA: pública, fuera del shell, scroll del documento.
+  "DiagnosticoPantalla",
 ]);
 
 /** El scroll de un MODAL no es el scroll de la página.

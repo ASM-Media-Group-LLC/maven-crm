@@ -583,9 +583,11 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           onClick={onClick}
           className={cn(
             "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",
+            // Los :hover SOLO con mouse: en iOS, un hover que cambia algo hace que el
+            // primer toque cuente como "pasar por encima" y el segundo como click.
             isActive
               ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
-              : "hover:bg-primary/5",
+              : "[@media(hover:hover)]:hover:bg-primary/5",
             // Sombreado del no-leído. 0.04 y después 0.09 seguían siendo casi invisibles,
             // sobre todo en modo claro. Se sube el tinte y además se marca con una barra
             // de acento a la izquierda (inset shadow, no empuja el layout): así se
@@ -663,7 +665,9 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 role="button"
                 tabIndex={0}
                 onClick={e => e.stopPropagation()}
-                className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity z-10"
+                // En táctil este ⋮ no se dibuja (las mismas acciones están en el menú
+                // de mantener presionado); con mouse aparece al pasar por encima.
+                className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:bg-muted transition-opacity z-10 [@media(hover:none)]:hidden"
               >
                 <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
               </div>

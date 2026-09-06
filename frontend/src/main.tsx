@@ -6,6 +6,8 @@ import "./index.css";
 import "./lib/promptDeInstalacion";
 // Mide cuánto le falta a 100dvh para llegar al borde inferior en la PWA de iPhone.
 import "./lib/altoDeLaApp";
+// iOS: sin zoom automático al enfocar el cajón de texto (solo iOS; ver el archivo).
+import "./lib/sinZoomAlEnfocar";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 
