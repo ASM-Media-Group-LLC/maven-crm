@@ -14,7 +14,11 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // En teléfono los avisos van arriba. Con viewport-fit=cover (PWA instalada en
+      // iPhone) el borde superior es el reloj: sin este padding la X de cerrar
+      // quedaba debajo de la barra de estado y el aviso, que no caduca solo,
+      // tapaba el botón del menú sin forma de quitarlo.
+      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col sm:pt-4 md:max-w-[420px]",
       className,
     )}
     {...props}
