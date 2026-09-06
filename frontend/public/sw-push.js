@@ -92,6 +92,10 @@ function mostrarAviso(data) {
           badge: "/favicon.ico",
           tag: tag,
           renotify: true,
+          // Android: que suene y vibre cuando el canal del sistema lo permite. Si
+          // el canal está en "silenciosa" (ajuste del teléfono), esto no lo cambia.
+          silent: false,
+          vibrate: [200, 100, 200],
           data: {
             url: data.url || "/",
             kind: data.type,
