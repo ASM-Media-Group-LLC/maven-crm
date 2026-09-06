@@ -2,6 +2,7 @@ import { BellOff, BellRing, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import InstalarMaven from "@/components/pwa/InstalarMaven";
+import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePushDispositivo } from "@/hooks/usePushDispositivo";
 
@@ -78,6 +79,12 @@ export default function NotificacionesEnEsteDispositivo() {
             </Button>
           </div>
         )}
+      </div>
+      {/* Para depurar la PWA en un teléfono sin inspector: medidas reales del dispositivo. */}
+      <div className="mt-3 pl-7">
+        <Link to="/diagnostico-pantalla" className="text-[11px] text-muted-foreground underline-offset-2 hover:underline">
+          Diagnóstico de pantalla
+        </Link>
       </div>
     </div>
   );

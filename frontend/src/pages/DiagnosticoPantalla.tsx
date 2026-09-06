@@ -41,6 +41,13 @@ export default function DiagnosticoPantalla() {
       <div id="probe-dvh" style={{ position: "fixed", top: 0, left: 0, width: 1, height: "100dvh", visibility: "hidden" }} />
       <div id="probe-safe-top" style={{ position: "fixed", visibility: "hidden", paddingTop: "env(safe-area-inset-top, 0px)" }} />
       <div id="probe-safe-bottom" style={{ position: "fixed", visibility: "hidden", paddingTop: "env(safe-area-inset-bottom, 0px)" }} />
+      <button
+        type="button"
+        onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard"))}
+        className="mb-3 text-sm text-primary underline-offset-2 hover:underline"
+      >
+        ← Volver
+      </button>
       <h1 className="text-lg font-bold">Diagnóstico de pantalla</h1>
       <p className="mb-3 text-xs text-muted-foreground">Sácale captura y mándala. No guarda nada.</p>
       <dl className="space-y-2 text-[13px]">
