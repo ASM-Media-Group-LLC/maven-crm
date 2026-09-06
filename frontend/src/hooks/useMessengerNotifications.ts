@@ -12,6 +12,7 @@ import {
   useNotificationPermission,
 } from "@/hooks/useBrowserNotifications";
 import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
+import { esMovil } from "@/lib/plataformaPwa";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
 
 // Etiqueta legible cuando el mensaje no trae texto.
@@ -78,7 +79,7 @@ function mentionsMe(content: string | null, myName: string | null): boolean {
  */
 export function useMessengerNotifications() {
   const { user } = useAuth();
-  const { settings } = useNotificationSettings();
+  const { settings, isLoading: settingsCargando } = useNotificationSettings();
   const { notify } = useBrowserNotifications();
   const navigate = useNavigate();
   useNotificationPermission();
@@ -91,6 +92,8 @@ export function useMessengerNotifications() {
   // vía refs (sin re-suscribir en cada cambio de settings/notify).
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const settingsCargandoRef = useRef(settingsCargando);
+  settingsCargandoRef.current = settingsCargando;
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   const navigateRef = useRef(navigate);
@@ -204,10 +207,16 @@ export function useMessengerNotifications() {
             now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
 
-          // Con push activo en ESTE dispositivo y el opt-in del usuario, la tarjeta
-          // con la pestaña oculta la muestra el service worker (sw-push.js): acá
-          // solo sonido y título, o llegarían dos avisos por mensaje.
-          if (s.push_enabled === true && tienePushEnEsteDispositivo(userId)) {
+          // La tarjeta del navegador (pestaña oculta) NO va:
+          //  · en el teléfono, nunca: ahí manda el push del service worker. La app
+          //    abierta de fondo seguía creando la suya y el primer mensaje llegaba
+          //    doble (Jhon lo vio en iPhone y Android);
+          //  · en escritorio, si este dispositivo tiene push y el usuario tiene el
+          //    opt-in (o los ajustes aún cargan y no sabemos: mejor uno que dos).
+          // En ambos casos quedan el sonido y el parpadeo del título.
+          const pushCubre =
+            tienePushEnEsteDispositivo(userId) && (s.push_enabled === true || settingsCargandoRef.current);
+          if (esMovil() || pushCubre) {
             if (soundOk) playNotificationSound();
             return;
           }
