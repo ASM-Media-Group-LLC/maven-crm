@@ -111,9 +111,22 @@ let ultimoEstadoPendiente: MediaState | null = null;
  *  Regla: si alguna conexión dice "en pausa", esa manda (la pausa es una acción
  *  deliberada registrada en el servidor; la pestaña que la hizo es la que sabe).
  *  Si ninguna, la más NUEVA. Exportada para poder testearla. */
-export function elegirPresencia<T extends { onBreak?: boolean }>(presencias: T[] | undefined): T | undefined {
+export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; screenShareOn?: boolean }>(presencias: T[] | undefined): T | undefined {
   if (!presencias?.length) return undefined;
-  return presencias.find((p) => p.onBreak) ?? presencias[presencias.length - 1];
+  const enPausa = presencias.find((p) => p.onBreak);
+  if (enPausa) return enPausa;
+  // Con dos conexiones de la misma persona (07/09: Cowork en dos pestañas),
+  // manda la que está TRABAJANDO —cámara y pantalla— y no la más nueva: la
+  // pestaña de fondo, sin cámara, era la que hacía sonar "cámara apagada" al
+  // supervisor mientras la persona estaba perfectamente en la otra. A igual
+  // puntaje, la más nueva (la última), como antes.
+  let mejor = presencias[presencias.length - 1];
+  let puntaje = -1;
+  for (const p of presencias) {
+    const pts = (p.camOn ? 2 : 0) + (p.screenShareOn ? 1 : 0);
+    if (pts >= puntaje) { puntaje = pts; mejor = p; }
+  }
+  return mejor;
 }
 
 function leerEstados(canal: CanalRealtime) {

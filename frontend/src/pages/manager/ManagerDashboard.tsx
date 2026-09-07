@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, CalendarClock, Clock, DollarSign, Gauge,
-  Megaphone, MousePointerClick, Sparkles, Users,
-} from "lucide-react";
+  Megaphone, MousePointerClick, Sparkles, Users, Timer } from "lucide-react";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +16,7 @@ import { es } from "date-fns/locale";
 import { usePromoScoresRango } from "@/pages/promolog/usePromoPeriodScores";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useMiTiempoCowork, resumirTiempoCowork, pieTiempoCowork } from "@/hooks/useMiTiempoCowork";
 import { useMisHoras, resumirHoras } from "@/hooks/useMisHoras";
 import { useMiObjetivo, useMisCreadoras, useMisNotasDelBot, type NotaDelBot } from "./useManagerDashboard";
 
@@ -153,6 +153,8 @@ export default function ManagerDashboard({ forzado = false }: {
 
   const { notas, cargando: notasCargando } = useMisNotasDelBot(desde, hasta);
   const { dias: diasHubstaff, cargando: horasCargando } = useMisHoras(desde, hasta);
+  const { dias: diasCowork, cargando: coworkCargando } = useMiTiempoCowork(desde, hasta);
+  const cowork = useMemo(() => resumirTiempoCowork(diasCowork), [diasCowork]);
   const objetivo = useMiObjetivo();
   const { creadoras, cargando: creadorasCargando } = useMisCreadoras();
   // Promolog: el score oficial por creadora (mismo RPC que el leaderboard de
@@ -300,6 +302,14 @@ export default function ManagerDashboard({ forzado = false }: {
                 ? `${horas.diasTrabajados} día${horas.diasTrabajados === 1 ? "" : "s"} con registro de Hubstaff`
                 : horasCargando ? "cargando…" : "sin registro en el rango"}
               icono={Clock} color="bg-sky-500" tinte="from-sky-500/10"
+            />
+            {/* El reloj de Cowork (cámara + pantalla, presente): va a reemplazar
+                a Hubstaff; conviven mientras dure la transición. */}
+            <Kpi
+              label="Cowork"
+              valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
+              pie={pieTiempoCowork(cowork, coworkCargando)}
+              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi
               label="Productividad"
