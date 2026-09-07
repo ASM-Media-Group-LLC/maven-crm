@@ -38,9 +38,22 @@ describe("catálogo de eventos", () => {
   it("incluye los kinds que los triggers de Postgres mandan al celular", () => {
     // push_chat_message (chat_message), push_correo_nuevo, push_cowork_llamado,
     // push_inbox_asignacion. Si se agrega un trigger nuevo, va acá y en el catálogo.
-    for (const kind of ["chat_message", "correo_nuevo", "cowork_llamado", "cowork_pedido_host", "inbox_asignacion"]) {
+    for (const kind of [
+      "chat_message", "correo_nuevo", "cowork_pedido_host", "inbox_asignacion",
+      // push_cowork_llamado manda 'cowork_llamado_' + kind, con los 4 kinds de cowork-session
+      "cowork_llamado_camara", "cowork_llamado_encuadre", "cowork_llamado_luz", "cowork_llamado_pantalla",
+    ]) {
       expect(eventoDelTipo(kind)?.canales, kind).toContain("push");
     }
+  });
+
+  it("hay un evento por cada kind de llamado de atención que registra cowork-session", () => {
+    // Espejo de `const KINDS = ["camara", "encuadre", "luz", "pantalla"]` en
+    // supabase/functions/cowork-session/index.ts (fuera del alcance del glob).
+    for (const kind of ["camara", "encuadre", "luz", "pantalla"]) {
+      expect(moduloDelTipo(`cowork_llamado_${kind}`), kind).toBe("Cowork");
+    }
+    expect(eventoDelTipo("cowork_llamado")).toBeNull();
   });
 
   it("incluye los tipos que la campana recibió de verdad en los últimos 90 días", () => {
@@ -58,7 +71,7 @@ describe("catálogo de eventos", () => {
       expect(eventoDelTipo(t)?.canales, t).not.toContain("email");
     }
     // Con canal correo: lo que pasa por push_notify_enqueue (que también resuelve el correo).
-    for (const t of ["cowork_llamado", "cowork_pedido_host", "inbox_asignacion", "closer_assigned", "chatter_evaluation", "onboarding_inactivity"]) {
+    for (const t of ["cowork_llamado_camara", "cowork_pedido_host", "inbox_asignacion", "closer_assigned", "chatter_evaluation", "onboarding_inactivity"]) {
       expect(eventoDelTipo(t)?.canales, t).toContain("email");
     }
   });

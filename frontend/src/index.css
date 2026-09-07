@@ -259,6 +259,45 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-ring: 350 80% 42%;
   }
 
+  /* ---- Tinte de fondo por skin (Jhon, 07/09/2026) ----
+     Los neutros (fondo, tarjetas, bordes, barra lateral) toman el MATIZ del
+     skin con la misma saturación y luminosidad que los de Maven: la app se
+     siente del color elegido sin tocar un solo contraste (la L no cambia).
+     Cada skin declara su matiz en --tinte-h y las dos reglas de abajo lo
+     aplican por tema. Van ANTES del bloque OLED a propósito: .dark[data-oled]
+     empata en especificidad (0,2,0) y gana por orden → en OLED el fondo sigue
+     negro puro. El skin Personalizado pone --tinte-h y data-skin-custom desde
+     hooks/useSkin.ts. El fallback 227 es el matiz de Maven. */
+  :root[data-skin="atardecer"]  { --tinte-h: 25; }
+  :root[data-skin="esmeralda"]  { --tinte-h: 160; }
+  :root[data-skin="orquidea"]   { --tinte-h: 290; }
+  :root[data-skin="medianoche"] { --tinte-h: 217; }
+  :root[data-skin="dorado"]     { --tinte-h: 43; }
+  :root[data-skin="kash"]       { --tinte-h: 350; }
+  :root[data-skin="diva"]       { --tinte-h: 330; }
+  :root[data-skin="unlimited"]  { --tinte-h: 150; }
+  :root[data-skin="unlok"]      { --tinte-h: 211; }
+  :root[data-season="halloween"] { --tinte-h: 25; }
+  :root[data-season="navidad"]   { --tinte-h: 350; }
+
+  .dark[data-skin], .dark[data-season], .dark[data-skin-custom] {
+    --background: var(--tinte-h, 227) 24% 7%;
+    --card: var(--tinte-h, 227) 30% 12%;
+    --popover: var(--tinte-h, 227) 30% 12%;
+    --muted: var(--tinte-h, 227) 27% 14%;
+    --border: var(--tinte-h, 227) 26% 17%;
+    --input: var(--tinte-h, 227) 26% 17%;
+    --sidebar-background: var(--tinte-h, 227) 28% 8%;
+    --sidebar-border: var(--tinte-h, 227) 26% 12%;
+  }
+  :root[data-skin]:not(.dark), :root[data-season]:not(.dark), :root[data-skin-custom]:not(.dark) {
+    --background: var(--tinte-h, 227) 30% 98.5%;
+    --muted: var(--tinte-h, 227) 18% 95%;
+    --border: var(--tinte-h, 227) 18% 89%;
+    --input: var(--tinte-h, 227) 18% 89%;
+    --sidebar-background: var(--tinte-h, 227) 24% 97.5%;
+  }
+
   /* ---- Modo OLED (data-oled en <html>) — SOLO en tema oscuro ----
      Negro puro de fondo (en pantallas OLED los píxeles negros se apagan →
      batería). Cards/popovers quedan apenas por encima del negro para no
