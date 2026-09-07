@@ -32,11 +32,27 @@ export interface Veredicto {
   detalle: string | null;
 }
 
-export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_FUERA_DE_CAMARA_MS): Veredicto {
+/** Qué exige la sesión. El reloj pide lo mismo que las alertas del supervisor:
+ *  si apagó la pantalla para su equipo (managers), el reloj no se detiene por
+ *  pantalla; si apagó la cámara, tampoco por cámara ni por "fuera de cámara"
+ *  (sin cámara no hay detector). Decisión de Jhon (07/09): depende de lo que
+ *  tenga configurado el supervisor. */
+export interface Exigencias {
+  camara: boolean;
+  pantalla: boolean;
+}
+
+export const EXIGE_TODO: Exigencias = { camara: true, pantalla: true };
+
+/** ¿Corre el reloj en este instante? Prioridad: pausa > sin cámara > sin
+ *  pantalla > fuera de cámara > activo — cada una solo si la sesión la exige. */
+export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_FUERA_DE_CAMARA_MS, exige: Exigencias = EXIGE_TODO): Veredicto {
   if (l.onBreak) return { estado: "pausa", detalle: null };
-  if (!l.camOn) return { estado: "sin_camara", detalle: null };
-  if (!l.screenShareOn) return { estado: "sin_pantalla", detalle: null };
-  if (l.faceState === "no_face") {
+  if (exige.camara && !l.camOn) return { estado: "sin_camara", detalle: null };
+  if (exige.pantalla && !l.screenShareOn) return { estado: "sin_pantalla", detalle: null };
+  // "Fuera de cámara" solo tiene sentido si la cámara se exige y está encendida.
+  if (exige.camara && l.camOn && l.faceState === "no_face") {
+    // Un faceSince en el futuro (reloj del cliente adelantado) cuenta como "recién".
     const desde = typeof l.faceSince === "number" && l.faceSince <= ahora ? l.faceSince : ahora;
     if (ahora - desde >= umbralFueraMs) return { estado: "fuera_de_camara", detalle: "no_face" };
   }

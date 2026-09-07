@@ -77,8 +77,15 @@ function resumenAviso(r: ReglaAviso): string {
   return `Se le avisa a la persona a ${textoSegundos(r.primerAvisoSeg)} y cada ${textoSegundos(r.repetirSeg)} · ${supervisor}`;
 }
 
-function resumenReloj(r: ReglaReloj): string {
-  return `Corre con cámara y pantalla · se detiene si no hay nadie ${textoSegundos(r.fueraDeCamaraSeg)} seguidos, en pausa, sin cámara o sin pantalla`;
+function resumenReloj(r: ReglaReloj, camara: boolean, pantalla: boolean): string {
+  const exige = camara && pantalla ? "cámara y pantalla" : camara ? "cámara (la pantalla no se exige acá)" : pantalla ? "pantalla (la cámara no se exige acá)" : "estar en la sala (ni cámara ni pantalla se exigen acá)";
+  const paradas = [
+    "en pausa",
+    camara ? "sin cámara" : null,
+    pantalla ? "sin pantalla" : null,
+    camara ? `si no hay nadie ${textoSegundos(r.fueraDeCamaraSeg)} seguidos` : null,
+  ].filter(Boolean).join(", ");
+  return `Corre con ${exige} · se detiene ${paradas}`;
 }
 
 function resumenPausas(p: ReglaPausas): string {
@@ -289,7 +296,7 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <TarjetaRegla
             icono={Timer}
             titulo="Reloj de tiempo trabajado"
-            resumen={resumenReloj(borrador.reloj)}
+            resumen={resumenReloj(borrador.reloj, borrador.camara.activa, borrador.pantalla.activa)}
             abierta={!!abiertas.reloj}
             onAlternar={() => alternar("reloj")}
           >
@@ -301,8 +308,9 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
               onCambio={(v) => cambiarReloj({ fueraDeCamaraSeg: Number(v) })}
             />
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Agacharse un momento no descuenta: el reloj se detiene solo cuando la ausencia dura más que esto.
-              Muy lejos o con poca luz no lo detienen; eso va por las alertas de encuadre.
+              El reloj exige lo mismo que las alertas de arriba: si apagas la de pantalla, no se detiene por pantalla;
+              si apagas la de cámara, tampoco por cámara. Agacharse un momento no descuenta: se detiene solo cuando
+              la ausencia dura más que esto. Muy lejos o con poca luz no lo detienen; eso va por las alertas de encuadre.
             </p>
           </TarjetaRegla>
         </div>
