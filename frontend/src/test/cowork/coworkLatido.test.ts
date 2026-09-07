@@ -4,9 +4,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "tok" } } }) } },
 }));
 
-import { iniciarLatido, actualizarLatido, detenerLatido, latidoActivo, INTERVALO_LATIDO_MS, RESPIRO_CAMBIO_MS } from "@/lib/coworkLatido";
+import { iniciarLatido, actualizarLatido, detenerLatido, latidoActivo, leerReloj, suscribirReloj, INTERVALO_LATIDO_MS, RESPIRO_CAMBIO_MS } from "@/lib/coworkLatido";
 
-const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, estado: "activo", segundosHoy: 900 }) });
 
 function cuerpos(): Array<Record<string, unknown>> {
   return fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
@@ -65,6 +65,19 @@ describe("coworkLatido", () => {
     iniciarLatido("s2", { camOn: true, screenShareOn: true });
     await vi.advanceTimersByTimeAsync(0);
     expect(latidoActivo()?.sessionId).toBe("s2");
+  });
+
+  it("la respuesta del servidor alimenta el reloj y avisa a quien escucha", async () => {
+    const visto: unknown[] = [];
+    const baja = suscribirReloj((r) => visto.push(r));
+    iniciarLatido("s1", { camOn: true, screenShareOn: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(leerReloj()).toMatchObject({ estado: "activo", segundosHoy: 900 });
+    expect(visto).toHaveLength(1);
+    detenerLatido();
+    expect(leerReloj()).toBeNull();
+    expect(visto[1]).toBeNull();
+    baja();
   });
 
   it("detener apaga todo: no late más ni con cambios", async () => {

@@ -10,8 +10,7 @@ import {
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelLeftClose, PanelLeftOpen,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2,
-} from "lucide-react";
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -34,6 +33,7 @@ import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
+import { relojDesdePresencia, segundosMostrados, formatoReloj, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
@@ -1597,6 +1597,39 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 <span className="truncate max-w-[92px]">{nombreYApellido(cowork.profiles[p.user_id])}</span> {pausa!.cuenta.texto}
                               </span>
                             ))}
+                          </div>
+                        );
+                      })()}
+                      {/* El reloj de tiempo trabajado de cada persona (reemplazo de
+                          Hubstaff): el mismo número que ve la persona, porque viaja
+                          por presencia desde su último latido. Verde corriendo, gris
+                          detenido con el motivo. */}
+                      {(() => {
+                        const conReloj = participants
+                          .map((p) => ({ p, reloj: relojDesdePresencia(mediaStates[p.user_id]) }))
+                          .filter((x) => x.reloj);
+                        if (!conReloj.length) return null;
+                        return (
+                          <div className="mt-1 flex flex-wrap items-center gap-1" data-testid="relojes-sala">
+                            {conReloj.map(({ p, reloj }) => {
+                              const corre = reloj!.estado === "activo";
+                              const seg = segundosMostrados(reloj, now);
+                              const motivo = motivoDetenidoDeOtro(reloj!.estado);
+                              return (
+                                <span
+                                  key={p.user_id}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                                    corre ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+                                  )}
+                                  title={`${cowork.profiles[p.user_id] || "Alguien"} · hoy ${formatoReloj(seg)} con el reloj corriendo${corre ? "" : ` · detenido: ${motivo}`}`}
+                                >
+                                  <Timer className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate max-w-[92px]">{nombreYApellido(cowork.profiles[p.user_id])}</span> {formatoReloj(seg)}
+                                  {!corre && motivo && <span className="font-normal opacity-80">· {motivo}</span>}
+                                </span>
+                              );
+                            })}
                           </div>
                         );
                       })()}

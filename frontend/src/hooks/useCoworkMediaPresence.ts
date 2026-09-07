@@ -30,6 +30,12 @@ export interface MediaState {
    *  por presence para que el supervisor vea exactamente el mismo contador que
    *  la persona: el presupuesto de baño es diario, no por pausa. */
   banoConsumidoSeg?: number | null;
+  /** El reloj de Cowork (tiempo trabajado hoy), tal como lo dijo el servidor
+   *  en el último latido de esta persona. Viaja por presencia para que el
+   *  supervisor vea el MISMO número que la persona (ver lib/coworkReloj). */
+  relojEstado?: string | null;
+  relojSegundosHoy?: number | null;
+  relojEn?: number | null;
 }
 
 interface UseCoworkMediaPresenceResult {
@@ -127,6 +133,9 @@ function leerEstados(canal: CanalRealtime) {
       faceState: ultima.faceState ?? null,
       faceSince: ultima.faceSince ?? null,
       banoConsumidoSeg: ultima.banoConsumidoSeg ?? null,
+      relojEstado: ultima.relojEstado ?? null,
+      relojSegundosHoy: ultima.relojSegundosHoy ?? null,
+      relojEn: ultima.relojEn ?? null,
     };
   });
   return resultado;
@@ -229,6 +238,9 @@ function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number)
     faceState: state.faceState ?? null,
     faceSince: state.faceSince ?? null,
     banoConsumidoSeg: state.banoConsumidoSeg ?? null,
+    relojEstado: state.relojEstado ?? null,
+    relojSegundosHoy: state.relojSegundosHoy ?? null,
+    relojEn: state.relojEn ?? null,
   });
   // `track()` devuelve una promesa y hasta ahora nadie la miraba. Cuando el
   // servidor rechaza la publicación —justamente el caso del corte por límite—
