@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Clock, DollarSign, Headphones,
-  MousePointerClick, Phone, Target, TrendingUp,
-} from "lucide-react";
+  MousePointerClick, Phone, Target, TrendingUp, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -14,6 +13,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CLOSER_STAGES, STAGE_LABELS, getNextContactDate, isContactOverdue, needsContactDecision } from "@/pages/closers/hooks/useCloserLeads";
 import { diasDelRango, useMisHoras, resumirHoras } from "@/hooks/useMisHoras";
+import { useMiTiempoCowork, resumirTiempoCowork, pieTiempoCowork } from "@/hooks/useMiTiempoCowork";
 import { useMiQa, useMisLeads, type LeadDelCloser } from "./useCloserDashboard";
 
 // TABLERO DEL CLOSER — su casa al entrar a Maven.
@@ -79,6 +79,8 @@ export default function CloserDashboard() {
 
   const { leads, cargando: leadsCargando } = useMisLeads();
   const { dias, cargando: hsCargando } = useMisHoras(desde, hasta);
+  const { dias: diasCowork, cargando: coworkCargando } = useMiTiempoCowork(desde, hasta);
+  const cowork = useMemo(() => resumirTiempoCowork(diasCowork), [diasCowork]);
   const qa = useMiQa(desde, hasta);
 
   const hubstaff = useMemo(() => resumirHoras(dias), [dias]);
@@ -177,6 +179,14 @@ export default function CloserDashboard() {
               valor={hubstaff.horas > 0 ? hubstaff.horas.toFixed(1) : "—"}
               pie={hubstaff.diasTrabajados > 0 ? `${hubstaff.diasTrabajados} día${hubstaff.diasTrabajados === 1 ? "" : "s"} con registro` : "sin registro en el rango"}
               icono={Clock} color="bg-sky-500" tinte="from-sky-500/10"
+            />
+            {/* El reloj de Cowork (cámara + pantalla, presente): va a reemplazar
+                a Hubstaff; conviven mientras dure la transición. */}
+            <Kpi
+              label="Cowork"
+              valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
+              pie={pieTiempoCowork(cowork, coworkCargando)}
+              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi
               label="Productividad"
