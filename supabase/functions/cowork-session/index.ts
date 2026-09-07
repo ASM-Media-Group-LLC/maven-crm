@@ -1,7 +1,7 @@
 import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { estadoDeTiempo, LATIDO_VENCIDO_MS } from "../_shared/cowork-tiempo.ts";
+import { estadoDeTiempo, LATIDO_VENCIDO_MS, type Exigencias } from "../_shared/cowork-tiempo.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -137,6 +137,13 @@ function normalizarPausas(raw: unknown, base: ReglaPausas): ReglaPausas {
 function normalizarReloj(raw: unknown, base: ReglaReloj): ReglaReloj {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return { fueraDeCamaraSeg: numeroEntre(r.fueraDeCamaraSeg, SEG_MIN, SEG_MAX, base.fueraDeCamaraSeg) };
+}
+
+/** Qué exige el reloj en esta sesión = qué alertas tiene encendidas el
+ *  supervisor (cámara y pantalla). Sin reglas propias, las dos. */
+function exigenciasDelReloj(alertRules: unknown): Exigencias {
+  const r = normalizarReglas(alertRules ?? {});
+  return { camara: r.camara.activa, pantalla: r.pantalla.activa };
 }
 
 /** Umbral del reloj (ms) que fija la SESIÓN; sin reglas propias, el estándar. */
@@ -561,6 +568,9 @@ serve(async (req) => {
       const { data: sesionReloj } = await admin.from("cowork_sessions")
         .select("alert_rules").eq("id", sessionId).maybeSingle();
       const umbralMs = umbralFueraDeCamaraMs(sesionReloj?.alert_rules);
+      // Y qué exige: si el supervisor apagó la pantalla para su equipo
+      // (managers), el reloj no se detiene por pantalla. Jhon, 07/09.
+      const exige = exigenciasDelReloj(sesionReloj?.alert_rules);
 
       const { estado, detalle } = estadoDeTiempo({
         camOn: body.camOn === true,
@@ -568,7 +578,7 @@ serve(async (req) => {
         faceState: typeof body.faceState === "string" ? body.faceState : null,
         faceSince: typeof body.faceSince === "number" ? body.faceSince : null,
         onBreak: !!pausa || body.onBreak === true,
-      }, ahora, umbralMs);
+      }, ahora, umbralMs, exige);
 
       const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
         .select("id, estado, room_id, session_id, last_seen_at")

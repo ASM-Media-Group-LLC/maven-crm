@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estadoDeTiempo, cuentaComoTrabajo, UMBRAL_FUERA_DE_CAMARA_MS, INTERVALO_LATIDO_MS, LATIDO_VENCIDO_MS, ESTADOS_TIEMPO } from "@/lib/coworkTiempoRegla";
+import { estadoDeTiempo, cuentaComoTrabajo, UMBRAL_FUERA_DE_CAMARA_MS, INTERVALO_LATIDO_MS, LATIDO_VENCIDO_MS, ESTADOS_TIEMPO, EXIGE_TODO } from "@/lib/coworkTiempoRegla";
 // La edge tiene SU copia (el frontend no puede importar de supabase/: el build
 // de Dokploy excluye esa carpeta). Acá se comprueba que digan lo mismo.
 import * as edge from "../../../../supabase/functions/_shared/cowork-tiempo";
@@ -45,15 +45,33 @@ describe("estadoDeTiempo — cuándo corre el reloj de Cowork", () => {
     expect(INTERVALO_LATIDO_MS).toBe(edge.INTERVALO_LATIDO_MS);
     expect(LATIDO_VENCIDO_MS).toBe(edge.LATIDO_VENCIDO_MS);
     expect([...ESTADOS_TIEMPO]).toEqual([...edge.ESTADOS_TIEMPO]);
-    const casos: Array<[Parameters<typeof estadoDeTiempo>[0], number | undefined]> = [];
+    const casos: Array<[Parameters<typeof estadoDeTiempo>[0], number | undefined, { camara: boolean; pantalla: boolean } | undefined]> = [];
     for (const camOn of [true, false]) for (const screenShareOn of [true, false]) for (const onBreak of [true, false, undefined])
       for (const faceState of ["ok", "no_face", "too_small", "too_dark", null, undefined])
         for (const faceSince of [T - 5_000, T - 60_000, T - 600_000, T + 1_000, null, undefined])
           for (const umbral of [undefined, 30_000, 300_000])
-            casos.push([{ camOn, screenShareOn, onBreak, faceState, faceSince }, umbral]);
-    for (const [l, umbral] of casos) {
-      expect(estadoDeTiempo(l, T, umbral)).toEqual(edge.estadoDeTiempo(l, T, umbral));
+            for (const exige of [undefined, EXIGE_TODO, { camara: true, pantalla: false }, { camara: false, pantalla: true }, { camara: false, pantalla: false }])
+              casos.push([{ camOn, screenShareOn, onBreak, faceState, faceSince }, umbral, exige]);
+    for (const [l, umbral, exige] of casos) {
+      expect(estadoDeTiempo(l, T, umbral, exige)).toEqual(edge.estadoDeTiempo(l, T, umbral, exige));
     }
-    expect(casos.length).toBeGreaterThan(500);
+    expect(casos.length).toBeGreaterThan(2000);
+  });
+
+  it("el reloj exige lo que exige la sesión: sin regla de pantalla, no se detiene por pantalla", () => {
+    const soloCamara = { camara: true, pantalla: false };
+    expect(estadoDeTiempo({ camOn: true, screenShareOn: false, faceState: "ok" }, T, undefined, soloCamara).estado).toBe("activo");
+    expect(estadoDeTiempo({ camOn: false, screenShareOn: false }, T, undefined, soloCamara).estado).toBe("sin_camara");
+    const fuera = { camOn: true, screenShareOn: false, faceState: "no_face", faceSince: T - 120_000 };
+    expect(estadoDeTiempo(fuera, T, undefined, soloCamara).estado).toBe("fuera_de_camara");
+  });
+  it("sin regla de cámara, ni la cámara ni 'fuera de cámara' detienen el reloj", () => {
+    const soloPantalla = { camara: false, pantalla: true };
+    expect(estadoDeTiempo({ camOn: false, screenShareOn: true }, T, undefined, soloPantalla).estado).toBe("activo");
+    const fuera = { camOn: true, screenShareOn: true, faceState: "no_face", faceSince: T - 120_000 };
+    expect(estadoDeTiempo(fuera, T, undefined, soloPantalla).estado).toBe("activo");
+    expect(estadoDeTiempo({ camOn: false, screenShareOn: false }, T, undefined, soloPantalla).estado).toBe("sin_pantalla");
+    // La pausa detiene siempre.
+    expect(estadoDeTiempo({ camOn: false, screenShareOn: false, onBreak: true }, T, undefined, { camara: false, pantalla: false }).estado).toBe("pausa");
   });
 });
