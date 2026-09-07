@@ -80,6 +80,9 @@ export interface ChatReaction {
 }
 
 export interface UserProfile {
+  /** Cuenta en la papelera. Sigue resolviendo nombre y foto en el historial,
+   *  pero no se puede ELEGIR: ver sinCuentasEliminadas(). */
+  deleted_at?: string | null;
   id: string;
   full_name: string | null;
   avatar_url: string | null;

@@ -438,6 +438,8 @@ export const useMavenUsers = () =>
       const { data: profiles, error: pErr } = await sb
         .from("profiles")
         .select("id, full_name, avatar_url")
+        // Selector de destinatarios: sin cuentas en la papelera.
+        .is("deleted_at", null)
         .order("full_name", { ascending: true });
       if (pErr) throw pErr;
       const { data: roles, error: rErr } = await sb

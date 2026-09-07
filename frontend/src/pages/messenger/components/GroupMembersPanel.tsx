@@ -144,7 +144,9 @@ export default function GroupMembersPanel({
     if (!showAddPanel) return;
     const load = async () => {
       setLoadingUsers(true);
-      const { data } = await supabase.from("profiles").select("id, full_name, avatar_url");
+      // Selector: acá no se ofrece a nadie que esté en la papelera.
+      const { data } = await supabase
+        .from("profiles").select("id, full_name, avatar_url").is("deleted_at", null);
       setAllUsers((data as UserProfile[]) || []);
       setLoadingUsers(false);
     };

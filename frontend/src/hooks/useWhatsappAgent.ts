@@ -448,7 +448,8 @@ export function useMavenUsersForLink() {
       // Traemos profiles + roles agregados. Hacemos dos queries y juntamos
       // en JS — más simple que un view custom y suficiente para <100 rows.
       const [profilesRes, rolesRes] = await Promise.all([
-        sb.from("profiles").select("id, full_name").order("full_name", { ascending: true }),
+        // Selector para vincular un número: sin cuentas en la papelera.
+        sb.from("profiles").select("id, full_name").is("deleted_at", null).order("full_name", { ascending: true }),
         sb.from("user_roles").select("user_id, role"),
       ]);
       if (profilesRes.error) throw profilesRes.error;

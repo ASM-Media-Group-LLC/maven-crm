@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { UserStatus, useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor, getStatusLabel } from "./components/StatusPicker";
+import { sinCuentasEliminadas } from "./sinCuentasEliminadas";
 
 interface NewChatModalProps {
   open: boolean;
@@ -35,7 +36,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
 
-  const allUsers = Object.values(profiles).filter(p => p.id !== user?.id);
+  const allUsers = sinCuentasEliminadas(Object.values(profiles)).filter(p => p.id !== user?.id);
 
   const sorted = [...allUsers].sort((a, b) => {
     const aOnline = isOnline(a.id);

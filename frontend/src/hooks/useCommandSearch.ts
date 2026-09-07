@@ -103,6 +103,8 @@ export function useCommandSearch(
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, avatar_seed")
+        // Selector: abre un DM, así que no ofrece cuentas en la papelera.
+        .is("deleted_at", null)
         .ilike("full_name", like)
         .order("full_name")
         .limit(GROUP_LIMIT + 1); // +1 por si el propio usuario matchea

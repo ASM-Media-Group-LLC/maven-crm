@@ -45,7 +45,10 @@ export function useChat() {
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, avatar_seed, whatsapp_push_name");
+      // deleted_at viene, pero acá NO se filtra: este mapa es el que le pone
+      // nombre y foto a los mensajes de quien ya salió del equipo. Filtrar acá
+      // devolvería los mensajes huérfanos. Los SELECTORES filtran, no el mapa.
+      .select("id, full_name, avatar_url, avatar_seed, whatsapp_push_name, deleted_at");
     if (data) {
       const map: Record<string, UserProfile> = {};
       data.forEach((p: any) => { map[p.id] = p; });
