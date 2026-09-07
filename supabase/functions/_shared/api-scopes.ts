@@ -45,6 +45,13 @@ export const SCOPE_CATALOG: ScopeDef[] = [
       "Horas trabajadas por día según Hubstaff: tiempo trackeado (horas), actividad general y proyecto, por empleado. Filtros por fecha y empleado.",
   },
   {
+    key: "cowork:read",
+    group: "Empleados",
+    label: "Tiempo en Cowork (diario y al detalle)",
+    description:
+      "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla o fuera de cámara. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
+  },
+  {
     key: "sales:read",
     group: "Ventas",
     label: "Ganancias por creadora (diario)",
