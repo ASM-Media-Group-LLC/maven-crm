@@ -156,8 +156,14 @@ function partirDirecciones(v: string): string[] {
 const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Tope total de adjuntos por correo. Coincide con el que valida la edge; el
- *  base64 pesa ~4/3, así que 15 MB de archivo son ~20 MB en el request. */
-const TOPE_ADJUNTOS = 15 * 1024 * 1024;
+ *  base64 pesa ~4/3, así que 20 MB de archivo son ~27 MB en el request.
+ *
+ *  Por qué 20 y no los 25 de Gmail: Zoho acepta 31 MB en el cable (lo anuncia
+ *  en el saludo SMTP: SIZE 32505856) ≈ 23 MB de archivo, y la edge tiene un
+ *  techo duro de 256 MB de memoria para armar el mensaje. 25 MB no entra por
+ *  ninguno de los dos lados sin subir el adjunto a Storage y leerlo de a
+ *  pedazos, que es otro trabajo. */
+const TOPE_ADJUNTOS = 20 * 1024 * 1024;
 
 /** Lee un archivo a base64 SIN el prefijo `data:<tipo>;base64,`. */
 function leerBase64(file: File): Promise<string> {
@@ -589,7 +595,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     const yaHay = adjuntos.reduce((n, a) => n + a.sizeBytes, 0);
     const total = yaHay + elegidos.reduce((n, f) => n + f.size, 0);
     if (total > TOPE_ADJUNTOS) {
-      toast.error("Los adjuntos superan el límite de 15 MB.");
+      toast.error("Los adjuntos superan el límite de 20 MB.");
       return;
     }
     try {

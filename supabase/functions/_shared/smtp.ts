@@ -406,9 +406,19 @@ function nombreParaFrom(nombre: string): string {
 }
 
 /** Pliega base64 en líneas de 76 (RFC 2045): el body de un adjunto es una
- *  tira larguísima y sin plegar pasaría el límite de 998 octetos por línea. */
+ *  tira larguísima y sin plegar pasaría el límite de 998 octetos por línea.
+ *
+ *  ⚠️ El bucle con slice() NO es un capricho de estilo: reemplaza a un
+ *  `.match(/.{1,76}/g)` que hacía lo mismo. Con un adjunto de 20 MB son ~370k
+ *  líneas, y match() MATERIALIZA cada una como string propio (~35 MB de puro
+ *  encabezado de objeto) mientras que slice() de 76 chars devuelve una VISTA
+ *  sobre el original. La edge tiene 256 MB y 2 s de CPU por pedido: con el
+ *  tope en 15 MB sobraba, al subirlo a 20 MB deja de sobrar. */
 function plegarBase64(b64: string): string {
-  return (b64.replace(/\s+/g, "").match(/.{1,76}/g) ?? []).join("\r\n");
+  const limpio = b64.replace(/\s+/g, "");
+  const lineas: string[] = [];
+  for (let i = 0; i < limpio.length; i += 76) lineas.push(limpio.slice(i, i + 76));
+  return lineas.join("\r\n");
 }
 
 /** Content-Type de un adjunto, saneado a `tipo/subtipo` ASCII. El valor viene

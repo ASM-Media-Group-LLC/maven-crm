@@ -633,7 +633,7 @@ Deno.serve(async (req) => {
         // Techo de respuesta: el JSON con el base64 pesa ~1,37× el archivo, y
         // pasarse revienta el límite de la edge con un error opaco. Mejor
         // cortar claro (los adjuntos gigantes son casos raros).
-        if (adj.bytes.length > 15 * 1024 * 1024) {
+        if (adj.bytes.length > 20 * 1024 * 1024) {
           return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
         }
 
@@ -782,14 +782,15 @@ Deno.serve(async (req) => {
           return json(req, { error: "un adjunto viene con formato inválido" }, 400);
         }
       }
-      // El base64 pesa ~4/3 del archivo; se acota el ARCHIVO a 15 MB (igual que
-      // la descarga). De más, revienta la memoria/límite de la edge.
+      // El base64 pesa ~4/3 del archivo; se acota el ARCHIVO a 20 MB (igual que
+      // la descarga). De más, revienta la memoria de la edge (256 MB) o el
+      // SIZE que anuncia Zoho (31 MB en el cable ≈ 23 MB de archivo).
       const bytesAdjuntos = adjuntos.reduce(
         (n, a) => n + Math.floor((a.contentBase64.replace(/\s/g, "").length * 3) / 4),
         0,
       );
-      if (bytesAdjuntos > 15 * 1024 * 1024) {
-        return json(req, { error: "los adjuntos superan el límite de 15 MB" }, 413);
+      if (bytesAdjuntos > 20 * 1024 * 1024) {
+        return json(req, { error: "los adjuntos superan el límite de 20 MB" }, 413);
       }
 
       const { data: cred, error: credErr } = await admin

@@ -309,3 +309,59 @@ Deno.test("un Content-Type malicioso cae al octet-stream (no inyecta)", () => {
   }
   assert(/Content-Type: application\/octet-stream/.test(rfc), "no cayó al tipo seguro");
 });
+
+// ---------------------------------------------------------------------------
+// Plegado del base64 con adjuntos GRANDES (tope 20 MB desde 07/09/2026)
+// ---------------------------------------------------------------------------
+
+/** La implementación VIEJA, como referencia: el cambio a slice() es por
+ *  memoria y CPU, y no puede alterar ni un byte de la salida. */
+function plegarViejo(b64: string): string {
+  return (b64.replace(/\s+/g, "").match(/.{1,76}/g) ?? []).join("\r\n");
+}
+
+function plegarNuevo(b64: string): string {
+  const limpio = b64.replace(/\s+/g, "");
+  const lineas: string[] = [];
+  for (let i = 0; i < limpio.length; i += 76) lineas.push(limpio.slice(i, i + 76));
+  return lineas.join("\r\n");
+}
+
+Deno.test("el plegado nuevo da EXACTAMENTE lo mismo que el viejo", () => {
+  // Bordes: vacío, más corto que una línea, justo 76, 76+1, y varias líneas.
+  const casos = [0, 1, 75, 76, 77, 152, 153, 1000, 4096];
+  for (const n of casos) {
+    const b64 = "QUJDRA".repeat(Math.ceil(n / 6)).slice(0, n);
+    assert(
+      plegarNuevo(b64) === plegarViejo(b64),
+      `difieren con largo ${n}`,
+    );
+  }
+  // Y con basura de espacios en el medio, que es lo que limpia el replace.
+  const sucio = "AAAA\r\nBBBB\t CCCC\n".repeat(50);
+  assert(plegarNuevo(sucio) === plegarViejo(sucio), "difieren con espacios");
+});
+
+Deno.test("un adjunto de 20 MB se pliega entero, rápido y sin líneas largas", () => {
+  // 20 MB de archivo = el tope. En base64 son ~26,7 MB y ~350k líneas: acá es
+  // donde el .match() viejo materializaba cada línea y se comía la memoria.
+  const bytesArchivo = 20 * 1024 * 1024;
+  const b64 = "QUJDRA".repeat(Math.ceil((bytesArchivo * 4 / 3) / 6));
+
+  const t0 = Date.now();
+  const plegado = plegarNuevo(b64);
+  const ms = Date.now() - t0;
+
+  const lineas = plegado.split("\r\n");
+  assert(lineas.length > 300_000, `esperaba ~350k líneas, hubo ${lineas.length}`);
+  for (const l of lineas) {
+    if (l.length > 76) throw new Error(`línea de ${l.length}`);
+  }
+  // Nada se pierde por el camino.
+  assert(
+    plegado.replace(/\r\n/g, "").length === b64.length,
+    "se perdieron caracteres al plegar",
+  );
+  // La edge tiene 2 s de CPU POR PEDIDO, y plegar es solo un paso de varios.
+  assert(ms < 1_500, `plegar tardó ${ms} ms, demasiado del presupuesto de CPU`);
+});
