@@ -108,6 +108,7 @@ const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
 // Admin
 const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
 const AuditoriaRoles = lazy(() => import("./pages/admin/AuditoriaRoles"));
+const CoworkVsHubstaff = lazy(() => import("./pages/admin/CoworkVsHubstaff"));
 
 
 // Misc
@@ -399,6 +400,7 @@ const App = () => (
                 {/* Admin routes */}
                 <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
                 <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
+                <Route path="/admin/cowork-vs-hubstaff" element={<AdminRoute><CoworkVsHubstaff /></AdminRoute>} />
               </Route>
 
               {/* Full-screen routes that intentionally bypass the shell */}

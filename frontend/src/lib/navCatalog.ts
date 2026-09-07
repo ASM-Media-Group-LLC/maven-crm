@@ -145,6 +145,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   // ── Admin ─────────────────────────────────────────────────────────────
   { title: "Admin · Usuarios", url: "/admin/usuarios", icon: UserCog, adminOnly: true, section: "Admin", keywords: ["roles"] },
   { title: "Admin · Auditoría de Roles", url: "/admin/auditoria", icon: Shield, adminOnly: true, section: "Admin" },
+  { title: "Admin · Cowork vs Hubstaff", url: "/admin/cowork-vs-hubstaff", icon: Clock, adminOnly: true, section: "Admin", keywords: ["tiempo", "horas", "reloj"] },
 
   // ── Sistema (sin gate de permisos: cualquier usuario logueado) ────────
   { title: "Settings", i18nKey: "nav.settings", url: "/settings", icon: Settings, section: "Sistema", keywords: ["ajustes", "configuración", "perfil"] },
