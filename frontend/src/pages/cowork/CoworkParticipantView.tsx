@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee } from "lucide-react";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee, Copy } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
 import RelojCowork from "./RelojCowork";
+import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
@@ -91,8 +92,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // LLAMADA, no lo que dura esta página. Al navegar a otra sección la llamada
   // sigue viva en la ventanita flotante; si el canal de presencia se cerrara
   // acá, el coordinador lo vería IRSE de la sala sin que se haya ido.
+  // Una sola pestaña por persona (ver lib/pestanaCowork): si Cowork ya está
+  // abierto en otra, esta no entra a la llamada, no publica presencia ni late.
+  const { principal: pestanaPrincipal, tomarEstaPestana } = usePestanaPrincipal(cowork.session?.id);
+
   const { trackMediaState } = useCoworkMediaPresence(
-    cowork.session?.id, userId, { persistente: true },
+    pestanaPrincipal ? cowork.session?.id : undefined, userId, { persistente: true },
   );
 
   // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
@@ -111,7 +116,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // sigue en la ventanita flotante—, solo al Salir (handleLeaveRoom).
   useEffect(() => {
     const sid = cowork.session?.id;
-    if (!sid || !myAssignment?.room_id) return;
+    if (!sid || !myAssignment?.room_id || !pestanaPrincipal) return;
     iniciarLatido(sid, {
       ...lastMediaRef.current,
       faceState: faceRef.current.faceState,
@@ -119,7 +124,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onBreak: !!breakStartedAt,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- los refs se leen al iniciar; después se actualizan con actualizarLatido
-  }, [cowork.session?.id, myAssignment?.room_id]);
+  }, [cowork.session?.id, myAssignment?.room_id, pestanaPrincipal]);
 
 
   useEffect(() => {
@@ -463,11 +468,23 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
-    if (manuallyLeft || oneOnOneRoom) return;
+    if (manuallyLeft || oneOnOneRoom || !pestanaPrincipal) return;
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
-  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id, oneOnOneRoom]);
+  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id, oneOnOneRoom, pestanaPrincipal]);
+
+  // Otra pestaña se llevó Cowork: esta se retira SIN avisarle al servidor que
+  // se fue (la persona sigue en la sala, desde la otra). Solo suelta la
+  // llamada, la presencia y el latido de acá.
+  useEffect(() => {
+    if (pestanaPrincipal !== false) return;
+    setConnectedLkRoom(null);
+    endCall();
+    salirDePresencia();
+    detenerLatido();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pestanaPrincipal]);
 
   const myOpenRequest = cowork.hostRequests.find(
     r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
@@ -559,6 +576,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     });
   }, [connectedLkRoom, oneOnOneRoom, displayName, myRoom?.name, startCall,
       getToken, handleLeaveRoom, handleMediaStateChange, handleFaceStateChange]);
+
+  if (pestanaPrincipal === false) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-3xl border border-border/50 bg-card p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15 text-warning">
+            <Copy className="h-5 w-5" />
+          </div>
+          <h2 className="text-base font-semibold text-foreground">Cowork ya está abierto en otra pestaña</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tu cámara, tu pantalla y tu reloj siguen en la otra. Si esta pestaña también entrara, el supervisor
+            te vería sin cámara y te llegarían alertas que no son.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button className="rounded-full" onClick={() => void tomarEstaPestana()}>Usar esta pestaña</Button>
+            <Button variant="outline" className="rounded-full" onClick={() => navigate("/dashboard")}>Volver al dashboard</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!myAssignment) {
     // ANTES: un spinner con "Esperando asignación de sala por el coordinador…".

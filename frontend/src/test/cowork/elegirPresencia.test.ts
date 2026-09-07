@@ -7,7 +7,7 @@ import { elegirPresencia } from "@/hooks/useCoworkMediaPresence";
 // dos conexiones (PWA + navegador, o una reconexión con el socket viejo aún
 // vivo) esa era justamente la que no sabía nada de la pausa.
 
-type P = { onBreak?: boolean; tag: string };
+type P = { onBreak?: boolean; camOn?: boolean; screenShareOn?: boolean; tag: string };
 
 describe("elegirPresencia — qué conexión se muestra cuando hay varias", () => {
   it("una sola: esa", () => {
@@ -27,5 +27,17 @@ describe("elegirPresencia — qué conexión se muestra cuando hay varias", () =
   it("vacío o undefined: undefined, sin explotar", () => {
     expect(elegirPresencia<P>([])).toBeUndefined();
     expect(elegirPresencia<P>(undefined)).toBeUndefined();
+  });
+
+  it("con dos pestañas, manda la que está TRABAJANDO (cámara + pantalla), no la más nueva", () => {
+    // 07/09: la pestaña de fondo, sin cámara, hacía sonar "cámara apagada"
+    // mientras la persona estaba perfecta en la otra.
+    expect(elegirPresencia<P>([
+      { tag: "trabajando", camOn: true, screenShareOn: true },
+      { tag: "fondo", camOn: false, screenShareOn: false },
+    ])?.tag).toBe("trabajando");
+    // Solo cámara le gana a solo pantalla; a igual puntaje, la más nueva.
+    expect(elegirPresencia<P>([{ tag: "cam", camOn: true }, { tag: "pantalla", screenShareOn: true }])?.tag).toBe("cam");
+    expect(elegirPresencia<P>([{ tag: "vieja", camOn: true }, { tag: "nueva", camOn: true }])?.tag).toBe("nueva");
   });
 });
