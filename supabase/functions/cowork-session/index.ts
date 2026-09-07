@@ -550,13 +550,22 @@ serve(async (req) => {
         .select("id, estado, room_id, session_id, last_seen_at")
         .eq("user_id", userId).is("ended_at", null).maybeSingle();
 
+      // Lo que lleva HOY (día de Bogotá) con el reloj corriendo. Va en cada
+      // respuesta para que la persona vea su cronómetro sin otra consulta, y
+      // lo publique por presencia para el tablero del supervisor.
+      const segundosHoy = async (): Promise<number> => {
+        const hoy = new Date(ahora).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+        const { data } = await admin.rpc("cowork_tiempo_diario", { _desde: hoy, _hasta: hoy, _user_id: userId, _limit: 1, _offset: 0 });
+        return Number(data?.[0]?.seg_activo ?? 0);
+      };
+
       const ahoraIso = new Date(ahora).toISOString();
       if (abierto) {
         const vencido = ahora - new Date(abierto.last_seen_at).getTime() > LATIDO_VENCIDO_MS;
         const mismo = abierto.estado === estado && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId;
         if (mismo && !vencido) {
           await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso }).eq("id", abierto.id);
-          return json(req, { ok: true, estado, detalle, segmento: abierto.id });
+          return json(req, { ok: true, estado, detalle, segmento: abierto.id, segundosHoy: await segundosHoy() });
         }
         // Cambió el estado (o se perdieron latidos): el anterior termina en el
         // último latido visto y arranca uno nuevo.
@@ -566,7 +575,7 @@ serve(async (req) => {
         .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso })
         .select("id").single();
       if (insErr) return err(req, insErr.message, 500);
-      return json(req, { ok: true, estado, detalle, segmento: nuevo.id });
+      return json(req, { ok: true, estado, detalle, segmento: nuevo.id, segundosHoy: await segundosHoy() });
     }
 
     if (action === "leaveRoom") {

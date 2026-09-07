@@ -10,7 +10,8 @@ import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvid
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
-import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
+import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
+import RelojCowork from "./RelojCowork";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
@@ -120,6 +121,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- los refs se leen al iniciar; después se actualizan con actualizarLatido
   }, [cowork.session?.id, myAssignment?.room_id]);
 
+
   useEffect(() => {
     if (!breakStartedAt) { setBreakElapsed(0); return; }
     const tick = () => setBreakElapsed(Math.floor((Date.now() - breakStartedAt) / 1000));
@@ -200,6 +202,25 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Lo cuenta el SERVIDOR: el navegador de quien está siendo medido no puede
   // ser la fuente, y además el presupuesto cruza sesiones y salas.
   const [banoConsumido, setBanoConsumido] = useState(0);
+
+  // El reloj que contesta el servidor viaja por presencia para que el
+  // supervisor vea el MISMO número que la persona. Va en un ref porque
+  // presence reemplaza el payload entero en cada track(): todos los
+  // trackMediaState de abajo lo incluyen.
+  const relojRef = useRef<{ relojEstado: string | null; relojSegundosHoy: number | null; relojEn: number | null }>({
+    relojEstado: null, relojSegundosHoy: null, relojEn: null,
+  });
+  useEffect(() => suscribirReloj((r) => {
+    relojRef.current = r
+      ? { relojEstado: r.estado, relojSegundosHoy: r.segundosHoy, relojEn: r.en }
+      : { relojEstado: null, relojSegundosHoy: null, relojEn: null };
+    trackMediaState({
+      ...lastMediaRef.current,
+      onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
+      ...faceRef.current,
+      ...relojRef.current,
+    });
+  }), [trackMediaState, breakStartedAt, breakKind, banoConsumido]);
   const recargarConsumido = useCallback(async () => {
     if (!userId) return;
     const { data } = await rpcBanoConsumido(supabase, [userId]);
@@ -270,6 +291,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         ...lastMediaRef.current,
         onBreak: !cerrando, breakStartedAt: inicio, breakKind: cerrando ? null : kind,
         ...faceRef.current,
+        ...relojRef.current,
       });
       actualizarLatido({ onBreak: !cerrando });
     } catch (e) {
@@ -338,6 +360,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         breakKind,
         banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
+        ...relojRef.current,
       });
     },
     [breakStartedAt, breakKind, banoConsumido, trackMediaState]
@@ -354,6 +377,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         ...state,
         onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
+        ...relojRef.current,
       });
     },
     [trackMediaState, breakStartedAt, breakKind, banoConsumido]
@@ -685,6 +709,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               <span className="text-muted-foreground/70 text-xs hidden sm:inline">{cowork.session?.name}</span>
             </>
           )}
+          {/* El reloj de tiempo trabajado (reemplazo de Hubstaff): siempre a la
+              vista, corriendo o detenido con el motivo. En el teléfono, solo el número. */}
+          <RelojCowork className="hidden md:inline-flex" />
+          <RelojCowork compacto className="md:hidden" />
         </div>
 
         {/* Desktop actions */}

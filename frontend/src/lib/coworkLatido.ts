@@ -11,8 +11,41 @@
 // cuando la persona SALE de la sala.
 import { supabase } from "@/integrations/supabase/client";
 import { INTERVALO_LATIDO_MS, type Latido } from "../../../supabase/functions/_shared/cowork-tiempo";
+import type { RelojCowork } from "@/lib/coworkReloj";
 
 export { INTERVALO_LATIDO_MS };
+
+// ── Lo que el servidor contesta: el reloj de hoy ────────────────────────────
+// Cada latido vuelve con `estado` y `segundosHoy`. Se guarda acá y se avisa a
+// quien quiera dibujarlo (la pantalla del participante) o publicarlo (presencia,
+// para el tablero del supervisor).
+let reloj: RelojCowork | null = null;
+const oyentes = new Set<(r: RelojCowork | null) => void>();
+
+export function leerReloj(): RelojCowork | null { return reloj; }
+
+export function suscribirReloj(cb: (r: RelojCowork | null) => void): () => void {
+  oyentes.add(cb);
+  return () => { oyentes.delete(cb); };
+}
+
+function fijarReloj(r: RelojCowork | null): void {
+  reloj = r;
+  for (const cb of oyentes) {
+    try { cb(r); } catch { /* un oyente roto no frena a los demás */ }
+  }
+}
+
+const ESTADOS = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"]);
+
+/** Interpreta la respuesta del servidor. Exportado para probarlo. */
+export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | null {
+  if (!json || typeof json !== "object") return null;
+  const j = json as Record<string, unknown>;
+  if (typeof j.estado !== "string" || !ESTADOS.has(j.estado)) return null;
+  const seg = typeof j.segundosHoy === "number" ? j.segundosHoy : 0;
+  return { estado: j.estado as RelojCowork["estado"], segundosHoy: seg, en: ahora };
+}
 
 /** Un cambio de estado se manda enseguida, con un respiro para juntar los
  *  que llegan en ráfaga (apagar cámara dispara dos o tres eventos). */
@@ -34,7 +67,7 @@ async function enviar(v: Vivo): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`, {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`, {
       method: "POST",
       keepalive: true,
       headers: {
@@ -44,6 +77,10 @@ async function enviar(v: Vivo): Promise<void> {
       },
       body: JSON.stringify({ action: "latido", sessionId: v.sessionId, ...v.estado }),
     });
+    if (res.ok && vivo === v) {
+      const r = relojDeRespuesta(await res.json().catch(() => null), Date.now());
+      if (r) fijarReloj(r);
+    }
   } catch {
     /* el próximo latido lo vuelve a intentar; un latido perdido no rompe nada */
   } finally {
@@ -97,6 +134,7 @@ export function detenerLatido(): void {
   clearInterval(vivo.cada);
   if (vivo.pendiente) clearTimeout(vivo.pendiente);
   vivo = null;
+  fijarReloj(null);
 }
 
 /** Para los tests y para depurar desde la consola. */
