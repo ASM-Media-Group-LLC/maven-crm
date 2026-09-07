@@ -199,7 +199,7 @@ export const activeSeason = (now: Date = new Date()): SeasonDef | null => {
 /* ---- Aplicación al DOM ---- */
 
 // Las 5 vars que redefine tanto un [data-skin] como el skin Personalizado.
-const CUSTOM_VARS = ["--primary", "--accent", "--ring", "--sidebar-primary", "--sidebar-ring", "--tinte-h"] as const;
+const CUSTOM_VARS = ["--primary", "--accent", "--ring", "--sidebar-primary", "--sidebar-ring"] as const;
 
 // Skin Personalizado: genera primary/accent al vuelo desde un hue libre.
 // accent = hue+30°; la L de CADA hue sale de la bisección AA (lib/wcag.ts)
@@ -207,11 +207,9 @@ const CUSTOM_VARS = ["--primary", "--accent", "--ring", "--sidebar-primary", "--
 // Vars inline en <html> ⇒ le ganan a cualquier bloque [data-skin]/[data-season]
 // del stylesheet — por eso el applier las suprime mientras hay temporada.
 export const applyCustomHue = (hue: number | null) => {
-  const root = document.documentElement;
-  const style = root.style;
+  const style = document.documentElement.style;
   if (hue == null) {
     for (const v of CUSTOM_VARS) style.removeProperty(v);
-    delete root.dataset.skinCustom;
     return;
   }
   const h = Math.min(360, Math.max(0, Math.round(hue))) % 360;
@@ -223,9 +221,6 @@ export const applyCustomHue = (hue: number | null) => {
   style.setProperty("--ring", primary);
   style.setProperty("--sidebar-primary", primary);
   style.setProperty("--sidebar-ring", primary);
-  // Tinte de fondo (index.css: .dark[data-skin-custom] usa --tinte-h).
-  style.setProperty("--tinte-h", String(h));
-  root.dataset.skinCustom = "";
 };
 
 // Estado DERIVADO completo de apariencia → atributos/vars en <html>. Es
