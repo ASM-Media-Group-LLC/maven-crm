@@ -65,19 +65,20 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
   {
     modulo: "Cowork",
     permiso: "Cowork",
+    // Todos solo si soy host de la sesión. Los cuatro llamados son los kinds
+    // que registra la edge cowork-session (camara, encuadre, luz, pantalla) y
+    // el trigger push_cowork_llamado los manda como 'cowork_llamado_<kind>'.
     eventos: [
-      {
-        type: "cowork_llamado",
-        label: "Llamado de atención en mi sala",
-        descripcion: "Solo si soy host: cámara apagada, mal encuadre, sin luz o sin compartir pantalla.",
-        canales: ["push", "email"],
-      },
       {
         type: "cowork_pedido_host",
         label: "Alguien pide supervisor",
         descripcion: "Solo si soy host de la sesión.",
         canales: ["in_app", "push", "email"],
       },
+      { type: "cowork_llamado_camara", label: "Llamado: cámara apagada", canales: ["push", "email"] },
+      { type: "cowork_llamado_encuadre", label: "Llamado: mal encuadre", canales: ["push", "email"] },
+      { type: "cowork_llamado_luz", label: "Llamado: sin luz", canales: ["push", "email"] },
+      { type: "cowork_llamado_pantalla", label: "Llamado: no comparte pantalla", canales: ["push", "email"] },
     ],
   },
   {

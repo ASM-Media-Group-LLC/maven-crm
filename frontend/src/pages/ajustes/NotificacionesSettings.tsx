@@ -36,21 +36,24 @@ const NotificacionesSettings = () => {
     <div className="flex-1 overflow-hidden flex flex-col">
       <div className="flex-1 min-h-0 overflow-hidden">
       <div className="h-full flex flex-col">
-        {/* Fixed Header */}
-        <div className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6 md:py-4">
+        {/* Encabezado fijo. Escala del PageHeader canónico (font-display). */}
+        <div className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur px-4 py-3 md:px-8 md:py-4">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-8 w-8 rounded-lg"
               onClick={() => navigate("/notificaciones")}
+              aria-label="Volver a notificaciones"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Configuración de Notificaciones</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Controla qué notificaciones recibes, por qué canal y con qué prioridad.
+            <div className="min-w-0">
+              <h1 className="font-display text-xl md:text-2xl font-bold leading-tight tracking-tight text-foreground">
+                Notificaciones
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                Qué te avisa Maven, por dónde y cuándo.
               </p>
             </div>
           </div>
@@ -61,23 +64,30 @@ const NotificacionesSettings = () => {
             las pestañas y el contenido quedaban lado a lado y el contenido se iba
             fuera de la pantalla — en el celular no se veía NADA de la pestaña. */}
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-          {/* Vertical Tabs - Desktop */}
-          <nav className="hidden md:flex shrink-0 w-48 border-r border-border bg-muted/30 flex-col py-2">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={cn(
-                  "flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
-                  activeTab === id
-                    ? "bg-background text-foreground font-medium border-r-2 border-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </button>
-            ))}
+          {/* Secciones (escritorio). La activa lleva la barrita con el degradé de marca. */}
+          <nav className="hidden md:flex shrink-0 w-56 border-r border-border/60 flex-col gap-0.5 p-3">
+            {TABS.map(({ id, label, icon: Icon }) => {
+              const activa = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  aria-current={activa ? "page" : undefined}
+                  className={cn(
+                    "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors text-left",
+                    activa
+                      ? "bg-primary/10 text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  )}
+                >
+                  {activa && (
+                    <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-accent to-primary" />
+                  )}
+                  <Icon className={cn("h-4 w-4 shrink-0", activa && "text-primary")} />
+                  {label}
+                </button>
+              );
+            })}
           </nav>
 
           {/* Horizontal Tabs - Mobile */}
@@ -101,9 +111,12 @@ const NotificacionesSettings = () => {
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 min-h-0 overflow-auto p-4 md:p-6">
-            <div className="max-w-3xl">
+          {/* Contenido. Ocupa la pantalla (hasta 1700 px): antes era una columna
+              max-w-3xl pegada a la izquierda y en un monitor grande quedaba media
+              pantalla vacía (Jhon, 07/09/2026). Cada pestaña decide cómo repartir
+              ese ancho (Eventos: matriz + panel lateral). */}
+          <div className="flex-1 min-h-0 overflow-auto p-4 md:p-8">
+            <div className="mx-auto w-full max-w-[1700px]">
               <ActiveComponent />
             </div>
           </div>
