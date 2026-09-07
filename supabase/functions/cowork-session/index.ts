@@ -50,6 +50,15 @@ async function createLKToken(apiKey: string, apiSecret: string, identity: string
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
+// Salas por sesión de Cowork. Era 10 y el 07/09/2026 CHATTERS KASH (Yoselin,
+// Luis Carlos) chocó contra el tope al crear la 11.ª: cada chatter tiene su
+// sala y el equipo creció. Jhon lo subió a 30: tres veces lo de hoy. No es
+// ilimitado a propósito: el tablero del supervisor monta y recibe el video de
+// TODAS las salas a la vez, y el freno real es el navegador del coordinador.
+// Antes de pasar de acá hay que montar solo las salas visibles (pendiente en
+// video_llamadas_meet). El mismo número vive en CoworkCreateDialog (MAX_ROOMS).
+const MAX_SALAS_POR_SESION = 30;
+
 function json(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 }
@@ -220,7 +229,7 @@ serve(async (req) => {
 
       const { name, description, roomNames } = body; // roomNames: string[]
       if (!name || !roomNames?.length) return err(req, "name and roomNames required");
-      if (roomNames.length > 10) return err(req, "Máximo 10 salas por sesión");
+      if (roomNames.length > MAX_SALAS_POR_SESION) return err(req, `Máximo ${MAX_SALAS_POR_SESION} salas por sesión`);
 
       // Check active session limit per user
       const { count: activeCount } = await admin.from("cowork_sessions")
@@ -1022,7 +1031,9 @@ serve(async (req) => {
       if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", sessionId);
-      if (count !== null && count >= 10) return err(req, "Máximo 10 salas por sesión");
+      if (count !== null && count >= MAX_SALAS_POR_SESION) {
+        return err(req, `Esta sesión ya tiene ${MAX_SALAS_POR_SESION} salas, el máximo. Si necesitan más, avísale a Jhon.`);
+      }
 
       const { data: last } = await admin.from("cowork_rooms").select("sort_order").eq("session_id", sessionId).order("sort_order", { ascending: false }).limit(1).maybeSingle();
       const nextOrder = (last?.sort_order ?? -1) + 1;
