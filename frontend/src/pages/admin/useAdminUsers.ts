@@ -31,7 +31,10 @@ export const useAdminUsers = () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, avatar_url, avatar_seed, created_at, ai_daily_quota_override");
+        .select("id, full_name, avatar_url, avatar_seed, created_at, ai_daily_quota_override")
+        // Las eliminadas viven en la papelera 30 días: no van en el listado
+        // normal, se ven (y se recuperan) en su propia pantalla.
+        .is("deleted_at", null);
 
       if (profilesError) throw profilesError;
 

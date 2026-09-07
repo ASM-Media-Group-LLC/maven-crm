@@ -12,6 +12,43 @@ import { deleteMailbox, listAccounts, zohoConfigured } from "../_shared/zoho.ts"
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
+// Días que una cuenta eliminada queda recuperable, como en Google Workspace.
+// Pasado ese plazo, el cron la purga de verdad (borrado destructivo de siempre).
+const DIAS_DE_PAPELERA = 30;
+
+// Deja constancia en public.cuenta_eventos. Guarda nombre y correo COMO COPIA
+// porque la bitácora tiene que seguir legible después de la purga, que es justo
+// cuando alguien pregunta quién dio de baja a quién.
+// Solo lo que anotarEvento usa. Tipar el parámetro como ReturnType<typeof
+// createClient> no compila: el genérico que devuelve createClient acá no es el
+// mismo que el del cliente ya construido y deno check lo rechaza.
+type ClienteQueEscribe = {
+  from: (tabla: string) => {
+    insert: (fila: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
+  };
+};
+
+async function anotarEvento(
+  adminClient: ClienteQueEscribe,
+  accion: "eliminada" | "restaurada" | "purgada",
+  destino: { id: string; email?: string | null; full_name?: string | null },
+  actor: { id: string; email?: string | null },
+  detalle?: Record<string, unknown>,
+) {
+  const { error } = await adminClient.from("cuenta_eventos").insert({
+    user_id: destino.id,
+    user_email: destino.email ?? null,
+    user_full_name: destino.full_name ?? null,
+    accion,
+    actor_id: actor.id,
+    actor_email: actor.email ?? null,
+    detalle: detalle ?? null,
+  });
+  // La bitácora no puede tumbar la operación, pero que quede ruidoso en los logs:
+  // una baja sin registro es exactamente el agujero que esto viene a tapar.
+  if (error) console.error(`[${accion}] no pude anotar el evento:`, error.message);
+}
+
 function generateTempPassword(): string {
   // Solo letras+números (sin I/O/0/l/1 para evitar confusiones), sin
   // símbolos. Algunos clientes de email/chat re-codifican `!@#$%` o se
@@ -62,6 +99,7 @@ Deno.serve(async (req) => {
     }
 
     const callerId = user.id;
+    const callerEmail = user.email ?? null;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -755,6 +793,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    // === ELIMINAR (suspender): la cuenta se va a la papelera 30 días ===
+    // No se borra NADA. Se le cierra la sesión, se le bloquea la entrada y se
+    // marca el perfil. Lo único irreversible es la casilla de Zoho, que se da de
+    // baja para liberar el puesto del plan — decisión tomada a sabiendas: al
+    // restaurar, el buzón vuelve a crearse vacío.
     if (action === "delete_user") {
       const gDelete = await assertCanManage(adminClient, callerId, user_id, "delete_user");
       if (!gDelete.ok) {
@@ -763,7 +806,18 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
-      console.log(`[delete_user] Starting deletion for user_id=${user_id}`);
+      console.log(`[delete_user] suspendiendo user_id=${user_id}`);
+
+      const { data: auDel } = await adminClient.auth.admin.getUserById(user_id);
+      const { data: perfilDel } = await adminClient
+        .from("profiles").select("full_name, deleted_at").eq("id", user_id).maybeSingle();
+
+      if ((perfilDel as { deleted_at?: string } | null)?.deleted_at) {
+        return new Response(JSON.stringify({ error: "Esa cuenta ya está en la papelera" }), {
+          status: 409,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
 
       // Antes de purgar (app_purge_user_refs borra mail_credentials): averiguar
       // la casilla Zoho de este usuario para darla de baja y LIBERAR el puesto.
@@ -810,6 +864,218 @@ Deno.serve(async (req) => {
         }
       };
 
+
+      // 1. Fuera de la sesión YA. Banear frena el refresh del token, pero el
+      // access token que ya tiene en el navegador le sirve hasta que vence.
+      const { error: revErr } = await adminClient.rpc("app_revoke_user_sessions", {
+        p_user_id: user_id,
+      });
+      if (revErr) console.error("[delete_user] no pude cerrar sesiones:", revErr.message);
+
+      // 2. Bloquear la entrada. 100 años ~ para siempre; restaurar lo quita.
+      const { error: banErr } = await adminClient.auth.admin.updateUserById(user_id, {
+        ban_duration: "876000h",
+      });
+      if (banErr) {
+        return new Response(JSON.stringify({ error: `No pude bloquear la cuenta: ${banErr.message}` }), {
+          status: 500,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      // 3. Marcar el perfil. Esto es lo que la esconde de los listados.
+      const { error: markErr } = await adminClient
+        .from("profiles")
+        .update({ deleted_at: new Date().toISOString(), deleted_by: callerId })
+        .eq("id", user_id)
+        .select("id");
+      if (markErr) {
+        // Revertimos el baneo: una cuenta bloqueada que sigue apareciendo como
+        // activa es el peor de los dos mundos.
+        await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "none" });
+        return new Response(JSON.stringify({ error: `No pude marcar la baja: ${markErr.message}` }), {
+          status: 500,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      // 4. Liberar el puesto de Zoho (irreversible, best-effort).
+      const mbRemoved = await liberarPuestoZoho();
+
+      // 5. Con la casilla dada de baja, la credencial guardada quedó muerta: si
+      // se deja, el worker de correo sigue intentando sincronizar un buzón que
+      // ya no existe. Los mensajes ya cacheados NO se tocan.
+      if (mbRemoved) {
+        await adminClient.from("mail_credentials").delete().eq("user_id", user_id);
+        await adminClient.from("mail_sync_state").delete().eq("user_id", user_id);
+      }
+
+      await anotarEvento(adminClient, "eliminada",
+        { id: user_id, email: auDel?.user?.email ?? null, full_name: (perfilDel as { full_name?: string } | null)?.full_name ?? null },
+        { id: callerId, email: callerEmail },
+        { casilla_zoho_liberada: mbRemoved, dias_de_papelera: DIAS_DE_PAPELERA });
+
+      console.log(`[delete_user] suspendida user_id=${user_id}, recuperable ${DIAS_DE_PAPELERA} días`);
+      return new Response(JSON.stringify({
+        success: true,
+        mailbox_removed: mbRemoved,
+        recuperable_hasta_dias: DIAS_DE_PAPELERA,
+      }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // === RESTAURAR: sacar de la papelera ===
+    // Mismo permiso que eliminar. No devuelve la casilla de correo.
+    if (action === "restore_user") {
+      const gRestore = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+      if (!gRestore.ok) {
+        return new Response(JSON.stringify(gRestore.body), {
+          status: gRestore.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: perfilRes } = await adminClient
+        .from("profiles").select("full_name, deleted_at").eq("id", user_id).maybeSingle();
+      const marcado = perfilRes as { full_name?: string; deleted_at?: string } | null;
+      if (!marcado) {
+        return new Response(JSON.stringify({ error: "Esa cuenta ya fue purgada: no se puede recuperar" }), {
+          status: 410,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+      if (!marcado.deleted_at) {
+        return new Response(JSON.stringify({ error: "Esa cuenta no está en la papelera" }), {
+          status: 409,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: unbanErr } = await adminClient.auth.admin.updateUserById(user_id, {
+        ban_duration: "none",
+      });
+      if (unbanErr) {
+        return new Response(JSON.stringify({ error: `No pude desbloquear la cuenta: ${unbanErr.message}` }), {
+          status: 500,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: clearErr } = await adminClient
+        .from("profiles")
+        .update({ deleted_at: null, deleted_by: null })
+        .eq("id", user_id)
+        .select("id");
+      if (clearErr) {
+        await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "876000h" });
+        return new Response(JSON.stringify({ error: `No pude limpiar la marca de baja: ${clearErr.message}` }), {
+          status: 500,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: auRes } = await adminClient.auth.admin.getUserById(user_id);
+      await anotarEvento(adminClient, "restaurada",
+        { id: user_id, email: auRes?.user?.email ?? null, full_name: marcado.full_name ?? null },
+        { id: callerId, email: callerEmail },
+        { eliminada_el: marcado.deleted_at });
+
+      console.log(`[restore_user] recuperada user_id=${user_id}`);
+      return new Response(JSON.stringify({
+        success: true,
+        // La casilla de Zoho no vuelve: se dio de baja al eliminar para liberar
+        // el puesto. Hay que crearla de nuevo si esta persona necesita correo.
+        mailbox_restored: false,
+      }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // === PAPELERA: qué hay y cuánto le queda ===
+    if (action === "list_deleted_users") {
+      const { data: enPapelera, error: papErr } = await adminClient
+        .from("profiles")
+        .select("id, full_name, avatar_url, avatar_seed, deleted_at, deleted_by")
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false });
+      if (papErr) {
+        return new Response(JSON.stringify({ error: papErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const filas = (enPapelera ?? []) as {
+        id: string; full_name: string | null; avatar_url: string | null;
+        avatar_seed: string | null; deleted_at: string; deleted_by: string | null;
+      }[];
+
+      // Nombre de quien la dio de baja, para no mostrar un uuid en pantalla.
+      const idsActores = [...new Set(filas.map((f) => f.deleted_by).filter(Boolean))] as string[];
+      const nombreDelActor = new Map<string, string>();
+      if (idsActores.length) {
+        const { data: actores } = await adminClient
+          .from("profiles").select("id, full_name").in("id", idsActores);
+        for (const a of (actores ?? []) as { id: string; full_name: string | null }[]) {
+          if (a.full_name) nombreDelActor.set(a.id, a.full_name);
+        }
+      }
+
+      const ahora = Date.now();
+      return new Response(JSON.stringify({
+        dias_de_papelera: DIAS_DE_PAPELERA,
+        users: await Promise.all(filas.map(async (f) => {
+          const { data: au } = await adminClient.auth.admin.getUserById(f.id);
+          const transcurridos = (ahora - new Date(f.deleted_at).getTime()) / 86_400_000;
+          return {
+            id: f.id,
+            full_name: f.full_name,
+            avatar_url: f.avatar_url,
+            avatar_seed: f.avatar_seed,
+            email: au?.user?.email ?? "",
+            deleted_at: f.deleted_at,
+            deleted_by: f.deleted_by,
+            deleted_by_name: f.deleted_by ? nombreDelActor.get(f.deleted_by) ?? null : null,
+            // Puede dar 0: es una cuenta que el cron va a purgar en el próximo pase.
+            dias_restantes: Math.max(0, Math.ceil(DIAS_DE_PAPELERA - transcurridos)),
+          };
+        })),
+      }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+    }
+
+    // === PURGAR: el borrado destructivo de siempre, ahora solo-admin ===
+    // Esto es lo que corría antes con cada "eliminar". Se lleva los roles, el
+    // correo, las horas de Cowork, los espacios que la persona creó, y deja sin
+    // autor ~50 columnas created_by/assigned_to por todo el CRM. Irreversible.
+    // Exige que la cuenta ya esté en la papelera: nadie destruye de un clic.
+    if (action === "purge_user") {
+      const { data: esAdmin } = await adminClient.rpc("has_role", {
+        _user_id: callerId,
+        _role: "admin",
+      });
+      if (!esAdmin) {
+        return new Response(JSON.stringify({ error: "Solo un admin puede purgar una cuenta" }), {
+          status: 403,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: perfilPur } = await adminClient
+        .from("profiles").select("full_name, deleted_at").eq("id", user_id).maybeSingle();
+      const aPurgar = perfilPur as { full_name?: string; deleted_at?: string } | null;
+      if (!aPurgar?.deleted_at) {
+        return new Response(JSON.stringify({
+          error: "Primero hay que eliminar la cuenta: la purga solo aplica a lo que está en la papelera",
+        }), { status: 409, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+      }
+
+      console.log(`[purge_user] purgando for user_id=${user_id}`);
+      const { data: auPur } = await adminClient.auth.admin.getUserById(user_id);
+
+      // La constancia va ANTES de destruir: después no queda de dónde copiar el
+      // nombre ni el correo.
+      await anotarEvento(adminClient, "purgada",
+        { id: user_id, email: auPur?.user?.email ?? null, full_name: aPurgar.full_name ?? null },
+        { id: callerId, email: callerEmail },
+        { eliminada_el: aPurgar.deleted_at });
+
       // 1. Limpia TODAS las refs en public.* a este user_id usando la
       // función SQL app_purge_user_refs. Antes esto era una lista
       // hardcoded de 6 tablas (employees, project_members,
@@ -823,7 +1089,7 @@ Deno.serve(async (req) => {
         p_user_id: user_id,
       });
       if (purgeErr) {
-        console.error("[delete_user] app_purge_user_refs failed:", purgeErr.message);
+        console.error("[purge_user] app_purge_user_refs failed:", purgeErr.message);
         return new Response(
           JSON.stringify({ error: `Error limpiando datos del usuario: ${purgeErr.message}` }),
           {
@@ -845,7 +1111,7 @@ Deno.serve(async (req) => {
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
       if (deleteError) {
         console.error(
-          "[delete_user] gotrue deleteUser failed:",
+          "[purge_user] gotrue deleteUser failed:",
           JSON.stringify({
             message: deleteError.message,
             status: (deleteError as { status?: number }).status,
@@ -861,19 +1127,19 @@ Deno.serve(async (req) => {
           });
           if (pgErr) {
             pgErrorDetail = pgErr.message;
-            console.error("[delete_user] direct delete also failed:", pgErr.message);
+            console.error("[purge_user] direct delete also failed:", pgErr.message);
           } else {
             // El DELETE directo funcionó — gotrue habrá fallado por
             // razones de su propio side (sesiones colgadas, etc.).
-            console.log(`[delete_user] Successfully deleted via direct DELETE for user_id=${user_id}`);
-            const mbRemovedDirect = await liberarPuestoZoho();
-            return new Response(JSON.stringify({ success: true, mailbox_removed: mbRemovedDirect }), {
+            console.log(`[purge_user] purgada por DELETE directo user_id=${user_id}`);
+            // La casilla de Zoho ya se dio de baja cuando se eliminó la cuenta.
+            return new Response(JSON.stringify({ success: true, purged: true }), {
               headers: { ...corsHeaders(req), "Content-Type": "application/json" },
             });
           }
         } catch (e) {
           console.warn(
-            "[delete_user] app_force_delete_auth_user RPC not available:",
+            "[purge_user] app_force_delete_auth_user RPC not available:",
             (e as Error).message,
           );
         }
@@ -889,9 +1155,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`[delete_user] Successfully deleted user_id=${user_id}`);
-      const mbRemoved = await liberarPuestoZoho();
-      return new Response(JSON.stringify({ success: true, mailbox_removed: mbRemoved }), {
+      console.log(`[purge_user] purgada user_id=${user_id}`);
+      return new Response(JSON.stringify({ success: true, purged: true }), {
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
