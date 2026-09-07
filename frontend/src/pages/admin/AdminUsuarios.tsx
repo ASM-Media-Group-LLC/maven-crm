@@ -14,7 +14,9 @@ import RolesContent from "./RolesContent";
 import ResetPasswordModal from "./ResetPasswordModal";
 import MigrarCorreoModal from "./MigrarCorreoModal";
 import AddUserModal, { type CredencialesCreadas } from "./AddUserModal";
-import type { AppRole } from "@/hooks/useUserRole";
+import PapeleraTabla from "./PapeleraTabla";
+import { usePapelera } from "./usePapelera";
+import { useUserRole, type AppRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
@@ -49,7 +51,7 @@ const AdminUsuarios = () => {
   // fuerzan y se esconde el selector — elegir "lista" ahí solo empeora todo.
   const isMobile = useIsMobile();
   const vistaEfectiva = isMobile ? "grid" : view;
-  const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "roles" | "papelera">("usuarios");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -142,10 +144,16 @@ const AdminUsuarios = () => {
   // El tab "Roles" (CRUD de roles + permisos) se gatea con el permiso "Roles".
   // El fallback de canAccess concede a quien tenga el módulo Administración, así que
   // los admins (que además bypassan) lo siguen viendo; permite restringirlo por rol.
+  const { isAdmin } = useUserRole();
+  const papelera = usePapelera(activeTab === "papelera");
+
   const canManageRoles = canAccess("Administración", "Roles");
   const tabs = [
     { key: "usuarios" as const, label: "Usuarios" },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
+    // Quien puede eliminar puede recuperar; purgar antes del plazo es solo-admin
+    // y eso lo gatea la propia tabla (y la edge, que es lo que manda).
+    { key: "papelera" as const, label: "Eliminadas" },
   ];
 
   return (
@@ -172,12 +180,12 @@ const AdminUsuarios = () => {
                     <Plus className="h-4 w-4 mr-1" />
                     Agregar Usuario
                   </Button>
-                ) : (
+                ) : activeTab === "roles" ? (
                   <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Nuevo Rol
                   </Button>
-                )}
+                ) : null}
               </div>
             </header>
 
@@ -212,8 +220,9 @@ const AdminUsuarios = () => {
                 ))}
               </div>
 
-              {/* Search bar - visible for both tabs */}
-              <div className="flex items-center justify-between">
+              {/* Search bar — no va en la papelera: son pocas filas y la vista
+                  ya trae su propia explicación arriba. */}
+              <div className={activeTab === "papelera" ? "hidden" : "flex items-center justify-between"}>
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -233,7 +242,18 @@ const AdminUsuarios = () => {
                 </div>
               </div>
 
-              {activeTab === "usuarios" ? (
+              {activeTab === "papelera" ? (
+                <PapeleraTabla
+                  cuentas={papelera.cuentas}
+                  diasDePapelera={papelera.diasDePapelera}
+                  isLoading={papelera.isLoading}
+                  puedePurgar={isAdmin}
+                  onRecuperar={(id) => papelera.recuperar.mutate(id)}
+                  onPurgar={(id) => papelera.purgar.mutate(id)}
+                  recuperando={papelera.recuperar.isPending}
+                  purgando={papelera.purgar.isPending}
+                />
+              ) : activeTab === "usuarios" ? (
                 <>
                   {/* Content */}
                   {isLoading ? (
