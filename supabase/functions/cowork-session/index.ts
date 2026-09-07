@@ -81,7 +81,8 @@ const HOST_CODE_TTL_MS = 30 * 60 * 1000;
 // que falta o trae basura cae al estándar, una clave desconocida se descarta.
 interface ReglaAviso { activa: boolean; primerAvisoSeg: number; repetirSeg: number; supervisorSeg: number | null }
 interface ReglaPausas { banoMin: number; breakMin: number; supervisorSeg: number | null }
-interface ReglasCowork { preset: string; camara: ReglaAviso; encuadre: ReglaAviso; pantalla: ReglaAviso; pausas: ReglaPausas }
+interface ReglaReloj { fueraDeCamaraSeg: number }
+interface ReglasCowork { preset: string; camara: ReglaAviso; encuadre: ReglaAviso; pantalla: ReglaAviso; pausas: ReglaPausas; reloj: ReglaReloj }
 
 // Lo que Cowork hace por defecto, número por número (= REGLAS_ESTANDAR del front).
 const REGLAS_ESTANDAR: ReglasCowork = {
@@ -90,6 +91,9 @@ const REGLAS_ESTANDAR: ReglasCowork = {
   encuadre: { activa: true, primerAvisoSeg: 90,  repetirSeg: 90,  supervisorSeg: 180 },
   pantalla: { activa: true, primerAvisoSeg: 120, repetirSeg: 120, supervisorSeg: 300 },
   pausas:   { banoMin: 10, breakMin: 30, supervisorSeg: 180 },
+  // El reloj de tiempo trabajado: cuánto dura el "no hay nadie" antes de
+  // detenerlo. 60 s por defecto (Jhon, 07/09/2026).
+  reloj:    { fueraDeCamaraSeg: 60 },
 };
 const PRESETS = ["estricto", "estandar", "relajado", "personalizado"];
 const SEG_MIN = 30, SEG_MAX = 3600;
@@ -130,6 +134,19 @@ function normalizarPausas(raw: unknown, base: ReglaPausas): ReglaPausas {
   };
 }
 
+function normalizarReloj(raw: unknown, base: ReglaReloj): ReglaReloj {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return { fueraDeCamaraSeg: numeroEntre(r.fueraDeCamaraSeg, SEG_MIN, SEG_MAX, base.fueraDeCamaraSeg) };
+}
+
+/** Umbral del reloj (ms) que fija la SESIÓN; sin reglas propias, el estándar. */
+function umbralFueraDeCamaraMs(alertRules: unknown): number {
+  const reloj = alertRules && typeof alertRules === "object"
+    ? (alertRules as Record<string, unknown>).reloj
+    : undefined;
+  return normalizarReloj(reloj, REGLAS_ESTANDAR.reloj).fueraDeCamaraSeg * 1000;
+}
+
 /** Reglas completas y sanas a partir de lo que mande el cliente. Solo salen las
  *  claves conocidas. El preset es informativo: el front lo recalcula al leer
  *  comparando los valores, así que acá basta con que sea un nombre válido. */
@@ -141,6 +158,7 @@ function normalizarReglas(raw: unknown): ReglasCowork {
     encuadre: normalizarAviso(r.encuadre, REGLAS_ESTANDAR.encuadre),
     pantalla: normalizarAviso(r.pantalla, REGLAS_ESTANDAR.pantalla),
     pausas: normalizarPausas(r.pausas, REGLAS_ESTANDAR.pausas),
+    reloj: normalizarReloj(r.reloj, REGLAS_ESTANDAR.reloj),
   };
 }
 
@@ -538,13 +556,19 @@ serve(async (req) => {
       const { data: pausa } = await admin.from("cowork_breaks")
         .select("id").eq("session_id", sessionId).eq("user_id", userId).is("ended_at", null).limit(1).maybeSingle();
 
+      // La tolerancia del "no hay nadie" la fija la sesión (reglas del
+      // supervisor); sin reglas propias, 60 s.
+      const { data: sesionReloj } = await admin.from("cowork_sessions")
+        .select("alert_rules").eq("id", sessionId).maybeSingle();
+      const umbralMs = umbralFueraDeCamaraMs(sesionReloj?.alert_rules);
+
       const { estado, detalle } = estadoDeTiempo({
         camOn: body.camOn === true,
         screenShareOn: body.screenShareOn === true,
         faceState: typeof body.faceState === "string" ? body.faceState : null,
         faceSince: typeof body.faceSince === "number" ? body.faceSince : null,
         onBreak: !!pausa || body.onBreak === true,
-      }, ahora);
+      }, ahora, umbralMs);
 
       const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
         .select("id, estado, room_id, session_id, last_seen_at")

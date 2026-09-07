@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   normalizarReglas, detectarPreset, sonEstandar, paraGuardar, reglaDeEstado, reglaDeLlamado,
-  textoSegundos, fijarReglas, reglasActuales, REGLAS_ESTANDAR, PRESETS,
+  textoSegundos, fijarReglas, reglasActuales, REGLAS_ESTANDAR, PRESETS, umbralFueraDeCamaraMs,
 } from "@/lib/coworkReglas";
 
 // Las reglas de Cowork por sesión. Lo que se fija acá son las garantías que no
@@ -82,5 +82,20 @@ describe("reglas de Cowork por sesión", () => {
     expect(textoSegundos(90)).toBe("1:30");
     expect(textoSegundos(300)).toBe("5:00");
     expect(textoSegundos(null)).toBe("Nunca");
+  });
+
+  it("el reloj: 60 s por defecto, ajustable por sesión, y tocarlo es Personalizado", () => {
+    expect(REGLAS_ESTANDAR.reloj.fueraDeCamaraSeg).toBe(60);
+    expect(umbralFueraDeCamaraMs(REGLAS_ESTANDAR)).toBe(60_000);
+    // Una fila guardada ANTES de que existiera el reloj sigue siendo su preset.
+    const vieja = normalizarReglas({ ...PRESETS.estricto, reloj: undefined });
+    expect(vieja.preset).toBe("estricto");
+    const conReloj = normalizarReglas({ reloj: { fueraDeCamaraSeg: 120 } });
+    expect(conReloj.reloj.fueraDeCamaraSeg).toBe(120);
+    expect(conReloj.preset).toBe("personalizado");
+    expect(paraGuardar(conReloj)?.reloj.fueraDeCamaraSeg).toBe(120);
+    // Basura y fuera de rango: al estándar o acotado.
+    expect(normalizarReglas({ reloj: { fueraDeCamaraSeg: "x" } }).reloj.fueraDeCamaraSeg).toBe(60);
+    expect(normalizarReglas({ reloj: { fueraDeCamaraSeg: 5 } }).reloj.fueraDeCamaraSeg).toBe(30);
   });
 });
