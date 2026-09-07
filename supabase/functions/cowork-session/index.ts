@@ -1,6 +1,7 @@
 import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { estadoDeTiempo, LATIDO_VENCIDO_MS } from "../_shared/cowork-tiempo.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -162,6 +163,21 @@ serve(async (req) => {
     const userId = userData.user.id;
     /** ¿Tiene el rol admin de Maven? Es la llave maestra de Cowork: puede
      *  finalizar y compartir el enlace de host de cualquier sesión. */
+    // ── Reloj de Cowork: cerrar lo que quedó abierto ──────────────────────
+    // Un segmento abierto es "el estado actual de la persona". Cuando se va de
+    // la sala, de la sesión, o la sesión termina, deja de tener estado: se
+    // cierra en el último latido visto, no en "ahora" — si hace 20 minutos que
+    // no late, esos 20 minutos no existieron.
+    const cerrarSegmentosAbiertos = async (filtro: { userId?: string; sessionId?: string }) => {
+      let q = admin.from("cowork_tiempo_segmentos").select("id, last_seen_at").is("ended_at", null);
+      if (filtro.userId) q = q.eq("user_id", filtro.userId);
+      if (filtro.sessionId) q = q.eq("session_id", filtro.sessionId);
+      const { data } = await q;
+      for (const seg of data ?? []) {
+        await admin.from("cowork_tiempo_segmentos").update({ ended_at: seg.last_seen_at }).eq("id", seg.id);
+      }
+    };
+
     const esAdmin = async (uid: string): Promise<boolean> => {
       const { data } = await admin.from("user_roles").select("user_id").eq("user_id", uid).eq("role", "admin").maybeSingle();
       return !!data;
@@ -485,6 +501,65 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     // LEAVE ROOM (deactivate caller's active assignment)
     // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // LATIDO — el reloj de Cowork (fase 1 del reemplazo de Hubstaff)
+    //
+    // El participante manda cada 30 s (y al cambiar algo) su estado: cámara,
+    // pantalla, detector de cara, pausa. Acá se decide si el reloj CORRE o
+    // está DETENIDO (ver _shared/cowork-tiempo.ts) y se guarda como segmentos:
+    // mismo estado → se extiende el abierto; distinto → se cierra y se abre
+    // otro. La verdad la escribe el servidor: el cliente solo cuenta lo que le
+    // pasa, y solo sobre sí mismo (user_id del token).
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "latido") {
+      const { sessionId } = body;
+      if (!sessionId) return err(req, "sessionId required");
+      const ahora = Date.now();
+
+      // Sin asignación activa no hay sala, y sin sala no hay reloj.
+      const { data: asignacion } = await admin.from("cowork_room_assignments")
+        .select("room_id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).maybeSingle();
+      if (!asignacion) {
+        await cerrarSegmentosAbiertos({ userId });
+        return json(req, { ok: true, estado: null, motivo: "sin sala" });
+      }
+
+      // La pausa se mira en la base, no en lo que diga el cliente: es lo único
+      // que sobrevive a que recargue la pestaña.
+      const { data: pausa } = await admin.from("cowork_breaks")
+        .select("id").eq("session_id", sessionId).eq("user_id", userId).is("ended_at", null).limit(1).maybeSingle();
+
+      const { estado, detalle } = estadoDeTiempo({
+        camOn: body.camOn === true,
+        screenShareOn: body.screenShareOn === true,
+        faceState: typeof body.faceState === "string" ? body.faceState : null,
+        faceSince: typeof body.faceSince === "number" ? body.faceSince : null,
+        onBreak: !!pausa || body.onBreak === true,
+      }, ahora);
+
+      const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
+        .select("id, estado, room_id, session_id, last_seen_at")
+        .eq("user_id", userId).is("ended_at", null).maybeSingle();
+
+      const ahoraIso = new Date(ahora).toISOString();
+      if (abierto) {
+        const vencido = ahora - new Date(abierto.last_seen_at).getTime() > LATIDO_VENCIDO_MS;
+        const mismo = abierto.estado === estado && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId;
+        if (mismo && !vencido) {
+          await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso }).eq("id", abierto.id);
+          return json(req, { ok: true, estado, detalle, segmento: abierto.id });
+        }
+        // Cambió el estado (o se perdieron latidos): el anterior termina en el
+        // último latido visto y arranca uno nuevo.
+        await admin.from("cowork_tiempo_segmentos").update({ ended_at: abierto.last_seen_at }).eq("id", abierto.id);
+      }
+      const { data: nuevo, error: insErr } = await admin.from("cowork_tiempo_segmentos")
+        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso })
+        .select("id").single();
+      if (insErr) return err(req, insErr.message, 500);
+      return json(req, { ok: true, estado, detalle, segmento: nuevo.id });
+    }
+
     if (action === "leaveRoom") {
       const { sessionId } = body;
       if (!sessionId) return err(req, "sessionId required");
@@ -496,6 +571,7 @@ serve(async (req) => {
         .eq("session_id", sessionId)
         .eq("user_id", userId)
         .eq("is_active", true);
+      await cerrarSegmentosAbiertos({ userId });
 
       return json(req, { ok: true });
     }
@@ -874,6 +950,7 @@ serve(async (req) => {
         .update({ status: "ended", ended_at: new Date().toISOString(), ended_by: userId })
         .eq("id", sessionId);
       if (upErr) return err(req, upErr.message, 500);
+      await cerrarSegmentosAbiertos({ sessionId });
       return json(req, { success: true });
     }
 
@@ -896,6 +973,7 @@ serve(async (req) => {
       }
       await admin.from("cowork_room_assignments")
         .update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
+      await cerrarSegmentosAbiertos({ userId });
       const { error: delErr } = await admin.from("cowork_memberships")
         .delete().eq("session_id", sessionId).eq("user_id", userId);
       if (delErr) return err(req, delErr.message, 500);

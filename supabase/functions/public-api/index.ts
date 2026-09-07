@@ -10,6 +10,8 @@
 //   GET /public-api/employees           employees:read
 //   GET /public-api/sales               sales:read      (ganancias diarias por creadora)
 //   GET /public-api/sales/chatters      sales:chatters  (ventas diarias por chatter)
+//   GET /public-api/cowork/time         cowork:read     (tiempo en Cowork por empleado y día)
+//   GET /public-api/cowork/time/segments cowork:read    (cada tramo del reloj, al detalle)
 //
 // La key se busca por su hash SHA-256; se chequea que no esté revocada ni vencida,
 // que la IP esté permitida (si tiene whitelist) y que tenga el scope del recurso.
@@ -181,6 +183,8 @@ Deno.serve(async (req) => {
         { path: "/contacts/{id}", scope: "contacts:read" },
         { path: "/employees", scope: "employees:read" },
         { path: "/hubstaff", scope: "hubstaff:read" },
+        { path: "/cowork/time", scope: "cowork:read" },
+        { path: "/cowork/time/segments", scope: "cowork:read" },
         { path: "/sales", scope: "sales:read" },
         { path: "/sales/chatters", scope: "sales:chatters" },
         { path: "/promolog", scope: "promolog:read" },
@@ -411,6 +415,50 @@ Deno.serve(async (req) => {
     });
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
     return json(req, { object: "list", resource: "hubstaff", count: (data ?? []).length, limit, offset, data: data ?? [] });
+  }
+
+  // ===== /cowork/time  y  /cowork/time/segments =====
+  // El reloj de Cowork (reemplazo de Hubstaff). `time` = por empleado y día,
+  // con los segundos repartidos por estado. `time/segments` = cada tramo, al
+  // detalle: inicio, fin, estado y motivo, sesión y sala.
+  if (resource === "cowork") {
+    if (!need("cowork:read")) return json(req, { error: "forbidden", message: "Falta el scope cowork:read" }, 403);
+    if (sub !== "time") return json(req, { error: "not_found", message: "Usa /cowork/time o /cowork/time/segments" }, 404);
+    const { limit, offset } = pageParams(url);
+    const detalle = rest[2] === "segments";
+    const params = {
+      _from: url.searchParams.get("from"),
+      _to: url.searchParams.get("to"),
+      _profile_id: url.searchParams.get("profile_id"),
+      _limit: limit,
+      _offset: offset,
+    };
+    if (detalle) {
+      const { data, error } = await admin.rpc("api_cowork_time_segments", params);
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+      return json(req, { object: "list", resource: "cowork/time/segments", count: (data ?? []).length, limit, offset, data: data ?? [] });
+    }
+    const { data, error } = await admin.rpc("cowork_tiempo_diario", {
+      _desde: params._from, _hasta: params._to, _user_id: params._profile_id, _limit: limit, _offset: offset,
+    });
+    if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    // Nombres en inglés y planos, como el resto de la API.
+    const filas = (data ?? []).map((r: Record<string, unknown>) => ({
+      date: r.dia,
+      profile_id: r.user_id,
+      employee: r.nombre,
+      active_seconds: r.seg_activo,
+      active_hours: r.horas_activas,
+      paused_seconds: r.seg_pausa,
+      no_camera_seconds: r.seg_sin_camara,
+      no_screen_seconds: r.seg_sin_pantalla,
+      away_seconds: r.seg_fuera_de_camara,
+      in_room_seconds: r.seg_en_sala,
+      sessions: r.sesiones,
+      first_join: r.primer_ingreso,
+      last_leave: r.ultima_salida,
+    }));
+    return json(req, { object: "list", resource: "cowork/time", count: filas.length, limit, offset, data: filas });
   }
 
   // ===== /promolog =====

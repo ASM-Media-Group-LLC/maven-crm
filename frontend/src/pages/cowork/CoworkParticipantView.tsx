@@ -10,6 +10,7 @@ import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvid
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
+import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,21 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const faceRef = useRef<{ faceState: string | null; faceSince: number | null }>({
     faceState: null, faceSince: null,
   });
+
+  // El reloj de Cowork (fase 1 del reemplazo de Hubstaff): late mientras la
+  // persona tenga sala. No se apaga al desmontar esta pantalla —la llamada
+  // sigue en la ventanita flotante—, solo al Salir (handleLeaveRoom).
+  useEffect(() => {
+    const sid = cowork.session?.id;
+    if (!sid || !myAssignment?.room_id) return;
+    iniciarLatido(sid, {
+      ...lastMediaRef.current,
+      faceState: faceRef.current.faceState,
+      faceSince: faceRef.current.faceSince,
+      onBreak: !!breakStartedAt,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- los refs se leen al iniciar; después se actualizan con actualizarLatido
+  }, [cowork.session?.id, myAssignment?.room_id]);
 
   useEffect(() => {
     if (!breakStartedAt) { setBreakElapsed(0); return; }
@@ -255,6 +271,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         onBreak: !cerrando, breakStartedAt: inicio, breakKind: cerrando ? null : kind,
         ...faceRef.current,
       });
+      actualizarLatido({ onBreak: !cerrando });
     } catch (e) {
       toast.error("No se pudo registrar la pausa", { description: (e as Error).message });
     }
@@ -270,6 +287,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     endCall();
     // Se fue de verdad: acá el `leave` del presence SÍ corresponde.
     salirDePresencia();
+    detenerLatido();
     // Y vuelve el estándar: las reglas eran de ESA sesión. La próxima que se
     // abra las fija de nuevo al cargar su fila.
     fijarReglas(null);
@@ -309,6 +327,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     (watch: { state: string; since: number }) => {
       setFaceWatch(watch);
       faceRef.current = { faceState: watch.state, faceSince: watch.since };
+      actualizarLatido({ faceState: watch.state, faceSince: watch.since });
       // La pausa viaja COMPLETA (tipo y consumido incluidos): presence
       // reemplaza el payload entero en cada track(), así que si acá faltara
       // breakKind el tablero vería la pausa como "Baño" y con consumido 0.
@@ -330,6 +349,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       // Guardamos el último estado de media para poder re-publicarlo junto con la
       // pausa: presence reemplaza el payload entero en cada track().
       lastMediaRef.current = state;
+      actualizarLatido({ camOn: state.camOn, screenShareOn: state.screenShareOn });
       trackMediaState({
         ...state,
         onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
