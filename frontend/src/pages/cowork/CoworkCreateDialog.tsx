@@ -18,7 +18,9 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
   const [roomNames, setRoomNames] = useState(["Sala 1", "Sala 2"]);
   const [loading, setLoading] = useState(false);
 
-  const MAX_ROOMS = 10;
+  // Mismo tope que la edge (MAX_SALAS_POR_SESION). Subido de 10 a 30 el
+  // 07/09/2026: CHATTERS KASH necesitaba la sala 11.
+  const MAX_ROOMS = 30;
   const addRoom = () => {
     if (roomNames.length < MAX_ROOMS) setRoomNames([...roomNames, `Sala ${roomNames.length + 1}`]);
   };
