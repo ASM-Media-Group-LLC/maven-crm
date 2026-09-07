@@ -11,6 +11,8 @@
 // una línea que repite la etiqueta y dice OK / NO / BAD. Hasta que no llega
 // esa línea etiquetada, la respuesta está incompleta.
 
+import { escribirTodo } from "./socket-write.ts";
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -21,6 +23,9 @@ const CMD_TIMEOUT_MS = 15_000;
  *  estrangula (acepta el TCP y no manda nada) deja la función colgada
  *  hasta que el gateway la mate — y la persona ve esqueletos eternos. */
 const CONNECT_TIMEOUT_MS = 10_000;
+/** Para el literal de APPEND (el mensaje entero, con adjuntos). Ver
+ *  escribirTodo: empujar megas no es lo mismo que un ida y vuelta. */
+const BODY_TIMEOUT_MS = 60_000;
 
 /** Corre `p` contra un reloj DE VERDAD.
  *
@@ -213,7 +218,7 @@ export class ImapClient {
   /** Manda un comando y espera su línea etiquetada de cierre. */
   private async command(raw: string): Promise<ImapResult> {
     const tag = this.nextTag();
-    await this.conn.write(enc.encode(`${tag} ${raw}\r\n`));
+    await escribirTodo(this.conn, enc.encode(`${tag} ${raw}\r\n`), CMD_TIMEOUT_MS, "IMAP");
     return await this.awaitCompletion(tag);
   }
 
@@ -222,7 +227,7 @@ export class ImapClient {
    *  caracteres especiales rompe el comando de formas difíciles de ver. */
   async login(user: string, password: string): Promise<ImapResult> {
     const tag = this.nextTag();
-    await this.conn.write(enc.encode(`${tag} AUTHENTICATE PLAIN\r\n`));
+    await escribirTodo(this.conn, enc.encode(`${tag} AUTHENTICATE PLAIN\r\n`), CMD_TIMEOUT_MS, "IMAP");
 
     // El servidor pide el payload con una línea que arranca con "+".
     try {
@@ -236,7 +241,7 @@ export class ImapClient {
     // invisible en el editor y cualquiera lo borra al reformatear, rompiendo
     // la autenticación de una forma imposible de ver leyendo el código.
     const payload = btoa(`\u0000${user}\u0000${password}`);
-    await this.conn.write(enc.encode(`${payload}\r\n`));
+    await escribirTodo(this.conn, enc.encode(`${payload}\r\n`), CMD_TIMEOUT_MS, "IMAP");
 
     return await this.awaitCompletion(tag);
   }
@@ -446,9 +451,7 @@ export class ImapClient {
     const bytes = enc.encode(rfc822);
     // El nombre de carpeta va entre comillas; escapamos " y \ por las dudas.
     const box = folder.replace(/(["\\])/g, "\\$1");
-    await this.conn.write(
-      enc.encode(`${tag} APPEND "${box}" (${flags}) {${bytes.length}}\r\n`),
-    );
+    await escribirTodo(this.conn, enc.encode(`${tag} APPEND "${box}" (${flags}) {${bytes.length}}\r\n`), CMD_TIMEOUT_MS, "IMAP");
     // Esperar la continuación "+". Si en vez de "+" llega el tag con NO/BAD,
     // la carpeta no existe o el mensaje fue rechazado: cortamos sin mandar el
     // literal (mandarlo desincronizaría la sesión).
@@ -461,8 +464,8 @@ export class ImapClient {
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
-    await this.conn.write(bytes);
-    await this.conn.write(enc.encode("\r\n"));
+    await escribirTodo(this.conn, bytes, BODY_TIMEOUT_MS, "IMAP");
+    await escribirTodo(this.conn, enc.encode("\r\n"), CMD_TIMEOUT_MS, "IMAP");
     const res = await this.awaitCompletion(tag);
     if (!res.ok) return { ok: false, error: res.error };
     const uid = res.completion.match(/APPENDUID \d+ (\d+)/)?.[1];

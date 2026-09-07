@@ -8,11 +8,17 @@
 // STARTTLS. Un puerto que arranca en claro y "sube" a TLS es una superficie
 // extra que no necesitamos: Zoho soporta 465 y es lo más simple de hacer bien.
 
+import { escribirTodo } from "./socket-write.ts";
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 const CMD_TIMEOUT_MS = 20_000;
 const CONNECT_TIMEOUT_MS = 10_000;
+/** Para el CUERPO del mensaje, que puede ser de megas si lleva adjuntos.
+ *  Escribirlo no es un ida y vuelta como un comando: es empujar bytes, y con
+ *  una conexión lenta 20 s no alcanzan. */
+const BODY_TIMEOUT_MS = 60_000;
 
 /** Reloj REAL contra la promesa (mismo arreglo que en imap.ts): el patrón
  *  de chequear Date.now() entre lecturas no sirve cuando el servidor acepta
@@ -125,7 +131,7 @@ export class SmtpClient {
   }
 
   private async send(line: string): Promise<SmtpResult> {
-    await this.conn.write(enc.encode(line + "\r\n"));
+    await escribirTodo(this.conn, enc.encode(line + "\r\n"), CMD_TIMEOUT_MS, "SMTP");
     return await this.readReply();
   }
 
@@ -178,7 +184,7 @@ export class SmtpClient {
     // Si el cuerpo tiene una línea así (pasa con texto plano y con base64),
     // hay que duplicar el punto o el mensaje se corta ahí.
     const stuffed = rfc822.replace(/\r\n\./g, "\r\n..");
-    await this.conn.write(enc.encode(stuffed + "\r\n.\r\n"));
+    await escribirTodo(this.conn, enc.encode(stuffed + "\r\n.\r\n"), BODY_TIMEOUT_MS, "SMTP");
     return await this.readReply();
   }
 
