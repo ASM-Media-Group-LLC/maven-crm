@@ -2,7 +2,7 @@
 // El servidor manda con cada latido cuánto lleva la persona hoy y en qué
 // estado está; acá se convierte eso en el número que corre en pantalla y en
 // la frase que explica por qué está detenido. Puro, sin React.
-import type { EstadoTiempo } from "../../../supabase/functions/_shared/cowork-tiempo";
+import type { EstadoTiempo } from "@/lib/coworkTiempoRegla";
 
 export type { EstadoTiempo };
 

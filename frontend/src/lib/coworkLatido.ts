@@ -10,7 +10,7 @@
 // tiene que seguir aunque la pantalla de Cowork se desmonte. Se detiene solo
 // cuando la persona SALE de la sala.
 import { supabase } from "@/integrations/supabase/client";
-import { INTERVALO_LATIDO_MS, type Latido } from "../../../supabase/functions/_shared/cowork-tiempo";
+import { INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
 import type { RelojCowork } from "@/lib/coworkReloj";
 
 export { INTERVALO_LATIDO_MS };
