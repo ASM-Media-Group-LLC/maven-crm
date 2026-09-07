@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, CalendarOff, Clock, Crown, DollarSign, Gauge,
-  Moon, Sun, Sunset, TrendingDown, Users, Zap,
+  Moon, Sun, Sunset, Timer, TrendingDown, Users, Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +13,7 @@ import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/c
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PRESET_CONFIG, diasEntre, rangeForPreset, type RangePreset } from "@/lib/range-presets";
 import { useDescansos, useNombres, useRoster } from "@/pages/chatters/horarios/useHorarios";
+import { useEquipoTiempoCowork, sumarCoworkDelEquipo } from "@/hooks/useEquipoTiempoCowork";
 import { TURNOS, diaSemanaDe, isoDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
 import FeedbackDialog from "./FeedbackDialog";
 
@@ -123,6 +124,10 @@ export default function EquipoDashboard() {
   ]);
 
   const filas = periodo.data ?? [];
+  // El reloj de Cowork (cámara + pantalla, presente): el dato que va a
+  // reemplazar a Hubstaff. Conviven mientras dure la transición.
+  const { porPersona: coworkPorPersona, cargando: coworkCargando } = useEquipoTiempoCowork(desde, hasta);
+  const cowork = useMemo(() => sumarCoworkDelEquipo(filas, coworkPorPersona), [filas, coworkPorPersona]);
 
   // ── Resumen del rango ────────────────────────────────────────────────────
   const resumen = useMemo(() => {
@@ -290,11 +295,11 @@ export default function EquipoDashboard() {
       <div className="space-y-4 p-4 md:p-6">
         {/* ── KPIs del rango ── */}
         {cargando ? (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Kpi
               label="Ventas del equipo"
               valor={money(resumen.ventas)}
@@ -322,6 +327,14 @@ export default function EquipoDashboard() {
               valor={Math.round(resumen.horas).toLocaleString("es")}
               pie="Hubstaff, todo el equipo"
               icono={Clock} color="bg-amber-500" tinte="from-amber-500/10"
+            />
+            <Kpi
+              label="Cowork"
+              valor={cowork.horas > 0 ? Math.round(cowork.horas).toLocaleString("es") : "—"}
+              pie={cowork.personasConReloj > 0
+                ? `reloj de Cowork · ${cowork.personasConReloj} de ${filas.length} con tiempo`
+                : coworkCargando ? "cargando…" : "reloj de Cowork · sin tiempo en el rango"}
+              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
           </div>
         )}
@@ -451,6 +464,7 @@ export default function EquipoDashboard() {
             <ul className="divide-y divide-white/5">
               {ordenadas.map((f) => (
                 <Fila key={f.identity_id} f={f} puesto={puestos.get(f.identity_id) ?? null}
+                  coworkHoras={f.maven_user_id ? coworkPorPersona.get(f.maven_user_id)?.horas : undefined}
                   maxVentas={maxVentas} descanso={descansaronTodoElRango.has(f.identity_id)} />
               ))}
             </ul>
@@ -481,7 +495,7 @@ function Motivo({ nombre, detalle, icono: Icono, clase }: { nombre: string; deta
   );
 }
 
-function Fila({ f, puesto, maxVentas, descanso }: { f: ChatterPeriodo; puesto: number | null; maxVentas: number; descanso: boolean }) {
+function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPeriodo; puesto: number | null; maxVentas: number; descanso: boolean; coworkHoras?: number }) {
   const cumplimiento = pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0));
   const nota = f.nota_promedio == null ? null : Number(f.nota_promedio);
   const tn = tonoNota(nota);
@@ -509,6 +523,7 @@ function Fila({ f, puesto, maxVentas, descanso }: { f: ChatterPeriodo; puesto: n
               : descanso ? "descansó" : "sin datos en el rango"}
             {f.modelos_distintas > 0 && ` · ${f.modelos_distintas} modelo${f.modelos_distintas === 1 ? "" : "s"}`}
             {f.horas_total != null && ` · ${Math.round(Number(f.horas_total))} h`}
+            {coworkHoras != null && coworkHoras > 0 && ` · Cowork ${Math.round(coworkHoras)} h`}
             {/* El feedback del TL ya está dentro de la nota; acá se dice cuánto
                 de ella es feedback, para que nadie tenga que adivinarlo. */}
             {!!f.feedback_n && (
