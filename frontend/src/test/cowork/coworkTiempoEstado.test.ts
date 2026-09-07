@@ -29,4 +29,11 @@ describe("estadoDeTiempo — cuándo corre el reloj de Cowork", () => {
     expect(estadoDeTiempo({ ...base, faceState: "no_face", faceSince: T + 99_000 }, T).estado).toBe("activo");
     expect(estadoDeTiempo({ ...base, faceState: "no_face", faceSince: null }, T).estado).toBe("activo");
   });
+
+  it("el umbral es configurable: con 30 s se detiene antes, con 300 s aguanta más", () => {
+    const hace45 = { ...base, faceState: "no_face", faceSince: T - 45_000 };
+    expect(estadoDeTiempo(hace45, T, 30_000).estado).toBe("fuera_de_camara");
+    expect(estadoDeTiempo(hace45, T, 60_000).estado).toBe("activo");
+    expect(estadoDeTiempo(hace45, T, 300_000).estado).toBe("activo");
+  });
 });

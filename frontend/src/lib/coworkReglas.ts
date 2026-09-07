@@ -44,6 +44,15 @@ export interface ReglaPausas {
   supervisorSeg: number | null;
 }
 
+/** El reloj de tiempo trabajado (reemplazo de Hubstaff). Corre con cámara y
+ *  pantalla; se detiene por pausa, sin cámara, sin pantalla o "fuera de
+ *  cámara". Lo único ajustable por sesión es cuánto tiene que durar el "no hay
+ *  nadie" para detenerlo: la tolerancia para agacharse un momento. */
+export interface ReglaReloj {
+  /** Segundos sin nadie frente a la cámara hasta que el reloj se detiene. */
+  fueraDeCamaraSeg: number;
+}
+
 export interface ReglasCowork {
   preset: Preset;
   camara: ReglaAviso;
@@ -51,6 +60,7 @@ export interface ReglasCowork {
   encuadre: ReglaAviso;
   pantalla: ReglaAviso;
   pausas: ReglaPausas;
+  reloj: ReglaReloj;
 }
 
 // Lo que Cowork hace HOY con los chatters, número por número. Es el punto de
@@ -62,6 +72,7 @@ export const REGLAS_ESTANDAR: ReglasCowork = {
   encuadre: { activa: true, primerAvisoSeg: 90,  repetirSeg: 90,  supervisorSeg: 180 },
   pantalla: { activa: true, primerAvisoSeg: 120, repetirSeg: 120, supervisorSeg: 300 },
   pausas:   { banoMin: 10, breakMin: 30, supervisorSeg: 180 },
+  reloj:    { fueraDeCamaraSeg: 60 },
 };
 
 const REGLAS_ESTRICTO: ReglasCowork = {
@@ -70,6 +81,7 @@ const REGLAS_ESTRICTO: ReglasCowork = {
   encuadre: { activa: true, primerAvisoSeg: 60, repetirSeg: 60, supervisorSeg: 120 },
   pantalla: { activa: true, primerAvisoSeg: 60, repetirSeg: 60, supervisorSeg: 180 },
   pausas:   { banoMin: 10, breakMin: 30, supervisorSeg: 60 },
+  reloj:    { fueraDeCamaraSeg: 60 },
 };
 
 // Relajado apaga la pantalla: es el caso de las managers, que no están
@@ -81,6 +93,7 @@ const REGLAS_RELAJADO: ReglasCowork = {
   encuadre: { activa: true,  primerAvisoSeg: 180, repetirSeg: 300, supervisorSeg: null },
   pantalla: { activa: false, primerAvisoSeg: 120, repetirSeg: 120, supervisorSeg: 300 },
   pausas:   { banoMin: 10, breakMin: 45, supervisorSeg: null },
+  reloj:    { fueraDeCamaraSeg: 60 },
 };
 
 export const PRESETS: Record<Exclude<Preset, "personalizado">, ReglasCowork> = {
@@ -95,6 +108,8 @@ export const PRESETS: Record<Exclude<Preset, "personalizado">, ReglasCowork> = {
 export const OPCIONES_SEG = [30, 60, 90, 120, 180, 300, 600, 900] as const;
 export const OPCIONES_BANO_MIN = [5, 10, 15, 20] as const;
 export const OPCIONES_BREAK_MIN = [15, 30, 45, 60] as const;
+/** Tolerancia del reloj ante "no hay nadie". 60 s por defecto (Jhon, 07/09). */
+export const OPCIONES_RELOJ_SEG = [30, 60, 90, 120, 180, 300] as const;
 
 const SEG_MIN = 30, SEG_MAX = 3600;
 const MIN_MIN = 1, MIN_MAX = 240;
@@ -133,6 +148,16 @@ function normalizarPausas(raw: unknown, base: ReglaPausas): ReglaPausas {
   };
 }
 
+function normalizarReloj(raw: unknown, base: ReglaReloj): ReglaReloj {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return { fueraDeCamaraSeg: numeroEntre(r.fueraDeCamaraSeg, SEG_MIN, SEG_MAX, base.fueraDeCamaraSeg) };
+}
+
+/** El umbral del reloj en milisegundos, para pasarlo a estadoDeTiempo. */
+export function umbralFueraDeCamaraMs(r: ReglasCowork): number {
+  return r.reloj.fueraDeCamaraSeg * 1000;
+}
+
 /** ¿Estas dos reglas dicen exactamente lo mismo, número por número? (sin
  *  mirar el preset). Lo usa el panel para saber si hay algo que guardar y el
  *  detector de preset; una sola copia, para que nunca discrepen. */
@@ -142,7 +167,8 @@ export function mismasReglas(a: ReglasCowork, b: ReglasCowork): boolean {
     x.repetirSeg === y.repetirSeg && x.supervisorSeg === y.supervisorSeg;
   return aviso(a.camara, b.camara) && aviso(a.encuadre, b.encuadre) && aviso(a.pantalla, b.pantalla)
     && a.pausas.banoMin === b.pausas.banoMin && a.pausas.breakMin === b.pausas.breakMin
-    && a.pausas.supervisorSeg === b.pausas.supervisorSeg;
+    && a.pausas.supervisorSeg === b.pausas.supervisorSeg
+    && a.reloj.fueraDeCamaraSeg === b.reloj.fueraDeCamaraSeg;
 }
 
 /** El preset que corresponde a estos valores. El nombre guardado NO manda: si
@@ -172,6 +198,7 @@ export function normalizarReglas(raw: unknown): ReglasCowork {
     encuadre: normalizarAviso(r.encuadre, REGLAS_ESTANDAR.encuadre),
     pantalla: normalizarAviso(r.pantalla, REGLAS_ESTANDAR.pantalla),
     pausas: normalizarPausas(r.pausas, REGLAS_ESTANDAR.pausas),
+    reloj: normalizarReloj(r.reloj, REGLAS_ESTANDAR.reloj),
   };
   return { ...sinPreset, preset: detectarPreset(sinPreset) };
 }

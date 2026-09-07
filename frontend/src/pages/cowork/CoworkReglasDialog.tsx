@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronDown, Coffee, Info, Loader2, Monitor, RotateCcw, ScanFace, VideoOff, type LucideIcon } from "lucide-react";
+import { ChevronDown, Coffee, Info, Loader2, Monitor, RotateCcw, ScanFace, Timer, VideoOff, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  PRESETS, REGLAS_ESTANDAR, OPCIONES_SEG, OPCIONES_BANO_MIN, OPCIONES_BREAK_MIN,
+  PRESETS, REGLAS_ESTANDAR, OPCIONES_SEG, OPCIONES_BANO_MIN, OPCIONES_BREAK_MIN, OPCIONES_RELOJ_SEG,
   detectarPreset, paraGuardar, textoSegundos, mismasReglas,
-  type Preset, type ReglaAviso, type ReglaPausas, type ReglasCowork,
+  type Preset, type ReglaAviso, type ReglaPausas, type ReglaReloj, type ReglasCowork,
 } from "@/lib/coworkReglas";
 
 // Popup del supervisor para las reglas de UNA sesión de Cowork (ver
@@ -77,6 +77,10 @@ function resumenAviso(r: ReglaAviso): string {
   return `Se le avisa a la persona a ${textoSegundos(r.primerAvisoSeg)} y cada ${textoSegundos(r.repetirSeg)} · ${supervisor}`;
 }
 
+function resumenReloj(r: ReglaReloj): string {
+  return `Corre con cámara y pantalla · se detiene si no hay nadie ${textoSegundos(r.fueraDeCamaraSeg)} seguidos, en pausa, sin cámara o sin pantalla`;
+}
+
 function resumenPausas(p: ReglaPausas): string {
   const supervisor = p.supervisorSeg === null
     ? "a ti nunca"
@@ -116,6 +120,8 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
     setBorrador((b) => ({ ...b, [clave]: { ...b[clave], ...parche } }));
   const cambiarPausas = (parche: Partial<ReglaPausas>) =>
     setBorrador((b) => ({ ...b, pausas: { ...b.pausas, ...parche } }));
+  const cambiarReloj = (parche: Partial<ReglaReloj>) =>
+    setBorrador((b) => ({ ...b, reloj: { ...b.reloj, ...parche } }));
   const alternar = (clave: string) => setAbiertas((a) => ({ ...a, [clave]: !a[clave] }));
 
   const guardar = async () => {
@@ -180,7 +186,7 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
                   onClick={() => {
                     if (manual) {
                       setModoPersonalizado(true);
-                      setAbiertas({ camara: true, encuadre: true, pantalla: true, pausas: true });
+                      setAbiertas({ camara: true, encuadre: true, pantalla: true, pausas: true, reloj: true });
                       return;
                     }
                     setModoPersonalizado(false);
@@ -274,6 +280,30 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
               opciones={opcionesSupervisor(borrador.pausas.supervisorSeg, "después de pasarse")}
               onCambio={(v) => cambiarPausas({ supervisorSeg: v === NUNCA ? null : Number(v) })}
             />
+          </TarjetaRegla>
+
+          {/* El reloj de tiempo trabajado (reemplazo de Hubstaff). No se apaga:
+              lo único ajustable es la tolerancia del "no hay nadie". Mal
+              encuadre y poca luz nunca lo detienen — para eso están las
+              tarjetas de arriba. */}
+          <TarjetaRegla
+            icono={Timer}
+            titulo="Reloj de tiempo trabajado"
+            resumen={resumenReloj(borrador.reloj)}
+            abierta={!!abiertas.reloj}
+            onAlternar={() => alternar("reloj")}
+          >
+            <CampoOpcion
+              etiqueta="Nadie frente a la cámara"
+              valor={String(borrador.reloj.fueraDeCamaraSeg)}
+              opciones={conValorActual(OPCIONES_RELOJ_SEG, borrador.reloj.fueraDeCamaraSeg)
+                .map((sg) => ({ valor: String(sg), texto: `${textoSegundos(sg)} y se detiene` }))}
+              onCambio={(v) => cambiarReloj({ fueraDeCamaraSeg: Number(v) })}
+            />
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Agacharse un momento no descuenta: el reloj se detiene solo cuando la ausencia dura más que esto.
+              Muy lejos o con poca luz no lo detienen; eso va por las alertas de encuadre.
+            </p>
           </TarjetaRegla>
         </div>
 
