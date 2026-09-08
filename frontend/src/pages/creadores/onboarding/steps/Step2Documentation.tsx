@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, ImageIcon, X, Gift, Globe, Info, Camera } from "lucide-react";
+import { Upload, FileText, ImageIcon, X, Gift, Globe, Info, Camera, Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import FileUploadModal, { type UploadedFile } from "@/components/FileUploadModal";
+import VideoOnboarding from "@/components/creadores/VideoOnboarding";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -44,6 +45,9 @@ interface Props {
   errors: Step2Errors;
   tempId: string;
   onChange: <K extends keyof Step2Data>(field: K, value: Step2Data[K]) => void;
+  /** Id REAL de la creadora (no el tempId de los archivos). null mientras
+   *  el autoguardado todavía no creó la fila. */
+  creatorId?: string | null;
 }
 
 function DocUploader({
@@ -93,7 +97,7 @@ function DocUploader({
   );
 }
 
-export default function Step2Documentation({ data, errors, tempId, onChange }: Props) {
+export default function Step2Documentation({ data, errors, tempId, onChange, creatorId }: Props) {
   const [uploadTarget, setUploadTarget] = useState<UploadTarget | null>(null);
 
   const targetFieldMap: Record<Exclude<UploadTarget, "extras">, keyof Step2Data> = {
@@ -121,6 +125,30 @@ export default function Step2Documentation({ data, errors, tempId, onChange }: P
   return (
     <TooltipProvider>
       <div className="space-y-6">
+        {/* Video de onboarding. Va acá y no en un paso propio porque es un
+            archivo más de los que ella entrega, y sumar un quinto paso a un
+            formulario que ya es largo hace que lo abandonen antes.
+
+            El video sube a R2 contra el id REAL de la creadora. Si el
+            autoguardado todavía no creó la fila, se avisa en vez de mostrar un
+            botón que iba a fallar con un error críptico. */}
+        {creatorId ? (
+          <VideoOnboarding
+            creatorId={creatorId}
+            videoKey={null}
+            puedeEditar
+            compacto
+          />
+        ) : (
+          <div className="flex items-start gap-2 rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+            <Clapperboard className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Para subir el <b>video de onboarding</b>, guarda primero el borrador
+              (botón de abajo). Después vuelve a este paso.
+            </span>
+          </div>
+        )}
+
         {/* ID Document Uploaders — 3 separate */}
         <div className="space-y-4">
           <Label className="text-sm font-semibold">Documento de Identidad</Label>

@@ -768,7 +768,19 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         <div key={step} className="animate-fade-in">
           {step === 1 && <Step1PersonalInfo data={step1} errors={step1Errors} onChange={updateStep1} />}
           {step === 2 && <Step2PsychologyLimits data={step2Psy} onChange={updateStep2Psy} />}
-          {step === 3 && <Step2Documentation data={step3Doc} errors={step3DocErrors} tempId={tempId} onChange={updateStep3Doc} />}
+          {step === 3 && (
+            <Step2Documentation
+              data={step3Doc}
+              errors={step3DocErrors}
+              tempId={tempId}
+              onChange={updateStep3Doc}
+              // El video se sube a R2 contra el id REAL de la creadora, no
+              // contra el tempId de los archivos: la fila ya existe apenas el
+              // autoguardado corre. Si todavía es null, el paso muestra el
+              // aviso de guardar primero en vez de un botón que va a fallar.
+              creatorId={editCreatorId || autoSaveIdRef.current}
+            />
+          )}
           {step === 4 && <Step4WorkConfig data={step4} onChange={updateStep4} />}
         </div>
       </CardContent>

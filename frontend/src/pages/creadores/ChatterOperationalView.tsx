@@ -7,9 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { parseCsv, parsePricing, priceLabels } from "./OperacionesTabContent";
+import VideoOnboarding from "@/components/creadores/VideoOnboarding";
 
 interface ChatterOperationalViewProps {
+  creatorId: string;
   creator: {
+    onboarding_video_key?: string | null;
+    onboarding_video_at?: string | null;
     tono_voz?: string | null;
     apodos_permitidos?: string | null;
     emoji_frecuente?: string | null;
@@ -26,7 +30,7 @@ interface ChatterOperationalViewProps {
 
 const NoData = () => <span className="text-sm text-muted-foreground italic">Sin configurar</span>;
 
-const ChatterOperationalView = ({ creator }: ChatterOperationalViewProps) => {
+const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewProps) => {
   const apodos = parseCsv(creator.apodos_permitidos);
   const pricing = parsePricing(creator.precios_contenido);
   const currencySymbol = creator.currency === "EUR" ? "€" : "$";
@@ -48,6 +52,17 @@ const ChatterOperationalView = ({ creator }: ChatterOperationalViewProps) => {
 
   return (
     <div className="space-y-5 mt-2">
+      {/* El video antes que la ficha escrita: para escribir como ella, oírla
+          treinta segundos vale más que leer treinta campos. Si no lo subió,
+          esto no dibuja nada — el chatter no puede resolverlo. */}
+      <VideoOnboarding
+        creatorId={creatorId}
+        videoKey={creator.onboarding_video_key ?? null}
+        videoAt={creator.onboarding_video_at ?? null}
+        puedeEditar={false}
+        ocultarSiVacio
+      />
+
       {/* 1. Personaje y Voz */}
       <Card className="border-2 border-t-[3px] border-t-primary">
         <CardHeader className="pb-3">
