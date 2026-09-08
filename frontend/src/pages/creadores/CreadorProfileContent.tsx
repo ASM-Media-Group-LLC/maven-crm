@@ -302,7 +302,7 @@ const CreadorProfileContent = () => {
           </TabsList>
 
           <TabsContent value="operaciones">
-            <OperacionesTabContent creator={c} />
+            <OperacionesTabContent creator={c} creatorId={id!} />
           </TabsContent>
 
           {vistaTrabajo && (

@@ -1,8 +1,16 @@
-import { AlertTriangle, Heart, Dog, UtensilsCrossed, MessageCircle, Shield, Sparkles, Video, Star, Lock } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Heart, Dog, UtensilsCrossed, MessageCircle, Shield, Sparkles, Video, Star, Lock, Edit, Save, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import ChatterOperationalView from "./ChatterOperationalView";
 import { useVistaTrabajo } from "./vistaTrabajo";
 
@@ -37,6 +45,7 @@ interface OperacionesTabContentProps {
     estrategia_recuperacion?: string | null;
     restricciones_seguridad?: string | null;
   };
+  creatorId: string;
 }
 
 export const priceLabels: Record<string, string> = {
@@ -88,15 +97,69 @@ const crisisScripts: { key: string; label: string }[] = [
   { key: "estrategia_rechazo", label: "Estrategia de rechazo" },
 ];
 
-const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
+// Campos de texto editables (todos columnas planas de creators).
+const TEXT_FIELDS = [
+  "tono_voz", "tono_emocional", "como_quieres_que_te_llamen", "emoji_frecuente",
+  "personalidad_marca", "terminos_afecto", "frases_venta",
+  "apodos_permitidos", "palabras_prohibidas", "contenido_jamas_haria",
+  "respuesta_sexo_en_persona", "respuesta_usuario_grosero", "respuesta_pedir_desnudos",
+  "respuesta_cuanto_cobra_encuentro", "respuesta_muestra_intimas",
+  "estrategia_material_gratis", "estrategia_problemas_personales", "estrategia_rechazo",
+  "hobbies", "mascotas_nombres", "comida_favorita",
+  "plataforma_videollamada", "usuarios_vip", "estrategia_recuperacion", "restricciones_seguridad",
+] as const;
+type TextField = typeof TEXT_FIELDS[number];
+type EditData = Record<TextField, string> & { gfe_disponible: boolean };
+
+const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProps) => {
+  const queryClient = useQueryClient();
   // La vista operativa (personaje, precios, protocolo de respuesta) es la que
   // ve quien abre el perfil como vista de trabajo: el chatter que llega por su
   // roster de Horarios y el rol legacy `agent`. Ver `vistaTrabajo.ts`.
   const { vistaTrabajo } = useVistaTrabajo();
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editData, setEditData] = useState<EditData>({} as EditData);
+
   if (vistaTrabajo) {
     return <ChatterOperationalView creator={creator} />;
   }
+
+  const startEditing = () => {
+    const base = Object.fromEntries(
+      TEXT_FIELDS.map((f) => [f, ((creator as Record<string, unknown>)[f] as string | null) ?? ""]),
+    ) as Record<TextField, string>;
+    setEditData({ ...base, gfe_disponible: !!creator.gfe_disponible });
+    setIsEditing(true);
+  };
+
+  const set = (field: TextField, value: string) => setEditData((p) => ({ ...p, [field]: value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = { gfe_disponible: editData.gfe_disponible };
+      for (const f of TEXT_FIELDS) payload[f] = editData[f].trim() || null;
+      const { error } = await supabase.from("creators").update(payload as any).eq("id", creatorId);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
+      setIsEditing(false);
+      toast.success("Ficha operativa guardada");
+    } catch (e: any) {
+      toast.error(`No se pudo guardar: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Helpers de edición: input o textarea con el label chiquito de la vista.
+  const EIn = ({ field, placeholder }: { field: TextField; placeholder?: string }) => (
+    <Input className="h-9 text-sm" value={editData[field] ?? ""} onChange={(e) => set(field, e.target.value)} placeholder={placeholder} />
+  );
+  const ETx = ({ field, placeholder }: { field: TextField; placeholder?: string }) => (
+    <Textarea className="text-sm min-h-[64px]" value={editData[field] ?? ""} onChange={(e) => set(field, e.target.value)} placeholder={placeholder} />
+  );
 
   const apodos = parseCsv(creator.apodos_permitidos);
   const prohibidas = parseCsv(creator.palabras_prohibidas);
@@ -109,6 +172,24 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
 
   return (
     <div className="space-y-5 mt-2">
+      {/* Editar/Guardar — mismo patrón que el tab Información */}
+      <div className="flex items-center justify-end -mb-2">
+        {!isEditing ? (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
+            <Edit className="h-3.5 w-3.5" /> Editar
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={saving}>
+              <X className="h-3.5 w-3.5 mr-1" /> Cancelar
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
+              <Save className="h-3.5 w-3.5" /> {saving ? "Guardando…" : "Guardar"}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* 1. Ficha de Personaje */}
       <Card>
         <CardHeader className="pb-3">
@@ -120,54 +201,56 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Tono de voz</p>
-              {creator.tono_voz ? (
+              {isEditing ? <EIn field="tono_voz" placeholder="dulce, coqueta…" /> : creator.tono_voz ? (
                 <p className="text-lg font-semibold capitalize">{creator.tono_voz}</p>
               ) : <NoData />}
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Tono emocional</p>
-              {creator.tono_emocional ? (
+              {isEditing ? <EIn field="tono_emocional" /> : creator.tono_emocional ? (
                 <p className="text-sm font-medium">{creator.tono_emocional}</p>
               ) : <NoData />}
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Cómo quiere que la llamen</p>
-              {creator.como_quieres_que_te_llamen ? (
+              {isEditing ? <EIn field="como_quieres_que_te_llamen" /> : creator.como_quieres_que_te_llamen ? (
                 <p className="text-sm font-medium">{creator.como_quieres_que_te_llamen}</p>
               ) : <NoData />}
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Emojis frecuentes</p>
-              {creator.emoji_frecuente ? (
+              {isEditing ? <EIn field="emoji_frecuente" placeholder="😏💦🔥" /> : creator.emoji_frecuente ? (
                 <p className="text-lg">{creator.emoji_frecuente}</p>
               ) : <NoData />}
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Personalidad de marca</p>
-              {creator.personalidad_marca ? (
+              {isEditing ? <ETx field="personalidad_marca" /> : creator.personalidad_marca ? (
                 <p className="text-sm">{creator.personalidad_marca}</p>
               ) : <NoData />}
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Términos de afecto preferidos</p>
-              {creator.terminos_afecto ? (
+              {isEditing ? <EIn field="terminos_afecto" placeholder="bebé, mi amor…" /> : creator.terminos_afecto ? (
                 <p className="text-sm">{creator.terminos_afecto}</p>
               ) : <NoData />}
             </div>
           </div>
 
-          {creator.frases_venta && (
+          {(isEditing || creator.frases_venta) && (
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
                 <Sparkles className="h-3 w-3" /> Frases de venta
               </p>
-              <p className="text-sm bg-muted/50 rounded-lg p-3 italic">"{creator.frases_venta}"</p>
+              {isEditing ? <ETx field="frases_venta" /> : (
+                <p className="text-sm bg-muted/50 rounded-lg p-3 italic">"{creator.frases_venta}"</p>
+              )}
             </div>
           )}
 
           <div className="pt-2 border-t">
             <p className="text-xs text-muted-foreground mb-1.5">Apodos permitidos</p>
-            {apodos.length > 0 ? (
+            {isEditing ? <EIn field="apodos_permitidos" placeholder="separados por coma: nena, princesa…" /> : apodos.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {apodos.map((a) => (
                   <Badge key={a} variant="primary-soft">{a}</Badge>
@@ -178,7 +261,7 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
 
           <div>
             <p className="text-xs text-muted-foreground mb-1.5">Palabras prohibidas</p>
-            {prohibidas.length > 0 ? (
+            {isEditing ? <EIn field="palabras_prohibidas" placeholder="separadas por coma" /> : prohibidas.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {prohibidas.map((p) => (
                   <Badge key={p} variant="destructive">{p}</Badge>
@@ -196,7 +279,7 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
           Esta modelo jamás hará:
         </AlertTitle>
         <AlertDescription className="mt-1">
-          {creator.contenido_jamas_haria ? (
+          {isEditing ? <ETx field="contenido_jamas_haria" /> : creator.contenido_jamas_haria ? (
             <p className="font-medium">{creator.contenido_jamas_haria}</p>
           ) : <NoData />}
         </AlertDescription>
@@ -210,7 +293,16 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {hasCrisisData ? (
+          {isEditing ? (
+            <div className="space-y-4">
+              {crisisScripts.map(({ key, label }) => (
+                <div key={key} className="space-y-1">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <ETx field={key as TextField} />
+                </div>
+              ))}
+            </div>
+          ) : hasCrisisData ? (
             <div className="space-y-4">
               {crisisScripts.map(({ key, label }) => {
                 const value = (creator as Record<string, unknown>)[key] as string | null;
@@ -237,23 +329,23 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
         <CardContent className="space-y-3">
           <div className="flex items-start gap-2">
             <Heart className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">Hobbies</p>
-              {creator.hobbies ? <p className="text-sm">{creator.hobbies}</p> : <NoData />}
+              {isEditing ? <EIn field="hobbies" /> : creator.hobbies ? <p className="text-sm">{creator.hobbies}</p> : <NoData />}
             </div>
           </div>
           <div className="flex items-start gap-2">
             <Dog className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">Mascotas</p>
-              {creator.mascotas_nombres ? <p className="text-sm">{creator.mascotas_nombres}</p> : <NoData />}
+              {isEditing ? <EIn field="mascotas_nombres" /> : creator.mascotas_nombres ? <p className="text-sm">{creator.mascotas_nombres}</p> : <NoData />}
             </div>
           </div>
           <div className="flex items-start gap-2">
             <UtensilsCrossed className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">Comida favorita</p>
-              {creator.comida_favorita ? <p className="text-sm">{creator.comida_favorita}</p> : <NoData />}
+              {isEditing ? <EIn field="comida_favorita" /> : creator.comida_favorita ? <p className="text-sm">{creator.comida_favorita}</p> : <NoData />}
             </div>
           </div>
         </CardContent>
@@ -304,41 +396,54 @@ const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Disponibilidad GFE</p>
-              <Badge variant={creator.gfe_disponible ? "success-soft" : "secondary-soft"}>
-                {creator.gfe_disponible ? "Disponible" : "No disponible"}
-              </Badge>
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <Switch checked={editData.gfe_disponible} onCheckedChange={(v) => setEditData((p) => ({ ...p, gfe_disponible: v }))} />
+                  <span className="text-sm">{editData.gfe_disponible ? "Disponible" : "No disponible"}</span>
+                </div>
+              ) : (
+                <Badge variant={creator.gfe_disponible ? "success-soft" : "secondary-soft"}>
+                  {creator.gfe_disponible ? "Disponible" : "No disponible"}
+                </Badge>
+              )}
             </div>
             <div className="flex items-start gap-2">
               <Video className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-muted-foreground">Plataforma de videollamada</p>
-                {creator.plataforma_videollamada ? (
+                {isEditing ? <EIn field="plataforma_videollamada" /> : creator.plataforma_videollamada ? (
                   <p className="text-sm font-medium">{creator.plataforma_videollamada}</p>
                 ) : <NoData />}
               </div>
             </div>
           </div>
 
-          {creator.usuarios_vip && (
+          {(isEditing || creator.usuarios_vip) && (
             <div>
               <p className="text-xs text-muted-foreground mb-1">Usuarios VIP</p>
-              <p className="text-sm bg-muted/50 rounded-lg p-3">{creator.usuarios_vip}</p>
+              {isEditing ? <ETx field="usuarios_vip" /> : (
+                <p className="text-sm bg-muted/50 rounded-lg p-3">{creator.usuarios_vip}</p>
+              )}
             </div>
           )}
 
-          {creator.estrategia_recuperacion && (
+          {(isEditing || creator.estrategia_recuperacion) && (
             <div>
               <p className="text-xs text-muted-foreground mb-1">Estrategia de recuperación</p>
-              <p className="text-sm">{creator.estrategia_recuperacion}</p>
+              {isEditing ? <ETx field="estrategia_recuperacion" /> : (
+                <p className="text-sm">{creator.estrategia_recuperacion}</p>
+              )}
             </div>
           )}
 
-          {creator.restricciones_seguridad && (
+          {(isEditing || creator.restricciones_seguridad) && (
             <div className="flex items-start gap-2">
               <Lock className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-muted-foreground">Restricciones de seguridad</p>
-                <p className="text-sm font-medium">{creator.restricciones_seguridad}</p>
+                {isEditing ? <ETx field="restricciones_seguridad" /> : (
+                  <p className="text-sm font-medium">{creator.restricciones_seguridad}</p>
+                )}
               </div>
             </div>
           )}

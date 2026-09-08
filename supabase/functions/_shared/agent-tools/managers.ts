@@ -213,7 +213,7 @@ export const managersTools: AgentTool[] = [
           status: c.status,
           manager: managerNombre,
           ...(c.assigned_manager_profile_id ? {} : {
-            nota_manager: "Sin manager asignada: queda FUERA de los conteos por línea (Plus/Massive).",
+            nota_manager: "Sin manager asignada en la ficha: queda FUERA de los conteos por manager.",
           }),
         },
         ...(posibleCorte ? {
@@ -424,9 +424,9 @@ export const managersTools: AgentTool[] = [
     description:
       "Cuántos CONTACTOS hizo cada manager por WhatsApp en un día (default HOY, Bogotá): creadoras DISTINTAS a las " +
       "que se les escribió por la línea del equipo de Managers, separado por manager. ⚠️ La línea es COMPARTIDA (un " +
-      "solo número), así que la atribución NO es por quién tipeó: es por la cuenta Kash de la creadora — Kash PLUS = " +
-      "Carolina, Kash MASSIVE = Fabiana (creator_business.kash_type, viene de BLU; fallback: manager asignada en el " +
-      "perfil). Cuenta solo mensajes SALIENTES (desde Maven o desde el teléfono/WA Web capturados como externos); los " +
+      "solo número), así que la atribución NO es por quién tipeó: es por la MANAGER ASIGNADA en la ficha de la " +
+      "creadora (creators.assigned_manager_profile_id, editable en el perfil — la regla vieja Plus=Carolina/" +
+      "Massive=Fabiana ya no existe). Cuenta solo mensajes SALIENTES (desde Maven o desde el teléfono/WA Web capturados como externos); los " +
       "fallidos no cuentan. Devuelve por manager: cuántas creadoras contactó + quiénes (con mensajes por creadora); y " +
       "aparte los contactos de la línea NO vinculados a una creadora (sin_atribuir). Pasa date (YYYY-MM-DD) para otro " +
       "día y manager_name para filtrar. Úsala para '¿cuántos contactos hizo hoy Carolina y Fabiana?'.",
@@ -546,33 +546,16 @@ export const managersTools: AgentTool[] = [
         return undefined;
       };
 
-      // 5) Atribución por manager: la línea es COMPARTIDA → se atribuye por la cuenta
-      // Kash de la creadora (creator_business.kash_type, viene de BLU): Plus=Carolina,
-      // Massive=Fabiana. Fallback: manager asignada en el perfil (profiles.full_name).
-      const creatorIds = [...new Set(((creators ?? []) as CreatorRow[]).map((c) => c.id))];
-      const kashByCreator = new Map<string, string>();
-      if (creatorIds.length) {
-        const { data: biz } = await ctx.sb
-          .from("creator_business").select("creator_id, kash_type").in("creator_id", creatorIds);
-        for (const b of (biz ?? []) as Array<{ creator_id: string; kash_type: string | null }>) {
-          if (b.kash_type) kashByCreator.set(b.creator_id, b.kash_type);
-        }
-      }
-      const KASH_MANAGER: Record<string, string> = { Plus: "Carolina (Kash Plus)", Massive: "Fabiana (Kash Massive)" };
+      // 5) Atribución por manager: la línea es COMPARTIDA → se atribuye por la MANAGER
+      // ASIGNADA en la ficha de la creadora (creators.assigned_manager_profile_id →
+      // profiles.full_name). La regla vieja por cuenta Kash (Plus=Carolina /
+      // Massive=Fabiana) se retiró el 07/09/26: el manager se elige en el perfil.
       const mgrIds = [...new Set(((creators ?? []) as CreatorRow[]).map((c) => c.assigned_manager_profile_id).filter((x): x is string => Boolean(x)))];
       const mgrName = new Map<string, string>();
       if (mgrIds.length) {
         const { data: profs } = await ctx.sb.from("profiles").select("id, full_name").in("id", mgrIds);
         for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) mgrName.set(p.id, p.full_name ?? "?");
       }
-      // El fallback por perfil debe caer en el MISMO bucket que el de kash_type (si no,
-      // "Fabiana Durán" y "Fabiana (Kash Massive)" salen como dos grupos distintos).
-      const groupLabel = (fullName: string): string => {
-        const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-        if (first === "carolina") return KASH_MANAGER.Plus;
-        if (first === "fabiana") return KASH_MANAGER.Massive;
-        return fullName;
-      };
 
       const byMgr = new Map<string, Array<{ creadora: string; instagram: string | null; mensajes: number; desde_maven: number; desde_telefono: number; ultimo_mensaje: string }>>();
       const sinAtribuir: Array<{ contacto: string; mensajes: number }> = [];
@@ -583,9 +566,9 @@ export const managersTools: AgentTool[] = [
         totalMsgs += agg.mensajes;
         const cr = matchCreator(ct.phone_e164);
         if (cr) {
-          const kash = kashByCreator.get(cr.id);
-          const grupo = (kash && KASH_MANAGER[kash])
-            || (cr.assigned_manager_profile_id ? groupLabel(mgrName.get(cr.assigned_manager_profile_id) ?? "(manager desconocida)") : "(sin manager)");
+          const grupo = cr.assigned_manager_profile_id
+            ? (mgrName.get(cr.assigned_manager_profile_id) ?? "(manager desconocida)")
+            : "(sin manager)";
           if (!byMgr.has(grupo)) byMgr.set(grupo, []);
           byMgr.get(grupo)!.push({
             creadora: cr.artistic_name || cr.name || "(sin nombre)",
@@ -620,7 +603,7 @@ export const managersTools: AgentTool[] = [
         por_manager: porManager,
         sin_atribuir: { contactos: sinAtribuir.length, detalle: sinAtribuir.sort((a, b) => b.mensajes - a.mensajes) },
         nota: "Contacto = creadora DISTINTA con ≥1 mensaje saliente ese día por la línea de Managers (Maven + teléfono/externos; fallidos no cuentan). " +
-          "Atribución por cuenta Kash de la creadora (Plus=Carolina, Massive=Fabiana; la línea es compartida, no se sabe quién tipeó). " +
+          "Atribución por la manager asignada en la ficha de cada creadora (la línea es compartida, no se sabe quién tipeó). " +
           "La línea se conectó a Maven el 2026-07-16: días anteriores no tienen historial.",
       };
     },
@@ -633,8 +616,8 @@ export const managersTools: AgentTool[] = [
       "get_manager_contact_activity (cuántas contactó HOY). Por manager: cuántas + lista (nombre, IG, días sin " +
       "contacto, último); dias_sin_contacto='sin registro' = ningún saliente POR LA LÍNEA DE MANAGERS en el " +
       "historial visible (NO prueba abandono: pudo ser otra línea o antes del 16/07). Matching por TELÉFONO, " +
-      "robusto (últimos 10 dígitos, sirve México 521/52); atribución por manager asignada " +
-      "(Plus=Carolina, Massive=Fabiana). silent_days cambia el umbral (default 3); manager_name filtra. " +
+      "robusto (últimos 10 dígitos, sirve México 521/52); atribución por la manager asignada " +
+      "en la ficha de cada creadora. silent_days cambia el umbral (default 3); manager_name filtra. " +
       "⚠️ NUNCA respondas esto de memoria ni lo deduzcas del growth feed (promo ≠ contacto): llama ESTA tool. " +
       "CAVEAT: solo ve las líneas 'manager'.",
     input_schema: {

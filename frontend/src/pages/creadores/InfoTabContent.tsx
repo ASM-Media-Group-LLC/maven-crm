@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
@@ -38,25 +38,35 @@ const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-s
   paused: "secondary-soft",
 };
 
-const countryOptions = [
-  "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Costa Rica", "Cuba",
-  "Ecuador", "El Salvador", "España", "Estados Unidos", "Guatemala", "Honduras",
-  "México", "Nicaragua", "Panamá", "Paraguay", "Perú", "Puerto Rico",
-  "República Dominicana", "Uruguay", "Venezuela",
-];
-
-// Fallback estático — la fuente real son scouter_companies (canónica).
-const AGENCY_OPTIONS_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "Content Protector", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
-const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
-const managerOptions = ["Full Management", "Hybrid", "Basic"];
-
+// País → código ISO. La lista del select sale de acá (ordenada alfabéticamente).
 const countryToCode: Record<string, string> = {
-  Argentina: "AR", Bolivia: "BO", Brasil: "BR", Chile: "CL", Colombia: "CO",
-  "Costa Rica": "CR", Cuba: "CU", Ecuador: "EC", "El Salvador": "SV",
-  España: "ES", "Estados Unidos": "US", Guatemala: "GT", Honduras: "HN",
-  México: "MX", Nicaragua: "NI", Panamá: "PA", Paraguay: "PY", Perú: "PE",
-  "Puerto Rico": "PR", "República Dominicana": "DO", Uruguay: "UY", Venezuela: "VE",
+  Alemania: "DE", Andorra: "AD", Argentina: "AR", Australia: "AU", Austria: "AT",
+  Bahamas: "BS", Barbados: "BB", Bélgica: "BE", Belice: "BZ", Bolivia: "BO",
+  Brasil: "BR", Bulgaria: "BG", Canadá: "CA", Chile: "CL", China: "CN",
+  Colombia: "CO", "Corea del Sur": "KR", "Costa Rica": "CR", Croacia: "HR",
+  Cuba: "CU", Dinamarca: "DK", Ecuador: "EC", Egipto: "EG",
+  "El Salvador": "SV", "Emiratos Árabes Unidos": "AE", Eslovaquia: "SK",
+  Eslovenia: "SI", España: "ES", "Estados Unidos": "US", Estonia: "EE",
+  Filipinas: "PH", Finlandia: "FI", Francia: "FR", Grecia: "GR",
+  Guatemala: "GT", Guyana: "GY", Haití: "HT", Honduras: "HN", Hungría: "HU",
+  India: "IN", Indonesia: "ID", Irlanda: "IE", Islandia: "IS", Israel: "IL",
+  Italia: "IT", Jamaica: "JM", Japón: "JP", Letonia: "LV", Lituania: "LT",
+  Luxemburgo: "LU", Malasia: "MY", Malta: "MT", Marruecos: "MA", México: "MX",
+  Nicaragua: "NI", Noruega: "NO", "Nueva Zelanda": "NZ", "Países Bajos": "NL",
+  Panamá: "PA", Paraguay: "PY", Perú: "PE", Polonia: "PL", Portugal: "PT",
+  "Puerto Rico": "PR", "Reino Unido": "GB", "República Checa": "CZ",
+  "República Dominicana": "DO", Rumania: "RO", Rusia: "RU", Singapur: "SG",
+  Sudáfrica: "ZA", Suecia: "SE", Suiza: "CH", Surinam: "SR", Tailandia: "TH",
+  "Trinidad y Tobago": "TT", Turquía: "TR", Ucrania: "UA", Uruguay: "UY",
+  Venezuela: "VE", Vietnam: "VN",
 };
+const countryOptions = Object.keys(countryToCode).sort((a, b) => a.localeCompare(b, "es"));
+
+// Agencias: lista fija pedida por dirección (07/09). Kash Plus/Massive son las
+// cuentas BLU; Unlok la casa. El manager de la creadora es un campo APARTE.
+const AGENCY_OPTIONS = ["Kash Massive", "Kash Plus", "Unlok"];
+const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
+const managerTypeOptions = ["Full Management", "Hybrid", "Basic"];
 
 const getFlagEmoji = (code: string | null) => {
   if (!code) return "";
@@ -67,6 +77,9 @@ interface EditData {
   assigned_agency: string;
   category: string;
   manager_type: string;
+  // Manager PERSONA (profiles.id de alguien con rol manager). Es la fuente de
+  // verdad de "quién maneja a esta modelo" — el bot y los RPCs agrupan por acá.
+  manager_profile_id: string;
   country: string;
   city: string;
   birth_date: string;
@@ -96,11 +109,22 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
-  // Compañías canónicas — fuente única scouter_companies.
+  // scouter_companies solo para resolver company_id si el nombre matchea.
   const { data: scouterCompanies = [] } = useScouterCompanies();
-  const agencyOptions = scouterCompanies.length > 0
-    ? scouterCompanies.map((sc) => sc.name)
-    : AGENCY_OPTIONS_FALLBACK;
+  // Personas con rol manager — vía RPC SECURITY DEFINER (RLS de user_roles solo
+  // deja leer la fila propia; mismo patrón que get_assignable_closers).
+  const { data: managers = [] } = useQuery({
+    queryKey: ["assignable-managers"],
+    queryFn: async (): Promise<Array<{ id: string; full_name: string | null }>> => {
+      const { data, error } = await supabase.rpc("get_assignable_managers" as any);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; full_name: string | null }>;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const managerName = c.assigned_manager_profile_id
+    ? (managers.find((m) => m.id === c.assigned_manager_profile_id)?.full_name ?? "(fuera del rol manager)")
+    : null;
   // Categorías canónicas — fuente única model_categories.
   const { data: modelCats = [] } = useModelCategories();
   const categoryOptions = modelCats.length > 0
@@ -113,6 +137,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
     assigned_agency: "",
     category: "",
     manager_type: "",
+    manager_profile_id: "",
     country: "",
     city: "",
     birth_date: "",
@@ -127,6 +152,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
       assigned_agency: (biz as any)?.company?.name ?? biz?.assigned_agency ?? "",
       category: c.category ?? "",
       manager_type: biz?.manager_type ?? "",
+      manager_profile_id: c.assigned_manager_profile_id ?? "",
       country: c.country ?? "",
       city: c.city ?? "",
       birth_date: c.birth_date ?? "",
@@ -153,7 +179,12 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           city: editData.city || null,
           birth_date: editData.birth_date || null,
           internal_notes: editData.internal_notes || null,
-        })
+          // Manager persona: se escriben LAS DOS columnas (profile_id es la
+          // canónica del bot/RPCs; assigned_manager_id la usan ManagerDashboard
+          // y ventas_tops — mantenerlas iguales evita el split-brain).
+          assigned_manager_profile_id: editData.manager_profile_id || null,
+          assigned_manager_id: editData.manager_profile_id || null,
+        } as any)
         .eq("id", creatorId);
 
       if (biz?.id) {
@@ -212,7 +243,11 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
             <Select value={editData.assigned_agency} onValueChange={(v) => updateField("assigned_agency", v)}>
               <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
-                {agencyOptions.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {/* Un valor guardado fuera de la lista fija sigue visible/elegible. */}
+                {(editData.assigned_agency && !AGENCY_OPTIONS.includes(editData.assigned_agency)
+                  ? [editData.assigned_agency, ...AGENCY_OPTIONS]
+                  : AGENCY_OPTIONS
+                ).map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
           </EditField>
@@ -252,18 +287,37 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           c.registration_date ? format(new Date(c.registration_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
         } />
 
-        {/* Manager */}
+        {/* Manager (PERSONA con rol manager — fuente de verdad de quién maneja
+            a esta modelo; el bot de WhatsApp y los reportes agrupan por acá) */}
         {isEditing ? (
           <EditField label="Manager">
-            <Select value={editData.manager_type} onValueChange={(v) => updateField("manager_type", v)}>
+            <Select
+              value={editData.manager_profile_id || "__none__"}
+              onValueChange={(v) => updateField("manager_profile_id", v === "__none__" ? "" : v)}
+            >
               <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
-                {managerOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                <SelectItem value="__none__">Sin manager</SelectItem>
+                {managers.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>)}
               </SelectContent>
             </Select>
           </EditField>
         ) : (
-          <InfoField label="Manager" value={biz?.manager_type} />
+          <InfoField label="Manager" value={managerName} />
+        )}
+
+        {/* Tipo de management (Full/Hybrid/Basic — concepto aparte del manager persona) */}
+        {isEditing ? (
+          <EditField label="Tipo de management">
+            <Select value={editData.manager_type} onValueChange={(v) => updateField("manager_type", v)}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                {managerTypeOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </EditField>
+        ) : (
+          <InfoField label="Tipo de management" value={biz?.manager_type} />
         )}
 
         {/* País */}
