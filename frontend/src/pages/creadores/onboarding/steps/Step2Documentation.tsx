@@ -133,12 +133,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
             autoguardado todavía no creó la fila, se avisa en vez de mostrar un
             botón que iba a fallar con un error críptico. */}
         {creatorId ? (
-          <VideoOnboarding
-            creatorId={creatorId}
-            videoKey={null}
-            puedeEditar
-            compacto
-          />
+          <VideoOnboarding creatorId={creatorId} puedeEditar compacto />
         ) : (
           <div className="flex items-start gap-2 rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
             <Clapperboard className="mt-0.5 h-4 w-4 shrink-0" />

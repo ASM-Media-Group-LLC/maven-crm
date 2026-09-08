@@ -45,8 +45,6 @@ interface OperacionesTabContentProps {
     usuarios_vip?: string | null;
     estrategia_recuperacion?: string | null;
     restricciones_seguridad?: string | null;
-    onboarding_video_key?: string | null;
-    onboarding_video_at?: string | null;
   };
   creatorId: string;
 }
@@ -178,13 +176,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
       {/* El video va PRIMERO: si existe, es la forma más rápida de aprender su
           voz, y leer treinta campos de texto antes de verlo es al revés.
           Subir/reemplazar aparece solo en modo edición, como el resto del tab. */}
-      <VideoOnboarding
-        creatorId={creatorId}
-        videoKey={creator.onboarding_video_key ?? null}
-        videoAt={creator.onboarding_video_at ?? null}
-        puedeEditar={isEditing}
-        onCambio={() => { void queryClient.invalidateQueries({ queryKey: ["creator", creatorId] }); }}
-      />
+      <VideoOnboarding creatorId={creatorId} puedeEditar={isEditing} />
 
       {/* Editar/Guardar — mismo patrón que el tab Información */}
       <div className="flex items-center justify-end -mb-2">

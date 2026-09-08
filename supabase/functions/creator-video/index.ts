@@ -1,6 +1,10 @@
 // creator-video — video de onboarding de la creadora, guardado en Cloudflare R2.
 //
-// Tres acciones, todas devuelven URLs FIRMADAS que vencen:
+// Hasta 3 videos por creadora. El tope lo hace cumplir un TRIGGER en la base,
+// no solo esta función: la tabla es escribible por RLS y una regla que vive en
+// un único camino de escritura no es una regla.
+//
+// Cuatro acciones, las de lectura devuelven URLs FIRMADAS que vencen:
 //   upload_url — presigned PUT para que el NAVEGADOR suba directo a R2
 //   view_url   — presigned GET para reproducirlo
 //   delete     — borra el objeto y limpia la fila
@@ -82,10 +86,20 @@ Deno.serve(async (req) => {
 
     const { data: creadora } = await admin
       .from("creators")
-      .select("id, onboarding_video_key")
+      .select("id")
       .eq("id", creator_id)
       .maybeSingle();
     if (!creadora) return json(req, { error: "esa creadora no existe" }, 404);
+
+    /** Los videos de esta creadora, del más viejo al más nuevo. */
+    const listar = async () => {
+      const { data } = await admin
+        .from("creator_onboarding_videos")
+        .select("id, storage_key, titulo, size_bytes, created_at, uploaded_by")
+        .eq("creator_id", creator_id)
+        .order("created_at", { ascending: true });
+      return data ?? [];
+    };
 
     // ── Subir ───────────────────────────────────────────────────────────
     if (action === "upload_url") {
@@ -101,62 +115,63 @@ Deno.serve(async (req) => {
         return json(req, { error: "el video supera el límite de 2 GB" }, 413);
       }
 
-      // Llave nueva SIEMPRE, aunque ya hubiera video: si se reusara la misma,
-      // el navegador y el CDN seguirían mostrando el anterior desde su caché.
+      // Se corta ACÁ si ya hay 3, antes de firmar: dejar subir 800 MB para
+      // rechazarlo al confirmar sería cruel.
+      if ((await listar()).length >= 3) {
+        return json(req, { error: "Esta creadora ya tiene 3 videos. Borra uno antes de subir otro." }, 409);
+      }
+
+      // Llave nueva SIEMPRE: si se reusara una, el navegador y el CDN
+      // seguirían mostrando el anterior desde su caché.
       const llave = `${creator_id}/${crypto.randomUUID()}.${ext}`;
       return json(req, { url: await firmar("PUT", llave, 3600), key: llave });
     }
 
     // ── Confirmar (después de que el PUT terminó) ───────────────────────
     if (action === "confirm") {
-      const { key, size_bytes } = body as { key?: string; size_bytes?: number };
+      const { key, size_bytes, titulo } = body as { key?: string; size_bytes?: number; titulo?: string };
       // La llave TIENE que ser de esta creadora: si no, alguien podría
-      // apuntar la fila de una creadora al video de otra.
+      // colgarle a una creadora el video de otra.
       if (!key || !key.startsWith(`${creator_id}/`)) {
         return json(req, { error: "esa llave no es de esta creadora" }, 400);
       }
-      const anterior = creadora.onboarding_video_key as string | null;
-      await admin.from("creators").update({
-        onboarding_video_key: key,
-        onboarding_video_at: new Date().toISOString(),
-        onboarding_video_bytes: size_bytes ?? null,
-        onboarding_video_by: user.id,
-      }).eq("id", creator_id);
-
-      // El video viejo se borra DESPUÉS de que la fila apunta al nuevo: al
-      // revés, un fallo entre medio deja a la creadora sin video.
-      if (anterior && anterior !== key) {
-        try {
-          const { cliente, base } = r2();
-          await cliente.fetch(`${base}/${anterior}`, { method: "DELETE" });
-        } catch { /* queda huérfano; es preferible a perder el nuevo */ }
+      const { error } = await admin.from("creator_onboarding_videos").insert({
+        creator_id,
+        storage_key: key,
+        titulo: titulo?.trim() || null,
+        size_bytes: size_bytes ?? null,
+        uploaded_by: user.id,
+      });
+      if (error) {
+        // El trigger del tope llega hasta acá con su propio mensaje: se pasa
+        // tal cual, que es más útil que un "error al guardar".
+        return json(req, { error: error.message }, 409);
       }
       return json(req, { ok: true });
     }
 
     // ── Ver ─────────────────────────────────────────────────────────────
     if (action === "view_url") {
-      const llave = creadora.onboarding_video_key as string | null;
-      if (!llave) return json(req, { error: "esta creadora todavía no tiene video" }, 404);
+      const { video_id } = body as { video_id?: string };
+      const fila = (await listar()).find((v) => v.id === video_id);
+      if (!fila) return json(req, { error: "ese video no existe" }, 404);
       // 2 h: alcanza para mirarlo entero sin que el link sirva para compartir.
-      return json(req, { url: await firmar("GET", llave, 7200) });
+      return json(req, { url: await firmar("GET", fila.storage_key as string, 7200) });
     }
 
     // ── Borrar ──────────────────────────────────────────────────────────
     if (action === "delete") {
-      const llave = creadora.onboarding_video_key as string | null;
-      await admin.from("creators").update({
-        onboarding_video_key: null,
-        onboarding_video_at: null,
-        onboarding_video_bytes: null,
-        onboarding_video_by: null,
-      }).eq("id", creator_id);
-      if (llave) {
-        try {
-          const { cliente, base } = r2();
-          await cliente.fetch(`${base}/${llave}`, { method: "DELETE" });
-        } catch { /* la fila ya quedó limpia */ }
-      }
+      const { video_id } = body as { video_id?: string };
+      const fila = (await listar()).find((v) => v.id === video_id);
+      if (!fila) return json(req, { error: "ese video no existe" }, 404);
+
+      // Primero la fila y después el objeto: al revés, si falla el borrado en
+      // R2 la ficha queda apuntando a un video que ya no se puede reproducir.
+      await admin.from("creator_onboarding_videos").delete().eq("id", video_id);
+      try {
+        const { cliente, base } = r2();
+        await cliente.fetch(`${base}/${fila.storage_key}`, { method: "DELETE" });
+      } catch { /* queda huérfano en R2; la ficha ya está limpia */ }
       return json(req, { ok: true });
     }
 
