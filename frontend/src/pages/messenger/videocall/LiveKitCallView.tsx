@@ -12,6 +12,7 @@ import ParticipantTile from "./ParticipantTile";
 import RecordingControl from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
+import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
 import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
@@ -143,6 +144,35 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     };
   }, [incomingAudioMuted, lk, lk.connectionState]);
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
+
+  // ── Pausa de Cowork: apagar todo al pausar, reencender al volver ─────────
+  // Pedido del jefe (08/09): que al marcar pausa "la cámara y todo se cancele".
+  // La orden llega por lib/ordenesDePausa desde la página de Cowork. Se recuerda
+  // qué estaba encendido para devolverlo igual. La pantalla compartida no se
+  // puede reabrir sola (el navegador exige un clic): queda pendiente y se
+  // muestra un botón.
+  const antesDePausaRef = useRef<{ mic: boolean; cam: boolean; pantalla: boolean } | null>(null);
+  const [pantallaPendiente, setPantallaPendiente] = useState(false);
+  const lkRef = useRef(lk);
+  lkRef.current = lk;
+  useEffect(() => suscribirOrdenesDePausa((orden) => {
+    const l = lkRef.current;
+    if (orden === "apagar") {
+      antesDePausaRef.current = { mic: l.isMicOn, cam: l.isCamOn, pantalla: l.isScreenSharing };
+      if (l.isScreenSharing) void l.toggleScreenShare();
+      if (l.isCamOn) void l.toggleCam();
+      if (l.isMicOn) void l.toggleMic();
+      setPantallaPendiente(false);
+      return;
+    }
+    const antes = antesDePausaRef.current;
+    antesDePausaRef.current = null;
+    if (!antes) return;
+    if (antes.cam && !l.isCamOn) void l.toggleCam();
+    if (antes.mic && !l.isMicOn) void l.toggleMic();
+    if (antes.pantalla && !l.isScreenSharing) setPantallaPendiente(true);
+  }), []);
+  useEffect(() => { if (lk.isScreenSharing) setPantallaPendiente(false); }, [lk.isScreenSharing]);
 
   // PiP automático estilo Google Meet: al cambiar de pestaña/ventana, la llamada
   // aparece en la ventanita flotante del navegador (pantalla compartida o hablante).
@@ -522,6 +552,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           reconecta solo a propósito: si lo hiciera, patearía a la otra pestaña,
           que volvería a patear a esta, y así para siempre. Se le muestra qué
           pasó y se le deja elegir dónde quedarse. */}
+      {pantallaPendiente && (
+        <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-primary/15 text-foreground text-xs font-medium text-center">
+          <span>Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.</span>
+          <button
+            type="button"
+            onClick={() => { void lk.toggleScreenShare(); setPantallaPendiente(false); }}
+            className="rounded-full bg-primary px-3 py-1 text-primary-foreground font-semibold hover:bg-primary/90"
+          >
+            Volver a compartir pantalla
+          </button>
+          <button type="button" onClick={() => setPantallaPendiente(false)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
+            Ahora no
+          </button>
+        </div>
+      )}
       {lk.otraPestanaTomoLaSesion && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <Copy className="h-3.5 w-3.5 shrink-0" />
