@@ -34,6 +34,7 @@ import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaP
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
+import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
@@ -316,6 +317,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       etiqueta: kind === "break" ? "Break" : "Baño",
       excedida: cuenta.excedida,
       cuenta,
+    };
+  };
+  // Si TODOS los que están en la sala marcaron pausa, la miniatura se apaga y
+  // muestra el panel de pausa (mock aprobado por Jhon, 08/09). Con una sola
+  // persona por sala —el caso normal— es "esa persona está en pausa".
+  const pausaDeLaSala = (uids: string[]): PausaDeSala | null => {
+    if (!uids.length) return null;
+    const pausas = uids.map((uid) => ({ uid, p: pausaDe(uid) }));
+    if (pausas.some((x) => !x.p)) return null;
+    // La más larga manda en el panel; con una persona es la única.
+    const { uid, p } = pausas.reduce((a, b) => (b.p!.segundos > a.p!.segundos ? b : a));
+    const st = mediaStates[uid];
+    return {
+      kind: p!.kind === "break" ? "break" : "bano", segundos: p!.segundos, desde: (st?.breakStartedAt as number | null) ?? null,
+      limiteMin: limitesPausa[p!.kind] ?? null,
+      consumidoSeg: p!.kind === "bano" ? (st?.banoConsumidoSeg ?? 0) : 0,
+      excedida: p!.excedida,
     };
   };
   // Barra lateral plegada, como el menu de Maven. Se recuerda porque es una
@@ -1635,7 +1653,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       })()}
                       {/* Estado de pantalla compartida de la sala, con quién comparte. */}
                       <div className="mt-1 flex items-center gap-1.5">
-                        {sharers.length > 0 ? (
+                        {pausaDeLaSala(participants.map((p) => p.user_id)) ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Coffee className="h-3 w-3 shrink-0" /> En pausa · cámara y pantalla apagadas
+                          </span>
+                        ) : sharers.length > 0 ? (
                           <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium">
                             <Monitor className="h-3 w-3 shrink-0" /> Compartiendo: {sharers.join(", ")}
                           </span>
@@ -1707,6 +1729,28 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 })}
                               </div>
                               {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
+                              <CoworkRoomMonitor
+                                roomId={room.id}
+                                roomName={room.name}
+                                issueToken={cowork.issueLiveKitToken}
+                                showVideo={false}
+                                hearOn={hearFor(room.id)}
+                                broadcastOn={broadcastFor(room.id)}
+                                micBaseTrack={micBaseTrack}
+                                camOn={camFor(room.id)}
+                                camBaseTrack={camBaseTrack}
+                                screenOn={screenFor(room.id)}
+                                screenBaseTrack={screenBaseTrack}
+                                enabled={activeRoomId !== room.id}
+                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
+                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
+                              />
+                            </>
+                          ) : pausaDeLaSala(participants.map((p) => p.user_id)) ? (
+                            <>
+                              <SalaEnPausa pausa={pausaDeLaSala(participants.map((p) => p.user_id))!} />
+                              {/* El monitor sigue conectado SOLO para el audio: el
+                                  supervisor puede hablarle a la sala cuando vuelva. */}
                               <CoworkRoomMonitor
                                 roomId={room.id}
                                 roomName={room.name}

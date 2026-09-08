@@ -13,6 +13,7 @@ import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMedia
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
 import RelojCowork from "./RelojCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
+import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePausa";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
@@ -288,6 +289,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const cerrando = !!breakStartedAt;
     try {
       const r = await cowork.setBreak?.(cerrando ? null : kind);
+      // La llamada apaga cámara, micro y pantalla al pausar, y reencende al
+      // volver (la pantalla pide un clic: la llamada muestra el botón).
+      if (cerrando) pedirReanudarTrasPausa(); else pedirApagarPorPausa();
       const inicio = cerrando ? null : (r?.startedAt ?? Date.now());
       setBreakStartedAt(inicio);
       setBreakKind(cerrando ? null : kind);
