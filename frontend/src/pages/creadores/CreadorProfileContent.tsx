@@ -163,7 +163,9 @@ const CreadorProfileContent = () => {
     ? getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null)
     : "";
   
-  const realAge = c.birth_date ? computeAge(c.birth_date) : c.age;
+  // Si la fecha de nacimiento es implausible (hay 18 en prod con años como
+  // 2025 o 275760), computeAge da null y se usa la edad cargada a mano.
+  const realAge = (c.birth_date ? computeAge(c.birth_date) : null) ?? c.age;
   const displayAge = showRealAge ? realAge : ((c as any).edad_mostrar ?? realAge);
   const birthdayDays = showRealAge && c.birth_date ? getDaysUntilBirthday(c.birth_date) : null;
 
