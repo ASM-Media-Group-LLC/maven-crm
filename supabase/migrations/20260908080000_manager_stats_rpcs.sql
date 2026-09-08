@@ -79,7 +79,6 @@ begin
            right(regexp_replace(coalesce(c.phone_e164, c.whatsapp_number, c.phone, ''),'\D','','g'),10) as d10
     from public.creators c
     where c.status = 'active' and c.assigned_manager_profile_id is not null
-      and (p_tenant is null or c.tenant_id = p_tenant)
   )
   select m.id, m.cname, m.ig, m.mgr,
          (length(m.d10) = 10) as phone_ok,
@@ -137,7 +136,6 @@ begin
            c.assigned_manager_profile_id as mgr
     from public.creators c
     where c.status = 'active' and c.assigned_manager_profile_id is not null
-      and (p_tenant is null or c.tenant_id = p_tenant)
   ),
   cur as (
     select e.creator_id,
