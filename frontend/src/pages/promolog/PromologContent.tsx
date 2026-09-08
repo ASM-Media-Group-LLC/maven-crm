@@ -79,7 +79,7 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable, { type SortKey, sortPromologEntries } from "./PromologTable";
 import { computePromoStreaks } from "./promoStreaks";
 import PromologGrid from "./PromologGrid";
-import PromologAgentDetailView from "./PromologAgentDetailView";
+import PromologManagersView from "./PromologManagersView";
 import PromologStoryGallery from "./PromologStoryGallery";
 import { collectDayStories } from "./storyEvidence";
 import PromologPerformanceView from "./PromologPerformanceView";
@@ -113,7 +113,6 @@ const contactTypeOptions = [
 const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" =>
   result === "Sí" ? "success-soft" : "destructive-soft";
 
-// agentsData is now computed dynamically via useMemo inside the component
 
 // Subtabs visibles dentro de Promolog. Antes había Promos/Agentes/
 // Campañas/Rendimiento; el spec nuevo dejó Dashboard/Promos/Agentes
@@ -122,18 +121,13 @@ const tabItems = [
   { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "calendario" as const, label: "Calendario", icon: CalendarIcon },
-  { id: "agentes" as const, label: "Agentes", icon: Users },
+  { id: "agentes" as const, label: "Managers", icon: Users },
   { id: "promobot" as const, label: "Promobot", icon: Bot },
   { id: "blu" as const, label: "Vincular BLU", icon: Link2 },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
-const getAgentWeekDays = (offset: number): Date[] => {
-  const now = new Date();
-  const monday = startOfWeek(addDays(now, offset * 7), { weekStartsOn: 1 });
-  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-};
 
 // Set de fechas-calendario "YYYY-MM-DD" del rango [from..to] (la fecha que el user
 // VE en el picker, sin convertir de zona). Se usa para recortar las entries al día
@@ -469,8 +463,6 @@ const PromologContent = () => {
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
   // si quiere ver el listado, "Agentes" para el detalle por agente.
   const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "calendario" | "agentes" | "promobot" | "blu">("dashboard");
-  const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
-  const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
 
   const [selectedCreator, setSelectedCreator] = useState("");
@@ -495,7 +487,6 @@ const PromologContent = () => {
   const [creatorModalCollapsed, setCreatorModalCollapsed] = useState<Set<string>>(new Set());
   const [entryView, setEntryView] = useState<"list" | "grid">("list");
 
-  const [searchAgent, setSearchAgent] = useState("");
   const [searchCampaign, setSearchCampaign] = useState("");
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
   const [campDateFrom, setCampDateFrom] = useState<Date | undefined>(undefined);
@@ -595,7 +586,6 @@ const PromologContent = () => {
   const [assignAgentTarget, setAssignAgentTarget] = useState<PromologEntry | null>(null);
   const [assignAgentSelected, setAssignAgentSelected] = useState<string>("");
   const [assignAgentSearch, setAssignAgentSearch] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
 
   // Campaign actions state
   const [viewCampaign, setViewCampaign] = useState<any>(null);
@@ -606,93 +596,6 @@ const PromologContent = () => {
   const [editCampGoalWeekly, setEditCampGoalWeekly] = useState("");
   const [editCampStatus, setEditCampStatus] = useState("");
 
-  // Fetch all agent IDs via RPC to avoid limit(200) bias
-  const { data: allAgentIds = [] } = useQuery({
-    queryKey: ["promolog-distinct-agents"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_distinct_promolog_agents");
-      if (error) throw error;
-      return (data || []).map((r: any) => r.agent_id as string);
-    },
-  });
-
-  // Fetch agent stats separately without limit. Usa el MISMO date-range global
-  // del header (dateFrom/dateTo) que Dashboard y Promos — el subtab Agentes ya
-  // no tiene su propio selector de fechas.
-  const { data: agentEntries = [] } = useQuery({
-    queryKey: ["promolog-agent-entries", dateFrom?.toISOString(), dateTo?.toISOString()],
-    queryFn: async () => {
-      let query = supabase
-        .from("promolog_entries")
-        .select("reviewed_by, created_by, promoted, network, date")
-        .order("date", { ascending: false });
-
-      if (dateFrom) {
-        query = query.gte("date", dateFrom.toISOString().split("T")[0]);
-      }
-      if (dateTo) {
-        const toEnd = new Date(dateTo);
-        toEnd.setDate(toEnd.getDate() + 1);
-        query = query.lt("date", toEnd.toISOString().split("T")[0]);
-      }
-
-      // Fetch all pages
-      const allData: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      while (true) {
-        const { data, error } = await query.range(from, from + pageSize - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        allData.push(...data);
-        if (data.length < pageSize) break;
-        from += pageSize;
-      }
-      return allData;
-    },
-    enabled: allAgentIds.length > 0,
-  });
-
-  // Dynamic agents data from full dataset.
-  // SOLO personas con rol manager (pedido de Jhon 08/09): antes salía cualquiera
-  // que hubiera revisado/creado una entry (Jhon, closers, etc.).
-  const managerIdSet = useMemo(() => new Set(assignableManagers.map((m) => m.id)), [assignableManagers]);
-  const agentsData = useMemo(() => {
-    const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
-
-    // Initialize all known agents
-    for (const agentId of allAgentIds) {
-      if (profilesMap[agentId] && managerIdSet.has(agentId)) {
-        agentMap.set(agentId, { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} });
-      }
-    }
-
-    for (const pe of agentEntries) {
-      const agentId = pe.reviewed_by || pe.created_by;
-      if (!agentId || !profilesMap[agentId] || !managerIdSet.has(agentId)) continue;
-
-      let agent = agentMap.get(agentId);
-      if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
-      agent.tickets++;
-      if (pe.promoted === "true") agent.si++;
-      else if (pe.promoted === "partial") agent.parcial++;
-      else if (pe.promoted === "false") agent.no++;
-      const net = (pe.network || "otro").toLowerCase();
-      const netLabel = net === "instagram" ? "IG" : net === "tiktok" ? "TK" : net === "x" ? "X" : net === "telegram" ? "TG" : "Otro";
-      agent.networks[netLabel] = (agent.networks[netLabel] || 0) + 1;
-      agentMap.set(agentId, agent);
-    }
-
-    return Array.from(agentMap.entries()).map(([id, d]) => ({
-      id,
-      name: profilesMap[id] || id,
-      tickets: d.tickets,
-      si: d.si,
-      parcial: d.parcial,
-      no: d.no,
-      badges: Object.entries(d.networks).map(([label, value]) => ({ label, value })),
-    }));
-  }, [allAgentIds, agentEntries, profilesMap, managerIdSet]);
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
@@ -987,16 +890,6 @@ const PromologContent = () => {
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
 
-  // If agent detail is selected, render that view
-  if (selectedAgent) {
-    return (
-      <PromologAgentDetailView
-        agent={selectedAgent}
-        onBack={() => setSelectedAgent(null)}
-      />
-    );
-  }
-
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header global — título a la izquierda, presets (Ayer/Hoy/...) +
@@ -1179,166 +1072,9 @@ const PromologContent = () => {
         </>
       )}
 
-      {/* Agentes tab */}
+      {/* Managers tab (ex Agentes): promo + calidad, contacto WA, usuarios nuevos BLU */}
       {activeTab === "agentes" && (
-        <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
-          <AnalyticsSectionBanner
-            title="Rendimiento de Agentes"
-            subtitle={
-              agentesView === "calendar"
-                ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
-                : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")
-            }
-            count={agentsData.length}
-            countLabel="Agentes Activos"
-          />
-
-          {/* Calendar view or agent cards */}
-          {agentesView === "calendar" ? (() => {
-            const weekDays = getAgentWeekDays(agentWeekOffset);
-            const entriesInDay = (agentId: string, day: Date) =>
-              promologEntries.filter(pe =>
-                (pe.reviewed_by === agentId || pe.created_by === agentId) &&
-                pe.promoted === "true" &&
-                isSameDay(new Date(pe.date), day)
-              ).length;
-            const colTotals = weekDays.map(day =>
-              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.id, day), 0)
-            );
-            const grandTotal = colTotals.reduce((a, b) => a + b, 0);
-            return (
-              <Card>
-                <CardContent className="pt-4 px-4 pb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w - 1)}>
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
-                    </Button>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w + 1)} disabled={agentWeekOffset >= 0}>
-                      Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[140px]">Agente</TableHead>
-                          {weekDays.map((day, i) => (
-                            <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
-                              {DAY_LABELS_ES[i]} {format(day, "d")}
-                            </TableHead>
-                          ))}
-                          <TableHead className="text-center font-semibold">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {agentsData.map((agent) => {
-                          const dayCounts = weekDays.map(day => entriesInDay(agent.id, day));
-                          const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
-                          return (
-                            <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
-                              <TableCell className="font-medium text-sm">{agent.name}</TableCell>
-                              {dayCounts.map((cnt, i) => (
-                                <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
-                                  {isFuture(startOfDay(weekDays[i])) || cnt === 0 ? "—" : cnt}
-                                </TableCell>
-                              ))}
-                              <TableCell className="text-center font-semibold">{rowTotal > 0 ? rowTotal : "—"}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                      <tfoot>
-                        <TableRow className="border-t-2 bg-muted/30">
-                          <TableCell className="font-bold text-sm">Total</TableCell>
-                          {colTotals.map((t, i) => (
-                            <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${(t === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
-                              {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
-                            </TableCell>
-                          ))}
-                          <TableCell className="text-center">
-                            <Badge variant="default">{grandTotal}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      </tfoot>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })() : (
-          agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <EmptyState seed="promolog-agentes" title="No hay datos para esta fecha" />
-              </CardContent>
-            </Card>
-          ) : (
-            <DataTableShell
-              currentPage={1}
-              totalPages={1}
-              totalCount={agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length}
-              pageSize={50}
-              onPageChange={() => {}}
-              className="flex-1 min-h-0"
-            >
-              <Table className="min-w-[700px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky top-0 bg-background z-10 min-w-[200px]">Agente</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[70px]">Total</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[60px]">Sí</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[70px]">Parcial</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[60px]">No</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[120px]">Redes</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-right w-[80px]">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => {
-                    const initials = agent.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-                    const successRate = agent.tickets > 0 ? Math.round((agent.si / agent.tickets) * 100) : 0;
-                    return (
-                      <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9">
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold truncate">{agent.name}</p>
-                              <p className="text-xs text-muted-foreground">{successRate}% éxito</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary" className="text-xs">{agent.tickets}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center text-sm font-medium text-success">{agent.si}</TableCell>
-                        <TableCell className="text-center text-sm font-medium text-warning">{agent.parcial}</TableCell>
-                        <TableCell className="text-center text-sm font-medium text-destructive">{agent.no}</TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1 flex-wrap">
-                            {agent.badges.map((b: { label: string; value: number }) => (
-                              <Badge key={b.label} variant="outline" className="text-xs">{b.label} {b.value}</Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setSelectedAgent({ id: agent.id, name: agent.name }); }}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </DataTableShell>
-          ))}
-        </div>
+        <PromologManagersView dateFrom={dateFrom} dateTo={dateTo} creators={creators as any} />
       )}
 
       {/* Creators Selection Modal — sólo creadoras ACTIVAS (las que el
