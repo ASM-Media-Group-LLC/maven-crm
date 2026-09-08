@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -95,6 +95,36 @@ export default function CoworkPage() {
     const t = setInterval(load, 30000);
     return () => { alive = false; clearInterval(t); };
   }, [sessionId, isAdmin, cowork.adminListSessions]);
+
+  // La lista única. Para el admin la base es adminListSessions (todas, con
+  // ocupación en vivo y salas); las suyas se enriquecen con lo que sabe
+  // listMyActiveSessions (última sala, quién la creó). Para el resto, las suyas.
+  const filasActivas = useMemo(() => {
+    type Fila = {
+      id: string; name: string; role: string | null; members: number; createdBy: string | null;
+      hostName: string | null; lastRoomId: string | null; online: number | null; incognito: string[];
+      rooms: Array<{ id: string; name: string; online: number | null }>; admin: AdminSessionRow | null;
+    };
+    const mias = new Map(mySessions.map((m) => [m.id, m]));
+    if (isAdmin && allSessions.length > 0) {
+      return allSessions.map((a): Fila => {
+        const m = mias.get(a.id);
+        return {
+          id: a.id, name: a.name, role: a.my_role ?? m?.role ?? null, members: a.members,
+          createdBy: m?.createdBy ?? null, hostName: a.host_name, lastRoomId: m?.lastRoomId ?? null,
+          online: a.online, incognito: a.incognito, rooms: a.rooms, admin: a,
+        };
+      });
+    }
+    return mySessions.map((m): Fila => {
+      const a = allSessions.find((x) => x.id === m.id);
+      return {
+        id: m.id, name: m.name, role: m.role, members: m.members, createdBy: m.createdBy,
+        hostName: null, lastRoomId: m.lastRoomId, online: a?.online ?? null, incognito: a?.incognito ?? [],
+        rooms: a?.rooms ?? [], admin: a ?? null,
+      };
+    });
+  }, [isAdmin, allSessions, mySessions]);
 
   // Entrar a una sesión ajena: el edge deja a los admin unirse como host sin
   // código. Queda como supervisor de esa sesión (tablero con todas las salas).
@@ -281,127 +311,16 @@ export default function CoworkPage() {
           </div>
         </div>
 
-        {!loadingSessions && mySessions.length > 0 && (
+        {/* UNA sola lista (pedido de Jhon, 08/09): antes había "Tus sesiones" y
+            aparte "Todas las sesiones" solo para admins, y daba la impresión de
+            que faltaban sesiones. Ahora los admins ven TODAS acá, con su rol en
+            cada una; el resto ve las suyas. Las finalizadas van al final. */}
+        {!loadingSessions && filasActivas.length > 0 && (
           <div className="w-full max-w-3xl flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-              Tus sesiones activas
+              Sesiones activas{isAdmin ? ` · ${filasActivas.length}` : ""}
             </h2>
-            {mySessions.map((s) => {
-              // Ocupación en vivo (solo llega para admins; para el resto queda undefined).
-              const viva = allSessions.find((a) => a.id === s.id);
-              return (
-              <div
-                key={s.id}
-                className="flex flex-wrap items-center gap-3 bg-card border border-border rounded-2xl px-4 py-3"
-              >
-                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
-                  <Users2 className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-foreground truncate">{s.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {s.role === "host" ? "Host" : "Participante"} · {s.members} {s.members === 1 ? "miembro" : "miembros"}
-                    {viva?.online != null && (
-                      <span className={viva.online > 0 ? "text-emerald-500 font-medium" : ""}>
-                        {" "}· {viva.online} en línea
-                      </span>
-                    )}
-                    {!!viva?.incognito?.length && (
-                      <span className="text-violet-500" title="Solo los admins ven esto">
-                        {" "}· 🕶 {viva.incognito.join(", ")}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
-                {/* Finalizar apaga la sesión para TODOS: solo quien la creó (o un
-                    admin). Los demás hosts tienen Salir, que se los lleva solo a
-                    ellos. Antes cualquier host veía Finalizar, y CHATTERS KASH se
-                    finalizó cuatro veces en cuatro días por hosts que querían irse. */}
-                {s.role === "host" && (s.createdBy === userId || isAdmin) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive rounded-full"
-                    onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
-                  >
-                    Finalizar
-                  </Button>
-                )}
-                {s.role === "host" && s.createdBy !== userId && !isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-foreground rounded-full gap-1"
-                    title="Salir de esta sesión (sigue para los demás)"
-                    onClick={() => setPorSalir({ id: s.id, name: s.name })}
-                  >
-                    <LogOut className="h-4 w-4" /> Salir
-                  </Button>
-                )}
-                {/* Incógnito también en las sesiones PROPIAS (solo admin): entrar
-                    como host te anuncia en el hub; esto observa sin aparecer. */}
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
-                    title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
-                    onClick={() => setSearchParams({ session: s.id, spy: "1" })}
-                  >
-                    <VenetianMask className="h-4 w-4" /> Incógnito
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  className="rounded-full gap-1 shrink-0"
-                  onClick={() => setSearchParams(
-                    // Sin el `room` el participante vuelve SIN asignación y queda
-                    // esperando una asignación que ya nadie puede hacer.
-                    s.lastRoomId && s.role !== "host"
-                      ? { session: s.id, room: s.lastRoomId }
-                      : { session: s.id }
-                  )}
-                >
-                  Volver <ArrowRight className="h-4 w-4" />
-                </Button>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Admin: TODAS las sesiones activas de la empresa (las que no son suyas),
-            con la gente conectada en cada sala según LiveKit. */}
-        {/* Quién finalizó qué, a la vista. Cuatro cierres en cuatro días por
-            cuatro personas distintas se ven de un vistazo acá; antes había que
-            rastrearlo en los registros del servidor. */}
-        {finalizadas.length > 0 && (
-          <div className="w-full max-w-lg flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5" /> Finalizadas recientemente
-            </h2>
-            {finalizadas.map((f) => (
-              <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-2.5">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground/80 truncate">{f.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien (sin registro: anterior al 3/9)"}</span>
-                    {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {isAdmin && allSessions.some((s) => !s.my_role) && (
-          <div className="w-full max-w-3xl flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-              Todas las sesiones activas
-            </h2>
-            {allSessions.filter((s) => !s.my_role).map((s) => (
+            {filasActivas.map((s) => (
               <div
                 key={s.id}
                 className="flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3"
@@ -413,42 +332,87 @@ export default function CoworkPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-foreground truncate">{s.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {s.host_name ? `Host: ${s.host_name} · ` : ""}{s.members} {s.members === 1 ? "miembro" : "miembros"}
+                      {s.role === "host" ? "Host" : s.role === "participant" ? "Participante" : "Sin unirte"}
+                      {s.hostName && s.createdBy !== userId ? ` · de ${s.hostName}` : ""}
+                      {" · "}{s.members} {s.members === 1 ? "miembro" : "miembros"}
                       {s.online != null && (
                         <span className={s.online > 0 ? "text-emerald-500 font-medium" : ""}>
                           {" "}· {s.online} en línea
                         </span>
                       )}
+                      {s.incognito.length > 0 && (
+                        <span className="text-violet-500" title="Solo los admins ven esto">
+                          {" "}· 🕶 {s.incognito.join(", ")}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  {s.incognito.length > 0 && (
-                    <span className="text-[11px] text-violet-500 shrink-0" title="Solo los admins ven esto">
-                      🕶 {s.incognito.join(", ")}
-                    </span>
-                  )}
-                  {/* Incógnito: observar sin unirse — no crea membresía ni
-                      aparece en ninguna lista (token hidden solo-lectura). */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
-                    title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
-                    onClick={() => setSearchParams({ session: s.id, spy: "1" })}
-                  >
-                    <VenetianMask className="h-4 w-4" /> Incógnito
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="rounded-full gap-1 shrink-0"
-                    disabled={enteringId === s.id}
-                    onClick={() => handleAdminEnter(s)}
-                  >
-                    {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
-                  </Button>
+                  <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
+                    {/* Finalizar apaga la sesión para TODOS: solo quien la creó (o un
+                        admin). Los demás hosts tienen Salir, que se los lleva solo a
+                        ellos. Antes cualquier host veía Finalizar, y CHATTERS KASH se
+                        finalizó cuatro veces en cuatro días por hosts que querían irse. */}
+                    {(s.createdBy === userId || isAdmin) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive rounded-full"
+                        onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
+                      >
+                        Finalizar
+                      </Button>
+                    )}
+                    {s.role === "host" && s.createdBy !== userId && !isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground rounded-full gap-1"
+                        title="Salir de esta sesión (sigue para los demás)"
+                        onClick={() => setPorSalir({ id: s.id, name: s.name })}
+                      >
+                        <LogOut className="h-4 w-4" /> Salir
+                      </Button>
+                    )}
+                    {/* Incógnito (solo admin): observar sin unirse ni aparecer. */}
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
+                        title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
+                        onClick={() => setSearchParams({ session: s.id, spy: "1" })}
+                      >
+                        <VenetianMask className="h-4 w-4" /> Incógnito
+                      </Button>
+                    )}
+                    {s.role ? (
+                      <Button
+                        size="sm"
+                        className="rounded-full gap-1 shrink-0"
+                        onClick={() => setSearchParams(
+                          // Sin el `room` el participante vuelve SIN asignación y queda
+                          // esperando una asignación que ya nadie puede hacer.
+                          s.lastRoomId && s.role !== "host"
+                            ? { session: s.id, room: s.lastRoomId }
+                            : { session: s.id }
+                        )}
+                      >
+                        Volver <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="rounded-full gap-1 shrink-0"
+                        disabled={enteringId === s.id}
+                        onClick={() => s.admin && handleAdminEnter(s.admin)}
+                      >
+                        {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {/* pl-[52px] = ancho del avatar (40) + gap (12): alinea los chips
-                    con el nombre. Antes decía `pl-13`, que Tailwind no genera
-                    (no existe en la escala) y en móvil no sangraba nada. */}
+                    con el nombre. */}
                 {s.rooms.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pl-[52px]">
                     {s.rooms.map((r) => (
@@ -467,6 +431,31 @@ export default function CoworkPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Quién finalizó qué, a la vista, al final de todo. Los admins ven TODAS
+            las finalizadas de la empresa; el resto, las sesiones donde estuvo.
+            Ventana de 10 días: lo más viejo se va solo (Jhon, 08/09). */}
+        {finalizadas.length > 0 && (
+          <div className="w-full max-w-3xl flex flex-col gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" /> Finalizadas recientemente <span className="font-normal normal-case tracking-normal">· últimos 10 días</span>
+            </h2>
+            {finalizadas.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground/80 truncate">
+                    {f.name}
+                    {f.createdByName && <span className="font-normal text-muted-foreground"> · de {f.createdByName}</span>}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien (sin registro: anterior al 3/9)"}</span>
+                    {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
