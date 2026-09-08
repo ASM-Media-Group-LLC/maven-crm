@@ -653,20 +653,23 @@ const PromologContent = () => {
     enabled: allAgentIds.length > 0,
   });
 
-  // Dynamic agents data from full dataset
+  // Dynamic agents data from full dataset.
+  // SOLO personas con rol manager (pedido de Jhon 08/09): antes salía cualquiera
+  // que hubiera revisado/creado una entry (Jhon, closers, etc.).
+  const managerIdSet = useMemo(() => new Set(assignableManagers.map((m) => m.id)), [assignableManagers]);
   const agentsData = useMemo(() => {
     const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
 
     // Initialize all known agents
     for (const agentId of allAgentIds) {
-      if (profilesMap[agentId]) {
+      if (profilesMap[agentId] && managerIdSet.has(agentId)) {
         agentMap.set(agentId, { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} });
       }
     }
 
     for (const pe of agentEntries) {
       const agentId = pe.reviewed_by || pe.created_by;
-      if (!agentId || !profilesMap[agentId]) continue;
+      if (!agentId || !profilesMap[agentId] || !managerIdSet.has(agentId)) continue;
 
       let agent = agentMap.get(agentId);
       if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
@@ -689,7 +692,7 @@ const PromologContent = () => {
       no: d.no,
       badges: Object.entries(d.networks).map(([label, value]) => ({ label, value })),
     }));
-  }, [allAgentIds, agentEntries, profilesMap]);
+  }, [allAgentIds, agentEntries, profilesMap, managerIdSet]);
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
