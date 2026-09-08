@@ -265,8 +265,14 @@ export function useUpdateCreador() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<TablesInsert<"creators">> }) => {
       const { error } = await supabase.from("creators").update(stripMaskedPii(data)).eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
+    // También la ficha abierta (useCreadorById): el lápiz del Listado y la ficha
+    // completa editan la misma fila.
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ["creators"] });
+      qc.invalidateQueries({ queryKey: ["creator", id] });
+    },
   });
 }
 

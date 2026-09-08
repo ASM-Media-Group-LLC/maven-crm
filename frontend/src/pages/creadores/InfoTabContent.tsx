@@ -15,10 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { ManagerSelect, managerAssignmentPatch, useManagerName } from "./ManagerSelect";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import { ExternalLink } from "lucide-react";
 
@@ -111,20 +112,9 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const biz = c.creator_business;
   // scouter_companies solo para resolver company_id si el nombre matchea.
   const { data: scouterCompanies = [] } = useScouterCompanies();
-  // Personas con rol manager — vía RPC SECURITY DEFINER (RLS de user_roles solo
-  // deja leer la fila propia; mismo patrón que get_assignable_closers).
-  const { data: managers = [] } = useQuery({
-    queryKey: ["assignable-managers"],
-    queryFn: async (): Promise<Array<{ id: string; full_name: string | null }>> => {
-      const { data, error } = await supabase.rpc("get_assignable_managers" as any);
-      if (error) throw error;
-      return (data ?? []) as Array<{ id: string; full_name: string | null }>;
-    },
-    staleTime: 5 * 60_000,
-  });
-  const managerName = c.assigned_manager_profile_id
-    ? (managers.find((m) => m.id === c.assigned_manager_profile_id)?.full_name ?? "(fuera del rol manager)")
-    : null;
+  // Manager: misma pieza que el lápiz del Listado (ManagerSelect) — un solo
+  // pool, un solo payload, un solo historial.
+  const managerName = useManagerName(c.assigned_manager_profile_id);
   // Categorías canónicas — fuente única model_categories.
   const { data: modelCats = [] } = useModelCategories();
   const categoryOptions = modelCats.length > 0
@@ -179,11 +169,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           city: editData.city || null,
           birth_date: editData.birth_date || null,
           internal_notes: editData.internal_notes || null,
-          // Manager persona: se escriben LAS DOS columnas (profile_id es la
-          // canónica del bot/RPCs; assigned_manager_id la usan ManagerDashboard
-          // y ventas_tops — mantenerlas iguales evita el split-brain).
-          assigned_manager_profile_id: editData.manager_profile_id || null,
-          assigned_manager_id: editData.manager_profile_id || null,
+          ...managerAssignmentPatch(editData.manager_profile_id),
         } as any)
         .eq("id", creatorId);
 
@@ -295,16 +281,11 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
             a esta modelo; el bot de WhatsApp y los reportes agrupan por acá) */}
         {isEditing ? (
           <EditField label="Manager">
-            <Select
-              value={editData.manager_profile_id || "__none__"}
-              onValueChange={(v) => updateField("manager_profile_id", v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin manager</SelectItem>
-                {managers.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ManagerSelect
+              value={editData.manager_profile_id}
+              onChange={(v) => updateField("manager_profile_id", v)}
+              className="h-9 text-sm"
+            />
           </EditField>
         ) : (
           <InfoField label="Manager" value={managerName} />

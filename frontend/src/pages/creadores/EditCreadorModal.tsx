@@ -29,6 +29,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import ExtraAccountsInline from "./ExtraAccountsInline";
 import { useUserRole } from "@/hooks/useUserRole";
+import { ManagerSelect, managerAssignmentPatch } from "./ManagerSelect";
 
 interface Props {
   open: boolean;
@@ -49,6 +50,8 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     country: "",
     city: "",
     category: "",
+    // Manager (persona con rol manager): misma pieza y mismo guardado que la ficha.
+    manager_profile_id: "",
     instagram_handle: "",
     tiktok_handle: "",
     twitter_handle: "",
@@ -78,6 +81,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         country: creator.country ?? "",
         city: creator.city ?? "",
         category: creator.category ?? "",
+        manager_profile_id: creator.assigned_manager_profile_id ?? "",
         instagram_handle: creator.instagram_handle ?? "",
         tiktok_handle: creator.tiktok_handle ?? "",
         twitter_handle: creator.twitter_handle ?? "",
@@ -115,6 +119,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           country: form.country.trim() || null,
           city: form.city.trim() || null,
           category: form.category || null,
+          ...managerAssignmentPatch(form.manager_profile_id),
           // Handles normalizados (cleanHandle saca @ y URLs) para que los bots los
           // lean. Telegram NO: el gateway acepta t.me/+invite y @canal.
           instagram_handle: cleanHandle(form.instagram_handle) || null,
@@ -238,7 +243,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <Label>Ciudad</Label>
               <Input value={form.city} onChange={(e) => handleChange("city", e.target.value)} />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label>Categoría</Label>
               <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
                 <SelectTrigger>
@@ -250,6 +255,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Manager</Label>
+              <ManagerSelect value={form.manager_profile_id} onChange={(v) => handleChange("manager_profile_id", v)} />
             </div>
           </section>
 
