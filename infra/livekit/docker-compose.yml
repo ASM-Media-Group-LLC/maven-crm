@@ -105,6 +105,20 @@ services:
         # Con tope 6 → hasta 3 grabaciones simultáneas.
         cpu_cost:
           room_composite_cpu_cost: 2
+        # Sube el MP4 directo a Cloudflare R2 en vez de dejarlo en /out.
+        # La clave es `storage.s3` ANIDADA (en versiones viejas del egress era
+        # `s3:` de primer nivel): con la clave equivocada el egress no falla,
+        # simplemente ignora el bloque y sigue escribiendo local — se ve igual
+        # que si no hubieras configurado nada.
+        # R2 habla S3: `region: auto` + endpoint propio de la cuenta.
+        # Los valores salen de Dokploy > Environment, NO se commitean.
+        storage:
+          s3:
+            access_key: ${R2_ACCESS_KEY}
+            secret: ${R2_SECRET}
+            region: auto
+            endpoint: https://694fc9df1186f623df3fb211bdf45d96.r2.cloudflarestorage.com
+            bucket: maven-grabaciones
     volumes:
       # El disco del VPS, decisión de Jhon: viable SOLO porque el
       # vencimiento a 90 días no tiene excepciones (espacio acotado).
