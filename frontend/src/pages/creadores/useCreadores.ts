@@ -77,13 +77,28 @@ function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
   return [...known, ...others];
 }
 
-function uniqueManagers(creators: CreatorWithBusiness[]): string[] {
-  const set = new Set<string>();
-  for (const c of creators) {
-    const mt = c.creator_business?.manager_type;
-    if (mt) set.add(mt);
-  }
-  return Array.from(set).sort();
+// Filtro Managers = PERSONAS con rol manager (mismo pool que el select de la
+// ficha, vía RPC SECURITY DEFINER porque RLS de user_roles solo deja leer la
+// fila propia).
+export interface ManagerOption {
+  id: string;
+  full_name: string | null;
+}
+
+async function fetchAssignableManagers(): Promise<ManagerOption[]> {
+  const { data, error } = await supabase.rpc("get_assignable_managers" as never);
+  if (error) throw error;
+  return (data ?? []) as ManagerOption[];
+}
+
+// Bitácora manager↔creadora (creator_manager_history): con ella el filtro
+// muestra las modelos que SON o FUERON de cada manager (pedido de Jhon 08/09).
+async function fetchManagerHistory(): Promise<Array<{ creator_id: string; manager_profile_id: string }>> {
+  const { data, error } = await supabase
+    .from("creator_manager_history" as never)
+    .select("creator_id, manager_profile_id");
+  if (error) throw error;
+  return (data ?? []) as Array<{ creator_id: string; manager_profile_id: string }>;
 }
 
 export interface CreadorFilters {
@@ -96,7 +111,12 @@ export interface CreadorFilters {
   manager: string;
 }
 
-function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters): CreatorWithBusiness[] {
+function applyFilters(
+  creators: CreatorWithBusiness[],
+  filters: CreadorFilters,
+  // creator_ids que alguna vez tuvieron a la manager del filtro (bitácora).
+  managerCreatorIds: Set<string> | null,
+): CreatorWithBusiness[] {
   let result = creators;
 
   if (filters.agency) {
@@ -119,7 +139,14 @@ function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters):
     result = result.filter((c) => c.city === filters.city);
   }
   if (filters.manager) {
-    result = result.filter((c) => c.creator_business?.manager_type === filters.manager);
+    // "Son o fueron" de la manager: asignación ACTUAL o cualquier fila de la
+    // bitácora. Se combina en AND con los demás filtros (ej. activas + Carolina
+    // = las activas que son o fueron de Carolina).
+    result = result.filter(
+      (c) =>
+        (c as { assigned_manager_profile_id?: string | null }).assigned_manager_profile_id === filters.manager ||
+        (managerCreatorIds?.has(c.id) ?? false),
+    );
   }
   if (filters.search) {
     const q = filters.search.toLowerCase();
@@ -140,9 +167,26 @@ export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
     queryKey: ["creators"],
     queryFn: fetchCreators,
   });
+  const managersQuery = useQuery({
+    queryKey: ["assignable-managers"],
+    queryFn: fetchAssignableManagers,
+    staleTime: 5 * 60_000,
+  });
+  const historyQuery = useQuery({
+    queryKey: ["creator-manager-history"],
+    queryFn: fetchManagerHistory,
+    staleTime: 60_000,
+  });
 
   const allCreators = query.data ?? [];
-  const filtered = applyFilters(allCreators, filters);
+  const managerCreatorIds = filters.manager
+    ? new Set(
+        (historyQuery.data ?? [])
+          .filter((h) => h.manager_profile_id === filters.manager)
+          .map((h) => h.creator_id),
+      )
+    : null;
+  const filtered = applyFilters(allCreators, filters, managerCreatorIds);
   const totalCount = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -158,7 +202,7 @@ export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
     categories: uniqueValues(allCreators, "category"),
     countries: uniqueValues(allCreators, "country"),
     cities: uniqueValues(allCreators, "city"),
-    managers: uniqueManagers(allCreators),
+    managers: managersQuery.data ?? [],
   };
 }
 

@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { CreadorFilters } from "./useCreadores";
+import type { CreadorFilters, ManagerOption } from "./useCreadores";
 
 interface Props {
   filters: CreadorFilters;
@@ -16,7 +16,9 @@ interface Props {
   categories: string[];
   countries: string[];
   cities: string[];
-  managers: string[];
+  // Personas con rol manager; el filtro muestra las creadoras que SON o
+  // FUERON de la elegida (bitácora creator_manager_history).
+  managers: ManagerOption[];
   // Compañías centralizadas en scouter_companies — fuente única para el
   // filtro y para cualquier input de compañía en el resto de la app.
   companies: string[];
@@ -74,12 +76,22 @@ const CreadoresFilters = ({
       options={cities}
       onChange={(v) => onChange({ city: v })}
     />
-    <FilterSelect
-      placeholder="Managers"
-      value={filters.manager}
-      options={managers}
-      onChange={(v) => onChange({ manager: v })}
-    />
+    <Select
+      value={filters.manager || undefined}
+      onValueChange={(v) => onChange({ manager: v === "__all__" ? "" : v })}
+    >
+      <SelectTrigger className="w-[150px] shrink-0">
+        <SelectValue placeholder="Managers" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__all__">Todas</SelectItem>
+        {managers.map((m) => (
+          <SelectItem key={m.id} value={m.id}>
+            {m.full_name ?? m.id}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
     {/* Compañías — fuente única scouter_companies, reemplaza la fila de
         botones de agency que estaba arriba del listado. */}
     <FilterSelect
