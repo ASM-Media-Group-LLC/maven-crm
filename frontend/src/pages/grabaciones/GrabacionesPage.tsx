@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useRecordings, RecordingRow } from "@/hooks/useRecordings";
+import { useRecordings, RecordingRow, FILTROS_VACIOS } from "@/hooks/useRecordings";
+import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
 import { motivoDeFallo } from "@/lib/grabacionMotivoFallo";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -11,6 +12,7 @@ import StatChip from "@/components/StatChip";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock, Play,
+  Search, X,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -47,10 +49,14 @@ const fechaCorta = (iso: string) =>
   new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function GrabacionesPage() {
-  const { rows, grabadores, usage, myUserId, loading, download, view, remove } = useRecordings();
+  const {
+    rows, grabadores, usage, myUserId, loading, download, view, remove,
+    filtros, setFiltros, cargarMas, cargandoMas, hayMas,
+  } = useRecordings();
   const { isAdmin } = useUserRole();
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
+  const hayFiltro = filtros.q !== "" || filtros.fuente !== "todas" || filtros.soloMias;
 
   const handleVer = async (r: RecordingRow) => {
     setTrabajando(r.id);
@@ -95,7 +101,7 @@ export default function GrabacionesPage() {
     // `min-h-0` es imprescindible: sin eso el hijo no puede encogerse dentro
     // de la columna flex y el overflow no se activa.
     <main className="flex-1 min-h-0 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
           <Clapperboard className="h-5 w-5 text-primary" />
@@ -140,17 +146,93 @@ export default function GrabacionesPage() {
         </span>
       </div>
 
+      {/* Buscador y filtros. Existen desde ahora y no cuando duela: con el
+          video mudándose a R2 esto pasa de 54 grabaciones a cientos, y una
+          lista plana sin forma de acotarla deja de servir mucho antes de
+          llenarse. Filtran en el SERVIDOR, no sobre lo ya cargado: filtrar en
+          el cliente solo mira la tanda que bajó y miente. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={filtros.q}
+            onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
+            placeholder="Buscar por título o sala…"
+            className="h-9 rounded-full pl-9 pr-9"
+          />
+          {filtros.q && (
+            <button
+              type="button"
+              onClick={() => setFiltros({ ...filtros, q: "" })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {([
+            { id: "todas", label: "Todas" },
+            { id: "meet", label: "Meet" },
+            { id: "cowork", label: "Cowork" },
+          ] as const).map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltros({ ...filtros, fuente: f.id })}
+              aria-pressed={filtros.fuente === f.id}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                filtros.fuente === f.id
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setFiltros({ ...filtros, soloMias: !filtros.soloMias })}
+            aria-pressed={filtros.soloMias}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+              filtros.soloMias
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            Solo mías
+          </button>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex flex-col gap-2">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState
-          className="rounded-3xl border border-dashed border-border/70"
-          seed="empty-grabaciones"
-          title="Todavía no hay grabaciones"
-          description="Dentro de una reunión de Meet o de una sala de Cowork verás el botón Grabar arriba a la izquierda. Al detener, eliges con quién compartirla."
-        />
+        hayFiltro ? (
+          // Decirle "todavía no hay grabaciones" a quien acaba de filtrar es
+          // desconcertante: parece que se borraron.
+          <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border/70 px-6 py-10 text-center">
+            <p className="text-sm text-muted-foreground">
+              Ninguna grabación coincide con lo que buscaste.
+            </p>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setFiltros(FILTROS_VACIOS)}>
+              Quitar filtros
+            </Button>
+          </div>
+        ) : (
+          <EmptyState
+            className="rounded-3xl border border-dashed border-border/70"
+            seed="empty-grabaciones"
+            title="Todavía no hay grabaciones"
+            description="Dentro de una reunión de Meet o de una sala de Cowork verás el botón Grabar arriba a la izquierda. Al detener, eliges con quién compartirla."
+          />
+        )
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((r) => {
@@ -253,6 +335,19 @@ export default function GrabacionesPage() {
               </div>
             );
           })}
+
+          {hayMas && (
+            <Button
+              variant="outline"
+              className="mt-1 rounded-full"
+              onClick={() => void cargarMas()}
+              disabled={cargandoMas}
+            >
+              {cargandoMas
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…</>
+                : "Cargar más"}
+            </Button>
+          )}
         </div>
       )}
 

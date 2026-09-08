@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Grabaciones de Meet/Cowork. La lista y el uso se leen DIRECTO por RLS
@@ -56,6 +56,26 @@ export async function invokeRecordings(
 
 const COLUMNAS = "id, room_name, source, title, started_by, started_at, ended_at, duration_seconds, size_bytes, status, expires_at, error";
 
+/** Cuántas filas por tanda. La lista se llenaba con `.limit(200)` de una:
+ *  funcionaba con 54 grabaciones, pero con el video mudándose a R2 esto se
+ *  acumula y 200 filas de golpe es una página lenta y una lista imposible de
+ *  recorrer. Se pide de a poco y se filtra en el servidor. */
+export const POR_PAGINA = 30;
+
+export interface FiltrosGrabaciones {
+  /** Busca en el título y en el nombre de la sala. */
+  q: string;
+  fuente: "todas" | "meet" | "cowork";
+  soloMias: boolean;
+}
+
+export const FILTROS_VACIOS: FiltrosGrabaciones = { q: "", fuente: "todas", soloMias: false };
+
+/** PostgREST parsea `or=(...)` separando por comas y paréntesis: si el texto
+ *  buscado los trae, la consulta se rompe entera. Se limpian, no se escapan:
+ *  nadie busca una grabación por un paréntesis. */
+const limpiarBusqueda = (q: string) => q.replace(/[,()*\\]/g, " ").trim();
+
 /** Trae nombre y cara de quienes grabaron, una sola consulta para toda la
  *  lista. Si falla, la lista sigue: solo se pierde el "Grabó X". */
 async function cargarGrabadores(filas: RecordingRow[]): Promise<Record<string, PerfilGrabador>> {
@@ -75,24 +95,57 @@ export function useRecordings() {
   const [usage, setUsage] = useState<RecordingsUsage | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [hayMas, setHayMas] = useState(false);
+  const [filtros, setFiltros] = useState<FiltrosGrabaciones>(FILTROS_VACIOS);
 
+  // Los filtros en un ref además del estado: `cargarMas` los necesita para
+  // pedir la tanda siguiente y no queremos recrear la función en cada tecla
+  // (recrearla dispara el efecto de abajo y la lista parpadea).
+  const filtrosRef = useRef(filtros);
+  filtrosRef.current = filtros;
+  const uidRef = useRef<string | null>(null);
+
+  /** Una tanda. Devuelve las filas y si quedan más detrás. */
+  const consultar = useCallback(async (desde: number, f: FiltrosGrabaciones) => {
+    let q = supabase
+      .from("meeting_recordings")
+      .select(COLUMNAS)
+      .is("deleted_at", null);
+
+    if (f.fuente !== "todas") q = q.eq("source", f.fuente);
+    if (f.soloMias && uidRef.current) q = q.eq("started_by", uidRef.current);
+
+    const texto = limpiarBusqueda(f.q);
+    if (texto) q = q.or(`title.ilike.%${texto}%,room_name.ilike.%${texto}%`);
+
+    // Se pide UNA de más para saber si hay siguiente sin un count aparte.
+    const { data } = await q
+      .order("started_at", { ascending: false })
+      .range(desde, desde + POR_PAGINA);
+
+    const filas = (data as RecordingRow[] | null) ?? [];
+    return { filas: filas.slice(0, POR_PAGINA), hayMas: filas.length > POR_PAGINA };
+  }, []);
+
+  /** Primera tanda: resetea la lista. También refresca el uso total, que NO
+   *  depende de los filtros — el espacio ocupado es del buzón entero. */
   const refresh = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setMyUserId(user?.id ?? null);
-    const [lista, uso] = await Promise.all([
-      supabase
-        .from("meeting_recordings")
-        .select(COLUMNAS)
-        .is("deleted_at", null)
-        .order("started_at", { ascending: false })
-        .limit(200),
+    if (!uidRef.current) {
+      const { data: { user } } = await supabase.auth.getUser();
+      uidRef.current = user?.id ?? null;
+      setMyUserId(uidRef.current);
+    }
+    const f = filtrosRef.current;
+    const [tanda, uso] = await Promise.all([
+      consultar(0, f),
       supabase.from("v_recordings_usage").select("*").maybeSingle(),
     ]);
-    const filas = (lista.data as RecordingRow[] | null) ?? [];
-    setRows(filas);
+    setRows(tanda.filas);
+    setHayMas(tanda.hayMas);
     setUsage((uso.data as RecordingsUsage | null) ?? null);
     setLoading(false);
-    void cargarGrabadores(filas).then(setGrabadores);
+    void cargarGrabadores(tanda.filas).then(setGrabadores);
 
     // Dos arreglos que solo se pueden hacer del lado del servidor, los dos al
     // abrir la lista porque es cuando a alguien le importa:
@@ -104,25 +157,48 @@ export function useRecordings() {
     //    se pueden descargar (el edge exige `ready`), así que la persona ve
     //    una grabación que existe y no puede bajar. El servidor le pregunta a
     //    LiveKit si el egress ya terminó y recién ahí la cierra.
-    const hayColgadas = filas.some((r) => r.status === "recording" || r.status === "processing");
-    const faltaPeso = filas.some((r) => r.status === "ready" && r.size_bytes == null);
+    const hayColgadas = tanda.filas.some((r) => r.status === "recording" || r.status === "processing");
+    const faltaPeso = tanda.filas.some((r) => r.status === "ready" && r.size_bytes == null);
     if (hayColgadas || faltaPeso) {
       try {
         const res = await invokeRecordings("reconcile", {});
         if (res?.actualizadas || res?.cerradas) {
-          const { data } = await supabase
-            .from("meeting_recordings")
-            .select(COLUMNAS)
-            .is("deleted_at", null)
-            .order("started_at", { ascending: false })
-            .limit(200);
-          setRows((data as RecordingRow[] | null) ?? filas);
+          const otra = await consultar(0, filtrosRef.current);
+          setRows(otra.filas);
+          setHayMas(otra.hayMas);
         }
       } catch { /* si no se puede, la lista igual funciona sin el peso */ }
     }
-  }, []);
+  }, [consultar]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  /** Siguiente tanda: agrega al final, no reemplaza. */
+  const cargarMas = useCallback(async () => {
+    setCargandoMas(true);
+    try {
+      const tanda = await consultar(rows.length, filtrosRef.current);
+      setRows((prev) => {
+        // La lista pudo cambiar mientras se pedía (una grabación nueva empuja
+        // todo): se descarta lo que ya estaba para no repetir filas.
+        const vistos = new Set(prev.map((r) => r.id));
+        return [...prev, ...tanda.filas.filter((r) => !vistos.has(r.id))];
+      });
+      setHayMas(tanda.hayMas);
+      void cargarGrabadores(tanda.filas).then((nuevos) =>
+        setGrabadores((prev) => ({ ...prev, ...nuevos })),
+      );
+    } finally {
+      setCargandoMas(false);
+    }
+  }, [consultar, rows.length]);
+
+  // Al cambiar los filtros se vuelve a la primera tanda. El texto va con
+  // retardo: sin esto cada tecla es una consulta.
+  useEffect(() => {
+    const t = setTimeout(() => { void refresh(); }, filtros.q ? 300 : 0);
+    return () => clearTimeout(t);
+    // `refresh` lee los filtros del ref, así que las deps son los filtros.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.q, filtros.fuente, filtros.soloMias]);
 
   // Abre la descarga en una pestaña nueva. El link vence a los 10 minutos:
   // si se comparte, se comparte la grabación desde Maven, no el link crudo.
@@ -148,5 +224,8 @@ export function useRecordings() {
     await refresh();
   }, [refresh]);
 
-  return { rows, grabadores, usage, myUserId, loading, refresh, download, view, remove };
+  return {
+    rows, grabadores, usage, myUserId, loading, refresh, download, view, remove,
+    filtros, setFiltros, cargarMas, cargandoMas, hayMas,
+  };
 }
