@@ -51,3 +51,10 @@ export const supabaseAnon = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLIS
     autoRefreshToken: false,
   },
 });
+
+// Realtime con el JWT vigente aunque la renovación la haga otra pestaña (ver
+// lib/realtimeAuthSync). Va acá, junto al cliente, para que corra en TODA la
+// app desde el primer módulo que lo importe.
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  void import("@/lib/realtimeAuthSync").then((m) => m.arrancarSincronizadorDeJwt());
+}
