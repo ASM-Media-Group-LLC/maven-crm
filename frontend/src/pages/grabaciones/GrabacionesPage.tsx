@@ -21,9 +21,12 @@ import {
 // Grabaciones de Meet/Cowork. Dos reglas que la página tiene que hacer
 // imposibles de ignorar (vienen del diseño de la tabla, ver la migración):
 //
-//   1. TODO vence a los 15 días, sin excepciones. Es lo que hace viable
-//      guardar en el disco del VPS. La fecha de vencimiento va en cada fila
-//      y el aviso arriba — quien necesite algo más tiempo, lo descarga.
+//   1. TODO vence a los 90 días, sin excepciones. Fueron 15 mientras el
+//      archivo vivía en el disco del VPS; ahora va a Cloudflare R2 y esa
+//      restricción no existe. La fecha de vencimiento va en cada fila y el
+//      aviso arriba — quien necesite algo más tiempo, lo descarga.
+//      ⚠️ R2 tiene su PROPIA regla de ciclo de vida a 90 días: si este
+//      número cambia, hay que cambiar la del bucket maven-grabaciones.
 //   2. El espacio usado se muestra SIEMPRE arriba. En Google terminamos con
 //      33 TB que nadie sabía que existían; acá el total nunca es invisible.
 
@@ -141,7 +144,7 @@ export default function GrabacionesPage() {
       <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-700 dark:text-amber-300">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Toda grabación <b>se borra a los 15 días, sin excepciones</b>. Si necesitas
+          Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitas
           conservar una por más tiempo, descárgala a tu equipo antes de que venza.
         </span>
       </div>
