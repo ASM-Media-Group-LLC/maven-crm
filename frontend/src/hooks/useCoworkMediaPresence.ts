@@ -278,9 +278,39 @@ function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number)
  *  detector de la ceguera de verdad: si suena cada vez que alguien sale de la
  *  pantalla, en una semana nadie le cree. Una alarma que grita en falso es una
  *  alarma perdida. */
-function cerrarCanal(entrada: CanalVivo): void {
+function cerrarCanal(entrada: CanalVivo): Promise<void> {
   entrada.cerrando = true;
-  supabase.removeChannel(entrada.canal);
+  // ⚠️ Devuelve la promesa, y quien REHACE el canal tiene que esperarla.
+  //
+  // El cliente de Realtime borra los canales POR NOMBRE, y solo cuando llega
+  // el acuse del `leave` (RealtimeClient._remove filtra por topic, y
+  // supabase.channel() devuelve el canal existente si el nombre coincide).
+  // Cerrar y abrir seguidos, sin esperar, hacía dos cosas: `channel()` te
+  // devolvía el canal VIEJO (todavía saliendo) en vez de uno nuevo, y cuando
+  // llegaba el acuse el cliente lo sacaba de la tabla de ruteo. El canal creía
+  // estar unido y el socket recibía la presencia de todos, pero a él no le
+  // llegaba nada. Así quedó el tablero de Jhon el 07/09: frames de presencia
+  // entrando por el socket y cero personas en pantalla.
+  return Promise.resolve(supabase.removeChannel(entrada.canal)).then(() => undefined, () => undefined);
+}
+
+/** Rehace el canal BIEN: primero espera a que el viejo termine de salir, y
+ *  recién ahí abre el nuevo con los mismos oyentes. Mientras tanto `vivo` es
+ *  null, así que lo que se quiera publicar queda pendiente y sale con el
+ *  SUBSCRIBED del nuevo. */
+async function rehacerCanal(entrada: CanalVivo): Promise<CanalVivo | null> {
+  const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
+  if (vivo === entrada) vivo = null;
+  olvidarPendiente();
+  await cerrarCanal(entrada);
+  // Si en el ínterin alguien abrió otro (cambio de sesión, remount), ese manda.
+  if (vivo) return vivo;
+  const nueva = abrirCanal(sessionId, userId);
+  nueva.usos = usos;
+  oyentes.forEach((f) => nueva.oyentes.add(f));
+  nueva.ultimoEstado = ultimoEstado;
+  vivo = nueva;
+  return nueva;
 }
 
 function abrirCanal(sessionId: string, userId: string): CanalVivo {
@@ -431,16 +461,10 @@ function revisarSalud() {
     fallosSeguidos += 1;
     proximoIntento = ahora + Math.min(ESPERA_MAX_MS, ESPERA_BASE_MS * 2 ** (fallosSeguidos - 1));
 
-    const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
-    cerrarCanal(entrada);
-    const nueva = abrirCanal(sessionId, userId);
-    nueva.usos = usos;
-    oyentes.forEach((f) => nueva.oyentes.add(f));
-    nueva.ultimoEstado = ultimoEstado;
-    vivo = nueva;
-    // Si esta persona estaba publicando su estado, lo vuelve a publicar: si no,
-    // reaparecería en el tablero de los demás pero sin cámara ni micro.
-    if (ultimoEstado) { publicar(nueva, ultimoEstado); ultimaRepublicacion = ahora; }
+    // El SUBSCRIBED del canal nuevo reanuncia solo lo último que se sabía: si
+    // esta persona publicaba, reaparece con cámara y micro como estaban.
+    if (entrada.ultimoEstado) ultimaRepublicacion = ahora;
+    void rehacerCanal(entrada);
     return;
   }
 
@@ -474,14 +498,7 @@ function revisarSalud() {
       "[Cowork] Me reanuncié", REINTENTOS_ANTES_DE_REHACER,
       "veces y sigo sin aparecer en la sala — rehago el canal.",
     );
-    const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
-    olvidarPendiente();
-    cerrarCanal(entrada);
-    const nueva = abrirCanal(sessionId, userId);
-    nueva.usos = usos;
-    oyentes.forEach((f) => nueva.oyentes.add(f));
-    nueva.ultimoEstado = ultimoEstado;
-    vivo = nueva;
+    void rehacerCanal(entrada);
     return;   // el `subscribe` del canal nuevo reanuncia solo
   }
 
@@ -515,8 +532,12 @@ export function salirDePresencia() {
   proximoIntento = 0;
   ultimaRepublicacion = 0;
   uniendoDesde = null;
+  // Sin canal no hay nada que vigilar: el revisor se apaga y se vuelve a
+  // armar con el próximo canal (también deja los timers limpios en los tests).
+  if (revisor !== null) { window.clearInterval(revisor); revisor = null; }
+  document.removeEventListener("visibilitychange", alVolverAMirar);
   if (!vivo) return;
-  cerrarCanal(vivo);
+  void cerrarCanal(vivo);
   vivo = null;
 }
 
@@ -536,30 +557,44 @@ export function useCoworkMediaPresence(
 
   useEffect(() => {
     if (!sessionId || !userId) return;
+    let cancelado = false;
+    let entrada: CanalVivo | null = null;
 
-    // Cambió la sesión (o el usuario): el canal viejo ya no sirve para nada.
-    if (vivo && (vivo.sessionId !== sessionId || vivo.userId !== userId)) {
-      cerrarCanal(vivo);
-      vivo = null;
-    }
-    if (!vivo) vivo = abrirCanal(sessionId, userId);
-    arrancarRevisor();
+    const engancharse = (e: CanalVivo) => {
+      entrada = e;
+      e.usos += 1;
+      e.oyentes.add(setMediaStates);
+      // Si el canal ya estaba abierto, arrancar con lo que ya sabe en vez de
+      // esperar al próximo evento (si no, la lista aparece vacía un instante).
+      setMediaStates(leerEstados(e.canal));
+    };
 
-    const entrada = vivo;
-    entrada.usos += 1;
-    entrada.oyentes.add(setMediaStates);
-    // Si el canal ya estaba abierto, arrancar con lo que ya sabe en vez de
-    // esperar al próximo evento (si no, la lista aparece vacía un instante).
-    setMediaStates(leerEstados(entrada.canal));
+    const preparar = async () => {
+      // Cambió la sesión (o el usuario): el canal viejo ya no sirve. Se ESPERA
+      // a que termine de salir antes de abrir el nuevo (ver cerrarCanal).
+      if (vivo && (vivo.sessionId !== sessionId || vivo.userId !== userId)) {
+        const viejo = vivo;
+        vivo = null;
+        await cerrarCanal(viejo);
+        if (cancelado) return;
+      }
+      if (!vivo) vivo = abrirCanal(sessionId, userId);
+      arrancarRevisor();
+      engancharse(vivo);
+    };
+    void preparar();
 
     return () => {
-      entrada.oyentes.delete(setMediaStates);
-      entrada.usos -= 1;
+      cancelado = true;
+      const e = entrada;
+      if (!e) return;
+      e.oyentes.delete(setMediaStates);
+      e.usos -= 1;
       // Acá está el arreglo: si nadie lo mira PERO la presencia es persistente,
       // el canal se queda abierto. Cerrarlo mandaría un `leave` y el
       // coordinador vería irse a alguien que sigue en la llamada.
-      if (entrada.usos <= 0 && !persistenteRef.current && vivo === entrada) {
-        cerrarCanal(entrada);
+      if (e.usos <= 0 && !persistenteRef.current && vivo === e) {
+        void cerrarCanal(e);
         vivo = null;
       }
     };
