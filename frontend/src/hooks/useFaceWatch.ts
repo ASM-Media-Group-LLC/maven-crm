@@ -104,6 +104,16 @@ function averageBrightness(data: Uint8ClampedArray): number {
   return sum / (data.length / 64);
 }
 
+/** Qué decir de un cuadro. Puro, para poder probarlo sin cámara.
+ *  - oscuro y SIN cara → "no_face": no se ve a nadie (el reloj se detiene).
+ *  - oscuro y CON cara → "too_dark": está, pero con mala luz (solo alerta).
+ *  - claro y sin cara → "no_face"; con cara chica → "too_small"; si no → "ok". */
+export function clasificarCuadro(c: { oscuro: boolean; hayCara: boolean; ratio: number }): FaceState {
+  if (!c.hayCara) return "no_face";
+  if (c.oscuro) return "too_dark";
+  return c.ratio < MIN_FACE_RATIO ? "too_small" : "ok";
+}
+
 export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): FaceWatch {
   const [watch, setWatch] = useState<FaceWatch>({ state: "cam_off", since: Date.now() });
   const stateRef = useRef<FaceState>("cam_off");
@@ -196,25 +206,23 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         ctx.drawImage(video, 0, 0, w, h);
 
         const frame = ctx.getImageData(0, 0, w, h);
-        if (averageBrightness(frame.data) < MIN_BRIGHTNESS) {
-          setState("too_dark");
-          return;
-        }
+        const oscuro = averageBrightness(frame.data) < MIN_BRIGHTNESS;
 
+        // Antes, con poca luz, se decía "too_dark" y NO se buscaba la cara. Eso
+        // mezclaba dos cosas distintas (Jhon, 07/09): la persona está pero con
+        // mala luz —alerta de encuadre, el reloj sigue— y la imagen es negra y
+        // no se ve a NADIE —es "fuera de cámara", el reloj se detiene—. Ahora
+        // la cara se busca siempre; la oscuridad solo califica el resultado.
         const res = detector.detect(canvas);
         const caras = res?.detections ?? [];
-        if (!caras.length) {
-          setState("no_face");
-          return;
-        }
-        const mayor = caras.reduce((best: any, d: any) => {
+        const mayor = caras.length ? caras.reduce((best: any, d: any) => {
           const area = (d.boundingBox?.width ?? 0) * (d.boundingBox?.height ?? 0);
           const bestArea = (best?.boundingBox?.width ?? 0) * (best?.boundingBox?.height ?? 0);
           return area > bestArea ? d : best;
-        }, caras[0]);
-        const bb = mayor.boundingBox;
-        const ratio = ((bb?.width ?? 0) * (bb?.height ?? 0)) / (w * h);
-        setState(ratio < MIN_FACE_RATIO ? "too_small" : "ok");
+        }, caras[0]) : null;
+        const bb = mayor?.boundingBox;
+        const ratio = mayor ? ((bb?.width ?? 0) * (bb?.height ?? 0)) / (w * h) : 0;
+        setState(clasificarCuadro({ oscuro, hayCara: !!mayor, ratio }));
       } catch {
         /* un frame que falla no cambia el estado: se reintenta al siguiente */
       }
