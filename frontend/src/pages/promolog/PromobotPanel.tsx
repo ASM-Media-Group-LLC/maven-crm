@@ -371,8 +371,8 @@ const PromobotPanel = () => {
     // y cada tab pone su propio scroll; sin esto, en celular todo lo que quedaba
     // debajo del lanzador (salud, corridas) era INALCANZABLE.
     <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-8 sm:px-6">
-      {/* Header */}
-      <div className="flex items-center gap-2">
+      {/* Header (order-first: queda ANTES de la salud, que también sube en celular) */}
+      <div className="order-first flex items-center gap-2">
         <Bot className="h-5 w-5 text-primary" />
         <div>
           <h2 className="text-base font-semibold leading-tight">Promobot</h2>
