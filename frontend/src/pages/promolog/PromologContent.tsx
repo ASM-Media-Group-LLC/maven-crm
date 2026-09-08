@@ -901,7 +901,9 @@ const PromologContent = () => {
     setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter("");
   };
   // Los mismos cinco selects en escritorio (en línea) y en celular (apilados a
-  // ancho completo dentro del panel). `full` = variante de celular.
+  // ancho completo dentro del panel). `full` = variante de celular. La opción
+  // "todos" lleva el nombre del filtro ("Estado: todos"): al estar siempre
+  // controlados, el placeholder nunca se ve y cuatro "Todas" seguidos no dicen nada.
   const STATUS_LABELS: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", revisar: "A revisar", pendiente: "No verificado" };
   const PLATFORM_LABELS: Record<string, string> = { onlyfans: "OnlyFans", unlok: "Unlok", otra: "Otra" };
   const renderFilterSelects = (full: boolean) => {
@@ -911,32 +913,32 @@ const PromologContent = () => {
         {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
             volver a "Todos" y deja pegado el rótulo anterior. */}
         <Select value={selectedStatus || "__all__"} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[150px]`}><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">{full ? "Estado: todos" : "Todos"}</SelectItem>
+            <SelectItem value="__all__">Estado: todos</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={selectedNetwork || "__all__"} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Red Social" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Red Social" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">{full ? "Red social: todas" : "Todas"}</SelectItem>
+            <SelectItem value="__all__">Red social: todas</SelectItem>
             {networkOptions.map((n) => (
               <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={selectedCardPlatform || "__all__"} onValueChange={(v) => setSelectedCardPlatform(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Plataforma" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Plataforma" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">{full ? "Plataforma: todas" : "Todas"}</SelectItem>
+            <SelectItem value="__all__">Plataforma: todas</SelectItem>
             {Object.entries(PLATFORM_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={selectedManagerFilter || "__all__"} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[150px]`}><SelectValue placeholder="Managers" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Managers" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">{full ? "Manager: todas" : "Todas"}</SelectItem>
+            <SelectItem value="__all__">Manager: todas</SelectItem>
             {assignableManagers.map((m) => (
               <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
             ))}
