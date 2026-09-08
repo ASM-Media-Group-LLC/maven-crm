@@ -12,6 +12,7 @@
 //   GET /public-api/sales/chatters      sales:chatters  (ventas diarias por chatter)
 //   GET /public-api/cowork/time         cowork:read     (tiempo en Cowork por empleado y día)
 //   GET /public-api/cowork/time/segments cowork:read    (cada tramo del reloj, al detalle)
+//   GET /public-api/cowork/breaks       cowork:read     (cada pausa: baño o break, con tope y exceso)
 //
 // La key se busca por su hash SHA-256; se chequea que no esté revocada ni vencida,
 // que la IP esté permitida (si tiene whitelist) y que tenga el scope del recurso.
@@ -185,6 +186,7 @@ Deno.serve(async (req) => {
         { path: "/hubstaff", scope: "hubstaff:read" },
         { path: "/cowork/time", scope: "cowork:read" },
         { path: "/cowork/time/segments", scope: "cowork:read" },
+        { path: "/cowork/breaks", scope: "cowork:read" },
         { path: "/sales", scope: "sales:read" },
         { path: "/sales/chatters", scope: "sales:chatters" },
         { path: "/promolog", scope: "promolog:read" },
@@ -423,7 +425,7 @@ Deno.serve(async (req) => {
   // detalle: inicio, fin, estado y motivo, sesión y sala.
   if (resource === "cowork") {
     if (!need("cowork:read")) return json(req, { error: "forbidden", message: "Falta el scope cowork:read" }, 403);
-    if (sub !== "time") return json(req, { error: "not_found", message: "Usa /cowork/time o /cowork/time/segments" }, 404);
+    if (sub !== "time" && sub !== "breaks") return json(req, { error: "not_found", message: "Usa /cowork/time, /cowork/time/segments o /cowork/breaks" }, 404);
     const { limit, offset } = pageParams(url);
     const detalle = rest[2] === "segments";
     const params = {
@@ -433,6 +435,13 @@ Deno.serve(async (req) => {
       _limit: limit,
       _offset: offset,
     };
+    // Cada pausa al detalle: bathroom | break, duración, tope vigente de la
+    // sesión y si se pasó. Pedido del jefe (08/09): "que la API lo tenga".
+    if (sub === "breaks") {
+      const { data, error } = await admin.rpc("api_cowork_breaks", params);
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+      return json(req, { object: "list", resource: "cowork/breaks", count: (data ?? []).length, limit, offset, data: data ?? [] });
+    }
     if (detalle) {
       const { data, error } = await admin.rpc("api_cowork_time_segments", params);
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
@@ -442,14 +451,35 @@ Deno.serve(async (req) => {
       _desde: params._from, _hasta: params._to, _user_id: params._profile_id, _limit: limit, _offset: offset,
     });
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    // El desglose de la pausa (baño vs break) sale del histórico de pausas, por
+    // persona y día; se pega a cada fila. `paused_seconds` sigue siendo lo que
+    // el reloj vio detenido por pausa; bathroom/break cuentan pausas cerradas.
+    const pausasPorClave = new Map<string, Record<string, unknown>>();
+    if ((data ?? []).length) {
+      const { data: pausas } = await admin.rpc("cowork_pausas_resumen", {
+        _desde: params._from, _hasta: params._to, _user_id: params._profile_id, _limit: 2000, _offset: 0,
+      });
+      for (const p of (pausas ?? []) as Record<string, unknown>[]) pausasPorClave.set(`${p.dia}|${p.user_id}`, p);
+    }
     // Nombres en inglés y planos, como el resto de la API.
-    const filas = (data ?? []).map((r: Record<string, unknown>) => ({
+    const filas = (data ?? []).map((r: Record<string, unknown>) => {
+      const pz = pausasPorClave.get(`${r.dia}|${r.user_id}`);
+      return {
       date: r.dia,
       profile_id: r.user_id,
       employee: r.nombre,
       active_seconds: r.seg_activo,
       active_hours: r.horas_activas,
       paused_seconds: r.seg_pausa,
+      bathroom_breaks: pz?.banos ?? 0,
+      bathroom_seconds: pz?.seg_bano ?? 0,
+      bathroom_limit_seconds: pz?.bano_limite_seg ?? null,
+      bathroom_exceeded: pz?.bano_excedido ?? false,
+      breaks: pz?.breaks ?? 0,
+      break_seconds: pz?.seg_break ?? 0,
+      break_limit_seconds: pz?.break_limite_seg ?? null,
+      breaks_exceeded: pz?.breaks_excedidos ?? 0,
+      break_excess_seconds: pz?.seg_break_de_mas ?? 0,
       no_camera_seconds: r.seg_sin_camara,
       no_screen_seconds: r.seg_sin_pantalla,
       away_seconds: r.seg_fuera_de_camara,
@@ -457,7 +487,8 @@ Deno.serve(async (req) => {
       sessions: r.sesiones,
       first_join: r.primer_ingreso,
       last_leave: r.ultima_salida,
-    }));
+      };
+    });
     return json(req, { object: "list", resource: "cowork/time", count: filas.length, limit, offset, data: filas });
   }
 

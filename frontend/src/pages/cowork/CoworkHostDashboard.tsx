@@ -39,6 +39,7 @@ import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
 import CoworkReglasDialog from "./CoworkReglasDialog";
+import CoworkPausasDialog from "./CoworkPausasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -58,6 +59,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // línea es la TDZ que ya tumbó esta pantalla dos veces.
   const reglas = useMemo(() => normalizarReglas(cowork.session?.alert_rules), [cowork.session?.alert_rules]);
   const [reglasOpen, setReglasOpen] = useState(false);
+  const [pausasOpen, setPausasOpen] = useState(false);
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
@@ -1222,6 +1224,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                title="Pausas: baño y break por persona"
+                onClick={() => setPausasOpen(true)}
+              >
+                <Coffee className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 className="relative h-7 w-7 text-muted-foreground hover:text-foreground"
                 title="Reglas de esta sesión"
                 onClick={() => setReglasOpen(true)}
@@ -2077,6 +2088,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           supervisor). Guardar las escribe en cowork_sessions.alert_rules; el
           realtime de la sesión las trae de vuelta a todos, incluido este
           dashboard. */}
+      <CoworkPausasDialog
+        open={pausasOpen}
+        onOpenChange={setPausasOpen}
+        sessionId={cowork.session?.id ?? null}
+        nombreSesion={cowork.session?.name ?? ""}
+        banoMin={limitesPausa.bano ?? 10}
+        breakMin={limitesPausa.break ?? 30}
+      />
       <CoworkReglasDialog
         open={reglasOpen}
         onOpenChange={setReglasOpen}
