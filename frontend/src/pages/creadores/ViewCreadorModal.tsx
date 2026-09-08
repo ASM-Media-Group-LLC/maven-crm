@@ -140,9 +140,12 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      {/* En el teléfono: margen lateral, esquinas menos redondas y todo apilable.
+          Antes el botón "Perfil Completo" y las 4 pestañas no cabían en 340 px y
+          el pie quedaba en columna (Jhon, iPhone, 07/09/2026). */}
+      <DialogContent className="max-w-[calc(100vw-1.5rem)] rounded-2xl sm:max-w-lg sm:rounded-3xl">
         <DialogHeader>
-          <div className="flex items-start gap-4 pr-8">
+          <div className="flex flex-wrap items-start gap-4 pr-8">
             {igUrl ? (
               <a
                 href={igUrl}
@@ -200,24 +203,24 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 )}
               </div>
             </div>
-            <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => { onOpenChange(false); navigate(`/creadores/${c.id}`); }}>
+            <Button variant="outline" size="sm" className="order-last w-full gap-1.5 sm:order-none sm:w-auto sm:shrink-0" onClick={() => { onOpenChange(false); navigate(`/creadores/${c.id}`); }}>
               <ExternalLink className="h-3.5 w-3.5" />
-              Perfil Completo
+              Perfil completo
             </Button>
           </div>
         </DialogHeader>
 
         <Tabs defaultValue="info" className="mt-2">
-          <TabsList className="w-full">
-            <TabsTrigger value="info" className="flex-1">Info</TabsTrigger>
-            <TabsTrigger value="redes" className="flex-1">Redes</TabsTrigger>
-            <TabsTrigger value="notas" className="flex-1">Notas (0)</TabsTrigger>
-            <TabsTrigger value="monetizacion" className="flex-1">Monetización</TabsTrigger>
+          <TabsList className="w-full justify-start overflow-x-auto sm:justify-center">
+            <TabsTrigger value="info" className="shrink-0 sm:flex-1">Info</TabsTrigger>
+            <TabsTrigger value="redes" className="shrink-0 sm:flex-1">Redes</TabsTrigger>
+            <TabsTrigger value="notas" className="shrink-0 sm:flex-1">Notas (0)</TabsTrigger>
+            <TabsTrigger value="monetizacion" className="shrink-0 sm:flex-1">Monetización</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="max-h-[45vh]">
             <TabsContent value="info" className="pr-3">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 [&_span]:break-words">
                 <InfoField icon={MapPin} label="Ubicación" value={
                   <span>{flag && <span className="mr-1">{flag}</span>}{c.city || c.country || "—"}</span>
                 } />
@@ -282,7 +285,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </ScrollArea>
         </Tabs>
 
-        <DialogFooter className="flex items-center justify-between sm:justify-between">
+        <DialogFooter className="flex-row items-center justify-between sm:justify-between">
           {isAdmin && (
             <Button variant="ghost" size="sm" className="text-destructive gap-1.5" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="h-4 w-4" /> Eliminar

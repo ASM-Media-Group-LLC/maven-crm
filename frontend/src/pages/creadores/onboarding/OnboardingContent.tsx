@@ -12,6 +12,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import CreadoresHeader from "../CreadoresHeader";
 
 const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
+export const FILTRO_POR_DEFECTO = "En curso";
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
@@ -19,7 +20,12 @@ const OnboardingContent = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Todas");
-  const [statusFilter, setStatusFilter] = useState<string>("Todas");
+  // Por defecto solo las que están en curso. La consulta trae también a las
+  // completadas (verificado/active) porque el KPI "Completados" las cuenta,
+  // pero con "Todas" la lista mezclaba 61 activas con 7 en proceso y parecía
+  // que "en onboarding hay tantas creadoras" (Jhon, 07/09/2026). El chip
+  // "Completados" o "Total" las muestran cuando hace falta.
+  const [statusFilter, setStatusFilter] = useState<string>(FILTRO_POR_DEFECTO);
   const [stepFilter, setStepFilter] = useState("");
   const [view, setView] = useState<"table" | "grid">("table");
 
@@ -30,7 +36,9 @@ const OnboardingContent = () => {
     if (activeTab !== "Todas") {
       list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
     }
-    if (statusFilter !== "Todas") {
+    if (statusFilter === FILTRO_POR_DEFECTO) {
+      list = list.filter((c) => c.status !== "Completado");
+    } else if (statusFilter !== "Todas") {
       const mapped = statusMap[statusFilter];
       if (mapped) list = list.filter((c) => c.status === mapped);
     }
@@ -49,10 +57,10 @@ const OnboardingContent = () => {
   const inProgress = creators.filter((c) => c.status === "En Progreso").length;
   const completed = creators.filter((c) => c.status === "Completado").length;
 
-  const hasActiveFilters = statusFilter !== "Todas" || activeTab !== "Todas" || stepFilter !== "" || search !== "";
+  const hasActiveFilters = statusFilter !== FILTRO_POR_DEFECTO || activeTab !== "Todas" || stepFilter !== "" || search !== "";
 
   const clearFilters = () => {
-    setStatusFilter("Todas");
+    setStatusFilter(FILTRO_POR_DEFECTO);
     setActiveTab("Todas");
     setStepFilter("");
     setSearch("");
