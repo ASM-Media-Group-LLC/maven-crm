@@ -35,11 +35,12 @@ export interface DateRange {
   to: Date;
 }
 
-export const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
-  { key: "yesterday", label: "Ayer" },
-  { key: "today", label: "Hoy" },
-  { key: "this_week", label: "Esta semana" },
-  { key: "this_month", label: "Este mes" },
+// shortLabel: en celular "Esta semana"/"Este mes" se partían en dos líneas.
+export const PRESET_CONFIG: Array<{ key: RangePreset; label: string; shortLabel: string }> = [
+  { key: "yesterday", label: "Ayer", shortLabel: "Ayer" },
+  { key: "today", label: "Hoy", shortLabel: "Hoy" },
+  { key: "this_week", label: "Esta semana", shortLabel: "Semana" },
+  { key: "this_month", label: "Este mes", shortLabel: "Mes" },
 ];
 
 export function rangeForPreset(preset: RangePreset, ref: Date = new Date()): DateRange {
@@ -90,7 +91,8 @@ const DateRangePresets = ({ range, activePreset, onChange, className, placeholde
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
             )}
           >
-            {p.label}
+            <span className="sm:hidden">{p.shortLabel}</span>
+            <span className="hidden sm:inline">{p.label}</span>
           </button>
         );
       })}

@@ -39,7 +39,11 @@ import {
   XCircle,
   Bot,
   Link2,
+  SlidersHorizontal,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
+import PromologMobileList from "./PromologMobileList";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
@@ -485,6 +489,10 @@ const PromologContent = () => {
   // estado completo y opera con set normal.
   const [creatorModalCollapsed, setCreatorModalCollapsed] = useState<Set<string>>(new Set());
   const [entryView, setEntryView] = useState<"list" | "grid">("list");
+  // Celular: la lista es siempre de filas compactas y los filtros viven en un
+  // panel deslizante (cinco selects apilados se comían media pantalla).
+  const isMobile = useIsMobile();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [searchCampaign, setSearchCampaign] = useState("");
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
@@ -889,16 +897,73 @@ const PromologContent = () => {
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
 
+  const clearFilters = () => {
+    setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter("");
+  };
+  // Los mismos cinco selects en escritorio (en línea) y en celular (apilados a
+  // ancho completo dentro del panel). `full` = variante de celular.
+  const STATUS_LABELS: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", revisar: "A revisar", pendiente: "No verificado" };
+  const PLATFORM_LABELS: Record<string, string> = { onlyfans: "OnlyFans", unlok: "Unlok", otra: "Otra" };
+  const renderFilterSelects = (full: boolean) => {
+    const trig = full ? "w-full h-10" : "h-9";
+    return (
+      <>
+        {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
+            volver a "Todos" y deja pegado el rótulo anterior. */}
+        <Select value={selectedStatus || "__all__"} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
+          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{full ? "Estado: todos" : "Todos"}</SelectItem>
+            {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={selectedNetwork || "__all__"} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
+          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Red Social" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{full ? "Red social: todas" : "Todas"}</SelectItem>
+            {networkOptions.map((n) => (
+              <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedCardPlatform || "__all__"} onValueChange={(v) => setSelectedCardPlatform(v === "__all__" ? "" : v)}>
+          <SelectTrigger className={full ? trig : `${trig} w-[140px]`}><SelectValue placeholder="Plataforma" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{full ? "Plataforma: todas" : "Todas"}</SelectItem>
+            {Object.entries(PLATFORM_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={selectedManagerFilter || "__all__"} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
+          <SelectTrigger className={full ? trig : `${trig} w-[150px]`}><SelectValue placeholder="Managers" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{full ? "Manager: todas" : "Todas"}</SelectItem>
+            {assignableManagers.map((m) => (
+              <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </>
+    );
+  };
+  // Chips de filtros activos (celular): se ve qué está filtrando sin abrir el panel.
+  const activeChips: Array<{ label: string; clear: () => void }> = [
+    selectedStatus ? { label: STATUS_LABELS[selectedStatus] ?? selectedStatus, clear: () => setSelectedStatus("") } : null,
+    selectedNetwork ? { label: networkOptions.find((n) => n.value === selectedNetwork)?.label ?? selectedNetwork, clear: () => setSelectedNetwork("") } : null,
+    selectedCardPlatform ? { label: PLATFORM_LABELS[selectedCardPlatform] ?? selectedCardPlatform, clear: () => setSelectedCardPlatform("") } : null,
+    selectedManagerFilter ? { label: assignableManagers.find((m) => m.id === selectedManagerFilter)?.full_name ?? "Manager", clear: () => setSelectedManagerFilter("") } : null,
+    selectedCreatorFilter ? { label: creators.find((c: any) => c.id === selectedCreatorFilter)?.name ?? "Creadora", clear: () => setSelectedCreatorFilter("") } : null,
+  ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header global — título a la izquierda, presets (Ayer/Hoy/...) +
           DateRangePicker a la derecha. Mismo patrón que PanelDeControl.
           El date range que vive acá afecta a los 3 subtabs (Dashboard,
           Promos, Agentes) — es la única fuente de verdad temporal. */}
-      <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+      <header className="bg-background/30 backdrop-blur-xl px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-white/10 shrink-0">
         <PageHeader
           title="Promolog"
-          subtitle="Seguimiento promocional diario"
+          subtitle={isMobile ? undefined : "Seguimiento promocional diario"}
           actions={
             <>
               <DateRangePresets
@@ -917,7 +982,10 @@ const PromologContent = () => {
 
       {/* Tabs — SubtabNav (glow azul gradient + ring) para match
           con Closers / LeadGen / Creadores / etc. */}
-      <div className="shrink-0 px-6 pt-3 pb-2">
+      <div className="relative shrink-0 px-4 pt-3 pb-2 sm:px-6">
+        {/* En celular los últimos tabs quedan fuera de vista: el degradé a la
+            derecha avisa que hay más para deslizar. */}
+        <div className="pointer-events-none absolute inset-y-0 right-4 z-10 w-10 bg-gradient-to-l from-background to-transparent sm:hidden" />
         <SubtabNav>
           {tabItems.filter(tab => {
             if (tab.id === "agentes") return isManagement;
@@ -967,75 +1035,80 @@ const PromologContent = () => {
       {activeTab === "promos" && (
         <>
           {/* Filters */}
-          <div className="shrink-0 px-6 pb-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+          <div className="shrink-0 px-4 pb-2 sm:px-6">
+            {isMobile ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar…" className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+                  </div>
+                  <Button variant="outline" size="sm" className="h-9 gap-1.5 shrink-0" onClick={() => setFiltersOpen(true)}>
+                    <SlidersHorizontal className="h-4 w-4" /> Filtros
+                    {activeChips.length > 0 && (
+                      <Badge variant="primary-soft" className="h-5 min-w-5 justify-center px-1.5 text-[10px]">{activeChips.length}</Badge>
+                    )}
+                  </Button>
+                </div>
+                {activeChips.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {activeChips.map((c) => (
+                      <button key={c.label} type="button" onClick={c.clear} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                        {c.label} <X className="h-3 w-3" />
+                      </button>
+                    ))}
+                    <button type="button" onClick={clearFilters} className="text-[11px] text-muted-foreground underline-offset-2 hover:underline">limpiar</button>
+                  </div>
+                )}
+                <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+                  <SheetContent side="bottom" className="rounded-t-2xl">
+                    <SheetHeader className="text-left">
+                      <SheetTitle>Filtros</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-3 space-y-2">{renderFilterSelects(true)}</div>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="ghost" className="flex-1" onClick={clearFilters} disabled={activeChips.length === 0 && !searchEntry}>Limpiar</Button>
+                      <Button className="flex-1" onClick={() => setFiltersOpen(false)}>Ver {filteredEntries.length} promos</Button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+                </div>
+                {renderFilterSelects(false)}
+                {/* DateRangePicker removido — ahora vive global en el header
+                    (DateRangePresets con chips Ayer/Hoy/Semana/Mes). El
+                    rango afecta a los 3 subtabs (Dashboard, Promos, Agentes)
+                    desde una sola fuente, eliminando la duplicidad anterior. */}
+                {(searchEntry || activeChips.length > 0) && (
+                  <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+                    <X className="mr-1.5 h-4 w-4" />
+                    Limpiar filtros
+                  </Button>
+                )}
+                <div className="ml-auto flex gap-1">
+                  <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="si_promociono">Sí</SelectItem>
-                  <SelectItem value="no_promociono">No</SelectItem>
-                  <SelectItem value="revisar">A revisar</SelectItem>
-                  <SelectItem value="pendiente">No verificado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
-                  {networkOptions.map((n) => (
-                    <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedCardPlatform || undefined} onValueChange={(v) => setSelectedCardPlatform(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Plataforma" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
-                  <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                  <SelectItem value="unlok">Unlok</SelectItem>
-                  <SelectItem value="otra">Otra</SelectItem>
-                </SelectContent>
-              </Select>
-              {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
-                  volver a "Todas" y deja pegado el nombre de la manager anterior. */}
-              <Select value={selectedManagerFilter || "__all__"} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Managers" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
-                  {assignableManagers.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* DateRangePicker removido — ahora vive global en el header
-                  (DateRangePresets con chips Ayer/Hoy/Semana/Mes). El
-                  rango afecta a los 3 subtabs (Dashboard, Promos, Agentes)
-                  desde una sola fuente, eliminando la duplicidad anterior. */}
-              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter || selectedManagerFilter) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter(""); }}>
-                  <X className="mr-1.5 h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-              <div className="ml-auto flex gap-1">
-                <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Table area */}
-          <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
-            {entryView === "list" ? (
+          <div className="flex-1 min-h-0 px-4 pb-4 sm:px-6 flex flex-col">
+            {isMobile ? (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <PromologMobileList entries={sortedFilteredEntries} onView={handleViewEntry} />
+              </div>
+            ) : entryView === "list" ? (
               <DataTableShell
                 onScroll={handleContentScroll}
                 className="flex-1 min-h-0"

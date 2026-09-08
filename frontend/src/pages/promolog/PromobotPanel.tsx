@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Play, RefreshCw, Loader2, Search, Bot, CheckCircle2, XCircle, Clock,
-  AlertTriangle, Users, Zap, DollarSign, Activity, Trash2, ScanLine,
+  AlertTriangle, Users, Zap, DollarSign, Activity, Trash2, ScanLine, ChevronDown,
 } from "lucide-react";
 
 // PromobotPanel — control manual del pipeline de verificación de Promolog.
@@ -359,9 +360,17 @@ const PromobotPanel = () => {
   const selectedCount = selected.size;
   const totalEligible = creators.length;
   const netCount = selectedNetworks.size;
+  // Celular: la lista de 58 creadoras con checkbox se pliega (casi nadie elige a
+  // mano desde el teléfono) y la salud del pipeline sube arriba de todo.
+  const isMobile = useIsMobile();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const showPicker = !isMobile || pickerOpen;
 
   return (
-    <div className="space-y-4 px-6 pb-8">
+    // flex-1 + min-h-0 + overflow-y-auto: el <main> de Promolog recorta (overflow-hidden)
+    // y cada tab pone su propio scroll; sin esto, en celular todo lo que quedaba
+    // debajo del lanzador (salud, corridas) era INALCANZABLE.
+    <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-8 sm:px-6">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Bot className="h-5 w-5 text-primary" />
@@ -376,7 +385,7 @@ const PromobotPanel = () => {
       {/* ── Lanzar análisis ─────────────────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
               <span className="text-sm font-medium">Lanzar análisis ahora</span>
@@ -384,10 +393,11 @@ const PromobotPanel = () => {
                 <Users className="h-3 w-3" /> {loadingCreators ? "…" : totalEligible} elegibles
               </Badge>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <Button
                 size="sm"
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={launching || selectedCount === 0 || netCount === 0}
                 onClick={() => setConfirmScope("selected")}
               >
@@ -396,6 +406,7 @@ const PromobotPanel = () => {
               </Button>
               <Button
                 size="sm"
+                className="w-full sm:w-auto"
                 disabled={launching || loadingCreators || totalEligible === 0 || netCount === 0}
                 onClick={() => setConfirmScope("all")}
               >
@@ -424,7 +435,19 @@ const PromobotPanel = () => {
             {netCount === 0 && <span className="text-[11px] text-destructive">· elige al menos una red</span>}
           </div>
 
-          {/* Buscador + lista de modelos */}
+          {/* Buscador + lista de modelos (plegado en celular) */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => setPickerOpen((o) => !o)}
+              className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm"
+            >
+              <span>Elegir creadoras{selectedCount > 0 ? ` · ${selectedCount} seleccionada${selectedCount === 1 ? "" : "s"}` : ""}</span>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
+            </button>
+          )}
+          {showPicker && (
+          <>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -462,6 +485,8 @@ const PromobotPanel = () => {
               </div>
             )}
           </ScrollArea>
+          </>
+          )}
           <p className="text-[11px] text-muted-foreground">
             Lanzar dispara un scrape real en Apify + análisis con Gemini (tiene costo). Usa <code>force</code> — saltea el límite de 1 corrida/día.
           </p>
@@ -478,9 +503,10 @@ const PromobotPanel = () => {
         const ago = (h: number) => (h === Infinity ? "nunca" : h < 1 ? `${Math.round(h * 60)} min` : `${Math.round(h)} h`);
         const gap = totalEligible > 0 ? totalEligible - health.scannedToday : 0;
         return (
-          <Card className={stale ? "border-destructive/40" : ""}>
+          // order-first: en celular lo primero que importa es CÓMO está el bot, no el lanzador.
+          <Card className={`order-first sm:order-none ${stale ? "border-destructive/40" : ""}`}>
             <CardContent className="space-y-3 p-4">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Salud del pipeline</span>
                 <Badge variant="secondary-soft" className="text-[10px]">solo IG</Badge>
@@ -527,7 +553,7 @@ const PromobotPanel = () => {
                 />
               </div>
               {fallen.length > 0 && (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-warning">
                     {fallen.length} creadora(s) quedaron sin escanear hoy por corridas con error.
                   </span>
@@ -576,6 +602,44 @@ const PromobotPanel = () => {
             </div>
           ) : runs.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">Todavía no hay corridas</div>
+          ) : isMobile ? (
+            <>
+            {/* Celular: una fila por corrida en vez de la tabla de 6 columnas. */}
+            <ul className="divide-y rounded-md border">
+              {runs.map((r) => {
+                const meta = statusMeta[r.status] ?? statusMeta.pending;
+                const isActive = ACTIVE_STATUSES.has(r.status);
+                const conDetalle = r.creators_count > 0 && (r.payload?.creator_ids?.length || r.payload?.input?.usernames?.length);
+                return (
+                  <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs tabular-nums">{fmtTime(r.started_at)}</span>
+                        <span className="text-[11px] text-muted-foreground">{r.dispatched_by ? "Manual" : "Cron"}</span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {conDetalle ? (
+                          <button type="button" onClick={() => setRunModels(r)} className="font-medium text-primary underline-offset-2 hover:underline">{r.creators_count} modelos</button>
+                        ) : `${r.creators_count} modelos`}
+                        {" · "}{r.entries_created} entries{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(3)}` : ""}
+                      </p>
+                    </div>
+                    <Badge variant={meta.variant} className="shrink-0 gap-1 text-[10px]">
+                      <meta.Icon className={`h-3 w-3 ${isActive && r.status === "running" ? "animate-spin" : ""}`} />
+                      {meta.label}
+                    </Badge>
+                  </li>
+                );
+              })}
+            </ul>
+            {runs.length >= runsLimit && (
+              <div className="flex justify-center pt-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRunsLimit((n) => n + 15)}>
+                  Ver más
+                </Button>
+              </div>
+            )}
+            </>
           ) : (
             <>
             <div className="overflow-x-auto">
