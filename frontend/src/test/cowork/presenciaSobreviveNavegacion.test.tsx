@@ -107,13 +107,17 @@ describe("presencia de Cowork al navegar", () => {
     expect(removeChannel).not.toHaveBeenCalled();
   });
 
-  it("cambiar de sesión sí cierra la anterior", () => {
+  it("cambiar de sesión sí cierra la anterior, y abre la nueva RECIÉN cuando la vieja terminó de salir", async () => {
     const { rerender } = renderHook(
       ({ s }) => useCoworkMediaPresence(s, CHATTER, { persistente: true }),
       { initialProps: { s: SESION } },
     );
     rerender({ s: "sesion-2" });
     expect(removeChannel).toHaveBeenCalledTimes(1);
+    // El canal nuevo NO se abre en el mismo tic: el cliente de Realtime borra
+    // por nombre tras el acuse, y abrir antes hacía nacer muerto al nuevo.
+    expect(channel).toHaveBeenCalledTimes(1);
+    await act(async () => { await Promise.resolve(); });
     expect(channel).toHaveBeenCalledTimes(2);
   });
 });

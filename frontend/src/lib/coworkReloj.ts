@@ -24,12 +24,14 @@ export function segundosMostrados(reloj: RelojCowork | null, ahora: number): num
   return base + Math.max(0, Math.floor((ahora - reloj.en) / 1000));
 }
 
-/** "3h 42m", "42m", "0m". Sin segundos: un cronómetro con segundos en la
- *  esquina distrae, y el dato que importa es el acumulado del día. */
+/** "3h 42m 07s", "42m 07s", "0m 05s". Con segundos (pedido de Jhon, 07/09):
+ *  ver el segundero correr es lo que le dice a la persona que el reloj está
+ *  vivo y no colgado. */
 export function formatoReloj(seg: number): string {
   const s = Math.max(0, Math.floor(seg));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  const ss = `${String(r).padStart(2, "0")}s`;
+  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m ${ss}` : `${m}m ${ss}`;
 }
 
 /** Por qué está detenido, dicho a la persona. `null` cuando corre. */

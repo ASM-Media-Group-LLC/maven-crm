@@ -6,6 +6,7 @@ import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarPersona } from "@/lib/avisoPersona";
+import { decidirAutoJoin } from "@/lib/coworkAutoJoin";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -179,21 +180,20 @@ export default function CoworkPage() {
     const code = searchParams.get("code");
     const roomId = searchParams.get("room");
 
-    const canAutoJoin = (role === "host" && code) || roomId;
-    if (!canAutoJoin) return;
-
-    if (cowork.myMembership) {
-      const wantsHost = role === "host" && code;
-      const isHost = cowork.myMembership.role === "host";
-      const needsRoomAssignment = !wantsHost && !isHost && roomId && !cowork.myAssignment;
-      if (((wantsHost && isHost) || (!wantsHost && !isHost)) && !needsRoomAssignment) return;
-    }
+    // La decisión vive en lib/coworkAutoJoin (con tests): un host con ?room=
+    // en la URL NO se auto-une como participante — era lo que lo degradaba.
+    const decision = decidirAutoJoin({
+      role, code, roomId,
+      membresia: cowork.myMembership ? { role: cowork.myMembership.role } : null,
+      tieneAsignacion: !!cowork.myAssignment,
+    });
+    if (decision === "nada") return;
 
     setAutoJoining(true);
     const doJoin = async () => {
       try {
-        if (role === "host" && code) {
-          await cowork.joinSession(sessionId, "host", code);
+        if (decision === "unirse-como-host") {
+          await cowork.joinSession(sessionId, "host", code ?? undefined);
         } else if (roomId) {
           await cowork.joinSession(sessionId, "participant", undefined, roomId);
         }

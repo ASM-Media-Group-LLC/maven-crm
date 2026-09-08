@@ -436,6 +436,14 @@ serve(async (req) => {
           return json(req, { membership: existing, alreadyJoined: true });
         }
 
+        // Un HOST nunca se degrada a participante por esta puerta (07/09/2026:
+        // a Jhon y al creador de otra sesión los bajó el auto-join de una URL
+        // con ?room=). A las salas los hosts entran desde el tablero sin
+        // cambiar de rol. Se contesta como si ya estuviera adentro.
+        if (existing.role === "host" && memberRole === "participant") {
+          return json(req, { membership: existing, alreadyJoined: true, keptHost: true });
+        }
+
         // Different role → update membership
         const { data: updated, error: upErr } = await admin.from("cowork_memberships")
           .update({ role: memberRole })
