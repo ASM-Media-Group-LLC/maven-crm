@@ -17,11 +17,11 @@ describe("segundosMostrados", () => {
 });
 
 describe("formatoReloj y motivos", () => {
-  it("formatea sin segundos", () => {
-    expect(formatoReloj(0)).toBe("0m");
-    expect(formatoReloj(59)).toBe("0m");
-    expect(formatoReloj(45 * 60)).toBe("45m");
-    expect(formatoReloj(3600 * 3 + 60 * 7)).toBe("3h 07m");
+  it("formatea con segundos, para que se vea correr", () => {
+    expect(formatoReloj(0)).toBe("0m 00s");
+    expect(formatoReloj(59)).toBe("0m 59s");
+    expect(formatoReloj(45 * 60 + 7)).toBe("45m 07s");
+    expect(formatoReloj(3600 * 3 + 60 * 7 + 9)).toBe("3h 07m 09s");
   });
   it("explica por qué está detenido, a la persona y al supervisor", () => {
     expect(motivoDetenido("activo")).toBeNull();
