@@ -173,13 +173,10 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
 
   return (
     <div className="space-y-5 mt-2">
-      {/* El video va PRIMERO: si existe, es la forma más rápida de aprender su
-          voz, y leer treinta campos de texto antes de verlo es al revés.
-          Subir/reemplazar aparece solo en modo edición, como el resto del tab. */}
-      <VideoOnboarding creatorId={creatorId} puedeEditar={isEditing} />
-
-      {/* Editar/Guardar — mismo patrón que el tab Información */}
-      <div className="flex items-center justify-end -mb-2">
+      {/* Editar/Guardar ARRIBA DE TODO: este botón gobierna el tab entero,
+          incluido el video, así que tenerlo debajo de la primera tarjeta
+          hacía parecer que solo afectaba a lo de abajo. */}
+      <div className="flex items-center justify-end">
         {!isEditing ? (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
             <Edit className="h-3.5 w-3.5" /> Editar
@@ -195,6 +192,12 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
           </div>
         )}
       </div>
+
+      {/* El video, primero del contenido: si existe, es la forma más rápida de aprender su
+          voz, y leer treinta campos de texto antes de verlo es al revés.
+          Subir/reemplazar aparece solo en modo edición, como el resto del tab. */}
+      <VideoOnboarding creatorId={creatorId} puedeEditar={isEditing} />
+
 
       {/* 1. Ficha de Personaje */}
       <Card>
