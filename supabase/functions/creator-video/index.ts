@@ -43,10 +43,24 @@ const TOPE_BYTES = 2 * 1024 * 1024 * 1024;
 
 function r2(): { cliente: AwsClient; base: string } {
   const cuenta = Deno.env.get("R2_ACCOUNT_ID");
-  const key = Deno.env.get("R2_ACCESS_KEY_ID");
-  const secret = Deno.env.get("R2_SECRET_ACCESS_KEY");
+  // Se aceptan LOS DOS nombres a propósito. El egress de LiveKit ya usaba
+  // R2_ACCESS_KEY/R2_SECRET en Dokploy, y pedir aquí los nombres del estándar
+  // S3 obligaba a tener el mismo valor con dos nombres distintos según dónde
+  // se cargue. Eso ya causó un "faltan los secrets de R2" que costó un
+  // redespliegue y un rato de búsqueda: la falla no dice qué nombre esperaba.
+  const key = Deno.env.get("R2_ACCESS_KEY_ID") ?? Deno.env.get("R2_ACCESS_KEY");
+  const secret = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? Deno.env.get("R2_SECRET");
   const bucket = Deno.env.get("R2_BUCKET_ONBOARDING") ?? "maven-onboarding";
-  if (!cuenta || !key || !secret) throw new Error("faltan los secrets de R2");
+  if (!cuenta || !key || !secret) {
+    // El mensaje dice QUÉ falta: "faltan los secrets" a secas mandó a revisar
+    // los cuatro cuando el problema era el nombre de uno.
+    const faltan = [
+      !cuenta && "R2_ACCOUNT_ID",
+      !key && "R2_ACCESS_KEY_ID (o R2_ACCESS_KEY)",
+      !secret && "R2_SECRET_ACCESS_KEY (o R2_SECRET)",
+    ].filter(Boolean).join(", ");
+    throw new Error(`faltan estos secrets de R2 en Supabase: ${faltan}`);
+  }
   return {
     // region "auto" es lo que R2 espera; con otra, la firma no valida.
     cliente: new AwsClient({ accessKeyId: key, secretAccessKey: secret, service: "s3", region: "auto" }),
