@@ -25,6 +25,16 @@ interface DateInputProps {
   toYear?: number;
 }
 
+// Un año tipeado fuera del rango del componente es un error de dedo casi
+// seguro (una creadora quedó con `71996-02-09` y el perfil decía "-69970
+// años"). El calendario ya no deja elegirlo; el texto libre tampoco debe.
+export function anioTipeadoEnRango(texto: string, fromYear: number, toYear: number): boolean {
+  const m = /^\d{2}\/\d{2}\/(\d{4})$/.exec(texto);
+  if (!m) return false;
+  const anio = Number(m[1]);
+  return anio >= fromYear && anio <= toYear;
+}
+
 export function DateInput({
   value,
   onChange,
@@ -89,7 +99,7 @@ export function DateInput({
 
     if (raw.length === 10) {
       const parsed = parse(raw, "dd/MM/yyyy", new Date());
-      if (isValid(parsed)) {
+      if (isValid(parsed) && anioTipeadoEnRango(raw, fromYear, toYear)) {
         setDraft(parsed);
         setDisplayMonth(parsed);
       }
@@ -99,7 +109,7 @@ export function DateInput({
   const handleTextBlur = () => {
     if (textValue.length === 10) {
       const parsed = parse(textValue, "dd/MM/yyyy", new Date());
-      if (isValid(parsed)) {
+      if (isValid(parsed) && anioTipeadoEnRango(textValue, fromYear, toYear)) {
         setDraft(parsed);
         return;
       }

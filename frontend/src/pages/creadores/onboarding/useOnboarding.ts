@@ -130,6 +130,8 @@ export function useOnboarding() {
       const { data, error } = await supabase
         .from("v_creators" as never) // PII enmascarada (real solo admin)
         .select("*, creator_business(*)")
+        // Incluye verificado/active a propósito: son las "Completadas" del KPI.
+        // La lista las esconde por defecto (OnboardingContent, FILTRO_POR_DEFECTO).
         .in("status", ["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado", "active"]);
 
       if (error) throw error;

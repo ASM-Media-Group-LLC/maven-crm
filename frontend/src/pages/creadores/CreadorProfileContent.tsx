@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { differenceInCalendarDays, setYear, format } from "date-fns";
+import { format } from "date-fns";
+import { computeAge, getDaysUntilBirthday } from "@/lib/edad";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -63,24 +64,6 @@ const getFlagEmoji = (code: string | null) => {
   return code.toUpperCase().split("").map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
 };
 
-function getDaysUntilBirthday(birthDate: string): number | null {
-  const bd = new Date(birthDate);
-  if (isNaN(bd.getTime())) return null;
-  const today = new Date();
-  let next = setYear(bd, today.getFullYear());
-  if (next < today) next = setYear(bd, today.getFullYear() + 1);
-  return differenceInCalendarDays(next, today);
-}
-
-function computeAge(birthDate: string): number | null {
-  const bd = new Date(birthDate);
-  if (isNaN(bd.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - bd.getFullYear();
-  const m = today.getMonth() - bd.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
-  return age;
-}
 const STATUS_OFFBOARDING: Record<string, { label: string; variant: string }> = {
   en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
   pendiente_aprobacion: { label: "Pend. Aprobación", variant: "bg-warning/15 text-warning border-warning/30" },
@@ -186,16 +169,19 @@ const CreadorProfileContent = () => {
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="px-6 pt-4">
+      <div className="px-3 pt-4 sm:px-6">
         <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Volver
         </Button>
       </div>
 
-      <div className="mx-6 mt-3 h-32 rounded-xl bg-primary/80 -mb-16" />
+      <div className="mx-3 mt-3 h-24 rounded-xl bg-primary/80 -mb-12 sm:mx-6 sm:h-32 sm:-mb-16" />
 
-      <div className="mx-6 relative z-10 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-6">
-        <div className="flex items-start gap-6">
+      {/* Cabecera. En el teléfono se APILA (foto, nombre, badges): en una sola
+          fila la columna derecha (exportar + 3 badges, shrink-0) se dibujaba
+          encima del nombre y fuera de la tarjeta (Jhon, iPhone, 07/09/2026). */}
+      <div className="mx-3 relative z-10 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-4 sm:mx-6 sm:p-6">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6">
           <ProfilePhotoEditor
             creatorId={c.id}
             photoUrl={c.profile_photo_url}
@@ -204,8 +190,8 @@ const CreadorProfileContent = () => {
             canEdit={!vistaTrabajo}
           />
 
-          <div className="flex-1 min-w-0 space-y-2">
-            <h1 className="text-2xl font-bold tracking-wide uppercase">{displayName}</h1>
+          <div className="w-full min-w-0 flex-1 space-y-2 text-center sm:text-left">
+            <h1 className="break-words text-xl font-bold uppercase tracking-wide sm:text-2xl">{displayName}</h1>
             {showRealName && c.artistic_name && (
               <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
             )}
@@ -213,7 +199,7 @@ const CreadorProfileContent = () => {
               <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
             )}
 
-            <div className="flex flex-wrap items-center gap-2 mt-3">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               {/* Contacto: NO en la vista de trabajo. El teléfono ya viene
                   enmascarado de la BD y estos botones son ese mismo número en
                   forma de acción (abren la bandeja / el chat con ella). */}
@@ -236,11 +222,12 @@ const CreadorProfileContent = () => {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
             {/* La ficha técnica en PDF es un volcado de TODOS los campos:
-                queda fuera de la vista de trabajo. */}
+                queda fuera de la vista de trabajo. Y del teléfono: el PDF se
+                genera y se lee en escritorio. */}
             {!vistaTrabajo && (
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={async () => {
+              <Button variant="outline" size="sm" className="hidden gap-1.5 sm:inline-flex" onClick={async () => {
                 const { generateCreatorPdf } = await import("./generateCreatorPdf");
                 generateCreatorPdf(c);
               }}>
