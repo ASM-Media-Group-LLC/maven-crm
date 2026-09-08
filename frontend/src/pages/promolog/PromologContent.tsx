@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { computeDayScore, displayPlatform } from "./promoScore";
@@ -179,7 +180,7 @@ const PromologContent = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("creators")
-        .select("id, name, artistic_name, category, country, country_code, status, profile_photo_url, instagram_handle, twitter_handle, tiktok_handle")
+        .select("id, name, artistic_name, category, country, country_code, status, profile_photo_url, instagram_handle, twitter_handle, tiktok_handle, assigned_manager_profile_id")
         .eq("status", "active")
         .order("name");
       if (error) throw error;
@@ -478,6 +479,10 @@ const PromologContent = () => {
   const [entryCustomPlatform, setEntryCustomPlatform] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [selectedCardPlatform, setSelectedCardPlatform] = useState("");
+  // Filtro por manager (persona con rol manager): entries de las creadoras
+  // ASIGNADAS actualmente a ella. Siempre sobre activas (la lista base ya lo es).
+  const [selectedManagerFilter, setSelectedManagerFilter] = useState("");
+  const { data: assignableManagers = [] } = useAssignableManagers();
   
   const [selectedCreatorFilter, setSelectedCreatorFilter] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
@@ -863,7 +868,7 @@ const PromologContent = () => {
   // aunque sí había registros. Se veía como "el filtro de tiempo no funciona".
   useEffect(() => {
     setPromoPage(1);
-  }, [dateFrom, dateTo, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry, selectedCreatorFilter]);
+  }, [dateFrom, dateTo, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry, selectedCreatorFilter, selectedManagerFilter]);
 
   // KPI modal state. "creadores_escaneados" abre un modal especial con
   // las creadoras únicas agrupadas por categoría (Elite, A+, ...). Los
@@ -897,9 +902,19 @@ const PromologContent = () => {
 
   const navigate = useNavigate();
 
+  // Manager de cada creadora activa (para el filtro por manager de Promos).
+  const managerByCreator = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const c of creators as Array<{ id: string; assigned_manager_profile_id?: string | null }>) {
+      map.set(c.id, c.assigned_manager_profile_id ?? null);
+    }
+    return map;
+  }, [creators]);
+
   const filteredEntries = useMemo(() => {
     return dedupedEntries.filter((entry) => {
       if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
+      if (selectedManagerFilter !== "" && (!entry.creator_id || managerByCreator.get(entry.creator_id) !== selectedManagerFilter)) return false;
       if (selectedStatus !== "") {
         // Resultado binario Sí/No + filtros aditivos: "no verificado" (pending) y "revisar".
         if (selectedStatus === "si_promociono" && entry.result !== "Sí") return false;
@@ -915,7 +930,7 @@ const PromologContent = () => {
       }
       return true;
     });
-  }, [dedupedEntries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
+  }, [dedupedEntries, selectedCreatorFilter, selectedManagerFilter, managerByCreator, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
 
   // Orden GLOBAL antes de paginar. Sin orden explícito (null) se respeta el orden
   // de la query; con orden se ordena el set completo y recién ahí se corta la página.
@@ -1095,12 +1110,21 @@ const PromologContent = () => {
                   <SelectItem value="otra">Otra</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={selectedManagerFilter || undefined} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Managers" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {assignableManagers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {/* DateRangePicker removido — ahora vive global en el header
                   (DateRangePresets con chips Ayer/Hoy/Semana/Mes). El
                   rango afecta a los 3 subtabs (Dashboard, Promos, Agentes)
                   desde una sola fuente, eliminando la duplicidad anterior. */}
-              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); }}>
+              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter || selectedManagerFilter) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter(""); }}>
                   <X className="mr-1.5 h-4 w-4" />
                   Limpiar filtros
                 </Button>

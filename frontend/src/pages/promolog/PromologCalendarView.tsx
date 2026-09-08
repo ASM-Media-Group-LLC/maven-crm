@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks/useTimezone";
+import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ interface Creator {
   artistic_name?: string | null;
   profile_photo_url?: string | null;
   instagram_handle?: string | null;
+  assigned_manager_profile_id?: string | null;
 }
 
 interface Props {
@@ -81,6 +83,22 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
   const [cursor, setCursor] = useState<Date>(() => startOfMonth(new Date()));
   const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Filtro por manager: acota la lista de creadoras a las ASIGNADAS a esa
+  // manager (sin manager elegida = lista completa de activas).
+  const [managerId, setManagerId] = useState<string>("");
+  const { data: assignableManagers = [] } = useAssignableManagers();
+  const creatorOptions = useMemo(
+    () => (managerId ? creators.filter((c) => c.assigned_manager_profile_id === managerId) : creators),
+    [creators, managerId],
+  );
+  const pickManager = (id: string) => {
+    setManagerId(id);
+    // Si la creadora elegida no es de esa manager, se limpia la selección.
+    if (id && creatorId && !creators.some((c) => c.id === creatorId && c.assigned_manager_profile_id === id)) {
+      setCreatorId("");
+    }
+  };
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth(); // 0-11
@@ -368,17 +386,30 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
 
   return (
     <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
-      {/* Controles: creadora + mes/año */}
+      {/* Controles: creadora + manager + mes/año */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={creatorId || undefined} onValueChange={setCreatorId}>
           <SelectTrigger className="w-[260px] h-10">
             <SelectValue placeholder="Selecciona una creadora…" />
           </SelectTrigger>
           <SelectContent>
-            {creators.map((c) => (
+            {creatorOptions.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.artistic_name || c.name}
               </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Manager: sin selección = todas las activas; con una = solo sus asignadas */}
+        <Select value={managerId || undefined} onValueChange={(v) => pickManager(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="w-[180px] h-10">
+            <SelectValue placeholder="Managers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todas las managers</SelectItem>
+            {assignableManagers.map((m) => (
+              <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
             ))}
           </SelectContent>
         </Select>
