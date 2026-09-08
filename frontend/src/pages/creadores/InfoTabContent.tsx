@@ -66,7 +66,6 @@ const countryOptions = Object.keys(countryToCode).sort((a, b) => a.localeCompare
 // cuentas BLU; Unlok la casa. El manager de la creadora es un campo APARTE.
 const AGENCY_OPTIONS = ["Kash Massive", "Kash Plus", "Unlok"];
 const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
-const managerTypeOptions = ["Full Management", "Hybrid", "Basic"];
 
 const getFlagEmoji = (code: string | null) => {
   if (!code) return "";
@@ -76,10 +75,11 @@ const getFlagEmoji = (code: string | null) => {
 interface EditData {
   assigned_agency: string;
   category: string;
-  manager_type: string;
   // Manager PERSONA (profiles.id de alguien con rol manager). Es la fuente de
   // verdad de "quién maneja a esta modelo" — el bot y los RPCs agrupan por acá.
   manager_profile_id: string;
+  // % con agencia (creator_business.agency_percentage) — como string del input.
+  agency_percentage: string;
   country: string;
   city: string;
   birth_date: string;
@@ -136,8 +136,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const [editData, setEditData] = useState<EditData>({
     assigned_agency: "",
     category: "",
-    manager_type: "",
     manager_profile_id: "",
+    agency_percentage: "",
     country: "",
     city: "",
     birth_date: "",
@@ -151,8 +151,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
       // Lee del FK joined; fallback al texto si la FK no está poblada.
       assigned_agency: (biz as any)?.company?.name ?? biz?.assigned_agency ?? "",
       category: c.category ?? "",
-      manager_type: biz?.manager_type ?? "",
       manager_profile_id: c.assigned_manager_profile_id ?? "",
+      agency_percentage: biz?.agency_percentage != null ? String(biz.agency_percentage) : "",
       country: c.country ?? "",
       city: c.city ?? "",
       birth_date: c.birth_date ?? "",
@@ -187,21 +187,25 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         } as any)
         .eq("id", creatorId);
 
+      // Dual-write: resolvemos company_id desde el name elegido y guardamos
+      // AMBOS — la FK canónica y el texto por backwards-compat. El porcentaje
+      // se acota a 0-100 (vacío = null).
+      const matchedCompany = scouterCompanies.find(
+        (sc) => sc.name === editData.assigned_agency,
+      );
+      const pctRaw = editData.agency_percentage.trim();
+      const pctNum = pctRaw === "" ? null : Math.min(100, Math.max(0, Number(pctRaw)));
+      const bizPayload = {
+        assigned_agency: editData.assigned_agency || null,
+        company_id: matchedCompany?.id ?? null,
+        agency_percentage: pctNum != null && Number.isFinite(pctNum) ? pctNum : null,
+      };
       if (biz?.id) {
-        // Dual-write: resolvemos company_id desde el name elegido (la
-        // lista viene de scouter_companies) y guardamos AMBOS — la FK
-        // canónica y el texto por backwards-compat.
-        const matchedCompany = scouterCompanies.find(
-          (sc) => sc.name === editData.assigned_agency,
-        );
-        await supabase
-          .from("creator_business")
-          .update({
-            assigned_agency: editData.assigned_agency || null,
-            company_id: matchedCompany?.id ?? null,
-            manager_type: editData.manager_type || null,
-          } as any)
-          .eq("id", biz.id);
+        await supabase.from("creator_business").update(bizPayload as any).eq("id", biz.id);
+      } else if (bizPayload.assigned_agency || bizPayload.agency_percentage != null) {
+        // La creadora aún no tiene fila de negocio: crearla en vez de perder
+        // el dato en silencio.
+        await supabase.from("creator_business").insert({ creator_id: creatorId, ...bizPayload } as any);
       }
 
       await queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
@@ -306,20 +310,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           <InfoField label="Manager" value={managerName} />
         )}
 
-        {/* Tipo de management (Full/Hybrid/Basic — concepto aparte del manager persona) */}
-        {isEditing ? (
-          <EditField label="Tipo de management">
-            <Select value={editData.manager_type} onValueChange={(v) => updateField("manager_type", v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent>
-                {managerTypeOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </EditField>
-        ) : (
-          <InfoField label="Tipo de management" value={biz?.manager_type} />
-        )}
-
         {/* País */}
         {isEditing ? (
           <EditField label="País">
@@ -358,8 +348,24 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           } />
         )}
 
-        {/* Porcentaje con Agencia (read-only always) */}
-        {biz?.commission_type === "tiered" && Array.isArray(biz?.commission_tiers) && (biz.commission_tiers as any[]).length > 0 ? (
+        {/* Porcentaje con Agencia */}
+        {isEditing ? (
+          <EditField label="Porcentaje con Agencia">
+            <div className="flex items-center gap-2">
+              <Input
+                className="h-9 text-sm w-28"
+                type="number"
+                min={0}
+                max={100}
+                step="0.5"
+                value={editData.agency_percentage}
+                onChange={(e) => updateField("agency_percentage", e.target.value)}
+                placeholder="30"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          </EditField>
+        ) : biz?.commission_type === "tiered" && Array.isArray(biz?.commission_tiers) && (biz.commission_tiers as any[]).length > 0 ? (
           <div className="py-3 sm:col-span-2">
             <p className="text-xs text-muted-foreground mb-1">Comisión por Rangos</p>
             <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1">
