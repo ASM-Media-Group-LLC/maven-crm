@@ -25,7 +25,7 @@ const CreadoresSubtabs = () => {
   };
 
   return (
-    <SubtabNav className="shrink-0 overflow-x-auto">
+    <SubtabNav className="max-w-full overflow-x-auto scrollbar-thin-x">
       {tabs.map((tab) => {
         if (!canAccess("Creadores", tab.submodule)) return null;
         const Icon = tab.icon;

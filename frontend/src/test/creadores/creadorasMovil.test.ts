@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 
 const fuentes = (import.meta as unknown as {
   glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
-}).glob(["/frontend/src/pages/creadores/ViewCreadorModal.tsx", "/frontend/src/pages/creadores/CreadorProfileContent.tsx"], { query: "?raw", import: "default", eager: true });
+}).glob(["/frontend/src/pages/creadores/ViewCreadorModal.tsx", "/frontend/src/pages/creadores/CreadorProfileContent.tsx", "/frontend/src/pages/creadores/CreadoresHeader.tsx", "/frontend/src/pages/creadores/onboarding/OnboardingContent.tsx"], { query: "?raw", import: "default", eager: true });
 const fuente = (nombre: string) => {
   const k = Object.keys(fuentes).find((p) => p.endsWith(nombre));
   if (!k) throw new Error(`no encontré ${nombre}`);
@@ -37,5 +37,17 @@ describe("perfil de la creadora (CreadorProfileContent)", () => {
   it("la edad sale del helper con guard, no de una copia local", () => {
     expect(s).toContain('from "@/lib/edad"');
     expect(s).not.toMatch(/^function computeAge/m);
+  });
+});
+
+describe("encabezado de Creadoras y Onboarding", () => {
+  it("la fila de subtabs + acción envuelve (el botón no se sale de la pantalla)", () => {
+    expect(fuente("CreadoresHeader.tsx")).toMatch(/<div className="flex flex-wrap items-center justify-between/);
+  });
+  it("en Onboarding nada hace scrollear la página de lado", () => {
+    const s = fuente("OnboardingContent.tsx");
+    expect(s).toContain("overflow-x-hidden");
+    expect(s).toContain("max-w-full overflow-x-auto");
+    expect(s).toMatch(/<div className="flex flex-wrap items-center gap-3">/);
   });
 });
