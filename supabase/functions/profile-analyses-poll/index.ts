@@ -58,6 +58,9 @@ Deno.serve(async (req: Request) => {
   // "no hay análisis stuck" no saltee este barrido.
   const cutoff = new Date(Date.now() - MIN_RUNNING_MINUTES * 60_000).toISOString();
   const hcResults = await sweepHandleCheckJobs(sb, cutoff, { SUPABASE_URL, APIFY_TOKEN, CRON_TOKEN, ANON_KEY });
+  // ── 3) parrilla_trending_jobs — reels en tendencia del bot de Managers ───
+  // Mismo patrón (webhook perdido → poll Apify → re-fire del callback + deadline).
+  const trResults = await sweepTrendingJobs(sb, cutoff, { SUPABASE_URL, APIFY_TOKEN, CRON_TOKEN, ANON_KEY });
 
   // Query jobs candidatos
   const { data: stuckJobs, error: qErr } = await (sb as any)
@@ -68,9 +71,9 @@ Deno.serve(async (req: Request) => {
     .order("created_at", { ascending: true })
     .limit(MAX_JOBS_PER_TICK);
 
-  if (qErr) return json(req, { error: `query failed: ${qErr.message}`, handle_checks: hcResults }, 500);
+  if (qErr) return json(req, { error: `query failed: ${qErr.message}`, handle_checks: hcResults, trending: trResults }, 500);
   if (!stuckJobs || stuckJobs.length === 0) {
-    return json(req, { ok: true, processed: 0, message: "No stuck jobs", handle_checks: hcResults });
+    return json(req, { ok: true, processed: 0, message: "No stuck jobs", handle_checks: hcResults, trending: trResults });
   }
 
   // Procesar cada job: consultar Apify, si terminó disparar callback
@@ -133,8 +136,70 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json(req, { ok: true, processed: results.length, results, handle_checks: hcResults });
+  return json(req, { ok: true, processed: results.length, results, handle_checks: hcResults, trending: trResults });
 });
+
+// Barre parrilla_trending_jobs no terminales (reels en tendencia, edge
+// parrilla-refs-trending). Misma lógica que sweepHandleCheckJobs: deadline duro
+// con aviso al grupo (claim atómico) y re-fire del callback si el webhook se perdió.
+const TRENDING_DEADLINE_MINUTES = 12;
+async function sweepTrendingJobs(
+  sb: any,
+  cutoff: string,
+  env: { SUPABASE_URL: string; APIFY_TOKEN: string; CRON_TOKEN: string | undefined; ANON_KEY: string },
+): Promise<Array<{ job_id: string; action: string }>> {
+  const out: Array<{ job_id: string; action: string }> = [];
+  const { data: jobs, error } = await sb
+    .from("parrilla_trending_jobs")
+    .select("id, status, apify_run_id, group_id, requested_by, created_at")
+    .in("status", ["pending", "running", "processing"])
+    .lt("created_at", cutoff)
+    .order("created_at", { ascending: true })
+    .limit(MAX_JOBS_PER_TICK);
+  if (error) return [{ job_id: "—", action: `query_failed: ${error.message}` }];
+
+  for (const job of (jobs ?? []) as any[]) {
+    const ageMin = (Date.now() - new Date(job.created_at).getTime()) / 60_000;
+    if (ageMin > TRENDING_DEADLINE_MINUTES) {
+      const { data: claimed } = await sb
+        .from("parrilla_trending_jobs")
+        .update({ status: "failed", error: `deadline_${TRENDING_DEADLINE_MINUTES}min`, completed_at: new Date().toISOString() })
+        .eq("id", job.id)
+        .in("status", ["pending", "running", "processing"])
+        .select("id");
+      if (!claimed || claimed.length === 0) { out.push({ job_id: job.id, action: "deadline_race_lost" }); continue; }
+      const quien = job.requested_by ? ` ${job.requested_by},` : "";
+      try {
+        await fetch(`${env.SUPABASE_URL}/functions/v1/whatsapp-send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Cron-Token": env.CRON_TOKEN ?? "" },
+          body: JSON.stringify({ group_id: job.group_id, body: `⚠️${quien} no pude armar el listado de reels en tendencia — el scraper no respondió a tiempo. Pídemelo de nuevo en unos minutos.` }),
+        });
+        out.push({ job_id: job.id, action: "deadline_failed_notified" });
+      } catch (e) {
+        out.push({ job_id: job.id, action: `deadline_notify_error: ${(e as Error).message.slice(0, 40)}` });
+      }
+      continue;
+    }
+    if (job.status !== "running" || !job.apify_run_id) { out.push({ job_id: job.id, action: "waiting" }); continue; }
+    try {
+      const resp = await fetch(`https://api.apify.com/v2/actor-runs/${job.apify_run_id}?token=${env.APIFY_TOKEN}`);
+      if (!resp.ok) { out.push({ job_id: job.id, action: `apify_${resp.status}` }); continue; }
+      const data = await resp.json();
+      const st = String(data?.data?.status ?? "unknown");
+      if (st === "READY" || st === "RUNNING") { out.push({ job_id: job.id, action: "still_running" }); continue; }
+      const cbResp = await fetch(`${env.SUPABASE_URL}/functions/v1/parrilla-refs-trending?cb=1&job_id=${job.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.ANON_KEY}` },
+        body: JSON.stringify({ runId: job.apify_run_id, status: st, defaultDatasetId: data?.data?.defaultDatasetId ?? null, job_id: job.id }),
+      });
+      out.push({ job_id: job.id, action: cbResp.ok ? "callback_triggered" : `callback_failed_${cbResp.status}` });
+    } catch (e) {
+      out.push({ job_id: job.id, action: `error: ${(e as Error).message.slice(0, 40)}` });
+    }
+  }
+  return out;
+}
 
 // Barre promolog_handle_check_jobs no terminales:
 //   - >HANDLE_CHECK_DEADLINE_MINUTES → failed + aviso al grupo (claim atómico:

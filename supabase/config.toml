@@ -222,6 +222,9 @@ verify_jwt = false  # redacción IA de la parrilla; auth propia (JWT del caller 
 [functions.parrilla-weekly]
 verify_jwt = false  # cron jueves (X-Cron-Token) o botón "Enviar al grupo" (JWT + can_use_module_function)
 
+[functions.parrilla-refs-trending]
+verify_jwt = false  # tool async del bot (X-Cron-Token) + webhook de Apify (?cb=1, auth por run id)
+
 [functions.qa-chat-mike]
 verify_jwt = false  # chat QA (Mike); auth propia
 

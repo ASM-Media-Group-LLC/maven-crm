@@ -733,4 +733,57 @@ export const managersTools: AgentTool[] = [
       };
     },
   },
+  {
+    name: "get_trending_reels",
+    description:
+      "Busca EN VIVO reels en tendencia de Instagram por género (chicas/chicos/ambos) y opcionalmente por nicho " +
+      "(fitness, humor, baile, moda, maquillaje, lifestyle…), scrapeando hashtags con Apify y ordenando por " +
+      "reproducciones de los últimos 30 días. Úsala cuando piden 'reels en tendencia', 'qué está funcionando', " +
+      "'referencias para la parrilla/para grabar'. ASÍNCRONA: devuelve 'queued' al instante y el listado (links + " +
+      "reproducciones + autor) se postea SOLO al grupo en ~2 min como segundo mensaje automático — responde " +
+      "'dame ~2 min, estoy buscando' y nada más; NUNCA inventes links ni tendencias. Los reels quedan guardados como " +
+      "referencias de la Parrilla (content_grid_refs). Costo: una corrida de Apify por pedido.",
+    input_schema: {
+      type: "object",
+      properties: {
+        genero: { type: "string", enum: ["chicas", "chicos", "ambos"], description: "para quién es el contenido; 'ambos' separa el listado en dos bloques" },
+        nicho: { type: "string", description: "opcional: fitness, gym, humor, baile, moda, maquillaje, lifestyle, cocina, gaming, u otro (se usa como hashtag)" },
+        hashtags: { type: "array", items: { type: "string" }, description: "opcional: hashtags exactos que pidieron (máx 8); reemplazan los por defecto" },
+        cantidad: { type: "integer", description: "cuántos reels por bloque (default 10, máx 20)" },
+        requested_by_display_name: { type: "string", description: "quién lo pidió (para citarlo cuando llegue el listado)" },
+      },
+      required: ["genero"],
+      additionalProperties: false,
+    },
+    domain: "managers",
+    scope: "read",
+    handler: async (args, ctx) => {
+      if (!ctx.groupId) return { error: "solo_desde_un_grupo", note: "El listado se postea al grupo: esta tool necesita un grupo de WhatsApp de destino." };
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/parrilla-refs-trending`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Cron-Token": CRON_TOKEN },
+          body: JSON.stringify({
+            genero: args?.genero, nicho: args?.nicho ?? null, hashtags: args?.hashtags ?? [], cantidad: args?.cantidad ?? null,
+            reply_group_id: ctx.groupId,
+            requested_by: String(args?.requested_by_display_name ?? "").trim() || null,
+            tenant_id: ctx.tenantId ?? null,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data?.ok) return { error: `dispatch_failed: ${data?.error ?? resp.status}` };
+        return {
+          status: "queued",
+          job_id: data.job_id,
+          hashtags: data.hashtags,
+          eta_seconds: data.eta_seconds ?? 120,
+          note: "Búsqueda lanzada. Responde corto: en ~2 min llega el listado en un segundo mensaje automático (links, reproducciones, autor). No des links ahora.",
+        };
+      } catch (e) {
+        return { error: `dispatch_call_failed: ${(e as Error).message}` };
+      }
+    },
+  },
 ];
