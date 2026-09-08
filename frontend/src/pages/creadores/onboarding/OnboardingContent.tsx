@@ -11,7 +11,6 @@ import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./u
 import { useUserRole } from "@/hooks/useUserRole";
 import CreadoresHeader from "../CreadoresHeader";
 
-const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
 export const FILTRO_POR_DEFECTO = "En curso";
 
 const OnboardingContent = () => {
@@ -19,7 +18,6 @@ const OnboardingContent = () => {
   const { isAgent } = useUserRole();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("Todas");
   // Por defecto solo las que están en curso. La consulta trae también a las
   // completadas (verificado/active) porque el KPI "Completados" las cuenta,
   // pero con "Todas" la lista mezclaba 61 activas con 7 en proceso y parecía
@@ -33,9 +31,6 @@ const OnboardingContent = () => {
 
   const filtered = useMemo(() => {
     let list = creators;
-    if (activeTab !== "Todas") {
-      list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
-    }
     if (statusFilter === FILTRO_POR_DEFECTO) {
       list = list.filter((c) => c.status !== "Completado");
     } else if (statusFilter !== "Todas") {
@@ -50,18 +45,17 @@ const OnboardingContent = () => {
       list = list.filter((c) => c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q));
     }
     return list;
-  }, [creators, activeTab, statusFilter, stepFilter, search]);
+  }, [creators, statusFilter, stepFilter, search]);
 
   const total = creators.length;
   const pending = creators.filter((c) => c.status === "Pendiente").length;
   const inProgress = creators.filter((c) => c.status === "En Progreso").length;
   const completed = creators.filter((c) => c.status === "Completado").length;
 
-  const hasActiveFilters = statusFilter !== FILTRO_POR_DEFECTO || activeTab !== "Todas" || stepFilter !== "" || search !== "";
+  const hasActiveFilters = statusFilter !== FILTRO_POR_DEFECTO || stepFilter !== "" || search !== "";
 
   const clearFilters = () => {
     setStatusFilter(FILTRO_POR_DEFECTO);
-    setActiveTab("Todas");
     setStepFilter("");
     setSearch("");
   };
@@ -107,16 +101,6 @@ const OnboardingContent = () => {
               className={statusFilter === kpi.filter ? "ring-2 ring-primary" : undefined}
             />
           ))}
-        </div>
-
-        {/* Agency Tabs */}
-        <div className="max-w-full overflow-x-auto scrollbar-thin-x">
-          <div className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-white/10 bg-white/5 p-1">
-            <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"} onClick={() => setActiveTab("Todas")}>Todas</Button>
-            {agencyOptions.map((a) => (
-              <Button key={a} size="sm" variant={activeTab === a ? "secondary" : "ghost"} onClick={() => setActiveTab(a)}>{a}</Button>
-            ))}
-          </div>
         </div>
 
         {/* Filters */}
