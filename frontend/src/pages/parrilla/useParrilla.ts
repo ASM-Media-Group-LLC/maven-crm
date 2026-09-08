@@ -47,6 +47,10 @@ export interface GridDay {
   idea: string;
   copy_sugerido: string;
   franja: string;
+  // Franja ESTRUCTURADA (hora-pared Bogotá, "HH:MM"). El texto `franja` se
+  // regenera en el guardado desde estas dos; es lo que verificará Promolog (F4).
+  franja_start: string | null;
+  franja_end: string | null;
   extra_type: ExtraType;
   extra_title: string;
   extra_desc: string;
@@ -143,6 +147,8 @@ export function useSaveGrid() {
           idea: d.idea,
           copy_sugerido: d.copy_sugerido,
           franja: d.franja,
+          franja_start: d.franja_start || null,
+          franja_end: d.franja_end || null,
           extra_type: d.extra_type,
           extra_title: d.extra_title,
           extra_desc: d.extra_desc,
@@ -167,6 +173,8 @@ const emptyDay = (dayIndex: number): Omit<GridDay, "grid_id" | "date"> => ({
   idea: "",
   copy_sugerido: "",
   franja: "11:00 - 13:00",
+  franja_start: "11:00",
+  franja_end: "13:00",
   extra_type: "custom",
   extra_title: "",
   extra_desc: "",
@@ -308,6 +316,79 @@ export function useGenerateParrilla() {
     onSuccess: (_d, gridId) => {
       qc.invalidateQueries({ queryKey: ["content-grids"] });
       qc.invalidateQueries({ queryKey: ["content-grid-days", gridId] });
+    },
+  });
+}
+
+// ── Excepciones por creadora (Ola 2 del compliance) ───────────────────────────
+// Una creadora exenta (toda la semana o un día) NO será auditada por Promolog en
+// F4: enferma, recién ingresada, sin Telegram, variación pactada con su manager.
+export interface GridExemption {
+  id: string;
+  grid_id: string;
+  creator_id: string;
+  day_date: string | null; // null = toda la semana
+  motivo: string;
+  created_at: string;
+}
+
+export function useGridExemptions(gridId: string | null) {
+  return useQuery({
+    queryKey: ["content-grid-exemptions", gridId],
+    enabled: !!gridId,
+    queryFn: async (): Promise<GridExemption[]> => {
+      const { data, error } = await (supabase as any)
+        .from("content_grid_exemptions")
+        .select("id, grid_id, creator_id, day_date, motivo, created_at")
+        .eq("grid_id", gridId)
+        .order("created_at");
+      if (error) throw error;
+      return (data ?? []) as GridExemption[];
+    },
+  });
+}
+
+export function useAddExemption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (e: { grid_id: string; creator_id: string; day_date: string | null; motivo: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await (supabase as any)
+        .from("content_grid_exemptions")
+        .insert({ ...e, created_by: userData?.user?.id ?? null })
+        .select("id");
+      if (error) throw error;
+      // RLS silenciosa: 0 filas sin error = sin permiso.
+      if (!data?.length) throw new Error("Sin permiso para editar la parrilla");
+    },
+    onSuccess: (_r, e) => qc.invalidateQueries({ queryKey: ["content-grid-exemptions", e.grid_id] }),
+  });
+}
+
+export function useRemoveExemption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (e: { id: string; grid_id: string }) => {
+      const { error } = await (supabase as any).from("content_grid_exemptions").delete().eq("id", e.id);
+      if (error) throw error;
+    },
+    onSuccess: (_r, e) => qc.invalidateQueries({ queryKey: ["content-grid-exemptions", e.grid_id] }),
+  });
+}
+
+// Creadoras activas para el selector de excepciones.
+export function useActiveCreatorsLite() {
+  return useQuery({
+    queryKey: ["creators-lite-active"],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<Array<{ id: string; name: string; artistic_name: string | null }>> => {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("id, name, artistic_name")
+        .eq("status", "active")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; artistic_name: string | null }>;
     },
   });
 }

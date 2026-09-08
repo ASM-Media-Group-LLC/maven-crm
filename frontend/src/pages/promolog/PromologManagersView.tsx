@@ -6,6 +6,10 @@
 // nuevas). Todo por la manager ASIGNADA en la ficha de cada creadora y siempre
 // sobre las activas. El rango es el global del header (Ayer/Hoy/Semana/Mes).
 //
+// Layout: UNA FILA por manager con un número grande por columna (las columnas
+// alineadas son la comparación) + una línea de alertas en chips. Los nombres de
+// creadoras viven en el drill-down (click en la fila), no amontonados en la card.
+//
 // Fuentes: promo_creator_period_scores (score 0-100 + promo-días),
 // get_manager_contact_stats (último contacto + días con contacto en el rango;
 // la línea es compartida → no se sabe quién tipeó) y get_manager_growth_stats
@@ -13,11 +17,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays } from "date-fns";
-import { ChevronDown, ChevronUp, MessageCircle, Sparkles, TrendingDown, TrendingUp, Users, UserPlus } from "lucide-react";
+import { es } from "date-fns/locale";
+import { ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { usePromoScoresRango, type PromoPeriodScore } from "./usePromoPeriodScores";
@@ -69,24 +74,32 @@ const Delta = ({ cur, prev }: { cur: number; prev: number }) => {
   if (d == null) return <span className="text-[11px] text-muted-foreground">sin base previa</span>;
   const up = d >= 0;
   return (
-    <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium", up ? "text-success" : "text-destructive")}>
+    <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium", up ? "text-success" : "text-destructive")} title="vs el mismo tramo anterior">
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-      {up ? "+" : ""}{d}% vs tramo anterior
+      {up ? "+" : ""}{d}%
     </span>
   );
 };
 
 const daysSince = (iso: string | null) => (iso ? differenceInCalendarDays(new Date(), new Date(iso)) : null);
 // "Silenciosa" = MISMO criterio que el bot (get_manager_silent_creators): sin
-// saliente en las últimas 72 h reales, no días calendario (con calendario, un
-// contacto del viernes noche ya contaba como "3 días" el lunes temprano).
+// saliente en las últimas 72 h reales, no días calendario.
 const isSilent = (iso: string | null) => (iso ? Date.now() - new Date(iso).getTime() >= SILENT_DAYS * 86400e3 : true);
 
+// Celda KPI: número grande + una línea de contexto. Sin listas.
+const Kpi = ({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "good" | "warn" | "bad" }) => (
+  <div className="min-w-0">
+    <p className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">{label}</p>
+    <p className={cn("text-2xl font-bold leading-none tabular-nums", tone === "good" && "text-success", tone === "warn" && "text-warning", tone === "bad" && "text-destructive")}>{value}</p>
+    {sub && <p className="mt-1 text-[11px] text-muted-foreground leading-snug">{sub}</p>}
+  </div>
+);
+
+const COLS = "md:grid-cols-[minmax(200px,1.3fr)_repeat(5,minmax(0,1fr))_32px]";
+
 const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
-  // El rango efectivo termina HOY como máximo: "Esta semana"/"Este mes" llegan
-  // hasta el domingo/fin de mes y, sin este recorte, el delta BLU comparaba 2 días
-  // de datos contra 7 del tramo anterior (−89% falso). Con el recorte, el tramo
-  // anterior tiene la MISMA cantidad de días con datos.
+  // El rango efectivo termina HOY como máximo: "Esta semana"/"Este mes" llegan al
+  // domingo/fin de mes y el delta BLU compararía 2 días contra 7 del tramo anterior.
   const hoy = new Date();
   const toDate = dateTo && dateTo < hoy ? dateTo : hoy;
   const fromDate = dateFrom && dateFrom <= toDate ? dateFrom : toDate;
@@ -144,7 +157,6 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
           const promoted = promoDays > 0;
           const silent = ct?.phone_ok ? isSilent(ct.last_contact_at) : null;
           const newFans = g?.new_fans ?? 0;
-          // Semáforo: rojo = no promociona + sin contacto reciente + sin fans nuevos.
           const flags = [!promoted && covered > 0, silent === true, newFans === 0].filter(Boolean).length;
           return {
             creator: c,
@@ -152,7 +164,6 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
             promoDays, covered, promoted,
             score: s?.score ?? null,
             isPartial: s?.is_partial ?? false,
-            lastContactAt: ct?.last_contact_at ?? null,
             lastDays,
             phoneOk: ct?.phone_ok ?? false,
             contactDays: ct?.contact_days_in_range ?? 0,
@@ -167,23 +178,23 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
         const scored = detail.filter((d) => d.score != null && d.covered > 0);
         const avgScore = scored.length ? Math.round(scored.reduce((a, d) => a + (d.score ?? 0), 0) / scored.length) : null;
         const promotedCount = detail.filter((d) => d.promoted).length;
-        const noPromo = detail.filter((d) => !d.promoted && d.covered > 0);
+        const noPromo = detail.filter((d) => !d.promoted && d.covered > 0).length;
         const contactable = detail.filter((d) => d.phoneOk);
-        const contacted = contactable.filter((d) => d.contactDays > 0);
-        const silent = contactable.filter((d) => d.silent === true).sort((a, b) => (b.lastDays ?? 999) - (a.lastDays ?? 999));
+        const contacted = contactable.filter((d) => d.contactDays > 0).length;
+        const silent = contactable.filter((d) => d.silent === true).length;
         const sum = (k: "newFans" | "newSub" | "recSub" | "total") => detail.reduce((a, d) => a + (d[k] as number), 0);
         const prevNewFans = roster.reduce((a, c) => a + (growthBy.get(c.id)?.prev_new_fans ?? 0), 0);
         const prevNewSub = roster.reduce((a, c) => a + (growthBy.get(c.id)?.prev_new_sub_gross ?? 0), 0);
-        const prevTotal = roster.reduce((a, c) => a + (growthBy.get(c.id)?.prev_total_gross ?? 0), 0);
-        const topFans = [...detail].filter((d) => d.newFans > 0).sort((a, b) => b.newFans - a.newFans).slice(0, 3);
+        const rojas = detail.filter((d) => d.semaforo === "rojo").length;
+        const order = { rojo: 0, ambar: 1, verde: 2 } as const;
         return {
           manager: m,
           roster: roster.length,
-          detail: detail.sort((a, b) => (a.semaforo === b.semaforo ? b.newFans - a.newFans : a.semaforo === "rojo" ? -1 : b.semaforo === "rojo" ? 1 : a.semaforo === "ambar" ? -1 : 1)),
+          detail: detail.sort((a, b) => order[a.semaforo as keyof typeof order] - order[b.semaforo as keyof typeof order] || b.newFans - a.newFans),
           promotedCount, avgScore, noPromo,
-          contactable: contactable.length, contacted: contacted.length, silent,
-          newFans: sum("newFans"), newSub: sum("newSub"), recSub: sum("recSub"), total: sum("total"),
-          prevNewFans, prevNewSub, prevTotal, topFans,
+          contactable: contactable.length, contacted, silent,
+          newFans: sum("newFans"), newSub: sum("newSub"), recSub: sum("recSub"),
+          prevNewFans, prevNewSub, rojas,
         };
       })
       .sort((a, b) => b.roster - a.roster);
@@ -192,176 +203,127 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
   const withRoster = rows.filter((r) => r.roster > 0);
   const loading = scoresLoading || contactsLoading || growthLoading;
 
-  const initials = (n: string) => n.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-
   return (
-    <div className="flex-1 min-h-0 overflow-auto p-6 space-y-5">
-      {/* Fila comparativa */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-            <div>
-              <h3 className="text-base font-semibold">Managers</h3>
-              <p className="text-xs text-muted-foreground">
-                {rangeDays === 1 ? format(fromDate, "d 'de' MMMM yyyy") : `${format(fromDate, "d MMM")} – ${format(toDate, "d MMM yyyy")} · ${rangeDays} días`}
-                {recortado && <span className="text-warning"> · recortado a hoy (el rango llegaba al futuro)</span>}
-                {" · "}por la manager asignada en la ficha · solo creadoras activas
-              </p>
-            </div>
-            {loading && <span className="text-xs text-muted-foreground">Cargando…</span>}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              { key: "promo", label: "Roster que promocionó", icon: Sparkles, val: (r: typeof rows[number]) => pct(r.promotedCount, r.roster), fmt: (v: number) => `${v}%` },
-              { key: "contacto", label: "Roster contactado por WhatsApp", icon: MessageCircle, val: (r: typeof rows[number]) => pct(r.contacted, r.contactable), fmt: (v: number) => `${v}%` },
-              { key: "fans", label: "Fans nuevos (BLU)", icon: UserPlus, val: (r: typeof rows[number]) => r.newFans, fmt: (v: number) => v.toLocaleString("es-CO") },
-            ].map((k) => {
-              const max = Math.max(1, ...withRoster.map((r) => k.val(r)));
-              return (
-                <div key={k.key} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-2"><k.icon className="h-3.5 w-3.5" /> {k.label}</p>
-                  <div className="space-y-1.5">
-                    {withRoster.map((r) => {
-                      const v = k.val(r);
-                      return (
-                        <div key={r.manager.id} className="flex items-center gap-2 text-xs">
-                          <span className="w-20 truncate">{(r.manager.full_name ?? "").split(" ")[0]}</span>
-                          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((v / max) * 100)}%` }} />
-                          </div>
-                          <span className="w-14 text-right font-medium">{k.fmt(v)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-lg font-semibold">Managers</h3>
+          <p className="text-xs text-muted-foreground">
+            {rangeDays === 1 ? format(fromDate, "d 'de' MMMM yyyy", { locale: es }) : `${format(fromDate, "d MMM", { locale: es })} – ${format(toDate, "d MMM yyyy", { locale: es })} · ${rangeDays} días`}
+            {recortado && <span className="text-warning"> · recortado a hoy</span>}
+            {" · "}creadoras activas, por la manager asignada en su ficha
+          </p>
+        </div>
+        {loading && <span className="text-xs text-muted-foreground">Cargando…</span>}
+      </div>
 
-      {/* Tarjetas por manager */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Encabezados de columna (desktop) */}
+      <div className={cn("hidden md:grid gap-4 px-5 text-[10px] uppercase tracking-wider text-muted-foreground", COLS)}>
+        <span>Manager</span>
+        <span>Promocionaron</span>
+        <span>Calidad promo</span>
+        <span>Contacto WhatsApp</span>
+        <span>Fans nuevos</span>
+        <span>Subs nuevas</span>
+        <span />
+      </div>
+
+      <div className="space-y-3">
         {withRoster.map((r) => {
           const open = openManager === r.manager.id;
           const name = r.manager.full_name ?? "—";
+          const promoPct = pct(r.promotedCount, r.roster);
+          const contactPct = pct(r.contacted, r.contactable);
           return (
             <Card key={r.manager.id} className={cn("transition-shadow", open && "ring-1 ring-primary/40")}>
-              <CardContent className="pt-4 pb-4 space-y-4">
-                <button type="button" className="w-full flex items-center gap-3 text-left" onClick={() => setOpenManager(open ? null : r.manager.id)}>
-                  <Avatar className="h-10 w-10"><AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">{initials(name)}</AvatarFallback></Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{name}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> {r.roster} creadoras activas</p>
+              <CardContent className="p-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenManager(open ? null : r.manager.id)}
+                  className={cn("w-full grid grid-cols-2 gap-4 p-5 text-left items-start hover:bg-white/[0.03] rounded-t-xl", COLS)}
+                >
+                  {/* Manager */}
+                  <div className="col-span-2 md:col-span-1 flex items-center gap-3 min-w-0">
+                    <UserAvatar name={name} src={r.manager.avatar_url} seed={r.manager.avatar_seed} size="lg" />
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold truncate">{name}</p>
+                      <p className="text-xs text-muted-foreground">{r.roster} creadoras activas</p>
+                    </div>
                   </div>
-                  {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  <Kpi label="Promocionaron" value={`${promoPct}%`} sub={`${r.promotedCount} de ${r.roster}`} tone={promoPct >= 70 ? "good" : promoPct >= 40 ? "warn" : "bad"} />
+                  <Kpi label="Calidad promo" value={r.avgScore != null ? r.avgScore : "—"} sub={r.avgScore != null ? "promedio /100" : "sin lecturas"} tone={r.avgScore == null ? undefined : r.avgScore >= 70 ? "good" : r.avgScore >= 40 ? "warn" : "bad"} />
+                  <Kpi label="Contacto WhatsApp" value={`${contactPct}%`} sub={`${r.contacted} de ${r.contactable} contactadas`} tone={contactPct >= 80 ? "good" : contactPct >= 50 ? "warn" : "bad"} />
+                  <Kpi label="Fans nuevos" value={r.newFans.toLocaleString("es-CO")} sub={<Delta cur={r.newFans} prev={r.prevNewFans} />} />
+                  <Kpi label="Subs nuevas" value={money(r.newSub)} sub={<><Delta cur={r.newSub} prev={r.prevNewSub} /> <span className="text-muted-foreground">· rec. {money(r.recSub)}</span></>} />
+                  <div className="hidden md:flex justify-end pt-1 text-muted-foreground">{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
                 </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Promoción */}
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Promoción</p>
-                    <p className="text-2xl font-bold mt-1">{pct(r.promotedCount, r.roster)}%</p>
-                    <p className="text-xs text-muted-foreground">{r.promotedCount} de {r.roster} promocionaron</p>
-                    <p className="text-xs mt-2">Calidad promedio: <span className="font-semibold">{r.avgScore != null ? `${r.avgScore}/100` : "—"}</span></p>
-                    {r.noPromo.length > 0 && (
-                      <p className="text-xs text-destructive mt-1">🔴 {r.noPromo.length} sin promo: {r.noPromo.slice(0, 3).map((d) => d.name).join(", ")}{r.noPromo.length > 3 ? "…" : ""}</p>
-                    )}
-                  </div>
-                  {/* Contacto */}
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> Contacto WhatsApp</p>
-                    <p className="text-2xl font-bold mt-1">{r.contacted}<span className="text-sm font-normal text-muted-foreground"> / {r.contactable}</span></p>
-                    <p className="text-xs text-muted-foreground">creadoras contactadas en el rango</p>
-                    {r.silent.length > 0 ? (
-                      <p className="text-xs text-warning mt-2">⏳ {r.silent.length} con {SILENT_DAYS}+ días sin contacto: {r.silent.slice(0, 3).map((d) => `${d.name}${d.lastDays != null ? ` (${d.lastDays}d)` : " (nunca)"}`).join(", ")}{r.silent.length > 3 ? "…" : ""}</p>
-                    ) : (
-                      <p className="text-xs text-success mt-2">Todas contactadas en los últimos {SILENT_DAYS} días</p>
-                    )}
-                    {r.roster - r.contactable > 0 && <p className="text-[11px] text-muted-foreground mt-1">{r.roster - r.contactable} sin teléfono normalizable (no atribuibles)</p>}
-                  </div>
-                  {/* Crecimiento */}
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><UserPlus className="h-3.5 w-3.5" /> Usuarios nuevos (BLU)</p>
-                    <p className="text-2xl font-bold mt-1">{r.newFans.toLocaleString("es-CO")}</p>
-                    <Delta cur={r.newFans} prev={r.prevNewFans} />
-                    <p className="text-xs mt-2">Subs nuevas: <span className="font-semibold">{money(r.newSub)}</span> <span className="text-muted-foreground">· recurrentes {money(r.recSub)}</span></p>
-                    <Delta cur={r.newSub} prev={r.prevNewSub} />
-                    {r.topFans.length > 0 && (
-                      <p className="text-[11px] text-muted-foreground mt-1">Top: {r.topFans.map((d) => `${d.name} (${d.newFans})`).join(" · ")}</p>
-                    )}
-                  </div>
+                {/* Alertas en chips (sin nombres: van en el drill-down) */}
+                <div className="flex flex-wrap items-center gap-2 px-5 pb-4 -mt-1">
+                  {r.rojas > 0 && <Badge variant="destructive-soft">🔴 {r.rojas} urgente{r.rojas > 1 ? "s" : ""}</Badge>}
+                  {r.noPromo > 0 && <Badge variant="destructive-soft">{r.noPromo} sin promo</Badge>}
+                  {r.silent > 0 ? <Badge variant="warning-soft">{r.silent} con {SILENT_DAYS}+ días sin contacto</Badge> : <Badge variant="success-soft">todas contactadas en {SILENT_DAYS} días</Badge>}
+                  {r.roster - r.contactable > 0 && <Badge variant="secondary-soft">{r.roster - r.contactable} sin teléfono</Badge>}
+                  <span className="ml-auto text-[11px] text-muted-foreground">{open ? "ocultar creadoras" : "ver creadoras"}</span>
                 </div>
 
+                {/* Drill-down: sus creadoras con semáforo */}
+                {open && (
+                  <div className="border-t border-white/10 overflow-x-auto">
+                    <Table className="min-w-[760px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Creadora</TableHead>
+                          <TableHead className="text-center">Promo</TableHead>
+                          <TableHead className="text-center">Calidad</TableHead>
+                          <TableHead className="text-center">Último contacto</TableHead>
+                          <TableHead className="text-right">Fans nuevos</TableHead>
+                          <TableHead className="text-right">Subs nuevas</TableHead>
+                          <TableHead className="text-right">Total BLU</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {r.detail.map((d) => (
+                          <TableRow key={d.creator.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? "No promociona + sin contacto + sin fans nuevos" : d.semaforo === "ambar" ? "Dos señales en rojo" : "OK"} />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{d.name}</p>
+                                  {d.creator.instagram_handle && <p className="text-[11px] text-muted-foreground">@{d.creator.instagram_handle}</p>}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center text-sm">
+                              {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{d.promoDays}/{d.covered} días</span> : <span className="text-muted-foreground text-xs">sin lectura</span>}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? " · parcial" : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+                            </TableCell>
+                            <TableCell className="text-center text-sm">
+                              {!d.phoneOk ? <span className="text-muted-foreground text-xs">sin teléfono</span>
+                                : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
+                                : <span className={cn(d.silent ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
+                            <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Drill-down a ancho completo: sus creadoras con semáforo */}
-      {openManager && (() => {
-        const r = withRoster.find((x) => x.manager.id === openManager);
-        if (!r) return null;
-        return (
-          <Card>
-            <CardContent className="pt-4 pb-4 space-y-3">
-              <p className="text-sm font-semibold">Creadoras de {r.manager.full_name} <span className="text-xs text-muted-foreground font-normal">· 🔴 no promociona + sin contacto + sin fans nuevos · 🟡 dos señales</span></p>
-            <div className="rounded-xl border border-white/10 overflow-x-auto">
-              <Table className="min-w-[760px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Creadora</TableHead>
-                    <TableHead className="text-center">Promo</TableHead>
-                    <TableHead className="text-center">Calidad</TableHead>
-                    <TableHead className="text-center">Último contacto</TableHead>
-                    <TableHead className="text-right">Fans nuevos</TableHead>
-                    <TableHead className="text-right">Subs nuevas</TableHead>
-                    <TableHead className="text-right">Total BLU</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {r.detail.map((d) => (
-                    <TableRow key={d.creator.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? "No promociona + sin contacto + sin fans nuevos" : d.semaforo === "ambar" ? "Dos señales en rojo" : "OK"} />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{d.name}</p>
-                            {d.creator.instagram_handle && <p className="text-[11px] text-muted-foreground">@{d.creator.instagram_handle}</p>}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{d.promoDays}/{d.covered} días</span> : <span className="text-muted-foreground text-xs">sin lectura</span>}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? " · parcial" : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
-                      </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {!d.phoneOk ? <span className="text-muted-foreground text-xs">sin teléfono</span>
-                          : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
-                          : <span className={cn(d.lastDays >= SILENT_DAYS ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
-                      <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {rows.length > withRoster.length && (
-        <p className="text-xs text-muted-foreground">
-          Sin creadoras asignadas: {rows.filter((r) => r.roster === 0).map((r) => r.manager.full_name).join(", ")}.
-        </p>
-      )}
+      <p className="text-[11px] text-muted-foreground">
+        🔴 urgente = no promociona + sin contacto reciente + sin fans nuevos · la línea de WhatsApp es compartida: el contacto se atribuye a la manager asignada en la ficha.
+        {rows.length > withRoster.length && ` · Sin creadoras asignadas: ${rows.filter((r) => r.roster === 0).map((r) => r.manager.full_name).join(", ")}.`}
+      </p>
     </div>
   );
 };

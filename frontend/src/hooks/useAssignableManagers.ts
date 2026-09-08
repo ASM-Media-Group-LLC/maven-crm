@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface AssignableManager {
   id: string;
   full_name: string | null;
+  avatar_url?: string | null;
+  avatar_seed?: string | null;
 }
 
 export function useAssignableManagers() {

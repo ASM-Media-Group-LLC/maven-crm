@@ -402,7 +402,9 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
         </Select>
 
         {/* Manager: sin selección = todas las activas; con una = solo sus asignadas */}
-        <Select value={managerId || undefined} onValueChange={(v) => pickManager(v === "__all__" ? "" : v)}>
+        {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
+            volver a "Todas" y deja pegado el nombre de la manager anterior. */}
+        <Select value={managerId || "__all__"} onValueChange={(v) => pickManager(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[180px] h-10">
             <SelectValue placeholder="Managers" />
           </SelectTrigger>

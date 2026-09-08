@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useGridExemptions, useAddExemption, useRemoveExemption, useActiveCreatorsLite } from "./useParrilla";
 import {
   type ContentGrid, type GridDay, type ExtraType, type GridTheme,
   DEFAULT_THEME, EXTRA_TYPE_META, proximoCiclo, useCreateWeek, useGenerateParrilla, useGridDays, useGridList, useSaveGrid, useSetWeekStart, weekdayLabel,
@@ -112,9 +113,25 @@ function DayColumn({ day, theme, isToday, onChange }: {
             style={{ backgroundColor: `${topColor}14` }}
           />
         </div>
+        {/* Franja ESTRUCTURADA (inicio/fin): es lo que Promolog verificará (F4) con
+            ±2 h de tolerancia. El texto "HH:MM - HH:MM" se regenera al guardar. */}
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Franja</span>
-          <Input value={day.franja} onChange={(e) => set({ franja: e.target.value })} className="h-6 flex-1 border-dashed bg-transparent px-1.5 text-[11px]" />
+          <Input
+            type="time"
+            value={day.franja_start ?? ""}
+            onChange={(e) => set({ franja_start: e.target.value || null, franja: e.target.value && day.franja_end ? `${e.target.value} - ${day.franja_end}` : day.franja })}
+            className="h-6 w-[82px] border-dashed bg-transparent px-1 text-[11px] print-hide"
+          />
+          <span className="text-[10px] text-muted-foreground print-hide">a</span>
+          <Input
+            type="time"
+            value={day.franja_end ?? ""}
+            onChange={(e) => set({ franja_end: e.target.value || null, franja: day.franja_start && e.target.value ? `${day.franja_start} - ${e.target.value}` : day.franja })}
+            className="h-6 w-[82px] border-dashed bg-transparent px-1 text-[11px] print-hide"
+          />
+          {/* Solo impresión: el texto plano de la franja */}
+          <span className="hidden print:inline text-[11px]">{day.franja}</span>
         </div>
       </div>
 
@@ -289,6 +306,27 @@ export default function ParrillaPage() {
   const save = useSaveGrid();
   const createWeek = useCreateWeek();
   const genIA = useGenerateParrilla();
+
+  // Excepciones por creadora (Ola 2 del compliance): quién NO se audita esta
+  // semana (o un día) y por qué. Las lee F4 para no marcar incumplimientos falsos.
+  const { data: exemptions = [] } = useGridExemptions(grid?.id ?? null);
+  const addEx = useAddExemption();
+  const removeEx = useRemoveExemption();
+  const { data: activeCreators = [] } = useActiveCreatorsLite();
+  const [exCreator, setExCreator] = useState("");
+  const [exDay, setExDay] = useState("__all__");
+  const [exMotivo, setExMotivo] = useState("");
+  const agregarExcepcion = () => {
+    if (!grid || !exCreator || !exMotivo.trim()) return;
+    addEx.mutate(
+      { grid_id: grid.id, creator_id: exCreator, day_date: exDay === "__all__" ? null : exDay, motivo: exMotivo.trim() },
+      {
+        onSuccess: () => { setExCreator(""); setExDay("__all__"); setExMotivo(""); toast.success("Excepción registrada"); },
+        onError: (e: any) => toast.error(`No se pudo registrar: ${e.message}`),
+      },
+    );
+  };
+  const soloLectura = grid?.status === "enviada";
   const setStart = useSetWeekStart();
   const [startPickerOpen, setStartPickerOpen] = useState(false);
 
@@ -549,7 +587,7 @@ export default function ParrillaPage() {
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid}>
+          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: volvé a borrador para editarla" : undefined}>
             {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
           </Button>
         </div>
@@ -571,8 +609,14 @@ export default function ParrillaPage() {
           </div>
         ) : (
           <>
-            {/* La lámina completa (título + tablero + regla): es lo que se escala al imprimir. */}
-            <div className="parrilla-sheet w-max min-w-full">
+            {soloLectura && (
+              <div className="print-hide mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900">
+                <b>Parrilla enviada al grupo</b> — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
+              </div>
+            )}
+            {/* La lámina completa (título + tablero + regla): es lo que se escala al imprimir.
+                Enviada = solo lectura (la base también lo bloquea con un trigger). */}
+            <div className={`parrilla-sheet w-max min-w-full${soloLectura ? " pointer-events-none select-text" : ""}`}>
               <div className="mb-3 flex items-baseline gap-3">
                 <h1 className="text-xl font-black tracking-tight" style={{ color: theme.tinta }}>
                   PARRILLA DE <span style={{ color: theme.video }}>PROMOCIÓN</span>
@@ -621,6 +665,57 @@ export default function ParrillaPage() {
                   </Button>
                 )}
               </div>
+            </div>
+
+            {/* Excepciones por creadora: quién NO se audita esta semana y por qué */}
+            <div className="print-hide mt-4 rounded-xl border bg-card p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Excepciones · creadoras que no se auditan esta semana</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Enferma, recién ingresada, sin Telegram, variación pactada… Registrarlas evita que Promolog marque incumplimientos falsos cuando verifique la parrilla.
+              </p>
+              {exemptions.length > 0 && (
+                <ul className="mt-2 divide-y rounded-lg border">
+                  {exemptions.map((ex) => {
+                    const cr = activeCreators.find((c) => c.id === ex.creator_id);
+                    return (
+                      <li key={ex.id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                        <span className="font-medium">{cr ? (cr.artistic_name || cr.name) : "(creadora)"}</span>
+                        <span className="text-muted-foreground">· {ex.day_date ? fmtDia(ex.day_date) : "toda la semana"} · {ex.motivo}</span>
+                        {!soloLectura && (
+                          <button type="button" className="ml-auto text-muted-foreground hover:text-destructive" onClick={() => removeEx.mutate({ id: ex.id, grid_id: ex.grid_id })} title="Quitar excepción">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {!soloLectura && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Select value={exCreator || undefined} onValueChange={setExCreator}>
+                    <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue placeholder="Creadora" /></SelectTrigger>
+                    <SelectContent>
+                      {activeCreators.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={exDay} onValueChange={setExDay}>
+                    <SelectTrigger className="h-8 w-[170px] text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Toda la semana</SelectItem>
+                      {days.map((d) => (
+                        <SelectItem key={d.day_index} value={d.date}>{weekdayLabel(d.date)} {fmtDia(d.date)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input value={exMotivo} onChange={(e) => setExMotivo(e.target.value)} placeholder="Motivo (ej. enferma, sin Telegram…)" className="h-8 w-[260px] text-xs" />
+                  <Button size="sm" variant="secondary" className="h-8" disabled={!exCreator || !exMotivo.trim() || addEx.isPending} onClick={agregarExcepcion}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Agregar
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}

@@ -13,7 +13,6 @@ import {
   Users,
   Search,
   Target,
-  Plus,
   Check,
   Minus,
   X,
@@ -911,10 +910,6 @@ const PromologContent = () => {
                   setActiveDatePreset(preset);
                 }}
               />
-              <Button variant="default" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" />
-                Agregar Promo
-              </Button>
             </>
           }
         />
@@ -1006,7 +1001,9 @@ const PromologContent = () => {
                   <SelectItem value="otra">Otra</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={selectedManagerFilter || undefined} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
+              {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
+                  volver a "Todas" y deja pegado el nombre de la manager anterior. */}
+              <Select value={selectedManagerFilter || "__all__"} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Managers" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todas</SelectItem>
