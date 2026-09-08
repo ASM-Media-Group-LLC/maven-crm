@@ -320,6 +320,29 @@ export function useGenerateParrilla() {
   });
 }
 
+// "Enviar al grupo" (F2): la edge parrilla-weekly renderiza el PDF con Gotenberg y lo
+// manda al grupo Managers de WhatsApp; la parrilla pasa a 'enviada'. El servidor
+// exige la función 'Enviar al grupo' del módulo Parrilla.
+export function useEnviarParrilla() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (gridId: string) => {
+      const { data, error } = await supabase.functions.invoke("parrilla-weekly", { body: { grid_id: gridId } });
+      if (error) {
+        let msg = (error as Error).message;
+        try {
+          const ctx = await (error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch { /* cuerpo no-JSON: queda el mensaje genérico */ }
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: boolean; enviado: boolean; pdf_url: string; dry_run: boolean };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["content-grids"] }),
+  });
+}
+
 // ── Excepciones por creadora (Ola 2 del compliance) ───────────────────────────
 // Una creadora exenta (toda la semana o un día) NO será auditada por Promolog en
 // F4: enferma, recién ingresada, sin Telegram, variación pactada con su manager.

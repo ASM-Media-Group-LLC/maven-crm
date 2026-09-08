@@ -48,6 +48,11 @@ interface SendRequest {
   // del scan (screenshot de la promo) cuando una manager disputa un registro
   // (pedido de Jhon 06/08). El caption pasa por las mismas guardas que el texto.
   image_url?: string;
+  // Documento adjunto (PDF, etc.): sale como archivo con `body` de caption. Lo usa
+  // parrilla-weekly para mandar la parrilla de la semana al grupo Managers.
+  document_url?: string;
+  file_name?: string;
+  mimetype?: string;
   // Modo queue (default true si no hay group_id+body).
   drain?: boolean;
   drain_limit?: number;
@@ -103,11 +108,12 @@ async function sendViaEvolution(
   }
 }
 
-// Imagen con caption — mismo gateway, endpoint /message/sendMedia (lo implementa
-// nuestro Baileys gateway; las menciones no aplican en media, WhatsApp las ignora).
+// Media con caption (imagen o documento) — mismo gateway, endpoint /message/sendMedia
+// (lo implementa nuestro Baileys gateway; las menciones no aplican en media,
+// WhatsApp las ignora). Para documentos el gateway lee `filename` y `mimetype`.
 async function sendMediaViaEvolution(
   groupExternalId: string,
-  imageUrl: string,
+  media: { mediatype: "image" | "document"; url: string; filename?: string; mimetype?: string },
   caption: string,
 ): Promise<ProviderSendResult> {
   if (!EVOLUTION_URL || !EVOLUTION_API_KEY) {
@@ -118,7 +124,7 @@ async function sendMediaViaEvolution(
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": EVOLUTION_API_KEY },
-      body: JSON.stringify({ number: groupExternalId, mediatype: "image", url: imageUrl, caption }),
+      body: JSON.stringify({ number: groupExternalId, ...media, caption }),
     });
     if (!resp.ok) {
       const txt = await resp.text();
@@ -139,6 +145,9 @@ async function sendOne(args: {
   mentions?: string[];
   quoted?: { id: string; fromMe: boolean; text: string };
   imageUrl?: string;
+  documentUrl?: string;
+  fileName?: string;
+  mimetype?: string;
 }): Promise<ProviderSendResult> {
   const sb = adminClient();
 
@@ -224,8 +233,10 @@ async function sendOne(args: {
 
   let result: ProviderSendResult;
   if (group.provider === "evolution") {
-    result = args.imageUrl
-      ? await sendMediaViaEvolution(group.external_id, args.imageUrl, bodyFinal)
+    result = args.documentUrl
+      ? await sendMediaViaEvolution(group.external_id, { mediatype: "document", url: args.documentUrl, filename: args.fileName, mimetype: args.mimetype }, bodyFinal)
+      : args.imageUrl
+      ? await sendMediaViaEvolution(group.external_id, { mediatype: "image", url: args.imageUrl }, bodyFinal)
       : await sendViaEvolution(group.external_id, bodyFinal, mentionsFinal.length > 0 ? mentionsFinal : undefined, args.quoted);
   } else if (group.provider === "manual") {
     // Modo manual: no mandamos al provider, solo grabamos la salida en
@@ -247,8 +258,8 @@ async function sendOne(args: {
         sender_external_id: "bot@maven",
         sender_display_name: "Maven Asistente",
         body: bodyFinal,
-        msg_type: args.imageUrl ? "image" : "text",
-        media_url: args.imageUrl ?? null,
+        msg_type: args.documentUrl ? "document" : args.imageUrl ? "image" : "text",
+        media_url: args.documentUrl ?? args.imageUrl ?? null,
         is_from_bot: true,
         sent_at: new Date().toISOString(),
         analyzed_at: new Date().toISOString(),
@@ -648,6 +659,9 @@ serve(async (req) => {
         tenantId: g.tenant_id,
         mentions: body.mentions,
         imageUrl: body.image_url,
+        documentUrl: body.document_url,
+        fileName: body.file_name,
+        mimetype: body.mimetype,
         quoted: body.quoted,
       });
       return new Response(JSON.stringify(result), {

@@ -7,7 +7,8 @@
 // (ver useParrilla.ts) → de cada guardado se derivan las tareas esperadas que
 // Promolog usará para medir cumplimiento (fase futura).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Sparkles, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Send, Sparkles, Trash2 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 import { type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useGridExemptions, useAddExemption, useRemoveExemption, useActiveCreatorsLite } from "./useParrilla";
+import { useGridExemptions, useAddExemption, useRemoveExemption, useActiveCreatorsLite, useEnviarParrilla } from "./useParrilla";
 import {
   type ContentGrid, type GridDay, type ExtraType, type GridTheme,
   DEFAULT_THEME, EXTRA_TYPE_META, proximoCiclo, useCreateWeek, useGenerateParrilla, useGridDays, useGridList, useSaveGrid, useSetWeekStart, weekdayLabel,
@@ -327,6 +328,29 @@ export default function ParrillaPage() {
     );
   };
   const soloLectura = grid?.status === "enviada";
+
+  // Enviar al grupo (F2): PDF con Gotenberg + WhatsApp al grupo Managers. El permiso
+  // real lo decide el servidor; acá solo se esconde si el rol lo tiene en false.
+  const { explicitPermission } = usePermissions();
+  const puedeEnviar = explicitPermission("Parrilla", "Enviar al grupo") !== false;
+  const enviar = useEnviarParrilla();
+  const enviarAlGrupo = () => {
+    if (!grid) return;
+    if (dirtyRef.current) { toast.warning("Guarda tus cambios antes de enviar"); return; }
+    toast("Se genera el PDF y se manda al grupo Managers de WhatsApp", {
+      description: "Después la parrilla queda en solo lectura (Volver a borrador para corregirla).",
+      duration: 10000,
+      action: {
+        label: "Enviar",
+        onClick: () => enviar.mutate(grid.id, {
+          onSuccess: (d) => toast.success(d.enviado ? "Parrilla enviada al grupo ✅" : "PDF generado (envío desactivado)", {
+            description: d.pdf_url ? "El PDF quedó guardado en la parrilla." : undefined,
+          }),
+          onError: (e: any) => toast.error(`No se pudo enviar: ${e.message}`),
+        }),
+      },
+    });
+  };
   const setStart = useSetWeekStart();
   const [startPickerOpen, setStartPickerOpen] = useState(false);
 
@@ -587,6 +611,11 @@ export default function ParrillaPage() {
               </div>
             </PopoverContent>
           </Popover>
+          {grid && !soloLectura && puedeEnviar && (
+            <Button variant="outline" size="sm" disabled={enviar.isPending} onClick={enviarAlGrupo} title="PDF + WhatsApp al grupo Managers">
+              {enviar.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Enviar al grupo
+            </Button>
+          )}
           <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: volvé a borrador para editarla" : undefined}>
             {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
           </Button>
@@ -611,7 +640,8 @@ export default function ParrillaPage() {
           <>
             {soloLectura && (
               <div className="print-hide mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900">
-                <b>Parrilla enviada al grupo</b> — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
+                <b>Parrilla enviada al grupo</b>{grid.sent_at ? ` el ${new Date(grid.sent_at).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}` : ""} — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
+                {grid.pdf_url && <> · <a href={grid.pdf_url} target="_blank" rel="noreferrer" className="font-semibold underline">Ver PDF</a></>}
               </div>
             )}
             {/* La lámina completa (título + tablero + regla): es lo que se escala al imprimir.
