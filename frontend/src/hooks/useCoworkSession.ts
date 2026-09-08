@@ -34,6 +34,7 @@ export interface SesionFinalizada {
   endedBy: string | null;
   endedByName: string | null;
   createdBy: string | null;
+  createdByName: string | null;
   members: number;
 }
 
@@ -372,14 +373,15 @@ export function useCoworkSession(sessionId: string | null) {
   // Las sesiones en las que estuve y que se finalizaron hace poco, con quién
   // las finalizó. Es la respuesta en pantalla a "¿quién cerró la sala?", que
   // hasta hoy había que ir a buscar a los registros del servidor.
-  const listMyEndedSessions = useCallback(async (dias = 7): Promise<SesionFinalizada[]> => {
+  const listMyEndedSessions = useCallback(async (dias = 10): Promise<SesionFinalizada[]> => {
     // El RPC todavía no está en los tipos generados; el cast se acota acá.
     const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: any[] | null; error: any }> })
       .rpc("cowork_mis_sesiones_finalizadas", { _dias: dias });
     if (error) throw error;
     return (data ?? []).map((s: any) => ({
       id: s.id, name: s.name, endedAt: s.ended_at, endedBy: s.ended_by ?? null,
-      endedByName: s.ended_by_name ?? null, createdBy: s.created_by ?? null, members: s.members ?? 0,
+      endedByName: s.ended_by_name ?? null, createdBy: s.created_by ?? null,
+      createdByName: s.created_by_name ?? null, members: s.members ?? 0,
     }));
   }, []);
 
