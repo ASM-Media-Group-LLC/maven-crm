@@ -77,11 +77,23 @@ const Delta = ({ cur, prev }: { cur: number; prev: number }) => {
 };
 
 const daysSince = (iso: string | null) => (iso ? differenceInCalendarDays(new Date(), new Date(iso)) : null);
+// "Silenciosa" = MISMO criterio que el bot (get_manager_silent_creators): sin
+// saliente en las últimas 72 h reales, no días calendario (con calendario, un
+// contacto del viernes noche ya contaba como "3 días" el lunes temprano).
+const isSilent = (iso: string | null) => (iso ? Date.now() - new Date(iso).getTime() >= SILENT_DAYS * 86400e3 : true);
 
 const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
-  const from = dateFrom ? format(dateFrom, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
-  const to = dateTo ? format(dateTo, "yyyy-MM-dd") : from;
-  const rangeDays = dateFrom && dateTo ? differenceInCalendarDays(dateTo, dateFrom) + 1 : 1;
+  // El rango efectivo termina HOY como máximo: "Esta semana"/"Este mes" llegan
+  // hasta el domingo/fin de mes y, sin este recorte, el delta BLU comparaba 2 días
+  // de datos contra 7 del tramo anterior (−89% falso). Con el recorte, el tramo
+  // anterior tiene la MISMA cantidad de días con datos.
+  const hoy = new Date();
+  const toDate = dateTo && dateTo < hoy ? dateTo : hoy;
+  const fromDate = dateFrom && dateFrom <= toDate ? dateFrom : toDate;
+  const from = format(fromDate, "yyyy-MM-dd");
+  const to = format(toDate, "yyyy-MM-dd");
+  const rangeDays = differenceInCalendarDays(toDate, fromDate) + 1;
+  const recortado = !!dateTo && dateTo > hoy;
 
   const { data: managers = [] } = useAssignableManagers();
   const { data: scores = [], isLoading: scoresLoading } = usePromoScoresRango(from, to);
@@ -130,7 +142,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
           const promoDays = s?.promo_days ?? 0;
           const covered = s?.covered_days ?? 0;
           const promoted = promoDays > 0;
-          const silent = ct?.phone_ok ? (lastDays == null || lastDays >= SILENT_DAYS) : null;
+          const silent = ct?.phone_ok ? isSilent(ct.last_contact_at) : null;
           const newFans = g?.new_fans ?? 0;
           // Semáforo: rojo = no promociona + sin contacto reciente + sin fans nuevos.
           const flags = [!promoted && covered > 0, silent === true, newFans === 0].filter(Boolean).length;
@@ -191,7 +203,8 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
             <div>
               <h3 className="text-base font-semibold">Managers</h3>
               <p className="text-xs text-muted-foreground">
-                {rangeDays === 1 ? format(dateFrom ?? new Date(), "d 'de' MMMM yyyy") : `${format(dateFrom!, "d MMM")} – ${format(dateTo!, "d MMM yyyy")} · ${rangeDays} días`}
+                {rangeDays === 1 ? format(fromDate, "d 'de' MMMM yyyy") : `${format(fromDate, "d MMM")} – ${format(toDate, "d MMM yyyy")} · ${rangeDays} días`}
+                {recortado && <span className="text-warning"> · recortado a hoy (el rango llegaba al futuro)</span>}
                 {" · "}por la manager asignada en la ficha · solo creadoras activas
               </p>
             </div>
@@ -281,58 +294,68 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                   </div>
                 </div>
 
-                {/* Drill-down: sus creadoras con semáforo */}
-                {open && (
-                  <div className="rounded-xl border border-white/10 overflow-x-auto">
-                    <Table className="min-w-[760px]">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Creadora</TableHead>
-                          <TableHead className="text-center">Promo</TableHead>
-                          <TableHead className="text-center">Calidad</TableHead>
-                          <TableHead className="text-center">Último contacto</TableHead>
-                          <TableHead className="text-right">Fans nuevos</TableHead>
-                          <TableHead className="text-right">Subs nuevas</TableHead>
-                          <TableHead className="text-right">Total BLU</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {r.detail.map((d) => (
-                          <TableRow key={d.creator.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? "No promociona + sin contacto + sin fans nuevos" : d.semaforo === "ambar" ? "Dos señales en rojo" : "OK"} />
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium truncate">{d.name}</p>
-                                  {d.creator.instagram_handle && <p className="text-[11px] text-muted-foreground">@{d.creator.instagram_handle}</p>}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm">
-                              {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{d.promoDays}/{d.covered} días</span> : <span className="text-muted-foreground text-xs">sin lectura</span>}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? " · parcial" : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
-                            </TableCell>
-                            <TableCell className="text-center text-sm">
-                              {!d.phoneOk ? <span className="text-muted-foreground text-xs">sin teléfono</span>
-                                : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
-                                : <span className={cn(d.lastDays >= SILENT_DAYS ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
-                            <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
-                            <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {/* Drill-down a ancho completo: sus creadoras con semáforo */}
+      {openManager && (() => {
+        const r = withRoster.find((x) => x.manager.id === openManager);
+        if (!r) return null;
+        return (
+          <Card>
+            <CardContent className="pt-4 pb-4 space-y-3">
+              <p className="text-sm font-semibold">Creadoras de {r.manager.full_name} <span className="text-xs text-muted-foreground font-normal">· 🔴 no promociona + sin contacto + sin fans nuevos · 🟡 dos señales</span></p>
+            <div className="rounded-xl border border-white/10 overflow-x-auto">
+              <Table className="min-w-[760px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Creadora</TableHead>
+                    <TableHead className="text-center">Promo</TableHead>
+                    <TableHead className="text-center">Calidad</TableHead>
+                    <TableHead className="text-center">Último contacto</TableHead>
+                    <TableHead className="text-right">Fans nuevos</TableHead>
+                    <TableHead className="text-right">Subs nuevas</TableHead>
+                    <TableHead className="text-right">Total BLU</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {r.detail.map((d) => (
+                    <TableRow key={d.creator.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? "No promociona + sin contacto + sin fans nuevos" : d.semaforo === "ambar" ? "Dos señales en rojo" : "OK"} />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{d.name}</p>
+                            {d.creator.instagram_handle && <p className="text-[11px] text-muted-foreground">@{d.creator.instagram_handle}</p>}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{d.promoDays}/{d.covered} días</span> : <span className="text-muted-foreground text-xs">sin lectura</span>}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? " · parcial" : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {!d.phoneOk ? <span className="text-muted-foreground text-xs">sin teléfono</span>
+                          : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
+                          : <span className={cn(d.lastDays >= SILENT_DAYS ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
+                      <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {rows.length > withRoster.length && (
         <p className="text-xs text-muted-foreground">
