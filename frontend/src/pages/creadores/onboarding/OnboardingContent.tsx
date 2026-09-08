@@ -90,7 +90,10 @@ const OnboardingContent = () => {
         }
       />
 
-      <div className="flex-1 overflow-auto px-6 pt-6 pb-6 space-y-4">
+      {/* overflow-x-hidden: la fila de agencias y la tabla se desplazan DENTRO de
+          su contenedor; antes hacían scrollear toda la página de lado en el
+          teléfono (Jhon, iPhone, 07/09/2026). */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-6 pb-6 space-y-4 sm:px-6">
         {/* KPI Cards — click filtra la lista (no abre modal porque la lista vive abajo) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {kpiCards.map((kpi) => (
@@ -107,16 +110,18 @@ const OnboardingContent = () => {
         </div>
 
         {/* Agency Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"} onClick={() => setActiveTab("Todas")}>Todas</Button>
-          {agencyOptions.map((a) => (
-            <Button key={a} size="sm" variant={activeTab === a ? "secondary" : "ghost"} onClick={() => setActiveTab(a)}>{a}</Button>
-          ))}
+        <div className="max-w-full overflow-x-auto scrollbar-thin-x">
+          <div className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-white/10 bg-white/5 p-1">
+            <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"} onClick={() => setActiveTab("Todas")}>Todas</Button>
+            {agencyOptions.map((a) => (
+              <Button key={a} size="sm" variant={activeTab === a ? "secondary" : "ghost"} onClick={() => setActiveTab(a)}>{a}</Button>
+            ))}
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
-          <div className="relative max-w-sm flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[11rem] max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nombre o empresa..."
@@ -127,7 +132,7 @@ const OnboardingContent = () => {
           </div>
 
           <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue placeholder="Etapa del Proceso" />
             </SelectTrigger>
             <SelectContent>
