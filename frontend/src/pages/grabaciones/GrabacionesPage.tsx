@@ -346,7 +346,10 @@ export default function GrabacionesPage() {
                     <span className="hidden sm:inline">Descargar</span>
                   </Button>
                 )}
-                {r.status === "ready" && (mia || isAdmin) && (
+                {/* Compartir la ve cualquiera que vea la grabación (Jhon, 09/09):
+                    si te la compartieron o la ves por tu alcance, también la
+                    puedes pasar. La edge lo comprueba con el mismo RLS. */}
+                {r.status === "ready" && (
                   <Button
                     size="sm"
                     variant="outline"

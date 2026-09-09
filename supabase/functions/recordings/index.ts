@@ -492,10 +492,18 @@ Deno.serve(async (req) => {
         .eq("id", recording_id).maybeSingle();
       if (!rec || rec.deleted_at) return json(req, { error: "grabación no encontrada" }, 404);
 
-      // Comparte quien la inició o un admin (misma regla que borrar).
-      const { data: rol } = await admin
-        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-      if (rec.started_by !== user.id && !rol) return json(req, { error: "Forbidden" }, 403);
+      // Comparte quien la inició, un admin, o cualquiera que la VEA: se lo
+      // pregunta al RLS con el cliente del usuario (cubre "me la compartieron"
+      // y el alcance por rol de Cowork sin duplicar esas reglas acá).
+      if (rec.started_by !== user.id) {
+        const { data: visible } = await authClient
+          .from("meeting_recordings").select("id").eq("id", rec.id).maybeSingle();
+        if (!visible) {
+          const { data: rol } = await admin
+            .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+          if (!rol) return json(req, { error: "Forbidden" }, 403);
+        }
+      }
 
       const { data: filas } = await admin
         .from("meeting_recording_recipients").select("user_id").eq("recording_id", rec.id);
