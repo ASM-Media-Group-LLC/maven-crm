@@ -74,7 +74,19 @@ async function puedeVer(admin: any, userId: string, rec: { id: string; started_b
   if (dest) return true;
   const { data: rol } = await admin
     .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-  return !!rol;
+  if (rol) return true;
+  // "Permisos de datos" de Grabaciones (Administración → Roles): con "todos" ve
+  // cualquier grabación; con "subordinados", las que grabó alguien de nivel
+  // inferior al suyo. Mismas funciones que usa la policy meeting_recordings_select.
+  const { data: global } = await admin.rpc("has_grabaciones_global_scope", { _user_id: userId });
+  if (global === true) return true;
+  const { data: equipo } = await admin.rpc("has_grabaciones_team_scope", { _user_id: userId });
+  if (equipo !== true) return false;
+  const [{ data: mio }, { data: suyo }] = await Promise.all([
+    admin.rpc("actor_level", { _user_id: userId }),
+    admin.rpc("actor_level", { _user_id: rec.started_by }),
+  ]);
+  return Number(suyo ?? 0) < Number(mio ?? 0);
 }
 
 Deno.serve(async (req) => {

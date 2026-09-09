@@ -40,6 +40,12 @@ export default function CoworkPage() {
   // Vista de admin en el landing: TODAS las sesiones activas de la empresa,
   // con cuánta gente hay conectada en cada sala (contado por LiveKit).
   const { isAdmin } = useUserRole();
+  // "Permisos de datos" de Cowork (Administración → Roles). Con "todos" o
+  // "subordinados" el landing lista sesiones ajenas: la RPC del edge ya filtra
+  // por alcance (todo, o solo las que tienen a alguien de nivel inferior). Antes
+  // esto era solo-admin y un rol con "Todos los datos" veía únicamente las suyas.
+  const { dataScope } = usePermissions();
+  const veTodasLasSesiones = isAdmin || dataScope("Cowork") !== "self";
   const [allSessions, setAllSessions] = useState<AdminSessionRow[]>([]);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 
@@ -84,7 +90,7 @@ export default function CoworkPage() {
   // mientras el landing esté abierto. Es UNA llamada al edge (que hace un solo
   // ListRooms a LiveKit) — nada de canales de presencia por sesión (#1458).
   useEffect(() => {
-    if (sessionId || !isAdmin) return;
+    if (sessionId || !veTodasLasSesiones) return;
     let alive = true;
     const load = () => {
       cowork.adminListSessions()
@@ -94,11 +100,12 @@ export default function CoworkPage() {
     load();
     const t = setInterval(load, 30000);
     return () => { alive = false; clearInterval(t); };
-  }, [sessionId, isAdmin, cowork.adminListSessions]);
+  }, [sessionId, veTodasLasSesiones, cowork.adminListSessions]);
 
-  // La lista única. Para el admin la base es adminListSessions (todas, con
-  // ocupación en vivo y salas); las suyas se enriquecen con lo que sabe
-  // listMyActiveSessions (última sala, quién la creó). Para el resto, las suyas.
+  // La lista única. Para quien ve todas (admin, o data_scope de Cowork en
+  // "todos"/"subordinados") la base es adminListSessions (con ocupación en vivo y
+  // salas); las suyas se enriquecen con lo que sabe listMyActiveSessions (última
+  // sala, quién la creó). Para el resto, las suyas.
   const filasActivas = useMemo(() => {
     type Fila = {
       id: string; name: string; role: string | null; members: number; createdBy: string | null;
@@ -106,7 +113,7 @@ export default function CoworkPage() {
       rooms: Array<{ id: string; name: string; online: number | null }>; admin: AdminSessionRow | null;
     };
     const mias = new Map(mySessions.map((m) => [m.id, m]));
-    if (isAdmin && allSessions.length > 0) {
+    if (veTodasLasSesiones && allSessions.length > 0) {
       return allSessions.map((a): Fila => {
         const m = mias.get(a.id);
         return {
@@ -124,7 +131,7 @@ export default function CoworkPage() {
         rooms: a?.rooms ?? [], admin: a ?? null,
       };
     });
-  }, [isAdmin, allSessions, mySessions]);
+  }, [veTodasLasSesiones, allSessions, mySessions]);
 
   // Entrar a una sesión ajena: el edge deja a los admin unirse como host sin
   // código. Queda como supervisor de esa sesión (tablero con todas las salas).
@@ -318,7 +325,7 @@ export default function CoworkPage() {
         {!loadingSessions && filasActivas.length > 0 && (
           <div className="w-full max-w-3xl flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-              Sesiones activas{isAdmin ? ` · ${filasActivas.length}` : ""}
+              Sesiones activas{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
             {filasActivas.map((s) => (
               <div
@@ -399,7 +406,7 @@ export default function CoworkPage() {
                       >
                         Volver <ArrowRight className="h-4 w-4" />
                       </Button>
-                    ) : (
+                    ) : isAdmin ? (
                       <Button
                         size="sm"
                         className="rounded-full gap-1 shrink-0"
@@ -408,6 +415,16 @@ export default function CoworkPage() {
                       >
                         {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
                       </Button>
+                    ) : (
+                      /* La ve por su alcance de datos, no es miembro: puede mirar
+                         quién está y cuántos hay, pero entrar como host sin código
+                         sigue siendo cosa de admin (lo exige el edge). */
+                      <span
+                        className="shrink-0 rounded-full border border-border/60 px-2.5 py-1 text-xs text-muted-foreground"
+                        title="Ves esta sesión por tu alcance de datos en Cowork. Para entrar necesitás el código de sala."
+                      >
+                        Solo lectura
+                      </span>
                     )}
                   </div>
                 </div>
