@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,11 @@ import type { Notification } from "@/hooks/useNotifications";
 
 export default function NotificationBell() {
   const navigate = useNavigate();
+  // El popover va CONTROLADO para poder cerrarlo al navegar. Radix no lo cierra
+  // por su cuenta cuando el clic ocurre DENTRO del panel, así que al ir a
+  // /notificaciones el panel quedaba abierto tapando la página y había que dar
+  // otro clic afuera. Igual que la nube de Messenger (MessagesBell).
+  const [abierta, setAbierta] = useState(false);
   const { t } = useLanguage();
   const { toast } = useToast();
   const { canAccess } = usePermissions();
@@ -45,11 +51,12 @@ export default function NotificationBell() {
       return;
     }
     const url = resolveDeepLink(n.reference_type, n.reference_id, n.deep_link_url);
+    setAbierta(false);
     navigate(url);
   };
 
   return (
-    <Popover>
+    <Popover open={abierta} onOpenChange={setAbierta}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className={BOTON_TOPBAR} title="Notificaciones">
           <Bell className="h-[18px] w-[18px]" />
@@ -100,7 +107,7 @@ export default function NotificationBell() {
             variant="ghost"
             size="sm"
             className="w-full text-xs"
-            onClick={() => navigate("/notificaciones")}
+            onClick={() => { setAbierta(false); navigate("/notificaciones"); }}
           >
             Ver todas las notificaciones
           </Button>
