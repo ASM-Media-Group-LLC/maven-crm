@@ -809,7 +809,7 @@ const InsightCard = ({ icon, label, value, subtitle }: InsightCardProps) => (
     <CardContent className="p-3">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
+        <p className="text-xs text-muted-foreground font-semibold">{label}</p>
       </div>
       <p className="text-xl font-bold truncate">{value}</p>
       <p className="text-[10px] text-muted-foreground truncate mt-0.5">{subtitle}</p>

@@ -17,7 +17,7 @@ const EscalabilidadSection = () => {
             Las politicas de Row Level Security (RLS) en Supabase utilizan este campo para filtrar automaticamente los registros segun la compania del usuario autenticado. Esto asegura aislamiento de datos sin necesidad de logica adicional en el frontend.
           </p>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4 mt-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Tablas con soporte multi-tenant</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Tablas con soporte multi-tenant</h4>
             <div className="flex flex-wrap gap-2">
               {["task_projects", "tasks", "deals", "profiles", "creators", "events"].map((t) => (
                 <span key={t} className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-mono">{t}</span>
@@ -41,7 +41,7 @@ const EscalabilidadSection = () => {
             Cada creador mantiene relaciones con multiples tablas satelite (business, guidelines, notes, documents, history, monetization, payments, training) que se escalan horizontalmente sin afectar el rendimiento de consultas gracias a indices en <code className="text-xs bg-muted px-1.5 py-0.5 rounded">creator_id</code>.
           </p>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Estrategias de rendimiento</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Estrategias de rendimiento</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
               <li>— Paginacion en listados para evitar carga completa de registros</li>
               <li>— Cache inteligente con TanStack Query (staleTime, cacheTime configurables)</li>
@@ -63,7 +63,7 @@ const EscalabilidadSection = () => {
             La asignacion de equipos se gestiona a traves de multiples campos en las tablas de creadores y asignaciones. Cada creador puede tener asignados un manager, un specialist y un closer de forma independiente.
           </p>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Modelo de asignacion</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Modelo de asignacion</h4>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -122,7 +122,7 @@ const EscalabilidadSection = () => {
             Maven esta disenada con una arquitectura modular que permite agregar nuevos modulos sin afectar los existentes. Cada modulo opera como una unidad independiente con sus propias rutas, componentes y hooks, conectandose al ecosistema a traves de interfaces compartidas.
           </p>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Patron de extension</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Patron de extension</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
               <li>— Crear nueva carpeta en <code className="bg-muted px-1 py-0.5 rounded">src/pages/[modulo]</code></li>
               <li>— Implementar componente wrapper con layout estandar (Sidebar + Topbar)</li>

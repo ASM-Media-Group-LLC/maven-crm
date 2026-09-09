@@ -257,25 +257,25 @@ const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-xs font-bold">
                   Fecha
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-xs font-bold">
                   Modelo
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-xs font-bold">
                   Closer
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-xs font-bold">
                   Evaluador
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-xs font-bold">
                   Resultado
                 </TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="text-right text-xs font-bold">
                   Score
                 </TableHead>
-                <TableHead className="w-[80px] text-center text-[10px] font-bold uppercase tracking-widest">
+                <TableHead className="w-[80px] text-center text-xs font-bold">
                   Reenviar
                 </TableHead>
               </TableRow>
@@ -356,7 +356,7 @@ const Stat = ({
   color: string;
 }) => (
   <div className="rounded-xl border border-border/60 bg-card p-4">
-    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+    <div className="text-xs font-bold text-muted-foreground">
       {label}
     </div>
     <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>

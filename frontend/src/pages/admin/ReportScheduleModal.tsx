@@ -420,7 +420,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               4 cols lg. */}
           {roleName === COMBINED_ROLE_SENTINEL && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-medium text-muted-foreground">
                 Roles a combinar ({combinedRoles.length})
               </p>
               {roles.length === 0 ? (
@@ -765,7 +765,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                           if (moduleSelected.length === 0 && moduleUnselected.length === 0) return null;
                           return (
                             <div key={mod} className={modIdx > 0 ? "pt-2 mt-2 border-t border-border/40" : ""}>
-                              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80 px-1 pb-1">
+                              <p className="text-xs font-semibold text-primary/80 px-1 pb-1">
                                 {MODULE_LABELS[mod] ?? mod}
                               </p>
                               <div className="space-y-1.5">

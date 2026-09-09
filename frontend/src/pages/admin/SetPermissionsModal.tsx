@@ -352,7 +352,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
             <button
               type="button"
               onClick={() => toggleAllMenus(!allMenusChecked)}
-              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80 hover:text-foreground"
+              className="flex items-center gap-2 text-xs font-bold text-foreground/80 hover:text-foreground"
             >
               <Checkbox checked={allMenusChecked} className="h-4 w-4" />
               <MenuIcon className="h-3.5 w-3.5" /> {t("permissions.menus")}
@@ -363,7 +363,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
             <button
               type="button"
               onClick={() => toggleAllFunctions(!allFunctionsChecked)}
-              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80 hover:text-foreground"
+              className="flex items-center gap-2 text-xs font-bold text-foreground/80 hover:text-foreground"
             >
               <Checkbox checked={allFunctionsChecked} className="h-4 w-4" />
               <MousePointerClick className="h-3.5 w-3.5" /> {t("permissions.functions")}
@@ -371,7 +371,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
             <p className="pl-6 text-[11px] text-muted-foreground">{t("permissions.functionsHint")}</p>
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80">
+            <div className="flex items-center gap-2 text-xs font-bold text-foreground/80">
               <Database className="h-3.5 w-3.5" /> {t("permissions.data")}
             </div>
             <RadioGroup value="" onValueChange={(v) => setGlobalDataScope(v)} className="flex flex-col gap-1 pl-1">
@@ -391,7 +391,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
               const groupModules = MODULES_CONFIG.filter((m) => m.group === group);
               return (
                 <div key={group} className="space-y-1.5">
-                  <h3 className="px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                  <h3 className="px-1 text-xs font-bold text-muted-foreground/70">
                     {group}
                   </h3>
                   <div className="overflow-hidden rounded-lg border border-border">

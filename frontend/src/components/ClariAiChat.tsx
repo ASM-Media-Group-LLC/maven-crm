@@ -400,7 +400,7 @@ const ClariAiChat = ({
                       }`}
                     >
                       {!isUser && (
-                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-violet-500">
+                        <div className="mb-1 text-xs font-bold text-violet-500">
                           Clari
                         </div>
                       )}
@@ -472,7 +472,7 @@ const ClariAiChat = ({
               <div className="flex items-end gap-2">
                 <ClariBubbleAvatar size={28} />
                 <div className="max-w-[80%] rounded-2xl border border-dashed border-violet-500/40 bg-violet-500/10 px-3 py-2 text-sm">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-500">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-violet-500">
                     <Bot className="h-3 w-3 animate-pulse" />
                     Clari escribiendo…
                   </div>

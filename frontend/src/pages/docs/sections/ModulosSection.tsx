@@ -152,19 +152,19 @@ const ModuleBlock = ({ mod }: { mod: ModuleDoc }) => {
       {open && (
         <div className="border-t border-border p-5 space-y-5">
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Objetivo</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1">Objetivo</h4>
             <p className="text-sm text-muted-foreground leading-relaxed">{mod.objetivo}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Submodulos</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Submodulos</h4>
               <ul className="space-y-1">
                 {mod.submodulos.map((s) => <li key={s} className="text-xs text-muted-foreground">— {s}</li>)}
               </ul>
             </div>
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Estados</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Estados</h4>
               <div className="flex flex-wrap gap-1.5">
                 {mod.estados.map((e) => (
                   <span key={e} className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs">{e}</span>
@@ -174,14 +174,14 @@ const ModuleBlock = ({ mod }: { mod: ModuleDoc }) => {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Funcionalidades Principales</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Funcionalidades Principales</h4>
             <ul className="space-y-1">
               {mod.funcionalidades.map((f) => <li key={f} className="text-xs text-muted-foreground">— {f}</li>)}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Flujos Internos</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Flujos Internos</h4>
             <ul className="space-y-1">
               {mod.flujos.map((f) => <li key={f} className="text-xs text-muted-foreground">— {f}</li>)}
             </ul>
@@ -189,13 +189,13 @@ const ModuleBlock = ({ mod }: { mod: ModuleDoc }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Automatizaciones</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Automatizaciones</h4>
               <ul className="space-y-1">
                 {mod.automatizaciones.map((a) => <li key={a} className="text-xs text-muted-foreground">— {a}</li>)}
               </ul>
             </div>
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">KPIs Asociados</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">KPIs Asociados</h4>
               <ul className="space-y-1">
                 {mod.kpis.map((k) => <li key={k} className="text-xs text-muted-foreground">— {k}</li>)}
               </ul>
@@ -203,14 +203,14 @@ const ModuleBlock = ({ mod }: { mod: ModuleDoc }) => {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Roles</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Roles</h4>
             <ul className="space-y-1">
               {mod.roles.map((r) => <li key={r} className="text-xs text-muted-foreground">— {r}</li>)}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Logica de Negocio</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Logica de Negocio</h4>
             <p className="text-sm text-muted-foreground leading-relaxed">{mod.logica}</p>
           </div>
         </div>

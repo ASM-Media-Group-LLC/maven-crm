@@ -280,7 +280,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
           {CATEGORIES.map((cat) => (
             <div key={cat.category}>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h4 className="text-xs font-semibold text-muted-foreground">
                   {cat.category}
                 </h4>
                 <Button
@@ -385,7 +385,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
               <div key={g.id} className="flex items-start gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-xs font-medium text-muted-foreground">
                       {g.guideline_type}
                     </span>
                     <span className="text-xs text-muted-foreground">·</span>

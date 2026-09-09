@@ -24,7 +24,7 @@ function Stat({ label, value, tone, hint }: { label: string; value: string; tone
   const toneCls = tone === "ok" ? "text-success" : tone === "warn" ? "text-warning" : tone === "bad" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-lg border border-border bg-card/40 p-3">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className={cn("text-xl font-bold leading-tight", toneCls)}>{value}</div>
       {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
     </div>

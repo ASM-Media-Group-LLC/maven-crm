@@ -40,15 +40,15 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
 
         <div className="space-y-4 overflow-y-auto min-h-0">
           <div>
-            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Nombre de la sesión</Label>
+            <Label className="text-muted-foreground text-xs font-medium">Nombre de la sesión</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Cowork semanal" className="mt-1.5 rounded-xl" />
           </div>
           <div>
-            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Descripción (opcional)</Label>
+            <Label className="text-muted-foreground text-xs font-medium">Descripción (opcional)</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." className="mt-1.5 rounded-xl" />
           </div>
           <div>
-            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+            <Label className="text-muted-foreground text-xs font-medium">
               Salas <span className="text-muted-foreground/70 font-normal normal-case">({roomNames.length}/10)</span>
             </Label>
             <div className="space-y-2 mt-1.5">

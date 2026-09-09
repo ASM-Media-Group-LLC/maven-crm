@@ -44,7 +44,7 @@ export default function SemanaViva({ dias, descansos, shift, hoy = new Date(), o
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       {/* Último día cerrado: anillo de meta + racha */}
       <div className="flex flex-col items-center justify-center rounded-xl border bg-gradient-to-b from-primary/10 to-transparent p-4 text-center">
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{ultimo ? `Último cierre · ${fechaDe(ultimo.dia).toLocaleDateString("es", { weekday: "short", day: "numeric" })}` : "Sin cierres todavía"}</p>
+        <p className="text-xs text-muted-foreground">{ultimo ? `Último cierre · ${fechaDe(ultimo.dia).toLocaleDateString("es", { weekday: "short", day: "numeric" })}` : "Sin cierres todavía"}</p>
         <Anillo pct={pct} nota={ultimo?.nota ?? null} />
         <p className="text-sm"><span className="font-semibold tabular-nums">{money(ultimo?.ventas)}</span> <span className="text-muted-foreground">de {money(ultimo?.ventas_esperadas)}</span></p>
         <div className="mt-3 flex w-full items-center justify-center gap-3 text-xs">
@@ -76,12 +76,12 @@ export default function SemanaViva({ dias, descansos, shift, hoy = new Date(), o
                 futuro && !libre && "opacity-40",
               )}>
               <div className="flex items-baseline justify-between">
-                <span className={cn("text-[10px] font-semibold uppercase tracking-wider", esHoy ? "text-primary" : "text-muted-foreground")}>{label}</span>
+                <span className={cn("text-xs font-semibold", esHoy ? "text-primary" : "text-muted-foreground")}>{label}</span>
                 <span className="text-xs font-semibold tabular-nums text-muted-foreground">{fechaDe(iso).getDate()}</span>
               </div>
               {libre ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground">
-                  <CalendarOff className="h-5 w-5" /><span className="text-[10px] uppercase tracking-wide">Descanso</span>
+                  <CalendarOff className="h-5 w-5" /><span className="text-xs">Descanso</span>
                 </div>
               ) : d ? (
                 <>
@@ -94,7 +94,7 @@ export default function SemanaViva({ dias, descansos, shift, hoy = new Date(), o
                 </>
               ) : esHoy ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-1 text-primary">
-                  <Icono className="h-5 w-5" /><span className="text-[10px] font-semibold uppercase tracking-wide">En curso</span>
+                  <Icono className="h-5 w-5" /><span className="text-xs font-semibold">En curso</span>
                   <span className="text-[10px] text-muted-foreground">cierra mañana</span>
                 </div>
               ) : (
@@ -121,7 +121,7 @@ function Anillo({ pct, nota }: { pct: number | null; nota: number | null }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={cn("font-display text-3xl font-extrabold leading-none tabular-nums", t.texto)}>{nota == null ? "—" : nota.toFixed(1)}</span>
-        <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{pct == null ? "sin meta" : `${Math.round(pct)}% meta`}</span>
+        <span className="mt-0.5 text-xs text-muted-foreground">{pct == null ? "Sin meta" : `${Math.round(pct)}% meta`}</span>
       </div>
     </div>
   );

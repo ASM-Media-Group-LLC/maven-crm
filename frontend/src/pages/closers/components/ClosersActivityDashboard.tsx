@@ -283,7 +283,7 @@ const EmployeeActivityDetail = ({
           <div className="flex flex-wrap gap-4">
             {stats.map((s) => (
               <div key={s.label} className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
                 <p className={cn("text-lg font-bold tabular-nums leading-tight", s.danger && "text-rose-500")}>{s.value}</p>
               </div>
             ))}
@@ -291,11 +291,11 @@ const EmployeeActivityDetail = ({
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Canales</span>
+            <span className="text-xs text-muted-foreground">Canales</span>
             <CountChips data={emp.by_channel} />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Resultados</span>
+            <span className="text-xs text-muted-foreground">Resultados</span>
             <CountChips data={emp.by_result} />
           </div>
         </div>

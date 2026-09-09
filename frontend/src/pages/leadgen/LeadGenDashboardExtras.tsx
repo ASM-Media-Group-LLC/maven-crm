@@ -89,7 +89,7 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
             <Trophy className="h-4 w-4 text-amber-500" />
             <h3 className="text-sm font-semibold">Top 3 LLGs</h3>
             {rangeLabel && (
-              <span className="text-[10px] text-muted-foreground ml-auto uppercase tracking-wider">
+              <span className="text-xs text-muted-foreground ml-auto">
                 {rangeLabel}
               </span>
             )}
@@ -137,7 +137,7 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold">Teléfonos obtenidos por día</h3>
-            <span className="text-[10px] text-muted-foreground ml-auto uppercase tracking-wider">
+            <span className="text-xs text-muted-foreground ml-auto">
               {totalPhones} total · {rangeLabel ?? "últimos 30 días"}
             </span>
           </div>

@@ -131,15 +131,15 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
 
               <div className="hidden md:flex items-center gap-4 text-right shrink-0">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
+                  <p className="text-xs text-muted-foreground">Ciudad</p>
                   <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
+                  <p className="text-xs text-muted-foreground">País</p>
                   <p className="text-xs font-medium">{c.pais ? getCountryShortDisplay(c.pais) : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
+                  <p className="text-xs text-muted-foreground">Creación</p>
                   <p className="text-xs font-medium whitespace-nowrap">{c.creacion}</p>
                 </div>
               </div>

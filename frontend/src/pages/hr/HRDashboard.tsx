@@ -460,7 +460,7 @@ export default function HRDashboard() {
 
         {/* Estado Actual de la Plantilla */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Estado Actual de la Plantilla</p>
+          <p className="text-xs font-medium text-muted-foreground mb-3">Estado Actual de la Plantilla</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)

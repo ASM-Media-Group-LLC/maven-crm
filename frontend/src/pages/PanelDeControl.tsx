@@ -277,7 +277,7 @@ const DetailDialog = ({
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set())}
-                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Expandir todas"
                 >
                   Expandir
@@ -287,7 +287,7 @@ const DetailDialog = ({
                   onClick={() =>
                     setCollapsed(new Set(groups.list.map((g) => g.cat)))
                   }
-                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Colapsar todas"
                 >
                   Colapsar
@@ -750,7 +750,7 @@ const LeadDetailDialog = ({
                 className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden"
               >
                 <div className="px-3 py-2 border-b border-border/40 bg-muted/30">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <p className="text-xs font-bold text-muted-foreground">
                     {sec.title}
                   </p>
                 </div>
@@ -1048,7 +1048,7 @@ const PanelDeControl = () => {
           className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
         >
           <div className="relative">
-            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+            <p className="text-xs text-foreground/80 font-semibold">
               Total leads generados
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -1079,7 +1079,7 @@ const PanelDeControl = () => {
           className="group relative overflow-hidden rounded-xl border-2 border-cyan-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-cyan-500/60 hover:shadow-[0_0_24px_-4px_rgba(34,211,238,0.4)]"
         >
           <div className="relative">
-            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+            <p className="text-xs text-foreground/80 font-semibold">
               Tasa de números obtenidos por lead
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -1119,7 +1119,7 @@ const PanelDeControl = () => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Tasa de números obtenidos
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -1140,7 +1140,7 @@ const PanelDeControl = () => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Tasa de cierre
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -1188,7 +1188,7 @@ const PanelDeControl = () => {
               </span>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Movimientos del CRM
               </p>
               {isLoading ? (
@@ -1248,7 +1248,7 @@ const PanelDeControl = () => {
               <Crown className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Mejor cerrador{" "}
                 <span className="text-muted-foreground font-normal normal-case">
                   ·{" "}
@@ -1370,7 +1370,7 @@ const FunnelStep = ({
   color: string;
 }) => (
   <div className="rounded-xl border border-white/10 bg-white/5/40 px-3 py-1.5">
-    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+    <p className="text-xs text-muted-foreground">
       {label}
     </p>
     <p className={cn("font-bold tabular-nums text-base", color)}>

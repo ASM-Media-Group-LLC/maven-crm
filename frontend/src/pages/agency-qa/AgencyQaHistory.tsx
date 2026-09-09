@@ -318,22 +318,22 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="w-[80px] text-xs font-bold">
                     Score
                   </TableHead>
-                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="text-xs font-bold">
                     Fecha
                   </TableHead>
-                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="text-xs font-bold">
                     Modelo
                   </TableHead>
-                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="text-xs font-bold">
                     Cerrador
                   </TableHead>
-                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="text-xs font-bold">
                     Estado
                   </TableHead>
-                  <TableHead className="w-[120px] text-right text-[10px] font-bold uppercase tracking-widest">
+                  <TableHead className="w-[120px] text-right text-xs font-bold">
                     Acciones
                   </TableHead>
                 </TableRow>

@@ -113,7 +113,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
             {task.instruction}
           </p>
           {/* Task type label */}
-          <span className="mt-0.5 inline-block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <span className="mt-0.5 inline-block text-xs font-bold text-muted-foreground">
             {TASK_LABELS[task.task_type]}
           </span>
         </div>

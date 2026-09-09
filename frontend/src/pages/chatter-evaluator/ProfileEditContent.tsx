@@ -574,7 +574,7 @@ const ChatterProfileEditContent = () => {
                 className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Label className="text-xs font-semibold text-muted-foreground">
                     Sección {i + 1}
                   </Label>
                   <Button

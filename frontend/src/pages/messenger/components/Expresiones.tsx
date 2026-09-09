@@ -66,7 +66,7 @@ export default function Expresiones({
             <div className="h-full overflow-y-auto pr-1">
               {favoritos.length > 0 && (
                 <section className="mb-2">
-                  <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-muted-foreground">Frecuentes</p>
+                  <p className="mb-1 px-1 text-xs text-muted-foreground">Frecuentes</p>
                   <div className="grid grid-cols-8 gap-0.5">
                     {favoritos.map((e) => (
                       <button key={`fav-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>
@@ -78,7 +78,7 @@ export default function Expresiones({
               )}
               {Object.entries(EMOJI_CATALOG).map(([grupo, lista]) => (
                 <section key={grupo} className="mb-2">
-                  <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-muted-foreground">{grupo}</p>
+                  <p className="mb-1 px-1 text-xs text-muted-foreground">{grupo}</p>
                   <div className="grid grid-cols-8 gap-0.5">
                     {lista.map((e) => (
                       <button key={`${grupo}-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>

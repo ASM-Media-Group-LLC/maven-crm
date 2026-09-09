@@ -231,7 +231,7 @@ const PromologEntryDetailDialog = ({
             const promo = promoDate ? byDate[promoDate] : undefined;
             return (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-                <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold">
+                <p className="text-xs text-amber-400 font-semibold">
                   Ingresos (BLU) · alrededor de la promo
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -269,7 +269,7 @@ const PromologEntryDetailDialog = ({
               Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
           {socialChips.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Redes de la modelo</p>
+              <p className="text-xs text-muted-foreground font-semibold">Redes de la modelo</p>
               <div className="flex flex-wrap gap-1.5">
                 {socialChips.map((c) => (
                   <a
@@ -290,7 +290,7 @@ const PromologEntryDetailDialog = ({
           {/* Buy link — sólo cuando la promo tiene link visible */}
           {entry.has_buy_link && (
             <div className="rounded-md border border-success/30 bg-success/5 p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wider text-success font-semibold flex items-center gap-1.5">
+              <p className="text-xs text-success font-semibold flex items-center gap-1.5">
                 <Check className="h-3 w-3" />
                 Link de compra detectado
               </p>
@@ -312,7 +312,7 @@ const PromologEntryDetailDialog = ({
           {/* Acción tomada — qué hizo la creadora para promocionar. */}
           {entry.action_taken && (
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Qué hizo para promocionar</p>
+              <p className="text-xs text-muted-foreground font-semibold">Qué hizo para promocionar</p>
               <p className="text-sm bg-muted/40 rounded-md p-3">{entry.action_taken}</p>
             </div>
           )}
@@ -320,7 +320,7 @@ const PromologEntryDetailDialog = ({
           {/* Notas — viene del chatter manual o del bot ([AUTO] reasoning). */}
           {entry.notes && (
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Notas</p>
+              <p className="text-xs text-muted-foreground font-semibold">Notas</p>
               <p className="text-sm bg-muted/40 rounded-md p-3 whitespace-pre-wrap">{entry.notes}</p>
             </div>
           )}
@@ -330,7 +330,7 @@ const PromologEntryDetailDialog = ({
           {!(dayNetworks && dayNetworks.length > 0) && !showStoryGallery && entry.ai_reasoning && (
             <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-wider text-blue-400 font-semibold">Análisis AI</p>
+                <p className="text-xs text-blue-400 font-semibold">Análisis AI</p>
                 {entry.ai_confidence != null && (
                   <Badge variant="secondary-soft" className="text-[10px] tabular-nums">
                     Confianza: {(entry.ai_confidence * 100).toFixed(0)}%
@@ -379,7 +379,7 @@ const PromologEntryDetailDialog = ({
           ) : entry.evidence_url ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Evidencia</p>
+                <p className="text-xs text-muted-foreground font-semibold">Evidencia</p>
                 <a
                   href={entry.evidence_url}
                   target="_blank"

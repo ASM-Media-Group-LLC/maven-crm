@@ -116,7 +116,7 @@ export default function HRPayroll() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
-                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border text-xs text-muted-foreground">
                     <th className="px-4 py-3 text-left font-semibold">Persona</th>
                     <th className="px-3 py-3 text-left font-semibold">Rol</th>
                     <th className="px-3 py-3 text-right font-semibold">Base (COP)</th>
@@ -171,7 +171,7 @@ function Kpi({ label, value, icon: Icon, color, hint, tone }: { label: string; v
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+          <div className="text-xs text-muted-foreground">{label}</div>
           <div className={cn("text-xl font-bold leading-tight", tone === "ok" && "text-success", tone === "bad" && "text-destructive")}>{value}</div>
           {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
         </div>

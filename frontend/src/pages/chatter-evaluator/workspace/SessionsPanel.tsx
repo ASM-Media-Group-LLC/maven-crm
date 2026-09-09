@@ -382,7 +382,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       {/* Header del rail (220px). Con esa anchura ya entra el label y el
           botón "+ Nueva sesión" lado a lado sin desbordar. */}
       <div className="flex shrink-0 items-center justify-between border-b p-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-xs font-semibold text-muted-foreground">
           Sesiones
         </span>
         <Button size="sm" onClick={() => setNewOpen(true)} className="h-7 gap-1 text-xs">

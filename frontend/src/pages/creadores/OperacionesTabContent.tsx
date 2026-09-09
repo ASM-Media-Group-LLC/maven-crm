@@ -284,7 +284,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
       {/* 2. Muro de Contención */}
       <Alert variant="destructive" className="border-2">
         <AlertTriangle className="h-5 w-5" />
-        <AlertTitle className="text-sm font-bold uppercase tracking-wide">
+        <AlertTitle className="text-sm font-bold">
           Esta modelo jamás hará:
         </AlertTitle>
         <AlertDescription className="mt-1">
@@ -306,7 +306,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
             <div className="space-y-4">
               {crisisScripts.map(({ key, label }) => (
                 <div key={key} className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{label}</p>
                   <ETx field={key as TextField} />
                 </div>
               ))}
@@ -318,7 +318,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
                 if (!value) return null;
                 return (
                   <div key={key} className="rounded-lg border p-3 space-y-1">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">{label}</p>
+                    <p className="text-xs font-bold text-muted-foreground">{label}</p>
                     <p className="text-sm">{value}</p>
                   </div>
                 );

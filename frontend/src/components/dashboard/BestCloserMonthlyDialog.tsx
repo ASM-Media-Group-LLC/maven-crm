@@ -44,7 +44,7 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
                   <Crown className="h-5 w-5 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  <p className="text-xs text-muted-foreground font-semibold">
                     {m.monthLabel}
                   </p>
                   {m.winner ? (

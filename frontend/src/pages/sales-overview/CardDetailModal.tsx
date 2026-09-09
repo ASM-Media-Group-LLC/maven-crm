@@ -44,7 +44,7 @@ const CardDetailModal = ({ open, onOpenChange, cardType, creators }: Props) => {
           <div className="max-h-[500px] overflow-auto space-y-1.5">
             {/* Header simulando una tabla — labels chiquitos arriba de
                 las columnas, alineados con los valores de cada row. */}
-            <div className="flex items-center gap-3 px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-3 px-3 pt-1 pb-2 text-xs text-muted-foreground">
               <span className="flex-1">Creadora</span>
               <span className="w-20 text-right">Actual</span>
               <span className="w-20 text-right">Anterior</span>

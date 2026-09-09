@@ -108,7 +108,7 @@ export default function AiChatSidebar({
 
             {groups.map((group) => (
               <div key={group.label}>
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">
                   {group.label}
                 </p>
                 <div className="space-y-1">

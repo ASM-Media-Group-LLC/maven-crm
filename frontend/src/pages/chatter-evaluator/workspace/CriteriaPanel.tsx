@@ -97,7 +97,7 @@ export const CriteriaPanel = ({
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="text-sm font-semibold text-muted-foreground">
             Criterios
           </h2>
           <Button

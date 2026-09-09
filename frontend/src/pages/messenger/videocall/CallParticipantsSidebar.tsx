@@ -130,7 +130,7 @@ export default function CallParticipantsSidebar({
 
       {isAdmin && (onMuteAll || onEndForAll) && (
         <div className="border-t border-secondary p-3 flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             Controles de anfitrión
           </span>
           {onMuteAll && (

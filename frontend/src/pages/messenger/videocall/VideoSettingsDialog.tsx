@@ -103,7 +103,7 @@ export default function VideoSettingsDialog({
               {/* Custom backgrounds */}
               {fondos.length > 0 && (
                 <>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Tus fondos</p>
+                  <p className="text-xs text-muted-foreground mb-1">Tus fondos</p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {fondos.map((bg) => (
                       <div

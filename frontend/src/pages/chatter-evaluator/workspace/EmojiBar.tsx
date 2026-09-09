@@ -159,7 +159,7 @@ export const EmojiBar = ({
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
               {Object.entries(EMOJI_CATALOG).map(([category, list]) => (
                 <div key={category}>
-                  <div className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div className="mb-1.5 text-xs text-muted-foreground">
                     {category}
                   </div>
                   <div className="flex flex-wrap gap-0.5">

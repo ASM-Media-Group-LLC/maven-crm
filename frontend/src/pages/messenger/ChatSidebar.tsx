@@ -331,7 +331,7 @@ export default function ChatSidebar({
             const sectionHeader = (label: string, count: number, expanded: boolean, toggle: () => void) => (
               <button
                 onClick={toggle}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                 <span>{label}</span>
@@ -390,7 +390,7 @@ export default function ChatSidebar({
           {/* Global message search results */}
           {search.trim().length >= 2 && (
             <div className="mt-1 px-2">
-              <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                 <Search className="h-3.5 w-3.5" />
                 <span>Resultados en mensajes</span>
               </div>
@@ -446,7 +446,7 @@ export default function ChatSidebar({
           <div className="mt-1 px-2">
             <button
               onClick={() => setContactsExpanded(!contactsExpanded)}
-              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
               {contactsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               <span>Contactos</span>
@@ -517,7 +517,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
         className="w-full flex items-center gap-1.5 px-3 pb-0.5 pt-1 select-none hover:bg-primary/5 rounded-2xl transition-colors"
       >
         {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</span>
+        <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       </button>
       {open && children}
     </div>

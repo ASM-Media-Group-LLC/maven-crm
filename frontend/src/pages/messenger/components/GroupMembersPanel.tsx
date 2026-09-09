@@ -309,7 +309,7 @@ export default function GroupMembersPanel({
       {/* Configuración del grupo (permisos) — solo admins */}
       {isAdmin && (
         <div className="px-4 py-3 border-b border-border space-y-3">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Configuración del grupo</p>
+          <p className="text-xs font-semibold text-muted-foreground">Configuración del grupo</p>
           {([
             { field: "msg_permission" as const, value: msgPerm, icon: Megaphone, label: "Enviar mensajes", hint: 'Solo admins = grupo "anuncios"' },
             { field: "members_visibility" as const, value: membersVis, icon: Eye, label: "Ver miembros", hint: "Quién ve esta lista" },
@@ -368,7 +368,7 @@ export default function GroupMembersPanel({
       {/* Solicitudes pendientes de aprobación — solo admins */}
       {isAdmin && pendingReqs.length > 0 && (
         <div className="px-4 py-3 border-b border-border">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">
             Solicitudes pendientes ({pendingReqs.length})
           </p>
           <div className="space-y-1.5">

@@ -97,7 +97,7 @@ export const CollapsibleSidebarGroup = ({
                       return (
                         <DropdownMenuLabel
                           key={`lbl-${idx}-${item.title}`}
-                          className="text-[10px] uppercase tracking-wider text-muted-foreground"
+                          className="text-xs text-muted-foreground"
                         >
                           {item.title}
                         </DropdownMenuLabel>
@@ -134,7 +134,7 @@ export const CollapsibleSidebarGroup = ({
     <SidebarGroup>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-widest !text-foreground/70 transition-colors hover:!text-foreground hover:bg-foreground/5">
+          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-xs font-semibold !text-foreground/70 transition-colors hover:!text-foreground hover:bg-foreground/5">
             <Icon className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
             <span className="flex-1 text-left">{label}</span>
             {/* Dot accent — solo si la ruta activa cae dentro de esta

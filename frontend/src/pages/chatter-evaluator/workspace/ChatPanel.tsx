@@ -86,7 +86,7 @@ const Metric = ({
   valueClass?: string;
 }) => (
   <div className="flex flex-col items-center leading-tight">
-    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+    <span className="text-xs font-bold text-muted-foreground">
       {label}
     </span>
     <span className={`mt-0.5 text-sm font-bold ${valueClass ?? ""}`}>{value}</span>
@@ -383,7 +383,7 @@ const MessageBubble = ({
     }
     return (
       <div className="my-2 text-center">
-        <span className="rounded-full bg-muted px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
           {msg.content || "system"}
         </span>
       </div>
@@ -1711,7 +1711,7 @@ export const ChatPanel = ({ session }: Props) => {
           {historyMsg && (
             <div className="space-y-2">
               <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
-                <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-primary">
                   <span>Actual</span>
                   {historyMsg.edited_at && (
                     <span className="font-normal normal-case text-muted-foreground">
@@ -1723,7 +1723,7 @@ export const ChatPanel = ({ session }: Props) => {
               </div>
               {(historyMsg.content_history ?? []).map((h, i) => (
                 <div key={i} className="rounded-lg border bg-muted/30 p-3">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="mb-1 text-xs font-semibold text-muted-foreground">
                     {i === 0 ? "Versión previa" : `Versión hace ${i + 1}`}
                     {h.edited_at && (
                       <span className="ml-2 font-normal normal-case">

@@ -302,7 +302,7 @@ const SectionThumbs = ({
           </PopoverTrigger>
           <PopoverContent className="w-80 space-y-2 p-3" align="end">
             <div>
-              <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              <Label className="text-xs font-bold text-muted-foreground">
                 ¿Qué le corregirías a la IA?
               </Label>
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -317,7 +317,7 @@ const SectionThumbs = ({
               placeholder="Ej: el score es muy bajo, en realidad el closer manejó bien la objeción de privacidad…"
               className="text-sm"
             />
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Label className="text-xs font-bold text-muted-foreground">
               Score sugerido (opcional, 0-100)
             </Label>
             <Input
@@ -443,7 +443,7 @@ const ScoreGauge = ({
         >
           {clamped}
         </span>
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           Score
         </span>
       </div>
@@ -472,7 +472,7 @@ const FactCard = ({
         {icon}
       </span>
       <span
-        className="text-xs font-bold uppercase tracking-wider"
+        className="text-xs font-bold"
         style={{ color: PRIMARY }}
       >
         {label}
@@ -689,7 +689,7 @@ const AudioMetricsChart = ({
               🎯
             </span>
             <span
-              className="text-xs font-bold uppercase tracking-wider"
+              className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
               Closer
@@ -708,7 +708,7 @@ const AudioMetricsChart = ({
               👤
             </span>
             <span
-              className="text-xs font-bold uppercase tracking-wider"
+              className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
               Modelo
@@ -735,7 +735,7 @@ const AudioMetricsChart = ({
         <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-4 text-sm leading-relaxed">
           <div>
             <span
-              className="text-[10px] font-bold uppercase tracking-wider"
+              className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
               Interés
@@ -746,7 +746,7 @@ const AudioMetricsChart = ({
           </div>
           <div>
             <span
-              className="text-[10px] font-bold uppercase tracking-wider"
+              className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
               Complicidad
@@ -758,7 +758,7 @@ const AudioMetricsChart = ({
           {modelSignals.summary_of_model && (
             <div>
               <span
-                className="text-[10px] font-bold uppercase tracking-wider"
+                className="text-xs font-bold"
                 style={{ color: PRIMARY }}
               >
                 Global
@@ -771,7 +771,7 @@ const AudioMetricsChart = ({
           {modelSignals.objections && modelSignals.objections.length > 0 && (
             <div className="mt-1">
               <div
-                className="mb-1 text-[10px] font-bold uppercase tracking-wider"
+                className="mb-1 text-xs font-bold"
                 style={{ color: PRIMARY }}
               >
                 Objeciones ({modelSignals.objections.length})
@@ -1061,7 +1061,7 @@ const AnalysisSections = ({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div
-                      className="text-xs font-semibold uppercase tracking-wider"
+                      className="text-xs font-semibold"
                       style={{
                         color: m.kind === "positivo" ? "#16a34a" : "#dc2626",
                       }}
@@ -1137,7 +1137,7 @@ const TranscriptCollapse = ({ transcript }: { transcript: string }) => {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between text-left"
       >
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="text-sm font-semibold text-muted-foreground">
           Transcript
         </h2>
         <span className="text-sm text-muted-foreground">
@@ -1583,7 +1583,7 @@ const CallDetailPage = ({
                 en la misma columna). */}
             <div className="flex shrink-0 flex-col items-center gap-2">
               <ScoreGauge score={call.claude_score} size={150} />
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="text-xs font-bold text-muted-foreground">
                 Score IA
               </span>
               <OutcomeBadge outcome={analysis.call_outcome} size="lg" shadow />
@@ -1615,8 +1615,8 @@ const CallDetailPage = ({
       {call.audio_path && (
         <section className="mt-3 rounded-2xl border border-border bg-card p-4">
           <h2
-            className="mb-3 text-base font-semibold uppercase tracking-wide"
-            style={{ color: PRIMARY, letterSpacing: "0.08em" }}
+            className="mb-3 text-base font-semibold"
+            style={{ color: PRIMARY }}
           >
             Audio de la llamada
           </h2>
@@ -1643,8 +1643,8 @@ const CallDetailPage = ({
       {/* Ficha rápida */}
       <section className="mt-3 rounded-2xl border border-border bg-card p-4">
         <h2
-          className="mb-3 text-base font-semibold uppercase tracking-wide"
-          style={{ color: PRIMARY, letterSpacing: "0.08em" }}
+          className="mb-3 text-base font-semibold"
+          style={{ color: PRIMARY }}
         >
           Ficha rápida
         </h2>
@@ -1673,7 +1673,7 @@ const CallDetailPage = ({
                   💡
                 </span>
                 <span
-                  className="text-xs font-bold uppercase tracking-wider"
+                  className="text-xs font-bold"
                   style={{ color: PRIMARY }}
                 >
                   Observaciones clave
@@ -1714,7 +1714,7 @@ const CallDetailPage = ({
         <div className="mt-3 flex flex-col gap-3 lg:flex-row">
           {hasDimensions && (
             <section className="flex-1 rounded-2xl border border-border bg-card p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
                 Perfil visual
               </h2>
               <DimensionsRadar dimensions={analysis.dimensions!} />
@@ -1723,7 +1723,7 @@ const CallDetailPage = ({
 
           {hasAudioMetrics && audioMetrics && (
             <section className="flex-1 rounded-2xl border border-border bg-card p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
                 Métricas de audio
               </h2>
               <AudioMetricsChart
@@ -1759,7 +1759,7 @@ const CallDetailPage = ({
 
       {/* Human feedback */}
       <section className="mt-3 rounded-2xl border border-border bg-card p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
           Feedback humano
         </h2>
         {lastFb && (
@@ -1905,7 +1905,7 @@ const AudioWithCaptions = ({
       </audio>
       {hasCaptions && (
         <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-400">
+          <p className="mb-1.5 text-xs font-bold text-violet-400">
             Captions en vivo
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">

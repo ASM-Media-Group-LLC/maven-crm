@@ -73,7 +73,7 @@ const FunnelStep = ({
   color: string;
 }) => (
   <div className="flex flex-col">
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+    <span className="text-xs text-muted-foreground">{label}</span>
     <span className={cn("text-lg font-bold tabular-nums", color)}>
       {value.toLocaleString("es")}
     </span>
@@ -263,7 +263,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
           className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
         >
           <div className="relative">
-            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+            <p className="text-xs text-foreground/80 font-semibold">
               Total sesiones de evaluación
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -279,7 +279,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
 
         <Card className="p-5 border-2 border-emerald-500/30 relative overflow-hidden">
           <div className="relative">
-            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+            <p className="text-xs text-foreground/80 font-semibold">
               Tasa de aprobación
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -318,7 +318,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Tasa de aprobación
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -339,7 +339,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 Tasa de claim
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">

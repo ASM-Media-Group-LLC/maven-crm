@@ -335,7 +335,7 @@ export default function CoworkPage() {
             cada una; el resto ve las suyas. Las finalizadas van al final. */}
         {!loadingSessions && filasActivas.length > 0 && (
           <div className="w-full max-w-3xl flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            <h2 className="text-xs font-semibold text-muted-foreground px-1">
               Sesiones activas{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
             {filasActivas.map((s) => (
@@ -463,7 +463,7 @@ export default function CoworkPage() {
             Ventana de 10 días: lo más viejo se va solo (Jhon, 08/09). */}
         {finalizadas.length > 0 && (
           <div className="w-full max-w-3xl flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 flex items-center gap-1.5">
+            <h2 className="text-xs font-semibold text-muted-foreground px-1 flex items-center gap-1.5">
               <History className="h-3.5 w-3.5" /> Finalizadas recientemente <span className="font-normal normal-case tracking-normal">· últimos 10 días</span>
             </h2>
             {finalizadas.map((f) => (

@@ -136,7 +136,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Última Hora</p>
+                <p className="text-sm font-medium text-muted-foreground">Última Hora</p>
                 <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center text-primary">
                   <Clock className="h-4 w-4" />
                 </div>
@@ -151,7 +151,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Hoy</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Hoy</p>
                 <div className="h-8 w-8 rounded-md bg-emerald-500/20 flex items-center justify-center text-emerald-500">
                   <Target className="h-4 w-4" />
                 </div>
@@ -166,7 +166,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Promedio por Hora</p>
+                <p className="text-sm font-medium text-muted-foreground">Promedio por Hora</p>
                 <div className="h-8 w-8 rounded-md bg-violet-500/20 flex items-center justify-center text-violet-500">
                   <TrendingUp className="h-4 w-4" />
                 </div>

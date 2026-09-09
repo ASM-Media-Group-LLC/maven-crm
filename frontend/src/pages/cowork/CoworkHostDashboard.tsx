@@ -1304,7 +1304,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
           {/* Host Requests */}
           <div className="p-3 border-t border-border/50 space-y-2">
-            <h3 className="text-xs font-medium text-amber-500 uppercase tracking-wider flex items-center gap-1">
+            <h3 className="text-xs font-medium text-amber-500 flex items-center gap-1">
               <Hand className="h-3 w-3" /> Solicitudes ({openHostRequests.length})
             </h3>
             {openHostRequests.length === 0 ? (
@@ -1416,7 +1416,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             if (!enPausa.length) return null;
             return (
               <div className="p-3 border-t border-border/50 space-y-2">
-                <h3 className="text-xs font-medium text-amber-500 uppercase tracking-wider flex items-center gap-1">
+                <h3 className="text-xs font-medium text-amber-500 flex items-center gap-1">
                   <Coffee className="h-3 w-3" /> En pausa ({enPausa.length})
                 </h3>
                 {enPausa.map((p) => (
@@ -1444,7 +1444,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           {/* Pantallas compartidas EN VIVO por sala (ya no hay aprobaciones: compartir
               es directo para todos; acá solo se ve quién está compartiendo y dónde). */}
           <div className="p-3 border-t border-border/50 space-y-2">
-            <h3 className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1">
+            <h3 className="text-xs font-medium text-primary flex items-center gap-1">
               <Monitor className="h-3 w-3" /> Pantallas en vivo
             </h3>
             {(() => {
@@ -1490,7 +1490,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         ) : (
           <div className="flex-1 overflow-auto p-4 pt-14 pb-32 md:p-6">
             <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Seleccione sala para ingresar</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Seleccione sala para ingresar</h3>
               <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
                 <Button
                   size="sm"

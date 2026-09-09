@@ -474,7 +474,7 @@ const SpammerCard = ({
             )}
             {r.is_restricted && (
               <span
-                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300"
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-rose-500/20 text-rose-300"
                 title="IG marcó la cuenta como restringida — oculta a viewers no-loggeados."
               >
                 <Lock className="h-2.5 w-2.5" />
@@ -483,7 +483,7 @@ const SpammerCard = ({
             )}
             {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
               <span
-                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300"
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-300"
                 title="No pudimos leer el perfil automáticamente. Reintenta el scan o sube un screenshot — no significa que esté restringida."
               >
                 <AlertCircle className="h-2.5 w-2.5" />
@@ -623,15 +623,15 @@ const ScoreBadge = ({
     <span className={cn("text-base font-bold tabular-nums", cfg.text)}>
       {score != null ? score : "—"}
     </span>
-    <span className={cn("text-[8px] font-bold uppercase tracking-wider", cfg.text)}>
-      {score != null ? "score" : "n/a"}
+    <span className={cn("text-[10px] font-bold", cfg.text)}>
+      {score != null ? "Score" : "N/A"}
     </span>
   </div>
 );
 
 const Metric = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-md border border-border/40 bg-background/40 py-1">
-    <div className="text-[8px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="text-xs text-muted-foreground">{label}</div>
     <div className="text-xs font-semibold tabular-nums">{value}</div>
   </div>
 );
@@ -745,7 +745,7 @@ const StatBox = ({
           <Icon className={cn("h-3.5 w-3.5", spinning && "animate-spin")} />
         </div>
         <div className="min-w-0">
-          <p className="text-[9px] uppercase tracking-wider text-foreground/70 font-semibold leading-tight">
+          <p className="text-xs text-foreground/70 font-semibold leading-tight">
             {label}
           </p>
           <p className="text-base font-bold tabular-nums leading-tight">
@@ -774,7 +774,7 @@ const RestrictedRecoveryGuide = () => {
     <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-3">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-emerald-400" />
-        <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+        <h3 className="text-xs font-bold text-emerald-400">
           Cómo recuperar esta cuenta
         </h3>
       </div>
@@ -925,7 +925,7 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
           )}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1">
+          <p className="text-xs font-semibold mb-1">
             {hasScreenshots
               ? `${paths.length} screenshot${paths.length > 1 ? "s" : ""} cargado${paths.length > 1 ? "s" : ""} — el análisis usa la data real`
               : awaiting
@@ -1100,7 +1100,7 @@ const SpammerDetailDialog = ({
             <div className="flex items-start gap-2">
               <Lock className="h-4 w-4 mt-0.5 shrink-0 text-rose-400" />
               <div className="text-xs leading-relaxed">
-                <span className="font-semibold text-rose-400 uppercase tracking-wider text-[10px] block mb-1">
+                <span className="font-semibold text-rose-400 text-xs block mb-1">
                   IG marcó la cuenta como restringida
                 </span>
                 <span className="text-foreground/80">
@@ -1139,7 +1139,7 @@ const SpammerDetailDialog = ({
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
               <div className="text-xs leading-relaxed">
-                <span className="font-semibold text-amber-400 uppercase tracking-wider text-[10px] block mb-1">
+                <span className="font-semibold text-amber-400 text-xs block mb-1">
                   No pudimos leer el perfil automáticamente
                 </span>
                 <span className="text-foreground/80">
@@ -1181,13 +1181,13 @@ const SpammerDetailDialog = ({
             </div>
 
             <p className="text-sm leading-relaxed">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-violet-400 mr-2">Resumen</span>
+              <span className="text-xs font-bold text-violet-400 mr-2">Resumen</span>
               {a.summary}
             </p>
 
             {a.would_respond === "no" && a.why_not && (
               <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-rose-400 mb-1">
+                <div className="text-xs font-bold text-rose-400 mb-1">
                   Por qué NO respondería
                 </div>
                 <p className="text-sm">{a.why_not}</p>
@@ -1196,7 +1196,7 @@ const SpammerDetailDialog = ({
 
             {a.urgent_improvements && a.urgent_improvements.length > 0 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-2">
+                <div className="text-xs font-bold text-amber-400 mb-2">
                   Mejoras urgentes
                 </div>
                 <ul className="space-y-1 pl-4 list-disc text-sm marker:text-amber-400">
@@ -1210,7 +1210,7 @@ const SpammerDetailDialog = ({
             <div className="grid gap-3 sm:grid-cols-2">
               {a.strengths.length > 0 && (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-2">
+                  <div className="text-xs font-bold text-emerald-400 mb-2">
                     Fortalezas
                   </div>
                   <ul className="space-y-1 pl-4 list-disc text-xs marker:text-emerald-400">
@@ -1222,13 +1222,13 @@ const SpammerDetailDialog = ({
               )}
               {a.red_flags.length > 0 && (
                 <div className="rounded-lg border border-border/60 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <div className="text-xs font-bold text-muted-foreground mb-2">
                     Red flags
                   </div>
                   <ul className="space-y-1.5 text-xs">
                     {a.red_flags.map((rf, i) => (
                       <li key={i} className="flex items-start gap-1.5">
-                        <span className={cn("inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider", SEVERITY_STYLE[rf.severity])}>
+                        <span className={cn("inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-bold capitalize", SEVERITY_STYLE[rf.severity])}>
                           {rf.severity}
                         </span>
                         <span>{rf.signal}</span>
@@ -1241,7 +1241,7 @@ const SpammerDetailDialog = ({
 
             {a.recommendations.length > 0 && (
               <div className="rounded-lg border border-border/60 p-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                <div className="text-xs font-bold text-muted-foreground mb-2">
                   Recomendaciones a mediano plazo
                 </div>
                 <ul className="space-y-1 pl-4 list-disc text-xs marker:text-muted-foreground">
@@ -1264,7 +1264,7 @@ const SpammerDetailDialog = ({
 
         {/* Operators */}
         <div className="rounded-md border border-border/40 p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+          <div className="text-xs font-bold text-muted-foreground mb-2">
             Scouters que la usan ({account.operators.length})
           </div>
           {account.operators.length === 0 ? (
@@ -1410,7 +1410,7 @@ const StatListDialog = ({
                         )}
                         {r.is_restricted && (
                           <span
-                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300"
+                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold bg-rose-500/20 text-rose-300"
                             title="IG marcó la cuenta como restringida — las creators target no pueden verla sin login."
                           >
                             <Lock className="h-2.5 w-2.5" />

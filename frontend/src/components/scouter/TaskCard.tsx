@@ -132,7 +132,7 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
             )}
             {strategyMeta && (
               <span
-                className={`inline-block rounded-full border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${strategyMeta.className}`}
+                className={`inline-block rounded-full border px-1.5 py-0.5 text-xs font-bold ${strategyMeta.className}`}
               >
                 {strategyMeta.label}
               </span>
@@ -160,7 +160,7 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+              className="flex w-full items-center gap-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
               {reasoningOpen ? (
                 <ChevronDown className="h-3.5 w-3.5 shrink-0" />

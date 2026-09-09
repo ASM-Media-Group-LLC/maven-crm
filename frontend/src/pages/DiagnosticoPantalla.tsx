@@ -53,7 +53,7 @@ export default function DiagnosticoPantalla() {
       <dl className="space-y-2 text-[13px]">
         {Object.entries(datos).map(([k, v]) => (
           <div key={k} className="rounded-lg border border-border bg-card px-3 py-2">
-            <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{k}</dt>
+            <dt className="text-xs text-muted-foreground">{k}</dt>
             <dd className="break-all font-mono">{v}</dd>
           </div>
         ))}

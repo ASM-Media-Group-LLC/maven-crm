@@ -137,7 +137,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
           {sales.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Registradas</p>
+              <p className="text-xs font-medium text-muted-foreground">Registradas</p>
               {sales.map((s) => (
                 <ListRow key={s.id} className="justify-between">
                   <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
 
           {availablePlatforms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agregar plataformas</p>
+              <p className="text-xs font-medium text-muted-foreground">Agregar plataformas</p>
               {availablePlatforms.map((p) => {
                 const isSelected = p in selectedPlatforms;
                 return (

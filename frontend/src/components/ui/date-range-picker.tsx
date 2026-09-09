@@ -188,7 +188,7 @@ function DateRangePicker({
           </div>
           <span className="truncate">{triggerLabel}</span>
           {hasRange && (
-            <span className="ml-1 shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+            <span className="ml-1 shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">
               Activo
             </span>
           )}

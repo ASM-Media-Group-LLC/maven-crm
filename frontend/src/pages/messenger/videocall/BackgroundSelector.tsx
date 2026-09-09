@@ -99,7 +99,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
             mañana y son los MISMOS que se ven en el diálogo de la llamada. */}
         {fondos.length > 0 && (
           <>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Tus fondos</p>
+            <p className="text-xs text-muted-foreground mb-2">Tus fondos</p>
             <div className="grid grid-cols-4 gap-1.5 mb-3">
               {fondos.map((bg) => (
                 <div
@@ -144,7 +144,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         )}
 
         {/* Templates */}
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Fondos virtuales</p>
+        <p className="text-xs text-muted-foreground mb-2">Fondos virtuales</p>
         <div className="grid grid-cols-4 gap-1.5 mb-3">
           {BACKGROUND_TEMPLATES.map((tpl) => (
             <button

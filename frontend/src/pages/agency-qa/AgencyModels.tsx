@@ -295,7 +295,7 @@ const StatCard = ({
         {icon}
       </div>
       <div>
-        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
+        <p className="text-xs text-foreground/80 font-semibold">{label}</p>
         <p className="text-3xl font-bold tabular-nums leading-tight">{value}</p>
         {hint && (
           <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{hint}</p>

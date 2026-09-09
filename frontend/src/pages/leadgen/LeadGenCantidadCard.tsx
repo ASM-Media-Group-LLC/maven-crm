@@ -59,7 +59,7 @@ const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
           <Trophy className="h-5 w-5 text-white" />
         </div>
-        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Mejor LLG</p>
+        <p className="text-xs text-foreground/80 font-semibold">Mejor LLG</p>
       </div>
       {data ? (
         <div className="flex items-center gap-3">

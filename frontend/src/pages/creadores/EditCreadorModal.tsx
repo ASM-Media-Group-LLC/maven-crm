@@ -263,7 +263,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </section>
 
           <section className="space-y-3 pt-2 border-t border-border/60">
-            <h4 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70 pt-3">Redes Sociales</h4>
+            <h4 className="text-xs font-semibold text-foreground/70 pt-3">Redes Sociales</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Instagram</Label>
@@ -319,7 +319,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </section>
 
           <section className="space-y-1.5 pt-2 border-t border-border/60">
-            <h4 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70 pt-3">Biografía</h4>
+            <h4 className="text-xs font-semibold text-foreground/70 pt-3">Biografía</h4>
             <Textarea
               value={form.bio}
               onChange={(e) => handleChange("bio", e.target.value)}

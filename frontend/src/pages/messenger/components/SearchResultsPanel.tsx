@@ -110,7 +110,7 @@ export default function SearchResultsPanel({
 
         {grouped.map((group) => (
           <div key={group.label}>
-            <div className="sticky top-0 bg-primary/5 backdrop-blur-sm px-3 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-widest z-10">
+            <div className="sticky top-0 bg-primary/5 backdrop-blur-sm px-3 py-1 text-xs font-medium text-muted-foreground z-10">
               {group.label}
             </div>
             {group.items.map((msg) => {

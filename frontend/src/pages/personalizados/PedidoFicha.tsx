@@ -46,7 +46,7 @@ function Titulo({ icono: I, children, extra }: { icono: typeof Paperclip; childr
   return (
     <div className="mb-2 flex items-center gap-2">
       <I className="h-3.5 w-3.5 text-muted-foreground/70" />
-      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>
+      <h4 className="text-xs font-semibold text-muted-foreground">{children}</h4>
       {extra ? <div className="ml-auto flex items-center gap-1">{extra}</div> : null}
     </div>
   );
@@ -263,7 +263,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                   { l: "Gasto del fan", v: usd(pedido.fan_total_spent_usd) },
                 ].map((k) => (
                   <div key={k.l} className="px-4 first:pl-0 last:pr-0">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k.l}</p>
+                    <p className="text-xs text-muted-foreground">{k.l}</p>
                     <p className={`tabular-nums ${k.grande ? "text-2xl font-semibold leading-tight" : "mt-0.5 text-base font-medium"}`}>{k.v}</p>
                   </div>
                 ))}

@@ -741,7 +741,7 @@ function CostMetric({ label, value }: { label: string; value: number | null | un
     n == null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`;
   return (
     <div className="rounded-md bg-muted/30 p-2">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-semibold tabular-nums">{fmt(value)}</p>
     </div>
   );
@@ -893,7 +893,7 @@ function Metric({ label, value, accent }: { label: string; value: number | null;
       "rounded-md p-2 text-center",
       accent === "positive" ? "bg-emerald-500/10" : "bg-muted/30",
     )}>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className={cn(
         "text-lg font-semibold tabular-nums",
         accent === "positive" ? "text-emerald-700 dark:text-emerald-400" : undefined,
