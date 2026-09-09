@@ -7,8 +7,7 @@ import {
   destinatariosRespuesta,
   direccionesDe,
   nombreDe,
-  tieneVariosInvolucrados,
-} from "@/lib/mailAddr";
+  tieneVariosInvolucrados, participantesDe} from "@/lib/mailAddr";
 
 describe("direccionesDe", () => {
   it("saca una sola dirección con nombre", () => {
@@ -141,5 +140,40 @@ describe("tieneVariosInvolucrados", () => {
     expect(
       tieneVariosInvolucrados({ from: "ana@x.com", to: "yo@maven.me", cc: "yo@maven.me", yo: "yo@maven.me" }),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// participantesDe — para MOSTRAR la lista de destinatarios (09/09/2026)
+// ---------------------------------------------------------------------------
+
+describe("participantesDe", () => {
+  it("saca nombre y correo de cada destinatario", () => {
+    const r = participantesDe('"Tatiana Vargas" <tatiana.vargas@maven-ai.me>, andrea.palacio@maven-ai.me');
+    expect(r).toEqual([
+      { nombre: "Tatiana Vargas", email: "tatiana.vargas@maven-ai.me" },
+      { nombre: "andrea.palacio@maven-ai.me", email: "andrea.palacio@maven-ai.me" },
+    ]);
+  });
+
+  it("una coma DENTRO del nombre no parte la dirección en dos", () => {
+    const r = participantesDe('"Pérez, Juan" <j@x.com>, ana@y.com');
+    expect(r).toHaveLength(2);
+    expect(r[0]).toEqual({ nombre: "Pérez, Juan", email: "j@x.com" });
+  });
+
+  it("NO deduplica: en pantalla se muestra lo que traía el encabezado", () => {
+    // A diferencia de direccionesDe, que sí deduplica porque decide a quién se
+    // le responde. Acá esconder un repetido sería mentir sobre el encabezado.
+    expect(participantesDe("a@x.com, a@x.com")).toHaveLength(2);
+  });
+
+  it("un encabezado vacío no rompe", () => {
+    expect(participantesDe("")).toEqual([]);
+  });
+
+  it("conserva el orden original", () => {
+    const r = participantesDe("c@x.com, a@x.com, b@x.com");
+    expect(r.map((p) => p.email)).toEqual(["c@x.com", "a@x.com", "b@x.com"]);
   });
 });

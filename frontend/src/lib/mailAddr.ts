@@ -33,6 +33,15 @@ export function correoDe(direccion: string): string {
  *  trataría como dos direcciones y colaría basura en el Para. Devuelve el
  *  correo de cada una en minúscula, ya listo para deduplicar. */
 export function direccionesDe(header: string): string[] {
+  return partesDeHeader(header)
+    .map((p) => correoDe(p).toLowerCase())
+    .filter((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c));
+}
+
+/** Parte un encabezado por comas de PRIMER NIVEL. Una coma dentro de comillas
+ *  es parte del nombre (`"Pérez, Juan"`), no un separador: partir a lo bruto
+ *  por `,` la trataría como dos direcciones y colaría basura. */
+function partesDeHeader(header: string): string[] {
   if (!header) return [];
   const partes: string[] = [];
   let actual = "";
@@ -47,9 +56,18 @@ export function direccionesDe(header: string): string[] {
     }
   }
   partes.push(actual);
-  return partes
-    .map((p) => correoDe(p).toLowerCase())
-    .filter((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c));
+  return partes;
+}
+
+/** Como `direccionesDe`, pero conserva el NOMBRE de cada uno. Para MOSTRAR la
+ *  lista de destinatarios: en pantalla "Tatiana Vargas" dice más que
+ *  "tatiana.vargas@maven-ai.me", y con veinte personas la diferencia entre leer
+ *  y no leer es esa. No deduplica ni filtra: lo que se muestra tiene que ser
+ *  exactamente lo que traía el encabezado. */
+export function participantesDe(header: string): { nombre: string; email: string }[] {
+  return partesDeHeader(header)
+    .map((p) => ({ nombre: nombreDe(p), email: correoDe(p) }))
+    .filter((x) => x.email);
 }
 
 export interface CamposOriginal {

@@ -31,6 +31,7 @@ import {
   MailOpen,
   Tag,
   type LucideIcon,
+  ChevronDown,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -64,7 +65,7 @@ import {
   type MailSummary,
  useMailBulk, type OperacionMasiva,
 } from "@/hooks/useMailbox";
-import { destinatariosRespuesta, direccionesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
+import { destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
 /**
@@ -137,6 +138,31 @@ const leerCarpetasAbiertas = (): boolean => {
   try { return localStorage.getItem(CARPETAS_KEY) !== "0"; } catch { return true; }
 };
 
+/** Una fila del detalle de destinatarios: la etiqueta y la gente debajo.
+ *
+ *  Cada persona en su propio renglón y con el correo completo a la vista: el
+ *  punto de desplegar esto es responder "¿a quién más le llegó?", y una lista
+ *  separada por comas que se corta no responde nada. Los correos se pueden
+ *  seleccionar con el mouse para copiarlos. */
+function FilaDetalle({ etiqueta, gente }: { etiqueta: string; gente: { nombre: string; email: string }[] }) {
+  if (gente.length === 0) return null;
+  return (
+    <div className="flex gap-2">
+      <span className="w-12 shrink-0 pt-0.5 text-muted-foreground">{etiqueta}</span>
+      <div className="min-w-0 flex-1 space-y-1">
+        {gente.map((p) => (
+          <div key={p.email} className="min-w-0">
+            {p.nombre && p.nombre !== p.email && (
+              <span className="mr-1.5 font-medium text-foreground">{p.nombre}</span>
+            )}
+            <span className="break-all text-muted-foreground select-text">{p.email}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CorreoPage() {
   const { data: buzon, isLoading: cargandoBuzon, error: errorBuzon } = useMailbox();
   const [params, setParams] = useSearchParams();
@@ -153,6 +179,9 @@ export default function CorreoPage() {
     });
   };
   const [sel, setSel] = useState<MailSummary | null>(null);
+  // Detalle de destinatarios desplegado. Se cierra al cambiar de correo: si
+  // no, abrir uno con veinte personas dejaba el siguiente con el panel puesto.
+  const [verDestinatarios, setVerDestinatarios] = useState(false);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
@@ -205,6 +234,7 @@ export default function CorreoPage() {
   // deshabilitados: no tienen equivalente IMAP directo.
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   useEffect(() => { setSeleccion(new Set()); }, [queryActiva]);
+  useEffect(() => { setVerDestinatarios(false); }, [sel]);
   const toggleSeleccion = (m: MailSummary) =>
     setSeleccion((prev) => {
       const next = new Set(prev);
@@ -232,7 +262,10 @@ export default function CorreoPage() {
   const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[]) => {
     const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
     if (!elegidos.length) return;
-    if (op === "delete" && carpeta === "Papelera") { setConfirmarBorrado(elegidos); return; }
+    // Confirmar SIEMPRE que se borra, no solo en Papelera: mover a la
+    // Papelera es recuperable, pero un clic accidental en una lista con
+    // veinte correos seleccionados no lo parece cuando pasa (pedido de Jhon).
+    if (op === "delete") { setConfirmarBorrado(elegidos); return; }
     lanzarMasiva(op, elegidos);
   };
   const lanzarMasiva = (op: OperacionMasiva, elegidos: MailSummary[]) => {
@@ -556,10 +589,23 @@ export default function CorreoPage() {
           <AlertDialog open={!!confirmarBorrado} onOpenChange={(o) => { if (!o) setConfirmarBorrado(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar definitivamente?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {carpeta === "Papelera" ? "¿Eliminar definitivamente?" : "¿Mover a la Papelera?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmarBorrado?.length === 1 ? "Este correo" : `Estos ${confirmarBorrado?.length ?? 0} correos`} ya
-              {confirmarBorrado?.length === 1 ? " está" : " están"} en la Papelera: se borran del servidor y no se pueden recuperar.
+              {carpeta === "Papelera" ? (
+                <>
+                  {confirmarBorrado?.length === 1 ? "Este correo" : `Estos ${confirmarBorrado?.length ?? 0} correos`} ya
+                  {confirmarBorrado?.length === 1 ? " está" : " están"} en la Papelera: se borran del servidor y no se pueden recuperar.
+                </>
+              ) : (
+                <>
+                  {confirmarBorrado?.length === 1
+                    ? "El correo se mueve"
+                    : `Los ${confirmarBorrado?.length ?? 0} correos se mueven`} a la Papelera.
+                  {" "}Desde ahí se pueden recuperar hasta que los elimines definitivamente.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -568,7 +614,7 @@ export default function CorreoPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const e = confirmarBorrado; setConfirmarBorrado(null); if (e) lanzarMasiva("delete", e); }}
             >
-              Eliminar definitivamente
+              {carpeta === "Papelera" ? "Eliminar definitivamente" : "Mover a la Papelera"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -721,10 +767,46 @@ export default function CorreoPage() {
                         {correoDe(mensaje.data.from)}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      Para {mensaje.data.to || "(sin destinatario)"}
-                      {mensaje.data.cc && ` · Copia ${mensaje.data.cc}`}
-                    </p>
+                    {/* Los destinatarios iban en UNA línea con `truncate`: con
+                        más de dos, el resto quedaba invisible y no había forma
+                        de saber a quién más le había llegado el correo. Ahora
+                        el resumen se despliega y muestra la lista completa. */}
+                    {(() => {
+                      const para = participantesDe(mensaje.data.to ?? "");
+                      const copia = participantesDe(mensaje.data.cc ?? "");
+                      const total = para.length + copia.length;
+                      const resumen = para.length === 0
+                        ? "(sin destinatario)"
+                        : total === 1
+                          ? (para[0].nombre || para[0].email)
+                          : `${para[0].nombre || para[0].email} y ${total - 1} más`;
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setVerDestinatarios((v) => !v)}
+                            aria-expanded={verDestinatarios}
+                            className="mt-0.5 flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <span className="truncate">Para {resumen}</span>
+                            <ChevronDown
+                              className={cn(
+                                "h-3 w-3 shrink-0 transition-transform",
+                                verDestinatarios && "rotate-180",
+                              )}
+                            />
+                          </button>
+
+                          {verDestinatarios && (
+                            <div className="mt-2 space-y-2 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs">
+                              <FilaDetalle etiqueta="De" gente={participantesDe(mensaje.data.from ?? "")} />
+                              <FilaDetalle etiqueta="Para" gente={para} />
+                              {copia.length > 0 && <FilaDetalle etiqueta="Copia" gente={copia} />}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <span className="shrink-0 pt-1 text-xs text-muted-foreground">
                     {fechaCorta(mensaje.data.date)}
