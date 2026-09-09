@@ -12,8 +12,10 @@ import StatChip from "@/components/StatChip";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock, Play,
-  Search, X,
+  Search, X, Share2, Square,
 } from "lucide-react";
+import { CompartirGrabacionDialog } from "./CompartirGrabacionDialog";
+import { invokeRecordings } from "@/hooks/useRecordings";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -55,10 +57,31 @@ export default function GrabacionesPage() {
   const {
     rows, grabadores, usage, myUserId, loading, download, view, remove,
     filtros, setFiltros, cargarMas, cargandoMas, hayMas,
+    refresh,
   } = useRecordings();
   const { isAdmin } = useUserRole();
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
+  // Compartir con gente de Maven (pedido de Jhon, 09/09/2026): la lista de
+  // destinatarios la guarda la edge; el diálogo solo elige.
+  const [compartiendo, setCompartiendo] = useState<RecordingRow | null>(null);
+
+  // Detener desde la lista: hasta hoy solo se podía desde dentro de la
+  // llamada, y una grabación que nadie paró seguía "En curso" durante días
+  // (PLUS 2 llevaba 92 horas). La edge ya deja parar a cualquiera que la vea.
+  const handleDetener = async (r: RecordingRow) => {
+    if (!window.confirm(`¿Detener la grabación "${r.title || r.room_name}"? Queda guardada hasta acá.`)) return;
+    setTrabajando(r.id);
+    try {
+      await invokeRecordings("stop", { recording_id: r.id, recipients: [] });
+      toast.success("Grabación detenida", { description: "Queda en la lista en unos segundos." });
+      await refresh();
+    } catch (e) {
+      toast.error((e as Error).message || "No se pudo detener la grabación");
+    } finally {
+      setTrabajando(null);
+    }
+  };
   const hayFiltro = filtros.q !== "" || filtros.fuente !== "todas" || filtros.soloMias;
 
   const handleVer = async (r: RecordingRow) => {
@@ -323,6 +346,32 @@ export default function GrabacionesPage() {
                     <span className="hidden sm:inline">Descargar</span>
                   </Button>
                 )}
+                {r.status === "ready" && (mia || isAdmin) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5 rounded-full"
+                    disabled={ocupado}
+                    title="Compartir con gente de Maven"
+                    onClick={() => setCompartiendo(r)}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Compartir</span>
+                  </Button>
+                )}
+                {r.status === "recording" && (mia || isAdmin) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5 rounded-full text-destructive hover:text-destructive"
+                    disabled={ocupado}
+                    title="Detener la grabación y guardarla hasta acá"
+                    onClick={() => void handleDetener(r)}
+                  >
+                    {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+                    <span className="hidden sm:inline">Detener</span>
+                  </Button>
+                )}
                 {(mia || isAdmin) && r.status !== "recording" && (
                   <Button
                     size="icon"
@@ -358,6 +407,8 @@ export default function GrabacionesPage() {
           grabaciones, que la sirve inline y con Range: sin eso el navegador
           tendría que bajarse el archivo entero antes de mostrar nada y la
           barra de progreso no dejaría saltar. */}
+      <CompartirGrabacionDialog grabacion={compartiendo} miId={myUserId} onClose={() => setCompartiendo(null)} />
+
       <Dialog open={!!viendo} onOpenChange={(abierto) => { if (!abierto) setViendo(null); }}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden">
           <DialogHeader className="px-4 pt-4">

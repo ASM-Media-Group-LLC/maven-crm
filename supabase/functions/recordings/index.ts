@@ -428,6 +428,56 @@ Deno.serve(async (req) => {
     }
 
     // === DELETE (anticipado) ===
+    // === RECIPIENTS === (con quién está compartida; la lee el diálogo de compartir)
+    // Por la edge y no por RLS: el SELECT de recipients es "solo mis filas o
+    // admin", y una policy que mire meeting_recordings volvería a la recursión
+    // 42P17 que ya rompió /grabaciones una vez.
+    if (action === "recipients" || action === "share") {
+      const { recording_id, user_ids } = body as { recording_id?: string; user_ids?: string[] };
+      if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);
+      const { data: rec } = await admin
+        .from("meeting_recordings")
+        .select("id, started_by, room_name, title, started_at, status, deleted_at")
+        .eq("id", recording_id).maybeSingle();
+      if (!rec || rec.deleted_at) return json(req, { error: "grabación no encontrada" }, 404);
+
+      // Comparte quien la inició o un admin (misma regla que borrar).
+      const { data: rol } = await admin
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      if (rec.started_by !== user.id && !rol) return json(req, { error: "Forbidden" }, 403);
+
+      const { data: filas } = await admin
+        .from("meeting_recording_recipients").select("user_id").eq("recording_id", rec.id);
+      const actuales: string[] = (filas ?? []).map((f: { user_id: string }) => f.user_id);
+
+      if (action === "recipients") return json(req, { ok: true, user_ids: actuales });
+
+      if (rec.status !== "ready") return json(req, { error: "solo se comparte una grabación terminada" }, 409);
+      // La lista deseada COMPLETA. Quien grabó queda siempre; se agrega lo
+      // nuevo, se quita lo que ya no está, y el correo va solo a los nuevos.
+      const deseados = new Set(
+        (Array.isArray(user_ids) ? user_ids : [])
+          .filter((u): u is string => typeof u === "string" && /^[0-9a-f-]{36}$/i.test(u))
+          .slice(0, 100),
+      );
+      deseados.add(rec.started_by);
+      const agregar = [...deseados].filter((u) => !actuales.includes(u));
+      const quitar = actuales.filter((u) => !deseados.has(u) && u !== rec.started_by);
+
+      if (agregar.length) {
+        await admin.from("meeting_recording_recipients").upsert(
+          agregar.map((u) => ({ recording_id: rec.id, user_id: u })),
+          { onConflict: "recording_id,user_id" },
+        );
+      }
+      if (quitar.length) {
+        await admin.from("meeting_recording_recipients")
+          .delete().eq("recording_id", rec.id).in("user_id", quitar);
+      }
+      const enviados = agregar.length ? await avisarPorCorreo(admin, rec, agregar) : 0;
+      return json(req, { ok: true, agregados: agregar.length, quitados: quitar.length, emails: enviados });
+    }
+
     if (action === "delete") {
       const { recording_id } = body as { recording_id?: string };
       if (!recording_id) return json(req, { error: "recording_id es requerido" }, 400);
