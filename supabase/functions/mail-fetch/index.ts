@@ -368,6 +368,86 @@ Deno.serve(async (req) => {
     // frontend pueda PRE-CARGAR mensajes (al pasar el mouse, los más
     // nuevos al entrar) sin marcarlos leídos: "leído" es una decisión de
     // quien lo abre, no un efecto de que lo hayamos descargado.
+    // === BULK === (Jhon, 09/09/2026: la barra de selección del correo, como
+    // en Gmail, tiene que HACER algo). Una sola sesión IMAP para todo el lote.
+    //   op: seen | unseen | delete | archive | spam · uids: number[] (máx. 200)
+    // Carpetas de Zoho: Papelera, Archive, "Correo no deseado". Eliminar mueve
+    // a Papelera; dentro de la Papelera borra de verdad. La caché
+    // (mail_messages / mail_folders) se ajusta al momento y el sincronizador
+    // la termina de cuadrar en su próximo barrido.
+    if (action === "bulk") {
+      const { op, uids } = body as { op?: string; uids?: unknown };
+      const ops = new Set(["seen", "unseen", "delete", "archive", "spam"]);
+      if (!op || !ops.has(op)) return json(req, { error: "op inválida" }, 400);
+      const lista = (Array.isArray(uids) ? uids : [])
+        .map((u) => Number(u)).filter((u) => Number.isInteger(u) && u > 0).slice(0, 200);
+      if (!lista.length) return json(req, { error: "uids es requerido" }, 400);
+      const box = (folder ?? "INBOX").slice(0, 200);
+
+      const { data: cred, error: credErr } = await admin
+        .from("mail_credentials")
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, imap_host, imap_port")
+        .eq("user_id", user.id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
+      if (!cred) return json(req, { error: "no_credential" }, 409);
+      const password = await unseal({
+        cipher: cred.secret_cipher as string,
+        nonce: cred.secret_nonce as string,
+        keyVersion: cred.key_version as number,
+      });
+      if (!password) return json(req, { error: "no se pudo descifrar la credencial — hay que re-provisionarla" }, 500);
+
+      const DESTINO: Record<string, string> = { archive: "Archive", spam: "Correo no deseado", delete: "Papelera" };
+      let client: ImapClient | null = null;
+      try {
+        client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
+        const auth = await client.login(cred.email_address as string, password);
+        if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        const sel = await client.selectFolder(box);
+        if (!sel.ok) return json(req, { error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
+
+        let ok = false;
+        let movidos = false;
+        if (op === "seen" || op === "unseen") {
+          ok = await client.storeFlagsUids(lista, op === "seen" ? "+FLAGS" : "-FLAGS", "\\Seen");
+        } else if (op === "delete" && box === "Papelera") {
+          ok = await client.deleteUids(lista);
+          movidos = true;
+        } else {
+          const dest = DESTINO[op];
+          if (dest === box) return json(req, { error: `ya están en ${box}` }, 409);
+          ok = await client.moveUids(lista, dest);
+          movidos = true;
+        }
+        if (!ok) return json(req, { error: `IMAP no pudo aplicar "${op}" en ${box}` }, 502);
+
+        // Caché al momento (la RLS del usuario no deja borrar filas: va con admin).
+        if (movidos) {
+          await admin.from("mail_messages").delete()
+            .eq("user_id", user.id).eq("folder", box).in("uid", lista);
+        } else {
+          await admin.from("mail_messages").update({ unread: op === "unseen" })
+            .eq("user_id", user.id).eq("folder", box).in("uid", lista);
+        }
+        const { count } = await admin.from("mail_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id).eq("folder", box).eq("unread", true);
+        await admin.from("mail_folders").update({ unread: count ?? 0 })
+          .eq("user_id", user.id).eq("folder", box);
+
+        return json(req, { ok: true, op, folder: box, afectados: lista.length });
+      } catch (e) {
+        return json(req, { error: (e as Error).message ?? "error de IMAP" }, 502);
+      } finally {
+        if (client) {
+          await client.logout();
+          client.close();
+        }
+      }
+    }
+
     if (action === "mark_seen") {
       const porUid = typeof (body as { uid?: number }).uid === "number" &&
         (body as { uid: number }).uid > 0;

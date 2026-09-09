@@ -472,6 +472,40 @@ export class ImapClient {
     return { ok: true, uid: uid ? Number(uid) : undefined };
   }
 
+  /** Cambia banderas de VARIOS mensajes de una vez (un solo comando por lote).
+   *  `uids` va como set IMAP ("12,15,30"). */
+  async storeFlagsUids(uids: number[], accion: "+FLAGS" | "-FLAGS", banderas: string): Promise<boolean> {
+    if (!uids.length) return true;
+    const res = await this.command(`UID STORE ${uids.join(",")} ${accion} (${banderas})`);
+    return res.ok;
+  }
+
+  /** Mueve varios mensajes a otra carpeta. UID MOVE (RFC 6851) si el servidor
+   *  lo soporta (Zoho sí); si no, COPY + \Deleted + UID EXPUNGE. */
+  async moveUids(uids: number[], dest: string): Promise<boolean> {
+    if (!uids.length) return true;
+    const d = `"${dest.replace(/"/g, '\\"')}"`;
+    const set = uids.join(",");
+    const mv = await this.command(`UID MOVE ${set} ${d}`);
+    if (mv.ok) return true;
+    const cp = await this.command(`UID COPY ${set} ${d}`);
+    if (!cp.ok) return false;
+    const del = await this.command(`UID STORE ${set} +FLAGS (\\Deleted)`);
+    if (!del.ok) return false;
+    const ex = await this.command(`UID EXPUNGE ${set}`);
+    return ex.ok;
+  }
+
+  /** Borra DEFINITIVAMENTE varios mensajes (se usa dentro de la Papelera). */
+  async deleteUids(uids: number[]): Promise<boolean> {
+    if (!uids.length) return true;
+    const set = uids.join(",");
+    const store = await this.command(`UID STORE ${set} +FLAGS (\\Deleted)`);
+    if (!store.ok) return false;
+    const ex = await this.command(`UID EXPUNGE ${set}`);
+    return ex.ok;
+  }
+
   /** Borra un mensaje por UID: lo marca \Deleted y lo expunga. UID EXPUNGE
    *  (RFC 4315) saca SOLO ese; si el servidor no lo soporta, el mensaje queda
    *  marcado \Deleted (invisible en la mayoría de los clientes) y se limpiará

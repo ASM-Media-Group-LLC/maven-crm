@@ -347,6 +347,43 @@ export function useMarkSeen() {
   });
 }
 
+export type OperacionMasiva = "seen" | "unseen" | "delete" | "archive" | "spam";
+
+/** Acciones sobre VARIOS correos de una carpeta (la barra de selección).
+ *  Optimista: la lista cambia al instante y se reconcilia con la respuesta.
+ *  Solo aplica a mensajes con UID (los de la caché); los del camino en vivo
+ *  no tienen un identificador estable. */
+export function useMailBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ folder, op, items }: { folder: string; op: OperacionMasiva; items: MailSummary[] }) => {
+      const uids = items.map((m) => Number(m.uid)).filter((u) => Number.isInteger(u) && u > 0);
+      if (!uids.length) throw new Error("Estos correos no tienen identificador; abre la carpeta de nuevo e inténtalo.");
+      const r = await callMail<{ ok: true; afectados: number }>({ action: "bulk", folder, op, uids });
+      return { ...r, omitidos: items.length - uids.length };
+    },
+    onMutate: ({ folder, op, items }) => {
+      const claves = new Set(items.map(claveDe));
+      qc.setQueryData(
+        ["mail-messages", folder],
+        (prev: { messages?: MailSummary[] } | undefined) => {
+          if (!prev?.messages) return prev;
+          const messages = op === "seen" || op === "unseen"
+            ? prev.messages.map((x) => (claves.has(claveDe(x)) ? { ...x, unread: op === "unseen" } : x))
+            : prev.messages.filter((x) => !claves.has(claveDe(x)));
+          return { ...prev, messages };
+        },
+      );
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["mail-messages"] });
+      qc.invalidateQueries({ queryKey: ["mail-folders"] });
+      qc.invalidateQueries({ queryKey: ["mail-search"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+    },
+  });
+}
+
 /** La bandeja se actualiza SOLA: el sincronizador inserta en mail_messages
  *  y Realtime lo empuja hasta acá — el mismo mecanismo de los ✓✓ del chat.
  *  RLS aplica también en Realtime: cada quien recibe solo sus filas. */
