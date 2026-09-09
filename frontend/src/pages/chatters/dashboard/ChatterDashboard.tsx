@@ -218,7 +218,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <CardTitle className={cardTitle}>Tu semana</CardTitle>
-                  <CardDescription>Cada día con su nota, sus ventas y cuánto de la meta cubriste. Tocá uno para el detalle.</CardDescription>
+                  <CardDescription>Cada día con su nota, sus ventas y cuánto de la meta cubriste. Toca uno para el detalle.</CardDescription>
                 </div>
                 <Sparkles className="h-4 w-4 text-primary" />
               </div>

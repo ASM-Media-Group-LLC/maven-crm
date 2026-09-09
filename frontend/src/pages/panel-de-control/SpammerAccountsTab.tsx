@@ -342,7 +342,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
               aggregated.length === 0
                 ? viewMode === "mine"
                   ? "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
-                  : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
+                  : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá aquí con su análisis IA."
                 : "Prueba con otro handle, nombre o scouter."
             }
             action={

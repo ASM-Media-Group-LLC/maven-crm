@@ -375,7 +375,7 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
-                      title="Detener la grabación y guardarla hasta acá"
+                      title="Detener la grabación y guardarla hasta aquí"
                       aria-label="Detener grabación"
                       disabled={ocupado}
                       onClick={() => setPorDetener(r)}

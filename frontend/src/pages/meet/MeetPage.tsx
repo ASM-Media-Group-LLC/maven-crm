@@ -59,7 +59,7 @@ export default function MeetPage() {
         .writeText(shareLink(room))
         .catch(() => { /* sin permiso de portapapeles: el link igual está en la lista */ });
       toast.success(`Reunión creada · código ${room.code}`, {
-        description: "Link copiado. Compartilo con quien quieras que entre.",
+        description: "Link copiado. Compártelo con quien quieras que entre.",
       });
     } catch (e: any) {
       toast.error(e.message || "No se pudo crear la reunión");

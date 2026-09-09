@@ -699,7 +699,7 @@ function CostsCard({ groupId }: { groupId: string }) {
 
       {!current ? (
         <p className="text-xs text-muted-foreground">
-          Sin actividad pagada todavía este mes. Los costos aparecen acá apenas el bot procese mensajes.
+          Sin actividad pagada todavía este mes. Los costos aparecen aquí apenas el bot procese mensajes.
         </p>
       ) : (
         <div className="space-y-3">
@@ -757,7 +757,7 @@ function DailyReportsList({ groupId }: { groupId: string }) {
   if (!reports || reports.length === 0) {
     return (
       <Card className="p-4 text-center text-xs text-muted-foreground">
-        Sin reportes todavía. Cuando alguien mande un reporte de jornada en el grupo (contactados, respuestas, etc), el bot lo guarda acá.
+        Sin reportes todavía. Cuando alguien mande un reporte de jornada en el grupo (contactados, respuestas, etc), el bot lo guarda aquí.
       </Card>
     );
   }

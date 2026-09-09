@@ -86,7 +86,7 @@ export default function ChattersQaHubstaff() {
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> Productividad</div>
           Todavía no hay datos de actividad cruzados con ventas. El micro <code>hubstaff-bridge</code> sincroniza cada 6h;
-          los chatters aparecen acá cuando su email de Hubstaff coincide con el de BLU.
+          los chatters aparecen aquí cuando su email de Hubstaff coincide con el de BLU.
         </CardContent>
       </Card>
     );
