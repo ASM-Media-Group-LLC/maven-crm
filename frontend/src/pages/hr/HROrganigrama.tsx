@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
@@ -164,10 +165,10 @@ export default function HROrganigrama() {
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Organigrama</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Estructura organizacional y jerarquías</p>
-        </div>
+        <PageHeader
+          title="Organigrama"
+          subtitle="Estructura organizacional y jerarquías"
+        />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -28,6 +28,7 @@ import { useNomina } from "./useNomina";
 // generatePayrollPdf + generateBankFile pull jspdf — loaded on demand
 // from the export buttons below so the nómina page stays light.
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
+import { PageHeader } from "@/components/ui/page-header";
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
   borrador: { variant: "secondary", label: "Borrador" },
@@ -386,19 +387,19 @@ export default function NominaPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Nómina</h1>
-            <p className="text-sm text-muted-foreground">Gestión de periodos de nómina · {periods.length} registros</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setShowCalcModal(true)}><Calculator className="h-4 w-4 mr-1" />Calcular Nómina</Button>
-            <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />Crear Batch</Button>
-            <Button size="sm" variant="outline" onClick={() => setShowCloseMonthDialog(true)} disabled={batchPeriods.length === 0}>
-              <Lock className="h-4 w-4 mr-1" />Cerrar Mes
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Nómina"
+          subtitle={`Gestión de periodos de nómina · ${periods.length} registros`}
+          actions={
+            <>
+              <Button size="sm" onClick={() => setShowCalcModal(true)}><Calculator className="h-4 w-4 mr-1" />Calcular Nómina</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />Crear Batch</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowCloseMonthDialog(true)} disabled={batchPeriods.length === 0}>
+                <Lock className="h-4 w-4 mr-1" />Cerrar Mes
+              </Button>
+            </>
+          }
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

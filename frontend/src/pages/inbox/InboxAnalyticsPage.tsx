@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ArrowLeft, BarChart3, Clock, MessageSquare, AlertTriangle, Bot } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface AgentRow { user_id: string | null; respondidas: number; sin_responder: number; resp_prom_min: number | null; resp_median_min: number | null; }
 interface ChannelRow { channel_id: string | null; respondidas: number; sin_responder: number; resp_prom_min: number | null; }
@@ -88,17 +89,21 @@ const InboxAnalyticsPage = () => {
         <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
           <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <BarChart3 className="h-5 w-5 text-primary" />
         <div className="flex-1">
-          <h1 className="text-base font-semibold leading-tight">Analítica de la bandeja</h1>
-          <p className="text-xs text-muted-foreground">
-            Tiempo de 1ª respuesta, conversaciones sin responder y volumen — por closer y por línea.
-          </p>
+          <PageHeader
+            title="Analítica de la bandeja"
+            subtitle="Tiempo de 1ª respuesta, conversaciones sin responder y volumen — por closer y por línea."
+            icon={<BarChart3 className="h-5 w-5" />}
+            actions={
+              <>
+                <DateRangePicker from={from} to={to} onApply={(f, t) => { setFrom(f); setTo(t); }} placeholder="Rango de fechas" />
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/inbox/canales">Canales</Link>
+                </Button>
+              </>
+            }
+          />
         </div>
-        <DateRangePicker from={from} to={to} onApply={(f, t) => { setFrom(f); setTo(t); }} placeholder="Rango de fechas" />
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/inbox/canales">Canales</Link>
-        </Button>
       </div>
 
       {error ? (

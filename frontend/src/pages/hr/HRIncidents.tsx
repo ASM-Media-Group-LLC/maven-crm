@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Card, CardContent } from "@/components/ui/card";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
@@ -177,15 +178,15 @@ export default function HRIncidents() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Incidentes Laborales</h1>
-            <p className="text-sm text-muted-foreground">{totalOpen} incidentes abiertos · {incidents.length} total</p>
-          </div>
-          <Button size="sm" onClick={() => navigate("/hr/incidentes/nuevo")}>
-            <Plus className="h-4 w-4 mr-1" />Reportar Incidente
-          </Button>
-        </div>
+        <PageHeader
+          title="Incidentes Laborales"
+          subtitle={<>{totalOpen} incidentes abiertos · {incidents.length} total</>}
+          actions={
+            <Button size="sm" onClick={() => navigate("/hr/incidentes/nuevo")}>
+              <Plus className="h-4 w-4 mr-1" />Reportar Incidente
+            </Button>
+          }
+        />
       </header>
 
       {/* ── Scrollable content ────────────────────────────────────────────── */}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import StatChip from "@/components/StatChip";
+import { PageHeader } from "@/components/ui/page-header";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -116,15 +117,15 @@ const HRAnnouncements = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Comunicación Interna</h1>
-            <p className="text-sm text-muted-foreground">Gestión avanzada de anuncios, avisos y comunicados</p>
-          </div>
-          <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Nuevo Anuncio
-          </Button>
-        </div>
+        <PageHeader
+          title="Comunicación Interna"
+          subtitle="Gestión avanzada de anuncios, avisos y comunicados"
+          actions={
+            <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" /> Nuevo Anuncio
+            </Button>
+          }
+        />
       </header>
 
       <main className="flex-1 overflow-auto p-6 space-y-5">

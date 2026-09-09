@@ -30,6 +30,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, 
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ── Data hooks ──
 function useRoleAssignments(targetRole: string) {
@@ -297,18 +298,19 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/hr/capacitacion")}><ArrowLeft className="h-5 w-5" /></Button>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Capacitación {roleLabel}</h1>
-              <p className="text-sm text-muted-foreground">Programas, contenidos y seguimiento para {roleLabel.toLowerCase()}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onConfig}><Settings className="h-4 w-4 mr-1.5" />Configuración</Button>
-            <Button onClick={onAssign}><Plus className="h-4 w-4 mr-1.5" />Asignar</Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/capacitacion")}><ArrowLeft className="h-5 w-5" /></Button>
+          <PageHeader
+            className="flex-1"
+            title={`Capacitación ${roleLabel}`}
+            subtitle={`Programas, contenidos y seguimiento para ${roleLabel.toLowerCase()}`}
+            actions={
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onConfig}><Settings className="h-4 w-4 mr-1.5" />Configuración</Button>
+                <Button onClick={onAssign}><Plus className="h-4 w-4 mr-1.5" />Asignar</Button>
+              </div>
+            }
+          />
         </div>
       </div>
 
@@ -662,13 +664,16 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</h1>
-              <Badge variant={getStatusBadgeVariant(assignment.status)}>{TRAINING_STATUSES.find((s) => s.value === assignment.status)?.label ?? assignment.status}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{prog?.name || "—"}</p>
-          </div>
+          <PageHeader
+            className="flex-1"
+            title={
+              <>
+                {emp ? `${emp.first_name} ${emp.last_name}` : "—"}{" "}
+                <Badge variant={getStatusBadgeVariant(assignment.status)}>{TRAINING_STATUSES.find((s) => s.value === assignment.status)?.label ?? assignment.status}</Badge>
+              </>
+            }
+            subtitle={prog?.name || "—"}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto">
@@ -760,10 +765,11 @@ function AssignTrainingView({ targetRole, roleLabel, onBack }: { targetRole: str
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
-          <div>
-            <h1 className="text-xl font-semibold">Asignar Capacitación — {roleLabel}</h1>
-            <p className="text-sm text-muted-foreground">Asigna un programa de {roleLabel.toLowerCase()} a un empleado</p>
-          </div>
+          <PageHeader
+            className="flex-1"
+            title={`Asignar Capacitación — ${roleLabel}`}
+            subtitle={`Asigna un programa de ${roleLabel.toLowerCase()} a un empleado`}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto">
@@ -903,15 +909,14 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
-            <div>
-              <h1 className="text-xl font-semibold">Programas de {roleLabel}</h1>
-              <p className="text-sm text-muted-foreground">Gestiona los programas y módulos de capacitación</p>
-            </div>
-          </div>
-          <Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Programa</Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <PageHeader
+            className="flex-1"
+            title={`Programas de ${roleLabel}`}
+            subtitle="Gestiona los programas y módulos de capacitación"
+            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Programa</Button>}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto">
@@ -1162,15 +1167,14 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
-            <div>
-              <h1 className="text-xl font-semibold">{program.name}</h1>
-              <p className="text-sm text-muted-foreground">Módulos del programa · {modules.length} módulos</p>
-            </div>
-          </div>
-          <Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Módulo</Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <PageHeader
+            className="flex-1"
+            title={program.name}
+            subtitle={`Módulos del programa · ${modules.length} módulos`}
+            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Módulo</Button>}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto">

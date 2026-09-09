@@ -5,6 +5,7 @@ import StatChip from "@/components/StatChip";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import { horas, porcentaje, type ResumenPersona } from "@/lib/coworkVsHubstaff";
 import { useCoworkVsHubstaff, fechaBogota } from "./coworkVsHubstaff/useCoworkVsHubstaff";
@@ -46,21 +47,19 @@ export default function CoworkVsHubstaff() {
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-foreground">Cowork vs Hubstaff</span>
         </div>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Cowork vs Hubstaff</h1>
-            <p className="text-muted-foreground text-sm">
-              Cuánto del tiempo que registra Hubstaff lo explica el reloj de Cowork (cámara + pantalla, presente). Solo admins, mientras se calibra la regla.
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-            {RANGOS.map((r) => (
-              <Button key={r.dias} size="sm" variant={dias === r.dias ? "default" : "ghost"} className="h-8 rounded-lg" onClick={() => setDias(r.dias)}>
-                {r.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <PageHeader
+          title="Cowork vs Hubstaff"
+          subtitle="Cuánto del tiempo que registra Hubstaff lo explica el reloj de Cowork (cámara + pantalla, presente). Solo admins, mientras se calibra la regla."
+          actions={
+            <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+              {RANGOS.map((r) => (
+                <Button key={r.dias} size="sm" variant={dias === r.dias ? "default" : "ghost"} className="h-8 rounded-lg" onClick={() => setDias(r.dias)}>
+                  {r.label}
+                </Button>
+              ))}
+            </div>
+          }
+        />
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">

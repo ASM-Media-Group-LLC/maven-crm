@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { ExternalLink, Radio, Inbox, Pencil, Users, Loader2, RefreshCw } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/hooks/use-toast";
 
 // Panel del gateway de Telegram (Dokploy) — ahí se vincula la cuenta (teléfono + código).
@@ -120,20 +121,18 @@ const TelegramChannelsPage = () => {
   return (
     <div className="space-y-5 px-6 py-5 max-w-3xl">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <TelegramIcon className="h-6 w-6 text-sky-500" />
-        <div className="flex-1">
-          <h1 className="text-base font-semibold leading-tight">Telegram · Cuentas</h1>
-          <p className="text-xs text-muted-foreground">
-            Líneas del canal Telegram — vinculación y auto-asignación.
-          </p>
-        </div>
-        {canAccess("Telegram", "Bandeja") && (
-          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
-            <Link to="/telegram/bandeja"><Inbox className="h-4 w-4" /> Bandeja</Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        icon={<TelegramIcon />}
+        title="Telegram · Cuentas"
+        subtitle="Líneas del canal Telegram — vinculación y auto-asignación."
+        actions={
+          canAccess("Telegram", "Bandeja") && (
+            <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
+              <Link to="/telegram/bandeja"><Inbox className="h-4 w-4" /> Bandeja</Link>
+            </Button>
+          )
+        }
+      />
 
       {/* Líneas (tg_channels) + auto-asignación — espejo del editor de canales de WhatsApp. */}
       <div className="rounded-lg border bg-card p-5 space-y-3">

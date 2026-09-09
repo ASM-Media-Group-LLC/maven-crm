@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { format } from "date-fns";
 import { EMPLOYEE_STATUS_OPTIONS, CONTRACT_TYPES, WORK_MODALITIES } from "@/lib/hrConstants";
 import { useAuth } from "@/hooks/useAuth";
+import { PageHeader } from "@/components/ui/page-header";
 
 /* ── KPI Cards ── usan StatChip del reskin */
 const kpiCards = [
@@ -285,16 +286,16 @@ export default function EmployeeDirectory() {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* ── Header ── */}
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Empleados Activos</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Hub de gestión del equipo activo · {activeEmps.length} activos de {employees.length} total</p>
-          </div>
-          <Button onClick={() => navigate("/hr/empleado/nuevo")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Empleado
-          </Button>
-        </div>
+        <PageHeader
+          title="Empleados Activos"
+          subtitle={`Hub de gestión del equipo activo · ${activeEmps.length} activos de ${employees.length} total`}
+          actions={
+            <Button onClick={() => navigate("/hr/empleado/nuevo")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Empleado
+            </Button>
+          }
+        />
       </header>
 
       {/* ── Scrollable content ── */}

@@ -28,6 +28,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SCHEDULE_TYPES = [
@@ -356,17 +357,15 @@ const HRSchedules = () => {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Horarios y Turnos</h1>
-            <p className="text-sm text-muted-foreground">Gestión de turnos, horas extra y banco de horas</p>
-          </div>
-          <div className="flex items-center gap-2">
+        <PageHeader
+          title="Horarios y Turnos"
+          subtitle="Gestión de turnos, horas extra y banco de horas"
+          actions={
             <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Crear Turno
             </Button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">

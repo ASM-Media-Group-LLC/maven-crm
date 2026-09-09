@@ -26,6 +26,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PageHeader } from "@/components/ui/page-header";
 import EarningsPagination from "@/pages/sales-performance/EarningsPagination";
 import { useLeadGenEntries, useLeadGenProfiles } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
@@ -157,19 +158,19 @@ const LeadGenBaseDatosContent = () => {
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <button onClick={() => navigate("/leadgen")} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors">
-              <ArrowLeft className="h-3 w-3" />LeadGen
-            </button>
-            <h1 className="text-2xl font-semibold">Base de Datos</h1>
-            <p className="text-sm text-muted-foreground mt-1">Todos los leads registrados en el sistema</p>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-primary">{totalCount.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">leads totales</p>
-          </div>
-        </div>
+        <button onClick={() => navigate("/leadgen")} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors">
+          <ArrowLeft className="h-3 w-3" />LeadGen
+        </button>
+        <PageHeader
+          title="Base de Datos"
+          subtitle="Todos los leads registrados en el sistema"
+          actions={
+            <div className="text-right">
+              <p className="text-3xl font-bold text-primary">{totalCount.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">leads totales</p>
+            </div>
+          }
+        />
       </header>
 
       <div className="flex-1 overflow-auto">

@@ -34,6 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { PageHeader } from "@/components/ui/page-header";
 // Sub-páginas que antes se navegaban como rutas separadas (perdiendo el
 // rail de Settings). Ahora se renderizan embebidas en el panel derecho
 // vía ?sub=<key>.
@@ -136,12 +137,7 @@ const MyAccountTab = () => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("settings.myAccount")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("settings.myAccountDesc")}
-        </p>
-      </div>
+      <PageHeader title={t("settings.myAccount")} subtitle={t("settings.myAccountDesc")} />
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-5">
@@ -794,12 +790,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
   const { t } = useLanguage();
   return (
   <div className="space-y-4">
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">{t("settings.adminTitle")}</h1>
-      <p className="text-sm text-muted-foreground">
-        {t("settings.adminDesc")}
-      </p>
-    </div>
+    <PageHeader title={t("settings.adminTitle")} subtitle={t("settings.adminDesc")} />
     <Card>
       <CardContent className="space-y-2 p-4">
         {(canAccess("Administración", "Usuarios") || isAdmin) && (
@@ -842,12 +833,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
 
 const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
   <div className="space-y-4">
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">{t("sidebar.resources") || "Recursos"}</h1>
-      <p className="text-sm text-muted-foreground">
-        {t("settings.resourcesDesc")}
-      </p>
-    </div>
+    <PageHeader title={t("sidebar.resources") || "Recursos"} subtitle={t("settings.resourcesDesc")} />
     <Card>
       <CardContent className="space-y-2 p-4">
         <Row

@@ -28,6 +28,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
@@ -419,16 +420,16 @@ export default function HRPermisos() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Permisos</h1>
-            <p className="text-sm text-muted-foreground">Gestiona las solicitudes de permisos de horario</p>
-          </div>
-          <Button onClick={() => navigate("/hr/permisos/nuevo")} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Solicitar Permiso
-          </Button>
-        </div>
+        <PageHeader
+          title="Permisos"
+          subtitle="Gestiona las solicitudes de permisos de horario"
+          actions={
+            <Button onClick={() => navigate("/hr/permisos/nuevo")} size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Solicitar Permiso
+            </Button>
+          }
+        />
       </header>
 
       {/* Scrollable content */}

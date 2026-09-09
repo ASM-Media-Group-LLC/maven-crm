@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import StatChip from "@/components/StatChip";
+import { PageHeader } from "@/components/ui/page-header";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "./NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
@@ -158,20 +159,20 @@ export default function ComisionesPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Comisiones</h1>
-            <p className="text-sm text-muted-foreground">Gestión de comisiones laborales y comerciales · {commissions.length} registros</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setShowNewModal(true)}><Plus className="h-4 w-4 mr-1" />Nueva Comisión</Button>
-            {activeTab === "Historial Batch" && (
-              <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(c => ({ Periodo: c.period, Base: c.base_amount, Porcentaje: c.percentage, Estimada: c.estimated_amount, Final: c.final_amount, Estado: c.status })), "comisiones-batch")}>
-                <Send className="h-4 w-4 mr-1" />Exportar QB
-              </Button>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          title="Comisiones"
+          subtitle={`Gestión de comisiones laborales y comerciales · ${commissions.length} registros`}
+          actions={
+            <>
+              <Button size="sm" onClick={() => setShowNewModal(true)}><Plus className="h-4 w-4 mr-1" />Nueva Comisión</Button>
+              {activeTab === "Historial Batch" && (
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(c => ({ Periodo: c.period, Base: c.base_amount, Porcentaje: c.percentage, Estimada: c.estimated_amount, Final: c.final_amount, Estado: c.status })), "comisiones-batch")}>
+                  <Send className="h-4 w-4 mr-1" />Exportar QB
+                </Button>
+              )}
+            </>
+          }
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

@@ -27,6 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useOffboardingById, type Offboarding } from "../useOffboarding";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "@/hooks/use-toast";
@@ -227,19 +228,25 @@ ${form.comentarios || "Sin comentarios"}
             <Button variant="ghost" size="icon" onClick={() => navigate("/creadores/offboarding")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold truncate">{creatorName}</h1>
-              <p className="text-sm text-muted-foreground truncate">{artisticName ?? instagramHandle ?? ""}</p>
+            <div className="min-w-0 flex-1">
+              <PageHeader
+                title={creatorName}
+                subtitle={artisticName ?? instagramHandle ?? ""}
+                actions={
+                  <>
+                    <Badge variant="outline" className={`text-xs shrink-0 ${statusInfo.variant}`}>{statusInfo.label}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => navigate(`/creadores/${offboarding.creator_id}`)}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Ver Perfil
+                    </Button>
+                  </>
+                }
+              />
             </div>
-            <Badge variant="outline" className={`text-xs shrink-0 ${statusInfo.variant}`}>{statusInfo.label}</Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => navigate(`/creadores/${offboarding.creator_id}`)}
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Ver Perfil
-            </Button>
           </div>
 
           {/* Scrollable Content */}

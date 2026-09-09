@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock, Play,
   Search, X, Share2, Square,
@@ -135,15 +136,11 @@ export default function GrabacionesPage() {
     // de la columna flex y el overflow no se activa.
     <main className="flex-1 min-h-0 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-          <Clapperboard className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Grabaciones</h1>
-          <p className="text-sm text-muted-foreground">Reuniones grabadas en Meet y Cowork</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Grabaciones"
+        subtitle="Reuniones grabadas en Meet y Cowork"
+        icon={<Clapperboard />}
+      />
 
       {/* El espacio y el vencimiento, siempre a la vista. */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

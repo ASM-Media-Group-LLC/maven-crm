@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatChip from "@/components/StatChip";
+import { PageHeader } from "@/components/ui/page-header";
 
 const TABS = ["Horas Extra", "Banco de Horas"] as const;
 type Tab = typeof TABS[number];
@@ -39,8 +40,7 @@ export default function HorasPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <h1 className="text-xl font-semibold text-foreground">Horas & Banco de Horas</h1>
-        <p className="text-sm text-muted-foreground">Vista financiera de horas extra y banco de horas</p>
+        <PageHeader title="Horas & Banco de Horas" subtitle="Vista financiera de horas extra y banco de horas" />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

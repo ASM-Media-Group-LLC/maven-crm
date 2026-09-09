@@ -31,6 +31,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface AbsenceRecord {
@@ -478,16 +479,16 @@ export default function HRAbsences() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Ausencias / Faltas</h1>
-            <p className="text-sm text-muted-foreground">Faltas injustificadas y sin aviso previo</p>
-          </div>
-          <Button onClick={() => setModalOpen(true)} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Registrar Falta
-          </Button>
-        </div>
+        <PageHeader
+          title="Ausencias / Faltas"
+          subtitle="Faltas injustificadas y sin aviso previo"
+          actions={
+            <Button onClick={() => setModalOpen(true)} size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Registrar Falta
+            </Button>
+          }
+        />
       </header>
 
       {/* ── Scrollable content ───────────────────────────────────────────────── */}

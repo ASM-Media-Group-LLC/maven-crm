@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useHrPersonCard, HR_ROLE_LABEL } from "./useHrPeople";
 import { periodLabel } from "@/pages/agency-qa/chatters-qa/useChatterScorecards";
+import { PageHeader } from "@/components/ui/page-header";
 
 const usd = (n: number | null | undefined) =>
   n == null ? "—" : `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -79,12 +80,14 @@ export default function HRPersonCard() {
         <Button variant="ghost" size="sm" className="mb-2 w-fit gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/personal")}>
           <ArrowLeft className="h-4 w-4" /> Personal
         </Button>
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {identity.name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("")}
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">{identity.name}</h1>
+        <PageHeader
+          icon={
+            <span className="text-sm font-semibold">
+              {identity.name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("")}
+            </span>
+          }
+          title={identity.name}
+          subtitle={
             <div className="flex items-center gap-2">
               <Badge variant="secondary-soft" className="text-[11px]">{HR_ROLE_LABEL[identity.role] ?? identity.role}</Badge>
               {identity.in_hubstaff ? (
@@ -93,8 +96,8 @@ export default function HRPersonCard() {
                 <span className="text-[11px] text-muted-foreground">Sin tracking de Hubstaff</span>
               )}
             </div>
-          </div>
-        </div>
+          }
+        />
       </header>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">

@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 
 type Tab = "resumen" | "matriz" | "actividad";
 
@@ -77,10 +78,10 @@ const AuditoriaRoles = () => {
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-foreground">Auditoría</span>
               </div>
-              <div>
-                <h1 className="text-xl font-semibold">Auditoría de Roles</h1>
-                <p className="text-muted-foreground text-sm">Reporte en tiempo real del estado de roles y permisos</p>
-              </div>
+              <PageHeader
+                title="Auditoría de Roles"
+                subtitle="Reporte en tiempo real del estado de roles y permisos"
+              />
             </header>
 
             {/* Scrollable Area */}

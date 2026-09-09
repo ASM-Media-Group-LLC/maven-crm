@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "sonner";
 import { useGridExemptions, useAddExemption, useRemoveExemption, useActiveCreatorsLite, useEnviarParrilla } from "./useParrilla";
 import {
@@ -515,21 +516,23 @@ export default function ParrillaPage() {
       `}</style>
 
       {/* Header */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 print-hide">
-        <CalendarRange className="h-5 w-5 text-muted-foreground" />
-        <h2 className="text-base font-bold">Parrilla de contenido</h2>
-        {statusBadge}
-        <Select value={grid?.id ?? ""} onValueChange={handleSelectWeek}>
-          <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder="Semana" /></SelectTrigger>
-          <SelectContent>
-            {grids.map((g) => (
-              <SelectItem key={g.id} value={g.id}>
-                {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {g.status}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="ml-auto flex items-center gap-2">
+      <PageHeader
+        className="shrink-0 border-b px-4 py-2 print-hide"
+        icon={<CalendarRange />}
+        title="Parrilla de contenido"
+        actions={
+          <>
+          {statusBadge}
+          <Select value={grid?.id ?? ""} onValueChange={handleSelectWeek}>
+            <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder="Semana" /></SelectTrigger>
+            <SelectContent>
+              {grids.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {g.status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm"><Palette className="mr-1 h-4 w-4" /> Tema</Button>
@@ -619,8 +622,9 @@ export default function ParrillaPage() {
           <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: volvé a borrador para editarla" : undefined}>
             {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Tablero */}
       <div className="parrilla-print-area flex-1 overflow-auto p-4" style={{ backgroundColor: theme.base }}>

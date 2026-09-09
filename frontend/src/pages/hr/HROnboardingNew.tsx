@@ -16,6 +16,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { useCostCenters } from "@/hooks/useFinancialConfig";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -224,8 +225,7 @@ export default function HROnboardingNew() {
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/onboarding")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Onboarding
         </Button>
-        <h1 className="text-xl font-semibold text-foreground">Iniciar Onboarding</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Configura el proceso de integración para un nuevo empleado</p>
+        <PageHeader title="Iniciar Onboarding" subtitle="Configura el proceso de integración para un nuevo empleado" />
       </div>
 
       {/* Stepper */}

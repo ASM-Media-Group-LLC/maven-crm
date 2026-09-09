@@ -27,6 +27,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 const SCHEDULE_TYPES = [
   { value: "manana", label: "Mañana", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
@@ -297,17 +298,15 @@ const HRChatterSchedules = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Horarios Chatters</h1>
-            <p className="text-sm text-muted-foreground">Gestión de turnos para el equipo de chatters</p>
-          </div>
-          <div className="flex items-center gap-2">
+        <PageHeader
+          title="Horarios Chatters"
+          subtitle="Gestión de turnos para el equipo de chatters"
+          actions={
             <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Crear Turno
             </Button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">

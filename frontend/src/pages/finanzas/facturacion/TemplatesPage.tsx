@@ -4,6 +4,7 @@ import InvoiceA4Preview from "./InvoiceA4Preview";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { PageHeader } from "@/components/ui/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -93,15 +94,15 @@ export default function TemplatesPage() {
           <span className="mx-2">›</span>
           <span className="text-foreground font-medium">Templates</span>
         </nav>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Templates</h1>
-            <p className="text-sm text-muted-foreground">Gestiona templates para invoices y notas de pago</p>
-          </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Crear Template
-          </Button>
-        </div>
+        <PageHeader
+          title="Templates"
+          subtitle="Gestiona templates para invoices y notas de pago"
+          actions={
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-2" /> Crear Template
+            </Button>
+          }
+        />
       </header>
 
       <div className="flex-1 min-h-0 flex flex-col px-6 py-4">

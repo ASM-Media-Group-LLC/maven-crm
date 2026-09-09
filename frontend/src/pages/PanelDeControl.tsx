@@ -63,6 +63,7 @@ import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { OUTCOME_META } from "@/hooks/useAgencyQa";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PageHeader } from "@/components/ui/page-header";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
@@ -962,52 +963,50 @@ const PanelDeControl = () => {
     // Sin overflow-y-auto acá adentro, el contenido se recorta y la
     // página no scrollea. `flex-1` toma toda la altura disponible.
     <main className="flex-1 overflow-y-auto p-6 space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Panel de control</h1>
-          <p className="text-sm text-muted-foreground">
-            Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Presets rápidos — pill segmentado. Click setea range y
-              marca el preset activo. Si el user después abre el
-              DateRangePicker y elige fechas custom, `activePreset` se
-              limpia (se ve más abajo en onApply). */}
-          <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
-            {PRESET_CONFIG.map((p) => {
-              const isActive = activePreset === p.key;
-              return (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => {
-                    setRange(rangeForPreset(p.key, new Date()));
-                    setActivePreset(p.key);
-                  }}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                    isActive
-                      ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                  )}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-          <DateRangePicker
-            from={range.from}
-            to={range.to}
-            onApply={(from, to) => {
-              setRange({ from, to });
-              setActivePreset(null); // selección manual → preset desactivado
-            }}
-            placeholder="Seleccionar fechas"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Panel de control"
+        subtitle="Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM."
+        actions={
+          <>
+            {/* Presets rápidos — pill segmentado. Click setea range y
+                marca el preset activo. Si el user después abre el
+                DateRangePicker y elige fechas custom, `activePreset` se
+                limpia (se ve más abajo en onApply). */}
+            <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+              {PRESET_CONFIG.map((p) => {
+                const isActive = activePreset === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => {
+                      setRange(rangeForPreset(p.key, new Date()));
+                      setActivePreset(p.key);
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      isActive
+                        ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            <DateRangePicker
+              from={range.from}
+              to={range.to}
+              onApply={(from, to) => {
+                setRange({ from, to });
+                setActivePreset(null); // selección manual → preset desactivado
+              }}
+              placeholder="Seleccionar fechas"
+            />
+          </>
+        }
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto" | "whatsapp-bot")}>
         <TabsList>

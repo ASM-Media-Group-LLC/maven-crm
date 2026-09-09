@@ -40,12 +40,32 @@ const leer = (ruta: string): string | null => fuentes[ruta] ?? null;
 const FUERA_DEL_SHELL = new Set([
   "Portada", "Concepto", "Privacidad", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "ChatterPublicView", "DiagnosticoPantalla",
-  "DesignSystem", "Docs", "Roadmap",
+  "DesignSystem", "Docs", 
 ]);
 
-/** Ya usan PageHeader (fase S3 del reskin de julio). No pueden volver atrás. */
+/**
+ * Ya usan PageHeader: las 7 del reskin de julio (S3) más las 75 del corte 3 de la
+ * fase 2 (septiembre de 2026). No pueden volver atrás. Quedan con título propio, a
+ * propósito: Cowork y Meet (hero a medida), Messenger, Correo y las bandejas de chat
+ * (título fundido con el panel), Agency QA (rail sticky), la ficha de la creadora y el
+ * detalle del agente de LeadGen (encabezados a medida) y las páginas públicas.
+ */
 const CON_PAGEHEADER = new Set([
-  "TelefonosPage", "Closers", "Tickets", "Promolog", "Personalizados", "ChatterHorarios", "Contactos",
+  "AdminUsuarios", "AuditoriaRoles", "ChatterAdmin", "ChatterEvaluator", "ChatterHistory",
+  "ChatterHorarios", "ChatterProfileEdit", "ChatterRendimiento", "Closers", "CollectionsPage",
+  "ConfiguracionPage", "Contactos", "ControlFinancieroPage", "CoworkVsHubstaff", "CreadorasDashboardPage",
+  "Creadores", "EmployeeDirectory", "EmployeeNew", "EmployeeProfile", "FacturacionPage",
+  "FinanzasDashboard", "GrabacionesPage", "HRAbsences", "HRAnnouncements", "HRApplicantNew", "HRApplicants",
+  "HRAttendance", "HRChatterSchedules", "HRDeductionNew", "HRDeductions", "HRDirectoryLookup", "HRHourBank",
+  "HRIncidentNew", "HRIncidents", "HROffboarding", "HROffboardingNew", "HROnboarding", "HROnboardingNew",
+  "HROrganigrama", "HROvertimeDetail", "HRPerformance", "HRPerformanceNew", "HRPermisoNew", "HRPermisos",
+  "HRPersonCard", "HRSchedules", "HRStaffSchedules", "HRTraining", "HRTrainingChatters", "HRTrainingTech",
+  "HRVacations", "HorasVariablesPage", "InboxAnalyticsPage", "InboxBotsPage", "InboxChannelsPage",
+  "LeadGen", "LeadGenBaseDatos", "NominaPage", "Notificaciones", "NuevaNotaPago", "NuevoContacto",
+  "NuevoCreador", "NuevoInvoice", "OffboardingDetailPage", "OffboardingListPage", "OnboardingPage",
+  "OnboardingWizardPage", "OpportunitiesPage", "PanelDeControl", "Parrilla", "Personalizados", "Promolog",
+  "ReportesPage", "Roadmap", "ScouterAssist", "Settings", "TelefonosPage", "TelegramChannelsPage",
+  "TelegramInboxPage", "TemplatesPage", "Tickets",
 ]);
 
 /**

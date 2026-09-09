@@ -6,6 +6,7 @@ import {
   Users, Gauge, DollarSign, Clock, Send, Info, AlertTriangle, Loader2, ChevronRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import DateRangePresets, { rangeForPreset, type DateRange, type RangePreset } from "@/components/dashboard/DateRangePresets";
 import { differenceInCalendarDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -278,29 +279,29 @@ export default function ChatterRendimiento() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          {puedeVolver && (
-            <Button
-              variant="ghost" size="sm"
-              className="mb-1 -ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => navigate(volverA!)}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Volver al dashboard
-            </Button>
-          )}
-          <h1 className="text-xl font-semibold text-foreground">Rendimiento de chatters</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Ventas contra lo esperado, masivos y nota diaria
-          </p>
-        </div>
-        <DateRangePresets
-          range={range}
-          activePreset={preset}
-          onChange={(r, p) => { setRange(r); setPreset(p); }}
-          placeholder="Elegir fechas"
+      <div>
+        {puedeVolver && (
+          <Button
+            variant="ghost" size="sm"
+            className="mb-1 -ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => navigate(volverA!)}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Volver al dashboard
+          </Button>
+        )}
+        <PageHeader
+          title="Rendimiento de chatters"
+          subtitle="Ventas contra lo esperado, masivos y nota diaria"
+          actions={
+            <DateRangePresets
+              range={range}
+              activePreset={preset}
+              onChange={(r, p) => { setRange(r); setPreset(p); }}
+              placeholder="Elegir fechas"
+            />
+          }
         />
-      </header>
+      </div>
 
       <AvisoCobertura dias={dias} diasConDatos={diasConDatos} />
 

@@ -3,6 +3,7 @@ import { useTheme } from "next-themes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList, AlertTriangle } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import ScouterHome from "./ScouterHome";
@@ -142,22 +143,24 @@ const ScouterAssist = () => {
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          {showLogo ? (
-            // Logo de la compañía filtrada (reemplaza el título). h-12 =
-            // 48px, layout tight — sin scale ni min-h artificial. Si el
-            // PNG cargado tiene padding interno, el logo visible va a
-            // verse chiquito; la solución real es el auto-crop al
-            // subir (queda pendiente como mejora).
-            <img
-              src={logoForTheme!}
-              alt={activeCompany!.name}
-              className="h-12 w-auto object-contain"
-            />
-          ) : (
-            <h1 className="text-2xl font-bold tracking-tight">Maven Scouter Assist</h1>
-          )}
-        </div>
+        <PageHeader
+          title={
+            showLogo ? (
+              // Logo de la compañía filtrada (reemplaza el título). h-12 =
+              // 48px, layout tight — sin scale ni min-h artificial. Si el
+              // PNG cargado tiene padding interno, el logo visible va a
+              // verse chiquito; la solución real es el auto-crop al
+              // subir (queda pendiente como mejora).
+              <img
+                src={logoForTheme!}
+                alt={activeCompany!.name}
+                className="h-12 w-auto object-contain"
+              />
+            ) : (
+              "Maven Scouter Assist"
+            )
+          }
+        />
 
         <Tabs value={active} onValueChange={(v) => setActive(v as SubKey)}>
           <TabsList>

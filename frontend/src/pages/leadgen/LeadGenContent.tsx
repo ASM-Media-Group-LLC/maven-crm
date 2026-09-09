@@ -42,6 +42,7 @@ import LeadGenPerformanceView from "./LeadGenPerformanceView";
 import LeadGenDashboardExtras from "./LeadGenDashboardExtras";
 import ViewAsLlgPicker from "./ViewAsLlgPicker";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
+import { PageHeader } from "@/components/ui/page-header";
 
 const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
 
@@ -352,59 +353,61 @@ const LeadGenContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-          <div className="shrink-0">
-            <h1 className="text-2xl font-semibold">LeadGen</h1>
-            <p className="text-sm text-muted-foreground mt-1 whitespace-nowrap">
+        <PageHeader
+          title="LeadGen"
+          subtitle={
+            <span className="whitespace-nowrap">
               {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
               {dateFrom && dateTo && (
                 <span className="ml-1">
                   ({format(dateFrom, "d MMM", { locale: es })} — {format(dateTo, "d MMM", { locale: es })})
                 </span>
               )}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
-            {/* Date picker global — visible en TODOS los subtabs.
-                Antes vivía en la filter bar (sólo Leads / Agentes).
-                Ahora persiste arriba a la derecha porque también
-                alimenta los KPIs del Dashboard. */}
-            <DateRangePicker
-              from={dateFrom}
-              to={dateTo}
-              onApply={handleDateApply}
-              placeholder="Selecciona fechas"
-              className="h-9"
-            />
-            {viewMode !== "agent" && (
-              <ViewAsLlgPicker
-                value={viewAsLgUserId}
-                onChange={(id, name) => {
-                  setViewAsLgUserId(id);
-                  setViewAsLgUserName(name);
-                  setPage(0);
-                }}
+            </span>
+          }
+          actions={
+            <>
+              {/* Date picker global — visible en TODOS los subtabs.
+                  Antes vivía en la filter bar (sólo Leads / Agentes).
+                  Ahora persiste arriba a la derecha porque también
+                  alimenta los KPIs del Dashboard. */}
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onApply={handleDateApply}
+                placeholder="Selecciona fechas"
+                className="h-9"
               />
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMisCuentasOpen(true)}
-              title="Estado de tus cuentas IG de outreach — qué tan creíble se ven y qué les falta para que las creadoras respondan"
-            >
-              <Activity className="h-4 w-4" />
-              Mis Cuentas IG
-            </Button>
-            <Button size="sm" onClick={() => setAddLeadOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Agregar Lead
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
-              <UserPlus className="h-4 w-4" />
-              Agregar Contacto
-            </Button>
-          </div>
-        </div>
+              {viewMode !== "agent" && (
+                <ViewAsLlgPicker
+                  value={viewAsLgUserId}
+                  onChange={(id, name) => {
+                    setViewAsLgUserId(id);
+                    setViewAsLgUserName(name);
+                    setPage(0);
+                  }}
+                />
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMisCuentasOpen(true)}
+                title="Estado de tus cuentas IG de outreach — qué tan creíble se ven y qué les falta para que las creadoras respondan"
+              >
+                <Activity className="h-4 w-4" />
+                Mis Cuentas IG
+              </Button>
+              <Button size="sm" onClick={() => setAddLeadOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Agregar Lead
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
+                <UserPlus className="h-4 w-4" />
+                Agregar Contacto
+              </Button>
+            </>
+          }
+        />
       </header>
 
       {/* Banner: vista filtrada como otro LLG */}

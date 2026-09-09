@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { PageHeader } from "@/components/ui/page-header";
 
 const STEPS = [
   { id: 1, label: "Empleado y Período", icon: Users },
@@ -126,10 +127,10 @@ export default function HRPerformanceNew() {
         <Button variant="ghost" size="icon" className="mb-2 -ml-2" onClick={() => navigate("/hr/desempeno")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Nueva Evaluación de Desempeño</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Complete los 4 pasos para crear una evaluación guiada</p>
-        </div>
+        <PageHeader
+          title="Nueva Evaluación de Desempeño"
+          subtitle="Complete los 4 pasos para crear una evaluación guiada"
+        />
       </div>
 
       {/* Stepper */}

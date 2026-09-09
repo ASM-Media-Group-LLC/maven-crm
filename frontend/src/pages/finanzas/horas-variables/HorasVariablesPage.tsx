@@ -25,6 +25,7 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "../comisiones/NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
+import { PageHeader } from "@/components/ui/page-header";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -522,12 +523,7 @@ export default function HorasVariablesPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Horas & Variables</h1>
-            <p className="text-sm text-muted-foreground">Gestión de horas extra, banco de horas y comisiones</p>
-          </div>
-        </div>
+        <PageHeader title="Horas & Variables" subtitle="Gestión de horas extra, banco de horas y comisiones" />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

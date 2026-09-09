@@ -25,6 +25,7 @@ import BufferedAccountsInline from "./BufferedAccountsInline";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
 // fuente real son las compañías canónicas de la DB.
@@ -349,12 +350,11 @@ const NuevoCreadorForm = () => {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Volver a Creadores
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
-            <Users className="h-5 w-5" /> Nuevo Creador
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Completa los detalles del nuevo creador</p>
-        </div>
+        <PageHeader
+          title="Nuevo Creador"
+          subtitle="Completa los detalles del nuevo creador"
+          icon={<Users className="h-5 w-5" />}
+        />
       </div>
 
       {/* Stepper */}

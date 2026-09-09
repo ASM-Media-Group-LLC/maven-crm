@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { CalendarIcon } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const OVERTIME_TYPES = [
   { value: "diurno", label: "Diurno" },
@@ -175,15 +176,14 @@ const HROvertimeDetail = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/hr/horarios")}><ArrowLeft className="h-4 w-4" /></Button>
-            <div>
-              <h1 className="text-xl font-semibold">Horas Extras</h1>
-              <p className="text-sm text-muted-foreground">Registro y aprobación de horas extra</p>
-            </div>
-          </div>
-          <Button onClick={() => { resetForm(); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" /> Registrar Horas Extra</Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/horarios")}><ArrowLeft className="h-4 w-4" /></Button>
+          <PageHeader
+            className="flex-1"
+            title="Horas Extras"
+            subtitle="Registro y aprobación de horas extra"
+            actions={<Button onClick={() => { resetForm(); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" /> Registrar Horas Extra</Button>}
+          />
         </div>
       </div>
 

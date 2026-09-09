@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { DateInput } from "@/components/ui/date-input";
 import { Progress } from "@/components/ui/progress";
+import { PageHeader } from "@/components/ui/page-header";
 import { usePayrollParams } from "@/hooks/useFinancialConfig";
 // generateSettlementPdf pulls jspdf — loaded on demand below.
 
@@ -282,8 +283,10 @@ export default function HROffboardingNew() {
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/offboarding")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Offboarding
         </Button>
-        <h1 className="text-xl font-semibold text-foreground">Iniciar Offboarding</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Configura el proceso de salida de un empleado</p>
+        <PageHeader
+          title="Iniciar Offboarding"
+          subtitle="Configura el proceso de salida de un empleado"
+        />
       </div>
 
       {/* Stepper */}

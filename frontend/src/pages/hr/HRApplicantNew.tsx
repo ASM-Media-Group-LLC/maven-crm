@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { APPLICANT_SOURCES } from "@/lib/hrConstants";
 import { useDepartments } from "@/hooks/useEmployees";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface FormState {
   full_name: string;
@@ -78,10 +79,7 @@ export default function HRApplicantNew() {
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/candidatos")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Candidatos
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Nuevo Candidato</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Agrega un nuevo candidato al proceso de reclutamiento</p>
-        </div>
+        <PageHeader title="Nuevo Candidato" subtitle="Agrega un nuevo candidato al proceso de reclutamiento" />
       </div>
 
       {/* Scrollable Content */}

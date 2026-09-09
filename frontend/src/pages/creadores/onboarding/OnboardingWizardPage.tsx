@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import OnboardingWizard from "./OnboardingWizard";
 import { useOnboarding, calculateCurrentStep } from "./useOnboarding";
+import { PageHeader } from "@/components/ui/page-header";
 
 const OnboardingWizardPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,9 +46,7 @@ const OnboardingWizardPage = () => {
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCancel}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <h1 className="text-xl font-semibold">
-                  {isEditing ? "Continuar Onboarding" : "Nuevo Onboarding"}
-                </h1>
+                <PageHeader title={isEditing ? "Continuar Onboarding" : "Nuevo Onboarding"} />
               </div>
             </div>
 

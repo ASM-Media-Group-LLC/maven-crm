@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Bot, Plus, Loader2, Radio, ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const DEPTS = [
   { value: "sales", label: "Ventas / Marketing" },
@@ -111,24 +112,24 @@ const BotsPage = () => {
     // pueda encogerse dentro de la columna flex.
     <main className="flex-1 min-h-0 overflow-y-auto">
       <div className="space-y-4 px-6 py-5">
-      <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
-          <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <Bot className="h-5 w-5 text-primary" />
-        <div className="flex-1">
-          <h1 className="text-base font-semibold leading-tight">Bots de WhatsApp</h1>
-          <p className="text-xs text-muted-foreground">
-            Cada bot: su Manual (cómo trabaja), su Llavero (a qué data accede) y el modelo. El motor base es común a todos.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/inbox/canales"><Radio className="h-4 w-4" /> Líneas</Link>
-        </Button>
-        <Button size="sm" onClick={() => setEditing("new")}>
-          <Plus className="h-4 w-4" /> Nuevo bot
-        </Button>
-      </div>
+      <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
+        <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
+      </Button>
+      <PageHeader
+        title="Bots de WhatsApp"
+        subtitle="Cada bot: su Manual (cómo trabaja), su Llavero (a qué data accede) y el modelo. El motor base es común a todos."
+        icon={<Bot />}
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/inbox/canales"><Radio className="h-4 w-4" /> Líneas</Link>
+            </Button>
+            <Button size="sm" onClick={() => setEditing("new")}>
+              <Plus className="h-4 w-4" /> Nuevo bot
+            </Button>
+          </>
+        }
+      />
 
       <div className="rounded-md border">
         {isLoading ? (
