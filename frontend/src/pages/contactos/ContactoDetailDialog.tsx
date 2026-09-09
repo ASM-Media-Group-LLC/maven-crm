@@ -217,7 +217,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
               key={s.label}
               className={`rounded-lg border border-border bg-card p-3 ${s.full ? "col-span-2 sm:col-span-3" : ""}`}
             >
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+              <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
               {s.full ? (
                 <div className="mt-0.5 text-sm font-medium">{s.value}</div>
               ) : (
@@ -229,7 +229,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
 
         {showSalesChannels && (
           <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            <p className="text-xs text-muted-foreground font-medium mb-2">
               Canales de venta contactado
             </p>
             {salesChannels.length === 0 ? (
@@ -256,7 +256,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
 
         {notesWithText.length > 0 && (
           <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            <p className="text-xs text-muted-foreground font-medium mb-2">
               Notas de contacto
             </p>
             <div className="space-y-1.5">

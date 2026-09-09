@@ -363,7 +363,7 @@ const AdminApiKeys = () => {
                               <span className="min-w-0 flex-1">
                                 <span className="flex items-center justify-between gap-2">
                                   <span className="text-sm font-medium">{s.label}</span>
-                                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">solo lectura</span>
+                                  <span className="shrink-0 text-xs text-muted-foreground">Solo lectura</span>
                                 </span>
                                 <span className="block text-xs text-muted-foreground">{s.description}</span>
                                 <code className="text-[10px] text-muted-foreground">{s.key}</code>

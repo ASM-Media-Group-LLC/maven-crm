@@ -202,7 +202,7 @@ const AgencyAnalytics = () => {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Outcome donut */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Distribución de resultados
               </h3>
               {outcomeData.length === 0 ? (
@@ -268,7 +268,7 @@ const AgencyAnalytics = () => {
 
             {/* Weekly volume line */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Volumen por semana (últimas 12)
               </h3>
               {weeklyData.length === 0 ? (
@@ -312,7 +312,7 @@ const AgencyAnalytics = () => {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Closer leaderboard */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Closer leaderboard (top 10 por avg score)
               </h3>
               {data.closer_leaderboard.length === 0 ? (
@@ -366,7 +366,7 @@ const AgencyAnalytics = () => {
 
             {/* Top models */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Modelos con más calls (top 10)
               </h3>
               {data.top_models.length === 0 ? (

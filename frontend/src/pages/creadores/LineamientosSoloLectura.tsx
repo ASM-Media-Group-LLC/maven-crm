@@ -109,7 +109,7 @@ export default function LineamientosSoloLectura({ creatorId }: { creatorId: stri
     <div className="mt-4 space-y-6">
       {grupos.map((g) => (
         <section key={g.etiqueta}>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.etiqueta}</h4>
+          <h4 className="mb-2 text-xs font-semibold text-muted-foreground">{g.etiqueta}</h4>
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {g.items.map((item) => (
               <div key={item.id} className="px-4 py-3">

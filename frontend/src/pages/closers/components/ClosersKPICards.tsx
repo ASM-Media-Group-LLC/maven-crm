@@ -170,8 +170,8 @@ const ClosersKPICards = ({
       >
         <UserAvatar name={bestCloser?.name ?? "?"} size="lg" ring />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
-            Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· {format(today, "MMMM yyyy", { locale: es })}</span>
+          <div className="text-xs font-extrabold text-amber-500">
+            Mejor cerrador <span className="text-muted-foreground/80 font-semibold capitalize">· {format(today, "MMMM yyyy", { locale: es })}</span>
           </div>
           {bestCloserLoading ? (
             <Skeleton className="mt-1 h-7 w-48" />
@@ -202,7 +202,7 @@ const ClosersKPICards = ({
       {/* Pipeline — primera sección */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+          <h3 className="text-xs font-semibold text-muted-foreground">
             Pipeline
           </h3>
           {/* Selector de LÍNEA DE NEGOCIO. Sin esto los conteos mezclaban
@@ -251,7 +251,7 @@ const ClosersKPICards = ({
 
       {/* Revenue Hero — 3 cards grandes con los totales relevantes */}
       <div className="space-y-3">
-        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+        <h3 className="text-xs font-semibold text-muted-foreground">
           Revenue
         </h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -272,7 +272,7 @@ const ClosersKPICards = ({
           segmento es clickeable y abre el popup detalle. Si platformsTotal
           es 0 (todas en cero), se muestra una barra placeholder gris. */}
       <div className="space-y-3">
-        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+        <h3 className="text-xs font-semibold text-muted-foreground">
           Por plataforma
         </h3>
         <Card className="p-4 space-y-3">
@@ -313,7 +313,7 @@ const ClosersKPICards = ({
                 >
                   <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground truncate">
                       {p.key}
                     </p>
                     <p className="text-sm font-bold tabular-nums leading-tight">

@@ -24,7 +24,7 @@ const InfoRow = ({
   return (
     <div>
       <div
-        className="mb-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+        className="mb-0.5 font-mono text-xs font-bold"
         style={{ color: accent ?? "hsl(var(--muted-foreground))" }}
       >
         {label}
@@ -61,7 +61,7 @@ const InfoCard = ({
         <span className={`flex h-6 w-6 items-center justify-center rounded-md text-sm ${styles.badge}`}>
           {icon}
         </span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/80">
+        <span className="text-xs font-bold text-foreground/80">
           {title}
         </span>
       </div>
@@ -141,7 +141,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
             <div className="mt-3 grid w-full grid-flow-col auto-cols-fr divide-x divide-border/40 text-center">
               {nationality && (
                 <div className="px-2">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  <div className="text-xs font-bold text-muted-foreground/80">
                     {lbl("nationality", "Nacionalidad", "Nationality")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
@@ -151,7 +151,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               )}
               {location && (
                 <div className="px-2">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  <div className="text-xs font-bold text-muted-foreground/80">
                     {lbl("location", "Ubicación", "Location")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
@@ -161,7 +161,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               )}
               {age && (
                 <div className="px-2">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  <div className="text-xs font-bold text-muted-foreground/80">
                     {lbl("age", "Edad", "Age")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
@@ -220,7 +220,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
           <InfoCard title={en ? "Prices" : "Precios"} icon="💰" tone="gold">
             {Object.entries(prices).map(([k, v]) => (
               <div key={k} className="flex items-baseline justify-between gap-3">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-500/90">
+                <span className="font-mono text-xs font-bold text-amber-500/90">
                   {k}
                 </span>
                 <span className="text-sm font-semibold text-amber-400">{v}</span>

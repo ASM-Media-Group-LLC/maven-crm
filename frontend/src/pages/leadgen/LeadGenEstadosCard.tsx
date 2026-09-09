@@ -78,7 +78,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
       <CardHeader className="pb-0.5 px-3 pt-2">
-        <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+        <CardTitle className="text-xs font-semibold text-muted-foreground">
           Estados
         </CardTitle>
       </CardHeader>

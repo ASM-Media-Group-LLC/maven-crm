@@ -407,7 +407,7 @@ const CompanyLogoUploader = ({
           así el user puede previsualizar antes de salir de Settings. */}
       {value && (
         <div className="space-y-1 pt-1 border-t border-border/40">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Preview en el header
           </p>
           <div className={`rounded-md px-4 py-3 ${previewBg}`}>
@@ -857,7 +857,7 @@ const CompanyFormModal = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-amber-400">
                     Asistente IA · Gemini 2.5 Flash
                   </span>
                 </div>
@@ -882,7 +882,7 @@ const CompanyFormModal = ({
                         : "bg-amber-400/10 border border-amber-400/20 ml-6"
                     }`}
                   >
-                    <span className="font-medium opacity-70 text-[10px] uppercase tracking-wider mr-2">
+                    <span className="font-medium opacity-70 text-xs mr-2">
                       {m.role === "assistant" ? "IA" : "Tú"}
                     </span>
                     {m.content}

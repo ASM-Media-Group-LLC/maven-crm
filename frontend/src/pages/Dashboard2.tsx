@@ -1017,7 +1017,7 @@ const Dashboard2 = () => {
                           que la card iguale en altura a Eficiencia sin
                           dejar un hueco vacío abajo. */}
                       <div className="flex-1 flex flex-col justify-center mt-3">
-                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Revenue Bruto</p>
+                        <p className="text-xs text-foreground/80 font-semibold">Revenue Bruto</p>
                         <p className="text-5xl font-bold tabular-nums leading-tight tracking-tight">{fmtK(grandTotal)}</p>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-3 mt-auto border-t border-border/50 text-xs">
@@ -1294,20 +1294,20 @@ const Dashboard2 = () => {
                               </div>
                               <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                                 <div>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">$/Día</p>
+                                  <p className="text-xs text-muted-foreground">$/Día</p>
                                   <p className="text-sm font-medium tabular-nums">{fmt(c.dailyAvg)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Días</p>
+                                  <p className="text-xs text-muted-foreground">Días</p>
                                   <p className="text-sm font-medium tabular-nums">{c.days}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Acumulado</p>
+                                  <p className="text-xs text-muted-foreground">Acumulado</p>
                                   <p className="text-sm font-medium tabular-nums">{fmt(c.total)}</p>
                                 </div>
                               </div>
                               <div className="text-right shrink-0 min-w-[90px]">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Proyectado</p>
+                                <p className="text-xs text-muted-foreground">Proyectado</p>
                                 <p className="text-base font-bold tabular-nums text-primary">{fmt(c.projected)}</p>
                               </div>
                               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
@@ -1349,7 +1349,7 @@ const Dashboard2 = () => {
               {/* ══════ SORTING TOOLBAR ══════ */}
               {!isLoading && creators.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Ordenar:</span>
+                  <span className="text-xs text-muted-foreground mr-1">Ordenar:</span>
                   {[
                     { col: "total" as SortKey, label: "Bruto" },
                     { col: "net" as SortKey, label: "Neto" },
@@ -1421,20 +1421,20 @@ const Dashboard2 = () => {
                         </div>
                         <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
                           <div className="text-right w-20">
-                            <p className="text-[10px] uppercase tracking-wider">Subs</p>
+                            <p className="text-xs">Subs</p>
                             <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.subs)}</p>
                           </div>
                           <div className="text-right w-20">
-                            <p className="text-[10px] uppercase tracking-wider">Tips</p>
+                            <p className="text-xs">Tips</p>
                             <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.tips)}</p>
                           </div>
                           <div className="text-right w-20">
-                            <p className="text-[10px] uppercase tracking-wider">Msgs</p>
+                            <p className="text-xs">Msgs</p>
                             <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.messages)}</p>
                           </div>
                         </div>
                         <div className="text-right shrink-0 w-[110px]">
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bruto</p>
+                          <p className="text-xs text-muted-foreground">Bruto</p>
                           <p className="text-base font-bold tabular-nums">{fmt(c.total)}</p>
                           <p className="text-[10px] tabular-nums text-success">{fmt(c.net)} <span className="text-muted-foreground">net</span></p>
                         </div>
@@ -1646,7 +1646,7 @@ const Dashboard2 = () => {
                             key={s.label}
                             className={`rounded-lg border ${s.highlight ? "border-primary/30 bg-primary/5" : "border-border bg-card"} p-3`}
                           >
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+                            <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
                             <p className={`text-lg font-bold tabular-nums ${s.color || ""}`}>{s.value}</p>
                           </div>
                         ))}
@@ -1727,7 +1727,7 @@ const Dashboard2 = () => {
                             key={s.label}
                             className={`rounded-lg border ${s.highlight ? "border-primary/30 bg-primary/5" : "border-border bg-card"} p-3`}
                           >
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+                            <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
                             <p className={`text-xl font-bold tabular-nums ${s.highlight ? "text-primary" : ""}`}>{s.value}</p>
                           </div>
                         ))}
@@ -1774,7 +1774,7 @@ const Dashboard2 = () => {
                 <div className="space-y-6">
                   {/* Retención & Fans — stat-chips compactos */}
                   <div>
-                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Retención & Fans</h3>
+                    <h3 className="text-xs font-semibold text-muted-foreground mb-3">Retención & Fans</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
                         { icon: <Repeat className="h-3.5 w-3.5" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación", color: "bg-cyan-500" },
@@ -1796,7 +1796,7 @@ const Dashboard2 = () => {
 
                   {isAdmin && (
                     <div>
-                      <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">CEO Insights</h3>
+                      <h3 className="text-xs font-semibold text-muted-foreground mb-3">CEO Insights</h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {/* Top creadora — clickable, abre ficha técnica */}
                         <button
@@ -1808,7 +1808,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500"><Crown className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Top creadora</p>
+                              <p className="text-xs text-foreground/80 font-semibold">Top creadora</p>
                               <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
                               <p className="text-2xl font-bold tabular-nums text-amber-500 leading-tight">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
                             </div>
@@ -1819,7 +1819,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500"><Target className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Promedio</p>
+                              <p className="text-xs text-foreground/80 font-semibold">Promedio</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{fmt(hlKpis.avgPerCreator)}</p>
                               <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.activeCount} activas</p>
                             </div>
@@ -1830,7 +1830,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive"><AlertTriangle className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Inactivas</p>
+                              <p className="text-xs text-foreground/80 font-semibold">Inactivas</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.zeroCreators}</p>
                               <p className="text-[10px] text-muted-foreground mt-1">$0 en ventas</p>
                             </div>
@@ -1841,7 +1841,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500"><TrendingUp className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Distribución</p>
+                              <p className="text-xs text-foreground/80 font-semibold">Distribución</p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal text-xs">{'>'} $10k</span></p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal text-xs">{'<'} $1k</span></p>
                             </div>
@@ -1953,7 +1953,7 @@ const Dashboard2 = () => {
                     <div className="space-y-5">
                       {paretoGroup === "80" && (
                       <div>
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-3">🔥 Top {paretoAnalysis.topCount} — Bruto</p>
                         <div className="space-y-2">
                           {paretoAnalysis.top.map((c, i) => {
                             const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
@@ -1996,7 +1996,7 @@ const Dashboard2 = () => {
                       )}
                       {paretoGroup === "20" && (
                       <div>
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">📉 Resto ({paretoAnalysis.rest.length})</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-3">📉 Resto ({paretoAnalysis.rest.length})</p>
                         {paretoAnalysis.rest.length > 0 ? (
                           <div className="space-y-2">
                             {paretoAnalysis.rest.map((c, i) => {

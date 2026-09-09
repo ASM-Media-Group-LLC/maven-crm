@@ -117,7 +117,7 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
 
       <div className="px-4 py-3 border-b border-card">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Participantes</span>
+          <span className="text-xs text-muted-foreground">Participantes</span>
           <span className="text-xs text-foreground">{participants.length}</span>
         </div>
       </div>

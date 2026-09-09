@@ -55,7 +55,7 @@ export default function MiSemana({ hoy = new Date() }: { hoy?: Date }) {
       <div className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
         {/* Hoy */}
         <section className="rounded-2xl border bg-card p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hoy · {fechaLarga}</p>
+          <p className="text-xs font-medium text-muted-foreground">Hoy · {fechaLarga}</p>
           <h2 className="mt-1 font-display text-2xl font-bold tracking-tight">{nombres[yo] ?? "Tu turno"}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {descansoHoy
@@ -65,7 +65,7 @@ export default function MiSemana({ hoy = new Date() }: { hoy?: Date }) {
             {miFila.is_supernumerary && <Badge variant="secondary" className="font-normal">Supernumerario</Badge>}
           </div>
 
-          <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="mt-5 text-xs font-medium text-muted-foreground">
             Tus creadoras · {misCreadoras.length}
           </p>
           {misCreadoras.length === 0 ? (
@@ -97,7 +97,7 @@ export default function MiSemana({ hoy = new Date() }: { hoy?: Date }) {
 
         {/* Descanso */}
         <section className="rounded-2xl border bg-card p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tu descanso esta semana</p>
+          <p className="text-xs font-medium text-muted-foreground">Tu descanso esta semana</p>
           {miDescanso ? (
             <>
               <h3 className="mt-1 font-display text-2xl font-bold tracking-tight">{etiquetaDia(semana, miDescanso.weekday)}</h3>
@@ -112,13 +112,13 @@ export default function MiSemana({ hoy = new Date() }: { hoy?: Date }) {
               <p className="mt-1 text-sm text-muted-foreground">{notasDia[0]?.note ?? "El supervisor todavía no cerró la semana."}</p>
             </>
           )}
-          <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Semana del {etiquetaSemana(siguiente)}</p>
+          <p className="mt-5 text-xs font-medium text-muted-foreground">Semana del {etiquetaSemana(siguiente)}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {miDescansoProx ? <>Descansás el <strong className="text-foreground">{etiquetaDia(siguiente, miDescansoProx.weekday).toLowerCase()}</strong>.</> : "Todavía sin publicar."}
           </p>
           {cubro.length > 0 && (
             <>
-              <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Cubrís a</p>
+              <p className="mt-5 text-xs font-medium text-muted-foreground">Cubrís a</p>
               <ul className="mt-1 space-y-1 text-sm">
                 {cubro.map((d) => <li key={d.id}><strong>{nombres[d.identity_id ?? ""] ?? "…"}</strong> <span className="text-muted-foreground">· {etiquetaDia(d.week_start, d.weekday)} <TurnoBadge shift={d.shift} className="ml-1 text-[10px] px-1.5 py-0" /></span></li>)}
               </ul>

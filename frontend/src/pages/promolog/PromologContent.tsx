@@ -1615,7 +1615,7 @@ const PromologContent = () => {
             <div className="max-h-[500px] overflow-auto space-y-1.5">
               {/* Header labels — sticky para alinearse con las columnas
                   de cada ListRow. */}
-              <div className="sticky top-0 z-[1] flex items-center gap-3 px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground bg-card/40 backdrop-blur-md">
+              <div className="sticky top-0 z-[1] flex items-center gap-3 px-3 pt-1 pb-2 text-xs text-muted-foreground bg-card/40 backdrop-blur-md">
                 <span className="w-12">Ticket</span>
                 <span className="flex-1">Creadora</span>
                 <span className="w-20">Red</span>

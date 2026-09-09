@@ -82,7 +82,7 @@ function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, 
           {valores.length > 1 && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ver solo</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">Ver solo</DropdownMenuLabel>
               {valores.map((v) => (
                 <DropdownMenuCheckboxItem key={v} checked={filtro === v}
                   onCheckedChange={(marcado) => onFiltrar(col, marcado ? v : "")}>

@@ -309,7 +309,7 @@ const MisTareas = () => {
       {/* Manager dashboard section — visible only to admin/manager/supervisor */}
       {isManagerRole && (
         <div className="pt-2">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          <div className="text-xs font-bold text-muted-foreground mb-3">
             Vista de manager
           </div>
           <ManagerDashboard date={selectedDate} onDateChange={setSelectedDate} />

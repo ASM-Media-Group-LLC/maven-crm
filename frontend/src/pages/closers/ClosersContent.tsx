@@ -250,7 +250,7 @@ const ClosersContent = () => {
                 <Eye className="h-3.5 w-3.5 text-primary" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-widest text-primary/80 font-bold leading-tight">
+                <p className="text-xs text-primary/80 font-bold leading-tight">
                   Vista filtrada
                 </p>
                 <p className="text-sm font-semibold truncate">

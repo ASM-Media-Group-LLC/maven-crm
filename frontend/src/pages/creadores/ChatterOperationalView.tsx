@@ -159,7 +159,7 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
         <CardContent className="space-y-4">
           <Alert variant="destructive" className="border-2">
             <AlertTriangle className="h-5 w-5" />
-            <AlertTitle className="text-sm font-bold uppercase tracking-wide">
+            <AlertTitle className="text-sm font-bold">
               Esta modelo JAMÁS hará:
             </AlertTitle>
             <AlertDescription className="mt-1">

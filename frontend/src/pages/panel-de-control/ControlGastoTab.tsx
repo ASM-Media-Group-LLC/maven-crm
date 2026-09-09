@@ -214,7 +214,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
           corner blur que se intensifica en hover. */}
       <Card className="p-5 border-2 border-indigo-500/30 relative overflow-hidden">
         <div className="relative">
-          <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+          <p className="text-xs text-foreground/80 font-semibold">
             Total en el rango
           </p>
           <div className="flex items-end gap-3 mt-2">
@@ -256,7 +256,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                   <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold truncate">
+                  <p className="text-xs text-foreground/80 font-semibold truncate">
                     {s.label}
                   </p>
                   <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -297,7 +297,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
               <DollarSign className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="text-xs text-foreground/80 font-semibold">
                 % del cap combinado
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -355,7 +355,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="py-2 pr-3">Fecha</th>
                   <th className="py-2 pr-3">Provider</th>
                   <th className="py-2 pr-3">Operación</th>

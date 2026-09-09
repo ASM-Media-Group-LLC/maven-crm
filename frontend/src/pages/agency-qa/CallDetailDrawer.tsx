@@ -96,7 +96,7 @@ const Avatar = ({ name, dataUrl, size = 36 }: { name: string; dataUrl: string | 
 const Section = ({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) => (
   <section className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
     <div className="flex items-center justify-between gap-2">
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</h3>
+      <h3 className="text-xs font-bold text-muted-foreground">{title}</h3>
       {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
     </div>
     {children}
@@ -252,7 +252,7 @@ const SectionThumbs = ({
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-72 space-y-2 p-3" align="end">
-          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          <Label className="text-xs font-bold text-muted-foreground">
             Nota sobre esta sección
           </Label>
           <Textarea
@@ -262,7 +262,7 @@ const SectionThumbs = ({
             placeholder="Por qué corriges esto, qué le faltó al análisis…"
             className="text-sm"
           />
-          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          <Label className="text-xs font-bold text-muted-foreground">
             Score sugerido (opcional, 0-100)
           </Label>
           <Input
@@ -377,7 +377,7 @@ const KeyMomentsBlock = ({
       <ul className="space-y-2">
         {moments.map((m, i) => (
           <li key={i} className="rounded-xl border border-white/10 bg-white/5 p-2.5">
-            <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs font-bold">
               <span style={{ color: m.kind === "positivo" ? "rgb(22 163 74)" : "rgb(220 38 38)" }}>
                 {m.kind === "positivo" ? "✓ Positivo" : "✗ Negativo"}
               </span>
@@ -417,7 +417,7 @@ const RedFlagsBlock = ({
             <div className="mb-1 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-destructive">
+                <span className="text-xs font-bold text-destructive">
                   {f.type.replace(/_/g, " ")}
                 </span>
               </div>
@@ -475,7 +475,7 @@ const ModelSignalsBlock = ({ signals }: { signals: NonNullable<CallAnalysis["mod
     </div>
     {signals.objections.length > 0 && (
       <div className="space-y-1">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="text-xs font-bold text-muted-foreground">
           Objeciones ({signals.objections.length})
         </div>
         <ul className="space-y-1.5">
@@ -505,7 +505,7 @@ const SignalCard = ({ label, level, reason }: { label: string; level: string; re
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="text-xs font-bold text-muted-foreground">
           {label}
         </span>
         <span className="text-xs font-bold" style={{ color }}>

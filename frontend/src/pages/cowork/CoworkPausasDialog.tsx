@@ -141,7 +141,7 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
 function Resumen({ label, valor, sub, alerta }: { label: string; valor: string; sub?: string; alerta?: boolean }) {
   return (
     <div className={cn("rounded-xl border px-3 py-2", alerta ? "border-destructive/40 bg-destructive/10" : "border-border bg-muted/30")}>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className={cn("font-display text-base font-semibold tabular-nums", alerta && "text-destructive")}>{valor}</div>
       {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
     </div>

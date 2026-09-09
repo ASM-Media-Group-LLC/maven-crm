@@ -335,7 +335,7 @@ const AgencyQaNotifications = () => {
                           {u.full_name?.trim() || "(sin nombre)"}
                         </span>
                         {u.role && (
-                          <span className="rounded-full border border-border/60 bg-background px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <span className="rounded-full border border-border/60 bg-background px-1.5 py-0.5 text-xs capitalize text-muted-foreground">
                             {u.role}
                           </span>
                         )}

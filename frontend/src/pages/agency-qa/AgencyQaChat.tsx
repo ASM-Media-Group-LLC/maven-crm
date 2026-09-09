@@ -499,7 +499,7 @@ const AgencyQaChat = () => {
                             )}
                           >
                             {isAssistant && (
-                              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                              <div className="mb-1 text-xs font-bold text-amber-500">
                                 Mike
                               </div>
                             )}
@@ -525,7 +525,7 @@ const AgencyQaChat = () => {
                     <div className="flex items-end gap-2">
                       <MikeAvatar size={28} />
                       <div className="max-w-[80%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
                           <Sparkles className="h-3 w-3 animate-pulse" />
                           Mike escribiendo…
                         </div>

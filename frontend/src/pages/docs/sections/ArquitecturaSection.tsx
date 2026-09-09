@@ -61,7 +61,7 @@ const ArquitecturaSection = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {moduleGroups.map((group) => (
             <div key={group.category} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.category}</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground">{group.category}</h3>
               <div className="space-y-1.5">
                 {group.modules.map((mod) => (
                   <div key={mod} className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-xs font-medium">{mod}</div>

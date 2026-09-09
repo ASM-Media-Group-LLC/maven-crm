@@ -92,14 +92,14 @@ const AssignCalidadModal = ({ open, onOpenChange, lead }: Props) => {
         <Card className="p-4">
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Calidad Actual</span>
+              <span className="text-xs font-semibold text-muted-foreground">Calidad Actual</span>
               <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold ${calidadColors[currentCat] ?? "bg-muted text-muted-foreground"}`}>
                 {lead.quality.toUpperCase()}
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground mt-4" />
             <div className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Nueva Calidad</span>
+              <span className="text-xs font-semibold text-muted-foreground">Nueva Calidad</span>
               <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold ${calidadColors[calidad] ?? "bg-muted text-muted-foreground"}`}>
                 {calidad ? calidad.toUpperCase() : "—"}
               </div>

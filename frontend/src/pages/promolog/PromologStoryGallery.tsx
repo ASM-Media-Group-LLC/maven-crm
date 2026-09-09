@@ -433,7 +433,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-semibold text-muted-foreground">
           Evidencia · {summary.total} {evidenceNoun}
         </p>
         <div className="flex items-center gap-1.5">

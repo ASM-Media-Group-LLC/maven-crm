@@ -324,7 +324,7 @@ function GrupoDispositivos({ titulo, icon: Icon, devices, selectedId, onSelect }
   if (devices.length === 0) return null;
   return (
     <div>
-      <p className="flex items-center gap-2 px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <p className="flex items-center gap-2 px-3 pt-2 pb-1 text-xs text-muted-foreground">
         <Icon className="h-3 w-3 shrink-0" /> {titulo}
       </p>
       {devices.map((d) => (

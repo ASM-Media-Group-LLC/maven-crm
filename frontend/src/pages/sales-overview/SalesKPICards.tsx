@@ -94,7 +94,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <card.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="flex items-center gap-1 text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+              <p className="flex items-center gap-1 text-xs text-foreground/80 font-semibold">
                 {card.title}
                 {card.tooltip && (
                   <Tooltip>

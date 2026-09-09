@@ -111,7 +111,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
               <card.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{card.title}</p>
+              <p className="text-xs text-foreground/80 font-semibold">{card.title}</p>
               {card.content}
             </div>
           </div>

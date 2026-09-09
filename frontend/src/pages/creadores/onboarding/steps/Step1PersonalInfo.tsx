@@ -106,7 +106,7 @@ function SectionLabel({ children, tooltip }: { children: React.ReactNode; toolti
     <div className="md:col-span-2 pt-2">
       <div className="flex items-center gap-3">
         <Separator className="flex-1" />
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{children}</span>
+        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{children}</span>
         {tooltip && (
           <Tooltip>
             <TooltipTrigger asChild>

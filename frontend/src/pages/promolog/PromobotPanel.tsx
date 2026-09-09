@@ -788,7 +788,7 @@ const HealthStat = ({
   <div className="rounded-lg border border-border bg-card/40 p-2.5">
     <div className="flex items-center gap-1.5 text-muted-foreground">
       {icon}
-      <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
+      <span className="text-xs font-semibold">{label}</span>
     </div>
     <p className={`mt-0.5 text-lg font-bold tabular-nums ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : ""}`}>
       {value}

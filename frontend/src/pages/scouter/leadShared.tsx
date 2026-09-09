@@ -396,7 +396,7 @@ export const LeadDrawer = ({
 
           {/* ── Bio (editable) ── */}
           <div className="px-4 pt-3">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+            <div className="text-xs font-bold text-muted-foreground mb-1">
               Bio
             </div>
             {editing ? (
@@ -417,7 +417,7 @@ export const LeadDrawer = ({
           {/* ── AI Analysis ── */}
           {aiReasons.length > 0 && (
             <div className="px-4 pt-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+              <div className="text-xs font-bold text-muted-foreground mb-1">
                 Analisis IA
               </div>
               <ul className="space-y-1 rounded-md border bg-muted/20 p-3 text-sm">
@@ -434,7 +434,7 @@ export const LeadDrawer = ({
           {/* ── Pipeline fields ── */}
           <div className="px-4 pt-3 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <div className="text-xs font-bold text-muted-foreground">
                 Pipeline
               </div>
               {editing ? (
@@ -724,7 +724,7 @@ export const LeadDrawer = ({
                     handleQuickStatus(qa.status);
                   }
                 }}
-                className="rounded-lg border px-1 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors hover:opacity-80 disabled:opacity-50"
+                className="rounded-lg border px-1 py-1.5 text-xs font-bold transition-colors hover:opacity-80 disabled:opacity-50"
                 style={{
                   borderColor: qa.color + "50",
                   color: qa.color,
@@ -857,7 +857,7 @@ const Field = ({
         : "grid grid-cols-[120px_1fr] items-center gap-2"
     }
   >
-    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="text-xs font-semibold text-muted-foreground">
       {label}
     </div>
     <div className="text-sm text-foreground">{children}</div>

@@ -156,7 +156,7 @@ const HistorySessionDetail = () => {
                     <XCircle className="h-6 w-6 text-destructive" />
                   )}
                   <div>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       Verdict
                     </div>
                     <div
@@ -171,7 +171,7 @@ const HistorySessionDetail = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     Puntuación
                   </div>
                   <div className="text-xl font-bold">
@@ -188,7 +188,7 @@ const HistorySessionDetail = () => {
 
               {evaluation.criteria_results.length > 0 && (
                 <div className="space-y-2 border-t pt-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     Criterios
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -211,7 +211,7 @@ const HistorySessionDetail = () => {
 
               {evaluation.feedback && (
                 <div className="border-t pt-3">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Feedback
                   </div>
                   <p className="whitespace-pre-wrap rounded-md border-l-2 border-primary bg-muted/40 p-3 text-sm">

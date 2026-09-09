@@ -26,7 +26,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
         </div>
 
         <div className="text-center space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-widest">
+          <p className="text-xs text-muted-foreground">
             {isOngoing ? "En curso" : "Entrante"} · {isGroup ? "grupo " : ""}{isAudio ? "audio" : "video"}
           </p>
           <p className="text-xl font-semibold text-foreground">{call.caller_name ?? "Desconocido"}</p>

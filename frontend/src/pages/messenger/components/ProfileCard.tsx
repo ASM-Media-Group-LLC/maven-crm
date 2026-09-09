@@ -174,7 +174,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
         {/* Karma Points */}
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold tracking-[0.13em] uppercase text-muted-foreground">Karma Points</span>
+            <span className="text-xs font-bold text-muted-foreground">Karma Points</span>
             <span className="text-[11px] font-bold font-mono" style={{ color: GOLD }}>{data.stars_count} / 5</span>
           </div>
           <div className="flex items-center justify-center gap-2">
@@ -239,7 +239,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
         {/* Vista admin: enviados / recibidos / Hubstaff */}
         {admin && data.admin && (
           <div className="mt-5 pt-4 border-t border-dashed border-border">
-            <div className="flex items-center gap-2 text-[10.5px] font-bold tracking-[0.13em] uppercase mb-3" style={{ color: "#5b8cff" }}>
+            <div className="flex items-center gap-2 text-xs font-bold mb-3" style={{ color: "#5b8cff" }}>
               🔒 Vista admin
             </div>
             <div className="grid grid-cols-2 gap-2.5">

@@ -176,7 +176,7 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
         {/* Cabecera: el nombre grande en la display, como los títulos del
             reskin. El degradado del acento del Dialog vive justo detrás. */}
         <DialogHeader className="px-7 pt-7 pb-5 text-left space-y-1.5">
-          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-primary">Reglas de esta sesión</p>
+          <p className="text-xs font-semibold text-primary">Reglas de esta sesión</p>
           <DialogTitle className="font-display text-[26px] leading-tight tracking-tight">{nombreSesion || "Esta sesión"}</DialogTitle>
           <DialogDescription>Aplican a todas las personas que entren a esta sesión, hoy y en adelante.</DialogDescription>
         </DialogHeader>
@@ -399,7 +399,7 @@ function CampoOpcion({ etiqueta, valor, opciones, onCambio }: CampoProps) {
   const actual = opciones.find((o) => o.valor === valor);
   return (
     <div className="space-y-1 min-w-0">
-      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{etiqueta}</Label>
+      <Label className="text-xs text-muted-foreground">{etiqueta}</Label>
       <Select value={valor} onValueChange={onCambio}>
         <SelectTrigger className="h-9 tactil:h-10 rounded-xl bg-white/[0.04] border-white/10">
           {/* En el disparador va la versión corta: "3:00 después de pasarse"

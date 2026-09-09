@@ -639,7 +639,7 @@ const ConfigSection = () => {
                         <div className="min-w-0 flex-1">
                           <div className="truncate">{name}</div>
                           {u.role && (
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            <div className="text-xs capitalize text-muted-foreground">
                               {u.role}
                             </div>
                           )}

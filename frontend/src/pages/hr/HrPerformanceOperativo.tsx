@@ -172,7 +172,7 @@ export default function HrPerformanceOperativo() {
 function Thead({ cols }: { cols: string[] }) {
   return (
     <thead>
-      <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+      <tr className="border-b border-border text-xs text-muted-foreground">
         {cols.map((c, i) => (
           <th key={i} className={`px-3 py-3 font-semibold ${i === 0 ? "text-left pl-4" : c === "" ? "text-left" : "text-right"}`}>{c}</th>
         ))}

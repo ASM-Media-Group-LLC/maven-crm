@@ -395,8 +395,8 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
     }
     return (
       <div className="my-2 text-center">
-        <span className="rounded-full bg-muted px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {msg.content || "system"}
+        <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+          {msg.content || "System"}
         </span>
       </div>
     );
@@ -1321,7 +1321,7 @@ const ChatterPublicView = () => {
       {/* LEFT — conversations + timer */}
       <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-card md:flex">
         <div className="border-b p-5">
-          <div className="mb-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <div className="mb-4 text-xs font-bold text-muted-foreground">
             {lang === "en" ? "Conversations" : "Conversaciones"}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">

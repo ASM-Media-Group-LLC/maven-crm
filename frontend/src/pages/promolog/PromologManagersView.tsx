@@ -89,7 +89,7 @@ const isSilent = (iso: string | null) => (iso ? Date.now() - new Date(iso).getTi
 // Celda KPI: número grande + una línea de contexto. Sin listas.
 const Kpi = ({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "good" | "warn" | "bad" }) => (
   <div className="min-w-0">
-    <p className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">{label}</p>
+    <p className="text-xs text-muted-foreground md:hidden">{label}</p>
     <p className={cn("text-2xl font-bold leading-none tabular-nums", tone === "good" && "text-success", tone === "warn" && "text-warning", tone === "bad" && "text-destructive")}>{value}</p>
     {sub && <p className="mt-1 text-[11px] text-muted-foreground leading-snug">{sub}</p>}
   </div>
@@ -218,7 +218,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
       </div>
 
       {/* Encabezados de columna (desktop) */}
-      <div className={cn("hidden md:grid gap-4 px-5 text-[10px] uppercase tracking-wider text-muted-foreground", COLS)}>
+      <div className={cn("hidden md:grid gap-4 px-5 text-xs text-muted-foreground", COLS)}>
         <span>Manager</span>
         <span>Promocionaron</span>
         <span>Calidad promo</span>

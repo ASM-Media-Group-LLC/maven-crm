@@ -421,7 +421,7 @@ export default function CorreoPage() {
           carpetasAbiertas ? "w-52" : "w-[60px]",
         )}>
           {carpetasAbiertas ? (
-            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <p className="px-3 pb-1 pt-2 text-xs font-semibold text-muted-foreground">
               Carpetas
             </p>
           ) : (

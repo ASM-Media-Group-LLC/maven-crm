@@ -162,7 +162,7 @@ const ScouterFunnel = () => {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Top sources */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Top fuentes de descubrimiento
               </h3>
               {data.topSources.length === 0 ? (
@@ -193,7 +193,7 @@ const ScouterFunnel = () => {
 
             {/* Per-company breakdown */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
                 Por compañía
               </h3>
               {data.perCompany.length === 0 ? (
@@ -262,7 +262,7 @@ const OutcomeCard = ({
   <div className="rounded-xl border border-border bg-card p-4">
     <div className="flex items-start justify-between gap-3">
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="text-xs font-semibold text-muted-foreground">
           {label}
         </div>
         <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>

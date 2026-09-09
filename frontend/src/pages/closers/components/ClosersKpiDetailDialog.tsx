@@ -120,7 +120,7 @@ const ClosersKpiDetailDialog = ({
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set())}
-                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Expandir todas"
                 >
                   Expandir
@@ -128,7 +128,7 @@ const ClosersKpiDetailDialog = ({
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set(groups.map((g) => g.cat)))}
-                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Colapsar todas"
                 >
                   Colapsar

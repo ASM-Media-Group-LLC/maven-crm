@@ -55,7 +55,7 @@ interface Props {
 
 const InfoCard = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="border rounded-lg p-3 space-y-1">
-    <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+    <p className="text-xs text-muted-foreground">{label}</p>
     <div className="text-sm font-medium">{children}</div>
   </div>
 );

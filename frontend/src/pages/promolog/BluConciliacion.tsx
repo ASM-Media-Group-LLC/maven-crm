@@ -51,7 +51,7 @@ function Cifra({ label, valor, pie, tono }: { label: string; valor: string; pie?
   return (
     <div className={cn("rounded-xl border px-3 py-2.5",
       tono === "alerta" ? "border-amber-500/30 bg-amber-500/5" : tono === "ok" ? "border-emerald-500/30 bg-emerald-500/5" : "border-border")}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-xl font-bold tabular-nums leading-none">{valor}</p>
       {pie && <p className="mt-1 text-[11px] text-muted-foreground">{pie}</p>}
     </div>

@@ -82,7 +82,7 @@ export default function Equipo({ puedeGestionar, hoy = new Date() }: { puedeGest
         <div className="rounded-2xl border bg-card overflow-x-auto">
           <table className="w-full min-w-[920px] text-sm">
             <thead>
-              <tr className="border-b bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                 <th className="px-3 py-2.5 text-left font-medium w-[150px]">Grupo</th>
                 <th className="px-3 py-2.5 text-left font-medium">Chatter</th>
                 <th className="px-3 py-2.5 text-left font-medium w-[70px]">Turno</th>
@@ -218,7 +218,7 @@ function NotasDia({ semana, agency, filas, puedeGestionar, diaHoy, onFijar }: { 
   const notas = filas.filter((d) => d.identity_id === null);
   return (
     <tr className="border-t-2 bg-muted/20">
-      <td className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground border-r" colSpan={3}>Notas del día</td>
+      <td className="px-3 py-2 text-xs font-medium text-muted-foreground border-r" colSpan={3}>Notas del día</td>
       {DIAS_CORTOS.map((_, i) => {
         const del = notas.filter((n) => n.weekday === i);
         return (

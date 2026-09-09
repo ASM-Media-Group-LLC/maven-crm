@@ -447,7 +447,7 @@ const AppearanceCard = () => {
 
           {/* Separador sutil del grupo de LÍNEAS de negocio. */}
           <div className="flex items-center gap-2 pt-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {t("settings.skinLines")}
             </span>
             <span className="h-px flex-1 bg-border" />
@@ -942,7 +942,7 @@ const Settings = () => {
           {/* Header del rail — mismo tratamiento tipográfico que los
               headers de sección del sidebar principal (text-[11px],
               tracking-widest, foreground/70). */}
-          <div className="hidden md:block px-2 pb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
+          <div className="hidden md:block px-2 pb-3 text-xs font-semibold text-foreground/70">
             {t("settings.connectedAs", { role: prettyRole })}
           </div>
           {/* Tabs — mismo lenguaje que la sidebar principal:

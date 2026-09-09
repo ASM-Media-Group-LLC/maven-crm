@@ -201,7 +201,7 @@ export default function MeetPage() {
 
       {!loading && myRooms.length > 0 && (
         <div className="w-full max-w-3xl flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
+          <h2 className="text-xs font-semibold text-muted-foreground px-1">
             Tus reuniones abiertas · {myRooms.length}
           </h2>
           {/* Con muchas reuniones la lista scrollea sola en vez de estirar la

@@ -178,7 +178,7 @@ function CompanyTable({ company, rows, prevByName }: {
 function Stat({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string | number; tone?: string }) {
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3 backdrop-blur">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
       <div className={`mt-0.5 text-2xl font-bold tabular-nums ${tone ?? ""}`}>{value}</div>
     </div>
   );

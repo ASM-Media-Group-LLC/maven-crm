@@ -513,7 +513,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
           <div className="max-h-64 overflow-y-auto p-2">
             {EMOJIS.map((seccion) => (
               <div key={seccion.grupo}>
-                <p className="px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground first:pt-0">
+                <p className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground first:pt-0">
                   {seccion.grupo}
                 </p>
                 <div className="grid grid-cols-8">

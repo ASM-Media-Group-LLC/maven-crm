@@ -133,7 +133,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                 <>
                   <TurnoHero shift={miFila.shift} hoy={hoy} libre={hoyLibre} grupo={miGrupo ? `${miGrupo.name} · ${miGrupo.agency === "plus" ? "Plus" : "Massive"}` : ""} />
                   <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">Tus creadoras · {misCreadoras.length}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">Tus creadoras · {misCreadoras.length}</p>
                     <ul className="space-y-1">
                       {misCreadoras.map((c) => {
                         const url = urlCreadora(c);
@@ -158,7 +158,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                   <div className="flex items-center gap-3 rounded-xl border border-orange-500/25 bg-orange-500/5 px-3 py-2.5">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400"><CalendarOff className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Tu descanso</p>
+                      <p className="text-xs text-muted-foreground">Tu descanso</p>
                       <p className="text-sm font-semibold">{descansoSemana ? etiquetaDia(semanaHoy, descansoSemana.weekday) : "Sin cargar"}</p>
                     </div>
                     {descansoSemana && <p className="text-right text-xs text-muted-foreground">{descansoSemana.covered_by_identity_id ? <>Te cubre<br /><span className="font-medium text-foreground">{nombres[descansoSemana.covered_by_identity_id] ?? "…"}</span></> : "Sin cobertura"}</p>}
@@ -178,8 +178,8 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                 </div>
                 {diasConDato.length > 0 && (
                   <div className="flex gap-4 text-right">
-                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Promedio</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, diasConDato.length))}<span className="text-xs font-normal text-muted-foreground">/día</span></p></div>
-                    <div><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sobre la meta</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{diasConDato.filter((d) => (d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0)).length}<span className="text-xs font-normal text-muted-foreground"> de {diasConDato.length}</span></p></div>
+                    <div><p className="text-xs text-muted-foreground">Promedio</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, diasConDato.length))}<span className="text-xs font-normal text-muted-foreground">/día</span></p></div>
+                    <div><p className="text-xs text-muted-foreground">Sobre la meta</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{diasConDato.filter((d) => (d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0)).length}<span className="text-xs font-normal text-muted-foreground"> de {diasConDato.length}</span></p></div>
                   </div>
                 )}
               </div>
@@ -252,7 +252,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                       <div className="flex items-center gap-3">
                         <Inicial nombre={top.model_name ?? "?"} size="lg" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-500">Tu #1</p>
+                          <p className="text-xs font-bold text-amber-500">Tu #1</p>
                           <p className="truncate font-display text-base font-bold leading-tight">{top.model_name ?? `Modelo ${top.blu_model_id}`}</p>
                           <p className="text-xs text-muted-foreground">{top.fans.toLocaleString("es")} fans · {top.dias} {top.dias === 1 ? "día" : "días"}</p>
                         </div>
@@ -338,7 +338,7 @@ function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: Retur
   return (
     <div className="grid gap-4 sm:grid-cols-[180px_1fr_1fr]">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Día</p>
+        <p className="text-xs font-medium text-muted-foreground">Día</p>
         <p className="text-sm font-semibold capitalize leading-tight">{fecha}</p>
         {libre && <Badge variant="outline" className="mt-1 gap-1 border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300"><CalendarOff className="h-3 w-3" /> Descanso</Badge>}
       </div>
@@ -347,9 +347,9 @@ function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: Retur
       ) : (
         <>
           <div className="flex items-end justify-between">
-            <div><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Nota</p>
+            <div><p className="text-xs text-muted-foreground">Nota</p>
               <p className={cn("mt-1 inline-block rounded-lg border px-2 py-0.5 text-lg font-bold tabular-nums", tonoDeNota(fila.nota))}>{fila.nota == null ? "—" : fila.nota.toFixed(1)}</p></div>
-            <div className="text-right"><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Ventas</p>
+            <div className="text-right"><p className="text-xs text-muted-foreground">Ventas</p>
               <p className="text-lg font-bold tabular-nums">{money(fila.ventas)}</p>
               <p className="text-[11px] text-muted-foreground">esperado {money(fila.ventas_esperadas)}</p></div>
           </div>
@@ -360,7 +360,7 @@ function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: Retur
           </ul>
           {faltan.length > 0 && <p className="text-xs text-warning">Calculada sin: {faltan.map((f) => NOMBRE_FALTANTE[f] ?? f).join(", ")}.</p>}
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Modelos atendidas</p>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Modelos atendidas</p>
             {modelos.isLoading ? <Skeleton className="h-6 w-full" /> : !modelos.data?.length ? <p className="text-xs text-muted-foreground">Sin cruce con modelos ese día.</p> : (
               <ul className="space-y-0.5 text-xs">
                 {modelos.data.map((m) => <li key={m.blu_model_id} className="flex justify-between gap-2"><span className="truncate">{m.model_name ?? `Modelo ${m.blu_model_id}`}</span><span className="tabular-nums font-medium">{money(m.sales)}</span></li>)}

@@ -200,7 +200,7 @@ const CreadorasDashboardContent = () => {
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
+                    <p className="text-xs text-foreground/80 font-semibold">{label}</p>
                     <p className="text-3xl font-bold tabular-nums leading-tight">{count}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">{pct}% del total</p>
                   </div>
@@ -345,14 +345,14 @@ const CreadorasDashboardContent = () => {
                       </div>
                       <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
+                          <p className="text-xs text-muted-foreground">Agencia</p>
                           <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—"}</p>
                         </div>
                         <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
                           {c.status}
                         </Badge>
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Registro</p>
+                          <p className="text-xs text-muted-foreground">Registro</p>
                           <p className="text-xs font-medium whitespace-nowrap">
                             {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: es }) : "—"}
                           </p>
@@ -466,7 +466,7 @@ const CreadorasDashboardContent = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                   {stats.map((s) => (
                     <div key={s.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
                       <p className="text-sm font-medium truncate">{s.value}</p>
                     </div>
                   ))}

@@ -402,7 +402,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           {report.conclusion && <Section icon={Flag} title="Conclusión" collapsible defaultOpen={false}><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.conclusion} fanIndex={fanIndex} /></p></Section>}
           {report.hallazgo_principal && (
             <div className={`rounded-xl border p-4 ${toneBadge[tone]}`}>
-              <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider opacity-80"><Flag className="h-3.5 w-3.5" /> Hallazgo principal</p>
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold opacity-80"><Flag className="h-3.5 w-3.5" /> Hallazgo principal</p>
               <p className="text-sm font-medium leading-relaxed"><Linkified text={report.hallazgo_principal} fanIndex={fanIndex} /></p>
             </div>
           )}

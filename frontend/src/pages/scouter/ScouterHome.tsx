@@ -58,7 +58,7 @@ const StatCard = ({
           <IconEl className="h-4 w-4 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-wider text-foreground/70 font-semibold leading-none">
+          <p className="text-xs text-foreground/70 font-semibold leading-none">
             {label}
           </p>
           <p className="mt-1 text-xl font-bold tabular-nums leading-none">{big}</p>

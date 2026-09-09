@@ -65,7 +65,7 @@ function Kpi({
   return (
     <div className={cn("relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-4 ring-1 ring-white/5 transition-transform", "bg-gradient-to-br to-transparent", tinte)}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
         <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", color)}>
           <Icono className="h-4 w-4 text-white" />
         </span>
@@ -358,7 +358,7 @@ export default function EquipoDashboard() {
                   const e = TURNO_ESTILO[t];
                   return (
                     <div key={t} className={cn("bg-gradient-to-r to-transparent px-4 py-3", e.tinte)}>
-                      <p className={cn("mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide", e.texto)}>
+                      <p className={cn("mb-2 flex items-center gap-1.5 text-xs font-semibold", e.texto)}>
                         <e.icono className="h-3.5 w-3.5" /> {TURNOS[t].label}
                         <span className="font-normal text-muted-foreground">{TURNOS[t].horas}</span>
                         <span className="ml-auto font-normal text-muted-foreground">{gente.length}</span>
@@ -512,8 +512,8 @@ function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPerio
           <p className="flex items-center gap-1.5 truncate text-sm font-medium leading-tight">
             {f.display_name}
             {!f.activo && (
-              <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] font-normal uppercase tracking-wide text-muted-foreground">
-                inactivo
+              <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                Inactivo
               </span>
             )}
           </p>

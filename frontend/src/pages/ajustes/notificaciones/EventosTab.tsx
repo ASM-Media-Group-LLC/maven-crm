@@ -144,7 +144,7 @@ const EventosTab = () => {
           <CardContent className="pt-3">
             <div className="grid gap-1">
               <div className={`${COLUMNAS} px-2`}>
-                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Evento</span>
+                <span className="text-xs font-medium text-muted-foreground">Evento</span>
                 {CANALES.map(({ canal, label, icon: Icon, ayuda }) => (
                   <div key={canal} className="flex items-center justify-center gap-1" title={ayuda}>
                     <Icon className="h-3.5 w-3.5 md:h-3 md:w-3 text-muted-foreground" aria-label={label} />

@@ -363,7 +363,7 @@ const DashboardContent = () => {
           >
             <UserAvatar name={bestCloserQ.data.name} size="lg" ring />
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-500">
+              <div className="text-xs font-extrabold text-amber-500">
                 {t("dashboard.bestCloser", { month: format(new Date(), "MMMM", { locale: es }) })}
               </div>
               <div className="truncate font-display text-lg font-bold">{bestCloserQ.data.name}</div>

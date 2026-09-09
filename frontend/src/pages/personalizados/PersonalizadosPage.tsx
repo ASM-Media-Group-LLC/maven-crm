@@ -210,7 +210,7 @@ export default function PersonalizadosPage() {
                 : "border-border/60 bg-card"
               }`}
             >
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{k.l}</p>
+              <p className="text-xs text-muted-foreground">{k.l}</p>
               <p className={`text-lg font-semibold leading-tight ${k.nivel === "vencido" ? "text-red-500" : k.nivel === "atencion" ? "text-amber-500" : ""}`}>{k.v}</p>
             </div>
           ))}

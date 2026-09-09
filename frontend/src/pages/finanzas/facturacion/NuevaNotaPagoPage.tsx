@@ -195,7 +195,7 @@ export default function NuevaNotaPagoPage() {
             <div className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
               {/* Preview header */}
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 shrink-0">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vista previa</p>
+                <p className="text-xs font-medium text-muted-foreground">Vista previa</p>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}>
                     <Minus className="h-3.5 w-3.5" />
