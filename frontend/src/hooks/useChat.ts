@@ -19,6 +19,7 @@ import {
 import { profileName } from "@/pages/messenger/utils";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
+import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -42,22 +43,43 @@ export function useChat() {
   // que al cambiar de cuenta vuelva a considerarse primera vez.
   const cargadoParaRef = useRef<string | null>(null);
 
-  const loadProfiles = useCallback(async () => {
-    const { data } = await supabase
+  // DEVUELVE el mapa además de guardarlo, y esto NO es un detalle: `setProfiles`
+  // solo actualiza `profilesRef` en el render siguiente, pero el `.then()` que
+  // encadena loadConversations corre en un microtask ANTES de ese render. Quien
+  // leyera el ref ahí encontraba `{}` y armaba la lista sin un solo perfil: todos
+  // los DMs llamados "Usuario" con avatar "U" (reportado por Grace, 09/09).
+  // Por eso se pisa el ref acá mismo y además se pasa el mapa por parámetro.
+  const loadProfiles = useCallback(async (): Promise<Record<string, UserProfile> | null> => {
+    const { data, error } = await supabase
       .from("profiles")
       // deleted_at viene, pero acá NO se filtra: este mapa es el que le pone
       // nombre y foto a los mensajes de quien ya salió del equipo. Filtrar acá
       // devolvería los mensajes huérfanos. Los SELECTORES filtran, no el mapa.
       .select("id, full_name, avatar_url, avatar_seed, whatsapp_push_name, deleted_at");
-    if (data) {
-      const map: Record<string, UserProfile> = {};
-      data.forEach((p: any) => { map[p.id] = p; });
-      setProfiles(map);
+    // Antes el error se comía en silencio y el mapa quedaba vacío PARA TODA LA
+    // SESIÓN: loadProfiles se llamaba una sola vez y ni el poll de 20s ni el
+    // realtime lo reintentaban, solo recargaban conversaciones.
+    if (error || !data) {
+      console.error("[useChat] no pude cargar los perfiles:", error?.message ?? "sin datos");
+      return null;
     }
+    const map: Record<string, UserProfile> = {};
+    data.forEach((p: any) => { map[p.id] = p; });
+    profilesRef.current = map;
+    setProfiles(map);
+    return map;
   }, []);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (perfilesRecienCargados?: Record<string, UserProfile>) => {
     if (!user) return;
+
+    // Con qué mapa se arma la lista: el recién cargado gana sobre el ref, y si
+    // está vacío se reintenta. El por qué está en perfilesGarantizados.
+    const perfiles = await perfilesGarantizados(
+      perfilesRecienCargados,
+      profilesRef.current,
+      loadProfiles,
+    );
 
     // `loading` SOLO en la primera carga de esta sesión. Antes se prendía en
     // cada llamada, y como hay un poll de 20s (+ visibilitychange + reconexión
@@ -137,7 +159,7 @@ export function useChat() {
             (p: any) => p.user_id !== user.id
           );
           if (otherParticipant) {
-            displayName = profileName(profilesRef.current[otherParticipant.user_id]);
+            displayName = profileName(perfiles[otherParticipant.user_id]);
           }
         }
 
@@ -145,7 +167,7 @@ export function useChat() {
           ...conv,
           participants: convParticipants.map((p: any) => ({
             ...p,
-            profile: profilesRef.current[p.user_id],
+            profile: perfiles[p.user_id],
           })),
           lastMessage,
           unreadCount: unreadMap[conv.id] || 0,
@@ -172,10 +194,12 @@ export function useChat() {
     } finally {
       if (primeraVez) setLoading(false);
     }
-  }, [user]);
+    // loadProfiles es estable (useCallback sin deps): va acá porque ahora se
+    // usa adentro para reintentar cuando el mapa quedó vacío.
+  }, [user, loadProfiles]);
 
   useEffect(() => {
-    loadProfiles().then(() => loadConversations());
+    loadProfiles().then((perfiles) => loadConversations(perfiles ?? undefined));
   }, [loadProfiles, loadConversations]);
 
   // Realtime subscription for conversation sync
