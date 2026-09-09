@@ -97,8 +97,8 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
         open={!!editRole}
         onOpenChange={(o) => !o && setEditRole(null)}
         role={editRole}
-        onConfirm={(id, name, description, aiDailyQuota, tier, level) => {
-          updateRole({ id, name, description, ai_daily_quota: aiDailyQuota, tier, level }, { onSuccess: () => setEditRole(null) });
+        onConfirm={(id, name, description, aiDailyQuota, tier) => {
+          updateRole({ id, name, description, ai_daily_quota: aiDailyQuota, tier }, { onSuccess: () => setEditRole(null) });
         }}
         isLoading={isUpdating}
       />
