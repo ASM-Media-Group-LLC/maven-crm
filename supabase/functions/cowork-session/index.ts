@@ -408,7 +408,16 @@ serve(async (req) => {
           // lista global del landing, sin pedirle el código al coordinador).
           const { data: adminRole } = await admin.from("user_roles")
             .select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
-          if (!adminRole) return err(req, "El enlace de host no es válido o ya venció. Pídele uno nuevo a quien creó la sesión.", 403);
+          // …o quien tenga ALCANCE sobre esta sesión por "Permisos de datos" de
+          // Cowork: "todos", o "subordinados" si la creó alguien de nivel inferior
+          // (RPC cowork_puede_supervisar, 08/09). Antes veían la sesión en el
+          // landing pero quedaban en "Solo lectura". Incógnito sigue solo admin.
+          let supervisa = false;
+          if (!adminRole) {
+            const { data: alcance } = await admin.rpc("cowork_puede_supervisar", { _user_id: userId, _session_id: sessionId });
+            supervisa = alcance === true;
+          }
+          if (!adminRole && !supervisa) return err(req, "El enlace de host no es válido o ya venció. Pídele uno nuevo a quien creó la sesión.", 403);
         }
         memberRole = "host";
       }
