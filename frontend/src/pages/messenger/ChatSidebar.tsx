@@ -1,8 +1,8 @@
 import InstalarMaven from "@/components/pwa/InstalarMaven";
 import { esTactil } from "@/lib/plataformaPwa";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil, Volume2, VolumeX } from "lucide-react";
-import { useChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
+import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
+import { BotonSilenciarCanal } from "@/components/BotonSilenciarCanal";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -206,7 +206,7 @@ export default function ChatSidebar({
             <StatusPicker />
           </div>
           <div className="flex items-center gap-0.5">
-            <BotonSilenciarMessenger />
+            <BotonSilenciarCanal channel="messenger" className="h-9 w-9 sm:h-8 sm:w-8 hover:bg-primary/8" />
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title="Nuevo">
@@ -726,29 +726,5 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         )}
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-/** Silenciar el SONIDO de las notificaciones del Messenger, por dispositivo
- *  (misma preferencia que antes vivía en el altavoz del ítem del menú; Jhon
- *  lo pidió acá, junto al "+", 09/09/2026). Rojo = silenciado. */
-function BotonSilenciarMessenger() {
-  const { muted, toggle } = useChannelSoundMuted("messenger");
-  const label = muted ? "Activar sonido de notificaciones" : "Silenciar sonido de notificaciones";
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={toggle}
-      title={label}
-      aria-label={label}
-      aria-pressed={muted}
-      className={cn(
-        "h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8",
-        muted ? "text-destructive hover:text-destructive" : "text-muted-foreground",
-      )}
-    >
-      {muted ? <VolumeX className="h-[18px] w-[18px]" /> : <Volume2 className="h-[18px] w-[18px]" />}
-    </Button>
   );
 }

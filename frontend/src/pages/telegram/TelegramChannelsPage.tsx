@@ -125,7 +125,7 @@ const TelegramChannelsPage = () => {
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Telegram · Cuentas</h1>
           <p className="text-xs text-muted-foreground">
-            Líneas del canal Telegram — vinculación y auto-asignación. <span className="text-sky-500 font-medium">Beta</span>
+            Líneas del canal Telegram — vinculación y auto-asignación.
           </p>
         </div>
         {canAccess("Telegram", "Bandeja") && (
