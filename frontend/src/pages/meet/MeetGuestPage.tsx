@@ -26,6 +26,10 @@ export default function MeetGuestPage() {
   const { status, error, roomName, guestName, call, knock, getToken } = useMeetGuest(code);
   const [name, setName] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
+  // El invitado colgó. Antes esto era `window.location.reload()`: la página se
+  // recargaba, el invitado seguía admitido y volvía DERECHO a la llamada, así
+  // que colgar se sentía como un refresco que no hacía nada (Jhon, 09/09).
+  const [sali, setSali] = useState(false);
 
   useEffect(() => {
     if (code.length !== 6) {
@@ -93,7 +97,7 @@ export default function MeetGuestPage() {
 
   // Admitido: la llamada es la misma vista que usa todo Maven, con el token que
   // emitió la edge tras la admisión (sin permisos de moderación).
-  if (status === "admitted" && call) {
+  if (status === "admitted" && call && !sali) {
     return (
       <div className="h-screen w-screen bg-background">
         {/* Igual que en la videollamada: esta pestaña es solo la reunión, así
@@ -108,7 +112,7 @@ export default function MeetGuestPage() {
             getToken={getToken}
             initialMicOn={false}
             initialCamOn={false}
-            onLeave={() => window.location.reload()}
+            onLeave={() => setSali(true)}
           />
         </LlamadaEnVentanaFlotante>
       </div>
@@ -136,6 +140,25 @@ export default function MeetGuestPage() {
         <p className="text-sm text-muted-foreground text-center">
           Ya no se puede entrar con este enlace.
         </p>
+      </Shell>
+    );
+  }
+
+  if (sali) {
+    return (
+      <Shell>
+        <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
+          <DoorClosed className="h-7 w-7 text-muted-foreground" />
+        </div>
+        <p className="text-foreground font-semibold text-center">Saliste de la reunión</p>
+        <p className="text-sm text-muted-foreground text-center">
+          Ya podés cerrar esta pestaña.
+        </p>
+        {/* Sigue admitido, así que volver no exige golpear de nuevo ni que
+            alguien lo apruebe otra vez. */}
+        <Button className="mt-1 w-full" onClick={() => setSali(false)}>
+          Volver a entrar
+        </Button>
       </Shell>
     );
   }
