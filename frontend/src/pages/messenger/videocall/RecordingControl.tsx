@@ -38,11 +38,32 @@ interface Perfil { id: string; full_name: string | null }
 
 const claveSesion = (roomName: string) => `maven_rec_${roomName}`;
 
-function leerMiGrabacion(roomName: string): { id: string; t: number } | null {
+export function leerMiGrabacion(roomName: string): { id: string; t: number } | null {
   try {
     const raw = sessionStorage.getItem(claveSesion(roomName));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
+}
+
+/** Parar la grabación propia al irse (botón Salir o cerrar la pestaña). Va
+ *  con `keepalive` para que el navegador termine el POST aunque la página ya
+ *  se esté descargando; `invokeRecordings` normal moriría con la pestaña. */
+export async function detenerAlSalir(roomName: string, recordingId: string): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    sessionStorage.removeItem(claveSesion(roomName));
+    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recordings`, {
+      method: "POST",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ action: "stop", recording_id: recordingId, room_name: roomName, recipients: [] }),
+    });
+  } catch { /* el barrido del servidor la cierra igual a los 5 min */ }
 }
 
 export default function RecordingControl({ room, roomName, source, title, canControl, compact }: Props) {
@@ -62,6 +83,18 @@ export default function RecordingControl({ room, roomName, source, title, canCon
   }, [room]);
 
   // Cronómetro solo si la inicié yo (soy el único que sabe CUÁNDO arrancó).
+  // Cerrar la pestaña con la grabación propia andando también la para.
+  // `pagehide` corre en escritorio y en el teléfono (beforeunload no siempre).
+  useEffect(() => {
+    const alIrse = () => {
+      const mia = miGrabacionRef.current;
+      if (!mia || !isRecording) return;
+      void detenerAlSalir(roomName, mia.id);
+    };
+    window.addEventListener("pagehide", alIrse);
+    return () => window.removeEventListener("pagehide", alIrse);
+  }, [isRecording, roomName]);
+
   useEffect(() => {
     if (!isRecording || !miGrabacionRef.current) { setElapsed(null); return; }
     const t0 = miGrabacionRef.current.t;

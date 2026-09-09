@@ -9,7 +9,7 @@ import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
-import RecordingControl from "./RecordingControl";
+import RecordingControl, { leerMiGrabacion, detenerAlSalir } from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
@@ -290,7 +290,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return () => window.removeEventListener("beforeunload", h);
   }, [lk]);
 
-  const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada"); }, [lk, onLeave, suppressLeaveToast]);
+  const handleLeave = useCallback(() => {
+    // Si ESTA persona está grabando, no se va sin parar: la grabación se
+    // detiene y queda guardada (Jhon, 09/09/2026: tres grabaciones quedaron
+    // días "En curso" porque quien grabó se fue). El servidor la cortaría
+    // igual a los 5 min sin el iniciador; esto la deja limpia al instante y
+    // le avisa a quien se va.
+    const mia = leerMiGrabacion(roomName);
+    if (mia) {
+      const ok = window.confirm("Estás grabando esta reunión. Si sales, la grabación se detiene y queda guardada en Grabaciones. ¿Salir?");
+      if (!ok) return;
+      void detenerAlSalir(roomName, mia.id);
+    }
+    lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada");
+  }, [lk, onLeave, suppressLeaveToast, roomName]);
 
   // Una acción de moderación puede volver con 403 del servidor (no eres
   // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
