@@ -19,7 +19,12 @@ import { toast } from "sonner";
 import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
-import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
+import type { BackgroundEffect } from "@/lib/fondoDeLlamada";
+import {
+  esBlur, radioDeBlur, isTemplateBackground, isCustomBackground,
+  resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
+} from "@/lib/fondoDeLlamada";
+import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
@@ -207,18 +212,6 @@ const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
 // Prevent burst camera-refresh operations from stacking expensive media reconfigurations.
 const VIDEO_SWITCH_MIN_INTERVAL_MS = 420;
 
-function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "blur" && !effect.startsWith("custom:");
-}
-
-function isCustomBackground(effect: BackgroundEffect) {
-  return typeof effect === "string" && effect.startsWith("custom:");
-}
-
-function getCustomBackgroundUrl(effect: BackgroundEffect) {
-  return effect.replace(/^custom:/, "");
-}
-
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -243,15 +236,6 @@ function scheduleWhenIdle(cb: () => void, delay = 100) {
     requestIdleCallback(cb, { timeout: delay + 500 });
   } else {
     setTimeout(cb, delay);
-  }
-}
-
-function isReloadNavigation() {
-  try {
-    const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    return navigationEntry?.type === "reload";
-  } catch {
-    return false;
   }
 }
 
@@ -341,6 +325,10 @@ export function useLiveKit() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  // El fondo al que el hook tuvo que caerse por su cuenta (hoy solo "none",
+  // cuando la imagen ya no existe). La UI dibuja su propio estado, así que sin
+  // esto el botón se quedaba encendido sobre una cámara sin fondo.
+  const [fondoCorregido, setFondoCorregido] = useState<BackgroundEffect | null>(null);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -665,26 +653,87 @@ export function useLiveKit() {
 
       if (opId !== bgApplyOpRef.current) return false;
 
-      if (effect === "blur") {
+      if (esBlur(effect)) {
+        // Dos niveles (09/09/2026): el radio sale de `radioDeBlur`, un solo
+        // lugar compartido con la vista previa del lobby. Antes estaba
+        // hardcodeado acá Y allá, así que cualquier cambio hacía que el lobby
+        // mintiera respecto a la llamada.
         await withTimeout(
-          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })),
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: radioDeBlur(effect) })),
           BACKGROUND_SWITCH_TIMEOUT_MS,
           "bg-blur",
         );
-      } else if (isTemplateBackground(effect)) {
-        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
-        const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
+      } else if (isTemplateBackground(effect) || isCustomBackground(effect)) {
+        // Un solo resolvedor para plantillas y para las imágenes propias: las
+        // propias viven en IndexedDB y su URL se recrea por documento.
+        // ⚠️ CON TIMEOUT: es el único await de este camino que sale del
+        // navegador, y este camino corre DENTRO de connect(). Un pedido de
+        // IndexedDB que no dispara ni onsuccess ni onerror (pasa en WebKit)
+        // dejaría connect() sin terminar: sin desbloqueo de audio, sin sync de
+        // participantes y con `connectingRef` trabado en true para siempre.
+        const imagen = await withTimeout(
+          resolverImagenDeFondo(effect, window.location.origin),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-resolver",
+        ).catch((): ImagenDeFondo => ({ falta: false }));
 
-        if (!selectedTemplate) return false;
+        // ⚠️ Re-chequeo OBLIGATORIO tras el await: si mientras se resolvía la
+        // persona eligió otro fondo, seguir acá pisaría su elección nueva (y la
+        // rama de abajo hasta le borraría la preferencia).
+        if (opId !== bgApplyOpRef.current) return false;
 
-        // Use low-res image for the ML processor (480px is enough for segmentation)
-        const processorUrl = `${window.location.origin}${selectedTemplate.lowSrc || selectedTemplate.src}`;
+        const processorUrl = "url" in imagen ? imagen.url : null;
+
+        if (!processorUrl) {
+          // Dos casos MUY distintos:
+          //  · `falta` → la imagen ya no existe (plantilla renombrada, fondo
+          //    propio borrado en otra pestaña). Se cae a "sin efecto" y se
+          //    limpia lo guardado.
+          //  · si no → no se pudo averiguar (almacenamiento con un hipo). NO se
+          //    toca la preferencia: borrarla por un fallo pasajero es
+          //    exactamente el problema que este cambio vino a resolver.
+          // En los dos casos hay que AVISAR: sin aviso la persona cree que
+          // tiene fondo y está publicando su habitación real.
+          const desaparecio = "falta" in imagen && imagen.falta === true;
+          console.warn("[LiveKit] No se pudo poner el fondo:", effect, desaparecio ? "(ya no existe)" : "(no se pudo leer)");
+          // La UI se corrige en LOS DOS casos: lo que la persona necesita saber
+          // es que AHORA no tiene fondo, y el interruptor encendido sobre una
+          // cámara sin fondo es el error que más caro sale acá.
+          // Lo que se decide distinto es la PREFERENCIA GUARDADA: solo se borra
+          // si la imagen de verdad no está.
+          setFondoCorregido("none");
+          if (desaparecio) {
+            guardarFondo("none");
+            backgroundEffectRef.current = "none";
+            bgRequestedEffectRef.current = "none";
+            toast.error("Tu fondo ya no está disponible", {
+              description: "Se quitó el efecto y tu cámara sale sin fondo. Elegí otro cuando quieras.",
+              id: "fondo-perdido",
+            });
+          } else {
+            toast.error("No se pudo poner tu fondo", {
+              description: "Tu cámara está saliendo sin fondo. Volvé a elegirlo para reintentar.",
+              id: "fondo-perdido",
+            });
+          }
+          bgLastAppliedEffectRef.current = "none";
+          if (processor.switchTo) {
+            await withTimeout(
+              Promise.resolve(processor.switchTo({ mode: "disabled" })),
+              BACKGROUND_SWITCH_TIMEOUT_MS,
+              "bg-disable",
+            ).catch(() => { /* ya está en disabled o murió; da igual */ });
+          }
+          refreshParticipants();
+          return true;
+        }
+
         if (!preloadedBackgroundsRef.current.has(processorUrl)) {
           await new Promise<void>((resolve, reject) => {
             const image = new Image();
             image.src = processorUrl;
             image.onload = () => resolve();
-            image.onerror = () => reject(new Error("template-load-failed"));
+            image.onerror = () => reject(new Error("bg-image-load-failed"));
           });
           preloadedBackgroundsRef.current.add(processorUrl);
         }
@@ -699,31 +748,7 @@ export function useLiveKit() {
             }),
           ),
           BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-template",
-        );
-      } else if (isCustomBackground(effect)) {
-        const customUrl = getCustomBackgroundUrl(effect);
-        if (!preloadedBackgroundsRef.current.has(customUrl)) {
-          await new Promise<void>((resolve, reject) => {
-            const image = new Image();
-            image.src = customUrl;
-            image.onload = () => resolve();
-            image.onerror = () => reject(new Error("custom-bg-load-failed"));
-          });
-          preloadedBackgroundsRef.current.add(customUrl);
-        }
-
-        if (opId !== bgApplyOpRef.current) return false;
-
-        await withTimeout(
-          Promise.resolve(
-            processor.switchTo({
-              mode: "virtual-background",
-              imagePath: customUrl,
-            }),
-          ),
-          BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-custom",
+          "bg-imagen",
         );
       } else {
         return false;
@@ -757,6 +782,20 @@ export function useLiveKit() {
       // Critical stability guard: never force camera restart when background ML fails.
       // Keep camera stream alive and disable only automatic background re-apply.
       skipAutoBackgroundRestoreRef.current = effect !== "none";
+
+      // Y AVISAR. Este camino apaga los reintentos automáticos, así que la
+      // cámara se queda publicando sin fondo hasta que la persona toque algo.
+      // Sin esto el botón quedaba encendido sobre la habitación real: mismo
+      // problema que el fondo que ya no existe, distinta causa. La preferencia
+      // NO se borra —el fondo sigue siendo válido, falló el procesador—, solo
+      // se corrige lo que la interfaz muestra.
+      if (effect !== "none") {
+        setFondoCorregido("none");
+        toast.error("No se pudo aplicar tu fondo", {
+          description: "Tu cámara está saliendo sin fondo. Volvé a elegirlo para reintentar.",
+          id: "fondo-fallo",
+        });
+      }
       refreshParticipants();
 
       return false;
@@ -974,11 +1013,30 @@ export function useLiveKit() {
         videoDeviceId: options.videoDeviceId,
         audioOutputDeviceId: options.audioOutputDeviceId,
       };
-      backgroundEffectRef.current = options.backgroundEffect || "none";
+      // Si quien llama no dice nada (Cowork en sus cuatro caminos, el invitado
+      // de Meet), vale lo último que la persona eligió. Antes caía a "none" y de
+      // ahí el reporte "el fondo que escoge no se guarda": en Cowork no había
+      // NINGUNA forma de que volviera.
+      backgroundEffectRef.current = options.backgroundEffect || leerFondoGuardado();
       bgInitialApplyDoneRef.current = false;
-      // On page reload with active background, skip auto-restore to keep startup smooth.
-      skipAutoBackgroundRestoreRef.current =
-        isReloadNavigation() && backgroundEffectRef.current !== "none";
+      // ⚠️ Acá antes se apagaba el fondo PARA SIEMPRE cuando la navegación era
+      // una recarga (se miraba `performance` para saber si el documento venía
+      // de un F5).
+      // Con el fondo ahora guardado eso dejaba el interruptor mintiendo — la UI
+      // decía "difuminado" y el video salía limpio, el mismo bug que ya tuvo el
+      // botón de cancelación de ruido.
+      //
+      // Se saca, y esto es POR QUÉ es seguro (no por el requestIdleCallback:
+      // `scheduleBackgroundApply` solo se llama en la rama donde el efecto ya es
+      // "none", así que ahí retorna en su primera línea): el modelo ML se carga
+      // ÚNICAMENTE dentro del bloque `if (shouldEnableCam)` de más abajo, y las
+      // superficies que se conectan encima del arranque de la página —los cuatro
+      // montajes de Cowork y el invitado de Meet— pasan TODAS
+      // `initialCamOn: false`. La única que entra con cámara es la videollamada,
+      // y ahí el connect sale de un clic en "Unirse", mucho después del load.
+      // Si algún día alguna de esas superficies arranca con la cámara prendida,
+      // hay que volver a diferir el fondo acá.
+      skipAutoBackgroundRestoreRef.current = false;
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
@@ -1721,6 +1779,11 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
+    // Se guarda ACÁ, no solo en la UI: así vale para las tres superficies y
+    // sobrevive a cerrar la pestaña. Mismo lugar donde el micro guarda la
+    // preferencia de cancelación de ruido.
+    guardarFondo(effect);
+    setFondoCorregido(null);
     // Manual user action always re-enables background processing path.
     skipAutoBackgroundRestoreRef.current = false;
 
@@ -1933,6 +1996,7 @@ export function useLiveKit() {
     setCohost,
     getRoom,
     setBackgroundEffect,
+    fondoCorregido,
     clearUnreadChat,
     switchAudioInput,
     switchAudioOutput,

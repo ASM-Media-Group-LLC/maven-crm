@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
   ChevronDown, Monitor, Volume2, Loader2, Settings,
@@ -7,7 +8,12 @@ import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-cli
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
-import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "./BackgroundSelector";
+import BackgroundSelector from "./BackgroundSelector";
+import {
+  BACKGROUND_TEMPLATES, esBlur, radioDeBlur, isCustomBackground,
+  resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
+  type BackgroundEffect, type ImagenDeFondo,
+} from "@/lib/fondoDeLlamada";
 import QuienesEstan from "./QuienesEstan";
 import type { PersonaEnSala } from "@/hooks/useQuienesEstanEnLaSala";
 
@@ -67,7 +73,14 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
+  // Arranca con lo último elegido (09/09/2026). Inicializador perezoso: leer
+  // localStorage en cada render sería trabajo al vicio, y bajarlo por prop
+  // haría reconectar la sala en la vista de llamada.
+  const [bgEffect, setBgEffectEstado] = useState<BackgroundEffect>(() => leerFondoGuardado());
+  const setBgEffect = useCallback((e: BackgroundEffect) => {
+    setBgEffectEstado(e);
+    guardarFondo(e);
+  }, []);
   
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
@@ -144,22 +157,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   }, []);
 
   // ── Background helpers ──────────────────────────────────────
-  const preloadTemplate = useCallback(async (effect: BackgroundEffect) => {
-    if (!isTemplateBackground(effect)) return;
-    const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-    if (!tpl) return;
-    // Use low-res version for processor (480px is sufficient for ML segmentation)
-    const templateUrl = `${window.location.origin}${tpl.lowSrc || tpl.src}`;
-    if (preloadedRef.current.has(templateUrl)) return;
-    await new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.src = templateUrl;
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("template-load-failed"));
-    });
-    preloadedRef.current.add(templateUrl);
-  }, []);
-
   const applyBackgroundToTrack = useCallback(async (track: LocalVideoTrack, effect: BackgroundEffect) => {
     if (!mountedRef.current) return false;
     if (effect !== "none" && !supportsBackgroundProcessors()) {
@@ -188,29 +185,44 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         bgAttachedTrackRef.current = track;
       }
       if (opId !== bgOpRef.current) return false;
-      if (isTemplateBackground(effect)) await preloadTemplate(effect);
-      if (isCustomBackground(effect)) {
-        const customUrl = getCustomBackgroundUrl(effect);
-        if (!preloadedRef.current.has(customUrl)) {
+      if (esBlur(effect)) {
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: radioDeBlur(effect) })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
+      } else {
+        // Plantillas y fondos propios por el MISMO resolvedor que usa la
+        // llamada: si acá se resolviera distinto, la vista previa mentiría.
+        // CON TIMEOUT, igual que en la llamada: un pedido de IndexedDB que no
+        // dispara ni onsuccess ni onerror dejaría esta cola muerta para toda la
+        // sesión, y la vista previa tapada por el velo de "preparando".
+        const imagen = await withTimeout(
+          resolverImagenDeFondo(effect, window.location.origin),
+          PREJOIN_BG_SWITCH_TIMEOUT_MS,
+          "prejoin-bg-resolver",
+        ).catch((): ImagenDeFondo => ({ falta: false }));
+        // ⚠️ Re-chequeo tras el await: si la persona ya eligió otra cosa, seguir
+        // acá le pisaría la elección nueva y hasta le borraría la preferencia.
+        if (opId !== bgOpRef.current) return false;
+        const urlImagen = "url" in imagen ? imagen.url : null;
+        if (!urlImagen) {
+          // Solo si la imagen DE VERDAD no está se limpia lo guardado. Si el
+          // almacenamiento tuvo un hipo, la preferencia se respeta.
+          if ("falta" in imagen && imagen.falta) {
+            guardarFondo("none");
+            setBgEffectEstado("none");
+            toast.error("Tu fondo ya no está disponible", { description: "Elegí otro cuando quieras.", id: "fondo-perdido" });
+          }
+          return false;
+        }
+        if (!preloadedRef.current.has(urlImagen)) {
           await new Promise<void>((resolve, reject) => {
             const img = new Image();
-            img.src = customUrl;
+            img.src = urlImagen;
             img.onload = () => resolve();
-            img.onerror = () => reject(new Error("custom-bg-load-failed"));
+            img.onerror = () => reject(new Error("bg-image-load-failed"));
           });
-          preloadedRef.current.add(customUrl);
+          preloadedRef.current.add(urlImagen);
         }
-      }
-      if (opId !== bgOpRef.current) return false;
-      if (effect === "blur") {
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
-      } else if (isCustomBackground(effect)) {
-        const customUrl = getCustomBackgroundUrl(effect);
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: customUrl })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-custom");
-      } else {
-        const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-        if (!tpl) return false;
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: `${window.location.origin}${tpl.lowSrc || tpl.src}` })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-template");
+        if (opId !== bgOpRef.current) return false;
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: urlImagen })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-imagen");
       }
       if (opId !== bgOpRef.current) return false;
       bgFailureCooldownUntilRef.current = 0;
@@ -231,7 +243,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setBackgroundPreviewUnsupported(effect !== "none");
       return false;
     }
-  }, [disposeBackgroundProcessor, preloadTemplate]);
+  }, [disposeBackgroundProcessor]);
 
   const queueBackgroundApply = useCallback((effect: BackgroundEffect) => {
     bgRequestedEffectRef.current = effect;
@@ -395,6 +407,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const selectedBackgroundLabel =
     bgEffect === "none" ? "Sin fondo virtual"
     : bgEffect === "blur" ? "Difuminar fondo"
+    : bgEffect === "blur-strong" ? "Difuminar más el fondo"
+    : isCustomBackground(bgEffect) ? "Tu fondo"
     : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;

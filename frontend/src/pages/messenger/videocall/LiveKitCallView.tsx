@@ -22,7 +22,7 @@ import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWat
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
-import { BackgroundEffect } from "./BackgroundSelector";
+import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
 
@@ -226,7 +226,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
+  // Si quien monta no dice nada —Cowork en sus cuatro caminos, el invitado de
+  // Meet—, vale lo último que la persona eligió.
+  // ⚠️ Inicializador PEREZOSO a propósito: `initialBackgroundEffect` está en las
+  // dependencias del efecto de conexión, cuyo cleanup desconecta la sala. Si
+  // esto llegara por un prop que cambia después del primer render, cada lectura
+  // de la preferencia reconectaría la llamada entera.
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(
+    () => (initialBackgroundEffect && initialBackgroundEffect !== "none" ? initialBackgroundEffect : leerFondoGuardado()),
+  );
+  // El fondo que se le pasa a `connect`, siempre el vigente.
+  // ⚠️ Va por REF, igual que displayName más abajo: `bgEffect` cambia cada vez
+  // que la persona toca un fondo, y lo que entra al efecto de conexión está en
+  // su array de dependencias — como estado, cada cambio de fondo reconectaría
+  // la sala entera. Al reconectar por otra razón (cambio de sala) se usa la
+  // elección de ese momento, no la del primer render.
+  // Y NO sirve pasar `initialBackgroundEffect`: su default es "none", que es
+  // truthy, así que el `|| leerFondoGuardado()` del hook nunca caía y en Cowork
+  // el fondo guardado no se aplicaba nunca.
+  const bgInicialRef = useRef<BackgroundEffect>(bgEffect);
+  bgInicialRef.current = bgEffect;
   const [audioInputId, setAudioInputId] = useState(initialAudioDeviceId);
   const [audioOutputId, setAudioOutputId] = useState(initialAudioOutputDeviceId);
   const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
@@ -236,8 +255,28 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   useEffect(() => { if (chatOpen && lk.unreadChatCount > 0) lk.clearUnreadChat(); }, [chatOpen, lk.unreadChatCount, lk.clearUnreadChat]);
 
+  // Si el hook tuvo que caerse a "sin efecto" —la imagen guardada ya no
+  // existe—, la UI tiene que seguirlo. Sin esto el botón quedaba encendido
+  // sobre una cámara que estaba publicando la habitación real.
+  useEffect(() => {
+    if (lk.fondoCorregido && lk.fondoCorregido !== bgEffect) setBgEffect(lk.fondoCorregido);
+    // `bgEffect` a propósito FUERA de las dependencias: acá solo interesa
+    // reaccionar a la corrección del hook, no re-evaluar en cada cambio de
+    // fondo (eso sería una pelea entre los dos estados).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lk.fondoCorregido]);
+
+  // El último nivel de difuminado que la persona eligió, para que el botón
+  // rápido lo devuelva igual. Antes apagaba "Difuminar más" y lo volvía a
+  // prender como normal, sin decir nada.
+  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  if (esBlur(bgEffect)) ultimoBlurRef.current = bgEffect;
+
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);
+    // Se guarda SIEMPRE, conectado o no: si solo lo guardara el hook, elegir
+    // fondo antes de que la sala termine de conectar no dejaría rastro.
+    guardarFondo(effect);
     if (lk.connectionState === ConnectionState.Connected) void lk.setBackgroundEffect(effect);
   }, [lk.connectionState, lk.setBackgroundEffect]);
 
@@ -259,7 +298,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           audioDeviceId: initialAudioDeviceId,
           videoDeviceId: initialVideoDeviceId,
           audioOutputDeviceId: initialAudioOutputDeviceId,
-          backgroundEffect: initialBackgroundEffect,
+          backgroundEffect: bgInicialRef.current,
           tokenProvider: getTokenRef.current ? () => getTokenRef.current!() : undefined,
         });
       } catch (err: any) {
@@ -792,7 +831,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         tactil={tactil}
         onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
-        onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
+        onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />

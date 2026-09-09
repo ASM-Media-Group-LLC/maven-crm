@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { fijarDuenoDeFondos } from "@/lib/fondoDeLlamada";
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        // El fondo virtual y las imágenes propias se guardan POR PERSONA: un
+        // fondo propio es una foto del cuarto de alguien y las máquinas se
+        // comparten entre turnos.
+        fijarDuenoDeFondos(session?.user?.id);
         setLoading(false);
       }
     );
@@ -37,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      fijarDuenoDeFondos(session?.user?.id);
       setLoading(false);
     });
 

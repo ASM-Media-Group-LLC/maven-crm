@@ -1,0 +1,375 @@
+// El fondo virtual de las llamadas: qué fondos hay, cuánto difumina cada nivel
+// y —lo nuevo (09/09/2026)— que la elección de cada persona SOBREVIVA.
+//
+// Antes: la elección vivía en un `useState` de la vista de llamada y en otro del
+// lobby, los dos arrancando en "none". Salías de la llamada y se perdía; la
+// imagen que subías era un `URL.createObjectURL`, o sea un `blob:` que muere al
+// recargar la pestaña. Reportado por Jhon: "el fondo que escoge no se guarda,
+// cuando ponen una imagen personalizada tampoco se guarda".
+//
+// Ahora: la elección va a localStorage y las imágenes propias a IndexedDB (los
+// BYTES, no una URL). Al entrar a cualquier llamada —Meet, Cowork, videollamada
+// del Messenger, invitado— se arranca con lo último que la persona eligió.
+//
+// Este módulo NO importa React a propósito: lo usan el hook `useLiveKit`, el
+// lobby y el selector. Es también el dueño del tipo y de la lista de plantillas
+// (antes vivían en `BackgroundSelector.tsx`, que ahora los re-exporta para no
+// tocar a los seis archivos que ya los importaban de ahí).
+
+/** "none" | "blur" | "blur-strong" | "<id de plantilla>" | "custom:<id>" */
+export type BackgroundEffect = "none" | "blur" | "blur-strong" | string;
+
+export const BACKGROUND_TEMPLATES = [
+  { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg", lowSrc: "/backgrounds/low/bg-office.jpg" },
+  { id: "tpl-bookshelf", label: "Biblioteca", src: "/backgrounds/bg-bookshelf.jpg", lowSrc: "/backgrounds/low/bg-bookshelf.jpg" },
+  { id: "tpl-beach", label: "Playa", src: "/backgrounds/bg-beach.jpg", lowSrc: "/backgrounds/low/bg-beach.jpg" },
+  { id: "tpl-mountains", label: "Montañas", src: "/backgrounds/bg-mountains.jpg", lowSrc: "/backgrounds/low/bg-mountains.jpg" },
+  { id: "tpl-cafe", label: "Café", src: "/backgrounds/bg-cafe.jpg", lowSrc: "/backgrounds/low/bg-cafe.jpg" },
+  { id: "tpl-livingroom", label: "Sala", src: "/backgrounds/bg-livingroom.jpg", lowSrc: "/backgrounds/low/bg-livingroom.jpg" },
+  { id: "tpl-forest", label: "Bosque", src: "/backgrounds/bg-forest.jpg", lowSrc: "/backgrounds/low/bg-forest.jpg" },
+  { id: "tpl-abstract", label: "Abstracto", src: "/backgrounds/bg-abstract.jpg", lowSrc: "/backgrounds/low/bg-abstract.jpg" },
+];
+
+// ── Niveles de difuminado ────────────────────────────────────────────────────
+//
+// DOS niveles, como Google Meet (pedido de Jhon, 09/09): el de siempre y uno
+// más fuerte. Los números salen de leer el shader de `@livekit/track-processors`
+// 0.7.2, no de tantear:
+//
+//   · El blur corre sobre una textura a 1/4 de resolución (`downsampleFactor
+//     = 4`), así que el radio que se pasa se divide por 4 antes del shader.
+//   · El shader clampa las muestras en 16: `min(16, ceil(radio/4))`. Pasado 64
+//     la ventana ya no crece y solo se aplanan los pesos (de 64 a 200 el
+//     desenfoque efectivo pasa de ~35 px a ~38 px): 64 es el máximo ÚTIL.
+//   · El bucle recorre -16..16 pero saltea el `texture()` fuera del radio
+//     (`if (abs(offset) > radius) continue;` va ANTES de la lectura). Así que
+//     el nivel fuerte NO es gratis: pasa de 11 a 33 lecturas de textura por
+//     píxel y por pasada, y el blur son dos pasadas por cuadro. Sobre una
+//     textura a 1/4 (unos 240×135) el absoluto sigue siendo chico, pero es
+//     TRIPLE, no igual — importa porque esto corre 8 horas y hay gente en
+//     celular. Quien vuelva a subir este número: no es gratis, medilo.
+//
+// `blur` se queda en 20 a propósito: es lo que la gente ya tiene y no se le
+// cambia debajo de los pies. El nivel nuevo es el fuerte.
+export const RADIO_DE_BLUR: Record<string, number> = {
+  blur: 20,
+  "blur-strong": 64,
+};
+
+export function esBlur(effect: BackgroundEffect): boolean {
+  return effect === "blur" || effect === "blur-strong";
+}
+
+/** Radio para `processor.switchTo({ mode: "background-blur", blurRadius })`. */
+export function radioDeBlur(effect: BackgroundEffect): number {
+  return RADIO_DE_BLUR[effect] ?? RADIO_DE_BLUR.blur;
+}
+
+/**
+ * Qué fondo pone el botón rápido de difuminar de la barra. Ese botón es de dos
+ * estados (encendido/apagado) porque la barra tiene el ancho medido y no admite
+ * otro control; el NIVEL se elige en "Fondos y efectos".
+ *
+ * Devuelve el ÚLTIMO nivel que la persona eligió, no siempre el normal: antes
+ * apagaba "Difuminar más" y lo volvía a encender como "Difuminar", sin decir
+ * nada y perdiendo la preferencia también para la próxima llamada.
+ */
+export function alternarBlur(actual: BackgroundEffect, ultimoNivel: BackgroundEffect): BackgroundEffect {
+  if (esBlur(actual)) return "none";
+  return esBlur(ultimoNivel) ? ultimoNivel : "blur";
+}
+
+export function isCustomBackground(effect: BackgroundEffect): boolean {
+  return typeof effect === "string" && effect.startsWith("custom:");
+}
+
+export function getCustomBackgroundUrl(effect: BackgroundEffect): string {
+  return effect.replace(/^custom:/, "");
+}
+
+/**
+ * ⚠️ Tiene que excluir TODOS los niveles de blur. Con el chequeo viejo
+ * (`effect !== "blur"`), "blur-strong" caía acá, se buscaba como plantilla, no
+ * se encontraba y el fondo simplemente no se aplicaba — en silencio.
+ */
+export function isTemplateBackground(effect: BackgroundEffect): boolean {
+  return effect !== "none" && !esBlur(effect) && !isCustomBackground(effect);
+}
+
+// ── La elección, guardada ────────────────────────────────────────────────────
+
+// ── De quién es cada fondo ──────────────────────────────────────────────────
+//
+// ⚠️ Esto NO puede ser "por navegador" a secas. Un fondo propio es una FOTO DEL
+// CUARTO de alguien, y las máquinas se comparten entre turnos: sin la identidad
+// adentro de la clave, la persona A cerraba sesión, entraba B y B aparecía en su
+// reunión con la foto del cuarto de A —que la sala entera veía— y además la veía
+// listada en "Tus fondos" y podía borrársela. La preferencia de cancelación de
+// ruido sí puede ser por navegador, porque es un booleano; esto no.
+//
+// El módulo no importa nada a propósito (lo usa el hook, que no puede depender
+// de este archivo si trae React), así que la identidad se la INYECTA el
+// AuthProvider. Sin identidad —el invitado de Meet, que no tiene cuenta— se usa
+// el espacio anónimo, que es lo mismo que había antes para él.
+let duenoActual = "";
+
+export function fijarDuenoDeFondos(userId: string | null | undefined): void {
+  duenoActual = userId || "";
+}
+
+export function duenoDeFondos(): string {
+  return duenoActual;
+}
+
+const CLAVE_FONDO_BASE = "call-background-effect";
+
+function claveDelFondo(): string {
+  return duenoActual ? `${CLAVE_FONDO_BASE}:${duenoActual}` : CLAVE_FONDO_BASE;
+}
+
+/**
+ * El fondo con el que arranca cualquier llamada. Mismo patrón que la
+ * preferencia de cancelación de ruido: por navegador, en try/catch porque en
+ * incógnito y con las cookies bloqueadas `localStorage` LANZA al leerlo.
+ *
+ * Un `custom:blob:...` guardado por una versión vieja se descarta: esa URL ya
+ * no apunta a nada.
+ */
+export function leerFondoGuardado(): BackgroundEffect {
+  try {
+    const val = localStorage.getItem(claveDelFondo());
+    if (!val) return "none";
+    if (val.startsWith("custom:blob:") || val.startsWith("custom:http")) return "none";
+    return val;
+  } catch {
+    return "none";
+  }
+}
+
+export function guardarFondo(effect: BackgroundEffect): void {
+  try {
+    if (!effect || effect === "none") localStorage.removeItem(claveDelFondo());
+    else localStorage.setItem(claveDelFondo(), effect);
+  } catch { /* incógnito: se queda sin memoria, no se rompe */ }
+}
+
+// ── Los fondos propios, en IndexedDB ────────────────────────────────────────
+//
+// Van los BYTES, no una URL: es la única forma de que la imagen siga estando
+// mañana. localStorage no sirve (cuota de ~5 MB para TODO el sitio y solo
+// texto); IndexedDB guarda Blobs sin convertir a base64.
+
+const NOMBRE_DB = "maven-fondos";
+const ALMACEN = "fondos";
+export const MAX_FONDOS_PROPIOS = 5;
+/** Ancho máximo al guardar. El segmentador trabaja a ~480 px; más es peso al vicio. */
+export const ANCHO_MAX_FONDO = 1280;
+
+// Una URL por imagen y por pestaña. Sin este caché, cada re-aplicación del
+// fondo crearía otra URL y ninguna se liberaría nunca.
+const urlsVivas = new Map<string, string>();
+
+export interface FondoPropio {
+  id: string;
+  blob: Blob;
+  creado: number;
+  /** Quién la subió. "" = sin cuenta (el invitado de Meet). */
+  dueno?: string;
+}
+
+// Una sola conexión por pestaña, no una por operación: abrir en cada lectura
+// deja conexiones colgadas durante toda la jornada y, peor, cualquier cambio de
+// versión futuro del almacén quedaría trabado por ellas.
+let dbPromesa: Promise<IDBDatabase | null> | null = null;
+
+function abrirDb(): Promise<IDBDatabase | null> {
+  dbPromesa ??= new Promise<IDBDatabase | null>((resolver) => {
+    try {
+      if (typeof indexedDB === "undefined") return resolver(null);
+      const pedido = indexedDB.open(NOMBRE_DB, 1);
+      pedido.onupgradeneeded = () => {
+        const db = pedido.result;
+        if (!db.objectStoreNames.contains(ALMACEN)) db.createObjectStore(ALMACEN, { keyPath: "id" });
+      };
+      pedido.onsuccess = () => {
+        const db = pedido.result;
+        // Si el navegador cierra la conexión (o otra pestaña pide una versión
+        // nueva), se olvida y la próxima llamada vuelve a abrir.
+        db.onclose = () => { dbPromesa = null; };
+        db.onversionchange = () => { try { db.close(); } catch { /* ya cerrada */ } dbPromesa = null; };
+        resolver(db);
+      };
+      pedido.onerror = () => { dbPromesa = null; resolver(null); };
+      pedido.onblocked = () => { dbPromesa = null; resolver(null); };
+    } catch {
+      resolver(null);
+    }
+  });
+  return dbPromesa;
+}
+
+/**
+ * Resultado de tocar el almacén. La diferencia entre "no pude leer" y "no está"
+ * NO es cosmética: si se confunden, un hipo del navegador BORRA la preferencia
+ * de la persona y volvemos al problema que este módulo vino a resolver.
+ */
+type Lectura<T> = { ok: true; valor: T } | { ok: false };
+
+function conAlmacen<T>(modo: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest): Promise<Lectura<T>> {
+  return abrirDb().then((db) => {
+    if (!db) return { ok: false as const };
+    return new Promise<Lectura<T>>((resolver) => {
+      try {
+        const tx = db.transaction(ALMACEN, modo);
+        const pedido = fn(tx.objectStore(ALMACEN));
+        let valor: T;
+        pedido.onsuccess = () => {
+          valor = pedido.result as T;
+          // ⚠️ Una LECTURA ya terminó acá. Una ESCRITURA todavía no: el `put`
+          // puede haber salido bien y la transacción abortar al confirmar (la
+          // cuota se llenó). Reportarla como guardada dejaría a la persona
+          // creyendo que su fondo está y no estaría.
+          if (modo === "readonly") resolver({ ok: true, valor });
+        };
+        pedido.onerror = () => resolver({ ok: false });
+        tx.oncomplete = () => resolver({ ok: true, valor });
+        tx.onabort = () => resolver({ ok: false });
+        tx.onerror = () => resolver({ ok: false });
+      } catch {
+        resolver({ ok: false });
+      }
+    });
+  });
+}
+
+/** Los fondos de LA PERSONA que está usando la app, no los del navegador. */
+export async function listarFondosPropios(): Promise<FondoPropio[]> {
+  const r = await conAlmacen<FondoPropio[]>("readonly", (s) => s.getAll());
+  const filas = r.ok ? (r.valor ?? []) : [];
+  return filas
+    .filter((f) => (f.dueno ?? "") === duenoActual)
+    .sort((a, b) => a.creado - b.creado);
+}
+
+/**
+ * Achica la imagen antes de guardarla. Una foto de celular son 4 MB y el
+ * segmentador no aprovecha nada de eso: guardarla entera es llenarle el disco a
+ * la persona para nada. Si el navegador no puede dibujar en canvas, se guarda
+ * el archivo tal cual antes que perder la función.
+ */
+export async function achicarImagen(file: Blob, anchoMax = ANCHO_MAX_FONDO): Promise<Blob | null> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // El navegador no sabe decodificar esto (un .heic del iPhone en Chrome, un
+    // .tiff). ANTES se guardaba el archivo tal cual y "funcionaba": la
+    // miniatura salía rota y, ya en la llamada, la imagen no cargaba, el
+    // procesador entraba en cooldown y la cámara publicaba la habitación real.
+    // Mejor no aceptarla y decirlo.
+    return null;
+  }
+  try {
+    const escala = Math.min(1, anchoMax / bitmap.width);
+    if (escala >= 1 && file.size < 400_000) { bitmap.close?.(); return file; }
+
+    const ancho = Math.max(1, Math.round(bitmap.width * escala));
+    const alto = Math.max(1, Math.round(bitmap.height * escala));
+    const lienzo = document.createElement("canvas");
+    lienzo.width = ancho;
+    lienzo.height = alto;
+    const ctx = lienzo.getContext("2d");
+    if (!ctx) { bitmap.close?.(); return file; }
+    ctx.drawImage(bitmap, 0, 0, ancho, alto);
+    bitmap.close?.();
+    const tipo = file.type === "image/png" || file.type === "image/webp" ? file.type : "image/jpeg";
+    const chico = await new Promise<Blob | null>((r) => lienzo.toBlob((b) => r(b), tipo, 0.82));
+    return chico && chico.size > 0 ? chico : file;
+  } catch {
+    return file;
+  }
+}
+
+/** Por qué no se pudo guardar una imagen. El aviso al usuario sale de acá. */
+export type FalloAlGuardar = "limite" | "ilegible" | "sin-almacen";
+
+/**
+ * ⚠️ Forma PLANA, no una unión discriminada por `ok`. Este proyecto compila con
+ * `strict: false`, y sin `strictNullChecks` TypeScript NO estrecha uniones por
+ * un booleano: `if (r.ok)` deja el otro miembro inaccesible y no compila.
+ */
+export type ResultadoGuardar = { fondo: FondoPropio | null; motivo: FalloAlGuardar | null };
+
+/**
+ * Guarda una imagen propia. Devuelve el MOTIVO del fallo: antes todo era `null`
+ * y el aviso decía siempre "ya tenés 5, borrá uno" — incluso con la lista vacía
+ * y el almacenamiento bloqueado, que es cuando la persona más necesita saber
+ * qué pasa.
+ */
+export async function guardarFondoPropio(file: Blob, ahora: number): Promise<ResultadoGuardar> {
+  const yaHay = await listarFondosPropios();
+  if (yaHay.length >= MAX_FONDOS_PROPIOS) return { fondo: null, motivo: "limite" };
+  const blob = await achicarImagen(file);
+  if (!blob) return { fondo: null, motivo: "ilegible" };
+  // El id NO se reutiliza nunca. Si se reciclara (`f1` libre → `f1` de nuevo),
+  // una elección guardada que apuntaba al fondo borrado pasaría a apuntar al
+  // NUEVO: la persona vería en su cámara una imagen que no eligió.
+  const mayor = yaHay.reduce((m, f) => Math.max(m, Number(String(f.id).split("-")[1]) || 0), 0);
+  const fondo: FondoPropio = { id: `f${ahora}-${mayor + 1}`, blob, creado: ahora, dueno: duenoActual };
+  const guardado = await conAlmacen("readwrite", (s) => s.put(fondo));
+  if (!guardado.ok) return { fondo: null, motivo: "sin-almacen" };
+  return { fondo, motivo: null };
+}
+
+export async function borrarFondoPropio(id: string): Promise<void> {
+  const mio = await conAlmacen<FondoPropio | undefined>("readonly", (s) => s.get(id));
+  if (mio.ok && mio.valor && (mio.valor.dueno ?? "") !== duenoActual) return;
+  await conAlmacen("readwrite", (s) => s.delete(id));
+  const url = urlsVivas.get(id);
+  if (url) { URL.revokeObjectURL(url); urlsVivas.delete(id); }
+}
+
+/** La URL de una imagen propia; `null` si no está, `undefined` si no se pudo mirar. */
+export async function urlDeFondoPropio(id: string): Promise<string | null | undefined> {
+  const cacheada = urlsVivas.get(id);
+  if (cacheada) return cacheada;
+  const r = await conAlmacen<FondoPropio | undefined>("readonly", (s) => s.get(id));
+  if (!r.ok) return undefined;          // el almacén no se pudo leer
+  if (!r.valor?.blob) return null;      // la fila NO está: la imagen se borró
+  // Cinturón y tirantes: la clave de la preferencia ya va por persona, pero un
+  // id de otra cuenta jamás se sirve.
+  if ((r.valor.dueno ?? "") !== duenoActual) return null;
+  const url = URL.createObjectURL(r.valor.blob);
+  urlsVivas.set(id, url);
+  return url;
+}
+
+/**
+ * La imagen que hay que pasarle al procesador para este fondo. Un solo lugar:
+ * antes el hook y el lobby resolvían la URL cada uno por su lado.
+ *
+ *   · `{ url }`            → aplicala.
+ *   · `{ falta: true }`    → esa imagen YA NO EXISTE. Se puede caer a "sin
+ *                            efecto" y limpiar lo guardado.
+ *   · `{ falta: false }`   → no se pudo averiguar (almacenamiento bloqueado o
+ *                            con un hipo). NO tocar lo guardado: la imagen
+ *                            probablemente sigue ahí y borrar la preferencia
+ *                            por un fallo pasajero es justo el bug que este
+ *                            módulo vino a arreglar.
+ */
+export type ImagenDeFondo = { url: string } | { falta: boolean };
+
+export async function resolverImagenDeFondo(effect: BackgroundEffect, origen: string): Promise<ImagenDeFondo> {
+  if (effect === "none" || esBlur(effect)) return { falta: true };
+  if (isCustomBackground(effect)) {
+    const ref = getCustomBackgroundUrl(effect);
+    // Compatibilidad: una elección vieja traía la URL adentro del propio valor.
+    if (/^(blob:|https?:|data:)/.test(ref)) return { url: ref };
+    const url = await urlDeFondoPropio(ref);
+    if (url) return { url };
+    return { falta: url === null };
+  }
+  const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
+  if (!tpl) return { falta: true };
+  return { url: `${origen}${tpl.lowSrc || tpl.src}` };
+}
