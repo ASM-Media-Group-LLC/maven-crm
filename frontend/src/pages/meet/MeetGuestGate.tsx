@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { invitadosNuevos } from "@/lib/avisoDeInvitado";
+import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 
 interface GuestRequest {
   id: string;
@@ -22,6 +25,8 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
   const [meetRoomId, setMeetRoomId] = useState<string | null>(null);
   const [requests, setRequests] = useState<GuestRequest[]>([]);
   const [deciding, setDeciding] = useState<string | null>(null);
+  // Los que ya conocíamos. `null` = todavía no miramos: la primera foto no suena.
+  const vistas = useRef<Set<string> | null>(null);
 
   // Resolvemos la reunión desde el nombre de sala de LiveKit (es lo único que
   // conoce la página de llamada).
@@ -59,7 +64,20 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       .select("id, guest_name, status, created_at")
       .eq("meet_room_id", roomId).eq("status", "pending")
       .order("created_at", { ascending: true });
-    setRequests((data as GuestRequest[]) || []);
+    const filas = (data as GuestRequest[]) || [];
+    setRequests(filas);
+
+    // Y SUENA. Antes el aviso era solo visual (Jhon, 09/09/2026): si estabas
+    // mirando otra pestaña, alguien podía quedarse golpeando sin que te
+    // enteraras. Es el mismo timbre que usa Cowork cuando alguien pide
+    // supervisor — "alguien necesita que lo atiendas" — y el panel de al lado
+    // aclara enseguida cuál de los dos es.
+    const { nuevos, vistas: ahora } = invitadosNuevos(vistas.current, filas.map((f) => f.id));
+    vistas.current = ahora;
+    if (!nuevos.length) return;
+    // Con la reunión abierta en dos pestañas, el timbre sonaría dos veces. La
+    // clave lleva la reunión adentro para que dos reuniones distintas sí suenen.
+    sonarUnaVezEntrePestanas(`meet-invitado-${roomId}`, 1500, () => playCoordinatorRequestSound());
   }, []);
 
   useEffect(() => {
