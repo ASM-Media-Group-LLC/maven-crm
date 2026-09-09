@@ -149,38 +149,49 @@ export default function MeetPage() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-    <div className="min-h-full flex flex-col items-center gap-6 p-4 md:p-6 pt-10 md:pt-16">
-      <div className="w-full max-w-lg flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12">
-        <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
-          <Video className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+    {/* Misma composición que la portada de Cowork (pedido de Jhon, 09/09/2026):
+        tarjeta ancha con icono + título a la izquierda y la acción a la derecha,
+        debajo la fila para entrar con link o código, y las reuniones abiertas
+        como lista de tarjetas. Antes Meet era una tarjeta angosta y centrada,
+        con todo apilado, y al lado de Cowork parecía otro producto. */}
+    <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6">
+      <div className="w-full max-w-3xl rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+        <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 md:h-12 md:w-12">
+            <Video className="h-7 w-7 text-primary md:h-6 md:w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Meet</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {myRooms.length > 0
+                ? "Vuelve a una de tus reuniones abiertas o crea una nueva."
+                : "Crea una reunión, comparte el link o el código, y quien lo tenga entra."}
+            </p>
+          </div>
+          {canCreate && (
+            <Button
+              onClick={handleCreate}
+              disabled={creating}
+              size="lg"
+              className="w-full gap-2 rounded-full px-7 shadow-md md:w-auto"
+            >
+              {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+              Nueva reunión
+            </Button>
+          )}
         </div>
-        <h1 className="text-xl md:text-3xl font-bold text-foreground tracking-tight text-center">
-          Meet
-        </h1>
-        <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
-          Crea una reunión, comparte el link o el código, y quien lo tenga entra.
-        </p>
 
-        {canCreate && (
-          <Button onClick={handleCreate} disabled={creating} size="lg" className="gap-2 rounded-full px-8 mt-2 shadow-md">
-            {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-            Nueva reunión
-          </Button>
-        )}
-
-        <div className="w-full max-w-sm flex flex-col gap-2 mt-3 pt-4 border-t border-border/40">
-          <span className="text-xs text-muted-foreground text-center">
-            Entrar con un link o un código
-          </span>
-          <div className="flex gap-2">
+        <div className="mt-5 flex flex-col items-center gap-2 border-t border-border/40 pt-4 md:flex-row md:justify-between">
+          <span className="text-xs text-muted-foreground">Entrar con un link o un código</span>
+          <div className="flex w-full gap-2 md:w-auto">
             <Input
               value={joinInput}
               onChange={(e) => setJoinInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !joinDisabled && handleJoin()}
               placeholder="ABC234 o pega el link"
-              className="rounded-full"
+              className="rounded-full md:w-64"
             />
-            <Button onClick={handleJoin} disabled={joinDisabled} className="rounded-full gap-1 shrink-0">
+            <Button onClick={handleJoin} disabled={joinDisabled} className="shrink-0 gap-1 rounded-full">
               {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               Entrar
             </Button>
@@ -189,9 +200,9 @@ export default function MeetPage() {
       </div>
 
       {!loading && myRooms.length > 0 && (
-        <div className="w-full max-w-lg flex flex-col gap-2">
+        <div className="w-full max-w-3xl flex flex-col gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-            Tus reuniones abiertas
+            Tus reuniones abiertas · {myRooms.length}
           </h2>
           {/* Con muchas reuniones la lista scrollea sola en vez de estirar la
               página. Las fijadas van arriba (el orden lo pone el hook). */}
@@ -209,7 +220,7 @@ export default function MeetPage() {
                         <div
                           ref={dragProvided.innerRef}
                           {...dragProvided.draggableProps}
-                          className={`flex flex-wrap items-center gap-2 bg-card border rounded-2xl px-3 py-3 ${
+                          className={`flex flex-wrap items-center gap-3 bg-card border rounded-2xl px-4 py-3 ${
                             snapshot.isDragging ? "border-primary shadow-lg" : "border-border"
                           }`}
                         >
