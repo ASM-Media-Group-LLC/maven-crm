@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Activity } from "lucide-react";
@@ -387,8 +388,12 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
   // todo. Computamos el rol arriba porque el defaultStatus depende
   // de él (sin esto el spammer arrancaba con statusFilter="discovery"
   // y la grilla quedaba vacía aunque tuviera asignaciones).
-  const { isAdmin, isManager, isSupervisor, isSpammer } = useUserRole();
-  const isManagerLikeRole = isAdmin || isManager || isSupervisor;
+  const { isAdmin, isSpammer } = useUserRole();
+  const { dataScope } = usePermissions();
+  // Ver el pool completo = "Permisos de datos" de Scouter Assist, no el nombre del
+  // rol (08/09): con nombres literales, Operations Sales y Closer + no entraban
+  // aunque tuvieran "Todos los datos".
+  const isManagerLikeRole = isAdmin || dataScope("Scouter Assist") !== "self";
   const onlyAssignedToMe = isSpammer && !isManagerLikeRole;
 
   // Default del status filter:
