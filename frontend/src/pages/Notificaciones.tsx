@@ -10,6 +10,7 @@ import { resolveDeepLink, MODULE_OPTIONS, MODULE_PERMISSION_MAP, PRIORITY_OPTION
 import NotificationItem from "@/components/notifications/NotificationItem";
 import type { Notification } from "@/hooks/useNotifications";
 import { CheckCheck, Archive, Bell, Settings } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const Notificaciones = () => {
   const [moduleFilter, setModuleFilter] = useState<string | null>(null);
@@ -65,23 +66,23 @@ const Notificaciones = () => {
           {/* En teléfono los botones van solo con icono (el texto aparece desde sm) y
               la fila puede partirse: a 390 px el engranaje —que es la única puerta a
               la configuración— quedaba fuera de la pantalla. */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <Bell className="h-5 w-5 shrink-0 text-primary" />
-              <h1 className="truncate text-xl font-bold">Notificaciones</h1>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1 text-xs" title="Marcar todas leídas" aria-label="Marcar todas leídas" onClick={() => markAllAsRead.mutate()}>
-                <CheckCheck className="h-3 w-3" /> <span className="hidden sm:inline">Marcar todas leídas</span>
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1 text-xs" title="Archivar todas" aria-label="Archivar todas" onClick={() => archiveAll.mutate()}>
-                <Archive className="h-3 w-3" /> <span className="hidden sm:inline">Archivar todas</span>
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1" title="Configuración de notificaciones" aria-label="Configuración de notificaciones" onClick={() => navigate("/ajustes/notificaciones")}>
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Notificaciones"
+            icon={<Bell />}
+            actions={
+              <>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" title="Marcar todas leídas" aria-label="Marcar todas leídas" onClick={() => markAllAsRead.mutate()}>
+                  <CheckCheck className="h-3 w-3" /> <span className="hidden sm:inline">Marcar todas leídas</span>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" title="Archivar todas" aria-label="Archivar todas" onClick={() => archiveAll.mutate()}>
+                  <Archive className="h-3 w-3" /> <span className="hidden sm:inline">Archivar todas</span>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1" title="Configuración de notificaciones" aria-label="Configuración de notificaciones" onClick={() => navigate("/ajustes/notificaciones")}>
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            }
+          />
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={moduleFilter ?? ""} onValueChange={(v) => setModuleFilter(v || null)}>

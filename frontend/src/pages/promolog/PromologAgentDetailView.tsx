@@ -26,6 +26,7 @@ import {
 import type { PromologEntry } from "./PromologEntryCard";
 import ViewPromologEntryModal from "./ViewPromologEntryModal";
 import { promotedToResult } from "./promoResult";
+import { PageHeader } from "@/components/ui/page-header";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram" },
@@ -264,11 +265,15 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold truncate">{agent.name}</h1>
-              <Badge variant="outline" className="text-xs shrink-0">{totalEntries} promos</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">Detalle del agente — Promolog</p>
+            <PageHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <span className="truncate">{agent.name}</span>
+                  <Badge variant="outline" className="text-xs shrink-0">{totalEntries} promos</Badge>
+                </span>
+              }
+              subtitle="Detalle del agente — Promolog"
+            />
           </div>
         </div>
         <Tabs value={activeTab} onValueChange={handleTabChange}>

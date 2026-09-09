@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
@@ -368,8 +369,7 @@ export default function FinanzasDashboard() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <h1 className="text-xl font-semibold text-foreground">Dashboard Financiero</h1>
-        <p className="text-sm text-muted-foreground">Vista ejecutiva y operativa consolidada</p>
+        <PageHeader title="Dashboard Financiero" subtitle="Vista ejecutiva y operativa consolidada" />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">

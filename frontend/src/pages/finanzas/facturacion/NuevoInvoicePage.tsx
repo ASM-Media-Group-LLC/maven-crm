@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -182,10 +183,11 @@ export default function NuevoInvoicePage() {
         >
           <ArrowLeft className="h-4 w-4" /> Volver
         </button>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FileText className="h-6 w-6" /> Nuevo Invoice
-        </h1>
-        <p className="text-sm text-muted-foreground">Crea un nuevo invoice para un creador</p>
+        <PageHeader
+          title="Nuevo Invoice"
+          subtitle="Crea un nuevo invoice para un creador"
+          icon={<FileText className="h-6 w-6" />}
+        />
       </header>
 
       {/* Content */}

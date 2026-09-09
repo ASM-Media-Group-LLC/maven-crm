@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Save, Plus, X, Loader2, Camera, Upload, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useChatterProfiles,
   useUpdateChatterProfile,
@@ -310,14 +311,10 @@ const ChatterProfileEditContent = () => {
           </Button>
         </div>
 
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Editar: {profile.name}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Estos cambios afectan a TODOS los examiners — perfiles son recursos compartidos.
-          </p>
-        </div>
+        <PageHeader
+          title={<>Editar: {profile.name}</>}
+          subtitle="Estos cambios afectan a TODOS los examiners — perfiles son recursos compartidos."
+        />
 
         {/* Avatar section */}
         <Card>

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
+import { PageHeader } from "@/components/ui/page-header";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Button } from "@/components/ui/button";
@@ -335,16 +336,16 @@ export default function HRVacations() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Vacaciones & Tiempo Libre</h1>
-            <p className="text-sm text-muted-foreground">Gestión de solicitudes, balances y calendario</p>
-          </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nueva Solicitud
-          </Button>
-        </div>
+        <PageHeader
+          title="Vacaciones & Tiempo Libre"
+          subtitle="Gestión de solicitudes, balances y calendario"
+          actions={
+            <Button onClick={() => setModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva Solicitud
+            </Button>
+          }
+        />
       </header>
 
       {/* Scrollable content */}

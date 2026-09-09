@@ -13,6 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/ui/page-header";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
@@ -108,10 +109,11 @@ export default function NuevaNotaPagoPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Volver
         </button>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FileText className="h-6 w-6" /> Nueva Nota de Pago
-        </h1>
-        <p className="text-sm text-muted-foreground">Crea una nueva nota de pago para un creador</p>
+        <PageHeader
+          title="Nueva Nota de Pago"
+          subtitle="Crea una nueva nota de pago para un creador"
+          icon={<FileText className="h-6 w-6" />}
+        />
       </header>
 
       {/* Content */}

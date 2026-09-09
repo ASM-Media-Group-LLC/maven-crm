@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PageHeader } from "@/components/ui/page-header";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
@@ -253,36 +254,36 @@ export default function HRPerformance() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Evaluaciones & Performance</h1>
-            <p className="text-sm text-muted-foreground">
-              {view === "operativo"
-                ? "Resultado operativo por rol desde Hubstaff y BLU"
-                : `${evals.length} evaluaciones registradas · ${completedCount} completadas`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
-              <Button variant={view === "operativo" ? "secondary" : "ghost"} size="sm" onClick={() => setView("operativo")}>
-                Operativo (Hubstaff)
-              </Button>
-              <Button variant={view === "evaluaciones" ? "secondary" : "ghost"} size="sm" onClick={() => setView("evaluaciones")}>
-                Evaluaciones
-              </Button>
+        <PageHeader
+          title="Evaluaciones & Performance"
+          subtitle={
+            view === "operativo"
+              ? "Resultado operativo por rol desde Hubstaff y BLU"
+              : `${evals.length} evaluaciones registradas · ${completedCount} completadas`
+          }
+          actions={
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+                <Button variant={view === "operativo" ? "secondary" : "ghost"} size="sm" onClick={() => setView("operativo")}>
+                  Operativo (Hubstaff)
+                </Button>
+                <Button variant={view === "evaluaciones" ? "secondary" : "ghost"} size="sm" onClick={() => setView("evaluaciones")}>
+                  Evaluaciones
+                </Button>
+              </div>
+              {view === "evaluaciones" && (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
+                    <Download className="h-4 w-4 mr-1" />Exportar
+                  </Button>
+                  <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
+                    <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
+                  </Button>
+                </>
+              )}
             </div>
-            {view === "evaluaciones" && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
-                  <Download className="h-4 w-4 mr-1" />Exportar
-                </Button>
-                <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
-                  <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+          }
+        />
         {/* Department Tabs — solo en evaluaciones manuales */}
         {view === "evaluaciones" && (
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap mt-4">

@@ -19,6 +19,7 @@ import { es } from "date-fns/locale";
 import { ABSENCE_TYPES, INCIDENT_SEVERITIES, TRAINING_STATUSES, PERFORMANCE_EVALUATION_STATUSES, HISTORY_CHANGE_TYPES, HISTORY_FIELD_LABELS } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 const ROLE_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   admin: { label: "Admin", variant: "destructive" },
@@ -94,14 +95,16 @@ export default function EmployeeProfile() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-semibold text-foreground">{fullName}</h1>
-              <EmployeeStatusBadge status={employee.status} />
-              {employee.positions?.name && <Badge variant="outline">{employee.positions.name}</Badge>}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {[employee.employee_code, employee.departments?.name, employee.hire_date ? `Ingreso: ${format(new Date(employee.hire_date), "dd/MM/yyyy")}` : null].filter(Boolean).join(" · ")}
-            </p>
+            <PageHeader
+              title={
+                <span className="flex items-center gap-3 flex-wrap">
+                  {fullName}
+                  <EmployeeStatusBadge status={employee.status} />
+                  {employee.positions?.name && <Badge variant="outline">{employee.positions.name}</Badge>}
+                </span>
+              }
+              subtitle={[employee.employee_code, employee.departments?.name, employee.hire_date ? `Ingreso: ${format(new Date(employee.hire_date), "dd/MM/yyyy")}` : null].filter(Boolean).join(" · ")}
+            />
           </div>
         </div>
       </header>

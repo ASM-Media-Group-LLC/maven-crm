@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,18 +169,16 @@ const AdminReportes = () => {
 
   return (
     <div className="space-y-4 p-6 lg:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reportes programados</h1>
-          <p className="text-sm text-muted-foreground">
-            Reportes automáticos por email — configura módulo, periodicidad y destinatarios.
-          </p>
-        </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nuevo reporte
-        </Button>
-      </div>
+      <PageHeader
+        title="Reportes programados"
+        subtitle="Reportes automáticos por email — configura módulo, periodicidad y destinatarios."
+        actions={
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nuevo reporte
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-3">

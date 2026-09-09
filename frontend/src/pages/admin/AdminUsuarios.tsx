@@ -24,6 +24,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { avisarPersona } from "@/lib/avisoPersona";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
 // lleno de apellidos acentuados (Suárez, Durán, Pinzón) y nadie los tipea con tilde.
@@ -170,23 +171,23 @@ const AdminUsuarios = () => {
                   Volver a Settings
                 </button>
               )}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-xl font-semibold">Gestión de Usuarios</h1>
-                  <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
-                </div>
-                {activeTab === "usuarios" ? (
-                  <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Agregar Usuario
-                  </Button>
-                ) : activeTab === "roles" ? (
-                  <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Nuevo Rol
-                  </Button>
-                ) : null}
-              </div>
+              <PageHeader
+                title="Gestión de Usuarios"
+                subtitle="Administra los usuarios y roles de la plataforma"
+                actions={
+                  activeTab === "usuarios" ? (
+                    <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar Usuario
+                    </Button>
+                  ) : activeTab === "roles" ? (
+                    <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Nuevo Rol
+                    </Button>
+                  ) : null
+                }
+              />
             </header>
 
             {/* Scrollable Area */}

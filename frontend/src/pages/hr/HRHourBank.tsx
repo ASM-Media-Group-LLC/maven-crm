@@ -28,6 +28,7 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 function getInitials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
@@ -207,18 +208,19 @@ const HRHourBank = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/hr/horarios")}><ArrowLeft className="h-4 w-4" /></Button>
-            <div>
-              <h1 className="text-xl font-semibold">Banco de Horas</h1>
-              <p className="text-sm text-muted-foreground">Gestión del banco de horas de empleados</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => { resetForm(); setWithdrawOpen(true); }}>Registrar Uso</Button>
-            <Button onClick={() => { resetForm(); setAddOpen(true); }}><Plus className="h-4 w-4 mr-2" /> Agregar Horas</Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/horarios")}><ArrowLeft className="h-4 w-4" /></Button>
+          <PageHeader
+            className="flex-1"
+            title="Banco de Horas"
+            subtitle="Gestión del banco de horas de empleados"
+            actions={
+              <>
+                <Button variant="outline" onClick={() => { resetForm(); setWithdrawOpen(true); }}>Registrar Uso</Button>
+                <Button onClick={() => { resetForm(); setAddOpen(true); }}><Plus className="h-4 w-4 mr-2" /> Agregar Horas</Button>
+              </>
+            }
+          />
         </div>
       </div>
 

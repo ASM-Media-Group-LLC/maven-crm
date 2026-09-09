@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
+import { PageHeader } from "@/components/ui/page-header";
 
 const CATEGORIES = [
   { value: "A+", label: "A+ (Premium)" },
@@ -362,10 +363,11 @@ const NuevoContactoForm = () => {
         >
           <ArrowLeft className="h-4 w-4" /> Volver
         </button>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <UserPlus className="h-6 w-6" /> Nuevo Contacto
-        </h1>
-        <p className="text-sm text-muted-foreground">Agrega un nuevo contacto al directorio de Closers</p>
+        <PageHeader
+          icon={<UserPlus className="h-6 w-6" />}
+          title="Nuevo Contacto"
+          subtitle="Agrega un nuevo contacto al directorio de Closers"
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6">

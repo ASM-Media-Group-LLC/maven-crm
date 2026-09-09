@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import HrAttendanceAuto from "./HrAttendanceAuto";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AttendanceRecord {
@@ -500,29 +501,29 @@ export default function HRAttendance() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Fixed Header ──────────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Control de Asistencia</h1>
-            <p className="text-sm text-muted-foreground">
-              {view === "auto"
-                ? "Check-in y puntualidad automáticos desde Hubstaff"
-                : "Registro y seguimiento manual de asistencia del equipo"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
-              <Button variant={view === "auto" ? "secondary" : "ghost"} size="sm" onClick={() => setView("auto")}>
-                Automática (Hubstaff)
-              </Button>
-              <Button variant={view === "manual" ? "secondary" : "ghost"} size="sm" onClick={() => setView("manual")}>
-                Manual
-              </Button>
-            </div>
-            {view === "manual" && (
-              <Button onClick={() => setModalOpen(true)} size="sm">+ Registrar</Button>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          title="Control de Asistencia"
+          subtitle={
+            view === "auto"
+              ? "Check-in y puntualidad automáticos desde Hubstaff"
+              : "Registro y seguimiento manual de asistencia del equipo"
+          }
+          actions={
+            <>
+              <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+                <Button variant={view === "auto" ? "secondary" : "ghost"} size="sm" onClick={() => setView("auto")}>
+                  Automática (Hubstaff)
+                </Button>
+                <Button variant={view === "manual" ? "secondary" : "ghost"} size="sm" onClick={() => setView("manual")}>
+                  Manual
+                </Button>
+              </div>
+              {view === "manual" && (
+                <Button onClick={() => setModalOpen(true)} size="sm">+ Registrar</Button>
+              )}
+            </>
+          }
+        />
       </header>
 
       {/* ── Scrollable content ────────────────────────────────────────────────── */}

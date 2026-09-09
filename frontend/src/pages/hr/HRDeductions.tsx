@@ -28,6 +28,7 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES, INFRACTION_CATEGORIES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeductionRecord {
@@ -171,15 +172,15 @@ export default function HRDeductions() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Deducciones</h1>
-            <p className="text-sm text-muted-foreground">Gestión de adelantos e infracciones · {deductions.length} registros</p>
-          </div>
-          <Button size="sm" onClick={() => navigate("/hr/deducciones/nuevo")}>
-            <Plus className="h-4 w-4 mr-1" />Nueva Deducción
-          </Button>
-        </div>
+        <PageHeader
+          title="Deducciones"
+          subtitle={`Gestión de adelantos e infracciones · ${deductions.length} registros`}
+          actions={
+            <Button size="sm" onClick={() => navigate("/hr/deducciones/nuevo")}>
+              <Plus className="h-4 w-4 mr-1" />Nueva Deducción
+            </Button>
+          }
+        />
       </header>
 
       {/* ── Scrollable content ────────────────────────────────────────────── */}

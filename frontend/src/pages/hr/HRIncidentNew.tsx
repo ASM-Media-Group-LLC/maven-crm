@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_CATEGORIES, INCIDENT_IMPACTS } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 const STEPS = [
   { id: 1, label: "Clasificación", icon: ClipboardList },
@@ -110,10 +111,7 @@ export default function HRIncidentNew() {
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/incidentes")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Incidentes
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Reportar Incidente</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Registra un nuevo incidente siguiendo el flujo de 4 pasos</p>
-        </div>
+        <PageHeader title="Reportar Incidente" subtitle="Registra un nuevo incidente siguiendo el flujo de 4 pasos" />
       </div>
 
       {/* Stepper */}

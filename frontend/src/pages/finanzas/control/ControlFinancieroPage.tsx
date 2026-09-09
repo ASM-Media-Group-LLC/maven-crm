@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
 type Tab = typeof TABS[number];
@@ -290,8 +291,7 @@ export default function ControlFinancieroPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <h1 className="text-xl font-semibold text-foreground">Control Financiero</h1>
-        <p className="text-sm text-muted-foreground">Vista analítica consolidada</p>
+        <PageHeader title="Control Financiero" subtitle="Vista analítica consolidada" />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

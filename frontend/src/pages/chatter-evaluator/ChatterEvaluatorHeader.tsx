@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, History as HistoryIcon, Settings, ListChecks, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubtabNav, subtabNavItemClass } from "@/components/ui/subtab-nav";
+import { PageHeader } from "@/components/ui/page-header";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useChatterSessions } from "@/hooks/useChatterEvaluator";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -33,7 +34,31 @@ const ChatterEvaluatorHeader = () => {
 
   return (
     <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-      <h1 className="text-2xl font-bold mb-4">Chatter Evaluator</h1>
+      <PageHeader
+        className="mb-4"
+        title="Chatter Evaluator"
+        actions={
+          <>
+            {canSeeWorkspace && (
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                <Link to="/chatter-evaluator/workspace">
+                  <ListChecks className="h-4 w-4" />
+                  Workspace
+                  {sessionsQ.data && sessionsQ.data.length > 0 && (
+                    <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      {sessionsQ.data.length}
+                    </span>
+                  )}
+                </Link>
+              </Button>
+            )}
+            <Button onClick={() => setNewSessionOpen(true)} size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Nueva sesión
+            </Button>
+          </>
+        }
+      />
       <div className="flex items-center justify-between gap-3">
         <SubtabNav className="shrink-0 overflow-x-auto">
           {tabs.filter((t) => t.show).map((tab) => {
@@ -50,25 +75,6 @@ const ChatterEvaluatorHeader = () => {
             );
           })}
         </SubtabNav>
-        <div className="flex items-center gap-2 shrink-0">
-          {canSeeWorkspace && (
-            <Button asChild variant="outline" size="sm" className="gap-1.5">
-              <Link to="/chatter-evaluator/workspace">
-                <ListChecks className="h-4 w-4" />
-                Workspace
-                {sessionsQ.data && sessionsQ.data.length > 0 && (
-                  <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                    {sessionsQ.data.length}
-                  </span>
-                )}
-              </Link>
-            </Button>
-          )}
-          <Button onClick={() => setNewSessionOpen(true)} size="sm" className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Nueva sesión
-          </Button>
-        </div>
       </div>
       <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
     </header>

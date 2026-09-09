@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfWeek, addWeeks, isWithinInterval, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 const STATUS_CYCLE = ["todo", "in_progress", "done", "blocked"] as const;
 
@@ -190,12 +191,7 @@ const RoadmapContent = () => {
     <div className="h-screen overflow-hidden flex flex-col">
       {/* Header */}
       <div className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Project Roadmap</h1>
-            <p className="text-sm text-muted-foreground mt-1">Progreso de construcción de la plataforma MAVEN</p>
-          </div>
-        </div>
+        <PageHeader title="Project Roadmap" subtitle="Progreso de construcción de la plataforma MAVEN" />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">

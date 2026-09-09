@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { adminInvoke } from "@/lib/adminInvoke";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Settings → Administración → API keys (SOLO admins).
 // Gestión de la API pública de Maven, estilo Infloww: tabla + modal agrupado por
@@ -167,25 +168,22 @@ const AdminApiKeys = () => {
   return (
     <div className="space-y-5 p-6 lg:p-8">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <KeyRound className="h-6 w-6 text-primary" /> API keys
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Acceso programático de solo-lectura a los datos de Maven (creadoras, empleados, ventas).
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-1.5" onClick={() => setDocsOpen(true)}>
-            <BookOpen className="h-4 w-4" /> API reference
-          </Button>
-          <Button className="gap-1.5" onClick={openCreate} disabled={atLimit}
-            title={atLimit ? `Máximo ${maxActive} keys activas` : undefined}>
-            <Plus className="h-4 w-4" /> Create API key
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="API keys"
+        subtitle="Acceso programático de solo-lectura a los datos de Maven (creadoras, empleados, ventas)."
+        icon={<KeyRound />}
+        actions={
+          <>
+            <Button variant="outline" className="gap-1.5" onClick={() => setDocsOpen(true)}>
+              <BookOpen className="h-4 w-4" /> API reference
+            </Button>
+            <Button className="gap-1.5" onClick={openCreate} disabled={atLimit}
+              title={atLimit ? `Máximo ${maxActive} keys activas` : undefined}>
+              <Plus className="h-4 w-4" /> Create API key
+            </Button>
+          </>
+        }
+      />
 
       {/* Banner de aviso */}
       <Card className="border-warning/30 bg-warning/5">

@@ -42,6 +42,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import NotaDeVoz from "@/pages/messenger/components/NotaDeVoz";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
@@ -526,14 +527,19 @@ const TelegramInboxPage = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Header interno (patrón WhatsApp: cada subtab con su header + nav a hermanos). */}
-      <div className="flex items-center gap-2 border-b px-4 py-2.5">
-        <TelegramIcon className="h-5 w-5 text-sky-500" />
-        <h1 className="text-base font-semibold">Telegram</h1>
-        <BotonSilenciarCanal channel="tg" className="h-7 w-7" />
-        <Link to="/telegram" className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <Radio className="h-3.5 w-3.5" /> {t("tg.accounts")}
-        </Link>
-      </div>
+      <PageHeader
+        className="border-b px-4 py-2.5"
+        icon={<TelegramIcon />}
+        title="Telegram"
+        actions={
+          <>
+            <BotonSilenciarCanal channel="tg" className="h-7 w-7" />
+            <Link to="/telegram" className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <Radio className="h-3.5 w-3.5" /> {t("tg.accounts")}
+            </Link>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1">
         {/* Lista */}

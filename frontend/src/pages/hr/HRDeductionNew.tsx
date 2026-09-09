@@ -14,6 +14,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { INFRACTION_CATEGORIES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface FormState {
   employee_id: string;
@@ -89,10 +90,10 @@ export default function HRDeductionNew() {
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/deducciones")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Deducciones
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Registrar Deducción</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Adelanto de nómina o infracción</p>
-        </div>
+        <PageHeader
+          title="Registrar Deducción"
+          subtitle="Adelanto de nómina o infracción"
+        />
       </div>
 
       {/* Scrollable Content */}

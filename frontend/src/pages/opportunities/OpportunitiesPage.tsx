@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { TrendingUp, Plus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ── catálogo de productos y etapas ───────────────────────────────────────────
 const PRODUCTS: { value: string; label: string }[] = [
@@ -161,18 +162,16 @@ const OpportunitiesPage = () => {
     // pueda encogerse dentro de la columna flex.
     <main className="flex-1 min-h-0 overflow-y-auto">
       <div className="space-y-4 px-6 py-5">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="h-5 w-5 text-primary" />
-        <div className="flex-1">
-          <h1 className="text-base font-semibold leading-tight">Oportunidades de monetización</h1>
-          <p className="text-xs text-muted-foreground">
-            Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; aquí las ves y manejas.
-          </p>
-        </div>
-        <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-          <Plus className="h-4 w-4" /> Nueva oportunidad
-        </Button>
-      </div>
+      <PageHeader
+        icon={<TrendingUp />}
+        title="Oportunidades de monetización"
+        subtitle="Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; aquí las ves y manejas."
+        actions={
+          <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
+            <Plus className="h-4 w-4" /> Nueva oportunidad
+          </Button>
+        }
+      />
 
       {/* Resumen — qué hay cerca de cerrar */}
       <div className="flex flex-wrap gap-2">

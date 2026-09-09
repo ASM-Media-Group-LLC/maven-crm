@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   Wifi, LogOut, LogIn, User, Stethoscope, GraduationCap, Briefcase,
 } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const PERMISSION_TYPES = [
   { value: "permiso_remoto", label: "Trabajo Remoto", icon: Wifi },
@@ -121,10 +122,11 @@ export default function HRPermisoNew() {
         >
           <ArrowLeft className="h-4 w-4" /> Volver
         </button>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Clock className="h-6 w-6" /> Nueva Solicitud
-        </h1>
-        <p className="text-sm text-muted-foreground">Registra un permiso, ausencia o incapacidad</p>
+        <PageHeader
+          title="Nueva Solicitud"
+          subtitle="Registra un permiso, ausencia o incapacidad"
+          icon={<Clock className="h-6 w-6" />}
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6">

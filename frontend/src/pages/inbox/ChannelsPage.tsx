@@ -33,6 +33,7 @@ import {
 import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
+import { PageHeader } from "@/components/ui/page-header";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
   { value: "closer", label: "Closers" },
@@ -202,23 +203,30 @@ const ChannelsPage = () => {
         <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
           <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <Radio className="h-5 w-5 text-primary" />
-        <div className="flex-1">
-          <h1 className="text-base font-semibold leading-tight">Canales del inbox</h1>
-          <p className="text-xs text-muted-foreground">
-            Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usa el{" "}
-            <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/inbox/analitica"><BarChart3 className="h-4 w-4" /> Analítica</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
-        </Button>
-        <Button size="sm" onClick={() => setNewOpen(true)}>
-          <Plus className="h-4 w-4" /> Nuevo canal
-        </Button>
+        <PageHeader
+          className="flex-1"
+          icon={<Radio className="h-5 w-5" />}
+          title="Canales del inbox"
+          subtitle={
+            <>
+              Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usa el{" "}
+              <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
+            </>
+          }
+          actions={
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/inbox/analitica"><BarChart3 className="h-4 w-4" /> Analítica</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
+              </Button>
+              <Button size="sm" onClick={() => setNewOpen(true)}>
+                <Plus className="h-4 w-4" /> Nuevo canal
+              </Button>
+            </>
+          }
+        />
       </div>
 
       <div className="rounded-md border">

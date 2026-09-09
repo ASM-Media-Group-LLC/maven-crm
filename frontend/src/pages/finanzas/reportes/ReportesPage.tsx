@@ -20,6 +20,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import StatChip from "@/components/StatChip";
+import { PageHeader } from "@/components/ui/page-header";
 import { generateReport, exportTableToExcel } from "./generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -471,13 +472,11 @@ export default function ReportesPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Reportes</h1>
-            <p className="text-sm text-muted-foreground">Generación y descarga de reportes financieros · {reports.length} generados</p>
-          </div>
-          <Button size="sm" onClick={() => setShowGenModal(true)}><Plus className="h-4 w-4 mr-1" />Generar Reporte</Button>
-        </div>
+        <PageHeader
+          title="Reportes"
+          subtitle={`Generación y descarga de reportes financieros · ${reports.length} generados`}
+          actions={<Button size="sm" onClick={() => setShowGenModal(true)}><Plus className="h-4 w-4 mr-1" />Generar Reporte</Button>}
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">

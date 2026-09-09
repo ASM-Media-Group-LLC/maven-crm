@@ -30,6 +30,7 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface OffboardingRecord {
@@ -221,15 +222,15 @@ export default function HROffboarding() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Offboarding</h1>
-            <p className="text-sm text-muted-foreground">Gestión de salida de empleados</p>
-          </div>
-          <Button size="sm" onClick={() => navigate("/hr/offboarding/nuevo")}>
-            <Plus className="h-4 w-4 mr-1" />Iniciar Offboarding
-          </Button>
-        </div>
+        <PageHeader
+          title="Offboarding"
+          subtitle="Gestión de salida de empleados"
+          actions={
+            <Button size="sm" onClick={() => navigate("/hr/offboarding/nuevo")}>
+              <Plus className="h-4 w-4 mr-1" />Iniciar Offboarding
+            </Button>
+          }
+        />
       </header>
 
       {/* ── Content ────────────────────────────────────────────────── */}

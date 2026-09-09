@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarClock, Search, Loader2, CheckCircle2, Copy } from "lucide-react";
 import { useQaStaff, useUserSchedule, saveUserSchedule, roleKindOf, type QaStaff } from "./useStaffSchedules";
+import { PageHeader } from "@/components/ui/page-header";
 
 const DAYS = [
   { w: 1, label: "Lunes" }, { w: 2, label: "Martes" }, { w: 3, label: "Miércoles" },
@@ -80,15 +81,16 @@ export default function HRStaffSchedules() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-          <CalendarClock className="h-5 w-5 text-primary" /> Horario del personal
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Horario real por persona y día de la semana. Lo usa la <strong>puntualidad</strong> de Asistencia (Hubstaff) —
-          cada quien con su horario (closers, chatters, managers, LLG; distinto por día si hace falta).
-        </p>
-      </div>
+      <PageHeader
+        title="Horario del personal"
+        icon={<CalendarClock className="h-5 w-5" />}
+        subtitle={
+          <>
+            Horario real por persona y día de la semana. Lo usa la <strong>puntualidad</strong> de Asistencia (Hubstaff) —
+            cada quien con su horario (closers, chatters, managers, LLG; distinto por día si hace falta).
+          </>
+        }
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[320px_1fr]">
         {/* Picker de personas */}

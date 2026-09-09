@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { UserAvatar } from "@/components/UserAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
+import { PageHeader } from "@/components/ui/page-header";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
 
 const MODALITY_LABELS: Record<string, string> = {
@@ -48,12 +49,10 @@ export default function HRDirectoryLookup() {
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Directorio</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Consulta rápida de datos del equipo · {activeEmployees.length} empleados activos
-          </p>
-        </div>
+        <PageHeader
+          title="Directorio"
+          subtitle={`Consulta rápida de datos del equipo · ${activeEmployees.length} empleados activos`}
+        />
 
         {/* Department tab bar */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">

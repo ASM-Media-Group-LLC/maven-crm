@@ -22,6 +22,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import {
   CONTRACT_TYPES, WORK_MODALITIES, NATIONAL_ID_TYPES, GENDER_OPTIONS,
@@ -157,10 +158,10 @@ export default function EmployeeNew() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Volver al Directorio
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Nuevo Empleado</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Complete los datos para registrar un nuevo empleado</p>
-        </div>
+        <PageHeader
+          title="Nuevo Empleado"
+          subtitle="Complete los datos para registrar un nuevo empleado"
+        />
       </div>
 
       {/* Stepper */}
