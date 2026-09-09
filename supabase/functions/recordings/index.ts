@@ -771,9 +771,9 @@ async function avisarPorCorreo(
 <p>Quedó disponible la grabación de <b>${titulo}</b>.</p>
 <p><a href="${appUrl}/grabaciones">Verla en Maven → Grabaciones</a></p>
 <p style="color:#b45309;font-size:13px"><b>Se borra a los 90 días, sin excepciones.</b>
-Si la necesitás por más tiempo, descargala a tu equipo.</p>
+Si la necesitas por más tiempo, descárgala a tu equipo.</p>
 </div>`,
-      text: `Quedó disponible la grabación de "${titulo}". Vela en ${appUrl}/grabaciones — se borra a los 90 días, sin excepciones: descargala si la necesitás más tiempo.`,
+      text: `Quedó disponible la grabación de "${titulo}". Vela en ${appUrl}/grabaciones — se borra a los 90 días, sin excepciones: descárgala si la necesitas más tiempo.`,
     });
 
     const smtp = await SmtpClient.connect(cred.smtp_host, cred.smtp_port);

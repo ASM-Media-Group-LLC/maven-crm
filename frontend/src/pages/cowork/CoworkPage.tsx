@@ -306,7 +306,7 @@ export default function CoworkPage() {
             <span className="text-xs text-muted-foreground">
               {permissionLoading || canCreateSessions
                 ? "Entrar con el código de tu sala"
-                : "Solo los coordinadores crean sesiones — entrá con el código de tu sala"}
+                : "Solo los coordinadores crean sesiones — entra con el código de tu sala"}
             </span>
             <div className="flex w-full gap-2 md:w-auto">
               <Input

@@ -166,7 +166,7 @@ const OpportunitiesPage = () => {
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Oportunidades de monetización</h1>
           <p className="text-xs text-muted-foreground">
-            Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; acá las ves y manejas.
+            Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; aquí las ves y manejas.
           </p>
         </div>
         <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>

@@ -311,7 +311,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               </p>
               <p className="text-xs text-muted-foreground">
                 Ve al tab Nueva QA, sube el audio de una llamada y al volver
-                acá vas a ver el estado del análisis.
+                aquí verás el estado del análisis.
               </p>
             </div>
           ) : (
