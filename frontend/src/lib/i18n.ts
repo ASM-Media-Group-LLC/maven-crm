@@ -204,7 +204,6 @@ const translations = {
   "dashboard.action.hr": { es: "Recursos Humanos", en: "Human Resources" },
   "dashboard.action.finance": { es: "Finanzas", en: "Finance" },
   "dashboard.action.promolog": { es: "Promolog", en: "Promolog" },
-  "dashboard.action.sales": { es: "Sales Dashboard", en: "Sales Dashboard" },
   "dashboard.action.admin": { es: "Administración", en: "Administration" },
   "dashboard.weeklyTitle": { es: "Rendimiento Semanal", en: "Weekly Performance" },
   "dashboard.weeklyDesc": { es: "Leads y Deals esta semana (datos reales)", en: "Leads and Deals this week (real data)" },

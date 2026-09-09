@@ -136,7 +136,6 @@ const ALL_ACTIONS: QuickAction[] = [
   { id: "hr",         label: "dashboard.action.hr",       icon: Briefcase,     url: "/hr",                module: "HR" },
   { id: "finanzas",   label: "dashboard.action.finance",  icon: DollarSign,    url: "/finanzas",          module: "Finanzas" },
   { id: "promolog",   label: "dashboard.action.promolog", icon: Megaphone,     url: "/promolog",          module: "Promolog" },
-  { id: "sales",      label: "dashboard.action.sales",    icon: TrendingUp,    url: "/sales",             module: "Creator Sales" },
   { id: "admin",      label: "dashboard.action.admin",    icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
 ];
 

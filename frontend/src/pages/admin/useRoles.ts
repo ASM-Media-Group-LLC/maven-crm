@@ -113,8 +113,16 @@ const def = (
 };
 
 // Nombre VISIBLE del módulo en la UI de permisos. La KEY (p.ej. "Creator Sales") se conserva en
-// role_permissions / PermissionRoute / canAccess; esto es solo cosmético para no confundir al usuario.
-const MODULE_LABELS: Record<string, string> = { "Creator Sales": "Ventas" };
+// role_permissions / PermissionRoute / canAccess; esto es solo cosmético.
+//
+// "Creator Sales" se mostraba como "Ventas" y parecía una pestaña que ya no existe
+// (el tab Ventas se fusionó en el Dashboard, #1525) — Jhon la desactivó para varios
+// roles creyéndola muerta (08/09). En realidad es el permiso de VER INGRESOS:
+//   · RLS `cde_sales_read` sobre creator_daily_earnings (los ingresos de BLU)
+//   · /dashboard2 (Dashboard de ingresos, ex "v2") y quién aterriza ahí desde /dashboard
+//   · RPC `ventas_tops` (tops del equipo)
+// Se muestra "Ingresos ▸ Dashboard" para que se lea como lo que es.
+const MODULE_LABELS: Record<string, string> = { "Creator Sales": "Ingresos" };
 export const moduleLabel = (module: string): string => MODULE_LABELS[module] ?? module;
 
 export const MODULES_CONFIG: ModuleConfig[] = [
