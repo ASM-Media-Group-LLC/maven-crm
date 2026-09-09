@@ -20,6 +20,7 @@ import {
   TOP_UP_TARGET,
 } from "@/hooks/useSpammerTasks";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
 
@@ -58,7 +59,8 @@ const MisTareas = () => {
 
   const accountsQ = useSpammerAccounts();
   const assignmentsQ = useDailyAssignments(selectedDate);
-  const { isAdmin, isManager, isSupervisor, isLoading: roleLoading } = useUserRole();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { dataScope } = usePermissions();
 
   const accounts = accountsQ.data ?? [];
   const assignments = assignmentsQ.data ?? [];
@@ -103,7 +105,11 @@ const MisTareas = () => {
     });
   }, [assignments, statusFilter, accountFilter, strategyFilter]);
 
-  const isManagerRole = isAdmin || isManager || isSupervisor;
+  // Vista de gestión = "Permisos de datos" de Scouter Assist, no el nombre del rol
+  // (08/09). Con nombres literales, Operations Sales y Closer + quedaban afuera
+  // aunque tuvieran "Todos los datos". El admin entra siempre; la RLS decide qué
+  // filas llegan (has_scouter_global_scope / has_scouter_team_scope).
+  const isManagerRole = isAdmin || dataScope("Scouter Assist") !== "self";
 
   // Top-up: count assignments not finished yet (pending + in_progress).
   // We only show the button on today's date — no point topping up a past day.
