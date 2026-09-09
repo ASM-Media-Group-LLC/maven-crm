@@ -464,7 +464,7 @@ const FactCard = ({
   value: string;
 }) => (
   <div
-    className="group flex flex-col gap-2 rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-muted/30 hover:shadow-md"
+    className="group flex flex-col gap-2 rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:bg-muted/30 hover:shadow-md"
     style={{ borderColor: `${GOLD}40` }}
   >
     <div className="flex items-center gap-2">
@@ -1479,11 +1479,6 @@ const CallDetailPage = ({
 
       {/* HERO HEADER — gradient con nombre + outcome pill + score circle */}
       <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/15 via-card to-card shadow-lg">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-        <div
-          className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full blur-3xl"
-          style={{ background: `${scoreColorPct(call.claude_score)}20` }}
-        />
         <div className="relative p-6 md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             {/* Left: avatar + nombre + meta. El IG icon va al lado del título
@@ -1507,7 +1502,7 @@ const CallDetailPage = ({
                     href={igUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block shrink-0 transition-transform hover:scale-105"
+                    className="block shrink-0 transition-transform"
                     title="Ver Instagram"
                   >
                     {inner}
@@ -1535,7 +1530,7 @@ const CallDetailPage = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Ver Instagram"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform hover:scale-110"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform"
                       >
                         <InstagramIcon className="h-3.5 w-3.5" />
                       </a>
@@ -1670,7 +1665,7 @@ const CallDetailPage = ({
               )}
             </div>
             <div
-              className="rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:scale-[1.005] hover:bg-muted/30 hover:shadow-md"
+              className="rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:bg-muted/30 hover:shadow-md"
               style={{ borderColor: `${GOLD}40` }}
             >
               <div className="mb-3 flex items-center gap-2">

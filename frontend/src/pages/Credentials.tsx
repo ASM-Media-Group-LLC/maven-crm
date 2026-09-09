@@ -137,7 +137,7 @@ const Credentials = () => {
                 key={role.name}
                 onClick={() => handleLogin(role.email, role.name)}
                 disabled={!!loadingRole}
-                className={`group relative backdrop-blur-2xl bg-gradient-to-br ${role.gradient} border ${role.border} rounded-2xl p-6 text-left transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_0_40px_-10px_hsl(271,91%,50%,0.2)] disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`group relative backdrop-blur-2xl bg-gradient-to-br ${role.gradient} border ${role.border} rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-[0_0_40px_-10px_hsl(271,91%,50%,0.2)] disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <div className="flex items-start gap-4">
                   <div className={`p-3 rounded-xl bg-white/5 ${role.iconColor}`}>

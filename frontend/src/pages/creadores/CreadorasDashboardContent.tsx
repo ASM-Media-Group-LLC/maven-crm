@@ -180,7 +180,7 @@ const CreadorasDashboardContent = () => {
                 key={key}
                 type="button"
                 onClick={() => setStatusPopup(key as StatusKey)}
-                className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+                className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
               >
                 {isOnboarding && pendingCount > 0 && (
                   <TooltipProvider>
@@ -195,7 +195,6 @@ const CreadorasDashboardContent = () => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${bg} transition-opacity group-hover:opacity-50`} />
                 <div className="relative space-y-3">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${bg}`}>
                     <Icon className="h-5 w-5 text-white" />
@@ -370,7 +369,7 @@ const CreadorasDashboardContent = () => {
 
         {/* Section 4 — Offboarding Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-t-[3px] border-t-destructive cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-destructive/10 hover:to-transparent">
+          <Card className="border-t-[3px] border-t-destructive cursor-pointer transition-all duration-200 hover:shadow-lg hover:bg-gradient-to-br hover:from-destructive/10 hover:to-transparent">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -385,7 +384,7 @@ const CreadorasDashboardContent = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-t-[3px] border-t-warning cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent">
+          <Card className="border-t-[3px] border-t-warning cursor-pointer transition-all duration-200 hover:shadow-lg hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>

@@ -53,7 +53,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra }: {
   color: string; tinte: string; barra?: { pct: number; clase: string };
 }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 ring-1 ring-white/5 transition-transform hover:-translate-y-0.5", tinte)}>
+    <div className={cn("relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 ring-1 ring-white/5 transition-transform", tinte)}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
         <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", color)}>

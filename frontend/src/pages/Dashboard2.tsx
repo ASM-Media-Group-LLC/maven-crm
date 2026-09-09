@@ -1007,9 +1007,8 @@ const Dashboard2 = () => {
                   <button
                     type="button"
                     onClick={() => setKpiListOpen("revenue")}
-                    className="group relative overflow-hidden rounded-xl border-2 border-emerald-500/30 bg-card p-5 text-left transition-all duration-200 ease-out hover:scale-[1.015] hover:border-emerald-500/60 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.4)] flex flex-col"
+                    className="group relative overflow-hidden rounded-xl border-2 border-emerald-500/30 bg-card p-5 text-left transition-all duration-200 ease-out hover:border-emerald-500/60 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.4)] flex flex-col"
                   >
-                    <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-emerald-500 transition-opacity group-hover:opacity-50" />
                     <div className="relative flex flex-col flex-1">
                       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500">
                         <DollarSign className="h-6 w-6 text-white" />
@@ -1036,7 +1035,6 @@ const Dashboard2 = () => {
                       Reemplaza al viejo Revenue Mix; barras gruesas con
                       el % adentro y el monto al costado. */}
                   <div className="rounded-xl border border-border bg-card p-5 relative overflow-hidden lg:col-span-2">
-                    <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-25 bg-amber-500" />
                     <div className="relative space-y-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500 shrink-0">
@@ -1805,9 +1803,8 @@ const Dashboard2 = () => {
                           type="button"
                           onClick={() => hlKpis.topCreator && setCreatorDetail(hlKpis.topCreator)}
                           disabled={!hlKpis.topCreator}
-                          className="group rounded-xl border-2 border-amber-500/40 bg-card p-4 relative overflow-hidden text-left transition-all duration-200 hover:scale-[1.015] hover:border-amber-500/70 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)] disabled:cursor-default"
+                          className="group rounded-xl border-2 border-amber-500/40 bg-card p-4 relative overflow-hidden text-left transition-all duration-200 hover:border-amber-500/70 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)] disabled:cursor-default"
                         >
-                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500 transition-opacity group-hover:opacity-50" />
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500"><Crown className="h-5 w-5 text-white" /></div>
                             <div>
@@ -1819,7 +1816,6 @@ const Dashboard2 = () => {
                         </button>
 
                         <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-blue-500" />
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500"><Target className="h-5 w-5 text-white" /></div>
                             <div>
@@ -1831,7 +1827,6 @@ const Dashboard2 = () => {
                         </div>
 
                         <div className="rounded-xl border border-destructive/40 bg-card p-4 relative overflow-hidden">
-                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-destructive" />
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive"><AlertTriangle className="h-5 w-5 text-white" /></div>
                             <div>
@@ -1843,7 +1838,6 @@ const Dashboard2 = () => {
                         </div>
 
                         <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-emerald-500" />
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500"><TrendingUp className="h-5 w-5 text-white" /></div>
                             <div>

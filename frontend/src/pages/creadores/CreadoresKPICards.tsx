@@ -11,12 +11,12 @@ const CreadoresKPICards = ({ counts, isCloser = false }: Props) => {
   const activePercent = counts.total > 0 ? Math.round((counts.active / counts.total) * 100) : 0;
 
   const cards = [
-    { label: "Total Creadoras", count: counts.total, subtitle: "Registro completo", icon: Users, colorClass: "text-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
-    { label: "Activas", count: counts.active, subtitle: `${activePercent}% del total`, icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-    { label: "En Onboarding", count: counts.onboarding + counts.pendiente + counts.pendiente_verificacion, subtitle: "En proceso", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
-    { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
-    { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
+    { label: "Total Creadoras", count: counts.total, subtitle: "Registro completo", icon: Users, colorClass: "text-foreground", bgClass: "bg-muted", hoverClass: " hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
+    { label: "Activas", count: counts.active, subtitle: `${activePercent}% del total`, icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: " hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+    { label: "En Onboarding", count: counts.onboarding + counts.pendiente + counts.pendiente_verificacion, subtitle: "En proceso", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: " hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: " hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+    { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: " hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
+    { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: " hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
   ].filter(card => !(isCloser && card.label === "En Onboarding"));
 
   return (

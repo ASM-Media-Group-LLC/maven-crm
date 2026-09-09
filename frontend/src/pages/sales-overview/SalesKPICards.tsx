@@ -87,9 +87,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
           key={card.id}
           type="button"
           onClick={() => onCardClick(card.id)}
-          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
         >
-          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${card.bg} transition-opacity group-hover:opacity-50`} />
           <div className="relative space-y-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg}`}>
               <card.icon className="h-5 w-5 text-white" />

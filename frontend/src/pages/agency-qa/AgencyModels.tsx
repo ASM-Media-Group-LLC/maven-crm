@@ -290,12 +290,6 @@ const StatCard = ({
   gradient: string;
 }) => (
   <Card className="p-4 relative overflow-hidden">
-    <div
-      className={cn(
-        "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
-        gradient,
-      )}
-    />
     <div className="relative space-y-3">
       <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
         {icon}

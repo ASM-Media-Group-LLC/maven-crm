@@ -65,7 +65,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra, onClick }: 
     <Caja
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={cn("relative w-full overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 text-left ring-1 ring-white/5 transition-transform hover:-translate-y-0.5",
+      className={cn("relative w-full overflow-hidden rounded-2xl border border-white/10 bg-card/60 bg-gradient-to-br to-transparent p-4 text-left ring-1 ring-white/5 transition-transform",
         onClick && "cursor-pointer hover:border-primary/40", tinte)}
     >
       <div className="flex items-start justify-between gap-2">

@@ -30,11 +30,11 @@ interface AgentDetailViewProps {
 }
 
 const qualityCardConfig = [
-  { key: "a+", label: "A+", icon: Star, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-  { key: "a", label: "A", icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-  { key: "b+", label: "B+", icon: ArrowUpRight, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
-  { key: "b", label: "B", icon: ArrowRight, colorClass: "text-warning/80", bgClass: "bg-warning/15", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent hover:border-warning/30" },
-  { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
+  { key: "a+", label: "A+", icon: Star, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: " hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+  { key: "a", label: "A", icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: " hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+  { key: "b+", label: "B+", icon: ArrowUpRight, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: " hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+  { key: "b", label: "B", icon: ArrowRight, colorClass: "text-warning/80", bgClass: "bg-warning/15", hoverClass: " hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent hover:border-warning/30" },
+  { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: " hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -216,7 +216,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
         <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[400px] opacity-100"}`}>
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
+            <Card className="cursor-default transition-all duration-200 hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground">Última Hora</p>
@@ -227,7 +227,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 <p className="mt-2 text-2xl font-bold text-primary">{lastHourLeads.length}</p>
               </CardContent>
             </Card>
-            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40">
+            <Card className="cursor-default transition-all duration-200 hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground">Total Hoy</p>
@@ -238,7 +238,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 <p className="mt-2 text-2xl font-bold text-success">{todayLeads.length}</p>
               </CardContent>
             </Card>
-            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40">
+            <Card className="cursor-default transition-all duration-200 hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div>

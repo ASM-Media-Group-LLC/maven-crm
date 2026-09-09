@@ -526,7 +526,7 @@ const LeadCard = ({
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-transform hover:scale-[1.02] hover:border-primary/40"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-transform hover:border-primary/40"
     >
       <div
         className="relative w-full"
@@ -578,7 +578,7 @@ const LeadCard = ({
               onToggleFavorite();
             }
           }}
-          className="absolute bottom-1.5 right-1.5 flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-full bg-black/55 transition-transform hover:scale-110"
+          className="absolute bottom-1.5 right-1.5 flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-full bg-black/55 transition-transform"
         >
           <Star
             className="h-3.5 w-3.5"

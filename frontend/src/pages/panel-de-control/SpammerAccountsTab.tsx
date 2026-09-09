@@ -447,7 +447,7 @@ const SpammerCard = ({
           onClick();
         }
       }}
-      className="group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:scale-[1.015] hover:border-primary/40 hover:shadow-lg cursor-pointer"
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:border-primary/40 hover:shadow-lg cursor-pointer"
     >
       {/* Botón eliminar — arriba a la derecha. stopPropagation para no
           disparar el onClick de la card (que abre el detalle). */}
@@ -729,20 +729,12 @@ const StatBox = ({
       className={cn(
         "group relative overflow-hidden rounded-lg border bg-card px-3 py-2.5 text-left transition-all duration-200",
         active ? cfg.borderActive : cfg.border,
-        onClick && "cursor-pointer hover:scale-[1.015]",
+        onClick && "cursor-pointer",
         onClick && cfg.borderHover,
         onClick && cfg.glow,
         active && "shadow-[0_0_16px_-4px_rgba(255,255,255,0.15)]",
       )}
     >
-      <div
-        className={cn(
-          "absolute -right-8 -top-8 h-20 w-20 rounded-full blur-2xl opacity-30 transition-opacity",
-          cfg.bg,
-          onClick && "group-hover:opacity-50",
-          active && "opacity-50",
-        )}
-      />
       <div className="relative flex items-center gap-2.5">
         <div
           className={cn(

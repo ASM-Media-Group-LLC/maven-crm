@@ -431,7 +431,7 @@ ${form.comentarios || "Sin comentarios"}
                 ].map((m) => (
                   <div
                     key={m.label}
-                    className="rounded-xl border border-border p-4 hover:shadow-md hover:scale-[1.03] transition-all duration-200"
+                    className="rounded-xl border border-border p-4 hover:shadow-md transition-all duration-200"
                   >
                     <p className="text-xs text-muted-foreground">{m.label}</p>
                     <p className={`text-2xl font-bold mt-1 ${m.color}`}>

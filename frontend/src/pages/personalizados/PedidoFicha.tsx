@@ -339,7 +339,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                   return (
                     <div key={a.id} className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-background/40">
                       {esImg && u ? (
-                        <img src={u} alt={a.file_name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <img src={u} alt={a.file_name} className="h-full w-full object-cover transition-transform duration-300 group-" />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center">
                           <Paperclip className="h-4 w-4 text-muted-foreground" />

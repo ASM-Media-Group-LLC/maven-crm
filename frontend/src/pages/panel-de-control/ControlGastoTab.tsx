@@ -213,7 +213,6 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
           cards de Reclutamiento modelos: border-2 con color, gradient
           corner blur que se intensifica en hover. */}
       <Card className="p-5 border-2 border-indigo-500/30 relative overflow-hidden">
-        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500" />
         <div className="relative">
           <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
             Total en el rango
@@ -252,12 +251,6 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                 borderByStatus,
               )}
             >
-              <div
-                className={cn(
-                  "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
-                  gradient,
-                )}
-              />
               <div className="relative space-y-3">
                 <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
                   <Icon className="h-5 w-5 text-white" />
@@ -299,7 +292,6 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
         {/* Card derived — % del cap combinado. Misma estética que el
             "Tasa de cierre" del tab modelos. */}
         <Card className="p-4 border-2 border-fuchsia-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-fuchsia-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-500">
               <DollarSign className="h-5 w-5 text-white" />

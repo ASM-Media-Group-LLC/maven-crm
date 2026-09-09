@@ -68,7 +68,7 @@ export default function HRPersonnel() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((p) => (
               <button key={p.profile_id} onClick={() => navigate(`/hr/persona/${p.profile_id}`)}
-                className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:-translate-y-[1px] hover:border-primary/40 hover:bg-primary/5">
+                className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary/40 hover:bg-primary/5">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                   {initials(p.name) || "?"}
                 </div>

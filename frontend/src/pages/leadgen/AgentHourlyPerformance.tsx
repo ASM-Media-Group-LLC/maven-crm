@@ -131,7 +131,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+        <Card className="group transition-all duration-300 hover:shadow-lg overflow-hidden border-none bg-card/50">
           <CardContent className="p-4 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
@@ -146,7 +146,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             </div>
           </CardContent>
         </Card>
-        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+        <Card className="group transition-all duration-300 hover:shadow-lg overflow-hidden border-none bg-card/50">
           <CardContent className="p-4 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
@@ -161,7 +161,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             </div>
           </CardContent>
         </Card>
-        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+        <Card className="group transition-all duration-300 hover:shadow-lg overflow-hidden border-none bg-card/50">
           <CardContent className="p-4 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
@@ -184,7 +184,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       {/* Quality Cards */}
       <div className="grid grid-cols-5 gap-3">
         {qualityCards.map((q) => (
-          <Card key={q.key} className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <Card key={q.key} className="group transition-all duration-300 hover:shadow-lg overflow-hidden border-none bg-card/50">
             <CardContent className="p-4 relative">
               <div className={`absolute inset-0 ${q.hoverBg} opacity-0 group-hover:opacity-100 transition-opacity`} />
               <div className="relative">

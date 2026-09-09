@@ -22,7 +22,7 @@ const CategorySectionHeader = ({ cat, count, isCollapsed, onToggle }: Props) => 
       className="group flex w-full items-center gap-3 sticky top-0 z-[1] py-1.5 px-0.5 bg-card/40 backdrop-blur-md rounded-2xl"
     >
       <div
-        className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
+        className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group- ${tone.bg} ${tone.ring}`}
       >
         <span className={`text-sm font-bold tracking-wide ${tone.text}`}>{cat}</span>
         <span
