@@ -33,6 +33,7 @@ const RolesTable = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive,
               <div className="flex items-center gap-2">
                 <span className="font-medium capitalize">{role.name}</span>
                 <Badge variant="secondary" className="text-xs">{ROLE_TIER_SHORT[role.tier]}</Badge>
+                <Badge variant="outline" className="text-xs tabular-nums" title="Nivel jerárquico: quién puede gestionar a quién y qué es «subordinado» en Permisos de datos">nivel {role.level}</Badge>
                 {role.is_system && (
                   <Badge variant="outline" className="text-xs">Sistema</Badge>
                 )}
