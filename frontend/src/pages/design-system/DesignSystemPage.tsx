@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { SistemaSection } from "./sections/SistemaSection";
 import { ColorsSection } from "./sections/ColorsSection";
 import { TypographySection } from "./sections/TypographySection";
 import { SpacingSection } from "./sections/SpacingSection";
@@ -40,15 +42,10 @@ const DesignSystemPage = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <div className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Design System</h1>
-            <Badge variant="secondary" className="text-xs">v1.0.0</Badge>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Referencia completa de tokens de diseño y componentes UI · React + Tailwind CSS · Light / Dark mode
-        </p>
+        <PageHeader
+          title={<span className="inline-flex items-center gap-3">Design System <Badge variant="secondary" className="text-xs font-sans">v2.0</Badge></span>}
+          subtitle="Tokens, componentes y las ocho reglas del sistema, en tema claro y oscuro."
+        />
       </div>
 
       {/* Tab bar */}
@@ -72,6 +69,7 @@ const DesignSystemPage = () => {
       <div className="flex-1 overflow-auto p-6 space-y-20">
         {activeTab === "foundations" && (
           <>
+            <SistemaSection />
             <ColorsSection />
             <TypographySection />
             <SpacingSection />

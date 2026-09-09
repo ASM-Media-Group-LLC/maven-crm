@@ -1,31 +1,40 @@
-const radii = [
-  { name: "none", className: "rounded-none", value: "0", usage: "Elementos sin redondeo. Uso excepcional." },
-  { name: "sm", className: "rounded-sm", value: "calc(var(--radius) - 4px)", usage: "Inputs, badges, elementos compactos." },
-  { name: "md", className: "rounded-md", value: "calc(var(--radius) - 2px)", usage: "Botones, selects, dropdowns." },
-  { name: "lg", className: "rounded-lg", value: "var(--radius)", usage: "Cards, modales, contenedores principales." },
-  { name: "xl", className: "rounded-xl", value: "0.75rem", usage: "Cards destacadas, elementos hero." },
-  { name: "2xl", className: "rounded-2xl", value: "1rem", usage: "Contenedores grandes, secciones." },
-  { name: "full", className: "rounded-full", value: "9999px", usage: "Avatares, badges circulares, indicadores." },
+// Radios del rediseño (09/2026): tres por ROL más `rounded-full`. La escala por
+// tamaño (sm/md/lg/xl/2xl/3xl) sigue existiendo para shadcn, pero en las
+// pantallas queda en retirada: el test de contrato la rechaza en pantallas nuevas.
+const radios = [
+  { name: "control", className: "rounded-control", value: "8px", usage: "Botones, inputs, chips rectangulares, celdas." },
+  { name: "panel", className: "rounded-panel", value: "12px", usage: "Paneles, tarjetas de lista, popovers." },
+  { name: "card", className: "rounded-card", value: "16px", usage: "Tarjetas grandes, modales, hojas inferiores." },
+  { name: "full", className: "rounded-full", value: "9999px", usage: "Chips, avatares, indicadores." },
+];
+
+const enRetirada = [
+  { vieja: "rounded-sm", px: "8px", nueva: "rounded-control" },
+  { vieja: "rounded-md", px: "10px", nueva: "rounded-control" },
+  { vieja: "rounded-lg", px: "12px", nueva: "rounded-panel" },
+  { vieja: "rounded-xl", px: "12px", nueva: "rounded-panel" },
+  { vieja: "rounded-2xl", px: "16px", nueva: "rounded-card" },
+  { vieja: "rounded-3xl", px: "24px", nueva: "rounded-card" },
 ];
 
 export const BordersSection = () => (
   <section id="borders" className="space-y-8">
     <div>
-      <h2 className="text-3xl font-semibold mb-2">1.4 Bordes y Radius</h2>
+      <h2 className="text-3xl font-semibold mb-2">1.4 Bordes y radios</h2>
       <p className="text-sm text-muted-foreground max-w-2xl">
-        El radius base se define con el token <code className="font-mono text-primary">--radius: 0.5rem</code>. 
-        Todos los demás valores se calculan a partir de este.
-        <span className="text-destructive font-medium"> Prohibido mezclar distintos radios sin justificación.</span>
+        Tres radios, elegidos por el rol del elemento y no por su tamaño, más <code className="font-mono text-primary">rounded-full</code>.
+        El token base sigue siendo <code className="font-mono text-primary">--radius: 0.75rem</code> (lo usan los
+        componentes shadcn). Siete radios distintos conviviendo era una de las razones de que nada pareciera de la misma familia.
       </p>
     </div>
 
     <div>
-      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Escala de radius</h3>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Los tres radios</h3>
       <div className="flex flex-wrap gap-8">
-        {radii.map((r) => (
-          <div key={r.name} className="flex flex-col items-center gap-2 max-w-[120px]">
+        {radios.map((r) => (
+          <div key={r.name} className="flex flex-col items-center gap-2 max-w-[140px]">
             <div className={`w-20 h-20 bg-primary ${r.className}`} />
-            <p className="text-sm font-medium">{r.name}</p>
+            <p className="text-sm font-medium">{r.name} <span className="text-muted-foreground font-mono text-xs">{r.value}</span></p>
             <p className="text-xs text-muted-foreground font-mono text-center">{r.className}</p>
             <p className="text-xs text-muted-foreground text-center">{r.usage}</p>
           </div>
@@ -34,12 +43,39 @@ export const BordersSection = () => (
     </div>
 
     <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">En retirada</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        La escala por tamaño se migra en la fase 2 del rediseño. Equivalencias para el barrido:
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm max-w-xl">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="pb-2 pr-4 font-medium">Clase vieja</th>
+              <th className="pb-2 pr-4 font-medium">Medía</th>
+              <th className="pb-2 font-medium">Pasa a</th>
+            </tr>
+          </thead>
+          <tbody>
+            {enRetirada.map((r) => (
+              <tr key={r.vieja} className="border-b border-border/50">
+                <td className="py-2 pr-4 font-mono text-xs text-destructive line-through">{r.vieja}</td>
+                <td className="py-2 pr-4 text-muted-foreground">{r.px}</td>
+                <td className="py-2 font-mono text-xs text-primary">{r.nueva}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Reglas</h3>
       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-        <li>Borde por defecto: <code className="font-mono text-foreground">border border-border</code></li>
+        <li>Borde por defecto: <code className="font-mono text-foreground">border border-border</code> (hairline). Es lo que separa filas dentro de un panel; nunca otra tarjeta.</li>
         <li>Borde de inputs: <code className="font-mono text-foreground">border border-input</code></li>
-        <li>Un componente debe mantener un radio consistente — no mezclar <code className="font-mono">rounded-sm</code> con <code className="font-mono">rounded-lg</code> sin motivo</li>
-        <li>Los hijos nunca deben tener un radio mayor que el padre</li>
+        <li>Sombra solo en el realce: una cosa por pantalla (el protagonista, un modal, la fila activa).</li>
+        <li>Los hijos nunca tienen un radio mayor que el padre.</li>
       </ul>
     </div>
   </section>
