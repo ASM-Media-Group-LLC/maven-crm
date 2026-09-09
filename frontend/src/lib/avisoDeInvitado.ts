@@ -10,16 +10,22 @@
 // de manos levantadas de Cowork.
 
 /**
- * @param vistas  Lo que ya se conocía. `null` = todavía no miramos nunca.
+ * @param vistas  Lo que ya se conocía.
  * @param actuales Los ids que están esperando ahora.
+ * @param esPrimeraMirada Si esta consulta es la primera. ⚠️ Lo decide quien
+ *   EMPIEZA primero, no quien termina primero: el panel dispara una consulta al
+ *   montarse y enseguida se suscribe al realtime, y si una respuesta se
+ *   adelantaba se declaraba "la primera", no sonaba, y ese invitado no hacía
+ *   sonar nada NUNCA. Por eso el que llama reclama el turno antes del await.
  * @returns `{ nuevos, vistas }` — `nuevos` es lo que debe sonar.
  */
 export function invitadosNuevos(
-  vistas: Set<string> | null,
+  vistas: Set<string>,
   actuales: string[],
+  esPrimeraMirada: boolean,
 ): { nuevos: string[]; vistas: Set<string> } {
   const ahora = new Set(actuales);
   // Primera foto: se guarda y no suena nada.
-  if (vistas === null) return { nuevos: [], vistas: ahora };
+  if (esPrimeraMirada) return { nuevos: [], vistas: ahora };
   return { nuevos: actuales.filter((id) => !vistas.has(id)), vistas: ahora };
 }
