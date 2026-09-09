@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud, Plus, X } from "lucide-react";
+import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud, CloudFog, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground } from "./BackgroundSelector";
+import { useFondosPropios } from "./BackgroundSelector";
+import { BACKGROUND_TEMPLATES, isCustomBackground, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 
 interface DeviceInfo {
   deviceId: string;
   label: string;
-}
-
-interface CustomBg {
-  id: string;
-  objectUrl: string;
 }
 
 interface VideoSettingsDialogProps {
@@ -30,7 +26,10 @@ export default function VideoSettingsDialog({
 }: VideoSettingsDialogProps) {
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [selectedVideoInput, setSelectedVideoInput] = useState(currentVideoInputId || "");
-  const [customBgs, setCustomBgs] = useState<CustomBg[]>([]);
+  // Los MISMOS fondos propios que ve el lobby: salen de IndexedDB, no de un
+  // useState local. Antes cada pantalla tenía su lista y lo que subías en el
+  // lobby no existía acá.
+  const { fondos, subir, borrar } = useFondosPropios(open);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const enumerateDevices = useCallback(async () => {
@@ -47,21 +46,18 @@ export default function VideoSettingsDialog({
     }
   }, [open, enumerateDevices, currentVideoInputId]);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const objectUrl = URL.createObjectURL(file);
-    const id = `custom-${Date.now()}`;
-    setCustomBgs((prev) => [...prev, { id, objectUrl }]);
-    onBackgroundChange(`custom:${objectUrl}`);
     if (fileRef.current) fileRef.current.value = "";
-  }, [onBackgroundChange]);
+    if (!file || !file.type.startsWith("image/")) return;
+    const efecto = await subir(file);
+    if (efecto) onBackgroundChange(efecto);
+  }, [onBackgroundChange, subir]);
 
-  const handleDeleteCustom = useCallback((bg: CustomBg) => {
-    URL.revokeObjectURL(bg.objectUrl);
-    setCustomBgs((prev) => prev.filter((b) => b.id !== bg.id));
-    if (backgroundEffect === `custom:${bg.objectUrl}`) onBackgroundChange("none");
-  }, [backgroundEffect, onBackgroundChange]);
+  const handleDeleteCustom = useCallback(async (id: string) => {
+    await borrar(id);
+    if (backgroundEffect === `custom:${id}`) onBackgroundChange("none");
+  }, [backgroundEffect, onBackgroundChange, borrar]);
 
   const isSelected = (id: string) => backgroundEffect === id;
 
@@ -79,15 +75,20 @@ export default function VideoSettingsDialog({
           <div className="space-y-2">
             <p className="text-xs font-medium text-foreground">Fondos y efectos</p>
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onBackgroundChange("none")}>
                   <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
                     <Ban className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </EffectOption>
-                <EffectOption label="Difuminar fondo" active={isSelected("blur")} onClick={() => onBackgroundChange("blur")}>
+                <EffectOption label="Difuminar" active={isSelected("blur")} onClick={() => onBackgroundChange("blur")}>
                   <div className="w-full h-full rounded bg-muted flex items-center justify-center">
                     <Cloud className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </EffectOption>
+                <EffectOption label="Difuminar más" active={isSelected("blur-strong")} onClick={() => onBackgroundChange("blur-strong")}>
+                  <div className="w-full h-full rounded bg-muted flex items-center justify-center">
+                    <CloudFog className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </EffectOption>
                 <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
@@ -100,35 +101,45 @@ export default function VideoSettingsDialog({
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
               {/* Custom backgrounds */}
-              {customBgs.length > 0 && (
+              {fondos.length > 0 && (
                 <>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Tus fondos</p>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {customBgs.map((bg) => (
-                      <button
+                    {fondos.map((bg) => (
+                      <div
                         key={bg.id}
-                        title="Fondo personalizado"
-                        onClick={() => onBackgroundChange(`custom:${bg.objectUrl}`)}
                         className={cn(
                           "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
-                          isSelected(`custom:${bg.objectUrl}`)
+                          isSelected(`custom:${bg.id}`)
                             ? "border-primary ring-1 ring-primary/30"
                             : "border-transparent hover:border-border"
                         )}
                       >
-                        <img src={bg.objectUrl} alt="Custom" className="w-full h-full object-cover" />
-                        {isSelected(`custom:${bg.objectUrl}`) && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <Check className="h-4 w-4 text-white" />
-                          </div>
-                        )}
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteCustom(bg); }}
-                          className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          type="button"
+                          title="Fondo personalizado"
+                          onClick={() => onBackgroundChange(`custom:${bg.id}`)}
+                          className="absolute inset-0 w-full h-full"
+                        >
+                          <img src={bg.url} alt="Fondo personalizado" className="w-full h-full object-cover" />
+                          {isSelected(`custom:${bg.id}`) && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                              <Check className="h-4 w-4 text-white" />
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          title="Borrar este fondo"
+                          onClick={() => void handleDeleteCustom(bg.id)}
+                          // Visible SIEMPRE: con `group-hover` en un teléfono no se veía nunca, y
+                    // desde que el borrado es permanente eso significaba borrar a ciegas
+                    // el fondo guardado. Área de toque de 24px y foco visible.
+                    className="absolute top-0 right-0 z-10 grid h-6 w-6 place-items-center rounded-bl-lg bg-black/70 text-white/90 hover:bg-black/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                         >
                           <X className="h-2.5 w-2.5 text-white" />
                         </button>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </>
@@ -172,12 +183,12 @@ function EffectOption({ label, active, onClick, children }: {
     <button
       onClick={onClick}
       className={cn(
-        "flex-1 flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-card",
+        "flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-card",
         active ? "border-primary bg-primary/10" : "border-transparent"
       )}
     >
       <div className="w-full h-8 rounded overflow-hidden">{children}</div>
-      <span className="text-[9px] text-muted-foreground leading-tight">{label}</span>
+      <span className="text-[9px] text-muted-foreground leading-tight text-center">{label}</span>
     </button>
   );
 }

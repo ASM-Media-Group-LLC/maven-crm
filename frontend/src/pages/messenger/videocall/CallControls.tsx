@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { BackgroundEffect } from "./BackgroundSelector";
+import { esBlur, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 
 interface DeviceInfo {
   deviceId: string;
@@ -481,7 +481,7 @@ export default function CallControls({
                     title="Difuminar fondo"
                     className={cn(
                       "h-8 px-3 rounded-full flex items-center gap-1.5 text-xs transition-colors",
-                      backgroundEffect === "blur"
+                      esBlur(backgroundEffect)
                         ? "bg-primary/20 text-primary hover:bg-primary/25"
                         : "bg-card text-foreground hover:bg-muted"
                     )}
@@ -624,7 +624,7 @@ export default function CallControls({
                       onClick={cerrarY(() => { onToggleNoiseCancellation(); avisarNC(!isNoiseCancellationOn); })} />
                   )}
                   <FilaMenu icon={Cloud} label="Difuminar fondo"
-                    activa={backgroundEffect === "blur"}
+                    activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />
                   <FilaMenu icon={Sparkles} label="Fondos y efectos" onClick={cerrarY(onOpenVideoSettings)} />
                   {onOpenAdjustView && (

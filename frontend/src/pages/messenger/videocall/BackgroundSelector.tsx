@@ -1,63 +1,85 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ImageIcon, Check, Ban, Cloud, Plus, X } from "lucide-react";
+import { ImageIcon, Check, Ban, Cloud, CloudFog, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  BACKGROUND_TEMPLATES, MAX_FONDOS_PROPIOS,
+  isCustomBackground, getCustomBackgroundUrl, isTemplateBackground,
+  listarFondosPropios, guardarFondoPropio, borrarFondoPropio, urlDeFondoPropio,
+  type BackgroundEffect, type FondoPropio, type FalloAlGuardar,
+} from "@/lib/fondoDeLlamada";
 
-export type BackgroundEffect = "none" | "blur" | string;
+// El tipo, las plantillas y los predicados VIVEN en `@/lib/fondoDeLlamada` desde
+// el 09/09/2026 (para que el hook los use sin importar este archivo, que trae
+// React). Se re-exportan desde acá porque media docena de archivos —y sus
+// tests— ya los importaban de este módulo.
+export type { BackgroundEffect };
+export { BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground };
 
-export function isCustomBackground(effect: BackgroundEffect): boolean {
-  return typeof effect === "string" && effect.startsWith("custom:");
-}
-
-export function getCustomBackgroundUrl(effect: BackgroundEffect): string {
-  return effect.replace(/^custom:/, "");
-}
-
-export function isTemplateBackground(effect: BackgroundEffect): boolean {
-  return effect !== "none" && effect !== "blur" && !isCustomBackground(effect);
-}
-
-export const BACKGROUND_TEMPLATES = [
-  { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg", lowSrc: "/backgrounds/low/bg-office.jpg" },
-  { id: "tpl-bookshelf", label: "Biblioteca", src: "/backgrounds/bg-bookshelf.jpg", lowSrc: "/backgrounds/low/bg-bookshelf.jpg" },
-  { id: "tpl-beach", label: "Playa", src: "/backgrounds/bg-beach.jpg", lowSrc: "/backgrounds/low/bg-beach.jpg" },
-  { id: "tpl-mountains", label: "Montañas", src: "/backgrounds/bg-mountains.jpg", lowSrc: "/backgrounds/low/bg-mountains.jpg" },
-  { id: "tpl-cafe", label: "Café", src: "/backgrounds/bg-cafe.jpg", lowSrc: "/backgrounds/low/bg-cafe.jpg" },
-  { id: "tpl-livingroom", label: "Sala", src: "/backgrounds/bg-livingroom.jpg", lowSrc: "/backgrounds/low/bg-livingroom.jpg" },
-  { id: "tpl-forest", label: "Bosque", src: "/backgrounds/bg-forest.jpg", lowSrc: "/backgrounds/low/bg-forest.jpg" },
-  { id: "tpl-abstract", label: "Abstracto", src: "/backgrounds/bg-abstract.jpg", lowSrc: "/backgrounds/low/bg-abstract.jpg" },
-];
-
-interface CustomBg {
-  id: string;
-  objectUrl: string;
-}
+/** Qué se le dice a la persona cuando su imagen no se pudo guardar. */
+const MOTIVO_DE_FALLO: Record<FalloAlGuardar, string> = {
+  limite: `Se guardan hasta ${MAX_FONDOS_PROPIOS}. Borrá uno y volvé a intentar.`,
+  ilegible: "Este navegador no puede abrir esa imagen. Probá con un JPG o un PNG.",
+  "sin-almacen": "Este navegador no está guardando datos del sitio, así que el fondo no se puede recordar.",
+};
 
 interface BackgroundSelectorProps {
   selected: BackgroundEffect;
   onSelect: (effect: BackgroundEffect) => void;
 }
 
+/** Los fondos propios de la persona, ya con su URL de esta pestaña. */
+export function useFondosPropios(activo: boolean) {
+  const [fondos, setFondos] = useState<Array<{ id: string; url: string; creado: number }>>([]);
+
+  const recargar = useCallback(async () => {
+    const filas = await listarFondosPropios();
+    const conUrl = await Promise.all(
+      filas.map(async (f: FondoPropio) => ({ id: f.id, creado: f.creado, url: (await urlDeFondoPropio(f.id)) ?? "" })),
+    );
+    setFondos(conUrl.filter((f) => f.url));
+  }, []);
+
+  useEffect(() => { if (activo) void recargar(); }, [activo, recargar]);
+
+  const subir = useCallback(async (file: File): Promise<string | null> => {
+    const { fondo, motivo } = await guardarFondoPropio(file, Date.now());
+    if (fondo) {
+      await recargar();
+      return `custom:${fondo.id}`;
+    }
+    // El aviso dice lo que DE VERDAD pasó. Antes siempre culpaba al límite,
+    // incluso con la lista vacía y el almacenamiento bloqueado.
+    toast.error("No se pudo guardar el fondo", { description: MOTIVO_DE_FALLO[motivo ?? "sin-almacen"] });
+    return null;
+  }, [recargar]);
+
+  const borrar = useCallback(async (id: string) => {
+    await borrarFondoPropio(id);
+    await recargar();
+  }, [recargar]);
+
+  return { fondos, subir, borrar, recargar };
+}
+
 export default function BackgroundSelector({ selected, onSelect }: BackgroundSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [customBgs, setCustomBgs] = useState<CustomBg[]>([]);
+  const { fondos, subir, borrar } = useFondosPropios(open);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const objectUrl = URL.createObjectURL(file);
-    const id = `custom-${Date.now()}`;
-    setCustomBgs((prev) => [...prev, { id, objectUrl }]);
-    onSelect(`custom:${objectUrl}`);
     if (fileRef.current) fileRef.current.value = "";
-  }, [onSelect]);
+    if (!file || !file.type.startsWith("image/")) return;
+    const efecto = await subir(file);
+    if (efecto) onSelect(efecto);
+  }, [onSelect, subir]);
 
-  const handleDeleteCustom = useCallback((bg: CustomBg) => {
-    URL.revokeObjectURL(bg.objectUrl);
-    setCustomBgs((prev) => prev.filter((b) => b.id !== bg.id));
-    if (selected === `custom:${bg.objectUrl}`) onSelect("none");
-  }, [selected, onSelect]);
+  const handleDeleteCustom = useCallback(async (id: string) => {
+    await borrar(id);
+    if (selected === `custom:${id}`) onSelect("none");
+  }, [selected, onSelect, borrar]);
 
   const handleRandom = () => {
     const tpl = BACKGROUND_TEMPLATES[Math.floor(Math.random() * BACKGROUND_TEMPLATES.length)];
@@ -81,19 +103,29 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           <ImageIcon className="h-[18px] w-[18px]" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" className="z-[200] w-80 p-3 bg-background border-secondary">
+      <PopoverContent side="top" align="center" // Tope de alto + scroll: con 5 fondos propios guardados y 8 plantillas el
+        // contenido pasa los 470px y en una pantalla baja (el teléfono acostado) la
+        // última fila quedaba fuera, sin forma de llegar.
+        className="z-[200] w-80 p-3 bg-background border-secondary max-h-[70vh] overflow-y-auto">
         <p className="text-xs font-medium text-foreground mb-3">Fondos y efectos</p>
 
-        {/* Effect options */}
-        <div className="flex gap-2 mb-3">
+        {/* Cuatro opciones: sin efecto, los DOS niveles de difuminado y subir
+            imagen. En grilla, no en flex: con cuatro en una fila `flex-1` las
+            etiquetas quedaban en 68 px y se partían en tres líneas. */}
+        <div className="grid grid-cols-4 gap-1.5 mb-3">
           <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onSelect("none")}>
             <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
               <Ban className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
-          <EffectOption label="Difuminar fondo" active={isSelected("blur")} onClick={() => onSelect("blur")}>
+          <EffectOption label="Difuminar" active={isSelected("blur")} onClick={() => onSelect("blur")}>
             <div className="w-full h-full rounded bg-muted flex items-center justify-center">
               <Cloud className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </EffectOption>
+          <EffectOption label="Difuminar más" active={isSelected("blur-strong")} onClick={() => onSelect("blur-strong")}>
+            <div className="w-full h-full rounded bg-muted flex items-center justify-center">
+              <CloudFog className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
           <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
@@ -105,36 +137,49 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
 
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-        {/* Custom backgrounds */}
-        {customBgs.length > 0 && (
+        {/* Fondos propios. Ahora salen de IndexedDB, así que siguen estando
+            mañana y son los MISMOS que se ven en el diálogo de la llamada. */}
+        {fondos.length > 0 && (
           <>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Tus fondos</p>
             <div className="grid grid-cols-4 gap-1.5 mb-3">
-              {customBgs.map((bg) => (
-                <button
+              {fondos.map((bg) => (
+                <div
                   key={bg.id}
-                  title="Fondo personalizado"
-                  onClick={() => onSelect(`custom:${bg.objectUrl}`)}
                   className={cn(
                     "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
-                    isSelected(`custom:${bg.objectUrl}`)
+                    isSelected(`custom:${bg.id}`)
                       ? "border-primary ring-1 ring-primary/30"
                       : "border-transparent hover:border-border"
                   )}
                 >
-                  <img src={bg.objectUrl} alt="Custom" className="w-full h-full object-cover" />
-                  {isSelected(`custom:${bg.objectUrl}`) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <Check className="h-4 w-4 text-white" />
-                    </div>
-                  )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteCustom(bg); }}
-                    className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    type="button"
+                    title="Fondo personalizado"
+                    onClick={() => onSelect(`custom:${bg.id}`)}
+                    className="absolute inset-0 w-full h-full"
+                  >
+                    <img src={bg.url} alt="Fondo personalizado" className="w-full h-full object-cover" />
+                    {isSelected(`custom:${bg.id}`) && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Check className="h-4 w-4 text-white" />
+                      </span>
+                    )}
+                  </button>
+                  {/* Va FUERA del otro botón: un <button> dentro de un <button>
+                      es HTML inválido y el navegador lo desanida solo. */}
+                  <button
+                    type="button"
+                    title="Borrar este fondo"
+                    onClick={() => void handleDeleteCustom(bg.id)}
+                    // Visible SIEMPRE: con `group-hover` en un teléfono no se veía nunca, y
+                    // desde que el borrado es permanente eso significaba borrar a ciegas
+                    // el fondo guardado. Área de toque de 24px y foco visible.
+                    className="absolute top-0 right-0 z-10 grid h-6 w-6 place-items-center rounded-bl-lg bg-black/70 text-white/90 hover:bg-black/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                   >
                     <X className="h-2.5 w-2.5 text-white" />
                   </button>
-                </button>
+                </div>
               ))}
             </div>
           </>
@@ -186,12 +231,12 @@ function EffectOption({
     <button
       onClick={onClick}
       className={cn(
-        "flex-1 flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-card",
+        "flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all hover:bg-card",
         active ? "border-primary bg-primary/10" : "border-transparent"
       )}
     >
       <div className="w-full h-8 rounded overflow-hidden">{children}</div>
-      <span className="text-[9px] text-muted-foreground leading-tight">{label}</span>
+      <span className="text-[9px] text-muted-foreground leading-tight text-center">{label}</span>
     </button>
   );
 }
