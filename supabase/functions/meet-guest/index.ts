@@ -157,14 +157,33 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     // CLAIM — "¿ya me admitieron?". Devuelve el token SOLO si sí.
     // ═══════════════════════════════════════════════════════════════
+    // El invitado colgó. Cierra SU admisión: nadie más puede hacerlo porque
+    // hace falta su token, que solo tiene su navegador.
+    if (action === "leave") {
+      const guestToken = String(body.guestToken ?? "");
+      if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
+      // `is("left_at", null)` para no correr la marca si vuelve a llamar: la
+      // hora que importa es la de la primera salida.
+      await admin.from("meet_guest_requests")
+        .update({ left_at: new Date().toISOString() })
+        .eq("guest_token", guestToken).is("left_at", null);
+      return json(req, { ok: true });
+    }
+
     if (action === "claim") {
       const guestToken = String(body.guestToken ?? "");
       if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
 
       const { data: request } = await admin.from("meet_guest_requests")
-        .select("id, meet_room_id, guest_name, status")
+        .select("id, meet_room_id, guest_name, status, left_at")
         .eq("guest_token", guestToken).maybeSingle();
       if (!request) return err(req, "Solicitud no encontrada", 404);
+
+      // Ya colgó una vez: esa entrada se consumió. Volver exige pedir de nuevo
+      // y que alguien de adentro apruebe otra vez (Jhon, 09/09/2026). Antes la
+      // admisión era para siempre y el token guardado lo devolvía derecho a la
+      // llamada, así que con el enlace un externo entraba y salía todo el día.
+      if (request.left_at) return json(req, { status: "left" });
 
       if (request.status === "denied") return json(req, { status: "denied" });
       if (request.status === "pending") return json(req, { status: "pending" });

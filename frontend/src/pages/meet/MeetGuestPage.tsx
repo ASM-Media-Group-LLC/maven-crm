@@ -23,12 +23,13 @@ export default function MeetGuestPage() {
   const { code: rawCode } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const code = normalizeRoomCode(rawCode || "");
-  const { status, error, roomName, guestName, call, knock, getToken } = useMeetGuest(code);
+  const { status, error, roomName, guestName, call, knock, getToken, leave } = useMeetGuest(code);
   const [name, setName] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   // El invitado colgó. Antes esto era `window.location.reload()`: la página se
   // recargaba, el invitado seguía admitido y volvía DERECHO a la llamada, así
   // que colgar se sentía como un refresco que no hacía nada (Jhon, 09/09).
+  // Y salir TERMINA la admisión: volver a entrar es pedir permiso de nuevo.
   const [sali, setSali] = useState(false);
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export default function MeetGuestPage() {
             getToken={getToken}
             initialMicOn={false}
             initialCamOn={false}
-            onLeave={() => setSali(true)}
+            onLeave={() => { setSali(true); void leave(); }}
           />
         </LlamadaEnVentanaFlotante>
       </div>
@@ -152,12 +153,13 @@ export default function MeetGuestPage() {
         </div>
         <p className="text-foreground font-semibold text-center">Saliste de la reunión</p>
         <p className="text-sm text-muted-foreground text-center">
-          Ya podés cerrar esta pestaña.
+          Ya podés cerrar esta pestaña. Si querés volver, tenés que pedir
+          entrada otra vez.
         </p>
-        {/* Sigue admitido, así que volver no exige golpear de nuevo ni que
-            alguien lo apruebe otra vez. */}
-        <Button className="mt-1 w-full" onClick={() => setSali(false)}>
-          Volver a entrar
+        {/* Vuelve al formulario, NO a la llamada: la admisión se terminó al
+            salir y alguien de adentro tiene que aprobarlo de nuevo. */}
+        <Button variant="outline" className="mt-1 w-full" onClick={() => setSali(false)}>
+          Pedir entrada de nuevo
         </Button>
       </Shell>
     );
