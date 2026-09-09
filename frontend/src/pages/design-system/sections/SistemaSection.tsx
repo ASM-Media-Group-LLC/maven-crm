@@ -91,13 +91,13 @@ export const SistemaSection = () => (
             <div key={k} className="flex items-center gap-3 text-xs">
               <span className="w-16 shrink-0 capitalize text-muted-foreground">{k}</span>
               <div className="h-2.5 rounded-full bg-primary/70" style={{ width: `${(PAGE_WIDTHS[k].max / MAX_PX) * 100}%` }} />
-              <span className="tabular-nums text-muted-foreground">{PAGE_WIDTHS[k].max} px</span>
+              <span className="whitespace-nowrap tabular-nums text-muted-foreground">{PAGE_WIDTHS[k].max} px</span>
             </div>
           ))}
           <div className="flex items-center gap-3 text-xs">
             <span className="w-16 shrink-0 text-muted-foreground">Teléfono</span>
             <div className="h-2.5 rounded-full bg-gradient-to-r from-accent to-primary" style={{ width: `${(TELEFONO_PX / MAX_PX) * 100}%` }} />
-            <span className="tabular-nums text-muted-foreground">{TELEFONO_PX} px, una columna</span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{TELEFONO_PX} px, una columna</span>
           </div>
         </Muestra>
         <Texto>
@@ -115,11 +115,11 @@ export const SistemaSection = () => (
             <div className="h-14 rounded-panel border border-border bg-card flex items-end justify-center pb-1">panel</div>
             <div className="h-14 rounded-panel border border-border bg-card shadow-lg flex items-end justify-center pb-1">realce</div>
           </div>
-          <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="h-7 w-7 rounded-control bg-primary/70" /> control 8
-            <span className="h-7 w-7 rounded-panel bg-primary/70" /> panel 12
-            <span className="h-7 w-7 rounded-card bg-primary/70" /> card 16
-            <span className="h-7 w-7 rounded-full bg-primary/70" /> full
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-muted-foreground [&>span]:shrink-0">
+            <span className="h-7 w-7 rounded-control bg-primary/70" /><span className="whitespace-nowrap">control 8</span>
+            <span className="h-7 w-7 rounded-panel bg-primary/70" /><span className="whitespace-nowrap">panel 12</span>
+            <span className="h-7 w-7 rounded-card bg-primary/70" /><span className="whitespace-nowrap">card 16</span>
+            <span className="h-7 w-7 rounded-full bg-primary/70" /><span className="whitespace-nowrap">full</span>
           </div>
         </Muestra>
         <Texto>

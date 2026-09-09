@@ -49,7 +49,7 @@ const DesignSystemPage = () => {
       </div>
 
       {/* Tab bar */}
-      <div className="px-6 py-3 border-b border-border shrink-0">
+      <div className="px-6 py-3 border-b border-border shrink-0 overflow-x-auto scrollbar-thin-x">
         <div className="inline-flex rounded-lg border bg-muted/50 p-1">
           {tabs.map((tab) => (
             <Button
