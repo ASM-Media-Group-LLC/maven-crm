@@ -133,8 +133,10 @@ export default function CoworkPage() {
     });
   }, [veTodasLasSesiones, allSessions, mySessions]);
 
-  // Entrar a una sesión ajena: el edge deja a los admin unirse como host sin
-  // código. Queda como supervisor de esa sesión (tablero con todas las salas).
+  // Entrar a una sesión ajena: el edge deja unirse como host sin código a los
+  // admin y a quien tenga alcance de Cowork sobre esa sesión ("todos", o
+  // "subordinados" si la creó alguien de nivel inferior). Queda como supervisor
+  // de esa sesión (tablero con todas las salas).
   const handleAdminEnter = async (s: AdminSessionRow) => {
     setEnteringId(s.id);
     try {
@@ -406,7 +408,11 @@ export default function CoworkPage() {
                       >
                         Volver <ArrowRight className="h-4 w-4" />
                       </Button>
-                    ) : isAdmin ? (
+                    ) : (
+                      /* No es miembro pero la ve: admin, o alcance de Cowork sobre
+                         esta sesión. El edge deja entrar como host sin código en
+                         ambos casos (cowork_puede_supervisar); si por lo que sea no
+                         corresponde, responde 403 y se muestra el error. */
                       <Button
                         size="sm"
                         className="rounded-full gap-1 shrink-0"
@@ -415,16 +421,6 @@ export default function CoworkPage() {
                       >
                         {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
                       </Button>
-                    ) : (
-                      /* La ve por su alcance de datos, no es miembro: puede mirar
-                         quién está y cuántos hay, pero entrar como host sin código
-                         sigue siendo cosa de admin (lo exige el edge). */
-                      <span
-                        className="shrink-0 rounded-full border border-border/60 px-2.5 py-1 text-xs text-muted-foreground"
-                        title="Ves esta sesión por tu alcance de datos en Cowork. Para entrar necesitás el código de sala."
-                      >
-                        Solo lectura
-                      </span>
                     )}
                   </div>
                 </div>
