@@ -5,13 +5,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Maven vive en más de un dominio (el propio y el histórico, que sigue sirviendo
 // los links públicos ya enviados), así que el origen se elige por request contra
 // esta lista. Se mantiene inline y en el mismo orden que `_shared/cors.ts`.
+// ⚠️ Esta copia quedó desfasada de _shared/cors.ts y faltaba `app.maven-ai.me`, que es
+// el dominio CANÓNICO: desde ahí el preflight devolvía maven.asmtech.ai, el navegador
+// bloqueaba la request y el front mostraba "Failed to send a request to the Edge
+// Function" — que parece un problema de permisos y no lo es. Mantener en sincronía
+// con ALLOWED_ORIGINS de _shared/cors.ts.
 const ORIGENES_PERMITIDOS = [
   "https://maven.asmtech.ai",
   "https://maven.asmtech.me",
+  "https://app.maven-ai.me",
   "https://www.maven-ai.me",
   "https://maven-ai.me",
   "http://localhost:5173",
   "http://localhost:4173",
+  "http://127.0.0.1:4173",
 ];
 const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? ORIGENES_PERMITIDOS[0];
 const corsPara = (req: Request) => {

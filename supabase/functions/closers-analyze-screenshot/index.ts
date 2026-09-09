@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCorsFor } from "../_shared/whatsapp.ts";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
 // closers-analyze-screenshot — analiza las CAPTURAS que los closers adjuntan a la nota
@@ -63,9 +63,9 @@ interface VisionAnalysis {
   mentions: Array<{ name: string; kind: string }>;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
-}
+// `json` se define DENTRO del handler (más abajo) porque el CORS se resuelve por
+// request: esta función SÍ la llama el navegador (leadScreenshots.ts), así que un
+// origen fijo solo servía a uno de los dominios de Maven.
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
@@ -208,7 +208,10 @@ async function processOne(sb: any, row: FileRow): Promise<boolean> {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  const json = (body: unknown, status = 200): Response =>
+    new Response(JSON.stringify(body), { status, headers: { ...whatsappCorsFor(req), "Content-Type": "application/json" } });
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCorsFor(req) });
   if (!authorizeCronOrJwt(req)) return json({ ok: false, error: "unauthorized" }, 401);
 
   const body = await req.json().catch(() => ({})) as { file_id?: string; batch_size?: number };

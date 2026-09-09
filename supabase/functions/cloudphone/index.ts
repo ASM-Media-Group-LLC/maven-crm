@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickAllowedOrigin } from "../_shared/cors.ts";
 
 // cloudphone — proxy autenticado entre Maven y el microservicio `cloudphone-gateway`.
 // El front llama acá con el JWT del usuario; esta función aplica el CONTROL DE ACCESO
@@ -20,13 +21,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // CONTROL DE TIEMPO: el reaper vive en el MICRO (in-memory, sin cron en Supabase). Esta función solo
 // escribe el LOG de uso (al abrir/cerrar) y reconcilia en `list` las sesiones que el reaper cerró.
 
-const cors = {
-  "Access-Control-Allow-Origin": Deno.env.get("CORS_ALLOW_ORIGIN") ?? "https://maven.asmtech.ai",
+// El origen se resuelve POR REQUEST contra la allowlist compartida. Antes era un valor
+// FIJO (maven.asmtech.ai, el dominio viejo), así que desde app.maven-ai.me —el canónico—
+// el navegador bloqueaba la respuesta y la pantalla de Teléfonos no podía hablar con esta
+// función. Un solo origen no alcanza: Maven vive en varios dominios.
+const corsFor = (req: Request) => ({
+  "Access-Control-Allow-Origin": pickAllowedOrigin(req),
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   Vary: "Origin",
-};
-const json = (b: unknown, status = 200) =>
-  new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
+});
 
 const GW_URL = (Deno.env.get("CLOUDPHONE_URL") ?? "").replace(/\/$/, "");
 const GW_TOKEN = Deno.env.get("CLOUDPHONE_SPIKE_TOKEN") ?? "";
@@ -70,7 +73,11 @@ async function reconcileLog(sb: any, activeIds: Set<string>, ended: any[]) {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  // `json` vive DENTRO del handler para poder resolver el CORS por request.
+  const json = (b: unknown, status = 200) =>
+    new Response(JSON.stringify(b), { status, headers: { ...corsFor(req), "Content-Type": "application/json" } });
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsFor(req) });
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
