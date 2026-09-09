@@ -24,6 +24,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { cn } from "@/lib/utils";
+import { BotonSilenciarCanal } from "@/components/BotonSilenciarCanal";
 import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser, Tags, Plus, ArrowLeft } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -847,6 +848,7 @@ const InboxPage = () => {
             en vivo
           </span>
           <div className="ml-auto flex items-center gap-2">
+            <BotonSilenciarCanal channel="wa" className="h-7 w-7" />
             {canAccess("WhatsApp", "Canales") && (
               <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="Gestionar canales">
                 <Link to="/inbox/canales"><Radio className="h-4 w-4" /></Link>

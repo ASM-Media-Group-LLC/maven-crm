@@ -12,6 +12,7 @@ import { Link, useSearchParams, useLocation, useNavigate } from "react-router-do
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { BotonSilenciarCanal } from "@/components/BotonSilenciarCanal";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -528,7 +529,7 @@ const TelegramInboxPage = () => {
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <TelegramIcon className="h-5 w-5 text-sky-500" />
         <h1 className="text-base font-semibold">Telegram</h1>
-        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">Beta</span>
+        <BotonSilenciarCanal channel="tg" className="h-7 w-7" />
         <Link to="/telegram" className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <Radio className="h-3.5 w-3.5" /> {t("tg.accounts")}
         </Link>

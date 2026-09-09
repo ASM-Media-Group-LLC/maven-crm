@@ -3,7 +3,7 @@ import {
   Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
   MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
-  Volume2, VolumeX, Mail, Clapperboard, CalendarRange, CalendarDays, Gift, RefreshCw } from "lucide-react";
+  Mail, Clapperboard, CalendarRange, CalendarDays, Gift, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useChannelSoundMuted, type MuteChannel } from "@/hooks/useChannelSoundMuted";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -58,35 +57,6 @@ const badgeTint = (module: string | undefined): string =>
 const compactBadge = (n: number): string =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(n);
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
-// Cuando una fila de menú tiene su botón de mute (WhatsApp/Telegram/Messenger),
-// el NavLink reserva espacio a la derecha para que ni el título ni el badge se
-// metan debajo del botón (posicionado absoluto sobre la fila).
-const LINK_CLASS_WITH_MUTE = `${LINK_CLASS} pr-9`;
-
-// Botón para SILENCIAR el sonido de las notificaciones de UN canal (WhatsApp,
-// Telegram o Messenger). Va a la derecha de la fila del tab. Es un botón aparte
-// del NavLink (no navega): stopPropagation + preventDefault por si el gesto
-// burbujea. VolumeX rojo = silenciado; Volume2 tenue = con sonido. Oculto en el
-// sidebar colapsado (icon-only) por falta de espacio.
-const ChannelMuteButton = ({ channel }: { channel: MuteChannel }) => {
-  const { muted, toggle } = useChannelSoundMuted(channel);
-  const label = muted ? "Activar sonido de notificaciones" : "Silenciar sonido de notificaciones";
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
-      title={label}
-      aria-label={label}
-      aria-pressed={muted}
-      className={cn(
-        "absolute right-1.5 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-colors hover:bg-foreground/10 group-data-[collapsible=icon]:hidden",
-        muted ? "text-destructive" : "text-muted-foreground/60 hover:text-foreground",
-      )}
-    >
-      {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-    </button>
-  );
-};
 
 // Picks the URL with the LONGEST prefix match against `pathname`. Sin
 // esto, dos items hermanos cuyas URLs se solapan (ej: /hr/horarios y
@@ -119,7 +89,7 @@ const DashboardSidebar = () => {
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
 
-  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
+  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Correo", url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
@@ -144,15 +114,15 @@ const DashboardSidebar = () => {
     item.url === "/creadores" ? pathname === "/creadores" : pathname.startsWith(item.url)
   );
 
-  const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined; muteChannel?: MuteChannel }[] = [
+  const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined }[] = [
     { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined },
     { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", submodule: undefined },
     { title: "Personalizados", url: "/personalizados", icon: Gift, module: "Personalizados", submodule: undefined },
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
-    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined, muteChannel: "wa" },
-    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined, muteChannel: "tg" },
+    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined },
+    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Chatters · Rendimiento", url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento" as string | undefined },
@@ -464,7 +434,7 @@ const DashboardSidebar = () => {
               {mainMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} end={item.url === "/dashboard"} className={item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
@@ -474,7 +444,6 @@ const DashboardSidebar = () => {
                       )}
                     </NavLink>
                   </SidebarMenuButton>
-                  {item.muteChannel && <ChannelMuteButton channel={item.muteChannel} />}
                 </SidebarMenuItem>
               ))}
 
@@ -505,7 +474,7 @@ const DashboardSidebar = () => {
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} className={cn(item.muteChannel ? LINK_CLASS_WITH_MUTE : LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                    <NavLink to={item.url} className={cn(LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                       {"badge" in item && item.badge != null && (
@@ -515,7 +484,6 @@ const DashboardSidebar = () => {
                       )}
                     </NavLink>
                   </SidebarMenuButton>
-                  {item.muteChannel && <ChannelMuteButton channel={item.muteChannel} />}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
