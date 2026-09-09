@@ -19,6 +19,10 @@ import { invokeRecordings } from "@/hooks/useRecordings";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Grabaciones de Meet/Cowork. Dos reglas que la página tiene que hacer
 // imposibles de ignorar (vienen del diseño de la tabla, ver la migración):
@@ -69,8 +73,13 @@ export default function GrabacionesPage() {
   // Detener desde la lista: hasta hoy solo se podía desde dentro de la
   // llamada, y una grabación que nadie paró seguía "En curso" durante días
   // (PLUS 2 llevaba 92 horas). La edge ya deja parar a cualquiera que la vea.
+  // Confirmaciones con el diálogo de Maven, no el `confirm` del navegador
+  // (Jhon, 09/09/2026). El botón de la fila solo abre el diálogo; la acción
+  // corre al confirmar.
+  const [porDetener, setPorDetener] = useState<RecordingRow | null>(null);
+  const [porBorrar, setPorBorrar] = useState<RecordingRow | null>(null);
+
   const handleDetener = async (r: RecordingRow) => {
-    if (!window.confirm(`¿Detener la grabación "${r.title || r.room_name}"? Queda guardada hasta acá.`)) return;
     setTrabajando(r.id);
     try {
       await invokeRecordings("stop", { recording_id: r.id, recipients: [] });
@@ -107,8 +116,6 @@ export default function GrabacionesPage() {
   };
 
   const handleDelete = async (r: RecordingRow) => {
-    const nombre = r.title || r.room_name;
-    if (!window.confirm(`¿Borrar la grabación "${nombre}"? El archivo se elimina ya mismo y no se puede recuperar.`)) return;
     setTrabajando(r.id);
     try {
       await remove(r.id);
@@ -371,7 +378,7 @@ export default function GrabacionesPage() {
                       title="Detener la grabación y guardarla hasta acá"
                       aria-label="Detener grabación"
                       disabled={ocupado}
-                      onClick={() => void handleDetener(r)}
+                      onClick={() => setPorDetener(r)}
                     >
                       {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
                     </button>
@@ -383,7 +390,7 @@ export default function GrabacionesPage() {
                       title="Borrar grabación"
                       aria-label="Borrar grabación"
                       disabled={ocupado}
-                      onClick={() => void handleDelete(r)}
+                      onClick={() => setPorBorrar(r)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -413,6 +420,49 @@ export default function GrabacionesPage() {
           tendría que bajarse el archivo entero antes de mostrar nada y la
           barra de progreso no dejaría saltar. */}
       <CompartirGrabacionDialog grabacion={compartiendo} miId={myUserId} onClose={() => setCompartiendo(null)} />
+
+      <AlertDialog open={!!porBorrar} onOpenChange={(o) => { if (!o) setPorBorrar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar esta grabación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <b className="text-foreground">{porBorrar?.title || porBorrar?.room_name}</b>
+              {porBorrar?.started_at ? ` · ${fechaCorta(porBorrar.started_at)}` : ""}. El archivo se elimina ya
+              mismo, para ti y para todos con quienes esté compartida, y no se puede recuperar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { const r = porBorrar; setPorBorrar(null); if (r) void handleDelete(r); }}
+            >
+              Borrar grabación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!porDetener} onOpenChange={(o) => { if (!o) setPorDetener(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Detener esta grabación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <b className="text-foreground">{porDetener?.title || porDetener?.room_name}</b> queda guardada hasta este
+              momento en Grabaciones, para quien la inició. La sala sigue abierta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir grabando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { const r = porDetener; setPorDetener(null); if (r) void handleDetener(r); }}
+            >
+              Detener grabación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={!!viendo} onOpenChange={(abierto) => { if (!abierto) setViendo(null); }}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden">
