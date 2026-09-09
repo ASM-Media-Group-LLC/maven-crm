@@ -66,6 +66,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        // Colores de canal: solo marcan canal (icono, chip, burbuja de Telegram).
+        // Nunca significan estado; para eso están success/warning/destructive.
+        whatsapp: "hsl(var(--whatsapp))",
+        telegram: "hsl(var(--telegram))",
         "instagram-pink": "hsl(var(--instagram-pink))",
         "instagram-purple": "hsl(var(--instagram-purple))",
         "instagram-orange": "hsl(var(--instagram-orange))",
@@ -74,6 +78,12 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Los tres radios del sistema (rediseño 09/2026): se declaran por rol,
+        // no por tamaño. `rounded-full` sigue para chips y avatares. La escala
+        // sm/md/lg/xl/2xl/3xl queda en retirada: ver /design-system → Radios.
+        control: "0.5rem",
+        panel: "0.75rem",
+        card: "1rem",
       },
       fontFamily: {
         // Fuente display del reskin — solo títulos/números grandes vía
