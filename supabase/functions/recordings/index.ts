@@ -21,7 +21,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // v2 (que movio Duration a /wkt) y el import explota AL BOOTEAR -- deno check
 // pasa igual porque tipa contra los .d.ts, no contra el bundle. Fue un
 // BOOT_ERROR real en prod el 21/08: la funcion nunca llego a servir.
-import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
+import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType, RoomServiceClient } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
@@ -48,6 +48,31 @@ function egress(): EgressClient {
     Deno.env.get("LIVEKIT_API_KEY")!,
     Deno.env.get("LIVEKIT_API_SECRET")!,
   );
+}
+
+function salas(): RoomServiceClient {
+  return new RoomServiceClient(
+    livekitHttpUrl(),
+    Deno.env.get("LIVEKIT_API_KEY")!,
+    Deno.env.get("LIVEKIT_API_SECRET")!,
+  );
+}
+
+/** Identidades de la gente REAL que está en la sala (sin el participante del
+ *  egress, que es oculto). Si la sala ya no existe en LiveKit, nadie. Si
+ *  LiveKit no contesta, null: no se decide nada con un dato que no llegó. */
+async function personasEnLaSala(roomName: string): Promise<string[] | null> {
+  try {
+    const lista = await salas().listParticipants(roomName);
+    return lista
+      .filter((p) => !p.permission?.hidden && !p.identity.startsWith("EG_"))
+      .map((p) => p.identity);
+  } catch (e) {
+    const msg = (e as Error).message ?? "";
+    // Sala cerrada = sala vacía. Cualquier otra cosa es "no sé".
+    if (/not found|does not exist|404/i.test(msg)) return [];
+    return null;
+  }
 }
 
 /** Firma para rec-server: HMAC(archivo.exp). El link vence solo. */
@@ -153,7 +178,33 @@ Deno.serve(async (req) => {
       // `egress_id` lo manda el webhook de LiveKit: "esta grabación terminó".
       // En ese caso no hay nada que esperar —la espera existe solo porque el
       // sondeo tiene que adivinar— así que se cierra esa fila y nada más.
-      const { egress_id } = body as { egress_id?: string };
+      const { egress_id, abortar } = body as { egress_id?: string; abortar?: string[] };
+      // `abortar`: ids de grabaciones colgadas que un admin decidió tirar
+      // (09/09/2026: tres llevaban días "En curso"). Se para el egress, se
+      // borra el archivo y la fila queda como borrada. Sin correo a nadie.
+      if (Array.isArray(abortar) && abortar.length) {
+        const abortadas: string[] = [];
+        for (const id of abortar.slice(0, 20)) {
+          const { data: rec } = await admin.from("meeting_recordings")
+            .select("id, egress_id, storage_key, status").eq("id", id).maybeSingle();
+          if (!rec || rec.status === "deleted") continue;
+          if (rec.egress_id) {
+            try { await egress().stopEgress(rec.egress_id); } catch (e) { console.warn("[recordings] abortar stopEgress:", (e as Error).message); }
+            await new Promise((r) => setTimeout(r, 4000)); // que el egress cierre el archivo
+          }
+          if (rec.storage_key) {
+            try {
+              const r = await fetch(await firmarUrl(rec.storage_key, "f", 60), { method: "DELETE" });
+              if (!r.ok && r.status !== 404) console.warn("[recordings] abortar borrar archivo:", r.status);
+            } catch (e) { console.warn("[recordings] abortar borrar archivo:", (e as Error).message); }
+          }
+          await admin.from("meeting_recordings")
+            .update({ status: "deleted", deleted_at: new Date().toISOString(), ended_at: new Date().toISOString(), detenida_por: "abortada_admin" })
+            .eq("id", rec.id);
+          abortadas.push(rec.id);
+        }
+        return json(req, { ok: true, abortadas });
+      }
       const cerradas = await cerrarHuerfanas(admin, egress_id);
       return json(req, { ok: true, cerradas });
     }
@@ -548,7 +599,7 @@ const GRACIA_HUERFANA_MS = 15 * 60 * 1000;
 async function cerrarHuerfanas(admin: any, egressId?: string): Promise<number> {
   let q = admin
     .from("meeting_recordings")
-    .select("id, started_by, egress_id, storage_key, room_name, title, started_at")
+    .select("id, started_by, egress_id, storage_key, room_name, title, started_at, sala_vacia_desde, sin_iniciador_desde")
     .in("status", ["recording", "processing"])
     .is("deleted_at", null)
     .limit(50);
@@ -564,10 +615,66 @@ async function cerrarHuerfanas(admin: any, egressId?: string): Promise<number> {
   let cerradas = 0;
   for (const c of colgadas ?? []) {
     // Con aviso de LiveKit no hace falta volver a preguntarle.
-    if (!egressId && await egressActivo(c.egress_id)) continue; // sigue grabando
+    if (!egressId && await egressActivo(c.egress_id)) {
+      // Sigue grabando. ¿Debería? Se corta sola si la sala se quedó sin gente
+      // real o si quien la inició lleva un rato afuera (Jhon, 09/09/2026:
+      // "que se pare automáticamente si no hay nadie", "que no se vaya sin
+      // parar"). Con gracia, para no cortar por un parpadeo de conexión.
+      if (await autoDetenerSiCorresponde(admin, c)) cerradas++;
+      continue;
+    }
     if (await finalizarHuerfana(admin, c)) cerradas++;
   }
   return cerradas;
+}
+
+const GRACIA_SALA_VACIA_MS = 3 * 60 * 1000;
+const GRACIA_SIN_INICIADOR_MS = 5 * 60 * 1000;
+
+/** Decide si una grabación viva debe cortarse. Devuelve true si la cortó. */
+// deno-lint-ignore no-explicit-any
+async function autoDetenerSiCorresponde(
+  admin: any,
+  rec: {
+    id: string; egress_id: string | null; storage_key: string | null; started_by?: string;
+    room_name?: string; title?: string | null; started_at?: string;
+    sala_vacia_desde?: string | null; sin_iniciador_desde?: string | null;
+  },
+): Promise<boolean> {
+  if (!rec.room_name) return false;
+  const gente = await personasEnLaSala(rec.room_name);
+  if (gente === null) return false; // LiveKit no contestó: no se decide nada
+
+  const ahora = Date.now();
+  const vacia = gente.length === 0;
+  // La identidad en LiveKit es `${userId}_${sufijo}` (livekit-token).
+  const iniciadorPresente = !!rec.started_by && gente.some((i) => i.startsWith(`${rec.started_by}_`));
+
+  const salaVaciaDesde = vacia ? (rec.sala_vacia_desde ?? new Date(ahora).toISOString()) : null;
+  const sinIniciadorDesde = iniciadorPresente ? null : (rec.sin_iniciador_desde ?? new Date(ahora).toISOString());
+
+  let motivo: "sala_vacia" | "iniciador_se_fue" | null = null;
+  if (salaVaciaDesde && ahora - new Date(salaVaciaDesde).getTime() >= GRACIA_SALA_VACIA_MS) motivo = "sala_vacia";
+  else if (sinIniciadorDesde && ahora - new Date(sinIniciadorDesde).getTime() >= GRACIA_SIN_INICIADOR_MS) motivo = "iniciador_se_fue";
+
+  if (!motivo) {
+    // Solo anotar desde cuándo (o limpiar) y seguir esperando.
+    if (salaVaciaDesde !== (rec.sala_vacia_desde ?? null) || sinIniciadorDesde !== (rec.sin_iniciador_desde ?? null)) {
+      await admin.from("meeting_recordings")
+        .update({ sala_vacia_desde: salaVaciaDesde, sin_iniciador_desde: sinIniciadorDesde })
+        .eq("id", rec.id);
+    }
+    return false;
+  }
+
+  if (rec.egress_id) {
+    try { await egress().stopEgress(rec.egress_id); } catch (e) { console.warn("[recordings] auto-stop stopEgress:", (e as Error).message); }
+    await new Promise((r) => setTimeout(r, 4000)); // que el egress cierre el MP4
+  }
+  await admin.from("meeting_recordings").update({ detenida_por: motivo }).eq("id", rec.id);
+  console.log(`[recordings] auto-stop ${rec.id} (${rec.title ?? rec.room_name}) por ${motivo}`);
+  // Se cierra como si hubieran apretado Detener: queda para quien grabó y se le avisa.
+  return await finalizarHuerfana(admin, rec);
 }
 
 /** Cierra una fila cuyo egress murió sin que nadie llamara a stop: 'ready'
