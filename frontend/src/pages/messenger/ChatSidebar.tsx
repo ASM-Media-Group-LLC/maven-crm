@@ -1,7 +1,8 @@
 import InstalarMaven from "@/components/pwa/InstalarMaven";
 import { esTactil } from "@/lib/plataformaPwa";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
+import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil, Volume2, VolumeX } from "lucide-react";
+import { useChannelSoundMuted } from "@/hooks/useChannelSoundMuted";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -204,7 +205,9 @@ export default function ChatSidebar({
           <div className="flex items-center gap-2 min-w-0">
             <StatusPicker />
           </div>
-          <DropdownMenu>
+          <div className="flex items-center gap-0.5">
+            <BotonSilenciarMessenger />
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title="Nuevo">
                 <Plus className="h-5 w-5" />
@@ -218,7 +221,8 @@ export default function ChatSidebar({
                 <Users className="h-3.5 w-3.5 mr-2" /> Nuevo grupo
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Search — M3 pill */}
@@ -722,5 +726,29 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         )}
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+/** Silenciar el SONIDO de las notificaciones del Messenger, por dispositivo
+ *  (misma preferencia que antes vivía en el altavoz del ítem del menú; Jhon
+ *  lo pidió acá, junto al "+", 09/09/2026). Rojo = silenciado. */
+function BotonSilenciarMessenger() {
+  const { muted, toggle } = useChannelSoundMuted("messenger");
+  const label = muted ? "Activar sonido de notificaciones" : "Silenciar sonido de notificaciones";
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggle}
+      title={label}
+      aria-label={label}
+      aria-pressed={muted}
+      className={cn(
+        "h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8",
+        muted ? "text-destructive hover:text-destructive" : "text-muted-foreground",
+      )}
+    >
+      {muted ? <VolumeX className="h-[18px] w-[18px]" /> : <Volume2 className="h-[18px] w-[18px]" />}
+    </Button>
   );
 }

@@ -122,7 +122,9 @@ const DashboardSidebar = () => {
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Correo", url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
-    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
+    // El mute del Messenger vive en la cabecera de su lista de chats, al lado
+    // del "+" (Jhon, 09/09/2026); WhatsApp y Telegram lo siguen teniendo acá.
+    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
     { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
