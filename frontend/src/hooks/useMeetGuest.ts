@@ -56,11 +56,20 @@ export function useMeetGuest(code: string) {
       setStatus("admitted");
       return true;
     }
+    // Ya colgó una vez: esa admisión se terminó. Se limpia el token guardado
+    // para que volver a entrar sea una solicitud NUEVA, con aprobación nueva.
+    if (res.status === "left") {
+      try { window.localStorage.removeItem(storageKey(code)); } catch { /* noop */ }
+      guestTokenRef.current = null;
+      setCall(null);
+      setStatus("idle");
+      return true;
+    }
     if (res.status === "denied") { setStatus("denied"); return true; }
     if (res.status === "ended") { setStatus("ended"); return true; }
     setStatus("pending");
     return false;
-  }, []);
+  }, [code]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
@@ -124,7 +133,24 @@ export function useMeetGuest(code: string) {
     return { token: call.token, url: call.url };
   }, [call]);
 
+  // Colgar TERMINA la admisión. Antes salir no cambiaba nada del lado del
+  // servidor: el token seguía guardado y volver a entrar —o simplemente
+  // recargar— lo metía derecho a la llamada sin que nadie lo aprobara otra vez
+  // (Jhon, 09/09/2026: "debería volver a pedir autorización y no entrar como si
+  // nada"). Ahora vuelve al formulario y tiene que golpear de nuevo.
+  const leave = useCallback(async () => {
+    const token = guestTokenRef.current;
+    stopPolling();
+    setCall(null);
+    setStatus("idle");
+    guestTokenRef.current = null;
+    try { window.localStorage.removeItem(storageKey(code)); } catch { /* noop */ }
+    // Aunque el aviso al servidor falle, del lado de esta persona ya salió: lo
+    // que se pierde es que su token viejo siga sirviendo, no la salida.
+    if (token) await callMeetGuest("leave", { guestToken: token }).catch(() => {});
+  }, [code, stopPolling]);
+
   useEffect(() => stopPolling, [stopPolling]);
 
-  return { status, error, roomName, guestName, call, knock, getToken };
+  return { status, error, roomName, guestName, call, knock, getToken, leave };
 }
