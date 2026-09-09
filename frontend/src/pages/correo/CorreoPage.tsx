@@ -27,8 +27,12 @@ import {
   ShieldAlert,
   Trash2,
   X,
+  FolderInput,
+  MailOpen,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -186,11 +190,34 @@ export default function CorreoPage() {
     setSel(null);
     setBusqueda("");
     setQueryActiva("");
+    setSeleccion(new Set());
   }, [carpeta]);
+
+  // Selección múltiple, como en Gmail (Jhon, 09/09/2026): casillas en cada
+  // fila, "seleccionar todos" y una barra de acciones arriba de la lista.
+  // Funciona: seleccionar y MARCAR COMO LEÍDO (es lo único que el correo de
+  // Maven ya sabe hacer por IMAP). El resto de la barra está en la UI pero
+  // deshabilitado hasta que exista la acción del lado del servidor.
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  useEffect(() => { setSeleccion(new Set()); }, [queryActiva]);
+  const toggleSeleccion = (m: MailSummary) =>
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      const k = claveDe(m);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
 
   // El hook entrega los mensajes ya ordenados (más nuevo primero) venga de
   // la caché o del camino en vivo. En búsqueda, la lista son los resultados.
   const mensajes = useMemo(() => lista.data?.messages ?? [], [lista.data]);
+
+  const marcarLeidosSeleccionados = (items: MailSummary[]) => {
+    const porLeer = items.filter((m) => seleccion.has(claveDe(m)) && m.unread);
+    if (porLeer.length === 0) { toast.info("Los correos seleccionados ya estaban leídos"); return; }
+    for (const m of porLeer) marcarLeido.mutate({ folder: carpeta, m });
+    toast.success(porLeer.length === 1 ? "1 correo marcado como leído" : `${porLeer.length} correos marcados como leídos`);
+  };
   const items = enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
   const cargandoItems = enBusqueda ? resultados.isFetching : lista.isLoading;
   const errorItems = enBusqueda ? resultados.error : lista.error;
@@ -493,6 +520,52 @@ export default function CorreoPage() {
               que el viewport y SE COME EL BORDE DERECHO (acá, las horas de
               la lista — mismo bug que ya mordió a Messenger). Forzarlo a
               block lo clampa y deja funcionar a truncate/min-w-0. */}
+          {/* Barra de selección (Gmail): casilla de todos + acciones. */}
+          {!cargandoItems && items.length > 0 && (() => {
+            const todos = items.length > 0 && items.every((m) => seleccion.has(claveDe(m)));
+            const algunos = items.some((m) => seleccion.has(claveDe(m)));
+            const n = items.filter((m) => seleccion.has(claveDe(m))).length;
+            const hayNoLeidos = items.some((m) => seleccion.has(claveDe(m)) && m.unread);
+            return (
+              <div className="flex flex-wrap items-center gap-1 border-b border-border/60 px-3 py-1.5" data-testid="barra-seleccion">
+                <Checkbox
+                  checked={todos ? true : algunos ? "indeterminate" : false}
+                  onCheckedChange={() => setSeleccion(todos ? new Set() : new Set(items.map(claveDe)))}
+                  aria-label={todos ? "Quitar la selección" : "Seleccionar todos"}
+                  title={todos ? "Quitar la selección" : "Seleccionar todos"}
+                />
+                {n > 0 ? (
+                  <>
+                    <span className="ml-1 text-xs font-medium text-foreground">{n} {n === 1 ? "seleccionado" : "seleccionados"}</span>
+                    <div className="ml-1 flex items-center gap-0.5">
+                      <AccionBarra icono={MailOpen} etiqueta="Marcar como leído" onClick={() => marcarLeidosSeleccionados(items)} disabled={!hayNoLeidos} />
+                      <AccionBarra icono={Mail} etiqueta="Marcar como no leído" pronto />
+                      <span className="mx-1 h-4 w-px bg-border/70" />
+                      <AccionBarra icono={Archive} etiqueta="Archivar" pronto />
+                      <AccionBarra icono={ShieldAlert} etiqueta="Marcar como spam" pronto />
+                      <AccionBarra icono={Trash2} etiqueta="Eliminar" pronto />
+                      <span className="mx-1 h-4 w-px bg-border/70" />
+                      <AccionBarra icono={Clock} etiqueta="Posponer" pronto />
+                      <AccionBarra icono={FolderInput} etiqueta="Mover a" pronto />
+                      <AccionBarra icono={Tag} etiqueta="Etiquetar" pronto />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSeleccion(new Set())}
+                      className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Quitar selección
+                    </button>
+                  </>
+                ) : (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    {items.length} {items.length === 1 ? "correo" : "correos"}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
           <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
             <div className="space-y-0.5 p-2">
               {cargandoItems &&
@@ -529,6 +602,8 @@ export default function CorreoPage() {
                   key={claveDe(m)}
                   m={m}
                   activo={sel ? claveDe(m) === claveDe(sel) : false}
+                  seleccionado={seleccion.has(claveDe(m))}
+                  onToggleSeleccion={() => toggleSeleccion(m)}
                   onClick={() => abrir(m)}
                   onPrecargar={() => precargar(carpeta, m)}
                   mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
@@ -716,12 +791,16 @@ export default function CorreoPage() {
 function FilaMensaje({
   m,
   activo,
+  seleccionado,
+  onToggleSeleccion,
   onClick,
   onPrecargar,
   mostrarDestinatario,
 }: {
   m: MailSummary;
   activo: boolean;
+  seleccionado: boolean;
+  onToggleSeleccion: () => void;
   onClick: () => void;
   /** Pasar el mouse (o apoyar el dedo) ya dispara la descarga: para
    *  cuando llega el clic, el mensaje suele estar listo. */
@@ -734,17 +813,34 @@ function FilaMensaje({
   const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
   const nombre = nombreDe(quien);
   return (
+    <div
+      className={cn(
+        "group relative flex items-center gap-1 rounded-2xl pl-2 transition-colors",
+        seleccionado && "bg-primary/10 ring-1 ring-primary/25",
+      )}
+    >
+      {/* La casilla es un botón aparte (Radix): no puede ir DENTRO del botón
+          de la fila. Seleccionar no abre el correo; abrir no selecciona. */}
+      <Checkbox
+        checked={seleccionado}
+        onCheckedChange={onToggleSeleccion}
+        aria-label={seleccionado ? "Quitar de la selección" : "Seleccionar este correo"}
+        className={cn(
+          "shrink-0 transition-opacity",
+          seleccionado ? "opacity-100" : "opacity-40 group-hover:opacity-100 [@media(hover:none)]:opacity-70",
+        )}
+      />
     <button
       onClick={onClick}
       onMouseEnter={onPrecargar}
       onFocus={onPrecargar}
       onTouchStart={onPrecargar}
       className={cn(
-        "relative flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-all duration-150",
+        "relative flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-all duration-150",
         activo
           ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
-          : "hover:bg-primary/5",
-        m.unread && !activo && "bg-primary/[0.04]",
+          : !seleccionado && "hover:bg-primary/5",
+        m.unread && !activo && !seleccionado && "bg-primary/[0.04]",
       )}
     >
       <Avatar className={cn("h-10 w-10 shrink-0", activo && "ring-2 ring-primary/20")}>
@@ -798,6 +894,7 @@ function FilaMensaje({
         ) : null}
       </div>
     </button>
+    </div>
   );
 }
 
@@ -823,5 +920,29 @@ function Aviso({ titulo, detalle }: { titulo: string; detalle: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Botón de la barra de selección. `pronto`: está en la UI para que se vea el
+ *  conjunto (como en Gmail) pero todavía no hace nada — falta la acción IMAP
+ *  del lado del servidor. Deshabilitado y con aviso en el title. */
+function AccionBarra({
+  icono: Icono, etiqueta, onClick, disabled, pronto,
+}: { icono: LucideIcon; etiqueta: string; onClick?: () => void; disabled?: boolean; pronto?: boolean }) {
+  const inactivo = pronto || disabled;
+  return (
+    <button
+      type="button"
+      onClick={inactivo ? undefined : onClick}
+      disabled={inactivo}
+      aria-label={etiqueta}
+      title={pronto ? `${etiqueta} · pronto` : etiqueta}
+      className={cn(
+        "grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition",
+        inactivo ? "cursor-not-allowed opacity-35" : "hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <Icono className="h-4 w-4" />
+    </button>
   );
 }
