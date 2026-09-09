@@ -54,7 +54,6 @@ const initials = (name: string): string => {
 const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?: string }) => (
   <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 bg-gradient-to-br from-amber-500/[0.05] to-transparent p-4 ring-1 ring-amber-400/10 md:col-span-2 lg:col-span-3">
     {/* Glow ámbar más fuerte que las demás cards — esta es la métrica destacada */}
-    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500 transition-opacity group-hover:opacity-50" />
     <div className="relative space-y-3">
       <div className="flex items-center gap-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">

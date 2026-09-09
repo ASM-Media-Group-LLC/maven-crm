@@ -72,7 +72,7 @@ export default function SemanaViva({ dias, descansos, shift, hoy = new Date(), o
                 libre ? "border-dashed bg-transparent" : d ? t.fondo : "bg-card",
                 esHoy && "ring-2 ring-primary/60 ring-offset-2 ring-offset-background",
                 sel && "ring-2 ring-foreground",
-                !futuro && "hover:-translate-y-0.5 hover:shadow-md",
+                !futuro && " hover:shadow-md",
                 futuro && !libre && "opacity-40",
               )}>
               <div className="flex items-baseline justify-between">

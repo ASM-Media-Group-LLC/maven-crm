@@ -92,17 +92,17 @@ export const GlobalStatesSection = () => (
         <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Elevación + borde</h4>
           <p className="text-xs text-muted-foreground">Cards de contenido (gráficos, tablas, feeds). Translate-y con cambio de borde.</p>
-          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md">transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30</p>
+          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md">transition-all duration-300 hover:border-primary/30</p>
         </div>
         <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Elevación + gradiente temático</h4>
           <p className="text-xs text-muted-foreground">Cards operacionales con borde superior de color. Gradiente del color asociado.</p>
-          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md">transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-[color]/5 hover:to-transparent</p>
+          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md">transition-all duration-300 hover:bg-gradient-to-b hover:from-[color]/5 hover:to-transparent</p>
         </div>
         <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Scale + gradiente (KPI)</h4>
           <p className="text-xs text-muted-foreground">KPI cards con hover de escala y gradiente radial del color asociado.</p>
-          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md">hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</p>
+          <p className="text-xs font-mono text-primary bg-muted px-3 py-2 rounded-md"> hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</p>
         </div>
       </div>
     </div>

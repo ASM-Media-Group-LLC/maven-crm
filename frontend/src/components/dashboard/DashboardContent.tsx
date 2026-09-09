@@ -359,7 +359,7 @@ const DashboardContent = () => {
           <button
             type="button"
             onClick={() => navigate("/closers")}
-            className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform hover:scale-[1.005]"
+            className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform"
           >
             <UserAvatar name={bestCloserQ.data.name} size="lg" ring />
             <div className="min-w-0 flex-1">
@@ -410,7 +410,7 @@ const DashboardContent = () => {
               {activeActions.map((action) => (
                 <div
                   key={action.id}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 group"
                   onClick={() => navigate(action.url, { state: { fromDashboard: true } })}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -432,7 +432,7 @@ const DashboardContent = () => {
         {/* Row 2: Weekly Performance + Avisos/Actividad */}
         <div className={`grid grid-cols-1 gap-4 ${canAccess("LeadGen") ? "lg:grid-cols-3" : ""}`}>
           {canAccess("LeadGen") && (
-            <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+            <Card className="lg:col-span-2 transition-all duration-300 hover:border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t("dashboard.weeklyTitle")}</CardTitle>
                 <CardDescription>{t("dashboard.weeklyDesc")}</CardDescription>
@@ -456,7 +456,7 @@ const DashboardContent = () => {
           )}
 
           {/* Avisos y Celebraciones */}
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
+          <Card className="transition-all duration-300 hover:border-accent/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Bell className="h-4 w-4" />
@@ -506,7 +506,7 @@ const DashboardContent = () => {
         </div>
 
         {/* Row 2b: Actividad Reciente */}
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
+        <Card className="transition-all duration-300 hover:border-destructive/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t("dashboard.recentActivityTitle")}</CardTitle>
             <CardDescription>{t("dashboard.recentActivityDesc")}</CardDescription>
@@ -557,7 +557,7 @@ const DashboardContent = () => {
           return (
         <div className={`grid gap-4 ${getGridCols(row3Count)}`}>
           {canAccess("LeadGen") && (
-            <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
+            <Card className="transition-all duration-300 hover:border-accent/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t("dashboard.pipelineTitle")}</CardTitle>
                 <CardDescription>{t("dashboard.pipelineDesc")}</CardDescription>
@@ -595,7 +595,7 @@ const DashboardContent = () => {
           )}
 
           {canAccess("Creadores") && (
-            <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+            <Card className="transition-all duration-300 hover:border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t("dashboard.top5Title")}</CardTitle>
                 <CardDescription>{t("dashboard.top5Desc")}</CardDescription>
@@ -632,7 +632,7 @@ const DashboardContent = () => {
           if (row4Count === 0) return null;
           return (
         <div className={`grid gap-4 ${getGridCols(row4Count)}`}>
-          {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
+          {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-destructive" />
@@ -665,7 +665,7 @@ const DashboardContent = () => {
           </Card>}
 
           {canAccess("Closers") && (
-            <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
+            <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <Phone className="h-5 w-5 text-primary" />
@@ -689,7 +689,7 @@ const DashboardContent = () => {
           )}
 
           {canAccess("HR") && (
-            <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
+            <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-accent-foreground" />

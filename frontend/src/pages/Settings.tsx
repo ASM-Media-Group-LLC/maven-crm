@@ -309,7 +309,7 @@ const SkinSwatch = ({
     className="group flex w-16 flex-col items-center gap-1.5 focus:outline-none"
   >
     <span
-      className={`h-10 w-10 rounded-full transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background ${
+      className={`h-10 w-10 rounded-full transition-transform group- group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background ${
         active
           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
           : "ring-1 ring-border"

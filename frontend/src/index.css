@@ -269,9 +269,8 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      Negro puro de fondo (en pantallas OLED los píxeles negros se apagan →
      batería). Cards/popovers quedan apenas por encima del negro para no
      perder la jerarquía de superficies, y el borde sube un paso (17→22%)
-     porque sobre negro absoluto el 17% casi no se ve. Los glows del
-     .dark body::before se quedan (spec). En tema claro el atributo no
-     matchea nada: cero efecto. .dark[data-oled] (0,2,0) gana sobre
+     porque sobre negro absoluto el 17% casi no se ve. En tema claro el
+     atributo no matchea nada: cero efecto. .dark[data-oled] (0,2,0) gana sobre
      .dark (0,1,0). */
   .dark[data-oled] {
     --background: 0 0% 0%;
@@ -320,20 +319,10 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     @apply font-display;
   }
 
-  /* Atmospheric body gradient — dos manchas radiales sutiles que
-     dan profundidad sin afectar legibilidad. Solo en dark (en light
-     el body queda plano white). El fixed garantiza que el degradado
-     no scrollea con el contenido. */
-  .dark body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(ellipse 80% 60% at 20% 0%, hsl(var(--primary) / 0.12), transparent 60%),
-      radial-gradient(ellipse 60% 80% at 100% 100%, hsl(var(--accent) / 0.10), transparent 60%);
-  }
+  /* Rediseño 09/2026: el fondo se queda quieto. Antes había dos manchas radiales
+     de marca fijas detrás del body en tema oscuro; con un solo acento que manda,
+     el degradé vive en lo que actúa (botón primario, burbuja propia, pestaña
+     activa) y no en el fondo. */
 }
 
 /* Scrollbar moderno y sutil — global */
@@ -363,11 +352,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 :root[data-contrast="high"] :focus-visible {
   outline: 2px solid hsl(var(--ring)) !important;
   outline-offset: 2px;
-}
-
-/* Hero gradient background */
-.hero-gradient {
-  background: radial-gradient(ellipse at center top, hsl(var(--accent) / 0.08) 0%, transparent 60%);
 }
 
 /* Calendar event dot indicator */

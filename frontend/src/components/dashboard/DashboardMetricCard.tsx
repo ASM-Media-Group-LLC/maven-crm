@@ -14,32 +14,32 @@ interface DashboardMetricCardProps {
 
 const colorConfig: Record<MetricColor, { hover: string; icon: string; value: string }> = {
   primary: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
+    hover: " hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
     icon: "bg-primary/10 text-primary",
     value: "text-primary",
   },
   accent: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
+    hover: " hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
     icon: "bg-accent/10 text-accent-foreground",
     value: "text-accent-foreground",
   },
   success: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
+    hover: " hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
     icon: "bg-success/10 text-success",
     value: "text-success",
   },
   warning: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40",
+    hover: " hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40",
     icon: "bg-warning/10 text-warning",
     value: "text-warning",
   },
   destructive: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40",
+    hover: " hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40",
     icon: "bg-destructive/10 text-destructive",
     value: "text-destructive",
   },
   muted: {
-    hover: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:to-transparent hover:border-muted-foreground/40",
+    hover: " hover:bg-gradient-to-br hover:from-muted/15 hover:to-transparent hover:border-muted-foreground/40",
     icon: "bg-muted text-muted-foreground",
     value: "",
   },

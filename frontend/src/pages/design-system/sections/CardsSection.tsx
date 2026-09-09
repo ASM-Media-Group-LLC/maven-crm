@@ -118,7 +118,7 @@ export const CardsSection = () => (
             </tbody>
           </table>
         </div>
-        <p className="pt-1"><strong className="text-foreground">Hover automático:</strong> <code className="font-mono text-foreground">hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</code></p>
+        <p className="pt-1"><strong className="text-foreground">Hover automático:</strong> <code className="font-mono text-foreground"> hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</code></p>
         <p><strong className="text-foreground">Reglas:</strong></p>
         <ul className="list-disc list-inside space-y-0.5 text-xs">
           <li>Siempre usar <code className="font-mono text-foreground">DashboardMetricCard</code> para KPIs — nunca divs manuales</li>

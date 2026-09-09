@@ -354,7 +354,7 @@ export default function HRDashboard() {
               {activeActions.map((action) => (
                 <div
                   key={action.id}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 group"
                   onClick={() => action.url && navigate(action.url, { state: { fromHR: true } })}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">

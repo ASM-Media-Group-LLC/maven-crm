@@ -404,7 +404,7 @@ const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabCo
             return (
               <Card
                 key={platform.key}
-                className="group p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40"
+                className="group p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40"
               >
                 <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                   {platform.icon}

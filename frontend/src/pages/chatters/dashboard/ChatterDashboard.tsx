@@ -125,8 +125,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
 
         {/* Fila 1: hoy (turno, creadoras, descanso) + ventas por día */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="relative overflow-hidden border-primary/25 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/40">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
+          <Card className="relative overflow-hidden border-primary/25 transition-all duration-300 hover:border-primary/40">
             <CardContent className="space-y-4 p-5">
               {!miFila ? (
                 <p className="text-sm text-muted-foreground">{identidad.isLoading ? "…" : "Todavía no estás en un grupo de horarios. Cuando un supervisor te asigne, acá vas a ver tu turno, tus creadoras y tu descanso."}</p>
@@ -170,7 +169,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             </CardContent>
           </Card>
 
-          <Card className="flex flex-col lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="flex flex-col lg:col-span-2 transition-all duration-300 hover:border-primary/30">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -213,7 +212,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
 
         {/* Fila 2: calendario de movimiento + detalle del día + ranking */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="lg:col-span-2 transition-all duration-300 hover:border-primary/30">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -233,7 +232,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             </CardContent>
           </Card>
 
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="transition-all duration-300 hover:border-primary/30">
             <CardHeader className="pb-3">
               <CardTitle className={cardTitle}>Tus mejores creadoras</CardTitle>
               <CardDescription>Con quién vendés más en el rango, según BLU</CardDescription>

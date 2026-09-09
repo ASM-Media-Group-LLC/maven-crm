@@ -642,7 +642,7 @@ const LeadDetailDialog = ({
             disabled={!igHandle}
             className={cn(
               "relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-border bg-muted",
-              igHandle && "cursor-pointer transition-all hover:border-primary hover:scale-105",
+              igHandle && "cursor-pointer transition-all hover:border-primary",
             )}
             aria-label={igHandle ? `Abrir Instagram de @${igHandle}` : "Sin Instagram"}
           >
@@ -1045,9 +1045,8 @@ const PanelDeControl = () => {
         <button
           type="button"
           onClick={() => setOpenMetric("totalGenerated")}
-          className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:scale-[1.015] hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
+          className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
         >
-          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500 transition-opacity group-hover:opacity-50" />
           <div className="relative">
             <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Total leads generados
@@ -1077,9 +1076,8 @@ const PanelDeControl = () => {
         <button
           type="button"
           onClick={() => setOpenMetric("numbersObtained")}
-          className="group relative overflow-hidden rounded-xl border-2 border-cyan-500/30 bg-card p-5 text-left transition-all duration-200 hover:scale-[1.015] hover:border-cyan-500/60 hover:shadow-[0_0_24px_-4px_rgba(34,211,238,0.4)]"
+          className="group relative overflow-hidden rounded-xl border-2 border-cyan-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-cyan-500/60 hover:shadow-[0_0_24px_-4px_rgba(34,211,238,0.4)]"
         >
-          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-cyan-500 transition-opacity group-hover:opacity-50" />
           <div className="relative">
             <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Tasa de números obtenidos por lead
@@ -1116,7 +1114,6 @@ const PanelDeControl = () => {
 
         {/* Tasa de números obtenidos — derived metric, no popup */}
         <Card className="p-4 border-2 border-cyan-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-cyan-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
               <TrendingUp className="h-5 w-5 text-white" />
@@ -1138,7 +1135,6 @@ const PanelDeControl = () => {
 
         {/* Conversion rate — derived metric, no popup */}
         <Card className="p-4 border-2 border-fuchsia-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-fuchsia-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-500">
               <TrendingUp className="h-5 w-5 text-white" />
@@ -1180,10 +1176,9 @@ const PanelDeControl = () => {
         <button
           type="button"
           onClick={() => setOpenMetric("enteredCrm")}
-          className={`group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:scale-[1.025] active:scale-[0.99] ${borderHover}`}
+          className={`group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 active:scale-[0.99] ${borderHover}`}
         >
           {/* Glow corner — color según el signo del balance. */}
-          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 transition-opacity group-hover:opacity-50 ${glowColor}`} />
           <div className="relative space-y-3">
             {/* Logo BLU dentro de un cuadrado h-10 w-10 (mismo
                 footprint que los icon-badges de los otros cards). */}
@@ -1246,9 +1241,8 @@ const PanelDeControl = () => {
         <button
           type="button"
           onClick={() => setBestCloserMonthlyOpen(true)}
-          className="text-left rounded-xl border-2 border-amber-500/30 relative overflow-hidden bg-card p-4 transition-all duration-200 hover:scale-[1.025] hover:border-amber-500/60 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)]"
+          className="text-left rounded-xl border-2 border-amber-500/30 relative overflow-hidden bg-card p-4 transition-all duration-200 hover:border-amber-500/60 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)]"
         >
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
               <Crown className="h-5 w-5 text-white" />

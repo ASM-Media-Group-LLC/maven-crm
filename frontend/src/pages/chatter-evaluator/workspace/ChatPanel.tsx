@@ -563,7 +563,7 @@ const MessageBubble = ({
                     className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
                       msg.purchased
                         ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
-                        : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
+                        : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:bg-orange-500 hover:text-white"
                     }`}
                   >
                     {msg.purchased ? "✓" : purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : "$"}

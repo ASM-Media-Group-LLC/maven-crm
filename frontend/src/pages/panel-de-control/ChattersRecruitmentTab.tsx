@@ -260,9 +260,8 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
         <button
           type="button"
           onClick={() => setOpenMetric("total")}
-          className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:scale-[1.015] hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
+          className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
         >
-          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500 transition-opacity group-hover:opacity-50" />
           <div className="relative">
             <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Total sesiones de evaluación
@@ -279,7 +278,6 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
         </button>
 
         <Card className="p-5 border-2 border-emerald-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-emerald-500" />
           <div className="relative">
             <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Tasa de aprobación
@@ -315,7 +313,6 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
 
         {/* Tasa de aprobación — derived metric, sin popup */}
         <Card className="p-4 border-2 border-emerald-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-emerald-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500">
               <TrendingUp className="h-5 w-5 text-white" />
@@ -337,7 +334,6 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
 
         {/* Tasa de claim — derived metric, sin popup */}
         <Card className="p-4 border-2 border-blue-500/30 relative overflow-hidden">
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-blue-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
               <TrendingUp className="h-5 w-5 text-white" />

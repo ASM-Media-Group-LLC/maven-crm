@@ -53,13 +53,6 @@ const StatCard = ({
   }`;
   const inner = (
     <>
-      {/* Gradient corner blur del color del ícono — mismo lenguaje
-          visual que los KpiCard del Panel de Control. Tamaño reducido
-          (h-20 w-20 vs h-32 w-32 del grande) para no saturar la card
-          compacta. */}
-      <div
-        className={`absolute -right-8 -top-8 h-20 w-20 rounded-full blur-3xl opacity-25 transition-opacity group-hover:opacity-50 ${color}`}
-      />
       <div className="relative flex items-center gap-3">
         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${color}`}>
           <IconEl className="h-4 w-4 text-white" />
@@ -114,7 +107,7 @@ const LeadCard = ({
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-transform hover:scale-[1.02] hover:border-primary/40"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-transform hover:border-primary/40"
     >
       {/* Photo area — square */}
       <div
@@ -174,7 +167,7 @@ const LeadCard = ({
               onToggleFavorite();
             }
           }}
-          className="absolute bottom-1.5 right-1.5 flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-full bg-black/55 transition-transform hover:scale-110"
+          className="absolute bottom-1.5 right-1.5 flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-full bg-black/55 transition-transform"
         >
           <Star
             className="h-3.5 w-3.5"

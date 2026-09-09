@@ -166,7 +166,7 @@ const ClosersKPICards = ({
       <button
         type="button"
         onClick={() => setMonthlyOpen(true)}
-        className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform hover:scale-[1.005]"
+        className="flex w-full items-center gap-4 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-transparent p-4 text-left transition-transform"
       >
         <UserAvatar name={bestCloser?.name ?? "?"} size="lg" ring />
         <div className="min-w-0 flex-1">
