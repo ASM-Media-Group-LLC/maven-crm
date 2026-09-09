@@ -308,6 +308,22 @@ const ROOM_OPTIONS: RoomOptions = {
   },
 };
 
+/**
+ * Los tiles que dibuja una persona. Quien comparte pantalla SIEMPRE tiene dos:
+ * su pantalla y su persona. Antes solo si tenía la cámara encendida: con la
+ * cámara apagada quedaba un solo tile (la pantalla), ese se iba al escenario y
+ * la persona desaparecía de la lista lateral —Jhon (08/09): "habemos 4
+ * participantes pero no sale uno… parece como si no estuviera". Con la cámara
+ * apagada el tile de persona muestra su avatar, igual que a cualquier otro.
+ */
+export function tilesDeParticipante(base: LKParticipant, pantallaViva: boolean, camaraViva: boolean): LKParticipant[] {
+  if (!base.isScreenSharing) return [base];
+  return [
+    { ...base, sid: `${base.sid}-screen`, isCameraOff: true, esTileDePantalla: true, hasVideoTrack: pantallaViva },
+    { ...base, isScreenSharing: false, hasVideoTrack: camaraViva },
+  ];
+}
+
 export function useLiveKit() {
   const roomRef = useRef<Room | null>(null);
   const bgProcessorRef = useRef<any>(null);
@@ -467,30 +483,14 @@ export function useLiveKit() {
     const result: LKParticipant[] = [];
     const local = buildParticipant(room.localParticipant, true);
 
-    // If local is screen-sharing AND camera is on, emit two tiles
-    if (local.isScreenSharing && !local.isCameraOff) {
-      const lp = room.localParticipant;
-      const localScreenPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
-      const localCamPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
-      // Screen share tile
-      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true, esTileDePantalla: true, hasVideoTrack: !!localScreenPub?.track && !localScreenPub.isMuted });
-      // Camera tile
-      result.push({ ...local, isScreenSharing: false, hasVideoTrack: !!localCamPub?.track && !localCamPub.isMuted });
-    } else {
-      result.push(local);
-    }
-
-    room.remoteParticipants.forEach((p) => {
-      const remote = buildParticipant(p, false);
-      if (remote.isScreenSharing && !remote.isCameraOff) {
-        const screenPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
-        const camPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
-        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true, esTileDePantalla: true, hasVideoTrack: !!screenPub?.track && !screenPub.isMuted });
-        result.push({ ...remote, isScreenSharing: false, hasVideoTrack: !!camPub?.track && !camPub.isMuted });
-      } else {
-        result.push(remote);
-      }
-    });
+    const tilesDe = (p: Participant, base: LKParticipant) => {
+      const pubs = Array.from(p.videoTrackPublications.values());
+      const screenPub = pubs.find((t) => t.source === Track.Source.ScreenShare);
+      const camPub = pubs.find((t) => t.source === Track.Source.Camera);
+      return tilesDeParticipante(base, !!screenPub?.track && !screenPub.isMuted, !!camPub?.track && !camPub.isMuted);
+    };
+    result.push(...tilesDe(room.localParticipant, local));
+    room.remoteParticipants.forEach((p) => { result.push(...tilesDe(p, buildParticipant(p, false))); });
 
     setParticipants(result);
   }, [buildParticipant]);

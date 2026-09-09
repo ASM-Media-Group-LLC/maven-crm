@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import AudioSink from "./AudioSink";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
@@ -102,19 +103,6 @@ function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScre
       )}
     </div>
   );
-}
-
-// Adjunta un track de audio remoto a un <audio> oculto. `muted` corta la reproducción sin
-// desconectar (así el 🔊 por sala es instantáneo).
-function AudioSink({ track, muted }: { track: any; muted: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (el && track) { try { track.attach(el); } catch { /* noop */ } }
-    return () => { try { track?.detach(); } catch { /* noop */ } };
-  }, [track]);
-  useEffect(() => { if (ref.current) ref.current.muted = muted; }, [muted]);
-  return <audio ref={ref} autoPlay />;
 }
 
 // ── Publicar un CLON de un track base en la sala ────────────────────────────
