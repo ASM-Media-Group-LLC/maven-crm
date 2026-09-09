@@ -33,6 +33,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -58,6 +62,7 @@ import {
   correoDe,
   nombreDe,
   type MailSummary,
+ useMailBulk, type OperacionMasiva,
 } from "@/hooks/useMailbox";
 import { destinatariosRespuesta, direccionesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
@@ -195,9 +200,9 @@ export default function CorreoPage() {
 
   // Selección múltiple, como en Gmail (Jhon, 09/09/2026): casillas en cada
   // fila, "seleccionar todos" y una barra de acciones arriba de la lista.
-  // Funciona: seleccionar y MARCAR COMO LEÍDO (es lo único que el correo de
-  // Maven ya sabe hacer por IMAP). El resto de la barra está en la UI pero
-  // deshabilitado hasta que exista la acción del lado del servidor.
+  // Funcionan: leído, no leído, archivar, spam y eliminar (acción "bulk" de la
+  // edge, una sesión IMAP por lote). Posponer, mover y etiquetar siguen
+  // deshabilitados: no tienen equivalente IMAP directo.
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   useEffect(() => { setSeleccion(new Set()); }, [queryActiva]);
   const toggleSeleccion = (m: MailSummary) =>
@@ -212,11 +217,39 @@ export default function CorreoPage() {
   // la caché o del camino en vivo. En búsqueda, la lista son los resultados.
   const mensajes = useMemo(() => lista.data?.messages ?? [], [lista.data]);
 
-  const marcarLeidosSeleccionados = (items: MailSummary[]) => {
-    const porLeer = items.filter((m) => seleccion.has(claveDe(m)) && m.unread);
-    if (porLeer.length === 0) { toast.info("Los correos seleccionados ya estaban leídos"); return; }
-    for (const m of porLeer) marcarLeido.mutate({ folder: carpeta, m });
-    toast.success(porLeer.length === 1 ? "1 correo marcado como leído" : `${porLeer.length} correos marcados como leídos`);
+  // Acciones de la barra de selección: una sola llamada por lote (IMAP + caché).
+  const masiva = useMailBulk();
+  const [confirmarBorrado, setConfirmarBorrado] = useState<MailSummary[] | null>(null);
+  const NOMBRE_OP: Record<OperacionMasiva, (n: number) => string> = {
+    seen: (n) => `${n} ${n === 1 ? "correo marcado" : "correos marcados"} como leído${n === 1 ? "" : "s"}`,
+    unseen: (n) => `${n} ${n === 1 ? "correo marcado" : "correos marcados"} como no leído${n === 1 ? "" : "s"}`,
+    archive: (n) => `${n} ${n === 1 ? "correo archivado" : "correos archivados"}`,
+    spam: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"} a Spam`,
+    delete: (n) => carpeta === "Papelera"
+      ? `${n} ${n === 1 ? "correo eliminado" : "correos eliminados"} definitivamente`
+      : `${n} ${n === 1 ? "correo movido" : "correos movidos"} a la Papelera`,
+  };
+  const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[]) => {
+    const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
+    if (!elegidos.length) return;
+    if (op === "delete" && carpeta === "Papelera") { setConfirmarBorrado(elegidos); return; }
+    lanzarMasiva(op, elegidos);
+  };
+  const lanzarMasiva = (op: OperacionMasiva, elegidos: MailSummary[]) => {
+    const n = elegidos.length;
+    if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
+    setSeleccion(new Set());
+    masiva.mutate(
+      { folder: carpeta, op, items: elegidos },
+      {
+        onSuccess: (r) => {
+          toast.success(NOMBRE_OP[op](n - (r.omitidos ?? 0)), {
+            description: r.omitidos ? `${r.omitidos} sin identificador: vuelve a abrir la carpeta e inténtalo.` : undefined,
+          });
+        },
+        onError: (e) => toast.error((e as Error).message || "No se pudo aplicar la acción"),
+      },
+    );
   };
   const items = enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
   const cargandoItems = enBusqueda ? resultados.isFetching : lista.isLoading;
@@ -520,7 +553,28 @@ export default function CorreoPage() {
               que el viewport y SE COME EL BORDE DERECHO (acá, las horas de
               la lista — mismo bug que ya mordió a Messenger). Forzarlo a
               block lo clampa y deja funcionar a truncate/min-w-0. */}
-          {/* Barra de selección (Gmail): casilla de todos + acciones. */}
+          <AlertDialog open={!!confirmarBorrado} onOpenChange={(o) => { if (!o) setConfirmarBorrado(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmarBorrado?.length === 1 ? "Este correo" : `Estos ${confirmarBorrado?.length ?? 0} correos`} ya
+              {confirmarBorrado?.length === 1 ? " está" : " están"} en la Papelera: se borran del servidor y no se pueden recuperar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { const e = confirmarBorrado; setConfirmarBorrado(null); if (e) lanzarMasiva("delete", e); }}
+            >
+              Eliminar definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Barra de selección (Gmail): casilla de todos + acciones. */}
           {!cargandoItems && items.length > 0 && (() => {
             const todos = items.length > 0 && items.every((m) => seleccion.has(claveDe(m)));
             const algunos = items.some((m) => seleccion.has(claveDe(m)));
@@ -538,12 +592,12 @@ export default function CorreoPage() {
                   <>
                     <span className="ml-1 text-xs font-medium text-foreground">{n} {n === 1 ? "seleccionado" : "seleccionados"}</span>
                     <div className="ml-1 flex items-center gap-0.5">
-                      <AccionBarra icono={MailOpen} etiqueta="Marcar como leído" onClick={() => marcarLeidosSeleccionados(items)} disabled={!hayNoLeidos} />
-                      <AccionBarra icono={Mail} etiqueta="Marcar como no leído" pronto />
+                      <AccionBarra icono={MailOpen} etiqueta="Marcar como leído" onClick={() => ejecutarMasiva("seen", items)} disabled={!hayNoLeidos || masiva.isPending} />
+                      <AccionBarra icono={Mail} etiqueta="Marcar como no leído" onClick={() => ejecutarMasiva("unseen", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
-                      <AccionBarra icono={Archive} etiqueta="Archivar" pronto />
-                      <AccionBarra icono={ShieldAlert} etiqueta="Marcar como spam" pronto />
-                      <AccionBarra icono={Trash2} etiqueta="Eliminar" pronto />
+                      <AccionBarra icono={Archive} etiqueta="Archivar" onClick={() => ejecutarMasiva("archive", items)} disabled={masiva.isPending || carpeta === "Archive"} />
+                      <AccionBarra icono={ShieldAlert} etiqueta="Marcar como spam" onClick={() => ejecutarMasiva("spam", items)} disabled={masiva.isPending || carpeta === "Correo no deseado"} />
+                      <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? "Eliminar definitivamente" : "Eliminar"} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
                       <AccionBarra icono={Clock} etiqueta="Posponer" pronto />
                       <AccionBarra icono={FolderInput} etiqueta="Mover a" pronto />
