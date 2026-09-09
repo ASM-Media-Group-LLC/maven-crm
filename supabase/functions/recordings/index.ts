@@ -90,11 +90,17 @@ async function personasEnLaSala(roomName: string): Promise<string[] | null> {
 // deja andando a la vez las viejas (que siguen en el VPS y mueren solas con la
 // retención de 90 días) y las nuevas.
 
-/** El nombre del objeto en R2. El egress recibe `filepath: /out/<id>.mp4`, y
- *  al subir a S3 usa esa ruta como llave sin la barra inicial. Se prueban las
- *  dos formas porque depende de la versión del egress. */
+/** El nombre del objeto en R2.
+ *
+ *  ⚠️ LA BARRA INICIAL SOBREVIVE. Se siguió el fuente del egress v1.9: la ruta
+ *  que se le manda (`filepath: /out/<id>.mp4`) pasa por `clean()`, que solo
+ *  saca prefijos `../`, y después por `path.Join(prefix, ...)` con el prefijo
+ *  vacío — así que la llave que llega al SDK es `/out/<id>.mp4`, CON la barra.
+ *  Mi primera versión probaba solo las formas normalizadas y por eso no
+ *  encontraba nada. Se prueban las tres porque no está garantizado que el SDK
+ *  o R2 no normalicen en el camino. */
 function llavesPosibles(archivo: string): string[] {
-  return [`out/${archivo}`, archivo];
+  return [`/out/${archivo}`, `out/${archivo}`, archivo];
 }
 
 function r2(): { cliente: AwsClient; base: string } | null {
@@ -112,37 +118,64 @@ function r2(): { cliente: AwsClient; base: string } | null {
   };
 }
 
-async function firmarR2(metodo: "GET" | "DELETE", llave: string, segundos: number): Promise<string | null> {
+async function firmarR2(metodo: "GET" | "DELETE", llave: string, segundos: number, extraQuery = ""): Promise<string | null> {
   const c = r2();
   if (!c) return null;
-  const url = new URL(`${c.base}/${llave}`);
+  const url = new URL(`${c.base}/${llave}${extraQuery ? `?${extraQuery}` : ""}`);
   url.searchParams.set("X-Amz-Expires", String(segundos));
   const firmada = await c.cliente.sign(new Request(url, { method: metodo }), { aws: { signQuery: true } });
   return firmada.url;
 }
 
 /** Tamaño del objeto en R2, o null si no está (o si R2 no está configurado). */
-async function buscarEnR2(archivo: string): Promise<{ llave: string; size: number } | null> {
+/** Lo que R2 tiene para decir de un archivo.
+ *
+ *  `concluyente` distingue "R2 contestó y NO está" de "R2 ni siquiera me dejó
+ *  preguntar". Sin esa diferencia, un token mal alcanzado se veía EXACTO igual
+ *  que un archivo inexistente: se caía a rec-server, se respondía 404 y no
+ *  quedaba ni una línea en los logs. Un error de configuración con forma de
+ *  pérdida de datos.
+ */
+async function buscarEnR2(
+  archivo: string,
+): Promise<{ hallado: { llave: string; size: number } | null; concluyente: boolean }> {
   const c = r2();
-  if (!c) return null;
+  if (!c) return { hallado: null, concluyente: false };   // sin R2: no sabemos nada
+  let concluyente = true;
   for (const llave of llavesPosibles(archivo)) {
     try {
       const firmada = await c.cliente.sign(
         new Request(`${c.base}/${llave}`, { method: "HEAD" }), { aws: { signQuery: true } },
       );
       const r = await fetch(firmada.url, { method: "HEAD" });
-      if (r.ok) return { llave, size: Number(r.headers.get("content-length")) || 0 };
+      if (r.ok) return { hallado: { llave, size: Number(r.headers.get("content-length")) || 0 }, concluyente: true };
+      if (r.status !== 404) {
+        // 403 = el token no alcanza este bucket. Hay que poder verlo en los logs.
+        concluyente = false;
+        console.warn(`[recordings] R2 respondió ${r.status} en ${llave} — ¿el token alcanza el bucket?`);
+      }
     } catch (e) {
+      concluyente = false;
       console.warn("[recordings] HEAD R2:", llave, (e as Error).message);
     }
   }
-  return null;
+  return { hallado: null, concluyente };
 }
 
 /** La URL para ver o bajar, mire donde mire. `null` si el archivo no está. */
 async function urlDelArchivo(archivo: string, accion: "d" | "v", vidaSegundos: number): Promise<string | null> {
-  const enR2 = await buscarEnR2(archivo);
-  if (enR2) return await firmarR2("GET", enR2.llave, vidaSegundos);
+  const { hallado } = await buscarEnR2(archivo);
+  if (hallado) {
+    // Descargar tiene que DESCARGAR. rec-server mandaba `Content-Disposition:
+    // attachment`; una URL firmada de R2 es un GET pelado y el egress sube los
+    // objetos como `inline`, así que sin esto el botón Descargar abría el video
+    // en otra pestaña y sin nombre de archivo.
+    const extra = accion === "d"
+      ? `response-content-disposition=${encodeURIComponent(`attachment; filename="${archivo}"`)}`
+      : "";
+    const url = await firmarR2("GET", hallado.llave, vidaSegundos, extra);
+    if (url) return url;
+  }
   const r = await fetch(await firmarUrl(archivo, "stat", 60)).catch(() => null);
   if (r?.ok) return await firmarUrl(archivo, accion, vidaSegundos);
   return null;
@@ -150,8 +183,8 @@ async function urlDelArchivo(archivo: string, accion: "d" | "v", vidaSegundos: n
 
 /** Cuánto pesa, mire donde mire. `null` = no está en ninguno de los dos. */
 async function tamanoDelArchivo(archivo: string): Promise<number | null> {
-  const enR2 = await buscarEnR2(archivo);
-  if (enR2) return enR2.size || null;
+  const { hallado } = await buscarEnR2(archivo);
+  if (hallado) return hallado.size || null;
   try {
     const r = await fetch(await firmarUrl(archivo, "stat", 60));
     if (r.ok) return (await r.json()).size ?? null;
@@ -161,15 +194,21 @@ async function tamanoDelArchivo(archivo: string): Promise<number | null> {
 
 /** Lo borra de donde esté. */
 async function borrarArchivo(archivo: string): Promise<void> {
-  const enR2 = await buscarEnR2(archivo);
-  if (enR2) {
-    const url = await firmarR2("DELETE", enR2.llave, 60);
+  const { hallado, concluyente } = await buscarEnR2(archivo);
+  if (hallado) {
+    const url = await firmarR2("DELETE", hallado.llave, 60);
     if (url) {
       const r = await fetch(url, { method: "DELETE" });
       if (!r.ok && r.status !== 404) throw new Error(`R2 ${r.status}`);
       return;
     }
   }
+  // ⚠️ Si R2 no contestó de forma concluyente, NO se puede dar por borrado.
+  // rec-server va a decir 404 —el archivo está en R2, no en el disco— y eso se
+  // leería como "ya no estaba": la fila quedaría marcada como borrada y el MP4
+  // seguiría en R2 para siempre, pagándose, sin ninguna fila que lo nombre.
+  if (!concluyente) throw new Error("R2 no contestó: no se puede confirmar el borrado");
+
   const r = await fetch(await firmarUrl(archivo, "f", 60), { method: "DELETE" });
   // 404 = el archivo ya no está: no es un huérfano.
   if (!r.ok && r.status !== 404) throw new Error(`rec-server ${r.status}`);
@@ -449,15 +488,20 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ⚠️ "Lista" SOLO si el archivo existe. Antes se marcaba `ready` aunque
-      // el tamaño fuera null, así que la lista ofrecía para reproducir una
-      // grabación que no estaba y la persona se enteraba recién al darle play.
-      // Vale la pena decir la verdad: "Falló" se entiende, "no se pudo
-      // reproducir" después de dos clics no.
+      // Queda en `ready` aunque todavía no se haya encontrado el archivo, Y ESO
+      // ES A PROPÓSITO. Degradarla a `failed` parecía más honesto, pero deja la
+      // fila en una trampa: el vencimiento de 90 días solo barre `ready`, y
+      // `syncSizes` solo repara `ready`. O sea que una grabación que EXISTE
+      // pero tardó en aparecer quedaba sin poder borrarse nunca y sin poder
+      // repararse nunca. Con `ready` + `size_bytes` en null, `syncSizes` la
+      // completa sola cuando el archivo aparece.
+      // Que no mienta lo resuelve el otro lado: ver y descargar responden 404
+      // con un motivo si el archivo no está, así que nadie se topa con un
+      // reproductor roto.
       await admin.from("meeting_recordings")
         .update(size
           ? { status: "ready", size_bytes: size, duration_seconds: dur, error: null }
-          : { status: "failed", duration_seconds: dur, error: "se detuvo pero no quedó ningún archivo" })
+          : { status: "ready", duration_seconds: dur })
         .eq("id", rec.id);
 
       await enviarAvisoASala(rec.room_name, {
