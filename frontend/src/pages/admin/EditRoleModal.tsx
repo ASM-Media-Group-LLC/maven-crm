@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useUserRole } from "@/hooks/useUserRole";
 import { ROLE_TIER_LABELS, type RoleConfig, type RoleTier } from "./useRoles";
 
-// Cuatro niveles y nada más — Empleado < Supervisor < Manager < Admin (Jhon,
+// Cuatro niveles y nada más — Empleado < Supervisor < Management < Admin (Jhon,
 // 08/09). El "tipo de acceso" ES el nivel: la base deriva de él quién puede
 // gestionar a quién y qué cuenta como "subordinado" en Permisos de datos. Un
 // número interno existe (roles_config.level) pero no se muestra ni se edita:
@@ -74,7 +74,7 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
                 ? "Rol de sistema: solo un admin puede cambiarle el nivel."
                 : role?.is_system && tier !== role.tier
                   ? "⚠️ Rol de sistema: muchas reglas de la base dependen de su nivel. Cambiarlo afecta de inmediato a todas las personas con este rol."
-                  : "De menor a mayor: Empleado < Supervisor < Manager < Admin. Un rol gestiona, y ve como «subordinados», a los de nivel inferior. Los menús se configuran en \"Permisos\"."}
+                  : "De menor a mayor: Empleado < Supervisor < Management < Admin. Un rol gestiona, y ve como «subordinados», a los de nivel inferior. Los menús se configuran en \"Permisos\"."}
             </p>
           </div>
 

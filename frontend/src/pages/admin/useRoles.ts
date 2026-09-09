@@ -8,6 +8,10 @@ import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 // acceso a nivel DB, aunque tenga permisos de menú en role_permissions). El
 // frontend setea el nivel desde el modal; el trigger tg_roles_config_sync_role_groups
 // garantiza que la fila exista igual (default miembro) para cualquier vía.
+// La KEY "manager" se conserva (role_groups.is_manager_or_above, 24 policies, 9
+// funciones); en pantalla el TIPO se llama "Management" para que no se confunda
+// con el ROL llamado "manager" — Jhon cambió el tipo del rol manager creyendo que
+// tocaba otra cosa (08/09).
 export type RoleTier = "member" | "supervisor" | "manager" | "admin";
 
 export const ROLE_TIER_FLAGS: Record<RoleTier, {
@@ -22,7 +26,7 @@ export const ROLE_TIER_FLAGS: Record<RoleTier, {
 export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
   member: "Empleado — solo lo suyo",
   supervisor: "Supervisor — ve a su equipo",
-  manager: "Manager — gestión amplia",
+  manager: "Management — gestión amplia",
   admin: "Admin — acceso total",
 };
 
@@ -30,7 +34,7 @@ export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
 export const ROLE_TIER_SHORT: Record<RoleTier, string> = {
   member: "Empleado",
   supervisor: "Supervisor",
-  manager: "Manager",
+  manager: "Management",
   admin: "Admin",
 };
 
