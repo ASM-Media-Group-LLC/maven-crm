@@ -6,19 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUserRole } from "@/hooks/useUserRole";
-import { ROLE_TIER_LABELS, type RoleConfig, type RoleTier } from "./useRoles";
+import { FRANJA_POR_TIER, ROLE_TIER_LABELS, type RoleConfig, type RoleTier } from "./useRoles";
 
-// Cuatro niveles y nada más — Empleado < Supervisor < Management < Admin (Jhon,
-// 08/09). El "tipo de acceso" ES el nivel: la base deriva de él quién puede
-// gestionar a quién y qué cuenta como "subordinado" en Permisos de datos. Un
-// número interno existe (roles_config.level) pero no se muestra ni se edita:
-// exponerlo solo confundió.
+// Dos campos que juntos forman la jerarquía (Jhon, 08/09):
+//   · Nivel de acceso (tipo)  → la FRANJA: Empleado < Supervisor < Management < Admin.
+//   · Posición en el nivel    → el número DENTRO de la franja. A mayor, más arriba:
+//     un Management en 85 ve como subordinados a los Management en 80.
+// Un supervisor nunca puede quedar por encima de un management: la franja manda.
 
 interface EditRoleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   role: RoleConfig | null;
-  onConfirm: (id: string, name: string, description: string | undefined, aiDailyQuota: number | null, tier: RoleTier) => void;
+  onConfirm: (id: string, name: string, description: string | undefined, aiDailyQuota: number | null, tier: RoleTier, level: number) => void;
   isLoading: boolean;
 }
 
@@ -28,6 +28,7 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
   const [description, setDescription] = useState("");
   const [aiQuota, setAiQuota] = useState("");
   const [tier, setTier] = useState<RoleTier>("member");
+  const [level, setLevel] = useState<number>(20);
 
   useEffect(() => {
     if (role && open) {
@@ -35,15 +36,26 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
       setDescription(role.description || "");
       setAiQuota(role.ai_daily_quota != null ? String(role.ai_daily_quota) : "");
       setTier(role.tier);
+      setLevel(role.level ?? FRANJA_POR_TIER[role.tier][0]);
     }
   }, [role, open]);
 
+  const [minNivel, maxNivel] = FRANJA_POR_TIER[tier];
+
+  // Cambiar el tipo lleva el número a la base de la franja nueva (la base hace
+  // lo mismo por trigger, así lo que se ve coincide con lo que se guarda).
+  const cambiarTier = (t: RoleTier) => {
+    setTier(t);
+    setLevel(FRANJA_POR_TIER[t][0]);
+  };
+
   // Los roles de sistema (admin, manager, supervisor, closer, agent, spammer,
-  // employee) los puede retocar SOLO un admin: 24 policies y 9 funciones dependen
-  // de "manager o superior", y bajar `manager` a supervisor se lo quita a todas
-  // las managers de una. La base lo exige igual (RLS de roles_config y
-  // role_groups son solo-admin); esto es para que el formulario lo diga.
+  // employee) los puede retocar SOLO un admin: muchas reglas de la base dependen
+  // de "management o superior" y bajar el tipo de un rol se lo quita a todas las
+  // personas de una. La base lo exige igual (RLS de roles_config y role_groups
+  // son solo-admin); esto es para que el formulario lo diga.
   const bloqueado = !!role?.is_system && !isAdmin;
+  const nivelValido = Number.isInteger(level) && level >= minNivel && level <= maxNivel;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -59,7 +71,7 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
 
           <div className="space-y-1.5">
             <Label>Nivel de acceso</Label>
-            <Select value={tier} onValueChange={(v) => setTier(v as RoleTier)} disabled={bloqueado}>
+            <Select value={tier} onValueChange={(v) => cambiarTier(v as RoleTier)} disabled={bloqueado}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -78,6 +90,23 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
             </p>
           </div>
 
+          {tier !== "admin" && (
+            <div className="space-y-1.5">
+              <Label>Posición en el nivel <span className="text-muted-foreground font-normal">({minNivel}–{maxNivel})</span></Label>
+              <Input
+                type="number" min={minNivel} max={maxNivel} step={1}
+                value={level}
+                onChange={(e) => setLevel(Number(e.target.value))}
+                disabled={!isAdmin}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isAdmin
+                  ? `Afina la jerarquía entre roles del mismo nivel: a mayor número, más arriba. Un rol en ${minNivel + 5} ve como subordinados a los que están en ${minNivel}. Nunca sale de la franja de su nivel.`
+                  : "Solo un admin puede cambiar la posición."}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>Descripción</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 300))} rows={3} />
@@ -85,14 +114,14 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
           <div className="space-y-1.5">
             <Label>Cuota IA / día (copiloto del inbox)</Label>
             <Input type="number" min={0} value={aiQuota} onChange={(e) => setAiQuota(e.target.value)} placeholder="20 (default)" />
-            <p className="text-xs text-muted-foreground">Usos del copiloto ✨ por persona/día para este rol. Vacío = 20. Admin/managers: sin tope.</p>
+            <p className="text-xs text-muted-foreground">Usos del copiloto ✨ por persona/día para este rol. Vacío = 20. Admin/management: sin tope.</p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
-            onClick={() => role && onConfirm(role.id, name.trim(), description.trim() || undefined, aiQuota.trim() === "" ? null : Number(aiQuota), tier)}
-            disabled={isLoading || !name.trim()}
+            onClick={() => role && onConfirm(role.id, name.trim(), description.trim() || undefined, aiQuota.trim() === "" ? null : Number(aiQuota), tier, tier === "admin" ? 100 : level)}
+            disabled={isLoading || !name.trim() || (tier !== "admin" && !nivelValido)}
           >
             {isLoading ? "Guardando..." : "Guardar"}
           </Button>

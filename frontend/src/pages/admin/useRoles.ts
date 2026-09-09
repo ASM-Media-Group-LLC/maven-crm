@@ -30,6 +30,16 @@ export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
   admin: "Admin — acceso total",
 };
 
+// El TIPO define la FRANJA del nivel jerárquico y el número afina dentro de ella
+// (Jhon, 08/09): empleado 20-49 · supervisor 50-79 · management 80-99 · admin 100.
+// "Subordinado" = nivel estrictamente menor, así que dos roles del mismo tipo se
+// pueden ordenar entre sí (HHRR 85 ve las salas de un Management en 80), pero un
+// supervisor nunca queda por encima de un management. La base valida la franja
+// (trigger trg_roles_config_level_en_franja) y resetea a la base al cambiar el tipo.
+export const FRANJA_POR_TIER: Record<RoleTier, [number, number]> = {
+  member: [20, 49], supervisor: [50, 79], manager: [80, 99], admin: [100, 100],
+};
+
 // Etiqueta corta para badges en la lista/grid.
 export const ROLE_TIER_SHORT: Record<RoleTier, string> = {
   member: "Empleado",
@@ -62,10 +72,9 @@ export interface RoleConfig {
   is_system: boolean;
   ai_daily_quota: number | null; // cuota diaria del copiloto IA del inbox para el rol (null = default 20)
   tier: RoleTier; // nivel de capacidad RLS (derivado de role_groups)
-  /** Nivel jerárquico interno (roles_config.level). SOLO LECTURA: la base lo
-   *  deriva del tipo por trigger (empleado 20 < supervisor 50 < manager 80 <
-   *  admin 100) — para Jhon hay cuatro niveles y el número no existe. Lo usan
-   *  can_manage_user / actor_level y el alcance "subordinados". */
+  /** Nivel jerárquico (roles_config.level): quién gestiona a quién y qué es
+   *  "subordinado" (can_manage_user / actor_level). Vive dentro de la FRANJA de
+   *  su tipo (FRANJA_POR_TIER); un admin lo afina desde el modal. */
   level: number;
   created_at: string;
   updated_at: string;
@@ -328,11 +337,12 @@ export const useRoles = () => {
   });
 
   const updateRole = useMutation({
-    mutationFn: async ({ id, name, description, ai_daily_quota, tier }: { id: string; name: string; description?: string; ai_daily_quota?: number | null; tier?: RoleTier }) => {
+    mutationFn: async ({ id, name, description, ai_daily_quota, tier, level }: { id: string; name: string; description?: string; ai_daily_quota?: number | null; tier?: RoleTier; level?: number }) => {
       const patch: Record<string, unknown> = { name, description };
       if (ai_daily_quota !== undefined) patch.ai_daily_quota = ai_daily_quota;
-      // El nivel jerárquico NO se manda: la base lo deriva del tipo (role_groups)
-      // con el trigger trg_role_groups_sync_level. Cuatro niveles y nada más.
+      // El nivel va dentro de la franja de su tipo; la base lo valida (23514) y
+      // solo un admin puede cambiarlo (tg_roles_config_guard_level).
+      if (level !== undefined) patch.level = level;
       const { error } = await supabase.from("roles_config").update(patch).eq("id", id);
       if (error) throw error;
       // Si cambió el nombre, el trigger ya renombró role_groups + user_roles.

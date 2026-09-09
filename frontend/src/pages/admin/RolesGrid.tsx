@@ -58,7 +58,7 @@ const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive, 
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              <Badge variant="secondary" className="text-xs">{ROLE_TIER_SHORT[role.tier]}</Badge>
+              <Badge variant="secondary" className="text-xs tabular-nums" title="Nivel jerárquico: a mayor número, más arriba. Solo se compara dentro del ordenamiento general (empleado 20-49 · supervisor 50-79 · management 80-99 · admin 100).">{ROLE_TIER_SHORT[role.tier]}{role.tier !== "admin" ? ` · ${role.level}` : ""}</Badge>
               {role.is_system && (
                 <Badge variant="outline" className="text-xs">Sistema</Badge>
               )}
