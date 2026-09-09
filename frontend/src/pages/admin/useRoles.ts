@@ -26,6 +26,11 @@ export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
   admin: "Admin — acceso total",
 };
 
+// Nivel JERÁRQUICO sugerido por tipo (roles_config.level). Sin esto un rol nuevo
+// nacía con level=10 —el más bajo— fuera cual fuera su tipo: así quedó
+// Operations Sales en 10 y por eso "subordinados" no le mostraba a nadie (08/09).
+export const NIVEL_POR_TIER: Record<RoleTier, number> = { admin: 100, manager: 80, supervisor: 50, member: 20 };
+
 // Etiqueta corta para badges en la lista/grid.
 export const ROLE_TIER_SHORT: Record<RoleTier, string> = {
   member: "Miembro",
@@ -58,6 +63,12 @@ export interface RoleConfig {
   is_system: boolean;
   ai_daily_quota: number | null; // cuota diaria del copiloto IA del inbox para el rol (null = default 20)
   tier: RoleTier; // nivel de capacidad RLS (derivado de role_groups)
+  /** Nivel JERÁRQUICO (roles_config.level, 1-100). Es OTRA cosa que `tier`:
+   *  decide quién puede gestionar a quién (can_manage_user / actor_level) y qué es
+   *  "subordinado" en Permisos de datos. Hasta 08/09 no se veía ni se editaba en
+   *  ningún lado, y Operations Sales quedó en 10 —el más bajo— sin que nadie lo
+   *  notara. Referencia: admin 100 · manager 80 · supervisor 50 · miembro 20. */
+  level: number;
   created_at: string;
   updated_at: string;
   user_count: number;
@@ -299,7 +310,7 @@ export const useRoles = () => {
 
   const createRole = useMutation({
     mutationFn: async ({ name, description, tier = "member" }: { name: string; description?: string; tier?: RoleTier }) => {
-      const { error } = await supabase.from("roles_config").insert({ name, description });
+      const { error } = await supabase.from("roles_config").insert({ name, description, level: NIVEL_POR_TIER[tier] });
       if (error) throw error;
       // Cablear role_groups (capacidades RLS) con el nivel elegido. SIN esto el
       // rol nacía sin acceso a nivel DB (bug histórico). El admin puede escribir
@@ -319,9 +330,12 @@ export const useRoles = () => {
   });
 
   const updateRole = useMutation({
-    mutationFn: async ({ id, name, description, ai_daily_quota, tier }: { id: string; name: string; description?: string; ai_daily_quota?: number | null; tier?: RoleTier }) => {
+    mutationFn: async ({ id, name, description, ai_daily_quota, tier, level }: { id: string; name: string; description?: string; ai_daily_quota?: number | null; tier?: RoleTier; level?: number }) => {
       const patch: Record<string, unknown> = { name, description };
       if (ai_daily_quota !== undefined) patch.ai_daily_quota = ai_daily_quota;
+      // El nivel jerárquico lo guarda la base solo si quien edita es admin
+      // (trigger tg_roles_config_guard_level) — el front no lo re-chequea.
+      if (level !== undefined) patch.level = level;
       const { error } = await supabase.from("roles_config").update(patch).eq("id", id);
       if (error) throw error;
       // Si cambió el nombre, el trigger ya renombró role_groups + user_roles.
