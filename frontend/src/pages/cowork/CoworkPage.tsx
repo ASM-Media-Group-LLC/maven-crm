@@ -113,24 +113,33 @@ export default function CoworkPage() {
       rooms: Array<{ id: string; name: string; online: number | null }>; admin: AdminSessionRow | null;
     };
     const mias = new Map(mySessions.map((m) => [m.id, m]));
-    if (veTodasLasSesiones && allSessions.length > 0) {
-      return allSessions.map((a): Fila => {
-        const m = mias.get(a.id);
+    const porAlcance: Fila[] = veTodasLasSesiones
+      ? allSessions.map((a): Fila => {
+          const m = mias.get(a.id);
+          return {
+            id: a.id, name: a.name, role: a.my_role ?? m?.role ?? null, members: a.members,
+            createdBy: m?.createdBy ?? null, hostName: a.host_name, lastRoomId: m?.lastRoomId ?? null,
+            online: a.online, incognito: a.incognito, rooms: a.rooms, admin: a,
+          };
+        })
+      : [];
+    // Las PROPIAS que el alcance no trae van igual. Con "subordinados" el alcance
+    // solo cubre sesiones creadas por gente de nivel inferior; si soy miembro de
+    // una creada por alguien de nivel superior (una manager en la sala de un
+    // admin), la sigo viendo: ser miembro es "propios" y se ve siempre. Antes,
+    // con alcance activo, la lista era SOLO lo del alcance y esas desaparecían.
+    const vistas = new Set(porAlcance.map((f) => f.id));
+    const propias: Fila[] = mySessions
+      .filter((m) => !vistas.has(m.id))
+      .map((m): Fila => {
+        const a = allSessions.find((x) => x.id === m.id);
         return {
-          id: a.id, name: a.name, role: a.my_role ?? m?.role ?? null, members: a.members,
-          createdBy: m?.createdBy ?? null, hostName: a.host_name, lastRoomId: m?.lastRoomId ?? null,
-          online: a.online, incognito: a.incognito, rooms: a.rooms, admin: a,
+          id: m.id, name: m.name, role: m.role, members: m.members, createdBy: m.createdBy,
+          hostName: null, lastRoomId: m.lastRoomId, online: a?.online ?? null, incognito: a?.incognito ?? [],
+          rooms: a?.rooms ?? [], admin: a ?? null,
         };
       });
-    }
-    return mySessions.map((m): Fila => {
-      const a = allSessions.find((x) => x.id === m.id);
-      return {
-        id: m.id, name: m.name, role: m.role, members: m.members, createdBy: m.createdBy,
-        hostName: null, lastRoomId: m.lastRoomId, online: a?.online ?? null, incognito: a?.incognito ?? [],
-        rooms: a?.rooms ?? [], admin: a ?? null,
-      };
-    });
+    return [...porAlcance, ...propias];
   }, [veTodasLasSesiones, allSessions, mySessions]);
 
   // Entrar a una sesión ajena: el edge deja unirse como host sin código a los
