@@ -138,8 +138,16 @@ Deno.serve(async (req) => {
   if (!membership) {
     // Los admins ven/usan TODOS los canales (igual que la RLS de wa_channels) y no
     // figuran como members → si no es member, recién ahí chequeamos admin.
+    //
+    // Y lo mismo para quien tiene el alcance global de la bandeja: la RLS de wa_channels
+    // usa has_wa_inbox_global_scope, así que si acá no lo chequeáramos, esa persona vería
+    // el canal en el selector y al elegirlo se comería un "not_channel_member". Este
+    // chequeo y esa policy tienen que decir lo MISMO o la UI ofrece lo que el back niega.
     const { data: isAdmin } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "admin" });
-    if (!isAdmin) return json({ ok: false, error: "not_channel_member" }, 403);
+    if (!isAdmin) {
+      const { data: verTodo } = await sb.rpc("has_wa_inbox_global_scope", { _user_id: userId });
+      if (!verTodo) return json({ ok: false, error: "not_channel_member" }, 403);
+    }
   }
 
   // ── Resolver teléfono del destino ──────────────────────────────────────────
