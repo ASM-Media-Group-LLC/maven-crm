@@ -600,10 +600,11 @@ export default function CorreoPage() {
                 </>
               ) : (
                 <>
-                  {confirmarBorrado?.length === 1
-                    ? "El correo se mueve"
-                    : `Los ${confirmarBorrado?.length ?? 0} correos se mueven`} a la Papelera.
-                  {" "}Desde ahí se pueden recuperar hasta que los elimines definitivamente.
+                  {confirmarBorrado?.length === 1 ? (
+                    <>El correo se mueve a la Papelera. Desde ahí se puede recuperar hasta que lo elimines definitivamente.</>
+                  ) : (
+                    <>Los {confirmarBorrado?.length ?? 0} correos se mueven a la Papelera. Desde ahí se pueden recuperar hasta que los elimines definitivamente.</>
+                  )}
                 </>
               )}
             </AlertDialogDescription>
