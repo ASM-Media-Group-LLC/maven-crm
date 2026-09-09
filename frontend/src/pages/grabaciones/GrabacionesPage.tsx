@@ -323,70 +323,72 @@ export default function GrabacionesPage() {
                   )}
                 </div>
 
-                {r.status === "ready" && (
-                  <Button
-                    size="sm"
-                    className="shrink-0 gap-1.5 rounded-full"
-                    disabled={ocupado}
-                    onClick={() => void handleVer(r)}
-                  >
-                    {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                    <span className="hidden sm:inline">Ver</span>
-                  </Button>
-                )}
-                {r.status === "ready" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 gap-1.5 rounded-full"
-                    disabled={ocupado}
-                    onClick={() => void handleDownload(r)}
-                  >
-                    {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    <span className="hidden sm:inline">Descargar</span>
-                  </Button>
-                )}
-                {/* Compartir la ve cualquiera que vea la grabación (Jhon, 09/09):
-                    si te la compartieron o la ves por tu alcance, también la
-                    puedes pasar. La edge lo comprueba con el mismo RLS. */}
-                {r.status === "ready" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 gap-1.5 rounded-full"
-                    disabled={ocupado}
-                    title="Compartir con gente de Maven"
-                    onClick={() => setCompartiendo(r)}
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Compartir</span>
-                  </Button>
-                )}
-                {r.status === "recording" && (mia || isAdmin) && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 gap-1.5 rounded-full text-destructive hover:text-destructive"
-                    disabled={ocupado}
-                    title="Detener la grabación y guardarla hasta acá"
-                    onClick={() => void handleDetener(r)}
-                  >
-                    {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
-                    <span className="hidden sm:inline">Detener</span>
-                  </Button>
-                )}
-                {(mia || isAdmin) && r.status !== "recording" && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive"
-                    title="Borrar grabación"
-                    disabled={ocupado}
-                    onClick={() => void handleDelete(r)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                {/* Acciones en una cápsula de iconos (Jhon, 09/09/2026: "más
+                    pequeños, sin letras, ocupan mucho"). Ver es el primario;
+                    Descargar y Compartir, neutros; Detener y Borrar, en rojo.
+                    El texto va en title/aria-label. */}
+                <div className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/60 p-1" data-testid="acciones">
+                  {r.status === "ready" && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-50"
+                      title="Ver"
+                      aria-label="Ver grabación"
+                      disabled={ocupado}
+                      onClick={() => void handleVer(r)}
+                    >
+                      {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+                    </button>
+                  )}
+                  {r.status === "ready" && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      title="Descargar"
+                      aria-label="Descargar grabación"
+                      disabled={ocupado}
+                      onClick={() => void handleDownload(r)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  )}
+                  {r.status === "ready" && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      title="Compartir con gente de Maven"
+                      aria-label="Compartir grabación"
+                      disabled={ocupado}
+                      onClick={() => setCompartiendo(r)}
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  {r.status === "recording" && (mia || isAdmin) && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+                      title="Detener la grabación y guardarla hasta acá"
+                      aria-label="Detener grabación"
+                      disabled={ocupado}
+                      onClick={() => void handleDetener(r)}
+                    >
+                      {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
+                    </button>
+                  )}
+                  {(mia || isAdmin) && r.status !== "recording" && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                      title="Borrar grabación"
+                      aria-label="Borrar grabación"
+                      disabled={ocupado}
+                      onClick={() => void handleDelete(r)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
