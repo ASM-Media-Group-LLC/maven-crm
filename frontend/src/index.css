@@ -56,6 +56,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
     --instagram-orange: 25 95% 53%;
+    /* Colores de canal (marca, no estado): verde WhatsApp #25D366 y celeste Telegram #34AADF. */
+    --whatsapp: 142 70% 49%;
+    --telegram: 199 73% 54%;
 
     /* Series de charts (mini-sistema dataviz, ola 2 UX — ver lib/chartTheme.ts).
        Orden FIJO azul → verde → cyan → ámbar → violeta → pink, validado con
@@ -119,6 +122,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
     --instagram-orange: 25 95% 53%;
+    /* Colores de canal (marca, no estado): verde WhatsApp #25D366 y celeste Telegram #34AADF. */
+    --whatsapp: 142 70% 49%;
+    --telegram: 199 73% 54%;
 
     /* Charts: mismos matices que :root pero con pasos re-calibrados para la
        superficie oscura (banda de luminosidad OKLCH + contraste ≥ 3:1 sobre

@@ -15,10 +15,12 @@ interface PageHeaderProps {
 // y layout responsive que evita el cramming: el bloque título/subtítulo no se aplasta
 // (shrink-0) y las acciones bajan a una segunda fila (flex-wrap) en vez de exprimir el
 // título. Reemplaza los 15+ headers inline con tamaños/pesos dispares.
+// `max-w-full`: en un teléfono (390 px) un subtítulo largo hacía que el bloque, al no
+// poder encogerse, midiera más que la pantalla y desbordara. Con el tope, envuelve.
 export function PageHeader({ title, subtitle, icon, actions, className }: PageHeaderProps) {
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-3", className)}>
-      <div className="flex shrink-0 items-start gap-3">
+      <div className="flex max-w-full shrink-0 items-start gap-3">
         {icon != null && (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:h-5 [&_svg]:w-5">
             {icon}

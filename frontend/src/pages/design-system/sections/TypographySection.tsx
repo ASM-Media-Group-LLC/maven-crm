@@ -1,19 +1,28 @@
+// Tipografía del rediseño (09/2026): dos familias y una escala. Sora (font-display)
+// en títulos y cifras, la sans del sistema en el cuerpo. La escala anterior
+// (H1 text-5xl, seis tamaños de título en las pantallas) queda retirada.
 const hierarchy = [
-  { role: "H1", size: "text-5xl", pixels: "48px", lineHeight: "1", letterSpacing: "tight (-0.025em)", usage: "Títulos principales de página. Solo uno por vista." },
-  { role: "H2", size: "text-3xl", pixels: "30px", lineHeight: "1.2", letterSpacing: "normal", usage: "Títulos de sección dentro de una página." },
-  { role: "H3", size: "text-2xl", pixels: "24px", lineHeight: "1.3", letterSpacing: "tight (-0.015em)", usage: "Subtítulos, headers de Cards." },
-  { role: "H4", size: "text-xl", pixels: "20px", lineHeight: "1.4", letterSpacing: "normal", usage: "Encabezados terciarios, títulos de grupos." },
-  { role: "Body", size: "text-base", pixels: "16px", lineHeight: "1.5", letterSpacing: "normal", usage: "Texto general, párrafos, contenido principal." },
-  { role: "Body SM", size: "text-sm", pixels: "14px", lineHeight: "1.43", letterSpacing: "normal", usage: "Texto secundario, descripciones, metadata." },
-  { role: "Caption", size: "text-xs", pixels: "12px", lineHeight: "1.33", letterSpacing: "normal", usage: "Etiquetas pequeñas, timestamps, hints." },
-  { role: "Label", size: "text-sm font-medium", pixels: "14px", lineHeight: "1.43", letterSpacing: "normal", usage: "Labels de formulario, navegación, badges." },
+  { role: "Título de página", size: "font-display text-2xl font-bold tracking-tight", pixels: "24px", usage: "Uno por pantalla, siempre vía <PageHeader>." },
+  { role: "Título grande", size: "font-display text-3xl font-bold tracking-tight", pixels: "30px", usage: "Saludo del Dashboard y cifras protagonistas. Con moderación." },
+  { role: "Cifra", size: "font-display text-2xl font-bold tabular-nums", pixels: "24px", usage: "KPI en StatChip: Sora con dígitos tabulares." },
+  { role: "Sección", size: "font-display text-xl font-semibold", pixels: "20px", usage: "Títulos de sección y de panel." },
+  { role: "Cuerpo", size: "text-base", pixels: "16px", usage: "Texto general, párrafos, formularios." },
+  { role: "Cuerpo compacto", size: "text-sm", pixels: "14px", usage: "Filas, descripciones, subtítulos." },
+  { role: "Etiqueta", size: "text-xs text-muted-foreground", pixels: "12px", usage: "En oración, sin mayúsculas ni tracking: «Ventas hoy», no «VENTAS HOY»." },
+  { role: "Código", size: "font-mono text-xs tabular-nums", pixels: "12px", usage: "Solo lo que es código: claves de sala, IDs, horas en columna." },
 ];
 
 const weights = [
-  { name: "normal", value: "400", className: "font-normal", usage: "Texto body, descripciones" },
-  { name: "medium", value: "500", className: "font-medium", usage: "Labels, navegación, badges" },
-  { name: "semibold", value: "600", className: "font-semibold", usage: "Títulos de cards, H3-H4" },
-  { name: "bold", value: "700", className: "font-bold", usage: "H1, H2, énfasis fuerte" },
+  { name: "normal", value: "400", className: "font-normal", usage: "Cuerpo, descripciones" },
+  { name: "medium", value: "500", className: "font-medium", usage: "Labels de formulario, navegación, chips" },
+  { name: "semibold", value: "600", className: "font-semibold", usage: "Títulos de sección, nombres en filas" },
+  { name: "bold", value: "700", className: "font-bold", usage: "Títulos de página y cifras (Sora)" },
+];
+
+const retirados = [
+  { que: "La ceja", como: "text-[10px] uppercase tracking-wider", porque: "422 usos en pantallas anteriores. Es el tic más visible de «panel de administración genérico»; la etiqueta va en oración." },
+  { que: "Mono decorativa", como: "font-mono en etiquetas y metadatos", porque: "301 usos. La monoespaciada queda solo para códigos, IDs y horas en columna." },
+  { que: "Títulos a mano", como: "text-lg / text-xl / text-3xl font-semibold en el h1", porque: "92 pantallas con seis tamaños distintos. El título lo pone <PageHeader>." },
 ];
 
 export const TypographySection = () => (
@@ -21,36 +30,33 @@ export const TypographySection = () => (
     <div>
       <h2 className="text-3xl font-semibold mb-2">1.2 Tipografía</h2>
       <p className="text-sm text-muted-foreground max-w-2xl">
-        El sistema usa la familia tipográfica del sistema operativo (system-ui, sans-serif) para máximo rendimiento. 
-        Toda la jerarquía se mapea a clases de Tailwind. Prohibido usar tamaños arbitrarios.
+        Dos familias. <span className="font-display font-semibold text-foreground">Sora</span> (<code className="font-mono text-primary">font-display</code>)
+        en títulos y cifras; la sans del sistema operativo en todo el cuerpo. Una sola escala de seis pasos mapeada a
+        clases de Tailwind. Prohibido usar tamaños arbitrarios o una tercera familia.
       </p>
     </div>
 
     <div>
-      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Jerarquía semántica</h3>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Escala</h3>
       <div className="space-y-4">
         {hierarchy.map((t) => (
           <div key={t.role} className="border-b border-border pb-4">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-1">
-              <span className="text-xs font-mono text-primary w-16 shrink-0">{t.role}</span>
+              <span className="text-xs text-primary w-32 shrink-0">{t.role}</span>
               <span className="text-xs text-muted-foreground font-mono">{t.size}</span>
               <span className="text-xs text-muted-foreground">({t.pixels})</span>
             </div>
-            <p className={`${t.size} mb-2`}>El veloz murciélago hindú</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              <span>Line-height: <span className="font-mono">{t.lineHeight}</span></span>
-              <span>Letter-spacing: <span className="font-mono">{t.letterSpacing}</span></span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">↳ {t.usage}</p>
+            <p className={`${t.size} mb-2`}>{t.role === "Cifra" ? "1.284\u00a0\u00a0\u00a012 / 14\u00a0\u00a0\u00a0$41.2k" : t.role === "Código" ? "T2GEGG 09:03 8KLM2P" : "El veloz murciélago hindú"}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t.usage}</p>
           </div>
         ))}
       </div>
     </div>
 
     <div>
-      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Pesos permitidos</h3>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Pesos</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Solo se usan estos 4 pesos. Prohibido usar thin, light, extrabold o black en producción.
+        Solo estos cuatro. Sora carga 600, 700 y 800; el 800 se reserva para la portada.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
         {weights.map((w) => (
@@ -58,6 +64,19 @@ export const TypographySection = () => (
             <p className={`text-2xl ${w.className}`}>Aa</p>
             <p className="text-sm font-medium">{w.name} <span className="text-muted-foreground font-mono">({w.value})</span></p>
             <p className="text-xs text-muted-foreground">{w.usage}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Retirado</h3>
+      <div className="grid gap-3 md:grid-cols-3">
+        {retirados.map((r) => (
+          <div key={r.que} className="rounded-panel border border-border bg-card p-4 space-y-1.5">
+            <p className="text-sm font-semibold">{r.que}</p>
+            <p className="font-mono text-xs text-destructive line-through">{r.como}</p>
+            <p className="text-xs text-muted-foreground">{r.porque}</p>
           </div>
         ))}
       </div>
