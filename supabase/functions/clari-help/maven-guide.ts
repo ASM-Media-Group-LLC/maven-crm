@@ -167,7 +167,6 @@ limpia 49 FK refs antes de borrar auth.users (irreversible — toda
 data del usuario se pierde).
 
 == PROYECTO MP ==
-Ruta: /proyectomp · Permiso "ProyectoMP". Módulo interno.
 
 == ASISTENTES IA ==
 3 asistentes:
