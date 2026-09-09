@@ -25,6 +25,7 @@ import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType, RoomSer
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token" });
 
@@ -76,6 +77,104 @@ async function personasEnLaSala(roomName: string): Promise<string[] | null> {
 }
 
 /** Firma para rec-server: HMAC(archivo.exp). El link vence solo. */
+// ── Dónde vive el MP4 ───────────────────────────────────────────────────────
+//
+// Hasta el 08/09/2026 el egress dejaba el archivo en el disco del VPS y
+// rec-server lo servía. Ese día se lo configuró para que suba directo a
+// Cloudflare R2 (#1713) — pero la mitad de la lectura quedó sin hacer, y esta
+// función siguió preguntándole a rec-server por un archivo que ya no estaba
+// ahí. Resultado: TODAS las grabaciones desde entonces se veían en la lista y
+// al darles play tiraban "No se pudo reproducir", y descargarlas fallaba igual.
+//
+// Ahora se busca en los DOS lados: primero R2, y si no está, rec-server. Eso
+// deja andando a la vez las viejas (que siguen en el VPS y mueren solas con la
+// retención de 90 días) y las nuevas.
+
+/** El nombre del objeto en R2. El egress recibe `filepath: /out/<id>.mp4`, y
+ *  al subir a S3 usa esa ruta como llave sin la barra inicial. Se prueban las
+ *  dos formas porque depende de la versión del egress. */
+function llavesPosibles(archivo: string): string[] {
+  return [`out/${archivo}`, archivo];
+}
+
+function r2(): { cliente: AwsClient; base: string } | null {
+  const cuenta = Deno.env.get("R2_ACCOUNT_ID");
+  // Los DOS nombres, igual que en creator-video: el egress de LiveKit ya usaba
+  // R2_ACCESS_KEY/R2_SECRET en Dokploy.
+  const key = Deno.env.get("R2_ACCESS_KEY_ID") ?? Deno.env.get("R2_ACCESS_KEY");
+  const secret = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? Deno.env.get("R2_SECRET");
+  const bucket = Deno.env.get("R2_BUCKET_GRABACIONES") ?? "maven-grabaciones";
+  if (!cuenta || !key || !secret) return null;   // sin R2 configurado: solo rec-server
+  return {
+    // region "auto" es lo que R2 espera; con otra, la firma no valida.
+    cliente: new AwsClient({ accessKeyId: key, secretAccessKey: secret, service: "s3", region: "auto" }),
+    base: `https://${cuenta}.r2.cloudflarestorage.com/${bucket}`,
+  };
+}
+
+async function firmarR2(metodo: "GET" | "DELETE", llave: string, segundos: number): Promise<string | null> {
+  const c = r2();
+  if (!c) return null;
+  const url = new URL(`${c.base}/${llave}`);
+  url.searchParams.set("X-Amz-Expires", String(segundos));
+  const firmada = await c.cliente.sign(new Request(url, { method: metodo }), { aws: { signQuery: true } });
+  return firmada.url;
+}
+
+/** Tamaño del objeto en R2, o null si no está (o si R2 no está configurado). */
+async function buscarEnR2(archivo: string): Promise<{ llave: string; size: number } | null> {
+  const c = r2();
+  if (!c) return null;
+  for (const llave of llavesPosibles(archivo)) {
+    try {
+      const firmada = await c.cliente.sign(
+        new Request(`${c.base}/${llave}`, { method: "HEAD" }), { aws: { signQuery: true } },
+      );
+      const r = await fetch(firmada.url, { method: "HEAD" });
+      if (r.ok) return { llave, size: Number(r.headers.get("content-length")) || 0 };
+    } catch (e) {
+      console.warn("[recordings] HEAD R2:", llave, (e as Error).message);
+    }
+  }
+  return null;
+}
+
+/** La URL para ver o bajar, mire donde mire. `null` si el archivo no está. */
+async function urlDelArchivo(archivo: string, accion: "d" | "v", vidaSegundos: number): Promise<string | null> {
+  const enR2 = await buscarEnR2(archivo);
+  if (enR2) return await firmarR2("GET", enR2.llave, vidaSegundos);
+  const r = await fetch(await firmarUrl(archivo, "stat", 60)).catch(() => null);
+  if (r?.ok) return await firmarUrl(archivo, accion, vidaSegundos);
+  return null;
+}
+
+/** Cuánto pesa, mire donde mire. `null` = no está en ninguno de los dos. */
+async function tamanoDelArchivo(archivo: string): Promise<number | null> {
+  const enR2 = await buscarEnR2(archivo);
+  if (enR2) return enR2.size || null;
+  try {
+    const r = await fetch(await firmarUrl(archivo, "stat", 60));
+    if (r.ok) return (await r.json()).size ?? null;
+  } catch { /* sin tamaño */ }
+  return null;
+}
+
+/** Lo borra de donde esté. */
+async function borrarArchivo(archivo: string): Promise<void> {
+  const enR2 = await buscarEnR2(archivo);
+  if (enR2) {
+    const url = await firmarR2("DELETE", enR2.llave, 60);
+    if (url) {
+      const r = await fetch(url, { method: "DELETE" });
+      if (!r.ok && r.status !== 404) throw new Error(`R2 ${r.status}`);
+      return;
+    }
+  }
+  const r = await fetch(await firmarUrl(archivo, "f", 60), { method: "DELETE" });
+  // 404 = el archivo ya no está: no es un huérfano.
+  if (!r.ok && r.status !== 404) throw new Error(`rec-server ${r.status}`);
+}
+
 async function firmarUrl(archivo: string, accion: "d" | "v" | "f" | "stat", vidaSegundos: number): Promise<string> {
   const secret = Deno.env.get("RECORDINGS_SIGNING_SECRET")!;
   const base = Deno.env.get("RECORDINGS_BASE_URL")!; // https://rec.asmtech.ai
@@ -141,10 +240,7 @@ Deno.serve(async (req) => {
       for (const v of (vencidas ?? []) as Array<{ id: string; storage_key: string }>) {
         try {
           if (v.storage_key) {
-            const url = await firmarUrl(v.storage_key, "f", 60);
-            const r = await fetch(url, { method: "DELETE" });
-            // 404 = el archivo ya no está: marcarla igual, no es huérfano.
-            if (!r.ok && r.status !== 404) throw new Error(`rec-server ${r.status}`);
+            await borrarArchivo(v.storage_key);
           }
           await admin.from("meeting_recordings")
             .update({ deleted_at: new Date().toISOString(), status: "deleted" })
@@ -193,10 +289,10 @@ Deno.serve(async (req) => {
             await new Promise((r) => setTimeout(r, 4000)); // que el egress cierre el archivo
           }
           if (rec.storage_key) {
-            try {
-              const r = await fetch(await firmarUrl(rec.storage_key, "f", 60), { method: "DELETE" });
-              if (!r.ok && r.status !== 404) console.warn("[recordings] abortar borrar archivo:", r.status);
-            } catch (e) { console.warn("[recordings] abortar borrar archivo:", (e as Error).message); }
+            // `borrarArchivo` ya tolera el 404 y tira si el borrado falla de
+            // verdad; acá un fallo no debe frenar el aborto de la grabación.
+            try { await borrarArchivo(rec.storage_key); }
+            catch (e) { console.warn("[recordings] abortar borrar archivo:", (e as Error).message); }
           }
           await admin.from("meeting_recordings")
             .update({ status: "deleted", deleted_at: new Date().toISOString(), ended_at: new Date().toISOString(), detenida_por: "abortada_admin" })
@@ -347,17 +443,21 @@ Deno.serve(async (req) => {
         for (const esperaMs of [1200, 2500]) {
           await new Promise((r) => setTimeout(r, esperaMs));
           try {
-            const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
-            if (r.ok) {
-              size = (await r.json()).size ?? null;
-              if (size) break;
-            }
+            size = await tamanoDelArchivo(rec.storage_key);
+            if (size) break;
           } catch { /* sin tamaño; no bloquea */ }
         }
       }
 
+      // ⚠️ "Lista" SOLO si el archivo existe. Antes se marcaba `ready` aunque
+      // el tamaño fuera null, así que la lista ofrecía para reproducir una
+      // grabación que no estaba y la persona se enteraba recién al darle play.
+      // Vale la pena decir la verdad: "Falló" se entiende, "no se pudo
+      // reproducir" después de dos clics no.
       await admin.from("meeting_recordings")
-        .update({ status: "ready", size_bytes: size, duration_seconds: dur })
+        .update(size
+          ? { status: "ready", size_bytes: size, duration_seconds: dur, error: null }
+          : { status: "failed", duration_seconds: dur, error: "se detuvo pero no quedó ningún archivo" })
         .eq("id", rec.id);
 
       await enviarAvisoASala(rec.room_name, {
@@ -433,9 +533,7 @@ Deno.serve(async (req) => {
         // Solo las que esta persona puede ver: la misma regla que el resto.
         if (!(await puedeVer(admin, user.id, rec))) continue;
         try {
-          const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
-          if (!r.ok) continue;
-          const size = (await r.json()).size ?? null;
+          const size = await tamanoDelArchivo(rec.storage_key);
           if (!size) continue;
           await admin.from("meeting_recordings").update({ size_bytes: size }).eq("id", rec.id);
           actualizadas++;
@@ -457,7 +555,9 @@ Deno.serve(async (req) => {
       if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
       // 10 minutos: suficiente para arrancar la descarga, inútil si el
       // link se filtra en un chat.
-      return json(req, { ok: true, url: await firmarUrl(rec.storage_key, "d", 600) });
+      const urlD = await urlDelArchivo(rec.storage_key, "d", 600);
+      if (!urlD) return json(req, { error: "El archivo de esta grabación no está disponible" }, 404);
+      return json(req, { ok: true, url: urlD });
     }
 
     // === VIEW (reproducir dentro de Maven) ===
@@ -475,7 +575,9 @@ Deno.serve(async (req) => {
         return json(req, { error: "grabación no disponible" }, 404);
       }
       if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
-      return json(req, { ok: true, url: await firmarUrl(rec.storage_key, "v", 3 * 3600) });
+      const urlV = await urlDelArchivo(rec.storage_key, "v", 3 * 3600);
+      if (!urlV) return json(req, { error: "El archivo de esta grabación no está disponible" }, 404);
+      return json(req, { ok: true, url: urlV });
     }
 
     // === DELETE (anticipado) ===
@@ -552,9 +654,12 @@ Deno.serve(async (req) => {
       if (rec.started_by !== user.id && !rol) return json(req, { error: "Forbidden" }, 403);
 
       if (rec.storage_key) {
-        const r = await fetch(await firmarUrl(rec.storage_key, "f", 60), { method: "DELETE" });
-        if (!r.ok && r.status !== 404) {
-          return json(req, { error: `no se pudo borrar el archivo (rec-server ${r.status})` }, 502);
+        // Acá SÍ importa: si el archivo no se borró, marcar la fila como
+        // borrada dejaría el archivo huérfano y sin nadie que lo limpie.
+        try {
+          await borrarArchivo(rec.storage_key);
+        } catch (e) {
+          return json(req, { error: `no se pudo borrar el archivo (${(e as Error).message})` }, 502);
         }
       }
       await admin.from("meeting_recordings")
@@ -705,14 +810,13 @@ async function finalizarHuerfana(
   let size: number | null = null;
   if (rec.storage_key) {
     try {
-      const r = await fetch(await firmarUrl(rec.storage_key, "stat", 60));
-      if (r.ok) size = (await r.json()).size ?? null;
+      size = await tamanoDelArchivo(rec.storage_key);
     } catch { /* sin tamaño: se trata como sin archivo */ }
   }
   const ahora = new Date().toISOString();
   await admin.from("meeting_recordings")
     .update(size
-      ? { status: "ready", ended_at: ahora, size_bytes: size }
+      ? { status: "ready", ended_at: ahora, size_bytes: size, error: null }
       : { status: "failed", ended_at: ahora, error: "el egress terminó sin stop y no dejó archivo" })
     .eq("id", rec.id);
 
