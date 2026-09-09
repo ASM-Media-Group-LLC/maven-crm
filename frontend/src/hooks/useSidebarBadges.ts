@@ -19,6 +19,11 @@ export function useSidebarBadges() {
       .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
       })
+      // Correo: el sincronizador actualiza mail_folders (no leídos por carpeta)
+      // al traer correo nuevo; sin esto el badge tardaría hasta un minuto.
+      .on("postgres_changes", { event: "*", schema: "public", table: "mail_folders", filter: `user_id=eq.${user.id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user?.id, queryClient]);
@@ -134,7 +139,21 @@ export function useSidebarBadges() {
         }
       }
 
-      return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount };
+      // --- Correo: no leídos de Recibidos (el mismo número de la carpeta).
+      //     Jhon (09/09/2026): "en el tab Correo debería salir badge cuando
+      //     llega correo nuevo". La RLS limita a las carpetas propias.
+      let correoUnreadCount = 0;
+      if (canAccess("Correo")) {
+        const { data: carpeta } = await supabase
+          .from("mail_folders")
+          .select("unread")
+          .eq("user_id", userId)
+          .eq("folder", "INBOX")
+          .maybeSingle();
+        correoUnreadCount = (carpeta as { unread: number | null } | null)?.unread ?? 0;
+      }
+
+      return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount };
     },
     enabled: !!user && !permsLoading,
     staleTime: 60_000,
@@ -148,5 +167,6 @@ export function useSidebarBadges() {
     waInboxCount: data?.waInboxCount || 0,
     tgInboxCount: data?.tgInboxCount || 0,
     coworkRequestsCount: data?.coworkRequestsCount || 0,
+    correoUnreadCount: data?.correoUnreadCount || 0,
   };
 }

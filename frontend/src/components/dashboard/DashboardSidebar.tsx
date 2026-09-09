@@ -43,6 +43,7 @@ const LINK_CLASS = "flex items-center gap-2 rounded-xl px-3 py-3 text-sm sidebar
 // lo urgente (Telegram sin leer). El número no cambia.
 const BADGE_TINTS: Record<string, string> = {
   Promolog: "bg-primary/15 text-primary",
+  Correo: "bg-primary/15 text-primary",
   LeadGen: "bg-accent/15 text-accent",
   Closers: "bg-warning/15 text-warning",
   WhatsApp: "bg-success/15 text-success",
@@ -116,11 +117,11 @@ const DashboardSidebar = () => {
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
-  const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount } = useSidebarBadges();
+  const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number; muteChannel?: MuteChannel }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: "Correo", url: "/correo", icon: Mail, module: "Correo" },
+    { title: "Correo", url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined, muteChannel: "messenger" },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
