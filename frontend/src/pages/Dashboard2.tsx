@@ -25,6 +25,7 @@ import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
 import { useChatters } from "./sales-performance/useChatters";
 import { usePromoDays } from "./sales-performance/usePromoDays";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCohortRetention } from "./sales-performance/useCohortRetention";
 import CohortRetentionTab from "./sales-performance/CohortRetentionTab";
 import LtvTab, { type LtvData, type LtvCreator } from "./sales-performance/LtvTab";
@@ -264,6 +265,13 @@ const Dashboard2 = () => {
     }
   };
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "ballenas" | "retencion" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
+  // Content ROI cruza el ingreso con los días de promo, que salen de promolog_entries.
+  // Con el alcance de datos de Promolog aplicado, quien no tiene el módulo lee 0 filas
+  // de esa tabla — y el cruce no fallaría, daría "sin promo lift", que es un número
+  // falso. Antes que mentir, se esconde el tab. Hoy toca a los Chatter Supervisor,
+  // que tienen el Dashboard de Ingresos pero no Promolog.
+  const { canAccess: puedeVer } = usePermissions();
+  const vePromolog = puedeVer("Promolog");
   // Ballenas / Retención: solo se jalan cuando el usuario abre el tab respectivo.
   const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas" || deepDiveTab === "ltv");
   const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
@@ -303,7 +311,7 @@ const Dashboard2 = () => {
   // Content ROI (Promolog × ingreso): depende de selectedPeriod, así que DEBE ir
   // después de su declaración. Estaba antes → ReferenceError TDZ "Cannot access
   // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
-  const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
+  const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi" && vePromolog);
   const { data: cohortData, isLoading: cohortLoading } = useCohortRetention(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "cohort");
   // Filas diarias para Content ROI y para los sparklines de Tendencia del tab MoM
   // (#21). Lazy (solo con uno de esos tabs abierto) + acotado al período; misma
@@ -2073,7 +2081,7 @@ const Dashboard2 = () => {
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
                       { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades", desc: "Dónde hay potencial" },
                       { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})`, desc: "Riesgos activos" },
-                    ]).map((tab) => (
+                    ]).filter((tab) => tab.key !== "content_roi" || vePromolog).map((tab) => (
                       <UITooltip key={tab.key}>
                         <TooltipTrigger asChild>
                           <Button
@@ -2817,7 +2825,7 @@ const Dashboard2 = () => {
                   )}
 
                   {/* ── Content ROI — Promolog (promo) × ingreso BLU ── */}
-                  {deepDiveTab === "content_roi" && (() => {
+                  {deepDiveTab === "content_roi" && vePromolog && (() => {
                     const pd = promoDays ?? new Map<string, Set<string>>();
                     const byC = new Map<string, { name: string; promoInc: number; promoDays: number; nonInc: number; nonDays: number }>();
                     let aPromoInc = 0, aPromoDays = 0, aNonInc = 0, aNonDays = 0;
