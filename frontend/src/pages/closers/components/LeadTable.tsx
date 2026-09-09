@@ -1247,7 +1247,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <ShoppingCart className="mr-2 h-4 w-4" />
                     Ventas por Plataforma
                   </DropdownMenuItem>
-                  {onConvertToCreator && canConvert && (
+                  {/* Solo RECLUTAMIENTO se convierte a creadora. Una venta de
+                      plataforma es a alguien que YA es creadora (convertir = ruido
+                      o, para una agencia, insertaría una creadora basura porque el
+                      "handle" es el nombre de la agencia y no matchea a nadie). */}
+                  {onConvertToCreator && canConvert && c.deal_type === "reclutamiento" && (
                     <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
                     </DropdownMenuItem>

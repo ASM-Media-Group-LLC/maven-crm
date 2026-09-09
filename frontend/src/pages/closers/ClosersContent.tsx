@@ -97,6 +97,19 @@ const ClosersContent = () => {
   // Click en "Convertir a Creadora" → abre el popup de confirmación
   // (antes convertía de una, sin preguntar) y chequea historial del handle.
   const handleConvertToCreator = (c: CloserCreatorRow) => {
+    // Guard: solo reclutamiento se convierte. Una venta de plataforma es a una
+    // creadora existente; una agencia es B2B → convertir insertaría una creadora
+    // basura (el handle es el nombre de la agencia, no matchea a nadie → Rama 3).
+    // El botón ya se oculta para estos casos; esto es defensa en profundidad.
+    if (c.deal_type !== "reclutamiento") {
+      toast({
+        title: "No aplica",
+        description: c.lead_source === "agencia"
+          ? "Una agencia no se convierte a creadora."
+          : "Esto es una venta de plataforma a una creadora que ya existe — no hay que convertirla.",
+      });
+      return;
+    }
     setConvertTarget(c);
     setConvertMatch(null);
     setConvertCheckLoading(true);
