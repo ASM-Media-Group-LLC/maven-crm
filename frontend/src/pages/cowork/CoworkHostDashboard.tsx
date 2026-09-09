@@ -266,7 +266,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [closeTarget, setCloseTarget] = useState<CoworkRoom | null>(null);
   const [roomBusy, setRoomBusy] = useState(false);
   // Central de audio del coordinador: master del micro + escuchar/hablar por sala + micro compartido.
-  const [roomHear, setRoomHear] = useState<Record<string, boolean>>({});
+  // Se recuerda por navegador: al recargar el tablero, las salas que uno
+  // silenció siguen silenciadas (antes volvían todas a "Escuchando").
+  const [roomHear, setRoomHearEstado] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem("maven.cowork.salas.escucha") ?? "{}") as Record<string, boolean>; } catch { return {}; }
+  });
+  const setRoomHear = (upd: Record<string, boolean> | ((m: Record<string, boolean>) => Record<string, boolean>)) =>
+    setRoomHearEstado((m) => {
+      const n = typeof upd === "function" ? upd(m) : upd;
+      try { localStorage.setItem("maven.cowork.salas.escucha", JSON.stringify(n)); } catch { /* noop */ }
+      return n;
+    });
   // Tic de un segundo: los contadores de pausa y las alertas de encuadre se
   // calculan contra este reloj, así avanzan solos sin depender de que llegue un
   // evento de presence.

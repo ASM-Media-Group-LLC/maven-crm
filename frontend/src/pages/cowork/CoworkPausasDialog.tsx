@@ -34,8 +34,15 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
   const { data, cargando, error, refrescar } = useCoworkPausas(desde, hasta, todas ? null : sessionId, open);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+    // NO modal: con el diálogo abierto se puede seguir moviendo la ventanita del
+    // Supervisor Hub (Jhon, 08/09: "cuando despliego este popup no puedo mover el
+    // supervisor hub"). Sin overlay, un clic afuera cerraría el diálogo al
+    // arrastrar: se cierra solo con la X o Escape.
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogContent
+        className="w-[calc(100%-1.5rem)] sm:max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Coffee className="h-4 w-4" /> Pausas</DialogTitle>
           <DialogDescription>
