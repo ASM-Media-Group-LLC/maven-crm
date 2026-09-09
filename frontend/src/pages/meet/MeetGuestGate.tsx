@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { invitadosNuevos } from "@/lib/avisoDeInvitado";
+import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
+import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 
 interface GuestRequest {
   id: string;
@@ -22,6 +25,8 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
   const [meetRoomId, setMeetRoomId] = useState<string | null>(null);
   const [requests, setRequests] = useState<GuestRequest[]>([]);
   const [deciding, setDeciding] = useState<string | null>(null);
+  // Los que ya conocíamos. `null` = todavía no miramos: la primera foto no suena.
+  const vistas = useRef<Set<string> | null>(null);
 
   // Resolvemos la reunión desde el nombre de sala de LiveKit (es lo único que
   // conoce la página de llamada).
@@ -54,16 +59,56 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
   }, [livekitRoom]);
 
   const fetchPending = useCallback(async (roomId: string) => {
-    const { data } = await supabase
+    // El turno de "primera mirada" se reclama ACÁ, antes de esperar. Si se
+    // decidiera al volver la respuesta, una consulta que se adelanta se
+    // declararía la primera, no sonaría, y ese invitado no haría sonar nada
+    // nunca: el montaje dispara una consulta y enseguida se suscribe al
+    // realtime, así que las dos corren juntas.
+    const esPrimeraMirada = vistas.current === null;
+    if (esPrimeraMirada) vistas.current = new Set();
+
+    const { data, error } = await supabase
       .from("meet_guest_requests")
       .select("id, guest_name, status, created_at")
       .eq("meet_room_id", roomId).eq("status", "pending")
       .order("created_at", { ascending: true });
-    setRequests((data as GuestRequest[]) || []);
+
+    // ⚠️ supabase-js NO lanza: ante un 5xx, la red caída o un hipo de
+    // PostgREST devuelve `data: null`. Tomarlo como "no hay nadie esperando"
+    // vaciaba la memoria, y al siguiente sondeo el MISMO invitado volvía a
+    // contar como nuevo: un timbre cada 5 segundos con wifi inestable, que es
+    // justo lo que este archivo existe para evitar. No sabemos nada: no se
+    // toca nada.
+    if (error) {
+      if (esPrimeraMirada) vistas.current = null;   // el turno queda libre
+      return;
+    }
+
+    const filas = (data as GuestRequest[]) || [];
+    setRequests(filas);
+
+    // Y SUENA. Antes el aviso era solo visual (Jhon, 09/09/2026): si estabas
+    // mirando otra pestaña, alguien podía quedarse golpeando sin que te
+    // enteraras. Es el mismo timbre que usa Cowork cuando alguien pide
+    // supervisor — "alguien necesita que lo atiendas" — y el panel de al lado
+    // aclara enseguida cuál de los dos es.
+    const { nuevos, vistas: ahora } = invitadosNuevos(
+      vistas.current ?? new Set(), filas.map((f) => f.id), esPrimeraMirada,
+    );
+    vistas.current = ahora;
+    if (!nuevos.length) return;
+    // Con la reunión abierta en dos pestañas, el timbre sonaría dos veces. La
+    // clave lleva la reunión adentro para que dos reuniones distintas sí suenen.
+    sonarUnaVezEntrePestanas(`meet-invitado-${roomId}`, 1500, () => playCoordinatorRequestSound());
   }, []);
 
   useEffect(() => {
     if (!meetRoomId) return;
+    // Otra reunión, otra memoria. Sin esto, pasar de una reunión a otra sin
+    // desmontar arrastraba los ids de la anterior: ninguno coincide con los de
+    // la nueva, así que TODOS los que ya estaban esperando contaban como nuevos
+    // y sonaba de golpe al entrar.
+    vistas.current = null;
     fetchPending(meetRoomId);
 
     const channel = supabase.channel(`meet-guests-${meetRoomId}`)
