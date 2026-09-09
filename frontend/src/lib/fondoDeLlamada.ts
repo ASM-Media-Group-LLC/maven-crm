@@ -182,10 +182,48 @@ export interface FondoPropio {
 // versión futuro del almacén quedaría trabado por ellas.
 let dbPromesa: Promise<IDBDatabase | null> | null = null;
 
+/** Cuánto se espera a que el navegador conteste el `open`. */
+const ESPERA_ABRIR_DB_MS = 3_000;
+/** Y a que confirme una lectura o una escritura. */
+const ESPERA_ALMACEN_MS = 4_000;
+
+/**
+ * ⚠️ CON TIEMPO LÍMITE, y el límite además OLVIDA el caché.
+ *
+ * En WebKit un pedido de IndexedDB puede no disparar ni `onsuccess` ni
+ * `onerror` — es el mismo motivo por el que la llamada y el lobby envuelven
+ * `resolverImagenDeFondo` en `withTimeout`. Este `open` era el único punto del
+ * camino que quedaba sin proteger, y con la promesa cacheada el cuelgue no era
+ * recuperable: "Tus fondos" se veía VACÍO como si la persona no tuviera
+ * ninguno, elegir una imagen no hacía nada y no salía ningún aviso, y eso
+ * duraba toda la pestaña —ni reintentar servía—. Recargar era la única salida.
+ */
 function abrirDb(): Promise<IDBDatabase | null> {
   dbPromesa ??= new Promise<IDBDatabase | null>((resolver) => {
+    let listo = false;
+    const olvidar = () => { dbPromesa = null; };
+    // El reloj va ANTES de `terminar`, que lo apaga: al revés eslint lo marca y
+    // en este repo un uso-antes-de-declarar ya tumbó producción dos veces.
+    const reloj = window.setTimeout(() => {
+      if (listo) return;
+      listo = true;
+      olvidar();          // sin esto, el cuelgue duraba toda la pestaña
+      resolver(null);
+    }, ESPERA_ABRIR_DB_MS);
+    const terminar = (db: IDBDatabase | null) => {
+      if (listo) {
+        // Llegó tarde, después de rendirnos: la conexión no la va a usar nadie.
+        if (db) { try { db.close(); } catch { /* ya cerrada */ } }
+        return;
+      }
+      listo = true;
+      window.clearTimeout(reloj);
+      if (!db) olvidar();
+      resolver(db);
+    };
+
     try {
-      if (typeof indexedDB === "undefined") return resolver(null);
+      if (typeof indexedDB === "undefined") return terminar(null);
       const pedido = indexedDB.open(NOMBRE_DB, 1);
       pedido.onupgradeneeded = () => {
         const db = pedido.result;
@@ -195,14 +233,14 @@ function abrirDb(): Promise<IDBDatabase | null> {
         const db = pedido.result;
         // Si el navegador cierra la conexión (o otra pestaña pide una versión
         // nueva), se olvida y la próxima llamada vuelve a abrir.
-        db.onclose = () => { dbPromesa = null; };
-        db.onversionchange = () => { try { db.close(); } catch { /* ya cerrada */ } dbPromesa = null; };
-        resolver(db);
+        db.onclose = olvidar;
+        db.onversionchange = () => { try { db.close(); } catch { /* ya cerrada */ } olvidar(); };
+        terminar(db);
       };
-      pedido.onerror = () => { dbPromesa = null; resolver(null); };
-      pedido.onblocked = () => { dbPromesa = null; resolver(null); };
+      pedido.onerror = () => terminar(null);
+      pedido.onblocked = () => terminar(null);
     } catch {
-      resolver(null);
+      terminar(null);
     }
   });
   return dbPromesa;
@@ -219,6 +257,11 @@ function conAlmacen<T>(modo: IDBTransactionMode, fn: (store: IDBObjectStore) => 
   return abrirDb().then((db) => {
     if (!db) return { ok: false as const };
     return new Promise<Lectura<T>>((resolver) => {
+      // Igual que el `open`: una transacción que no contesta no puede dejar la
+      // promesa colgada. Se declara FUERA del try para que el catch también
+      // pueda apagar el reloj.
+      const reloj = window.setTimeout(() => resolver({ ok: false }), ESPERA_ALMACEN_MS);
+      const contestar = (r: Lectura<T>) => { window.clearTimeout(reloj); resolver(r); };
       try {
         const tx = db.transaction(ALMACEN, modo);
         const pedido = fn(tx.objectStore(ALMACEN));
@@ -229,14 +272,14 @@ function conAlmacen<T>(modo: IDBTransactionMode, fn: (store: IDBObjectStore) => 
           // puede haber salido bien y la transacción abortar al confirmar (la
           // cuota se llenó). Reportarla como guardada dejaría a la persona
           // creyendo que su fondo está y no estaría.
-          if (modo === "readonly") resolver({ ok: true, valor });
+          if (modo === "readonly") contestar({ ok: true, valor });
         };
-        pedido.onerror = () => resolver({ ok: false });
-        tx.oncomplete = () => resolver({ ok: true, valor });
-        tx.onabort = () => resolver({ ok: false });
-        tx.onerror = () => resolver({ ok: false });
+        pedido.onerror = () => contestar({ ok: false });
+        tx.oncomplete = () => contestar({ ok: true, valor });
+        tx.onabort = () => contestar({ ok: false });
+        tx.onerror = () => contestar({ ok: false });
       } catch {
-        resolver({ ok: false });
+        contestar({ ok: false });
       }
     });
   });

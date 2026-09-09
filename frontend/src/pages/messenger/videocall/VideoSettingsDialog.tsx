@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud, CloudFog, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFondosPropios } from "./BackgroundSelector";
+import { useFondosPropios } from "@/hooks/useFondosPropios";
 import { BACKGROUND_TEMPLATES, isCustomBackground, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 
 interface DeviceInfo {
