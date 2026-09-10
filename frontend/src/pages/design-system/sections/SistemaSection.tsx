@@ -5,7 +5,6 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { PAGE_WIDTHS } from "@/lib/pageWidths";
 import StatChip from "@/components/StatChip";
 
 const Regla = ({ titulo, children }: { titulo: string; children: ReactNode }) => (
@@ -28,7 +27,6 @@ const Codigo = ({ children }: { children: ReactNode }) => (
 );
 
 const TELEFONO_PX = 390;
-const MAX_PX = PAGE_WIDTHS.tablero.max;
 
 export const SistemaSection = () => (
   <section id="sistema" className="space-y-8">
@@ -85,26 +83,25 @@ export const SistemaSection = () => (
         </Texto>
       </Regla>
 
-      <Regla titulo="Anchos y teléfono">
+      <Regla titulo="Ancho y teléfono">
         <Muestra className="space-y-2">
-          {(Object.keys(PAGE_WIDTHS) as Array<keyof typeof PAGE_WIDTHS>).map((k) => (
-            <div key={k} className="flex items-center gap-3 text-xs">
-              <span className="w-16 shrink-0 capitalize text-muted-foreground">{k}</span>
-              <div className="h-2.5 rounded-full bg-primary/70" style={{ width: `${(PAGE_WIDTHS[k].max / MAX_PX) * 100}%` }} />
-              <span className="whitespace-nowrap tabular-nums text-muted-foreground">{PAGE_WIDTHS[k].max} px</span>
-            </div>
-          ))}
+          <div className="flex items-center gap-3 text-xs">
+            <span className="w-16 shrink-0 text-muted-foreground">Escritorio</span>
+            <div className="h-2.5 flex-1 rounded-full bg-primary/70" />
+            <span className="whitespace-nowrap text-muted-foreground">todo el ancho</span>
+          </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="w-16 shrink-0 text-muted-foreground">Teléfono</span>
-            <div className="h-2.5 rounded-full bg-gradient-to-r from-accent to-primary" style={{ width: `${(TELEFONO_PX / MAX_PX) * 100}%` }} />
-            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{TELEFONO_PX} px, una columna</span>
+            <div className="h-2.5 rounded-full bg-gradient-to-r from-accent to-primary" style={{ width: "23%" }} />
+            <span className="whitespace-nowrap text-muted-foreground">{TELEFONO_PX} px, una columna</span>
           </div>
         </Muestra>
         <Texto>
-          Cada pantalla declara su ancho con <Codigo>{'<Page width="lectura | trabajo | tablero">'}</Codigo>; el
-          contenedor centra, acota y pone el padding (16 px en teléfono, 24 en escritorio) y el scroll propio que pide
-          el AppShell. Lectura: {PAGE_WIDTHS.lectura.uso}. Trabajo: {PAGE_WIDTHS.trabajo.uso}. Tablero: {PAGE_WIDTHS.tablero.uso}.
-          En el teléfono todo es una columna: sin desborde horizontal, ninguna tabla sin versión en tarjetas, controles de 44 px.
+          <b>Sin tope de ancho.</b> Maven ocupa la pantalla: en un monitor grande el contenido se reparte en columnas y
+          paneles, no se acota ni se centra (se probaron topes de 720 y 1200 px y las pantallas quedaban perdidas en un vacío
+          a 2560 px). El contenedor <Codigo>{"<Page>"}</Codigo> aporta el scroll propio que pide el AppShell y el padding
+          (16 px en teléfono, 24 en escritorio). En el teléfono todo es una columna: sin desborde horizontal, ninguna tabla
+          sin versión en tarjetas, controles de 44 px.
         </Texto>
       </Regla>
 
@@ -214,14 +211,14 @@ import { PageHeader } from "@/components/ui/page-header";
 
 export default function ClosersPage() {
   return (
-    <Page width="trabajo">
+    <Page>
       <PageHeader title="Closers" subtitle="Pipeline de agencias y creadoras." actions={<Button>Nuevo lead</Button>} />
       {/* cifras arriba, filtros en chips, tabla con su versión en tarjetas para el teléfono */}
     </Page>
   );
 }`}</code></pre>
       <Texto>
-        El test de contrato revisa toda ruta nueva de <Codigo>App.tsx</Codigo>: PageHeader, ancho declarado, tabla con
+        El test de contrato revisa toda ruta nueva de <Codigo>App.tsx</Codigo>: PageHeader, contenedor Page, tabla con
         versión móvil, cuadrículas con breakpoint, radios y colores del sistema, etiquetas en oración y sin hover que
         agranda. Las pantallas anteriores al contrato están listadas en el test y salen de la lista a medida que se migran.
       </Texto>

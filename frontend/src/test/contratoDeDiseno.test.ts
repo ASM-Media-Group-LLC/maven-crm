@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { PAGE_WIDTHS } from "@/lib/pageWidths";
 
 // EL CONTRATO DE DISEÑO DE MAVEN, PUESTO POR ESCRITO (rediseño de septiembre
 // de 2026, fase 1: "cerrar el sistema y publicarlo").
@@ -12,7 +11,8 @@ import { PAGE_WIDTHS } from "@/lib/pageWidths";
 // fuera del sistema:
 //
 //   1. Encabezado canónico: `<PageHeader>` (título Sora, subtítulo, acciones).
-//   2. Ancho declarado: `<Page width="lectura" | "trabajo" | "tablero">`.
+//   2. Contenedor `<Page>`: scroll propio y padding responsive. Sin tope de ancho:
+//      Maven ocupa la pantalla (decisión de Jhon, 09/09/2026).
 //   3. Teléfono (390 px): ninguna tabla sin versión en tarjetas o un panel solo
 //      para móvil; ninguna cuadrícula de 3+ columnas sin breakpoint; ningún
 //      ancho mínimo de 400 px o más sin contenedor que lo absorba.
@@ -148,7 +148,7 @@ function faltas(rutaPagina: string): string[] {
   const problemas: string[] = [];
 
   if (!/<PageHeader[\s>]/.test(todo)) problemas.push("sin <PageHeader>");
-  if (!/<Page\s[^>]*\bwidth=/.test(todo)) problemas.push('sin <Page width="lectura|trabajo|tablero">');
+  if (!/<Page(\s|>)/.test(todo)) problemas.push("sin <Page> (scroll propio y padding)");
 
   for (const ruta of arbol) {
     const src = leer(ruta) ?? "";
@@ -179,11 +179,6 @@ describe("contrato de diseño: ninguna pantalla nueva nace fuera del sistema", (
     expect(paginas.length).toBeGreaterThan(90);
   });
 
-  it("el sistema declara exactamente tres anchos", () => {
-    expect(Object.keys(PAGE_WIDTHS)).toEqual(["lectura", "trabajo", "tablero"]);
-    expect(Object.values(PAGE_WIDTHS).map((a) => a.max)).toEqual([720, 1200, 1700]);
-  });
-
   it("la lista de pantallas anteriores solo se achica", () => {
     const fantasmas = [...ANTERIORES_AL_CONTRATO].filter((n) => !porNombre.has(n));
     // Si falla: esa pantalla ya no existe o cambió de nombre. Sacala de la lista.
@@ -205,8 +200,8 @@ describe("contrato de diseño: ninguna pantalla nueva nace fuera del sistema", (
       const f = faltas(ruta);
       if (f.length > 0) incumplen[nombre] = f;
     }
-    // Si agregaste una pantalla y esto falla: envolvela en <Page width="..."> con
-    // un <PageHeader>, dale a la tabla su versión en tarjetas para el teléfono,
+    // Si agregaste una pantalla y esto falla: envolvela en <Page> con un
+    // <PageHeader>, dale a la tabla su versión en tarjetas para el teléfono,
     // y usá los tokens (rounded-panel, text-success, text-whatsapp...). No la
     // sumes a ANTERIORES_AL_CONTRATO: esa lista es para lo que ya existía.
     expect(incumplen).toEqual({});
