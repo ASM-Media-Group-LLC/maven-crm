@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChatShared } from "@/hooks/ChatProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useMuelleFlotante, FAB_SIZE, MARGIN } from "@/hooks/useMuelleFlotante";
+import { useMuelleFlotante, FAB_SIZE, MARGIN, MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import ClariAiFab from "@/components/ClariAiFab";
 import { useUserRole } from "@/hooks/useUserRole";
 import DockChatWindow, { VENTANA_ANCHO } from "./DockChatWindow";
@@ -182,6 +182,11 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           if (!c) return null;
           return <Burbuja key={id} conversation={c} onOpen={() => abrirChat(id)} onClose={() => cerrar(id)} />;
         })}
+
+        {/* Ancla para lo que otras pantallas cuelgan encima de la nubecita
+            (el «Hub» minimizado de Cowork). `contents`: lo que llegue por
+            portal entra a la pila como un hijo más. */}
+        <div id={MUELLE_EXTRA_ID} className="contents" />
       </div>
       )}
     </DockContext.Provider>
