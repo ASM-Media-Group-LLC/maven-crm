@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import "./portada.css";
 
@@ -57,10 +58,7 @@ function Marca({ chico = false }: { chico?: boolean }) {
   return (
     <span className="marca" style={chico ? { fontSize: 15 } : undefined}>
       <i style={{ width: lado, height: lado }}>
-        <svg width={chico ? 12 : 14} height={chico ? 12 : 14} viewBox="0 0 24 24" fill="none"
-          stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 19V7l8 7 8-7v12" />
-        </svg>
+        <MarcaM alto={chico ? "10px" : "12px"} />
       </i>
       Maven
     </span>

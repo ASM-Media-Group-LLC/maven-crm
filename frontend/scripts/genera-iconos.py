@@ -1,9 +1,11 @@
-"""Iconos de Maven (favicon, PWA, iOS): la M gruesa de producción, CENTRADA.
+"""Iconos de Maven (favicon, PWA, iOS): la baldosa con la M nueva, CENTRADA.
 
-En el icono de #1625 la M quedaba un 8% arriba del centro y sobraba azul
-abajo (Jhon, 05/09/2026). Acá la geometría va en fracciones del lado de la
-baldosa, medida de ese icono, y la M se centra en vertical. Se dibuja a 8x y se
-reduce con LANCZOS, así queda suave a 16 px igual que a 512.
+La M es la del mock que aprobó Jhon el 10/09/2026 (la misma de
+src/components/MarcaM.tsx): caja apaisada de 53 x 33 con cuatro cintas de
+ancho 10 y puntas redondas, las patas de afuera apagadas y la V del medio
+blanca por encima. La geometría va en fracciones del lado de la baldosa y la
+M queda centrada. Se dibuja a 8x y se reduce con LANCZOS, así queda suave a
+16 px igual que a 512.
 
 Uso:  python3 frontend/scripts/genera-iconos.py            (escribe en frontend/public)
       python3 frontend/scripts/genera-iconos.py /otra/carpeta
@@ -21,11 +23,13 @@ C0 = (138.6, 91.5, 246.0)   # esquina arriba-izquierda
 C1 = (58.6, 129.5, 246.0)   # esquina abajo-derecha
 RADIO = 0.195               # radio de la baldosa, fracción del lado
 
-# La M, en fracciones del lado (mismas proporciones que la M de Lucide del logo).
-ANCHO = 0.625    # entre los centros de las patas
-ALTO = 0.469     # largo de las patas, entre centros
-VERTICE = 0.273  # del tope de las patas al vértice de la V
-TRAZO = 0.15     # grosor del trazo
+# La M, en su caja propia de 53 x 33 (ver components/MarcaM.tsx).
+M_W, M_H, M_SW = 53.0, 33.0, 10.0
+M_CIMA_I, M_CIMA_D, M_CIMA_Y = 14.5, 38.5, 5.5
+M_PIE_I, M_PIE_D, M_PIE_Y = 5.0, 48.0, 27.0
+M_VERT_X, M_VERT_Y = 26.5, 27.5
+ALTO_M = 0.46        # alto de la M, fracción del lado de la baldosa (74% de ancho)
+ALFA_PATAS = 0.55    # las patas de afuera, más apagadas que la V
 
 
 def gradiente(size):
@@ -48,25 +52,38 @@ def baldosa(size, ss=8):
 
 
 def letra(size, ss=8):
+    """Dos máscaras: las patas de afuera y la V del medio, que va por encima."""
     big = size * ss
-    w = TRAZO * big
-    top = (1 - (ALTO + TRAZO)) / 2 * big + w / 2   # centrada en vertical
-    bot = top + ALTO * big
-    xl, xr = (0.5 - ANCHO / 2) * big, (0.5 + ANCHO / 2) * big
-    pts = [(xl, bot), (xl, top), (big / 2, top + VERTICE * big), (xr, top), (xr, bot)]
-    layer = Image.new("L", (big, big), 0)
-    d = ImageDraw.Draw(layer)
-    d.line(pts, fill=255, width=int(round(w)), joint="curve")
-    for p in (pts[0], pts[-1]):   # puntas redondas
-        d.ellipse([p[0] - w / 2, p[1] - w / 2, p[0] + w / 2, p[1] + w / 2], fill=255)
-    return layer.resize((size, size), Image.LANCZOS)
+    alto = ALTO_M * big
+    esc = alto / M_H
+    x0 = (big - M_W * esc) / 2
+    y0 = (big - alto) / 2
+    P = lambda x, y: (x0 + x * esc, y0 + y * esc)
+    w = M_SW * esc
+
+    def trazo(puntos):
+        capa = Image.new("L", (big, big), 0)
+        d = ImageDraw.Draw(capa)
+        d.line(puntos, fill=255, width=int(round(w)), joint="curve")
+        for p in (puntos[0], puntos[-1]):   # puntas redondas
+            d.ellipse([p[0] - w / 2, p[1] - w / 2, p[0] + w / 2, p[1] + w / 2], fill=255)
+        return capa
+
+    patas = trazo([P(M_CIMA_I, M_CIMA_Y), P(M_PIE_I, M_PIE_Y)])
+    dcha = trazo([P(M_CIMA_D, M_CIMA_Y), P(M_PIE_D, M_PIE_Y)])
+    patas.paste(dcha, (0, 0), dcha)
+    uve = trazo([P(M_CIMA_I, M_CIMA_Y), P(M_VERT_X, M_VERT_Y), P(M_CIMA_D, M_CIMA_Y)])
+    return (patas.resize((size, size), Image.LANCZOS),
+            uve.resize((size, size), Image.LANCZOS))
 
 
 def icono(size):
     b = baldosa(size)
-    blanco = Image.new("RGBA", (size, size), (255, 255, 255, 255))
-    blanco.putalpha(letra(size))
-    b.alpha_composite(blanco)
+    patas, uve = letra(size)
+    for mascara, alfa in ((patas, ALFA_PATAS), (uve, 1.0)):
+        capa = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+        capa.putalpha(mascara if alfa == 1.0 else mascara.point(lambda v: int(v * alfa)))
+        b.alpha_composite(capa)
     return b
 
 
