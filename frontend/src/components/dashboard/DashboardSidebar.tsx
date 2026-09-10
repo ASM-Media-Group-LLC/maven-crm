@@ -24,7 +24,6 @@ import {
   Sidebar, SidebarContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub,
   SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
-  SidebarGroup, SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -35,7 +34,8 @@ import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 
-const LINK_CLASS = "flex items-center gap-2 rounded-xl px-3 py-3 text-sm sidebar-glass-hover";
+// Ítem dentro de un grupo: cuelga de la guía vertical del grupo, 40 px de alto.
+const LINK_CLASS = "flex items-center gap-2.5 rounded-xl px-2 py-2.5 text-sm sidebar-glass-hover";
 
 // Tinte del badge por módulo (mockup "Maven sin corbata"): cada contador con
 // el color de su módulo en vez de rojo genérico. El rojo queda reservado para
@@ -408,21 +408,20 @@ const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      {/* `flex-row` explícito: SidebarHeader trae `flex flex-col` de base, así
-          que sin esto `items-center` centraba el logo HORIZONTALMENTE y quedaba
-          descuadrado con la lista del menú. Con px-5 la baldosa arranca en la
-          misma línea que los iconos de los items. */}
-      <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
+      {/* Rediseño 09/2026: la marca va centrada y con aire arriba (como en el
+          resto de las plataformas de Unlimited), sin línea debajo: el menú
+          arranca solo. En el rail plegado queda la baldosa. */}
+      <SidebarHeader className="flex h-20 flex-row items-center justify-center px-4 shrink-0">
         <Link
           to="/dashboard"
           aria-label="Ir al Dashboard"
           className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Logo size="sm" collapsed={collapsed} />
+          <Logo size={collapsed ? "sm" : "md"} collapsed={collapsed} />
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="gap-3 py-1">
+      <SidebarContent className="gap-0.5 px-2 py-1">
         <CollapsibleSidebarGroup
           label={t("sidebar.menu")}
           storageKey="menu"
@@ -767,31 +766,6 @@ const DashboardSidebar = () => {
             Settings page (reachable from the user dropdown), keeping
             the left rail focused on day-to-day operational tabs. */}
 
-        {/* Panel de control — top-level tab justo después de RRHH.
-            Mismo DOM que un SidebarGroupLabel de CollapsibleSidebarGroup
-            (no SidebarMenuButton) para que el peso visual coincida con
-            los headers de sección (MENU / OPERACIONES / FINANZAS / RRHH)
-            y no se vea más bold/brighter. */}
-        {canAccess("Panel de control") && (
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <NavLink
-                to="/panel-de-control"
-                title="Panel de control"
-                className={({ isActive }) =>
-                  `group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-widest transition-colors hover:!text-foreground hover:bg-foreground/5 ${
-                    isActive
-                      ? "!text-foreground bg-foreground/5"
-                      : "!text-foreground/70"
-                  }`
-                }
-              >
-                <Gauge className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
-                <span className="flex-1 text-left">Panel de control</span>
-              </NavLink>
-            </SidebarGroupLabel>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-border p-3">

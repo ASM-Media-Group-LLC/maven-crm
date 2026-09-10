@@ -23,8 +23,7 @@ import {
   AlertCircle,
   Moon,
   Sun,
-  Monitor,
-} from "lucide-react";
+  Monitor, Gauge } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSkin, SKINS, useUiPrefs, activeSeason, applyCustomHue } from "@/hooks/useSkin";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
@@ -825,6 +824,16 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             description="Acceso programático de solo-lectura (creadoras y sus redes)."
           />
         )}
+        {/* Panel de control vivía como entrada suelta del menú lateral; es una
+            pantalla de administración y acá tiene su lugar (Jhon, 09/09/2026). */}
+        {(canAccess("Panel de control") || isAdmin) && (
+          <Row
+            to="/panel-de-control"
+            icon={Gauge}
+            title="Panel de control"
+            description="Funnel operativo en tiempo real: del contacto LLG al ingreso en el CRM."
+          />
+        )}
       </CardContent>
     </Card>
   </div>
@@ -873,7 +882,7 @@ const Settings = () => {
     navigate("/login");
   };
 
-  const showAdmin = canAccess("Administración") || isAdmin;
+  const showAdmin = canAccess("Administración") || canAccess("Panel de control") || isAdmin;
   const showResources = showAdmin;
 
   // Build the tab list dynamically — same canAccess() rules the

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Collapsible,
@@ -68,7 +68,7 @@ export const CollapsibleSidebarGroup = ({
 
   if (collapsed) {
     return (
-      <SidebarGroup>
+      <SidebarGroup className="p-0">
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -131,28 +131,47 @@ export const CollapsibleSidebarGroup = ({
   }
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="p-0">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-xs font-semibold !text-foreground/70 transition-colors hover:!text-foreground hover:bg-foreground/5">
-            <Icon className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
-            <span className="flex-1 text-left">{label}</span>
-            {/* Dot accent — solo si la ruta activa cae dentro de esta
-                sección. Sirve como "estás acá" cuando los grupos están
-                plegados, sin competir con el active bar del item. */}
+          {/* Fila de primer nivel del menú (rediseño 09/2026): mismo peso que
+              cualquier entrada suelta (Panel de control): ícono de 20 px,
+              etiqueta a 16 px medium, chevron a la derecha, 48 px de alto. Si la
+              ruta activa cae acá adentro y el grupo está plegado, la fila se
+              realza con una superficie neutra: "estás acá" sin robarle el
+              acento al ítem. */}
+          <SidebarGroupLabel
+            className={`group/label flex h-auto w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-base font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${
+              active && !open ? "bg-foreground/[0.06] !text-foreground" : ""
+            }`}
+          >
+            <Icon className="h-5 w-5 shrink-0 opacity-80 transition-opacity group-hover/label:opacity-100" />
+            <span className="flex-1 truncate text-left">{label}</span>
+            {/* El puntito "estás acá": se pinta con el acento del skin de cada
+                persona (bg-accent) y brilla. Se ve siempre que la ruta activa
+                caiga dentro del grupo, esté plegado o abierto. Jhon lo pidió de
+                vuelta el 09/09/2026: se lee de un vistazo y lleva el color propio. */}
             {active && (
               <span
                 aria-hidden
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_hsl(var(--accent)/0.55)]"
               />
             )}
-            <ChevronRight
-              className={`h-3 w-3 shrink-0 opacity-40 transition-[transform,opacity] group-hover/label:opacity-80 ${open ? "rotate-90" : ""}`}
-            />
+            {/* La flecha va en un circulito con fondo y a plena opacidad: es el
+                control para desplegar el grupo y tiene que verse como tal
+                (había gente que no lo encontraba). Gira al abrir. */}
+            <span
+              aria-hidden
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground/90 transition-colors group-hover/label:bg-foreground/[0.14] group-hover/label:text-foreground"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+            </span>
           </SidebarGroupLabel>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarGroupContent>{children}</SidebarGroupContent>
+          {/* Los hijos cuelgan de una guía vertical pegada al borde izquierdo del
+              ícono del grupo; la sangría del texto es de un paso, no de tres. */}
+          <SidebarGroupContent className="ml-2.5 mt-1 border-l border-primary/25 pl-1">{children}</SidebarGroupContent>
         </CollapsibleContent>
       </Collapsible>
     </SidebarGroup>
