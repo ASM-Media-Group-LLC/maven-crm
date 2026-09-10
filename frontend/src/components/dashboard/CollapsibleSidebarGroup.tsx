@@ -171,7 +171,7 @@ export const CollapsibleSidebarGroup = ({
         <CollapsibleContent>
           {/* Los hijos cuelgan de una guía vertical pegada al borde izquierdo del
               ícono del grupo; la sangría del texto es de un paso, no de tres. */}
-          <SidebarGroupContent className="ml-2.5 mt-1 border-l border-primary/25 pl-1">{children}</SidebarGroupContent>
+          <SidebarGroupContent className="ml-2.5 mt-1 w-auto border-l border-primary/25 pl-1">{children}</SidebarGroupContent>
         </CollapsibleContent>
       </Collapsible>
     </SidebarGroup>
