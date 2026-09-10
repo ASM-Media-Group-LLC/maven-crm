@@ -1171,6 +1171,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // suben en una hoja inferior.
   const isMobile = useIsMobile();
   const [salaEnHoja, setSalaEnHoja] = useState<string | null>(null);
+  // Filtro de la fila de chips del teléfono (mock de Álvaro 10/09).
+  type EstadoDeSala = "llamada" | "pausa" | "libre";
+  const [filtroSalas, setFiltroSalas] = useState<"todas" | EstadoDeSala>("todas");
 
   // Dónde colgar el botón «Hub» cuando el hub está minimizado: en la pila del
   // muelle flotante (encima de la nubecita del Messenger), que es lo que la
@@ -1303,6 +1306,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
   const conectadas = cowork.assignments.filter((a) => a.is_active).length;
   const fraseDeSalas = `${conectadas} ${conectadas === 1 ? "persona conectada" : "personas conectadas"} en ${cowork.rooms.length} ${cowork.rooms.length === 1 ? "sala" : "salas"}.`;
+
+  // Cómo está cada sala, calculado UNA vez y antes de dibujar: lo usan las
+  // tarjetas, la fila de filtros del teléfono y su renglón de estado (mock de
+  // Álvaro 10/09). "Participantes" son los asignados que ESTÁN según LiveKit;
+  // si el monitor no sabe (no conectó, o está apagado porque entré a esa
+  // sala), los asignados a secas.
+  const fichas = cowork.rooms.map((room) => {
+    const asignados = getRoomParticipants(room.id);
+    const presentes = new Set(personasEnSala(asignados.map((a) => a.user_id), roomConectados[room.id]));
+    const participants = asignados.filter((a) => presentes.has(a.user_id));
+    const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
+    const estado: EstadoDeSala = participants.length === 0 ? "libre" : pausaSala ? "pausa" : "llamada";
+    return { room, participants, pausaSala, estado };
+  });
+  const FILTROS_DE_SALAS: Array<{ valor: "todas" | EstadoDeSala; etiqueta: string }> = [
+    { valor: "todas", etiqueta: "Todas" },
+    { valor: "llamada", etiqueta: "En llamada" },
+    { valor: "pausa", etiqueta: "En pausa" },
+    { valor: "libre", etiqueta: "Disponibles" },
+  ];
+  const cuantasSalas = (valor: "todas" | EstadoDeSala) =>
+    valor === "todas" ? fichas.length : fichas.filter((f) => f.estado === valor).length;
+  const fichasVisibles = filtroSalas === "todas" ? fichas : fichas.filter((f) => f.estado === filtroSalas);
 
   return (
     <div className="flex flex-1 min-h-0 bg-background text-foreground relative">
@@ -1772,19 +1798,34 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 </Button>
               </div>
             </div>
+            {/* Filtros, solo teléfono (mock de Álvaro 10/09): con quince salas en
+                dos columnas, ver solo las que están en pausa ahorra scroll. */}
+            <div className="-mx-3 mb-3 flex gap-1.5 overflow-x-auto px-3 pb-0.5 md:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {FILTROS_DE_SALAS.map((f) => {
+                const activo = filtroSalas === f.valor;
+                return (
+                  <button
+                    key={f.valor}
+                    type="button"
+                    aria-pressed={activo}
+                    className={cn(
+                      "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                      activo ? "border-primary/50 bg-primary/15 text-primary" : "border-border bg-card text-muted-foreground",
+                    )}
+                    onClick={() => setFiltroSalas(f.valor)}
+                  >
+                    {f.etiqueta}
+                    <span className={cn("tabular-nums", activo ? "text-primary" : "text-muted-foreground/70")}>{cuantasSalas(f.valor)}</span>
+                  </button>
+                );
+              })}
+            </div>
             {/* La grilla se llena sola: en un monitor grande entran cinco o
                 seis salas por fila y todas quedan a la vista; en una ventana
                 angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
             <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
-              {cowork.rooms.map((room) => {
-                // Asignados que ESTÁN, según LiveKit. Si el monitor no sabe
-                // (no conectó, o está apagado porque entré a esta sala), los
-                // asignados a secas.
-                const asignados = getRoomParticipants(room.id);
-                const presentes = new Set(personasEnSala(asignados.map((a) => a.user_id), roomConectados[room.id]));
-                const participants = asignados.filter((a) => presentes.has(a.user_id));
+              {fichasVisibles.map(({ room, participants, pausaSala, estado }) => {
                 const speakers = roomSpeakers[room.id] ?? [];
-                const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
                 const etiquetas = etiquetasDe(participants, !pausaSala);
                 const personas = personasDe(participants);
                 const monitor = (showVideo: boolean) => (
@@ -1875,10 +1916,37 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
+                    {/* Segundo renglón, solo teléfono (mock de Álvaro 10/09): en qué
+                        está la sala, para leerlo sin mirar el video. */}
+                    <div className="-mt-1.5 mb-2 flex items-center gap-1.5 px-3 text-[11px] font-medium md:hidden">
+                      {estado === "pausa" ? (
+                        <>
+                          <Coffee className={cn("h-3 w-3", pausaSala?.excedida ? "text-destructive" : "text-warning")} />
+                          <span className={pausaSala?.excedida ? "text-destructive" : "text-warning"}>
+                            {pausaSala?.kind === "bano" ? "En el baño" : "En break"}{pausaSala?.excedida ? " · pasado" : ""}
+                          </span>
+                        </>
+                      ) : estado === "libre" ? (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                          <span className="text-muted-foreground">Disponible</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-success" />
+                          <span className="text-success">En llamada</span>
+                        </>
+                      )}
+                    </div>
 
                     {/* El video, a 16:9 y de borde a borde. Encima: los llamados
                         (arriba a la izquierda) y la gente con su reloj (abajo). */}
-                    <div className={cn("relative aspect-video overflow-hidden", participants.length === 0 ? "bg-muted/50" : "bg-black/40")}>
+                    <div className={cn(
+                      // En el teléfono va redondeado y a 4:3: a 175 px de ancho, 16:9
+                      // daban 98 px de alto y el panel de pausa no cabía (10/09).
+                      "relative mx-2 mb-2 aspect-[4/3] overflow-hidden rounded-xl md:mx-0 md:mb-0 md:aspect-video md:rounded-none",
+                      participants.length === 0 ? "bg-muted/50" : "bg-black/40",
+                    )}>
                       {participants.length === 0 ? (
                         <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
                           <Users2 className="h-5 w-5" />
@@ -1973,6 +2041,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 );
               })}
             </div>
+            {fichasVisibles.length === 0 && fichas.length > 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground md:hidden">Ninguna sala está así ahora.</p>
+            )}
           </div>
         )}
       </div>

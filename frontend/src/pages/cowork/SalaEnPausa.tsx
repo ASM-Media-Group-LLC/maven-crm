@@ -1,12 +1,14 @@
 // La miniatura de una sala cuando TODOS los que están en ella marcaron pausa.
 //
-// Mock aprobado por Jhon (08/09): en pausa la miniatura se APAGA. Nada de video
-// ni punto verde: un panel gris que dice en grande qué pausa es y cuánto lleva,
-// con la barra del tope. Rojo y latiendo si se pasó. Antes la persona en pausa
-// seguía mostrando su video (o la silla vacía) con un chip chiquito encima, y
-// el jefe veía a dos personas "en almuerzo" en verde.
+// Mock de Álvaro (10/09), que reemplaza al panel gris del 08/09: la miniatura
+// sigue APAGADA (nada de video ni punto verde), pero ahora se lee de un vistazo
+// también en el teléfono, donde la anterior no cabía (cuatro renglones en 98 px
+// de alto y el "le quedan 13" se cortaba). Taza en un anillo, el tiempo grande
+// al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
+// que la pausa no parezca una falta. Rojo y latiendo si se pasó.
 import { Coffee } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fraseDePausa } from "@/lib/frasesDePausa";
 
 export interface PausaDeSala {
   kind: "bano" | "break";
@@ -27,15 +29,15 @@ const mmss = (seg: number) => {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 };
 const horaCorta = (epoch: number | null) =>
-  epoch ? new Date(epoch).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : null;
+  epoch ? new Date(epoch).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : null;
 
-/** Textos y proporción de la barra. Puro, para probarlo. */
+/** Textos y proporción del tope. Puro, para probarlo. */
 export function describirPausa(p: PausaDeSala): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
   const esBano = p.kind === "bano";
   const titulo = esBano ? "En el baño" : "En break";
   const partes: string[] = [];
   const desde = horaCorta(p.desde);
-  if (desde) partes.push(`desde ${desde}`);
+  if (desde) partes.push(`Desde ${desde}`);
   let pct = 0;
   let tono: "ok" | "poco" | "excedida" = "ok";
   if (p.limiteMin != null) {
@@ -45,15 +47,15 @@ export function describirPausa(p: PausaDeSala): { titulo: string; detalle: strin
     const deMas = usado - topeSeg;
     if (deMas >= 0) {
       tono = "excedida";
-      partes.push(esBano ? `pasó los ${p.limiteMin} min de baño de hoy` : `límite ${p.limiteMin} min · ${Math.ceil(deMas / 60)} min de más`);
+      partes.push(esBano ? `Pasó los ${p.limiteMin} min de baño de hoy` : `${Math.ceil(deMas / 60)} min de más`);
     } else {
       tono = pct >= 75 ? "poco" : "ok";
       partes.push(esBano
-        ? `hoy lleva ${Math.round(usado / 60)} de ${p.limiteMin} min de baño`
-        : `límite ${p.limiteMin} min · le quedan ${Math.ceil((topeSeg - usado) / 60)}`);
+        ? `Hoy lleva ${Math.round(usado / 60)} de ${p.limiteMin} min`
+        : `Quedan ${Math.ceil((topeSeg - usado) / 60)} min`);
     }
   } else {
-    partes.push("sin tope configurado");
+    partes.push("Sin tope");
   }
   return { titulo: tono === "excedida" ? `${titulo} · pasado` : titulo, detalle: partes.join(" · "), pct, tono };
 }
@@ -61,32 +63,51 @@ export function describirPausa(p: PausaDeSala): { titulo: string; detalle: strin
 export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; className?: string }) {
   const d = describirPausa(pausa);
   const excedida = d.tono === "excedida";
+  const acento = excedida ? "text-destructive" : "text-warning";
+  // En la miniatura el título va en una línea al lado del anillo: "En break ·
+  // pasado" no cabe en el teléfono, así que pasado el tope se acorta.
+  const etiqueta = excedida ? (pausa.kind === "bano" ? "Baño pasado" : "Break pasado") : d.titulo;
+  // "Desde 1:51 p. m." y "Quedan 24 min": en el teléfono (163 px de ancho útil)
+  // van en dos renglones limpios; en escritorio, en uno separados por el punto.
+  const partes = d.detalle.split(" · ");
   return (
     <div
       data-testid="sala-en-pausa"
       data-tono={d.tono}
       className={cn(
-        "h-36 rounded-xl border border-dashed flex flex-col items-center justify-center gap-1 px-3 text-center",
-        excedida ? "border-destructive/50 bg-destructive/10" : "border-border bg-muted/40",
+        // Medidas del teléfono primero (la tarjeta mide 179 px y el área 4:3 da 122 px
+        // de alto); en escritorio (300 px, 16:9) todo crece un punto.
+        "h-36 rounded-xl border flex flex-col items-center justify-center gap-1 px-3 py-1.5 text-center md:gap-1.5 md:py-2",
+        excedida ? "border-destructive/40 bg-destructive/10" : "border-border bg-muted/40",
         className,
       )}
     >
-      <div className={cn(
-        "grid h-9 w-9 place-items-center rounded-full",
-        excedida ? "bg-destructive/20 text-destructive animate-pulse motion-reduce:animate-none" : "bg-muted text-muted-foreground",
-      )}>
-        {pausa.kind === "bano" ? <span aria-hidden className="text-base leading-none">🚻</span> : <Coffee className="h-4 w-4" />}
-      </div>
-      <div className={cn("font-display text-base font-bold leading-tight", excedida ? "text-destructive" : "text-foreground")}>{d.titulo}</div>
-      <div className={cn("font-display text-xl font-semibold tabular-nums leading-none", excedida ? "text-destructive" : "text-foreground")}>{mmss(pausa.segundos)}</div>
-      <div className={cn("text-[11px] leading-snug", excedida ? "text-destructive/90" : "text-muted-foreground")}>{d.detalle}</div>
-      {pausa.limiteMin != null && (
-        <div className="mt-1 h-1 w-3/5 overflow-hidden rounded-full bg-muted-foreground/20">
-          <div
-            className={cn("h-full rounded-full", d.tono === "excedida" ? "bg-destructive" : d.tono === "poco" ? "bg-warning" : "bg-success")}
-            style={{ width: `${d.pct}%` }}
-          />
+      <div className="flex items-center gap-2.5 md:gap-3">
+        <div className={cn(
+          "grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 md:h-10 md:w-10",
+          excedida
+            ? "bg-destructive/15 text-destructive ring-destructive/40 animate-pulse motion-reduce:animate-none"
+            : "bg-warning/10 text-warning ring-warning/40",
+        )}>
+          {pausa.kind === "bano" ? <span aria-hidden className="text-base leading-none md:text-lg">🚻</span> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
         </div>
+        <div className="text-left">
+          <div className={cn("whitespace-nowrap text-[11px] font-semibold leading-none", acento)}>{etiqueta}</div>
+          <div className={cn("font-display text-xl font-bold tabular-nums leading-tight md:text-2xl", acento)}>{mmss(pausa.segundos)}</div>
+        </div>
+      </div>
+      <div className={cn("text-[10px] leading-snug md:text-[11px]", excedida ? "text-destructive/90" : "text-muted-foreground")}>
+        {partes.map((p, i) => (
+          <span key={p} className="whitespace-nowrap">
+            {i > 0 && <span className="hidden md:inline"> · </span>}
+            {i > 0 && <br className="md:hidden" />}
+            {p}
+          </span>
+        ))}
+      </div>
+      {/* La frase es del break y de cuando va bien: pasado el tope, sobra. */}
+      {pausa.kind === "break" && !excedida && (
+        <p className="line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-muted-foreground/70">{fraseDePausa(pausa.desde)}</p>
       )}
     </div>
   );
