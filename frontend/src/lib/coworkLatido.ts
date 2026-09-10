@@ -36,7 +36,7 @@ function fijarReloj(r: RelojCowork | null): void {
   }
 }
 
-const ESTADOS = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"]);
+const ESTADOS = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
 
 /** Interpreta la respuesta del servidor. Exportado para probarlo. */
 export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | null {

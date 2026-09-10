@@ -90,6 +90,31 @@ export interface CoworkAssignment {
   assigned_at: string;
 }
 
+/** Meet grupal (Jhon, 10/09/2026): el supervisor se lleva a la gente de una o
+ *  varias salas a una sala temporal. Abierto mientras `ended_at` es null. */
+export interface CoworkMeetParticipant {
+  id: string;
+  meet_id: string;
+  session_id: string;
+  user_id: string;
+  /** De qué sala vino (para volver y para el reporte). */
+  room_id: string | null;
+  joined_at: string;
+  left_at: string | null;
+  left_reason: "volvio" | "meet_terminado" | "barrido" | null;
+}
+export interface CoworkMeet {
+  id: string;
+  session_id: string;
+  created_by: string;
+  livekit_room_name: string;
+  title: string;
+  started_at: string;
+  ended_at: string | null;
+  end_reason: string | null;
+  participantes: CoworkMeetParticipant[];
+}
+
 export interface HostRequest {
   id: string;
   session_id: string;
@@ -135,6 +160,7 @@ export function useCoworkSession(sessionId: string | null) {
   const [memberships, setMemberships] = useState<CoworkMembership[]>([]);
   const [assignments, setAssignments] = useState<CoworkAssignment[]>([]);
   const [hostRequests, setHostRequests] = useState<HostRequest[]>([]);
+  const [meets, setMeets] = useState<CoworkMeet[]>([]);
   const [screenShareRequests, setScreenShareRequests] = useState<ScreenShareRequest[]>([]);
   const [myMembership, setMyMembership] = useState<CoworkMembership | null>(null);
   const [myAssignment, setMyAssignment] = useState<CoworkAssignment | null>(null);
@@ -174,6 +200,18 @@ export function useCoworkSession(sessionId: string | null) {
 
       const { data: ssReqs } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false });
       setScreenShareRequests((ssReqs as ScreenShareRequest[]) || []);
+
+      // Meets grupales ABIERTOS con su gente. Los cerrados son historia: los ven
+      // los reportes, no el tablero.
+      // La tabla es nueva: los types generados se regeneran al aplicar la
+      // migración, hasta entonces se consulta sin tipar la tabla.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sinTipar = supabase as unknown as { from: (tabla: string) => any };
+      const { data: ms } = await sinTipar.from("cowork_meets")
+        .select("*, participantes:cowork_meet_participants(*)")
+        .eq("session_id", sessionId).is("ended_at", null).order("started_at", { ascending: false });
+      const filas = (ms ?? []) as Array<Omit<CoworkMeet, "participantes"> & { participantes?: CoworkMeetParticipant[] }>;
+      setMeets(filas.map((m) => ({ ...m, participantes: m.participantes ?? [] })));
 
       const userIds = (mems as CoworkMembership[])?.map(m => m.user_id) || [];
       if (userIds.length) {
@@ -215,11 +253,18 @@ export function useCoworkSession(sessionId: string | null) {
       .on("postgres_changes", { event: "*", schema: "public", table: "cowork_screenshare_requests", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
+    const meetsCh = supabase.channel(`cowork-meets-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_meets", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+    const meetPartsCh = supabase.channel(`cowork-meet-parts-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_meet_participants", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+
     const memCh = supabase.channel(`cowork-members-${sessionId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "cowork_memberships", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
-    channelsRef.current = [sessionCh, roomsCh, assignCh, reqCh, ssCh, memCh];
+    channelsRef.current = [sessionCh, roomsCh, assignCh, reqCh, ssCh, memCh, meetsCh, meetPartsCh];
 
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
@@ -284,6 +329,12 @@ export function useCoworkSession(sessionId: string | null) {
     // igual en verde.
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId, clientId: idDePestana() });
   }, [sessionId]);
+
+  // ── Meet grupal: el supervisor se lleva a la gente de una o varias salas ──
+  const crearMeetGrupal = useCallback(async (roomIds: string[]) => invokeCowork("crearMeetGrupal", { sessionId, roomIds }), [sessionId]);
+  const terminarMeetGrupal = useCallback(async (meetId: string, reason: "supervisor_salio" | "terminado" = "terminado") => invokeCowork("terminarMeetGrupal", { meetId, reason }), []);
+  const salirDeMeetGrupal = useCallback(async (meetId: string) => invokeCowork("salirDeMeetGrupal", { meetId }), []);
+  const joinMeetGrupal = useCallback(async (meetId: string) => invokeCowork("issueLiveKitToken", { sessionId, purpose: "join_meet_grupal", meetId, clientId: idDePestana() }), [sessionId]);
 
   /** Apaga las asignaciones de quien lleva más de 3 min sin latir: cerró la
    *  pestaña sin salir. Solo hosts; lo llama el tablero cada un par de minutos. */
@@ -421,10 +472,11 @@ export function useCoworkSession(sessionId: string | null) {
   const incognitoLeave = useCallback(async (sid: string) => invokeCowork("incognitoLeave", { sessionId: sid }), []);
 
   return {
-    session, rooms, memberships, assignments, hostRequests, screenShareRequests,
+    session, rooms, memberships, assignments, hostRequests, screenShareRequests, meets,
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest, barrerAsignacionesColgadas,
+    crearMeetGrupal, terminarMeetGrupal, salirDeMeetGrupal, joinMeetGrupal,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
     listMyActiveSessions, listMyEndedSessions, leaveSessionById, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
   };

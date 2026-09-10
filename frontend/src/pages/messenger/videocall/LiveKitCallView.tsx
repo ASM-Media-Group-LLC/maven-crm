@@ -35,6 +35,9 @@ interface LiveKitCallViewProps {
   onLeave: () => void;
   initialMicOn?: boolean;
   initialCamOn?: boolean;
+  /** Arrancar compartiendo pantalla (volver de un meet grupal como se estaba).
+   *  Best-effort: el navegador solo lo permite cerca del clic; si no, avisa. */
+  initialScreenShareOn?: boolean;
   initialAudioDeviceId?: string;
   initialVideoDeviceId?: string;
   initialAudioOutputDeviceId?: string;
@@ -119,7 +122,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -328,6 +331,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect, reintentoManual]);
+
+  // Volver de un meet grupal compartiendo pantalla como antes (Jhon, 10/09). El
+  // navegador solo deja pedir la pantalla cerca del clic de "Volver"; si ya
+  // pasó el momento, se avisa en vez de fallar en silencio. Una sola vez.
+  const pantallaInicialRef = useRef(initialScreenShareOn);
+  useEffect(() => {
+    if (!pantallaInicialRef.current || lk.connectionState !== ConnectionState.Connected || lk.isScreenSharing) return;
+    pantallaInicialRef.current = false;
+    Promise.resolve(lk.toggleScreenShare()).catch(() => toast.info("Toca «Compartir pantalla» para volver a compartirla"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lk.connectionState]);
 
   useEffect(() => {
     const h = () => { lk.disconnect(); };

@@ -20,7 +20,8 @@ export interface RelojCowork {
 export function segundosMostrados(reloj: RelojCowork | null, ahora: number): number {
   if (!reloj) return 0;
   const base = Math.max(0, reloj.segundosHoy);
-  if (reloj.estado !== "activo") return base;
+  // Corre en "activo" y en "meet" (el meet grupal cuenta como trabajo).
+  if (reloj.estado !== "activo" && reloj.estado !== "meet") return base;
   return base + Math.max(0, Math.floor((ahora - reloj.en) / 1000));
 }
 
@@ -57,7 +58,7 @@ export function motivoDetenidoDeOtro(estado: EstadoTiempo | null | undefined): s
   }
 }
 
-const ESTADOS = new Set<string>(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"]);
+const ESTADOS = new Set<string>(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
 
 /** Arma el reloj desde lo que llegó por presencia (campos sueltos, cualquiera
  *  puede faltar si el otro lado corre un bundle viejo). */

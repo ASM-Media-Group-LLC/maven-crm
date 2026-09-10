@@ -37,7 +37,7 @@ export interface RelojDeRespaldo {
   ultimo_latido: string | null;
 }
 
-const ESTADOS: ReadonlySet<string> = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"]);
+const ESTADOS: ReadonlySet<string> = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
 
 /**
  * Un reloj para el tablero armado desde la base, con la misma forma que el que

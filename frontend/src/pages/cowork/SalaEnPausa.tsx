@@ -7,12 +7,14 @@
 // al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
 // que la pausa no parezca una falta. Rojo y latiendo si se pasó.
 import { useId } from "react";
-import { Coffee } from "lucide-react";
+import { Coffee, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fraseDePausa } from "@/lib/frasesDePausa";
 
 export interface PausaDeSala {
-  kind: "bano" | "break";
+  /** "meet" = la sala entera está en un meet grupal del supervisor: no es una
+   *  pausa (el reloj sigue sumando), pero la miniatura se apaga igual. */
+  kind: "bano" | "break" | "meet";
   /** Segundos que lleva ESTA pausa. */
   segundos: number;
   /** Epoch ms de cuándo arrancó. */
@@ -82,10 +84,12 @@ export function PaisajeDePausa({ excedida }: { excedida: boolean }) {
 /** Textos y proporción del tope. Puro, para probarlo. */
 export function describirPausa(p: PausaDeSala): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
   const esBano = p.kind === "bano";
-  const titulo = esBano ? "En el baño" : "En break";
+  const titulo = p.kind === "meet" ? "En meet grupal" : esBano ? "En el baño" : "En break";
   const partes: string[] = [];
   const desde = horaCorta(p.desde);
   if (desde) partes.push(`Desde ${desde}`);
+  // El meet no tiene tope ni se "pasa": solo desde cuándo.
+  if (p.kind === "meet") return { titulo, detalle: partes.join(" · "), pct: 0, tono: "ok" };
   let pct = 0;
   let tono: "ok" | "poco" | "excedida" = "ok";
   if (p.limiteMin != null) {
@@ -111,7 +115,9 @@ export function describirPausa(p: PausaDeSala): { titulo: string; detalle: strin
 export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; className?: string }) {
   const d = describirPausa(pausa);
   const excedida = d.tono === "excedida";
-  const acento = excedida ? "text-destructive" : "text-warning";
+  const esMeet = pausa.kind === "meet";
+  // Ámbar es pausa; el meet grupal es trabajo y va en el color de la marca.
+  const acento = excedida ? "text-destructive" : esMeet ? "text-primary" : "text-warning";
   // En la miniatura el título va en una línea al lado del anillo: "En break ·
   // pasado" no cabe en el teléfono, así que pasado el tope se acorta.
   const etiqueta = excedida ? (pausa.kind === "bano" ? "Baño pasado" : "Break pasado") : d.titulo;
@@ -136,9 +142,11 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
           "grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 md:h-10 md:w-10",
           excedida
             ? "bg-destructive/15 text-destructive ring-destructive/40 animate-pulse motion-reduce:animate-none"
-            : "bg-warning/15 text-warning ring-warning/50",
+            : esMeet ? "bg-primary/15 text-primary ring-primary/50" : "bg-warning/15 text-warning ring-warning/50",
         )}>
-          {pausa.kind === "bano" ? <span aria-hidden className="text-base leading-none md:text-lg">🚻</span> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
+          {pausa.kind === "bano"
+            ? <span aria-hidden className="text-base leading-none md:text-lg">🚻</span>
+            : esMeet ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
         </div>
         <div className="text-left">
           <div className={cn("whitespace-nowrap text-[11px] font-semibold leading-none", acento)}>{etiqueta}</div>

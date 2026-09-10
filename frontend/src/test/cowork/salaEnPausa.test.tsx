@@ -28,6 +28,12 @@ describe("describirPausa — lo que dice el panel gris", () => {
     expect(d.pct).toBe(70);
     expect(d.tono).toBe("ok");
   });
+  it("meet grupal: solo desde cuándo, sin tope ni 'pasado'", () => {
+    const d = describirPausa({ kind: "meet", segundos: 5 * 60, desde: T, limiteMin: 30, consumidoSeg: 0, excedida: false });
+    expect(d.titulo).toBe("En meet grupal");
+    expect(d.detalle).toMatch(/^Desde /);
+    expect(d.tono).toBe("ok");
+  });
   it("sin tope configurado no inventa uno", () => {
     const d = describirPausa({ kind: "break", segundos: 60, desde: null, limiteMin: null, consumidoSeg: 0, excedida: false });
     expect(d.detalle).toBe("Sin tope");

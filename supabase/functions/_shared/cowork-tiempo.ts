@@ -13,9 +13,9 @@
 //   · Tolerancia: agacharse tres segundos no descuenta. La ausencia tiene que
 //     durar UMBRAL_FUERA_DE_CAMARA_MS para que el reloj se detenga.
 
-export type EstadoTiempo = "activo" | "pausa" | "sin_camara" | "sin_pantalla" | "fuera_de_camara";
+export type EstadoTiempo = "activo" | "pausa" | "sin_camara" | "sin_pantalla" | "fuera_de_camara" | "meet";
 
-export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = ["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"];
+export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = ["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"];
 
 /** Cuánto tiene que durar el "no hay nadie" para detener el reloj. */
 export const UMBRAL_FUERA_DE_CAMARA_MS = 60_000;
@@ -33,6 +33,9 @@ export interface Latido {
   /** Epoch ms desde que el detector está en `faceState`. */
   faceSince?: number | null;
   onBreak?: boolean;
+  /** Llevado a un meet grupal por su supervisor: cuenta como trabajo aunque
+   *  no comparta pantalla (en el meet no se comparte). La pausa manda igual. */
+  enMeet?: boolean;
 }
 
 export interface Veredicto {
@@ -57,6 +60,7 @@ export const EXIGE_TODO: Exigencias = { camara: true, pantalla: true };
  *  pantalla > fuera de cámara > activo — cada una solo si la sesión la exige. */
 export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_FUERA_DE_CAMARA_MS, exige: Exigencias = EXIGE_TODO): Veredicto {
   if (l.onBreak) return { estado: "pausa", detalle: null };
+  if (l.enMeet) return { estado: "meet", detalle: null };
   if (exige.camara && !l.camOn) return { estado: "sin_camara", detalle: null };
   if (exige.pantalla && !l.screenShareOn) return { estado: "sin_pantalla", detalle: null };
   // "Fuera de cámara" solo tiene sentido si la cámara se exige y está encendida.
@@ -70,5 +74,5 @@ export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_
 
 /** ¿El reloj corre en este estado? */
 export function cuentaComoTrabajo(estado: EstadoTiempo): boolean {
-  return estado === "activo";
+  return estado === "activo" || estado === "meet";
 }

@@ -13,17 +13,17 @@ export function useRelojPropio(): { reloj: Reloj | null; segundos: number } {
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => suscribirReloj(setReloj), []);
   useEffect(() => {
-    if (reloj?.estado !== "activo") return;
+    if (reloj?.estado !== "activo" && reloj?.estado !== "meet") return;
     const id = window.setInterval(() => setAhora(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [reloj?.estado]);
-  return { reloj, segundos: segundosMostrados(reloj, reloj?.estado === "activo" ? ahora : Date.now()) };
+  return { reloj, segundos: segundosMostrados(reloj, reloj?.estado === "activo" || reloj?.estado === "meet" ? ahora : Date.now()) };
 }
 
 export default function RelojCowork({ compacto = false, className }: { compacto?: boolean; className?: string }) {
   const { reloj, segundos } = useRelojPropio();
   if (!reloj) return null; // todavía no llegó el primer latido
-  const corre = reloj.estado === "activo";
+  const corre = reloj.estado === "activo" || reloj.estado === "meet";
   const motivo = motivoDetenido(reloj.estado);
   return (
     <span

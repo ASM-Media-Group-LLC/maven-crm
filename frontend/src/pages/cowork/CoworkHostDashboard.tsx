@@ -43,6 +43,8 @@ import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
 import CoworkReglasDialog from "./CoworkReglasDialog";
 import CoworkPausasDialog from "./CoworkPausasDialog";
+import MeetGrupalDialog from "./MeetGrupalDialog";
+import type { CoworkMeet } from "@/hooks/useCoworkSession";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
 import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor, etiquetaDePausaSupervisor } from "@/lib/pausaSupervisor";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
@@ -103,6 +105,8 @@ interface Props {
 }
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
+  // Los métodos del meet grupal sueltos: los callbacks dependen de ellos, no de `cowork` entero.
+  const { crearMeetGrupal, terminarMeetGrupal, joinMeetGrupal } = cowork;
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
   const { mediaStates, supervisores, supervisoresDesde, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
@@ -135,6 +139,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
+  // Meet grupal (Jhon, 10/09): si la "sala activa" es un meet, acá va su id. El
+  // token sale de otro purpose y colgar TERMINA el meet para todos.
+  const [activeMeetId, setActiveMeetId] = useState<string | null>(null);
+  const [meetDialogOpen, setMeetDialogOpen] = useState(false);
   const {
     startCall, endCall, activeKey,
     abrirVentanaDelSistema, cerrarVentanaDelSistema,
@@ -383,8 +391,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Si TODOS los que están en la sala marcaron pausa, la miniatura se apaga y
   // muestra el panel de pausa (mock aprobado por Jhon, 08/09). Con una sola
   // persona por sala —el caso normal— es "esa persona está en pausa".
+  /** Si la persona está en un meet grupal ahora: cuál y desde cuándo (epoch ms). */
+  const meetDe = (uid: string): { meetId: string; desde: number } | null => {
+    for (const m of cowork.meets) {
+      const p = m.participantes.find((x) => x.user_id === uid && !x.left_at);
+      if (p) return { meetId: m.id, desde: Date.parse(p.joined_at) };
+    }
+    return null;
+  };
   const pausaDeLaSala = (uids: string[]): PausaDeSala | null => {
     if (!uids.length) return null;
+    // Todos en el meet grupal → la miniatura dice "En meet grupal" con el tiempo
+    // del que más lleva. No es pausa (el reloj suma), pero el video se apaga igual.
+    const meets = uids.map((uid) => meetDe(uid));
+    if (meets.every((m) => m)) {
+      const desde = Math.min(...meets.map((m) => m!.desde));
+      return { kind: "meet", segundos: Math.max(0, Math.floor((now - desde) / 1000)), desde, limiteMin: null, consumidoSeg: 0, excedida: false };
+    }
     const pausas = uids.map((uid) => ({ uid, p: pausaDe(uid) }));
     if (pausas.some((x) => !x.p)) return null;
     // La más larga manda en el panel; con una persona es la única.
@@ -674,13 +697,36 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setHubMaximized(false);
     // Ya estoy en esta sala → nada que hacer.
     if (activeRoomId === roomId) return;
+    // Si venía de un meet grupal, irme a una sala es dejarlo: se cierra para todos.
+    if (activeMeetId) { void terminarMeetGrupal(activeMeetId, "supervisor_salio").catch(() => { /* ya cerrado */ }); setActiveMeetId(null); }
     const switching = !!activeRoomId;
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
     // Cambiar de sala = moverse: la anterior se cuelga (no se puede estar en dos salas).
     if (switching) toast.info(`Te moviste a ${room.name}`);
-  }, [cowork.rooms, activeRoomId]);
+  }, [cowork.rooms, activeRoomId, activeMeetId, terminarMeetGrupal]);
+
+  // ── Meet grupal ──────────────────────────────────────────────────────────
+  // El supervisor entra al meet como a una sala más (misma vista a pantalla
+  // completa), pero el token es otro y colgar TERMINA el meet para todos.
+  const entrarAlMeet = useCallback((meet: Pick<CoworkMeet, "id" | "livekit_room_name">) => {
+    setHubMaximized(false);
+    setActiveMeetId(meet.id);
+    setActiveRoomLk(meet.livekit_room_name);
+    setActiveRoomId(`meet:${meet.id}`);
+    setActiveRoomName("Meet grupal");
+  }, []);
+  const crearMeet = useCallback(async (roomIds: string[]) => {
+    try {
+      const r = await crearMeetGrupal(roomIds);
+      toast.success(`Meet grupal con ${r.participantes} ${r.participantes === 1 ? "persona" : "personas"}`);
+      setMeetDialogOpen(false);
+      entrarAlMeet(r.meet);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo crear el meet");
+    }
+  }, [crearMeetGrupal, entrarAlMeet]);
 
   const getHubToken = useCallback(async () => {
     const result = await cowork.issueLiveKitToken("join_host_hub");
@@ -770,18 +816,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   }, [hubSilenciado]);
 
   const getActiveRoomToken = useCallback(async () => {
-    const result = await cowork.issueLiveKitToken("join_room", activeRoomId!);
+    const result = activeMeetId
+      ? await joinMeetGrupal(activeMeetId)
+      : await cowork.issueLiveKitToken("join_room", activeRoomId!);
     return { token: result.token, url: result.url };
-  }, [cowork.issueLiveKitToken, activeRoomId]);
+  }, [cowork.issueLiveKitToken, joinMeetGrupal, activeRoomId, activeMeetId]);
 
   // Salir de la sala (Volver al dashboard o el botón rojo) = colgar ESA sala.
   const leaveActiveRoom = useCallback(() => {
+    // Colgar el meet grupal lo termina para todos: la gente vuelve a su sala.
+    if (activeMeetId) {
+      void terminarMeetGrupal(activeMeetId, "supervisor_salio").catch(() => { /* ya cerrado */ });
+      setActiveMeetId(null);
+      toast.info("Meet grupal terminado: todos vuelven a su sala");
+    }
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
     // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
     // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
-  }, []);
+  }, [activeMeetId, terminarMeetGrupal]);
 
   // ── Navegador de salas (flechas + lista dentro de la llamada) ─────────────
   //
@@ -1201,6 +1255,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     for (const a of participants) {
       const ms = mediaStates[a.user_id];
       const quien = participants.length > 1 ? `${nombreYApellido(cowork.profiles[a.user_id])} · ` : "";
+      // En un meet grupal no hay cámara ni pantalla que exigir: su chip dice
+      // dónde está y cuánto lleva, y nada más.
+      const enMeet = meetDe(a.user_id);
+      if (enMeet) {
+        if (sinPausaGlobal) {
+          out.push({ key: `${a.user_id}-meet`, icono: Video, texto: `${quien}En meet grupal · ${minutosTexto(Math.floor((now - enMeet.desde) / 1000))}`, tono: "muted" });
+        }
+        continue;
+      }
       const problema = faceIssue(ms);
       if (problema && ms?.faceSince) {
         out.push({
@@ -1241,7 +1304,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const personasDe = (participants: Array<{ user_id: string }>) => participants.map((a) => {
     // La presencia manda; si no llegó, el reloj que el latido dejó en la base.
     const reloj = relojDesdePresencia(mediaStates[a.user_id]) ?? relojDeRespaldo(relojRespaldo[a.user_id], now);
-    const corre = reloj?.estado === "activo";
+    const corre = reloj?.estado === "activo" || reloj?.estado === "meet";
     return {
       uid: a.user_id,
       nombre: nombreYApellido(cowork.profiles[a.user_id]),
@@ -1858,6 +1921,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant="outline"
+                  className="gap-1.5 rounded-full h-8 shrink-0"
+                  title="Meet grupal: llevar la gente de una o varias salas a una sala temporal"
+                  onClick={() => setMeetDialogOpen(true)}
+                >
+                  <Video className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Meet</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="gap-1 rounded-full h-8 shrink-0"
                   title="Añadir sala"
                   onClick={() => { setAddName(""); setAddOpen(true); }}
@@ -1870,6 +1942,37 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 seis salas por fila y todas quedan a la vista; en una ventana
                 angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
             <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
+              {/* Meets grupales abiertos: una tarjeta cada uno, antes de las salas,
+                  con su gente y el tiempo. Cualquier supervisor puede entrar; el
+                  que lo invocó lo termina al colgar. */}
+              {cowork.meets.map((meet) => {
+                const gente = meet.participantes.filter((p) => !p.left_at);
+                const dentro = activeMeetId === meet.id;
+                return (
+                  <div key={`meet-${meet.id}`} data-meet={meet.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-primary/40 bg-card">
+                    <div className="flex h-10 items-center gap-2 px-3">
+                      <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">Meet grupal</span>
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={`${gente.length} en el meet`}>
+                        <Users2 className="h-3 w-3" />{gente.length}
+                      </span>
+                    </div>
+                    <div className="mx-2 mb-2 flex aspect-[4/3] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl bg-primary/10 px-3 text-center md:mx-0 md:mb-0 md:aspect-video md:rounded-none">
+                      <div className="font-display text-2xl font-bold tabular-nums text-primary">{formatoReloj(Math.max(0, Math.floor((now - Date.parse(meet.started_at)) / 1000)))}</div>
+                      <div className="text-[11px] text-muted-foreground">Lo invocó {nombreYApellido(cowork.profiles[meet.created_by]) || "un supervisor"}</div>
+                      <div className="line-clamp-2 text-[11px] text-foreground/80">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || "Todos volvieron a su sala"}</div>
+                    </div>
+                    <div className="hidden md:flex items-center gap-1 px-2 py-2">
+                      <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs text-destructive hover:text-destructive" onClick={() => { void terminarMeetGrupal(meet.id, "terminado").catch((e: unknown) => toast.error(e instanceof Error ? e.message : "No se pudo terminar")); if (dentro) leaveActiveRoom(); }}>
+                        Terminar
+                      </Button>
+                      <Button variant="secondary" size="sm" className="ml-auto h-8 gap-1.5 rounded-lg text-xs" disabled={dentro} onClick={() => entrarAlMeet(meet)}>
+                        <DoorOpen className="h-3.5 w-3.5" /> {dentro ? "Estás dentro" : "Entrar"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
               {fichas.map(({ room, participants, pausaSala }) => {
                 const speakers = roomSpeakers[room.id] ?? [];
                 const etiquetas = etiquetasDe(participants, !pausaSala);
@@ -2136,15 +2239,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               recording={{ source: "cowork", title: activeRoomName || undefined }}
               hideShareLink
               suppressLeaveToast
-              initialMicOn={false}
-              initialCamOn={false}
+              // En el meet grupal el supervisor entra hablando y con cámara; en una
+              // sala, como siempre, apagado.
+              initialMicOn={!!activeMeetId}
+              initialCamOn={!!activeMeetId}
               getToken={getActiveRoomToken}
-              leaveLabel="Colgar"
+              leaveLabel={activeMeetId ? "Terminar meet" : "Colgar"}
               // Flechas + lista para moverse entre las SALAS de esta sesión sin
               // volver al dashboard (Jhon, 10/09: cambiar de sesión se hace solo
               // desde el Supervisor Hub). Moverse = "Entrar" a la otra: la actual
-              // se cuelga y a la nueva llegás con el micro apagado.
-              roomSwitcher={{
+              // se cuelga y a la nueva llegás con el micro apagado. En el meet
+              // grupal no hay flechas: se sale con "Terminar meet".
+              roomSwitcher={activeMeetId ? undefined : {
                 rooms: cowork.rooms.map((r) => ({ id: r.id, name: r.name })),
                 currentId: activeRoomId,
                 onSwitch: enterRoom,
@@ -2386,6 +2492,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         </SheetContent>
       </Sheet>
 
+      <MeetGrupalDialog
+        open={meetDialogOpen}
+        onOpenChange={setMeetDialogOpen}
+        salas={cowork.rooms.map((r) => {
+          const gente = getRoomParticipants(r.id);
+          return { id: r.id, name: r.name, personas: gente.map((a) => nombreYApellido(cowork.profiles[a.user_id])), enPausa: gente.filter((a) => !!pausaDe(a.user_id)).length };
+        })}
+        onConfirmar={crearMeet}
+      />
       <CoworkPausasDialog
         open={pausasOpen}
         onOpenChange={setPausasOpen}

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee, Copy } from "lucide-react";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee, Copy, Video } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -57,6 +57,8 @@ export function formatBreak(totalSeconds: number): string {
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
+  // Los métodos del meet grupal sueltos: los callbacks dependen de ellos, no de `cowork` entero.
+  const { joinMeetGrupal, salirDeMeetGrupal } = cowork;
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [displayName, setDisplayName] = useState("User");
@@ -69,6 +71,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
+  // Meet grupal (Jhon, 10/09): el supervisor me llevó a una sala temporal. Se
+  // corta la llamada de la sala (cámara, micro y pantalla quedan apagados para
+  // los demás) y al volver se restaura cómo la tenía.
+  const [meetRoom, setMeetRoom] = useState<string | null>(null);
+  const [meetId, setMeetId] = useState<string | null>(null);
+  const estadoPrevioRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean } | null>(null);
 
   // Pantalla "no tengo sala": código para entrar y la última sala para reanudar.
   const [roomCode, setRoomCode] = useState("");
@@ -408,6 +416,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
   }, [myRoom?.livekit_room_name]);
 
+  const volverDelMeet = useCallback(() => {
+    setMeetId(null);
+    setMeetRoom(null);
+    reconnectToMainRoom();
+  }, [reconnectToMainRoom]);
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
@@ -555,6 +569,44 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return { token: result.token, url: result.url };
   }, [cowork.joinOneOnOne, oneOnOneRequestId]);
 
+  const getMeetToken = useCallback(async () => {
+    if (!meetId) throw new Error("Sin meet");
+    const result = await joinMeetGrupal(meetId);
+    return { token: result.token, url: result.url };
+  }, [joinMeetGrupal, meetId]);
+
+  // Mi participación abierta en un meet grupal (la base manda: sobrevive a recargar).
+  const miMeet = cowork.meets.find((m) => !m.ended_at && m.participantes.some((p) => p.user_id === userId && !p.left_at)) ?? null;
+
+  // Me llevaron: guardo cómo tenía cámara/micro/pantalla y entro al meet.
+  useEffect(() => {
+    if (!miMeet || meetId === miMeet.id) return;
+    estadoPrevioRef.current = { ...lastMediaRef.current };
+    setMeetId(miMeet.id);
+    setMeetRoom(miMeet.livekit_room_name);
+    setConnectedLkRoom(null);
+    toast.info("Tu supervisor te llevó a un meet grupal");
+  }, [miMeet, meetId]);
+
+  // El meet terminó (el supervisor se fue) o me sacaron: vuelvo a mi sala como estaba.
+  useEffect(() => {
+    if (!meetId || miMeet?.id === meetId) return;
+    volverDelMeet();
+    toast.info("El meet grupal terminó: volviste a tu sala");
+  }, [miMeet?.id, meetId, volverDelMeet]);
+
+  const salirDelMeet = useCallback(async () => {
+    const id = meetId;
+    if (id) { try { await salirDeMeetGrupal(id); } catch { /* best-effort: la base lo cierra si el meet termina */ } }
+    volverDelMeet();
+  }, [meetId, salirDeMeetGrupal, volverDelMeet]);
+
+  // En el meet, si estaba en break entra con todo apagado; prender micro o
+  // cámara ahí es volver del break (Jhon, 10/09).
+  const mediaEnMeet = useCallback((state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
+    if (breakStartedAt && (state.micOn || state.camOn)) void toggleBreak();
+  }, [breakStartedAt, toggleBreak]);
+
   // La llamada de la sala vive en el PersistentCallProvider, por encima del
   // router: mientras el chatter está en Cowork se dibuja en el hueco que ofrece
   // esta página, y si navega a otra sección pasa sola a una ventanita flotante
@@ -567,7 +619,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // evalúa al renderizar, y referenciar desde ahí un const declarado más abajo
   // tumba la página entera — es exactamente lo que pasó hoy con cbRef.
   useEffect(() => {
-    if (!connectedLkRoom || oneOnOneRoom) return;
+    if (!connectedLkRoom || oneOnOneRoom || meetRoom) return;
+    // Al volver de un meet grupal, la sala arranca como se dejó (cámara, micro
+    // y pantalla). En cualquier otro ingreso, apagado como siempre.
+    const previo = estadoPrevioRef.current;
+    estadoPrevioRef.current = null;
     startCall({
       key: `cowork-room-${connectedLkRoom}`,
       roomName: connectedLkRoom,
@@ -578,8 +634,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onLeave: handleLeaveRoom,
       hideShareLink: true,
       suppressLeaveToast: true,
-      initialMicOn: false,
-      initialCamOn: false,
+      initialMicOn: previo?.micOn ?? false,
+      initialCamOn: previo?.camOn ?? false,
+      initialScreenShareOn: previo?.screenShareOn ?? false,
       getToken,
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
@@ -587,7 +644,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       leaveLabel: "Salir y volver al dashboard",
       leaveIcon: LogOut,
     });
-  }, [connectedLkRoom, oneOnOneRoom, displayName, myRoom?.name, startCall,
+  }, [connectedLkRoom, oneOnOneRoom, meetRoom, displayName, myRoom?.name, startCall,
       getToken, handleLeaveRoom, handleMediaStateChange, handleFaceStateChange]);
 
   if (pestanaPrincipal === false) {
@@ -896,7 +953,44 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
       {/* Video area */}
       <div className="flex-1 min-h-0">
-        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
+        {meetRoom && meetId ? (
+          <div className="flex h-full flex-col">
+            {/* La barra del meet: qué pasa y el botón grande para volver (Jhon, 10/09). */}
+            <div className={cn("flex shrink-0 items-center gap-2 border-b px-3 py-2", breakStartedAt ? "border-warning/30 bg-warning/10" : "border-primary/30 bg-primary/10")}>
+              <Video className="h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1 text-xs">
+                <span className="font-medium text-foreground">Estás en un meet grupal.</span>{" "}
+                <span className="text-muted-foreground">
+                  {breakStartedAt
+                    ? "Sigues en break: prende el micrófono o la cámara para salir del break."
+                    : "En tu sala quedaste con cámara, micro y pantalla apagados hasta que vuelvas."}
+                </span>
+              </div>
+              <Button size="sm" className="h-8 shrink-0 gap-1.5 rounded-full" onClick={() => void salirDelMeet()}>
+                <DoorOpen className="h-3.5 w-3.5" /> Volver a mi sala
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1">
+              <LiveKitCallView
+                key={`meet-${meetRoom}`}
+                roomName={meetRoom}
+                displayName={displayName}
+                callDisplayName="Meet grupal"
+                isAdmin={false}
+                onLeave={() => void salirDelMeet()}
+                hideShareLink
+                suppressLeaveToast
+                autoLeaveOnEmpty={undefined}
+                initialMicOn={!breakStartedAt}
+                initialCamOn={!breakStartedAt}
+                getToken={getMeetToken}
+                onMediaStateChange={mediaEnMeet}
+                leaveLabel="Volver a mi sala Cowork"
+                leaveIcon={DoorOpen}
+              />
+            </div>
+          </div>
+        ) : isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
           <LiveKitCallView
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}

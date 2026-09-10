@@ -579,6 +579,11 @@ serve(async (req) => {
       // que sobrevive a que recargue la pestaña.
       const { data: pausa } = await admin.from("cowork_breaks")
         .select("id").eq("session_id", sessionId).eq("user_id", userId).is("ended_at", null).limit(1).maybeSingle();
+      // Y el meet grupal también en la base: mientras tenga una participación
+      // abierta, el reloj marca 'meet' y suma (en el meet no se comparte
+      // pantalla; sin esto se detendría por "sin pantalla").
+      const { data: enMeet } = await admin.from("cowork_meet_participants")
+        .select("id").eq("user_id", userId).is("left_at", null).limit(1).maybeSingle();
 
       // La tolerancia del "no hay nadie" la fija la sesión (reglas del
       // supervisor); sin reglas propias, 60 s.
@@ -595,6 +600,7 @@ serve(async (req) => {
         faceState: typeof body.faceState === "string" ? body.faceState : null,
         faceSince: typeof body.faceSince === "number" ? body.faceSince : null,
         onBreak: !!pausa || body.onBreak === true,
+        enMeet: !!enMeet,
       }, ahora, umbralMs, exige);
 
       const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
@@ -710,9 +716,74 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     // ISSUE LIVEKIT TOKEN
     // ═══════════════════════════════════════════════════════════════
+    // ── Meet grupal (Jhon, 10/09/2026) ─────────────────────────────────────
+    // El supervisor se lleva a la gente de una o varias salas a una sala
+    // temporal. Solo hosts. Queda registro por persona (desde qué sala, cuánto)
+    // porque ese tiempo SUMA al reloj y se reporta aparte.
+    if (action === "crearMeetGrupal") {
+      const { sessionId, roomIds } = body;
+      if (!sessionId || !Array.isArray(roomIds) || !roomIds.length) return err(req, "sessionId and roomIds required");
+      const { data: hostCheck } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
+
+      const { data: gente } = await admin.from("cowork_room_assignments")
+        .select("user_id, room_id").eq("session_id", sessionId).eq("is_active", true).in("room_id", roomIds);
+      const personas = ((gente ?? []) as Array<{ user_id: string; room_id: string }>).filter((a) => a.user_id !== userId);
+      if (!personas.length) return err(req, "No hay nadie en esas salas");
+
+      const meetId = crypto.randomUUID();
+      const { data: meet, error: meetErr } = await admin.from("cowork_meets").insert({
+        id: meetId, session_id: sessionId, created_by: userId,
+        livekit_room_name: `cowork_meet_${sessionId.slice(0, 8)}_${meetId.slice(0, 8)}`,
+      }).select("*").single();
+      if (meetErr || !meet) return err(req, meetErr?.message || "No se pudo crear el meet", 500);
+
+      // Nadie está en dos meets: si alguien seguía en otro abierto, sale de aquel.
+      await admin.from("cowork_meet_participants")
+        .update({ left_at: new Date().toISOString(), left_reason: "volvio" })
+        .in("user_id", personas.map((p) => p.user_id)).is("left_at", null);
+      const { error: partErr } = await admin.from("cowork_meet_participants").insert(
+        personas.map((p) => ({ meet_id: meetId, session_id: sessionId, user_id: p.user_id, room_id: p.room_id })),
+      );
+      if (partErr) return err(req, partErr.message, 500);
+      console.log(`[cowork] meet grupal ${meetId} en ${sessionId}: ${personas.length} personas de ${roomIds.length} salas`);
+      return json(req, { meet, participantes: personas.length });
+    }
+
+    if (action === "terminarMeetGrupal") {
+      const { meetId, reason } = body;
+      if (!meetId) return err(req, "meetId required");
+      const { data: meet } = await admin.from("cowork_meets")
+        .select("id, session_id, created_by, ended_at").eq("id", meetId).single();
+      if (!meet) return err(req, "Meet not found", 404);
+      if (meet.created_by !== userId) {
+        const { data: hostCheck } = await admin.from("cowork_memberships")
+          .select("role").eq("session_id", meet.session_id).eq("user_id", userId).single();
+        if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
+      }
+      if (meet.ended_at) return json(req, { ok: true, yaTerminado: true });
+      const ahoraIso = new Date().toISOString();
+      await admin.from("cowork_meet_participants")
+        .update({ left_at: ahoraIso, left_reason: "meet_terminado" }).eq("meet_id", meetId).is("left_at", null);
+      await admin.from("cowork_meets")
+        .update({ ended_at: ahoraIso, end_reason: reason === "supervisor_salio" ? "supervisor_salio" : "terminado" }).eq("id", meetId);
+      return json(req, { ok: true });
+    }
+
+    // El chatter vuelve a su sala por su cuenta. El meet sigue para los demás.
+    if (action === "salirDeMeetGrupal") {
+      const { meetId } = body;
+      if (!meetId) return err(req, "meetId required");
+      await admin.from("cowork_meet_participants")
+        .update({ left_at: new Date().toISOString(), left_reason: "volvio" })
+        .eq("meet_id", meetId).eq("user_id", userId).is("left_at", null);
+      return json(req, { ok: true });
+    }
+
     if (action === "issueLiveKitToken") {
-      const { sessionId, purpose, roomId } = body;
-      // purpose: "join_room" | "join_host_hub"
+      const { sessionId, purpose, roomId, meetId } = body;
+      // purpose: "join_room" | "join_host_hub" | "join_meet_grupal" (+ meetId)
       if (!sessionId || !purpose) return err(req, "sessionId and purpose required");
 
       const { data: membership } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
@@ -758,6 +829,26 @@ serve(async (req) => {
       if (!membership) return err(req, "Not a member of this session", 403);
 
       const isHost = membership.role === "host";
+
+      // Meet grupal: entran quienes tienen participación abierta y los hosts de
+      // la sesión (el que lo invocó y cualquier otro supervisor).
+      if (purpose === "join_meet_grupal") {
+        if (!meetId) return err(req, "meetId required");
+        const { data: meet } = await admin.from("cowork_meets")
+          .select("id, session_id, livekit_room_name, ended_at").eq("id", meetId).single();
+        if (!meet || meet.session_id !== sessionId) return err(req, "Meet not found", 404);
+        if (meet.ended_at) return err(req, "El meet ya terminó", 410);
+        const esHost = membership?.role === "host";
+        if (!esHost) {
+          const { data: part } = await admin.from("cowork_meet_participants")
+            .select("id").eq("meet_id", meetId).eq("user_id", userId).is("left_at", null).limit(1).maybeSingle();
+          if (!part) return err(req, "No estás en este meet", 403);
+        }
+        const token = await createLKToken(lkKey, lkSecret, userId, userName, {
+          roomJoin: true, room: meet.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: esHost,
+        }, 3600 * 4);
+        return json(req, { token, url: lkUrl, room: meet.livekit_room_name });
+      }
 
       if (purpose === "join_host_hub") {
         if (!isHost) return err(req, "Only hosts can join host hub", 403);

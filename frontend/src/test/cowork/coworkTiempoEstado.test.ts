@@ -75,3 +75,14 @@ describe("estadoDeTiempo — cuándo corre el reloj de Cowork", () => {
     expect(estadoDeTiempo({ camOn: false, screenShareOn: false, onBreak: true }, T, undefined, { camara: false, pantalla: false }).estado).toBe("pausa");
   });
 });
+
+
+describe("meet grupal — cuenta como trabajo", () => {
+  const T = Date.parse("2026-09-10T15:00:00Z");
+  it("en meet el reloj corre aunque no comparta pantalla; la pausa manda igual", () => {
+    expect(estadoDeTiempo({ camOn: true, screenShareOn: false, faceState: "ok", faceSince: null, enMeet: true }, T)).toEqual({ estado: "meet", detalle: null });
+    expect(estadoDeTiempo({ camOn: false, screenShareOn: false, faceState: null, faceSince: null, enMeet: true, onBreak: true }, T).estado).toBe("pausa");
+    expect(cuentaComoTrabajo("meet")).toBe(true);
+    expect(edge.cuentaComoTrabajo("meet")).toBe(true);
+  });
+});
