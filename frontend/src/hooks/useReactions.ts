@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 export interface Reaction {
   id: string;
@@ -55,11 +56,9 @@ export function useReactions(conversationId: string | null) {
   }, [conversationId]);
 
   // Realtime: apply payloads inline instead of full refresh
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const channel = supabase
-      .channel(`reactions-${conversationId}`)
+  useCanalQueRevive({
+    topic: conversationId ? `reactions-${conversationId}` : null,
+    armar: (canal) => canal
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (payload) => {
         const newReaction = payload.new as Reaction;
         if (!messageIdsRef.current.has(newReaction.message_id)) return;
@@ -72,11 +71,11 @@ export function useReactions(conversationId: string | null) {
         const oldReaction = payload.old as Partial<Reaction>;
         if (!oldReaction.id) return;
         setReactions(prev => prev.filter(r => r.id !== oldReaction.id));
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [conversationId]);
+      }),
+    // Mientras estuvo muerto se perdieron reacciones: volver a traer las de
+    // los mensajes que hay en pantalla.
+    alRevivir: () => void loadReactionsForMessages(Array.from(messageIdsRef.current)),
+  });
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;

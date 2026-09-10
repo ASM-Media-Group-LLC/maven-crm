@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 export function usePinnedChats() {
   const { user } = useAuth();
@@ -24,14 +25,14 @@ export function usePinnedChats() {
 
   useEffect(() => { loadPinned(); }, [loadPinned]);
 
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel("pinned-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_pinned" }, () => { void loadPinned(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, loadPinned]);
+  // Topic por usuario y versionado por el hook: el fijo "pinned-realtime" que
+  // había era la trampa de #1603 (tras un CLOSED, pedirlo devuelve el zombi).
+  useCanalQueRevive({
+    topic: user ? `pinned-${user.id}` : null,
+    armar: (canal) => canal
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_pinned" }, () => { void loadPinned(); }),
+    alRevivir: () => void loadPinned(),
+  });
 
   const togglePin = useCallback(async (conversationId: string) => {
     if (!user) return;

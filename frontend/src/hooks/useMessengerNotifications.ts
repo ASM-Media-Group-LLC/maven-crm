@@ -15,6 +15,8 @@ import {
 import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
 import { esMovil } from "@/lib/plataformaPwa";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // Etiqueta legible cuando el mensaje no trae texto.
 const MEDIA_LABEL: Record<string, string> = {
@@ -137,8 +139,9 @@ export function useMessengerNotifications() {
       if (ids.length) await markMessagesDelivered(userId, ids);
     })();
 
-    const channel = supabase
-      .channel("chat-incoming-" + Math.random().toString(36).slice(2))
+    // El canal se arma acá (cierra sobre userId y los refs) pero VIVE en
+    // useCanalQueRevive, que lo levanta de nuevo si se muere.
+    armarCanalRef.current = (canal) => canal
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
@@ -235,10 +238,15 @@ export function useMessengerNotifications() {
           );
         },
       )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+;
   }, [userId, version]);
+
+  const armarCanalRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
+  useCanalQueRevive({
+    topic: userId ? `chat-incoming-${userId}` : null,
+    armar: (canal) => armarCanalRef.current?.(canal) ?? canal,
+    // Mientras estuvo muerto llegaron mensajes sin marcar "entregado": el
+    // efecto de arriba hace ese backfill al bumpear `version`.
+    alRevivir: () => setVersion((v) => v + 1),
+  });
 }

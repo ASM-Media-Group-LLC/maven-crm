@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 /**
  * Cuántas CONVERSACIONES tienen mensajes sin leer — no cuántos mensajes.
@@ -42,11 +43,9 @@ export function useUnreadChatCount() {
   refreshRef.current = refresh;
   const userId = user?.id ?? null;
 
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel("chat-unread-" + Math.random().toString(36).slice(2))
+  useCanalQueRevive({
+    topic: userId ? `chat-unread-${userId}` : null,
+    armar: (canal) => canal
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
@@ -64,11 +63,10 @@ export function useUnreadChatCount() {
             void refreshRef.current();
           }
         }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+      ),
+    // Mientras estuvo muerto se perdieron eventos: recontar.
+    alRevivir: () => void refreshRef.current(),
+  });
 
   return count;
 }

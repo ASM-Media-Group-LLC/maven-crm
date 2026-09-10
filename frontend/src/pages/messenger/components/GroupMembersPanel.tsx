@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { X, UserPlus, UserMinus, Search, Shield, ShieldOff, Crown, Loader2, LogOut, Megaphone, Eye, Pencil, Check, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { puedeVerLaListaDeMiembros } from "../utils";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
@@ -104,12 +105,17 @@ export default function GroupMembersPanel({
       }
     };
     load();
-    const ch = supabase
-      .channel(`join-reqs-${conversation.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_join_requests", filter: `conversation_id=eq.${conversation.id}` }, () => void load())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    cargarSolicitudesRef.current = load;
   }, [isAdmin, conversation.id]);
+
+  // Solicitudes pendientes en vivo. Solo para admins; el canal revive solo.
+  const cargarSolicitudesRef = useRef<(() => Promise<void>) | null>(null);
+  useCanalQueRevive({
+    topic: isAdmin ? `join-reqs-${conversation.id}` : null,
+    armar: (canal) => canal
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_join_requests", filter: `conversation_id=eq.${conversation.id}` }, () => { void cargarSolicitudesRef.current?.(); }),
+    alRevivir: () => void cargarSolicitudesRef.current?.(),
+  });
 
   const reqName = (uid: string) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || "Usuario";
 

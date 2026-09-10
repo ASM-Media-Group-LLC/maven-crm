@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 export function useArchivedChats() {
   const { user } = useAuth();
@@ -20,14 +21,13 @@ export function useArchivedChats() {
 
   useEffect(() => { loadArchived(); }, [loadArchived]);
 
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel("archived-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_archived" }, () => { void loadArchived(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, loadArchived]);
+  // Topic por usuario y versionado por el hook (ver usePinnedChats).
+  useCanalQueRevive({
+    topic: user ? `archived-${user.id}` : null,
+    armar: (canal) => canal
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_archived" }, () => { void loadArchived(); }),
+    alRevivir: () => void loadArchived(),
+  });
 
   const toggleArchive = useCallback(async (conversationId: string) => {
     if (!user) return;

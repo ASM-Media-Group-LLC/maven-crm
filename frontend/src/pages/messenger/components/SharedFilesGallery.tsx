@@ -15,6 +15,7 @@ interface SharedFilesGalleryProps {
 type TabType = "all" | "media" | "documents" | "links";
 
 import { formatFileSize as _formatFileSize } from "../uploadUtils";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 function formatFileSize(bytes: number | null) {
   if (!bytes) return "";
@@ -102,10 +103,11 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
     fetchSharedFiles();
   }, [conversationId]);
 
-  // Real-time sync: refresh when messages change in this conversation
-  useEffect(() => {
-    const channel = supabase
-      .channel(`shared-files-${conversationId}`)
+  // Real-time sync: refresh when messages change in this conversation.
+  // El canal revive solo si se muere (antes quedaba muerto hasta cerrar el panel).
+  useCanalQueRevive({
+    topic: `shared-files-${conversationId}`,
+    armar: (canal) => canal
       .on(
         "postgres_changes",
         {
@@ -126,13 +128,9 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
             fetchSharedFiles(false);
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [conversationId]);
+      ),
+    alRevivir: () => fetchSharedFiles(false),
+  });
 
   const links = useMemo(() => extractLinks(textMessages), [textMessages]);
   const media = useMemo(() => fileMessages.filter(isMediaFile), [fileMessages]);

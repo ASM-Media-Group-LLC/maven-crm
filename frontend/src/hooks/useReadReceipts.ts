@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface ReadReceipt {
   message_id: string;
@@ -69,15 +71,20 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
         return next;
       });
     };
-    const channel = supabase
-      .channel(`read-receipts-${conversationId}`)
+    // `handle` cierra sobre este efecto; el canal vive en useCanalQueRevive.
+    armarRecibosRef.current = (canal) => canal
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_read_receipts" }, handle)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_read_receipts" }, handle)
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") void loadReceiptsRef.current();
-      });
-    return () => { supabase.removeChannel(channel); };
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_read_receipts" }, handle);
   }, [conversationId]);
+
+  const armarRecibosRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
+  useCanalQueRevive({
+    topic: conversationId ? `read-receipts-${conversationId}` : null,
+    armar: (canal) => armarRecibosRef.current?.(canal) ?? canal,
+    // Antes solo se recargaba en CHANNEL_ERROR/TIMED_OUT y el canal muerto se
+    // quedaba muerto; CLOSED —el terminal— ni se miraba.
+    alRevivir: () => void loadReceiptsRef.current(),
+  });
 
   // Marcar como LEÍDO. Merge (sin ignoreDuplicates): si ya existe la fila de "entregado",
   // la actualiza poniendo read_at (deja delivered_at intacto porque no va en el payload).

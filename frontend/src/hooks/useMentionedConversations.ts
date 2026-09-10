@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 /**
  * Returns a Set of conversation IDs where the current user
@@ -12,8 +13,6 @@ export function useMentionedConversations(
 ) {
   const { user } = useAuth();
   const [mentionedIds, setMentionedIds] = useState<Set<string>>(new Set());
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const channelCounterRef = useRef(0);
 
   // Stabilize conversationIds by joining into a string key
   const convIdsKey = useMemo(() => conversationIds.join(","), [conversationIds]);
@@ -64,22 +63,11 @@ export function useMentionedConversations(
     refresh();
   }, [refresh]);
 
-  // Subscribe to realtime inserts on chat_messages to catch new mentions
-  useEffect(() => {
-    if (!user || stableConvIds.length === 0 || !currentUserName) return;
-
-    // Clean up previous channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-
-    // Use unique channel name to prevent Supabase JS from reusing stale channel
-    channelCounterRef.current += 1;
-    const channelName = `mentions-rt-${user.id.slice(0, 8)}-${channelCounterRef.current}`;
-
-    const channel = supabase
-      .channel(channelName)
+  // Realtime: menciones nuevas y cambios en mi last_read_at. El canal revive
+  // solo si se muere (antes se moría en silencio y el badge se congelaba).
+  useCanalQueRevive({
+    topic: user && currentUserName && stableConvIds.length > 0 ? `mentions-rt-${user.id.slice(0, 8)}` : null,
+    armar: (canal) => canal
       .on(
         "postgres_changes",
         {
@@ -108,16 +96,9 @@ export function useMentionedConversations(
             refresh();
           }
         },
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
-  }, [user, currentUserName, stableConvIds, refresh]);
+      ),
+    alRevivir: () => { void refresh(); },
+  });
 
   return { mentionedIds, refreshMentions: refresh };
 }
