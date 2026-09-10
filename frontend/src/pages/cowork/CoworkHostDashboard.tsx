@@ -9,7 +9,7 @@ import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
-  PanelLeftClose, PanelLeftOpen,
+  PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
   type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -48,6 +48,8 @@ import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor, etiq
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChatShared } from "@/hooks/ChatProvider";
+import { useMessengerDock } from "@/components/messenger/MessengerDock";
 import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -1109,6 +1111,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
   // mostraba "nadie comparte" aunque alguien lo estuviera haciendo).
   const [roomSharers, setRoomSharers] = useState<Record<string, string[]>>({});
+  const [roomSharerIds, setRoomSharerIds] = useState<Record<string, string[]>>({});
   // Quién está HABLANDO en cada sala (ActiveSpeakersChanged de LiveKit), para
   // pintar la card en verde mientras alguien habla.
   const [roomSpeakers, setRoomSpeakers] = useState<Record<string, string[]>>({});
@@ -1171,6 +1174,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // suben en una hoja inferior.
   const isMobile = useIsMobile();
   const [salaEnHoja, setSalaEnHoja] = useState<string | null>(null);
+  // Escribirle a alguien desde la lista de pantallas: se abre (o crea) el DM
+  // y sale en la ventanita flotante del Messenger, sin irse del tablero.
+  const { createDirectChat } = useChatShared();
+  const { abrirChat } = useMessengerDock();
+  const escribirA = (uid: string) => { const id = createDirectChat(uid); if (id) abrirChat(id); };
 
   // Dónde colgar el botón «Hub» cuando el hub está minimizado: en la pila del
   // muelle flotante (encima de la nubecita del Messenger), que es lo que la
@@ -1316,7 +1324,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   });
 
   return (
-    <div className="flex flex-1 min-h-0 bg-background text-foreground relative">
+    <div className="flex flex-1 min-h-0 bg-background text-foreground relative md:flex-row-reverse">
+      {/* En escritorio el panel lateral va a la DERECHA (Jhon, 10/09); el orden del
+          DOM no cambia, lo invierte flex-row-reverse. En el teléfono el panel es
+          una hoja fija y el orden no importa. */}
       {/* Mobile sidebar toggle */}
       <Button
         variant="ghost"
@@ -1332,18 +1343,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Left sidebar */}
+      {/* Panel lateral */}
       {/* Plegada queda una tira angosta con el boton para volver a abrirla: si
           desapareciera del todo no habria como traerla de vuelta. */}
       {sidebarCollapsed && (
-        <div className="hidden md:flex w-10 h-full border-r border-border bg-card flex-col items-center pt-3 shrink-0">
+        <div className="hidden md:flex w-10 h-full border-l border-border bg-card flex-col items-center pt-3 shrink-0">
           <Button
             variant="ghost" size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
             title="Mostrar el panel de solicitudes y pantallas"
             onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
           >
-            <PanelLeftOpen className="h-4 w-4" />
+            <PanelRightOpen className="h-4 w-4" />
           </Button>
           {/* Con el panel plegado, una mano levantada quedaria invisible: el
               unico lugar donde se listan es adentro. El contador lo trae de
@@ -1388,33 +1399,33 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       <div className={`
         fixed md:relative z-40 md:z-auto
         w-72 xl:w-80 h-[calc(100dvh-3.5rem)] md:h-full
-        border-r border-border flex flex-col bg-card
+        md:border-l border-border/60 flex flex-col bg-card
         transition-transform duration-200 ease-in-out
         ${sidebarCollapsed ? "md:hidden" : ""}
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
-        <div className="p-4 pl-14 md:pl-4 border-b border-border">
-          <div className="flex items-center justify-between">
+        <div className="border-b border-border/60 px-4 pb-3 pl-14 pt-4 md:pl-4">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">Supervisor Dashboard</p>
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <button
                 type="button"
-                className="group flex items-center gap-1.5 text-left"
+                className="group flex min-w-0 items-center gap-1.5 text-left"
                 title="Cambiar el nombre de la sesión"
                 onClick={() => {
                   setSessionName(cowork.session?.name || "");
                   setRenameOpen(true);
                 }}
               >
-                <h2 className="text-sm font-semibold text-foreground truncate">{cowork.session?.name}</h2>
+                <h2 className="truncate font-display text-base font-semibold text-foreground">{cowork.session?.name}</h2>
                 <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
               </button>
-              <p className="text-xs text-muted-foreground">Supervisor Dashboard</p>
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
                 una tenía el suyo (el enlace en acento, el apagado en rojo) y la
                 fila se veía desparejada. Finalizar la sesión ya no está acá:
                 vive en la lista de sesiones, fuera del tablero. */}
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-muted/40 p-0.5">
               {puedeFinalizar && (
                 <Button
                   variant="ghost"
@@ -1479,47 +1490,48 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 aria-label="Ocultar este panel"
                 onClick={() => { setSidebarCollapsed(true); localStorage.setItem("maven.cowork.sidebar.collapsed", "1"); }}
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelRightClose className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1">
-          {/* Host Hub indicator */}
-          <div className="p-3 border-b border-border/50">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Radio className={`h-3 w-3 ${hubConnected ? "text-success" : "text-muted-foreground/50"}`} />
-              <span>Supervisor Hub</span>
+          {/* El panel va en TARJETAS (Jhon, 10/09: "dale un buen diseño"): cada
+              bloque con su icono en un círculo, su título y su cuenta, sobre un
+              fondo apenas más claro que el panel. */}
+          <section className="mx-3 mt-3 rounded-2xl border border-border/60 bg-background/50 p-3">
+            <div className="flex items-center gap-2.5">
+              <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", hubConnected ? "bg-success/15 text-success" : "bg-muted text-muted-foreground")}>
+                <Radio className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-foreground">Supervisor Hub</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {hubConnected ? (hubMinimized ? "Conectado · minimizado" : "Conectado") : "Sin conectar"}
+                </p>
+              </div>
               {hubConnected ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 text-[10px] text-primary hover:text-primary/80 px-1.5"
-                  onClick={() => setHubMinimized(!hubMinimized)}
-                >
+                <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-full px-2.5 text-[11px]" onClick={() => setHubMinimized(!hubMinimized)}>
                   {hubMinimized ? "Mostrar" : "Minimizar"}
                 </Button>
               ) : cowork.session?.host_hub_livekit_room ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 text-[10px] text-primary hover:text-primary/80 px-1.5"
-                  onClick={conectarHub}
-                >
+                <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-full px-2.5 text-[11px]" onClick={conectarHub}>
                   Reconectar
                 </Button>
               ) : null}
             </div>
-          </div>
+          </section>
 
           {/* Unassigned members section removed — participants self-join via URL ?room=X */}
 
           {/* Host Requests */}
-          <div className="p-3 border-t border-border/50 space-y-2">
-            <h3 className="text-xs font-medium text-warning flex items-center gap-1">
-              <Hand className="h-3 w-3" /> Solicitudes ({openHostRequests.length})
-            </h3>
+          <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-warning/15 text-warning"><Hand className="h-3.5 w-3.5" /></span>
+              <h3 className="text-xs font-semibold text-foreground">Solicitudes</h3>
+              <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{openHostRequests.length}</span>
+            </div>
             {openHostRequests.length === 0 ? (
               <p className="text-xs text-muted-foreground px-1">Sin solicitudes pendientes</p>
             ) : (
@@ -1529,9 +1541,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 return (
                   <div key={req.id} className={`rounded-xl p-2.5 space-y-1 ${is1on1 ? "bg-primary/5" : "bg-warning/10"}`}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        {is1on1 ? <Phone className="h-3 w-3 text-primary" /> : <Hand className="h-3 w-3 text-warning" />}
-                        <span className="text-xs text-foreground/80">{cowork.profiles[req.user_id] || "User"}</span>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserAvatar name={cowork.profiles[req.user_id]} size="sm" />
+                        <span className="truncate text-xs font-medium text-foreground/90">{cowork.profiles[req.user_id] || "User"}</span>
+                        {is1on1 ? <Phone className="h-3 w-3 shrink-0 text-primary" /> : <Hand className="h-3 w-3 shrink-0 text-warning" />}
                       </div>
                       <Badge variant="outline" className={`text-[9px] rounded-full ${is1on1 ? "border-primary/30 text-primary" : "border-warning/30 text-warning"}`}>{roomName}</Badge>
                     </div>
@@ -1603,7 +1616,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 );
               })
             )}
-          </div>
+          </section>
 
           {/* En pausa (baño). Amarillo y con el tiempo corriendo, para ver de un
               vistazo quién se levantó y hace cuánto. El estado vive en presence:
@@ -1628,15 +1641,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               .sort((a, b) => b.segundos - a.segundos);
             if (!enPausa.length) return null;
             return (
-              <div className="p-3 border-t border-border/50 space-y-2">
-                <h3 className="text-xs font-medium text-warning flex items-center gap-1">
-                  <Coffee className="h-3 w-3" /> En pausa ({enPausa.length})
-                </h3>
+              <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-warning/15 text-warning"><Coffee className="h-3.5 w-3.5" /></span>
+                  <h3 className="text-xs font-semibold text-foreground">En pausa</h3>
+                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{enPausa.length}</span>
+                </div>
                 {enPausa.map((p) => (
-                  <div key={p.uid} className="bg-warning/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex items-center gap-1.5">
-                      <Coffee className="h-3 w-3 text-warning shrink-0" />
-                      <span className="text-xs text-foreground/80 truncate">{p.nombre}</span>
+                  <div key={p.uid} className="bg-warning/10 rounded-xl px-2 py-1.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <UserAvatar name={p.nombre} size="sm" />
+                      <span className="text-xs text-foreground/90 truncate">{p.nombre}</span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {p.sala && (
@@ -1650,7 +1665,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                   </div>
                 ))}
-              </div>
+              </section>
             );
           })()}
 
@@ -1689,25 +1704,59 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
           {/* Pantallas compartidas EN VIVO por sala (ya no hay aprobaciones: compartir
               es directo para todos; acá solo se ve quién está compartiendo y dónde). */}
-          <div className="p-3 border-t border-border/50 space-y-2">
-            <h3 className="text-xs font-medium text-primary flex items-center gap-1">
-              <Monitor className="h-3 w-3" /> Pantallas en vivo
-            </h3>
+          <section className="mx-3 my-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/15 text-primary"><Monitor className="h-3.5 w-3.5" /></span>
+              <h3 className="text-xs font-semibold text-foreground">Pantallas en vivo</h3>
+            </div>
             {(() => {
-              const sharing = cowork.rooms
-                .map(room => ({ room, sharers: getRoomSharers(room.id) }))
-                .filter(x => x.sharers.length > 0);
-              if (sharing.length === 0) {
+              // Una fila por persona (Jhon, 10/09): su avatar, un punto de estado
+              // —verde conectada, naranja en break o baño— y el menú para
+              // escribirle por Messenger sin salir del tablero. Si el monitor aún
+              // no reportó ids (versión vieja en caché), caen los nombres de antes.
+              const filas = cowork.rooms.flatMap((room) => {
+                const ids = roomSharerIds[room.id] ?? [];
+                if (ids.length) return ids.map((uid) => ({ key: `${room.id}-${uid}`, room, uid, nombre: nombreYApellido(cowork.profiles[uid]) || "Alguien" }));
+                return getRoomSharers(room.id).map((n) => ({ key: `${room.id}-${n}`, room, uid: null as string | null, nombre: n }));
+              });
+              if (filas.length === 0) {
                 return <p className="text-xs text-muted-foreground px-1">Nadie está compartiendo pantalla</p>;
               }
-              return sharing.map(({ room, sharers }) => (
-                <div key={room.id} className="bg-primary/5 rounded-xl p-2.5 flex items-center justify-between gap-2">
-                  <span className="text-xs text-foreground/80 truncate">{sharers.join(", ")}</span>
-                  <Badge variant="outline" className="text-[9px] border-primary/30 text-primary rounded-full shrink-0">{room.name}</Badge>
-                </div>
-              ));
+              return filas.map((f) => {
+                const enPausa = f.uid ? !!pausaDe(f.uid) : false;
+                const conectada = f.uid ? isOnline(f.uid) : true;
+                return (
+                  <div key={f.key} className="bg-primary/5 rounded-xl px-2 py-1.5 flex items-center gap-2">
+                    <UserAvatar name={f.uid ? cowork.profiles[f.uid] : f.nombre} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={cn("h-2 w-2 shrink-0 rounded-full", enPausa ? "bg-warning" : conectada ? "bg-success" : "bg-muted-foreground/40")}
+                          title={enPausa ? "En pausa" : conectada ? "Conectada en Cowork" : "Sin señal"}
+                        />
+                        <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
+                      </div>
+                      <span className="block truncate text-[10px] text-primary/80">{f.room.name}</span>
+                    </div>
+                    {f.uid && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-foreground" title="Más">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem onClick={() => escribirA(f.uid!)}>
+                            <MessageCircle className="mr-2 h-4 w-4" /> Escribirle por Messenger
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                );
+              });
             })()}
-          </div>
+          </section>
         </ScrollArea>
       </div>
 
@@ -1740,8 +1789,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <h2 className="font-display text-lg font-semibold leading-tight text-foreground">Salas</h2>
                 <p className="text-sm text-muted-foreground">{fraseDeSalas}</p>
               </div>
-              {/* Los cuatro botones globales fijan TODAS las salas de un golpe;
-                  en el teléfono quedan solo con el icono para caber en una fila. */}
+              {/* Los cuatro botones globales fijan TODAS las salas de un golpe. Una
+                  palabra cada uno (Jhon, 10/09: "ocupan mucho espacio"): el estado
+                  lo dice el color, no el texto. En el teléfono, solo el icono. */}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
@@ -1753,7 +1803,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarEscuchaDeTodas(!todasEscuchando)}
                 >
                   {todasEscuchando ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{todasEscuchando ? "Escuchando todas" : "Escuchar todas"}</span>
+                  <span className="hidden sm:inline">Escuchar</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1777,7 +1827,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarMicDeTodas(!hablandoATodas)}
                 >
                   {hablandoATodas && !micCaido ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{micCaido ? "Micro caído" : hablandoATodas ? "Hablando a todas" : "Hablar a todas"}</span>
+                  <span className="hidden sm:inline">{micCaido ? "Micro caído" : "Hablar"}</span>
                 </Button>
                 {/* Cámara y pantalla a todas: mismo modelo que escuchar/hablar —
                     el global fija todas y después se apagan salas individuales. */}
@@ -1791,7 +1841,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarCamDeTodas(!camaraATodas)}
                 >
                   {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{camaraATodas ? "Cámara en todas" : "Cámara a todas"}</span>
+                  <span className="hidden sm:inline">Cámara</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1803,7 +1853,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarScreenDeTodas(!pantallaATodas)}
                 >
                   {pantallaATodas ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{pantallaATodas ? "Pantalla en todas" : "Pantalla a todas"}</span>
+                  <span className="hidden sm:inline">Pantalla</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1839,7 +1889,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
                     enabled={activeRoomId !== room.id}
-                    onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
+                    onSharersChange={(names, ids) => { setRoomSharers((m) => ({ ...m, [room.id]: names })); setRoomSharerIds((m) => ({ ...m, [room.id]: ids ?? [] })); }}
                     onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
                     onParticipantsChange={(ids) => setRoomConectados((m) => ({ ...m, [room.id]: ids }))}
                   />

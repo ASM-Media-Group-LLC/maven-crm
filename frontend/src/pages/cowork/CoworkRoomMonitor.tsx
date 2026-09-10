@@ -34,7 +34,9 @@ interface Props {
   // dos veces (📢 monitor + él mismo como participante). Default true.
   enabled?: boolean;
   // Reporta quién está compartiendo pantalla en esta sala (verdad de LiveKit, no presence).
-  onSharersChange?: (names: string[]) => void;
+  /** Quién comparte pantalla: nombres (para las etiquetas) e ids de usuario
+   *  (para el avatar, el estado y el menú de la lista del panel). */
+  onSharersChange?: (names: string[], ids?: string[]) => void;
   // Reporta quién está HABLANDO ahora (ActiveSpeakersChanged). El dashboard lo usa
   // para pintar la card en verde: se ve de un vistazo dónde hay conversación.
   onSpeakingChange?: (names: string[]) => void;
@@ -327,6 +329,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       if (!roomRef.current) return;
       const names: string[] = [];
       const ids: string[] = [];
+      const sharerIds: string[] = [];
       roomRef.current.remoteParticipants.forEach((p: any) => {
         const identity: string = p.identity || "";
         // Otros monitores y vistas previas de supervisores no son gente de la sala.
@@ -334,9 +337,12 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
         const sharing = Array.from(p.trackPublications.values()).some(
           (pub: any) => pub.source === Track.Source.ScreenShare && pub.kind === Track.Kind.Video,
         );
-        if (sharing) names.push(p.name || p.identity || "Alguien");
+        if (sharing) {
+          names.push(p.name || p.identity || "Alguien");
+          if (identity && !identity.startsWith("__")) sharerIds.push(identity);
+        }
       });
-      onSharersRef.current?.(names);
+      onSharersRef.current?.(names, sharerIds);
       onParticipantsRef.current?.(ids);
     };
 
