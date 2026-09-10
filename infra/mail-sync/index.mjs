@@ -24,6 +24,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
 import { esAvisoDelProveedor } from "./notices.mjs";
+import { decidirSiAbrir } from "./barrido.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -57,6 +58,12 @@ const CREDS_REFRESH_MS = Number(process.env.CREDS_REFRESH_MS || 300_000);
 // aunque no hubiera pasado nada, y el 99,92% de los barridos no trae correo
 // (medido 04/09 sobre edge_logs: 163 correos guardados, 1.213.688 peticiones).
 const RECONCILIAR_MS = Number(process.env.RECONCILIAR_MS || 900_000);
+// Latido: como mucho cada tanto el worker escribe mail_credentials.last_sync_at
+// con la hora en que terminó de revisar la casilla. mail_folders.synced_at ya
+// no sirve para saber si está vivo: solo se escribe cuando algo cambió, y con
+// el STATUS de abajo casi nunca cambia (10/09: leímos "22 casillas sin barrer
+// hace más de 10 min" donde había casillas quietas).
+const LATIDO_MS = Number(process.env.LATIDO_MS || 300_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
 const PER_FOLDER_INIT = Number(process.env.PER_FOLDER_INIT || 50);
 // Techo del cuerpo guardado. Un correo de 5 MB de HTML no aporta nada.
@@ -141,6 +148,13 @@ class CuentaSync {
     this.firmaBanderas = new Map();
     // clave → cuándo se reconcilió por última vez (piso RECONCILIAR_MS).
     this.ultimaReconciliacion = new Map();
+    // clave → huella del último STATUS (uidvalidity|uidnext|mensajes|no leídos).
+    // Si la huella no cambió y no toca reconciliar, la carpeta no se abre.
+    this.huellaCarpeta = new Map();
+    this.abiertas = 0; // carpetas abiertas (SELECT + FETCH) desde el arranque
+    this.saltadas = 0; // carpetas saltadas gracias al STATUS
+    this.ultimaRevision = null; // fin del último barrido, caliente o completo
+    this.ultimoLatido = 0;
   }
 
   log(...args) {
@@ -193,6 +207,15 @@ class CuentaSync {
     // con el retraso del barrido en vez de al instante. Cortar acá hace que
     // el push sea de verdad inmediato.
     this.client.on("exists", () => {
+      this.inboxPendiente = true;
+      this.despertar?.();
+    });
+    // Alguien leyó o des-leyó en INBOX desde otro cliente (o el mark_seen de
+    // Maven): el servidor lo cuenta con un FETCH suelto durante el IDLE. Se
+    // trata igual que el correo nuevo: una vuelta de INBOX y el punto azul se
+    // corrige al instante en vez de esperar al barrido. Las respuestas a
+    // NUESTROS fetch no pasan por acá (imapflow las entrega al comando en curso).
+    this.client.on("flags", () => {
       this.inboxPendiente = true;
       this.despertar?.();
     });
@@ -249,9 +272,11 @@ class CuentaSync {
         }
 
         if (this.inboxPendiente) {
-          this.log("push: correo nuevo en INBOX");
+          this.log("push: novedad en INBOX");
           await this.sincronizarCarpeta("INBOX");
           this.inboxPendiente = false;
+          // Se abrió sin pasar por el STATUS: la huella guardada quedó vieja.
+          this.huellaCarpeta.delete("INBOX");
         }
       }
     } finally {
@@ -292,10 +317,11 @@ class CuentaSync {
       if (b.flags?.has("\\Noselect")) continue;
       const clave = claveCanonica(b);
       carpetas.set(clave, b.path);
-      await this.sincronizarCarpeta(b.path, clave);
+      await this.revisarCarpeta(b.path, clave);
     }
     this.carpetas = carpetas;
     this.ultimoBarrido = new Date().toISOString();
+    await this.latir(this.ultimoBarrido);
     this.estado = "idle";
   }
 
@@ -309,8 +335,54 @@ class CuentaSync {
       if (this.detenida) return;
       const path = this.carpetas.get(clave);
       if (!path) continue;
-      await this.sincronizarCarpeta(path, clave);
+      await this.revisarCarpeta(path, clave);
     }
+    await this.latir(new Date().toISOString());
+  }
+
+  /** Antes de ABRIR una carpeta (SELECT + FETCH de las banderas de los últimos
+   *  50: lo caro, y lo que Zoho castiga cuando son 58 casillas × N carpetas
+   *  cada minuto) se le pregunta al servidor con un STATUS, un solo comando
+   *  liviano. Si nada cambió desde la última vez y no toca reconciliar, la
+   *  carpeta se salta. La decisión en sí vive en barrido.mjs (probada). */
+  async revisarCarpeta(path, clave = path) {
+    let status = null;
+    try {
+      status = await this.client.status(path, { messages: true, uidNext: true, uidValidity: true, unseen: true });
+    } catch (e) {
+      this.log(`STATUS falló en ${path}; se abre igual:`, e?.message);
+    }
+    const decision = decidirSiAbrir({
+      status: status || null,
+      huellaPrevia: this.huellaCarpeta.get(clave) ?? null,
+      ultimaReconciliacion: this.ultimaReconciliacion.get(clave) ?? 0,
+      ahora: Date.now(),
+      reconciliarMs: RECONCILIAR_MS,
+    });
+    if (!decision.abrir) {
+      this.saltadas++;
+      return;
+    }
+    await this.sincronizarCarpeta(path, clave);
+    this.abiertas++;
+    // La huella es la de ANTES de abrir: si entró correo entre el STATUS y el
+    // SELECT, la próxima vuelta ve la diferencia y vuelve a abrir. Nunca al revés.
+    if (decision.huella) this.huellaCarpeta.set(clave, decision.huella);
+    else this.huellaCarpeta.delete(clave);
+  }
+
+  /** Latido: como mucho cada LATIDO_MS deja en mail_credentials.last_sync_at
+   *  la hora en que terminó de revisar la casilla. Responde "¿el worker está
+   *  vivo para esta casilla?" con un SELECT, sin entrar al contenedor. */
+  async latir(iso) {
+    this.ultimaRevision = iso;
+    if (Date.now() - this.ultimoLatido < LATIDO_MS) return;
+    this.ultimoLatido = Date.now();
+    const { error } = await db.from("mail_credentials")
+      .update({ last_sync_at: iso })
+      .eq("user_id", this.cred.user_id)
+      .eq("email_address", this.cred.email_address);
+    if (error) this.log("no se pudo escribir el latido:", error.message);
   }
 
   async sincronizarCarpeta(path, clave = path) {
@@ -598,6 +670,9 @@ http.createServer((req, res) => {
       email: c.cred.email_address,
       estado: c.estado,
       ultimo_barrido: c.ultimoBarrido,
+      ultima_revision: c.ultimaRevision,
+      carpetas_abiertas: c.abiertas,
+      carpetas_saltadas: c.saltadas,
       ultimo_error: c.ultimoError,
     }));
     res.writeHead(200, { "content-type": "application/json" });

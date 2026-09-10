@@ -22,11 +22,27 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... MAIL_CRED_KEY=... npm start
 | `SUPABASE_URL` | — | proyecto de Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | escribe mail_messages (RLS no aplica) |
 | `MAIL_CRED_KEY` | — | la MISMA clave AES que usan las edge functions |
-| `SWEEP_INTERVAL_MS` | 180000 | barrido de carpetas no-INBOX |
+| `SWEEP_INBOX_MS` | 60000 | cadencia de las carpetas calientes (`SWEEP_INTERVAL_MS` sigue valiendo como alias) |
+| `SWEEP_FULL_MS` | 300000 | barrido de TODAS las carpetas. En prod está en **1800000** (30 min) desde el 10/09: 58 casillas × todas sus carpetas cada 5 min era lo que Zoho castigaba |
+| `RECONCILIAR_MS` | 900000 | piso para abrir una carpeta aunque el STATUS diga que nada cambió (red de seguridad de banderas y conteos) |
+| `LATIDO_MS` | 300000 | como mucho cada tanto escribe `mail_credentials.last_sync_at`: responde "¿está vivo el worker para esta casilla?" |
 | `PER_FOLDER_INIT` | 50 | mensajes iniciales por carpeta |
-| `HOT_FOLDERS` | INBOX,Notification | carpetas revisadas con la cadencia de INBOX (`SWEEP_INBOX_MS`) en vez del barrido completo; Notification porque ahí Zoho archiva resets de contraseña y avisos |
+| `HOT_FOLDERS` | INBOX,Notification | carpetas revisadas con la cadencia de INBOX (`SWEEP_INBOX_MS`) en vez del barrido completo; Notification porque ahí Zoho archiva resets de contraseña y avisos . En prod está en **INBOX** solo desde el 10/09 (menos comandos por minuto) |
 | `STARTUP_STAGGER_MS` | 6000 | espaciado entre logins al arrancar — los logins en ráfaga (cada deploy) son lo que el proveedor castiga |
 | `PORT` | 4610 | `/health` |
+
+## Cómo decide abrir una carpeta
+
+Antes de abrir una carpeta (SELECT + FETCH de las banderas de los últimos 50:
+lo caro) le pregunta al servidor con un `STATUS (MESSAGES UIDNEXT UIDVALIDITY
+UNSEEN)`, un solo comando liviano. Si esos cuatro números son los mismos que la
+última vez y no pasaron `RECONCILIAR_MS`, la carpeta se salta. Llegó correo →
+sube UIDNEXT; alguien leyó → baja UNSEEN; se borró algo → baja MESSAGES:
+cualquiera de los tres la abre. Además, en INBOX (que queda en IDLE) el servidor
+avisa los cambios de banderas con un FETCH suelto y el worker la revisa al
+instante, igual que con el EXISTS del correo nuevo. `/health` cuenta
+`carpetas_abiertas` y `carpetas_saltadas` por casilla; la decisión pura vive en
+`barrido.mjs` y tiene tests.
 
 ## Dokploy
 
@@ -35,7 +51,7 @@ Dockerfile. Env: las tres obligatorias. Healthcheck: `GET /health`.
 
 ## Tests
 
-`npm test` — los 19 casos del saneador (espejo de
+`npm test` — los casos de `barrido.mjs` (STATUS: abrir o saltar) y los 19 del saneador (espejo de
 `supabase/functions/_shared/html-sanitize.test.ts`; las dos copias se
 mantienen en sincronía a mano).
 

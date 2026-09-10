@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
+import { decidirSiAbrir, huellaDeStatus } from "./barrido.mjs";
 
 const limpio = (html) => sanitizeEmailHtml(html).html;
 
@@ -127,4 +128,61 @@ test("informa qué se descartó", () => {
   const r = sanitizeEmailHtml('<script>x</script><div onclick="y">z</div>');
   assert.ok(r.dropped.includes("script"));
   assert.ok(r.dropped.some((d) => d.includes("onclick")));
+});
+
+// --- barrido.mjs: cuándo se abre una carpeta y cuándo se salta --------------
+// El STATUS es lo que ahorra el grueso del tráfico contra Zoho (10/09); estos
+// casos fijan que el ahorro nunca se coma un correo ni un cambio de banderas.
+
+const st = (extra = {}) => ({ path: "INBOX", messages: 120, uidNext: 501, uidValidity: 7n, unseen: 3, ...extra });
+const base = { ultimaReconciliacion: 1_000_000, ahora: 1_000_000 + 60_000, reconciliarMs: 900_000 };
+
+test("huella: los cuatro números del STATUS, BigInt incluido", () => {
+  assert.equal(huellaDeStatus(st()), "7|501|120|3");
+  assert.equal(huellaDeStatus(st({ unseen: undefined })), "7|501|120|-");
+  assert.equal(huellaDeStatus(false), null);
+  assert.equal(huellaDeStatus(null), null);
+});
+
+test("la primera vez se abre", () => {
+  const d = decidirSiAbrir({ ...base, status: st(), huellaPrevia: null });
+  assert.equal(d.abrir, true);
+  assert.equal(d.motivo, "primera");
+  assert.equal(d.huella, "7|501|120|3");
+});
+
+test("misma huella y reconciliación fresca: se salta", () => {
+  const d = decidirSiAbrir({ ...base, status: st(), huellaPrevia: "7|501|120|3" });
+  assert.equal(d.abrir, false);
+  assert.equal(d.motivo, "igual");
+});
+
+test("llegó correo (sube UIDNEXT): se abre", () => {
+  const d = decidirSiAbrir({ ...base, status: st(), huellaPrevia: "7|500|119|2" });
+  assert.equal(d.abrir, true);
+  assert.equal(d.motivo, "cambio");
+});
+
+test("alguien leyó desde otro lado (baja UNSEEN): se abre", () => {
+  const d = decidirSiAbrir({ ...base, status: st(), huellaPrevia: "7|501|120|4" });
+  assert.equal(d.abrir, true);
+  assert.equal(d.motivo, "cambio");
+});
+
+test("se borró algo (baja MESSAGES) o renació la carpeta (uidvalidity): se abre", () => {
+  assert.equal(decidirSiAbrir({ ...base, status: st(), huellaPrevia: "7|501|121|3" }).abrir, true);
+  assert.equal(decidirSiAbrir({ ...base, status: st(), huellaPrevia: "6|501|120|3" }).abrir, true);
+});
+
+test("pasó el piso de reconciliación: se abre aunque nada cambió", () => {
+  const d = decidirSiAbrir({ ...base, ahora: 1_000_000 + 900_000, status: st(), huellaPrevia: "7|501|120|3" });
+  assert.equal(d.abrir, true);
+  assert.equal(d.motivo, "reconciliar");
+});
+
+test("sin STATUS (el servidor no contestó): se abre como siempre y no deja huella", () => {
+  const d = decidirSiAbrir({ ...base, status: false, huellaPrevia: "7|501|120|3" });
+  assert.equal(d.abrir, true);
+  assert.equal(d.motivo, "sin-status");
+  assert.equal(d.huella, null);
 });
