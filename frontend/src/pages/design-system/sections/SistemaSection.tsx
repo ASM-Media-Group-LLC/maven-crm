@@ -160,8 +160,8 @@ export const SistemaSection = () => (
           Cifras con <Codigo>StatChip</Codigo>: etiqueta en oración, número en Sora tabular, delta con signo y color
           semántico. La franja de cifras acompaña; el protagonista de un tablero es lo que
           pasa (el feed, la sala, la lista), no la tarjeta de KPI. Gráficos con el tema único validado para daltonismo y
-          punto final enfatizado. Tablas con encabezado pegajoso y filas de 44 px; en el teléfono la misma fila se vuelve
-          tarjeta con cara, nombre, estado y una acción.
+          punto final enfatizado. Tablas con encabezado pegajoso y filas de 44 px. En el teléfono la <Codigo>{"<Table>"}</Codigo> se vuelve tarjetas
+          sola: cada fila es una tarjeta y cada celda lleva el rótulo de su columna, sin código por pantalla.
         </Texto>
       </Regla>
 

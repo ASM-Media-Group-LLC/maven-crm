@@ -13,9 +13,10 @@ import { describe, it, expect } from "vitest";
 //   1. Encabezado canónico: `<PageHeader>` (título Sora, subtítulo, acciones).
 //   2. Contenedor `<Page>`: scroll propio y padding responsive. Sin tope de ancho:
 //      Maven ocupa la pantalla (decisión de Jhon, 09/09/2026).
-//   3. Teléfono (390 px): ninguna tabla sin versión en tarjetas o un panel solo
-//      para móvil; ninguna cuadrícula de 3+ columnas sin breakpoint; ningún
-//      ancho mínimo de 400 px o más sin contenedor que lo absorba.
+//   3. Teléfono (390 px): la <Table> de shadcn se vuelve tarjetas sola (ver
+//      components/ui/table.tsx), pero un <table> crudo no: necesita versión en
+//      tarjetas o un panel solo para móvil; ninguna cuadrícula de 3+ columnas
+//      sin breakpoint; ningún ancho mínimo de 400 px o más sin contenedor que lo absorba.
 //   4. Radios del sistema: `rounded-control` (8) / `rounded-panel` (12) /
 //      `rounded-card` (16) / `rounded-full`. Se retiran rounded-sm, -md y -3xl.
 //   5. Color por rol: primary/accent, success/warning/destructive y los de canal
@@ -130,7 +131,8 @@ function normalizar(ruta: string): string {
 const literales = (src: string): string[] =>
   [...src.matchAll(/(["'`])([^"'`\n]*?)\1/g)].map((m) => m[2]);
 
-const RE_TABLA = /<Table\b|<table\b/;
+/** Solo el <table> crudo: la <Table> de shadcn ya se vuelve tarjetas en el teléfono. */
+const RE_TABLA = /<table\b/;
 /** Versión móvil: tarjetas o panel solo-teléfono, o la pantalla pregunta si está en uno. */
 const RE_SALIDA_MOVIL = /\b(sm|md|lg):hidden\b|\bhidden (sm|md|lg):(block|flex|grid|table)\b|useIsMobile|useMediaQuery/;
 const RE_GRID_ANCHA = /(^|\s)grid-cols-([3-9]|1[0-2])(\s|$)/;
@@ -153,7 +155,7 @@ function faltas(rutaPagina: string): string[] {
   for (const ruta of arbol) {
     const src = leer(ruta) ?? "";
     const corto = ruta.replace("/frontend/src/pages/", "");
-    if (RE_TABLA.test(src) && !RE_SALIDA_MOVIL.test(src)) problemas.push(`${corto}: tabla sin versión móvil (tarjetas o panel md:hidden)`);
+    if (RE_TABLA.test(src) && !RE_SALIDA_MOVIL.test(src)) problemas.push(`${corto}: <table> crudo sin versión móvil (usar <Table> de shadcn, o tarjetas md:hidden)`);
     for (const lit of literales(src)) {
       if (RE_GRID_ANCHA.test(lit) && !RE_GRID_RESPONSIVE.test(lit)) problemas.push(`${corto}: "${lit.trim()}" tiene 3+ columnas sin breakpoint`);
       if (RE_RADIO_RETIRADO.test(lit)) problemas.push(`${corto}: "${lit.trim()}" usa un radio retirado (usar rounded-control/panel/card/full)`);
