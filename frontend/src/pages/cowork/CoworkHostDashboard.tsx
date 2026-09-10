@@ -2001,17 +2001,32 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {hubConnected && cowork.session?.host_hub_livekit_room && (
         <>
           {hubMinimized && (() => {
+            // El dorado es la seña del Hub desde siempre (Jhon lo pidió de
+            // vuelta el 10/09): un disco dorado con los audífonos sobre el mismo
+            // vidrio que la nubecita del Messenger, a su misma altura, para que
+            // se lea como de la misma familia. Colgado del ancla del muelle se
+            // posiciona absoluto (no ensancha la pila) y se alinea hacia adentro
+            // según el lado en que esté el muelle.
+            const lado = anclaMuelle?.dataset.lado === "izquierda" ? "left-0" : "right-0";
             const boton = (
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn("gap-1.5 shadow-lg border border-border/60 bg-card/85 backdrop-blur-xl hover:bg-muted text-foreground rounded-full", salaEnHoja && "invisible")}
+              <button
+                type="button"
                 title="Volver a mostrar el Supervisor Hub"
+                aria-label="Volver a mostrar el Supervisor Hub"
                 onClick={() => setHubMinimized(false)}
+                className={cn(
+                  "glass-panel group flex h-14 items-center gap-2.5 rounded-full pl-2 pr-4 text-foreground",
+                  "ring-1 ring-warning/35 shadow-[0_10px_28px_-10px_hsl(var(--warning)/.55)]",
+                  "transition-transform hover:scale-105 active:scale-95 motion-reduce:transition-none",
+                  anclaMuelle && `absolute bottom-0 ${lado}`,
+                  salaEnHoja && "invisible",
+                )}
               >
-                <Headphones className="h-3.5 w-3.5" />
-                Hub
-              </Button>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning/15 text-warning transition-colors group-hover:bg-warning/25">
+                  <Headphones className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-semibold">Hub</span>
+              </button>
             );
             return anclaMuelle
               ? createPortal(boton, anclaMuelle)
@@ -2045,7 +2060,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 onPointerDown={(e) => { if (!hubMaximized) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
                 title={hubMaximized ? undefined : "Arrastra para mover la ventana"}
               >
-                <Headphones className="h-3 w-3 text-success" />
+                <Headphones className="h-3 w-3 text-warning" />
                 Supervisor Hub
               </div>
               <div className="flex gap-0.5">
