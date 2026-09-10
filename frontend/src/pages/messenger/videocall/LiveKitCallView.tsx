@@ -88,6 +88,9 @@ interface LiveKitCallViewProps {
   // Instagram + botón con la lista completa. La vista solo DIBUJA y avisa;
   // moverse de verdad (colgar la sala anterior, entrar muteado a la nueva) es
   // del dueño, vía onSwitch.
+  /** Cowork: sin "Terminar para todos" en el panel de participantes. Una sala
+   *  de Cowork no se termina desde adentro de la llamada. */
+  hideEndForAll?: boolean;
   roomSwitcher?: {
     rooms: Array<{ id: string; name: string }>;
     currentId: string;
@@ -113,7 +116,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -590,9 +593,47 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     : visibleParticipants.length <= 9 ? "grid-cols-2 md:grid-cols-3"
     : "grid-cols-3 md:grid-cols-4";
 
+  // Navegador de sesiones/salas de Cowork. El SELECTOR va en la barra superior:
+  // antes flotaba abajo, sobre el video, y tapaba el nombre de la gente y el
+  // aviso de "esperando a que otros se unan" (pedido de Jhon, 10/09). Las
+  // flechas de los costados siguen donde estaban.
+  const salasNavegables = roomSwitcher && roomSwitcher.rooms.length > 1 ? roomSwitcher.rooms : null;
+  const salaActualIdx = salasNavegables && roomSwitcher
+    ? Math.max(0, salasNavegables.findIndex((r) => r.id === roomSwitcher.currentId))
+    : 0;
+  const selectorDeSalas = salasNavegables && roomSwitcher ? (
+    <div className="relative flex items-center">
+      <button
+        type="button"
+        onClick={() => setSalasAbiertas((v) => !v)}
+        title="Cambiar de sala: te saca de la actual y entras muteado a la elegida"
+        className={`flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted ${effectiveCompact ? "max-w-[190px]" : "max-w-[240px]"}`}
+      >
+        <DoorOpen className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? "Salas"}</span>
+        <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${salasAbiertas ? "-rotate-90" : "rotate-90"}`} />
+      </button>
+      {salasAbiertas && (
+        <div className="absolute left-0 top-full z-40 mt-1 max-h-56 min-w-[200px] overflow-y-auto rounded-2xl border border-border bg-card/95 py-1 shadow-xl backdrop-blur-sm">
+          {salasNavegables.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => { setSalasAbiertas(false); if (r.id !== roomSwitcher.currentId) roomSwitcher.onSwitch(r.id); }}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-primary/10 ${r.id === roomSwitcher.currentId ? "text-primary font-medium" : "text-foreground"}`}
+            >
+              <span className="w-4 shrink-0">{r.id === roomSwitcher.currentId && <Check className="h-3.5 w-3.5" />}</span>
+              <span className="truncate">{r.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} />
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} />
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
@@ -736,7 +777,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               },
               "Todos silenciados",
             )}
-            onEndForAll={async () => {
+            onEndForAll={hideEndForAll ? undefined : async () => {
               if (!window.confirm("¿Terminar la llamada para todos los participantes?")) return;
               await runModeration(lk.endRoomForAll, "Llamada terminada para todos");
             }}
@@ -778,34 +819,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               <ChevronRight className="h-5 w-5" />
             </button>
 
-            {/* Botón de lista, pegado a la barra de controles. */}
-            <div className="absolute bottom-16 tactil:bottom-20 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1">
-              {salasAbiertas && (
-                <div className="max-h-56 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-sm shadow-xl py-1 min-w-[200px]">
-                  {roomSwitcher.rooms.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => { setSalasAbiertas(false); if (r.id !== roomSwitcher.currentId) roomSwitcher.onSwitch(r.id); }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-primary/10 ${r.id === roomSwitcher.currentId ? "text-primary font-medium" : "text-foreground"}`}
-                    >
-                      <span className="w-4 shrink-0">{r.id === roomSwitcher.currentId && <Check className="h-3.5 w-3.5" />}</span>
-                      <span className="truncate">{r.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setSalasAbiertas((v) => !v)}
-                title="Cambiar de sala: te saca de la actual y entras muteado a la elegida"
-                className="flex items-center gap-1.5 rounded-full bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white px-3 py-1.5 text-xs font-medium transition-colors"
-              >
-                <DoorOpen className="h-3.5 w-3.5" />
-                {roomSwitcher.rooms[idx]?.name ?? "Salas"}
-                <ChevronRight className={`h-3 w-3 transition-transform ${salasAbiertas ? "-rotate-90" : "rotate-90"}`} />
-              </button>
-            </div>
           </>
         );
       })()}
