@@ -380,7 +380,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             {pendingFiles.map((pf, i) => (
               <div key={i} className="relative shrink-0 group/file">
                 {pf.preview ? (
-                  <img src={pf.preview} alt={pf.file.name} decoding="async" className="h-16 w-16 object-cover rounded-2xl" />
+                  // decoding="sync", no "async": la miniatura PARPADEABA al escribir
+                  // (Jhon, 10/09). No era React —un MutationObserver sobre la tira
+                  // registró 0 mutaciones tecleando 25 letras—, era el pintado: cada
+                  // tecla cambia el alto del compositor, Chrome invalida la capa de la
+                  // imagen y el decodificado asíncrono pinta un frame vacío hasta tener
+                  // el bitmap. A 64 px, decodificar en el hilo principal no cuesta nada.
+                  <img src={pf.preview} alt={pf.file.name} decoding="sync" className="h-16 w-16 object-cover rounded-2xl" />
                 ) : (
                   <div className="h-16 w-16 rounded-2xl bg-primary/5 flex flex-col items-center justify-center gap-1">
                     <FileText className="h-5 w-5 text-muted-foreground" />
