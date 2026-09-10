@@ -26,6 +26,7 @@ import {
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
+import { marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
@@ -995,6 +996,7 @@ export function useLiveKit() {
 
     try {
       if (roomRef.current) {
+        quitarLlamadaActiva(roomRef.current.name);
         roomRef.current.disconnect(true);
         roomRef.current = null;
       }
@@ -1306,6 +1308,9 @@ export function useLiveKit() {
 
       // ── Connect & publish tracks ────────────────────────────
       await room.connect(livekitUrl, tokenData.token);
+      // Que la página NO se recargue sola por un deploy mientras esto dure.
+      marcarLlamadaActiva(roomName);
+      room.once(RoomEvent.Disconnected, () => quitarLlamadaActiva(roomName));
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
 

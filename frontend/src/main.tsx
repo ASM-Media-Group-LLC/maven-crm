@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { hayLlamadaActiva } from "@/lib/llamadaActiva";
 import App from "./App.tsx";
 import "./index.css";
 // Captura `beforeinstallprompt` (Android/escritorio Chrome) ANTES de montar React:
@@ -53,6 +54,37 @@ function mostrarAvisoDeRecarga() {
   document.body.appendChild(aviso);
 }
 
+/** Hay versión nueva pero la persona está en llamada: aviso fijo con botón, sin
+ *  recargar por su cuenta. DOM pelado por el mismo motivo que el aviso de arriba. */
+function mostrarAvisoDeRecargaPendiente() {
+  if (document.getElementById("maven-recarga-pendiente")) return;
+  const aviso = document.createElement("div");
+  aviso.id = "maven-recarga-pendiente";
+  aviso.setAttribute("role", "status");
+  aviso.style.cssText =
+    "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;" +
+    "background:#1a1a2e;color:#fff;padding:12px 16px;border-radius:12px;" +
+    "display:flex;align-items:center;gap:12px;font-size:14px;font-family:system-ui,sans-serif;" +
+    "box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:calc(100vw - 32px)";
+  const texto = document.createElement("span");
+  texto.textContent = "Hay una versión nueva de Maven. Recargá cuando termines la llamada.";
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.textContent = "Recargar ahora";
+  boton.style.cssText =
+    "background:#fff;color:#1a1a2e;border:0;border-radius:999px;padding:6px 12px;" +
+    "font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap";
+  boton.addEventListener("click", () => window.location.reload());
+  const cerrar = document.createElement("button");
+  cerrar.type = "button";
+  cerrar.setAttribute("aria-label", "Cerrar aviso");
+  cerrar.textContent = "×";
+  cerrar.style.cssText = "background:transparent;color:rgba(255,255,255,.7);border:0;font-size:18px;cursor:pointer;line-height:1";
+  cerrar.addEventListener("click", () => aviso.remove());
+  aviso.append(texto, boton, cerrar);
+  document.body.appendChild(aviso);
+}
+
 window.addEventListener("vite:preloadError", (e) => {
   const CLAVE = "maven.recarga-por-deploy";
   const ANTIBUCLE_MS = 15_000;
@@ -67,6 +99,15 @@ window.addEventListener("vite:preloadError", (e) => {
     if (Date.now() - ultima < ANTIBUCLE_MS) return;
     sessionStorage.setItem(CLAVE, String(Date.now()));
     e.preventDefault();
+    // EN LLAMADA NO SE RECARGA SOLO. Cada merge a main despliega, y una pestaña
+    // abierta se recargaba al primer chunk que ya no existía: en una tabla es un
+    // parpadeo, en un Meet o en Cowork es que se te caiga la llamada sin aviso
+    // (Jhon, 10/09/2026, en un día con diez deploys). Acá se avisa y se deja el
+    // botón: la persona recarga cuando cuelgue.
+    if (hayLlamadaActiva()) {
+      mostrarAvisoDeRecargaPendiente();
+      return;
+    }
     // Un aviso de un segundo antes de recargar. Sin él, el refresh parecía un
     // glitch ("entro a Maven y a los segundos se me refresca solo"); con él se
     // entiende que es Maven actualizándose a la versión que se acaba de
