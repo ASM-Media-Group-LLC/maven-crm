@@ -15,7 +15,11 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- `?v=`: los iconos no llevan hash en el nombre y hasta hoy se servían con
+         caché de un año, así que el cambio de logo no llegaba a quien ya tenía la
+         página abierta ni al iPhone al reinstalar. Subir el número al cambiarlos. -->
+    <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2" />
     <!-- Lo que ve alguien ANTES de abrir la página: la pestaña, Google y la
          tarjeta que arma WhatsApp/LinkedIn al pegar el enlace. Va en español
          y con la tesis de la portada; la portada afina el <title> al montar. -->
@@ -29,7 +33,7 @@
     <meta property="og:url" content="https://app.maven-ai.me/" />
     <meta property="og:title" content="Maven — Reemplaza siete suscripciones por una sola sesión" />
     <meta property="og:description" content="Correo con tu dominio, chat interno, oficina virtual, reuniones con grabación, tickets, recursos humanos y finanzas. Con una capa de IA que supervisa, califica y avisa." />
-    <meta property="og:image" content="https://app.maven-ai.me/og.png" />
+    <meta property="og:image" content="https://app.maven-ai.me/og.png?v=2" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Maven: correo, chat, oficina virtual y operación, en una sola sesión" />
@@ -37,7 +41,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Maven — Reemplaza siete suscripciones por una sola sesión" />
     <meta name="twitter:description" content="Correo con tu dominio, chat interno, oficina virtual, reuniones con grabación, tickets, recursos humanos y finanzas. Con una capa de IA que supervisa, califica y avisa." />
-    <meta name="twitter:image" content="https://app.maven-ai.me/og.png" />
+    <meta name="twitter:image" content="https://app.maven-ai.me/og.png?v=2" />
 
     <!-- Sora: fuente display del reskin (títulos y números grandes). El body
          sigue en system-ui — el texto corrido no cambia y no pagamos FOUT ahí. -->
