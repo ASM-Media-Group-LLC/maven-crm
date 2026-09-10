@@ -6,6 +6,7 @@
 // de alto y el "le quedan 13" se cortaba). Taza en un anillo, el tiempo grande
 // al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
 // que la pausa no parezca una falta. Rojo y latiendo si se pasó.
+import { useId } from "react";
 import { Coffee } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fraseDePausa } from "@/lib/frasesDePausa";
@@ -30,6 +31,53 @@ const mmss = (seg: number) => {
 };
 const horaCorta = (epoch: number | null) =>
   epoch ? new Date(epoch).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : null;
+
+// El "paisaje" de fondo de las miniaturas en pausa del mock (Jhon, 10/09:
+// "tienen hasta una especie de paisaje detrás"). Dibujado en SVG —noche, luna,
+// cerros y pinos— para no depender de una foto ni de la red, y siempre oscuro
+// para que el ámbar del tiempo y el texto claro se lean igual en los dos temas.
+const ESTRELLAS: Array<[number, number, number]> = [
+  [22, 26, 1.2], [58, 14, 0.8], [96, 40, 1], [132, 18, 0.7], [166, 52, 1.1], [190, 22, 0.8],
+  [214, 86, 0.7], [292, 30, 1], [306, 74, 0.7], [76, 78, 0.8], [40, 96, 0.6], [150, 84, 0.6],
+];
+const PINOS: Array<[number, number]> = [[26, 44], [44, 60], [60, 36], [236, 40], [256, 58], [276, 34], [296, 48]];
+
+function PaisajeDePausa({ excedida }: { excedida: boolean }) {
+  // Cada panel lleva sus propios degradados: con varios en pantalla, ids
+  // repetidos harían que todos usaran los del primero.
+  const id = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const cielo = `${id}-cielo`, luna = `${id}-luna`, velo = `${id}-velo`;
+  return (
+    <svg aria-hidden className="absolute inset-0 h-full w-full" viewBox="0 0 320 240" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id={cielo} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#090c1f" />
+          <stop offset="0.55" stopColor="#151a44" />
+          <stop offset="1" stopColor="#3b2a6e" />
+        </linearGradient>
+        <radialGradient id={luna} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#fde68a" stopOpacity="0.9" />
+          <stop offset="0.35" stopColor="#fde68a" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#fde68a" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={velo} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#05070f" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#05070f" stopOpacity="0.9" />
+        </linearGradient>
+      </defs>
+      <rect width="320" height="240" fill={`url(#${cielo})`} />
+      {ESTRELLAS.map(([x, y, r]) => <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill="#e9e6ff" opacity="0.7" />)}
+      <circle cx="248" cy="58" r="44" fill={`url(#${luna})`} />
+      <circle cx="248" cy="58" r="14" fill="#fef3c7" opacity="0.95" />
+      {/* cerros lejanos y cercanos */}
+      <path d="M0 168 L48 118 L86 150 L128 104 L172 146 L214 112 L258 152 L292 128 L320 150 L320 240 L0 240 Z" fill="#1c2150" />
+      <path d="M0 196 L40 166 L92 190 L150 156 L206 188 L262 162 L320 192 L320 240 L0 240 Z" fill="#111538" />
+      {PINOS.map(([x, h]) => <path key={x} d={`M${x} ${240 - h} L${x - h * 0.28} 240 L${x + h * 0.28} 240 Z`} fill="#0a0d24" />)}
+      <rect width="320" height="240" fill={`url(#${velo})`} />
+      {excedida && <rect width="320" height="240" fill="#7f1d1d" opacity="0.5" />}
+    </svg>
+  );
+}
 
 /** Textos y proporción del tope. Puro, para probarlo. */
 export function describirPausa(p: PausaDeSala): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
@@ -77,17 +125,18 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
       className={cn(
         // Medidas del teléfono primero (la tarjeta mide 179 px y el área 4:3 da 122 px
         // de alto); en escritorio (300 px, 16:9) todo crece un punto.
-        "h-36 rounded-xl border flex flex-col items-center justify-center gap-1 px-3 py-1.5 text-center md:gap-1.5 md:py-2",
-        excedida ? "border-destructive/40 bg-destructive/10" : "border-border bg-muted/40",
+        "relative h-36 overflow-hidden rounded-xl border flex flex-col items-center justify-center gap-1 px-3 py-1.5 text-center md:gap-1.5 md:py-2",
+        excedida ? "border-destructive/40" : "border-border",
         className,
       )}
     >
-      <div className="flex items-center gap-2.5 md:gap-3">
+      <PaisajeDePausa excedida={excedida} />
+      <div className="relative flex items-center gap-2.5 md:gap-3">
         <div className={cn(
           "grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 md:h-10 md:w-10",
           excedida
             ? "bg-destructive/15 text-destructive ring-destructive/40 animate-pulse motion-reduce:animate-none"
-            : "bg-warning/10 text-warning ring-warning/40",
+            : "bg-warning/15 text-warning ring-warning/50",
         )}>
           {pausa.kind === "bano" ? <span aria-hidden className="text-base leading-none md:text-lg">🚻</span> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
         </div>
@@ -96,7 +145,7 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
           <div className={cn("font-display text-xl font-bold tabular-nums leading-tight md:text-2xl", acento)}>{mmss(pausa.segundos)}</div>
         </div>
       </div>
-      <div className={cn("text-[10px] leading-snug md:text-[11px]", excedida ? "text-destructive/90" : "text-muted-foreground")}>
+      <div className={cn("relative text-[10px] leading-snug md:text-[11px]", excedida ? "text-red-100/85" : "text-white/80")}>
         {partes.map((p, i) => (
           <span key={p} className="whitespace-nowrap">
             {i > 0 && <span className="hidden md:inline"> · </span>}
@@ -107,7 +156,7 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
       </div>
       {/* La frase es del break y de cuando va bien: pasado el tope, sobra. */}
       {pausa.kind === "break" && !excedida && (
-        <p className="line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-muted-foreground/70">{fraseDePausa(pausa.desde)}</p>
+        <p className="relative line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-white/60">{fraseDePausa(pausa.desde)}</p>
       )}
     </div>
   );
