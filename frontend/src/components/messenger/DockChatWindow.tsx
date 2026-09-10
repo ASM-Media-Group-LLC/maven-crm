@@ -31,11 +31,13 @@ export const VENTANA_ALTO = 460;
  * reacciones y todas las funciones del cajón son exactamente los mismos.
  */
 export default function DockChatWindow({
-  conversation, onMinimize, onClose,
+  conversation, onMinimize, onClose, llenar = false,
 }: {
   conversation: ConversationWithDetails;
   onMinimize: () => void;
   onClose: () => void;
+  /** Ocupar todo el contenedor (la hoja del teléfono) en vez de la ventanita fija. */
+  llenar?: boolean;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -96,7 +98,7 @@ export default function DockChatWindow({
   return (
     <div
       className="glass-panel pointer-events-auto flex flex-col overflow-hidden rounded-t-2xl"
-      style={{ width: VENTANA_ANCHO, height: VENTANA_ALTO }}
+      style={llenar ? { width: "100%", height: "100%" } : { width: VENTANA_ANCHO, height: VENTANA_ALTO }}
       role="dialog"
       aria-label={`Chat con ${conversation.displayName}`}
     >

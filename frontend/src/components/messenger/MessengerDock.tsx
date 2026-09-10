@@ -45,12 +45,19 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   const [abiertas, setAbiertas] = useState<string[]>([]);
   const [minimizadas, setMinimizadas] = useState<string[]>([]);
   const [panelAbierto, setPanelAbierto] = useState(false);
+  // Teléfono: la conversación abierta desde la nube, en una hoja encima de la
+  // pantalla (las ventanitas de escritorio no entran en 390 px).
+  const [chatEnHoja, setChatEnHoja] = useState<string | null>(null);
 
   const enMessenger = location.pathname.startsWith("/messenger");
   const puedeMessenger = canAccess("Messenger");
   // En /messenger la parte de Messenger del muelle desaparece: ya estás ahí.
   // Clari se queda, que no tiene nada que ver.
-  const mostrarMessenger = puedeMessenger && !enMessenger && !isMobile;
+  // En el teléfono la nube vive SOLO en Cowork (Jhon, 10/09: "mandar mensajes
+  // sin salir de Cowork"): en las demás pantallas móviles taparía composers y
+  // botones de abajo. En escritorio, en todas como siempre.
+  const enCowork = location.pathname.startsWith("/cowork");
+  const mostrarMessenger = puedeMessenger && !enMessenger && (!isMobile || enCowork);
   // En el teléfono, dentro del Messenger, el botón de Clari se montaba sobre la
   // barra del composer (grabar nota de voz quedaba debajo). Ahí no va.
   const mostrarClari = isAdmin && !(isMobile && enMessenger);
@@ -128,19 +135,43 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           manda un mensaje sin salir de la pantalla, que es lo que se pidió. */}
       {mostrarMessenger && panelAbierto && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setPanelAbierto(false)} aria-hidden />
+          <div className={cn("fixed inset-0 z-40", isMobile && "bg-black/40")} onClick={() => setPanelAbierto(false)} aria-hidden />
           <div
-            className="glass-panel fixed z-50 flex w-[360px] flex-col overflow-hidden rounded-2xl text-popover-foreground"
-            style={{ ...anclarPanel(360, 520), width: 360 }}
+            className={cn(
+              "glass-panel fixed z-50 flex flex-col overflow-hidden text-popover-foreground",
+              // Teléfono: hoja inferior a lo ancho; escritorio: pegado al muelle.
+              isMobile ? "inset-x-0 bottom-0 rounded-t-2xl pb-safe" : "w-[360px] rounded-2xl",
+            )}
+            style={isMobile ? undefined : { ...anclarPanel(360, 520), width: 360 }}
             role="dialog"
             aria-label="Chats"
           >
             <ChatsPanel
-              alto={330}
-              onAbrirChat={(id) => { setPanelAbierto(false); abrirChat(id); }}
+              alto={isMobile ? 360 : 330}
+              // En el teléfono el chat se abre en una hoja encima, sin salir de la
+              // pantalla; en escritorio, en su ventanita junto al muelle.
+              onAbrirChat={(id) => { setPanelAbierto(false); if (isMobile) setChatEnHoja(id); else abrirChat(id); }}
               onNuevo={() => { setPanelAbierto(false); navigate("/messenger?nuevo=1"); }}
               onVerTodo={() => { setPanelAbierto(false); navigate("/messenger"); }}
               onCerrar={() => setPanelAbierto(false)}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Teléfono: la conversación abierta desde la nube, en una hoja que ocupa
+          casi toda la pantalla. "Minimizar" vuelve a la lista; cerrar la cierra.
+          Es la misma DockChatWindow del escritorio (MessageList + MessageInput
+          completos), solo que llena la hoja en vez de medir 336 px. */}
+      {mostrarMessenger && isMobile && chatEnHoja && porId[chatEnHoja] && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setChatEnHoja(null)} aria-hidden />
+          <div className="fixed inset-x-0 bottom-0 z-50 h-[85dvh] pb-safe">
+            <DockChatWindow
+              conversation={porId[chatEnHoja]}
+              llenar
+              onMinimize={() => { setChatEnHoja(null); setPanelAbierto(true); }}
+              onClose={() => setChatEnHoja(null)}
             />
           </div>
         </>
