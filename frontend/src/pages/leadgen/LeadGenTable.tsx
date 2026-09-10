@@ -429,7 +429,7 @@ const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
   );
 
   return (
-    <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="min-w-[1050px]">
+    <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="md:min-w-[1050px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>

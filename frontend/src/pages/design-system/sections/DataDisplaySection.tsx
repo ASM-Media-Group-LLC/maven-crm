@@ -216,7 +216,7 @@ export const DataDisplaySection = () => {
             onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
             className="h-[420px]"
           >
-            <Table className="min-w-[1200px]">
+            <Table className="md:min-w-[1200px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className={STICKY_HEADER_CLASS}>

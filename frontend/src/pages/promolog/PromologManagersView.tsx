@@ -270,7 +270,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                 {/* Drill-down: sus creadoras con semáforo */}
                 {open && (
                   <div className="border-t border-white/10 overflow-x-auto">
-                    <Table className="min-w-[760px]">
+                    <Table className="md:min-w-[760px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Creadora</TableHead>

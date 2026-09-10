@@ -1419,7 +1419,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
   return (
     <>
-      <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="min-w-[760px]">
+      <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="md:min-w-[760px]">
         <TableHeader>
           {renderHeaders()}
         </TableHeader>

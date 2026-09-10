@@ -271,7 +271,7 @@ const PromologTable = ({
   }
 
   return (
-    <Table containerClassName="overflow-visible" className="min-w-[1000px]">
+    <Table containerClassName="overflow-visible" className="md:min-w-[1000px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[50px]">#</TableHead>
