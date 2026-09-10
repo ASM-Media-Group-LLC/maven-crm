@@ -59,11 +59,16 @@ interface MessageInputProps {
   /** Grupo con la lista de miembros oculta: el buscador de @ va a ciegas. */
   aCiegas?: boolean;
   chatType?: string;
+  /** Fuerza el composer del TELÉFONO (una fila, sin la barra de emojis: las
+   *  expresiones van en un solo botón) aunque la pantalla sea grande. Lo usa
+   *  la ventanita flotante del Messenger, donde la barra no entraba y tapaba
+   *  el chat (Jhon, 10/09/2026). */
+  compacto?: boolean;
 }
 
 const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   conversationId, onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
-  participants, chatType, aCiegas,
+  participants, chatType, aCiegas, compacto = false,
 }, ref) => {
   const { user } = useAuth();
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -85,7 +90,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
   const [showToolbar, setShowToolbar] = useState(false);
   // Teléfono: fila única estilo WhatsApp (+ · cajón con expresiones · cámara · mic/enviar).
-  const isMobile = useIsMobile();
+  // `compacto` pide esa misma fila desde una ventana chica en escritorio.
+  const isMobile = useIsMobile() || compacto;
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);

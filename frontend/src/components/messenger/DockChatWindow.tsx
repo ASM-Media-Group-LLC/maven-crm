@@ -203,6 +203,10 @@ export default function DockChatWindow({
           participants={conversation.participants}
           chatType={conversation.type}
           aCiegas={!puedeVerLaListaDeMiembros(conversation, user?.id)}
+          // La ventanita mide 336 px: la barra de emojis de escritorio no entra
+          // y tapa el chat. Va el composer del teléfono, con las expresiones en
+          // un botón (Jhon, 10/09).
+          compacto
         />
       </div>
     </div>
