@@ -43,6 +43,8 @@ import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
 import CoworkReglasDialog from "./CoworkReglasDialog";
 import CoworkPausasDialog from "./CoworkPausasDialog";
+import PausaSupervisorBoton from "./PausaSupervisorBoton";
+import { leerPausaSupervisor, suscribirPausaSupervisor } from "@/lib/pausaSupervisor";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -101,7 +103,14 @@ interface Props {
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
-  const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
+  const { mediaStates, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
+  // La pausa del supervisor (break / almuerzo / ausente) se elige con la tacita
+  // de la barra del Hub y se publica por presencia para que los chatters la
+  // vean. Aparte de `mediaStates` a propósito: ver useCoworkMediaPresence.
+  useEffect(() => {
+    trackEstadoSupervisor(leerPausaSupervisor());
+    return suscribirPausaSupervisor((e) => trackEstadoSupervisor(e));
+  }, [trackEstadoSupervisor]);
   // Quién está CONECTADO a cada sala según LiveKit, reportado por el monitor de
   // esa sala. `null` = ese monitor no sabe. Es la verdad para las tarjetas: las
   // asignaciones quedan activas aunque la persona cierre la pestaña sin salir
@@ -714,6 +723,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       initialCamOn: false,
       getToken: getHubToken,
       incomingAudioMuted: hubSilenciado,
+      // La tacita: break / almuerzo / ausente. Es un elemento fijo que lee su
+      // estado del store, así que no queda viejo aunque esta config se arme
+      // una sola vez.
+      controlesExtra: <PausaSupervisorBoton />,
       // La ventanita flotante del provider también tiene el 🔇: cuando lo
       // togglean allá, acá se sincroniza el estado y la persistencia.
       onIncomingAudioMutedChange: fijarHubSilencio,

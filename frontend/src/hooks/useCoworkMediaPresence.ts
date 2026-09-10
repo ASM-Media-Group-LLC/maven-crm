@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
 
 export interface MediaState {
   micOn: boolean;
@@ -41,6 +42,10 @@ export interface MediaState {
 interface UseCoworkMediaPresenceResult {
   mediaStates: Record<string, MediaState>;
   trackMediaState: (state: MediaState) => void;
+  /** Disponibilidad de cada supervisor de la sesión (clave = su user_id). `null` = disponible. */
+  supervisores: Record<string, EstadoSupervisor | null>;
+  /** El supervisor anuncia break / almuerzo / ausente, o `null` = disponible. */
+  trackEstadoSupervisor: (estado: EstadoSupervisor | null) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -67,7 +72,15 @@ interface UseCoworkMediaPresenceResult {
 type CanalRealtime = ReturnType<typeof supabase.channel>;
 
 /** Lo que cada cliente publica sobre sí mismo en el presence. */
-type PayloadPresencia = Partial<MediaState> & { user_id?: string };
+type PayloadPresencia = Partial<MediaState> & {
+  user_id?: string;
+  /** Un supervisor publicando su disponibilidad (break/almuerzo/ausente). Va
+   *  por el MISMO canal pero se lee APARTE: si entrara a `mediaStates` con la
+   *  cámara en false, el tablero le pondría alertas de "sin pantalla" al
+   *  propio supervisor. */
+  esSupervisor?: boolean;
+  supervisorEstado?: EstadoSupervisor | null;
+};
 
 interface CanalVivo {
   sessionId: string;
@@ -77,9 +90,12 @@ interface CanalVivo {
    *  canal SIGUE VIVO — es justamente el punto. */
   usos: number;
   /** Lo avisan a quien esté escuchando cuando cambia el estado de la sala. */
-  oyentes: Set<(estados: Record<string, MediaState>) => void>;
+  oyentes: Set<(estados: Record<string, MediaState>, supervisores: Record<string, EstadoSupervisor | null>) => void>;
   /** Lo último que se publicó, para poder re-publicarlo si hiciera falta. */
   ultimoEstado: MediaState | null;
+  /** Si este canal lo abrió un SUPERVISOR: su disponibilidad. `undefined` = no
+   *  publica disponibilidad (es un chatter). `null` = disponible. */
+  ultimoSupervisor?: EstadoSupervisor | null;
   /** Lo estamos cerrando NOSOTROS, a propósito (salir de Cowork, cambiar de
    *  sesión, rehacer el canal). Sirve para no gritar por algo que pedimos. */
   cerrando?: boolean;
@@ -100,6 +116,8 @@ let vivo: CanalVivo | null = null;
 // se vuelve a disparar al volver. Sin esto, un solo aviso perdido dejaba a esa
 // persona invisible para la supervisión por el resto del turno.
 let ultimoEstadoPendiente: MediaState | null = null;
+/** Lo mismo para la disponibilidad del supervisor, cuando el canal aún no está. */
+let ultimoSupervisorPendiente: EstadoSupervisor | null | undefined = undefined;
 
 /** Con VARIAS conexiones bajo la misma clave (la persona tiene Cowork abierto
  *  en la PWA y en el navegador, o está reconectando y la conexión vieja
@@ -129,11 +147,33 @@ export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; 
   return mejor;
 }
 
+/** De las conexiones de una clave, cuáles son GENTE y cuál es la disponibilidad
+ *  del supervisor (si alguna la trae). Puro, para probarlo. */
+export function separarPresencias<T extends { esSupervisor?: boolean; supervisorEstado?: unknown }>(
+  presencias: T[] | undefined,
+): { gente: T[]; supervisor: EstadoSupervisor | null | undefined } {
+  const gente = (presencias ?? []).filter((p) => !p.esSupervisor);
+  const deSupervisor = (presencias ?? []).filter((p) => p.esSupervisor);
+  if (!deSupervisor.length) return { gente, supervisor: undefined };
+  const ultima = deSupervisor[deSupervisor.length - 1];
+  return { gente, supervisor: esEstadoSupervisor(ultima.supervisorEstado) ? ultima.supervisorEstado : null };
+}
+
+function leerSupervisores(canal: CanalRealtime): Record<string, EstadoSupervisor | null> {
+  const estado = canal.presenceState<PayloadPresencia>();
+  const resultado: Record<string, EstadoSupervisor | null> = {};
+  Object.entries(estado).forEach(([key, presencias]) => {
+    const { supervisor } = separarPresencias(presencias);
+    if (supervisor !== undefined) resultado[key] = supervisor;
+  });
+  return resultado;
+}
+
 function leerEstados(canal: CanalRealtime) {
   const estado = canal.presenceState<PayloadPresencia>();
   const resultado: Record<string, MediaState> = {};
   Object.entries(estado).forEach(([key, presencias]) => {
-    const ultima = elegirPresencia(presencias);
+    const ultima = elegirPresencia(separarPresencias(presencias).gente);
     if (!ultima) return;
     resultado[key] = {
       micOn: !!ultima.micOn,
@@ -237,6 +277,16 @@ function olvidarPendiente() {
   pendienteDePublicar = null;
 }
 
+/** El supervisor anuncia su disponibilidad. Sin cola ni coalescencia: cambia
+ *  un par de veces al día, no diez por segundo. */
+function enviarSupervisor(entrada: CanalVivo, estado: EstadoSupervisor | null) {
+  entrada.ultimoSupervisor = estado;
+  const envio = entrada.canal.track({ user_id: entrada.userId, esSupervisor: true, supervisorEstado: estado });
+  void Promise.resolve(envio).then((r) => {
+    if (r !== "ok") console.warn("[cowork] la disponibilidad del supervisor no se pudo publicar:", r);
+  }).catch((e) => console.warn("[cowork] la disponibilidad del supervisor no se pudo publicar:", e));
+}
+
 function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number) {
   ultimaPublicacion = Date.now();
   const envio = entrada.canal.track({
@@ -299,7 +349,7 @@ function cerrarCanal(entrada: CanalVivo): Promise<void> {
  *  null, así que lo que se quiera publicar queda pendiente y sale con el
  *  SUBSCRIBED del nuevo. */
 async function rehacerCanal(entrada: CanalVivo): Promise<CanalVivo | null> {
-  const { sessionId, userId, oyentes, ultimoEstado, usos } = entrada;
+  const { sessionId, userId, oyentes, ultimoEstado, ultimoSupervisor, usos } = entrada;
   if (vivo === entrada) vivo = null;
   olvidarPendiente();
   await cerrarCanal(entrada);
@@ -309,6 +359,7 @@ async function rehacerCanal(entrada: CanalVivo): Promise<CanalVivo | null> {
   nueva.usos = usos;
   oyentes.forEach((f) => nueva.oyentes.add(f));
   nueva.ultimoEstado = ultimoEstado;
+  nueva.ultimoSupervisor = ultimoSupervisor;
   vivo = nueva;
   return nueva;
 }
@@ -321,7 +372,8 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
 
   const avisar = () => {
     const estados = leerEstados(canal);
-    entrada.oyentes.forEach((f) => f(estados));
+    const supervisores = leerSupervisores(canal);
+    entrada.oyentes.forEach((f) => f(estados, supervisores));
   };
 
   canal
@@ -346,6 +398,8 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
       const aPublicar = entrada.ultimoEstado ?? ultimoEstadoPendiente;
       if (estado === "SUBSCRIBED") {
         if (aPublicar) publicar(entrada, aPublicar);
+        const disponibilidad = entrada.ultimoSupervisor !== undefined ? entrada.ultimoSupervisor : ultimoSupervisorPendiente;
+        if (disponibilidad !== undefined) { ultimoSupervisorPendiente = undefined; enviarSupervisor(entrada, disponibilidad); }
         return;
       }
       // Cualquier otro estado significa que este canal NO entrega nada, y hasta
@@ -475,7 +529,7 @@ function revisarSalud() {
   // Aunque el canal esté sano, se relee: un `sync` perdido no deja rastro.
   // Esto NO manda nada, solo lee lo que ya está en memoria — es gratis.
   const estados = leerEstados(entrada.canal);
-  entrada.oyentes.forEach((f) => f(estados));
+  entrada.oyentes.forEach((f) => f(estados, leerSupervisores(entrada.canal)));
 
   // Y el chequeo que de verdad importa para quien PUBLICA: "yo debería
   // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia — pero con techo:
@@ -521,6 +575,7 @@ function alVolverAMirar() {
  *  desde acá el resto ve el `leave`, que es lo correcto en ese caso. */
 export function salirDePresencia() {
   ultimoEstadoPendiente = null;
+  ultimoSupervisorPendiente = undefined;
   olvidarPendiente();
   ultimaPublicacion = 0;
   noAparezco = 0;
@@ -550,6 +605,9 @@ export function useCoworkMediaPresence(
   opciones?: { persistente?: boolean },
 ): UseCoworkMediaPresenceResult {
   const [mediaStates, setMediaStates] = useState<Record<string, MediaState>>({});
+  /** Disponibilidad de cada supervisor de la sesión (clave = su user_id).
+   *  Solo aparecen los que la publicaron alguna vez; `null` = disponible. */
+  const [supervisores, setSupervisores] = useState<Record<string, EstadoSupervisor | null>>({});
   const persistente = !!opciones?.persistente;
   // En una ref para que cambiarla no re-suscriba el canal.
   const persistenteRef = useRef(persistente);
@@ -560,13 +618,18 @@ export function useCoworkMediaPresence(
     let cancelado = false;
     let entrada: CanalVivo | null = null;
 
+    const oyente = (estados: Record<string, MediaState>, sups: Record<string, EstadoSupervisor | null>) => {
+      setMediaStates(estados);
+      setSupervisores(sups);
+    };
     const engancharse = (e: CanalVivo) => {
       entrada = e;
       e.usos += 1;
-      e.oyentes.add(setMediaStates);
+      e.oyentes.add(oyente);
       // Si el canal ya estaba abierto, arrancar con lo que ya sabe en vez de
       // esperar al próximo evento (si no, la lista aparece vacía un instante).
       setMediaStates(leerEstados(e.canal));
+      setSupervisores(leerSupervisores(e.canal));
     };
 
     const preparar = async () => {
@@ -588,7 +651,7 @@ export function useCoworkMediaPresence(
       cancelado = true;
       const e = entrada;
       if (!e) return;
-      e.oyentes.delete(setMediaStates);
+      e.oyentes.delete(oyente);
       e.usos -= 1;
       // Acá está el arreglo: si nadie lo mira PERO la presencia es persistente,
       // el canal se queda abierto. Cerrarlo mandaría un `leave` y el
@@ -610,5 +673,17 @@ export function useCoworkMediaPresence(
     [userId],
   );
 
-  return { mediaStates, trackMediaState };
+  /** El supervisor anuncia break / almuerzo / ausente (o `null` = disponible). */
+  const trackEstadoSupervisor = useCallback(
+    (estado: EstadoSupervisor | null) => {
+      ultimoSupervisorPendiente = estado;
+      const entrada = vivo;
+      if (!entrada || entrada.userId !== userId) return;  // sale con el SUBSCRIBED
+      ultimoSupervisorPendiente = undefined;
+      enviarSupervisor(entrada, estado);
+    },
+    [userId],
+  );
+
+  return { mediaStates, supervisores, trackMediaState, trackEstadoSupervisor };
 }
