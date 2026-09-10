@@ -708,8 +708,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           detecta que no se le ve, que se entere y se acomode. Es una ayuda, no
           una cámara de vigilancia silenciosa. */}
       {onFaceStateChange && faceStateLabel(faceWatch.state) && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 backdrop-blur-sm">
-          <span className="text-[11px] text-amber-500">{faceStateLabel(faceWatch.state)}</span>
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-full bg-warning/15 border border-warning/30 px-3 py-1.5 backdrop-blur-sm">
+          <span className="text-[11px] text-warning">{faceStateLabel(faceWatch.state)}</span>
         </div>
       )}
 

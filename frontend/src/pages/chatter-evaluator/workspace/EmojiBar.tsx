@@ -111,13 +111,13 @@ export const EmojiBar = ({
             onMouseDown={(ev) => ev.preventDefault()}
             onClick={() => handleClickEmoji(e)}
             className={`relative shrink-0 rounded p-0.5 text-xl leading-none transition-colors hover:bg-muted ${
-              editMode ? "ring-1 ring-rose-500/40 hover:ring-rose-500" : ""
+              editMode ? "ring-1 ring-destructive/40 hover:ring-destructive" : ""
             }`}
             title={editMode ? "Click para eliminar" : `Insertar ${e}`}
           >
             {e}
             {editMode && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-white">
                 ✕
               </span>
             )}
@@ -138,7 +138,7 @@ export const EmojiBar = ({
               onClick={() => setEditMode((v) => !v)}
               className={`rounded border p-1 text-xs transition-colors ${
                 editMode
-                  ? "border-emerald-500 text-emerald-400 hover:bg-emerald-500/10"
+                  ? "border-success text-success hover:bg-success/10"
                   : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-foreground hover:text-foreground"
               }`}
               title={editMode ? "Terminar edición" : "Editar emojis"}

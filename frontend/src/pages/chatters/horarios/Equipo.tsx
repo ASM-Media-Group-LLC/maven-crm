@@ -167,12 +167,12 @@ function CeldaDia({ miembro, weekday, semana, agency, descanso, esHoy, puedeGest
   const candidatos = miembros.filter((m) => m.identity_id !== miembro.identity_id && m.shift === miembro.shift);
 
   const contenido = descanso ? (
-    <span className="inline-flex flex-col items-center rounded-md bg-orange-500/10 px-2 py-1 text-[11px] font-semibold text-orange-700 dark:text-orange-300 leading-tight">
+    <span className="inline-flex flex-col items-center rounded-md bg-warning/10 px-2 py-1 text-[11px] font-semibold text-warning leading-tight">
       <span className="inline-flex items-center gap-1"><CalendarOff className="h-3 w-3" /> Descansa</span>
       {descanso.covered_by_identity_id && <span className="font-normal text-muted-foreground">cubre {(nombres[descanso.covered_by_identity_id] ?? "…").split(" ")[0]}</span>}
       {descanso.note && <span className="font-normal text-muted-foreground truncate max-w-[110px]">{descanso.note}</span>}
     </span>
-  ) : <span className="inline-block h-2 w-2 rounded-full bg-emerald-500/70" aria-label="Trabaja" />;
+  ) : <span className="inline-block h-2 w-2 rounded-full bg-success/70" aria-label="Trabaja" />;
 
   if (!puedeGestionar) return <td className={cn("px-2 py-2 text-center", esHoy && "bg-primary/5")}>{contenido}</td>;
 

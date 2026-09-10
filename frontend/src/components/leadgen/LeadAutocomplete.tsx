@@ -181,7 +181,7 @@ export function LeadAutocomplete({
                         </code>
                       )}
                       {lead.phone_raw && (
-                        <span className="text-[10px] text-emerald-500 font-bold ml-auto shrink-0">
+                        <span className="text-[10px] text-success font-bold ml-auto shrink-0">
                           📞 ya tiene tel
                         </span>
                       )}

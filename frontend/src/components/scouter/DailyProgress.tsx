@@ -85,9 +85,9 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
           className="h-2.5 bg-muted/40"
           indicatorClassName={
             pct === 100
-              ? "bg-emerald-500"
+              ? "bg-success"
               : pct >= 50
-              ? "bg-sky-500"
+              ? "bg-primary"
               : "bg-primary"
           }
         />
@@ -96,19 +96,19 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
       {/* ── Stats pills ── */}
       <div className="flex flex-wrap gap-2">
         <StatPill
-          icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+          icon={<CheckCircle2 className="h-3.5 w-3.5 text-success" />}
           label="Listas"
           value={done}
           color="emerald"
         />
         <StatPill
-          icon={<Clock className="h-3.5 w-3.5 text-amber-400" />}
+          icon={<Clock className="h-3.5 w-3.5 text-warning" />}
           label="Pendientes"
           value={pending}
           color="amber"
         />
         <StatPill
-          icon={<SkipForward className="h-3.5 w-3.5 text-zinc-400" />}
+          icon={<SkipForward className="h-3.5 w-3.5 text-muted-foreground" />}
           label="Saltadas"
           value={skipped}
           color="zinc"
@@ -121,9 +121,9 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
 // ─── Sub-component ────────────────────────────────────────────────────────
 
 const COLOR_MAP: Record<string, string> = {
-  emerald: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  amber: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  zinc: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
+  emerald: "border-success/30 bg-success/10 text-success",
+  amber: "border-warning/30 bg-warning/10 text-warning",
+  zinc: "border-border bg-muted text-muted-foreground",
 };
 
 const StatPill = ({

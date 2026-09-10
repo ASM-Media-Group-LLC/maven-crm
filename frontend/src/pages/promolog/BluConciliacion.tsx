@@ -50,7 +50,7 @@ interface Conciliacion {
 function Cifra({ label, valor, pie, tono }: { label: string; valor: string; pie?: string; tono?: "ok" | "alerta" }) {
   return (
     <div className={cn("rounded-xl border px-3 py-2.5",
-      tono === "alerta" ? "border-amber-500/30 bg-amber-500/5" : tono === "ok" ? "border-emerald-500/30 bg-emerald-500/5" : "border-border")}>
+      tono === "alerta" ? "border-warning/30 bg-warning/5" : tono === "ok" ? "border-success/30 bg-success/5" : "border-border")}>
       <p className="text-xs font-semibold text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-xl font-bold tabular-nums leading-none">{valor}</p>
       {pie && <p className="mt-1 text-[11px] text-muted-foreground">{pie}</p>}
@@ -83,11 +83,11 @@ export default function BluConciliacion() {
           <Scale className="h-5 w-5" />
           Conciliación Maven ↔ BLU
           {data.cuadra ? (
-            <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-500" variant="outline">
+            <Badge className="gap-1 border-success/30 bg-success/15 text-success" variant="outline">
               <CheckCircle2 className="h-3 w-3" /> cuadra
             </Badge>
           ) : (
-            <Badge className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-500" variant="outline">
+            <Badge className="gap-1 border-warning/30 bg-warning/15 text-warning" variant="outline">
               <AlertTriangle className="h-3 w-3" /> no cuadra
             </Badge>
           )}
@@ -127,8 +127,8 @@ export default function BluConciliacion() {
         </div>
 
         {data.sin_vincular.length > 0 && (
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
-            <p className="text-xs font-semibold text-amber-500">
+          <div className="rounded-xl border border-warning/25 bg-warning/5 p-3">
+            <p className="text-xs font-semibold text-warning">
               Ganan en BLU y no están vinculadas a ninguna creadora ({data.blu_sin_vincular})
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -145,7 +145,7 @@ export default function BluConciliacion() {
                 <li key={r.cuenta} className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
                   <span className="font-medium">{r.cuenta}</span>
                   {r.agencia ? (
-                    <Badge variant="outline" className="border-emerald-500/30 text-[10px] capitalize text-emerald-500">
+                    <Badge variant="outline" className="border-success/30 text-[10px] capitalize text-success">
                       {r.agencia}
                     </Badge>
                   ) : (
@@ -163,8 +163,8 @@ export default function BluConciliacion() {
         )}
 
         {data.facturan_sin_estar_activas.length > 0 && (
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
-            <p className="text-xs font-semibold text-amber-500">
+          <div className="rounded-xl border border-warning/25 bg-warning/5 p-3">
+            <p className="text-xs font-semibold text-warning">
               Facturan en BLU pero en Maven no están activas ({data.facturan_sin_estar_activas.length})
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">

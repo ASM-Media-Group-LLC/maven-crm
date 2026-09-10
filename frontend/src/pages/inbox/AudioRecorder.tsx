@@ -148,7 +148,7 @@ export function AudioRecorderBar({ onSend, onCancel }: AudioRecorderBarProps) {
         <Trash2 className="h-5 w-5" />
       </button>
       <span className="flex shrink-0 items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
-        <span className={cn("h-2 w-2 rounded-full bg-red-500", !paused && "animate-pulse")} />
+        <span className={cn("h-2 w-2 rounded-full bg-destructive", !paused && "animate-pulse")} />
         {fmt(elapsed)}
       </span>
       <canvas ref={canvasRef} width={600} height={36} className="h-9 min-w-0 flex-1 rounded bg-muted/30" />

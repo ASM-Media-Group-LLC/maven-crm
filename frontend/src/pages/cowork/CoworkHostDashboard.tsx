@@ -1134,10 +1134,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <button
               onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
               title={`${openHostRequests.length} ${openHostRequests.length === 1 ? "persona pide" : "personas piden"} supervisor`}
-              className="mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 transition-colors animate-pulse"
+              className="mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center bg-warning/15 text-warning hover:bg-warning/25 transition-colors animate-pulse"
             >
               <Hand className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-amber-500 text-[10px] font-semibold text-black flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-warning text-[10px] font-semibold text-warning-foreground flex items-center justify-center">
                 {openHostRequests.length > 9 ? "9+" : openHostRequests.length}
               </span>
             </button>
@@ -1206,7 +1206,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-blue-500 hover:text-blue-400"
+                  className="h-7 w-7 text-primary hover:text-primary/80"
                   title="Copiar enlace de host (vale 30 minutos)"
                   disabled={copiandoEnlace}
                   // El código se pide AL COPIAR, no al abrir el tablero: el servidor
@@ -1282,7 +1282,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 text-[10px] text-amber-500 hover:text-amber-400 px-1.5"
+                  className="h-5 text-[10px] text-warning hover:text-warning/80 px-1.5"
                   onClick={() => setHubMinimized(!hubMinimized)}
                 >
                   {hubMinimized ? "Mostrar" : "Minimizar"}
@@ -1291,7 +1291,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 text-[10px] text-amber-500 hover:text-amber-400 px-1.5"
+                  className="h-5 text-[10px] text-warning hover:text-warning/80 px-1.5"
                   onClick={conectarHub}
                 >
                   Reconectar
@@ -1304,7 +1304,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
           {/* Host Requests */}
           <div className="p-3 border-t border-border/50 space-y-2">
-            <h3 className="text-xs font-medium text-amber-500 flex items-center gap-1">
+            <h3 className="text-xs font-medium text-warning flex items-center gap-1">
               <Hand className="h-3 w-3" /> Solicitudes ({openHostRequests.length})
             </h3>
             {openHostRequests.length === 0 ? (
@@ -1314,18 +1314,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
                 const is1on1 = !!req.oneone_livekit_room;
                 return (
-                  <div key={req.id} className={`rounded-xl p-2.5 space-y-1 ${is1on1 ? "bg-primary/5" : "bg-amber-500/10"}`}>
+                  <div key={req.id} className={`rounded-xl p-2.5 space-y-1 ${is1on1 ? "bg-primary/5" : "bg-warning/10"}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        {is1on1 ? <Phone className="h-3 w-3 text-primary" /> : <Hand className="h-3 w-3 text-amber-500" />}
+                        {is1on1 ? <Phone className="h-3 w-3 text-primary" /> : <Hand className="h-3 w-3 text-warning" />}
                         <span className="text-xs text-foreground/80">{cowork.profiles[req.user_id] || "User"}</span>
                       </div>
-                      <Badge variant="outline" className={`text-[9px] rounded-full ${is1on1 ? "border-primary/30 text-primary" : "border-amber-500/30 text-amber-500"}`}>{roomName}</Badge>
+                      <Badge variant="outline" className={`text-[9px] rounded-full ${is1on1 ? "border-primary/30 text-primary" : "border-warning/30 text-warning"}`}>{roomName}</Badge>
                     </div>
                     {req.message && <p className="text-[10px] text-muted-foreground">{req.message}</p>}
                     <div className="flex gap-1">
                       {req.status === "open" && (
-                        <Button size="sm" variant="ghost" className={`h-5 text-[10px] rounded-full ${is1on1 ? "text-primary" : "text-amber-500"}`} onClick={async () => {
+                        <Button size="sm" variant="ghost" className={`h-5 text-[10px] rounded-full ${is1on1 ? "text-primary" : "text-warning"}`} onClick={async () => {
                           if (is1on1) {
                             await cowork.ackHostRequest(req.id);
                             setOneOnOneRequestId(req.id);
@@ -1416,18 +1416,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             if (!enPausa.length) return null;
             return (
               <div className="p-3 border-t border-border/50 space-y-2">
-                <h3 className="text-xs font-medium text-amber-500 flex items-center gap-1">
+                <h3 className="text-xs font-medium text-warning flex items-center gap-1">
                   <Coffee className="h-3 w-3" /> En pausa ({enPausa.length})
                 </h3>
                 {enPausa.map((p) => (
-                  <div key={p.uid} className="bg-amber-500/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                  <div key={p.uid} className="bg-warning/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
                     <div className="min-w-0 flex items-center gap-1.5">
-                      <Coffee className="h-3 w-3 text-amber-500 shrink-0" />
+                      <Coffee className="h-3 w-3 text-warning shrink-0" />
                       <span className="text-xs text-foreground/80 truncate">{p.nombre}</span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {p.sala && (
-                        <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500 rounded-full">
+                        <Badge variant="outline" className="text-[9px] border-warning/30 text-warning rounded-full">
                           {p.sala}
                         </Badge>
                       )}
@@ -1626,7 +1626,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                 className={cn(
                                   "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
                                   pausa!.cuenta.estado === "excedida" ? "bg-destructive/20 animate-pulse"
-                                    : pausa!.cuenta.estado === "poco" ? "bg-amber-500/15"
+                                    : pausa!.cuenta.estado === "poco" ? "bg-warning/15"
                                     : "bg-success/15",
                                   clasesPausa(pausa!.cuenta.estado),
                                 )}
@@ -1720,7 +1720,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                             {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
                                             {faceIssue(ms) && (
                                               <span
-                                                className="flex items-center gap-0.5 text-[10px] text-amber-500"
+                                                className="flex items-center gap-0.5 text-[10px] text-warning"
                                                 title={`${faceIssue(ms)} desde hace ${formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}`}
                                               >
                                                 <EyeOff className="h-3 w-3" />
@@ -1729,7 +1729,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                             )}
                                             {sinPantalla(ms) && (
                                               <span
-                                                className="flex items-center gap-0.5 text-[10px] text-amber-500"
+                                                className="flex items-center gap-0.5 text-[10px] text-warning"
                                                 title={`Sin compartir pantalla desde hace ${formatBreak(Math.floor((now - (ms.screenShareSince as number)) / 1000))}`}
                                               >
                                                 <MonitorOff className="h-3 w-3" />
@@ -1737,7 +1737,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                               </span>
                                             )}
                                             {ms.onBreak && ms.breakStartedAt && (
-                                              <span className="flex items-center gap-0.5 text-[10px] text-amber-500 font-mono tabular-nums">
+                                              <span className="flex items-center gap-0.5 text-[10px] text-warning font-mono tabular-nums">
                                                 <Coffee className="h-3 w-3" />
                                                 {formatBreak(Math.max(0, Math.floor((now - ms.breakStartedAt) / 1000)))}
                                               </span>

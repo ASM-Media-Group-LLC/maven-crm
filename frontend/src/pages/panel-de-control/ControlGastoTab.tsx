@@ -237,12 +237,12 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
           const gradient = PROVIDER_GRADIENT[s.provider] ?? "bg-slate-500";
           const borderByStatus =
             s.status === "red"
-              ? "border-rose-500/40"
+              ? "border-destructive/40"
               : s.status === "amber"
-                ? "border-amber-500/40"
+                ? "border-warning/40"
                 : "border-border";
           const barByStatus =
-            s.status === "red" ? "bg-rose-500" : s.status === "amber" ? "bg-amber-500" : "bg-emerald-500";
+            s.status === "red" ? "bg-destructive" : s.status === "amber" ? "bg-warning" : "bg-success";
           return (
             <Card
               key={s.provider}
@@ -279,7 +279,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                   </p>
                 </div>
                 {s.status === "red" && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-rose-500 font-medium">
+                  <div className="flex items-center gap-1.5 text-[11px] text-destructive font-medium">
                     <AlertTriangle className="h-3 w-3" />
                     Cerca del cap mensual
                   </div>

@@ -72,7 +72,7 @@ export default function HrAttendanceAuto() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold">
-            <CalendarClock className="h-4 w-4 text-emerald-500" /> Check-in y puntualidad
+            <CalendarClock className="h-4 w-4 text-success" /> Check-in y puntualidad
           </h3>
           <p className="text-sm text-muted-foreground">
             Hora de entrada (1ª actividad de Hubstaff) vs horario — {stats && periodLabel(stats.period)}.

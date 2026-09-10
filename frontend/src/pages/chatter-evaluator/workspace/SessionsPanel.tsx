@@ -41,8 +41,8 @@ const formatRelative = (iso: string): string => {
 };
 
 const StatusDot = ({ status }: { status: ChatterSession["status"] }) => {
-  if (status === "active") return <CircleDot className="h-3 w-3 text-emerald-500" />;
-  if (status === "waiting") return <CircleDashed className="h-3 w-3 text-amber-500" />;
+  if (status === "active") return <CircleDot className="h-3 w-3 text-success" />;
+  if (status === "waiting") return <CircleDashed className="h-3 w-3 text-warning" />;
   return <CircleDashed className="h-3 w-3 text-muted-foreground" />;
 };
 
@@ -78,7 +78,7 @@ const SessionRow = ({
         notificaciones de chat. */}
     {unread > 0 && (
       <span
-        className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow ring-2 ring-background"
+        className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-bold text-destructive-foreground shadow ring-2 ring-background"
         aria-label={`${unread} mensajes sin leer`}
       >
         {unread > 99 ? "99+" : unread}
@@ -107,7 +107,7 @@ const SessionRow = ({
         <span className="truncate text-sm font-medium">{session.chatter_name}</span>
       </div>
       {isTyping ? (
-        <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+        <div className="flex items-center gap-1 text-[11px] font-medium text-success">
           <span className="inline-flex gap-0.5">
             <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "0ms" }} />
             <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "150ms" }} />
@@ -125,7 +125,7 @@ const SessionRow = ({
             <Clock className="h-2.5 w-2.5" />
             {formatRelative(session.created_at)}
           </span>
-          <span className="shrink-0 whitespace-nowrap font-mono font-bold text-emerald-500">
+          <span className="shrink-0 whitespace-nowrap font-mono font-bold text-success">
             ${totalSpent}
           </span>
         </div>
@@ -469,7 +469,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void confirmEndAndDismiss();

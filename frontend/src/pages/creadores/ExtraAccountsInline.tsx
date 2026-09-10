@@ -117,7 +117,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
           key={a.id}
           className={`inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[11px] ${a.active ? "" : "opacity-50"}`}
         >
-          {isWhatsapp && <Phone className="h-3 w-3 text-emerald-500" />}
+          {isWhatsapp && <Phone className="h-3 w-3 text-whatsapp" />}
           <button
             type="button"
             onClick={() => effectiveCanManage && toggle(a.id, !a.active)}

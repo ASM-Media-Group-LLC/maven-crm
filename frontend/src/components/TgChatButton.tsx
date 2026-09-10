@@ -74,7 +74,7 @@ export function TgChatButton({
     });
   };
 
-  const btnClass = className ?? "h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700";
+  const btnClass = className ?? "h-7 gap-1.5 px-2 text-xs text-telegram hover:text-telegram/80";
 
   // Una sola línea (o ninguna registrada aún) → abre directo con la default.
   const trigger = channels.length <= 1 ? (

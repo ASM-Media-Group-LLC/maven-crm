@@ -522,7 +522,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                       )}
                     </div>
                     {inMonth && (incomeByDay.get(key) || 0) > 0 && (
-                      <span className="text-[10px] font-semibold leading-none tabular-nums text-amber-600 dark:text-amber-400">
+                      <span className="text-[10px] font-semibold leading-none tabular-nums text-warning">
                         ${Math.round(incomeByDay.get(key) || 0).toLocaleString("en-US")}
                       </span>
                     )}

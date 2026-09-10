@@ -296,7 +296,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
           <AlertDialogFooter>
             <AlertDialogCancel disabled={delMut.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void handleConfirmedDelete();

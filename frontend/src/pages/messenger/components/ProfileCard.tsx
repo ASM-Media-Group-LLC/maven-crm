@@ -77,7 +77,7 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
         className={cn(
           "min-w-0 inline-flex items-center gap-1.5 max-w-full text-[11.5px] font-medium",
           "bg-muted border border-border rounded-full pl-2.5 pr-3 py-1.5 cursor-copy transition-colors",
-          copiado ? "text-emerald-500 border-emerald-500/40" : "text-muted-foreground hover:text-foreground hover:border-foreground/25",
+          copiado ? "text-success border-success/40" : "text-muted-foreground hover:text-foreground hover:border-foreground/25",
         )}
       >
         {copiado ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Mail className="h-3.5 w-3.5 shrink-0" />}

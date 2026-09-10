@@ -47,8 +47,8 @@ const ChangePasswordModal = ({ open, onOpenChange }: ChangePasswordModalProps) =
 
   const RequirementItem = ({ met, label }: { met: boolean; label: string }) => (
     <div className="flex items-center gap-1.5 text-xs">
-      {met ? <Check className="h-3 w-3 text-green-500" /> : <X className="h-3 w-3 text-muted-foreground" />}
-      <span className={met ? "text-green-500" : "text-muted-foreground"}>{label}</span>
+      {met ? <Check className="h-3 w-3 text-success" /> : <X className="h-3 w-3 text-muted-foreground" />}
+      <span className={met ? "text-success" : "text-muted-foreground"}>{label}</span>
     </div>
   );
 

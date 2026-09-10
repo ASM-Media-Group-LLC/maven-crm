@@ -105,8 +105,8 @@ function getStatusBadgeClasses(status: string) {
   switch (status) {
     case "completed": return "bg-success/15 text-success border-success/30";
     case "pending": return "bg-warning/15 text-warning border-warning/30";
-    case "draft": return "bg-gray-100 text-gray-600 border-gray-200";
-    case "reviewed": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "draft": return "bg-muted text-muted-foreground border-border";
+    case "reviewed": return "bg-primary/10 text-primary border-primary/30";
     default: return "";
   }
 }

@@ -34,8 +34,8 @@ interface ChangeStatusModalProps {
 
 const statusOptions = [
   { value: "active", label: "Activa", color: "bg-success" },
-  { value: "onboarding", label: "Onboarding", color: "bg-blue-500" },
-  { value: "paused", label: "Pausada", color: "bg-gray-400" },
+  { value: "onboarding", label: "Onboarding", color: "bg-primary" },
+  { value: "paused", label: "Pausada", color: "bg-muted-foreground" },
   { value: "leaving", label: "Retiro", color: "bg-warning" },
   { value: "terminated", label: "Terminada", color: "bg-destructive" },
 ];

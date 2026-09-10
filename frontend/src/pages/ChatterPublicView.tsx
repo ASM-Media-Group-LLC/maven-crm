@@ -514,8 +514,8 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
             <div
               className={`mt-1 inline-block rounded-[14px] border-2 p-1 ${
                 msg.purchased
-                  ? "border-emerald-500 bg-emerald-500/10"
-                  : "border-orange-500 bg-orange-500/5"
+                  ? "border-success bg-success/10"
+                  : "border-warning bg-warning/5"
               }`}
             >
               <div className="flex flex-wrap gap-1">
@@ -530,7 +530,7 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
               </div>
               <span
                 className={`block rounded-b-[12px] px-4 py-1.5 text-center text-sm font-bold text-white ${
-                  msg.purchased ? "bg-emerald-500" : "bg-orange-500"
+                  msg.purchased ? "bg-success" : "bg-warning"
                 }`}
               >
                 ${msg.price}{msg.purchased ? " ✓" : ""}
@@ -562,7 +562,7 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
 
 const LockedScreen = ({ onRetry, busy }: { onRetry: () => void; busy: boolean }) => (
   <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
-    <Lock className="h-12 w-12 text-amber-500" />
+    <Lock className="h-12 w-12 text-warning" />
     <h1 className="text-xl font-bold">Sesión en uso</h1>
     <p className="max-w-sm text-sm text-muted-foreground">
       Esta sesión ya está activa en otro dispositivo. Solo un dispositivo puede rendir el examen.
@@ -583,7 +583,7 @@ const LockedScreen = ({ onRetry, busy }: { onRetry: () => void; busy: boolean })
 
 const NotFoundScreen = ({ reason }: { reason: string }) => (
   <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
-    <AlertTriangle className="h-12 w-12 text-rose-500" />
+    <AlertTriangle className="h-12 w-12 text-destructive" />
     <h1 className="text-xl font-bold">Sesión no disponible</h1>
     <p className="max-w-sm text-sm text-muted-foreground">{reason}</p>
   </div>
@@ -591,7 +591,7 @@ const NotFoundScreen = ({ reason }: { reason: string }) => (
 
 const TabLockedScreen = () => (
   <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
-    <Lock className="h-12 w-12 text-amber-500" />
+    <Lock className="h-12 w-12 text-warning" />
     <h1 className="text-xl font-bold">Sesión abierta en otra pestaña</h1>
     <p className="max-w-sm text-sm text-muted-foreground">
       Esta sesión se está usando en otra pestaña de este navegador.
@@ -1332,8 +1332,8 @@ const ChatterPublicView = () => {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-bold">{fanName}</div>
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-500">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <div className="flex items-center gap-1.5 text-[11px] text-success">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
                 {lang === "en" ? "online" : "en línea"}
               </div>
               {/* Total spent — mirrors chatterTotalSpent in the original. */}
@@ -1363,7 +1363,7 @@ const ChatterPublicView = () => {
             <>
               <div
                 className={`rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold ${
-                  timerExpired ? "text-rose-500" : timerLow ? "text-amber-400" : "text-amber-500"
+                  timerExpired ? "text-destructive" : timerLow ? "text-warning" : "text-amber-500"
                 }`}
               >
                 {formatRemaining(remainingMs)}
@@ -1647,7 +1647,7 @@ const ChatterPublicView = () => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingMsg}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={async (e) => {
                 e.preventDefault();
                 if (!confirmDelMsg || !session) return;
@@ -1845,7 +1845,7 @@ const VaultPickerDialog = ({
                 popover but with $0 (free) as a valid choice. */}
             <div>
               <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-                Precio <span className="text-rose-400">*</span>
+                Precio <span className="text-destructive">*</span>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {VAULT_PRICE_PRESETS.map((amt) => {

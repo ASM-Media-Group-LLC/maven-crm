@@ -437,7 +437,7 @@ const MessageBubble = ({
           <div
             className={`group/bubble relative rounded-2xl px-3 py-1.5 ${
               msg.deleted === "chatter"
-                ? "rounded-bl-sm bg-rose-500 text-white"
+                ? "rounded-bl-sm bg-destructive text-destructive-foreground"
                 : isFan
                 ? "rounded-br-sm bg-gradient-to-br from-accent to-primary text-white shadow-sm"
                 : "rounded-bl-sm bg-muted text-foreground"
@@ -534,8 +534,8 @@ const MessageBubble = ({
                 <div
                   className={`relative inline-block rounded-[14px] border-2 p-1 ${
                     msg.purchased
-                      ? "border-emerald-500 bg-emerald-500/10"
-                      : "border-orange-500 bg-orange-500/5"
+                      ? "border-success bg-success/10"
+                      : "border-warning bg-warning/5"
                   }`}
                 >
                   <div className="flex flex-wrap gap-1">
@@ -550,7 +550,7 @@ const MessageBubble = ({
                   </div>
                   <span
                     className={`block rounded-b-[12px] px-4 py-1.5 text-center text-sm font-bold text-white ${
-                      msg.purchased ? "bg-emerald-500" : "bg-orange-500"
+                      msg.purchased ? "bg-success" : "bg-warning"
                     }`}
                   >
                     ${msg.price}{msg.purchased ? " ✓" : ""}
@@ -562,8 +562,8 @@ const MessageBubble = ({
                     title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
                     className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
                       msg.purchased
-                        ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
-                        : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:bg-orange-500 hover:text-white"
+                        ? "cursor-default border-success bg-success/15 text-success"
+                        : "cursor-pointer border-warning bg-card text-warning hover:bg-warning hover:text-white"
                     }`}
                   >
                     {msg.purchased ? "✓" : purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : "$"}
@@ -590,7 +590,7 @@ const MessageBubble = ({
               Single check = sent. Double check (sky-blue) = read by chatter. */}
           {isFan && msg.msg_type === "message" && (
             readByOther && new Date(readByOther) >= new Date(msg.created_at) ? (
-              <CheckCheck className="h-3 w-3 text-sky-400" />
+              <CheckCheck className="h-3 w-3 text-primary" />
             ) : (
               <Check className="h-3 w-3" />
             )
@@ -1371,9 +1371,9 @@ export const ChatPanel = ({ session }: Props) => {
         const timeClass = ended
           ? "text-muted-foreground"
           : isExpired
-          ? "text-rose-400"
+          ? "text-destructive"
           : isLow
-          ? "text-amber-400"
+          ? "text-warning"
           : "text-foreground";
         return (
           <div className="grid grid-cols-1 items-center gap-3 border-b px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -1411,7 +1411,7 @@ export const ChatPanel = ({ session }: Props) => {
                     </button>
                   )}
                   {session.typing_chatter && !ended && (
-                    <span className="italic text-emerald-400">escribiendo…</span>
+                    <span className="italic text-success">escribiendo…</span>
                   )}
                 </div>
               </div>
@@ -1466,7 +1466,7 @@ export const ChatPanel = ({ session }: Props) => {
                 disabled={ended}
                 title="Terminar la sesión de chat"
                 aria-label="Terminar la sesión de chat"
-                className="h-8 w-8 border-rose-500/60 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                className="h-8 w-8 border-destructive/60 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <Square className="h-4 w-4 fill-current" />
               </Button>
@@ -1602,7 +1602,7 @@ export const ChatPanel = ({ session }: Props) => {
                   size="icon"
                   variant={listening ? "default" : "ghost"}
                   title={listening ? "Detener dictado" : "Dictar (Web Speech)"}
-                  className={listening ? "h-9 w-9 bg-rose-500 text-white hover:bg-rose-500/90" : "h-9 w-9 text-muted-foreground"}
+                  className={listening ? "h-9 w-9 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "h-9 w-9 text-muted-foreground"}
                 >
                   {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
@@ -1754,7 +1754,7 @@ export const ChatPanel = ({ session }: Props) => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMsgMut.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 if (!confirmDelMsg || !session) return;
@@ -1790,7 +1790,7 @@ export const ChatPanel = ({ session }: Props) => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 endMut.mutate(session.id, {

@@ -23,8 +23,8 @@ import { PageHeader } from "@/components/ui/page-header";
 const STATUS_CYCLE = ["todo", "in_progress", "done", "blocked"] as const;
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  done: { label: "Done", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
-  in_progress: { label: "In Progress", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  done: { label: "Done", color: "bg-success/20 text-success border-success/30" },
+  in_progress: { label: "In Progress", color: "bg-warning/20 text-warning border-warning/30" },
   todo: { label: "To Do", color: "bg-muted text-muted-foreground border-border" },
   blocked: { label: "Blocked", color: "bg-destructive/20 text-destructive border-destructive/30" },
 };
@@ -92,8 +92,8 @@ const RoadmapContent = () => {
   };
 
   const getWeekBarColor = (item: RoadmapItem) => {
-    if (item.status === "done") return "bg-emerald-500";
-    if (item.status === "in_progress") return "bg-amber-500";
+    if (item.status === "done") return "bg-success";
+    if (item.status === "in_progress") return "bg-warning";
     if (item.status === "blocked") return "bg-destructive";
     return "bg-muted-foreground/40";
   };

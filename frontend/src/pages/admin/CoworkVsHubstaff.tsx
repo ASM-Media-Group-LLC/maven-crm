@@ -27,8 +27,8 @@ const fechaCorta = (iso: string) =>
 /** Colores de la cobertura: cuánto del Hubstaff lo explica Cowork. */
 function tonoCobertura(c: number | null): string {
   if (c == null) return "text-muted-foreground";
-  if (c >= 0.8) return "text-emerald-600 dark:text-emerald-400";
-  if (c >= 0.5) return "text-amber-600 dark:text-amber-400";
+  if (c >= 0.8) return "text-success";
+  if (c >= 0.5) return "text-warning";
   return "text-destructive";
 }
 
@@ -88,11 +88,11 @@ export default function CoworkVsHubstaff() {
                 value={<span className={tonoCobertura(data.totales.cobertura)}>{porcentaje(data.totales.cobertura)}</span>}
                 hint={data.totales.sinCowork > 0 ? `${data.totales.sinCowork} con Hubstaff y sin Cowork` : undefined}
                 icon={<Percent className="h-3.5 w-3.5" />}
-                color="bg-emerald-500"
+                color="bg-success"
               />
             </div>
 
-            <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-[13px] leading-snug text-warning">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 <b>Cobertura</b> = horas del reloj de Cowork ÷ horas de Hubstaff. Menos de 100 % no es "trabajó menos": es tiempo que Hubstaff registró

@@ -100,7 +100,7 @@ export const SpammerDetailModal = ({
                 {stats.done}/{stats.total} hechas
               </Badge>
               {stats.pending > 0 && (
-                <Badge variant="outline" className="text-amber-400 border-amber-400/30">
+                <Badge variant="outline" className="text-warning border-warning/30">
                   {stats.pending} pendientes
                 </Badge>
               )}
@@ -110,7 +110,7 @@ export const SpammerDetailModal = ({
                 </Badge>
               )}
               {stats.comments > 0 && (
-                <Badge variant="outline" className="text-amber-400 border-amber-400/30">
+                <Badge variant="outline" className="text-warning border-warning/30">
                   {stats.commentsWithProof}/{stats.comments} comments con screenshot
                 </Badge>
               )}
@@ -234,7 +234,7 @@ const TaskRow = ({
     <div className="flex items-start gap-2 text-xs">
       <div className="mt-0.5 shrink-0">
         {isDone ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
         ) : isSkipped ? (
           <SkipForward className="h-3.5 w-3.5 text-muted-foreground" />
         ) : (

@@ -22,14 +22,14 @@ import { usePromoPeriodScores, type PromoPeriodScore } from "./usePromoPeriodSco
 const NET_LABEL: Record<string, string> = { instagram: "IG", x: "X", telegram: "TG", facebook: "FB" };
 
 function scoreColor(score: number): string {
-  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 40) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
+  if (score >= 70) return "text-success";
+  if (score >= 40) return "text-warning";
+  return "text-destructive";
 }
 
 function PartialBadge({ r }: { r: PromoPeriodScore }) {
   return (
-    <Badge variant="outline" className="h-4 px-1 text-[10px] text-amber-600 border-amber-400/50" title={`Solo se leyó el ${r.coverage_pct ?? "?"}% de la ventana — score con poca evidencia, tomalo con pinzas`}>
+    <Badge variant="outline" className="h-4 px-1 text-[10px] text-warning border-warning/50" title={`Solo se leyó el ${r.coverage_pct ?? "?"}% de la ventana — score con poca evidencia, tomalo con pinzas`}>
       parcial
     </Badge>
   );
@@ -42,12 +42,12 @@ function DetailLine({ r, center = false }: { r: PromoPeriodScore; center?: boole
       {(r.target_networks || []).map((n) => NET_LABEL[n] ?? n).join("·") || "—"}
       {" · "}frec {Math.round(r.freq_pts)} · calidad {Math.round(r.quality_pts)} · const {Math.round(r.consistency_pts)}
       {r.lift_pct != null && (
-        <span className={r.lift_pct >= 0 ? "text-emerald-600" : "text-red-500"} title={`Ingreso del día siguiente a un día con promo vs sin promo, sobre ${r.lift_n_promo}v${r.lift_n_quiet} días liquidados`}>
+        <span className={r.lift_pct >= 0 ? "text-success" : "text-destructive"} title={`Ingreso del día siguiente a un día con promo vs sin promo, sobre ${r.lift_n_promo}v${r.lift_n_quiet} días liquidados`}>
           {" "}· ${r.lift_pct >= 0 ? "+" : ""}{Math.round(r.lift_pct)}% con promo
         </span>
       )}
       {(r.manual_share ?? 0) >= 50 && (
-        <span className="text-amber-600" title={`El ${Math.round(r.manual_share!)}% de sus promo-días viene SOLO de registros manuales (sin lectura del bot)`}> · ✍️ {Math.round(r.manual_share!)}% manual</span>
+        <span className="text-warning" title={`El ${Math.round(r.manual_share!)}% de sus promo-días viene SOLO de registros manuales (sin lectura del bot)`}> · ✍️ {Math.round(r.manual_share!)}% manual</span>
       )}
     </div>
   );

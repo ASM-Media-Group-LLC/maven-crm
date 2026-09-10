@@ -206,10 +206,10 @@ const CreadorProfileContent = () => {
                   enmascarado de la BD y estos botones son ese mismo número en
                   forma de acción (abren la bandeja / el chat con ella). */}
               {!vistaTrabajo && c.whatsapp_number && (
-                <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
+                <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-whatsapp hover:text-whatsapp/80" />
               )}
               {!vistaTrabajo && (c.whatsapp_number || c.phone) && (
-                <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700" />
+                <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-telegram hover:text-telegram/80" />
               )}
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">

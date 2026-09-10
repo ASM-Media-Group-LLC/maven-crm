@@ -842,8 +842,8 @@ const InboxPage = () => {
           <h1 className="text-base font-semibold">Bandeja</h1>
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Actualización en tiempo real">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
             </span>
             en vivo
           </span>

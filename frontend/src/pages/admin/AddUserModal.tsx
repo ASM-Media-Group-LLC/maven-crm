@@ -132,7 +132,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-emerald-500" />
+                <UserCheck className="h-5 w-5 text-success" />
                 Usuario creado
               </DialogTitle>
             </DialogHeader>
@@ -168,7 +168,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                       Correo al entrar.
                     </p>
                   ) : (
-                    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
                       El acceso a Maven quedó bien, pero la casilla de correo no
                       se pudo crear{credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : ""}.
                       Se puede reintentar después sin romper nada.
@@ -196,7 +196,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                    entrega en mano — sin esto la persona queda sin poder
                    entrar y nadie se entera. */
                 <>
-                  <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-muted-foreground">
+                  <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-muted-foreground">
                     La cuenta quedó creada pero <strong>el correo con la
                     contraseña no salió</strong>
                     {credenciales.email_error ? ` (${credenciales.email_error})` : ""}.
@@ -386,7 +386,7 @@ function Credencial({
           {valor}
         </span>
         <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onCopiar}>
-          {copiado ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          {copiado ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
         </Button>
       </div>
     </div>

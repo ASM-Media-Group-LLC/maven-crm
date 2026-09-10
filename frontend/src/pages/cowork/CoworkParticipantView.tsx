@@ -742,8 +742,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           {isInOneOnOne ? (
             <>
-              <Crown className="h-4 w-4 text-amber-500 shrink-0" />
-              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con supervisor</span>
+              <Crown className="h-4 w-4 text-warning shrink-0" />
+              <span className="text-warning text-sm font-medium truncate">Llamada privada con supervisor</span>
             </>
           ) : (
             <>
@@ -760,7 +760,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
           {dismissedActiveRequest && !isInOneOnOne && (
-            <Button variant="ghost" size="sm" className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 gap-1.5 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
+            <Button variant="ghost" size="sm" className="text-warning hover:text-warning/80 hover:bg-warning/10 gap-1.5 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" /> Reconectar a llamada privada
             </Button>
           )}
@@ -773,7 +773,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            className={`gap-1.5 rounded-full ${breakStartedAt ? "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+            className={`gap-1.5 rounded-full ${breakStartedAt ? "text-warning hover:text-warning/80 hover:bg-warning/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
             onClick={breakStartedAt ? () => toggleBreak() : undefined}
             title={breakStartedAt ? "Avisar que volviste" : "Avisar que te ausentás un momento"}
             asChild={!breakStartedAt}
@@ -835,7 +835,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             );
           })()}
           {dismissedActiveRequest && !isInOneOnOne && (
-            <Button variant="ghost" size="icon" className="text-amber-500 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
+            <Button variant="ghost" size="icon" className="text-warning animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" />
             </Button>
           )}

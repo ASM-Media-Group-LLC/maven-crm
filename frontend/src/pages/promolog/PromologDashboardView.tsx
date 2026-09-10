@@ -348,10 +348,10 @@ const PromologDashboardView = ({
   };
 
   const networkLabel: Record<string, { label: string; icon: ReactNode; color: string }> = {
-    instagram: { label: "Instagram", icon: <InstagramIcon className="h-4 w-4" />, color: "text-pink-400" },
+    instagram: { label: "Instagram", icon: <InstagramIcon className="h-4 w-4" />, color: "text-instagram-pink" },
     tiktok: { label: "TikTok", icon: <TikTokIcon className="h-4 w-4" />, color: "text-foreground" },
     x: { label: "X", icon: <XIcon className="h-4 w-4" />, color: "text-foreground" },
-    telegram: { label: "Telegram", icon: <Send className="h-4 w-4" />, color: "text-sky-400" },
+    telegram: { label: "Telegram", icon: <Send className="h-4 w-4" />, color: "text-telegram" },
   };
 
   return (
@@ -699,7 +699,7 @@ const PromologDashboardView = ({
 const REC_TONE: Record<number, string> = {
   1: "bg-destructive/15 text-destructive",
   2: "bg-warning/15 text-warning",
-  3: "bg-sky-500/15 text-sky-400",
+  3: "bg-primary/15 text-primary",
 };
 
 const POSITION_STYLES = [

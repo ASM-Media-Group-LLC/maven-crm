@@ -396,7 +396,7 @@ const ClosersContent = () => {
                         title={dotTitle}
                         className={
                           "ml-1.5 inline-block h-2 w-2 rounded-full " +
-                          (hasOverdue ? "bg-destructive animate-pulse" : "bg-orange-500")
+                          (hasOverdue ? "bg-destructive animate-pulse" : "bg-warning")
                         }
                         aria-label={dotTitle}
                       />

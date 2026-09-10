@@ -74,7 +74,7 @@ export default function FeedbackDialog({
           </div>
           {feedback.length > 0 && (
             <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
-              neto < 0 ? "bg-red-500/15 text-red-400" : neto > 0 ? "bg-emerald-500/15 text-emerald-500" : "bg-white/5 text-muted-foreground")}>
+              neto < 0 ? "bg-destructive/15 text-destructive" : neto > 0 ? "bg-success/15 text-success" : "bg-white/5 text-muted-foreground")}>
               {neto > 0 ? "+" : ""}{neto} en el rango
             </span>
           )}
@@ -102,17 +102,17 @@ export default function FeedbackDialog({
                       "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-all disabled:opacity-50",
                       negativo
                         ? marcado
-                          ? "border-red-500/70 bg-red-500/15 ring-1 ring-red-500/40"
-                          : "border-red-500/25 bg-red-500/5 hover:bg-red-500/10"
+                          ? "border-destructive/70 bg-destructive/15 ring-1 ring-destructive/40"
+                          : "border-destructive/25 bg-destructive/5 hover:bg-destructive/10"
                         : marcado
-                          ? "border-emerald-500/70 bg-emerald-500/15 ring-1 ring-emerald-500/40"
-                          : "border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/10",
+                          ? "border-success/70 bg-success/15 ring-1 ring-success/40"
+                          : "border-success/25 bg-success/5 hover:bg-success/10",
                     )}
                   >
                     <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors",
                       negativo
-                        ? marcado ? "bg-red-500 text-white" : "bg-red-500/15 text-red-400"
-                        : marcado ? "bg-emerald-500 text-white" : "bg-emerald-500/15 text-emerald-500")}>
+                        ? marcado ? "bg-destructive text-destructive-foreground" : "bg-destructive/15 text-destructive"
+                        : marcado ? "bg-success text-success-foreground" : "bg-success/15 text-success")}>
                       {marcado
                         ? <Check className="h-3.5 w-3.5" />
                         : negativo ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
@@ -122,7 +122,7 @@ export default function FeedbackDialog({
                       <span className="block truncate text-[11px] text-muted-foreground">{t.ayuda}</span>
                     </span>
                     <span className={cn("shrink-0 text-xs font-bold tabular-nums",
-                      negativo ? "text-red-400" : "text-emerald-500")}>
+                      negativo ? "text-destructive" : "text-success")}>
                       {t.puntos > 0 ? "+" : ""}{t.puntos}
                     </span>
                   </button>
@@ -153,7 +153,7 @@ export default function FeedbackDialog({
               {seleccion.length > 0 && (
                 <>
                   <span className={cn("text-xs font-semibold tabular-nums",
-                    puntosElegidos < 0 ? "text-red-400" : puntosElegidos > 0 ? "text-emerald-500" : "text-muted-foreground")}>
+                    puntosElegidos < 0 ? "text-destructive" : puntosElegidos > 0 ? "text-success" : "text-muted-foreground")}>
                     {puntosElegidos > 0 ? "+" : ""}{puntosElegidos} a la nota del {fechaCorta}
                   </span>
                   <button type="button" onClick={() => setSeleccion([])}
@@ -184,7 +184,7 @@ export default function FeedbackDialog({
                   return (
                     <li key={f.id} className="flex items-center gap-3 px-3 py-2">
                       <span className={cn("w-10 shrink-0 text-center text-xs font-bold tabular-nums",
-                        negativo ? "text-red-400" : "text-emerald-500")}>
+                        negativo ? "text-destructive" : "text-success")}>
                         {Number(f.puntos) > 0 ? "+" : ""}{Number(f.puntos)}
                       </span>
                       <div className="min-w-0 flex-1">

@@ -134,7 +134,7 @@ const BluUnmatchedManager = () => {
                         {/* La agencia la sella el bridge según con qué token trajo la
                             cuenta: si dice algo, la creadora es nuestra y falta en Maven. */}
                         {o.agency ? (
-                          <span className="rounded-full border border-emerald-500/30 px-2 py-0.5 text-[10px] capitalize text-emerald-500">
+                          <span className="rounded-full border border-success/30 px-2 py-0.5 text-[10px] capitalize text-success">
                             {o.agency}
                           </span>
                         ) : (

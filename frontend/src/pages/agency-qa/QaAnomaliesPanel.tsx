@@ -12,7 +12,7 @@ import { periodLabel } from "./chatters-qa/useChatterScorecards";
 const TIPO_META: Record<AnomalyTipo, { label: string; tone: string; icon: any }> = {
   baja_actividad: { label: "Online inactivo", tone: "bg-destructive/15 text-destructive",  icon: Activity },
   dia_corto:      { label: "Jornada corta",   tone: "bg-warning/15 text-warning", icon: Hourglass },
-  dia_largo:      { label: "Jornada larga",   tone: "bg-sky-500/15 text-sky-600",     icon: Timer },
+  dia_largo:      { label: "Jornada larga",   tone: "bg-primary/15 text-primary",     icon: Timer },
 };
 
 const relativeTime = (iso: string | null): string => {
@@ -66,7 +66,7 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <ShieldAlert className="h-4 w-4 text-amber-500" /> Anomalías de actividad
+            <ShieldAlert className="h-4 w-4 text-warning" /> Anomalías de actividad
           </h3>
           <p className="text-sm text-muted-foreground">
             Días que merecen una mirada — {stats && periodLabel(stats.period)}.

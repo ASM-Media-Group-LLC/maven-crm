@@ -176,7 +176,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
       )}
 
       {truncated && (
-        <p className="rounded-2xl bg-amber-500/10 px-4 py-2.5 text-sm text-muted-foreground">
+        <p className="rounded-2xl bg-warning/10 px-4 py-2.5 text-sm text-muted-foreground">
           El correo es muy largo y se muestra recortado.
         </p>
       )}

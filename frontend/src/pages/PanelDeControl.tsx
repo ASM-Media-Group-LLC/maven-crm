@@ -867,15 +867,15 @@ const PanelDeControl = () => {
       gradient: "bg-primary",
       hint: (
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300 tabular-nums">
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 ring-1 ring-success/30 px-2 py-0.5 text-[10px] font-bold text-success tabular-nums">
             Nuevas
-            <span className="text-emerald-100 font-extrabold">
+            <span className="text-success font-extrabold">
               {k.leadsNuevas.toLocaleString("es")}
             </span>
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 ring-1 ring-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-amber-300 tabular-nums">
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 ring-1 ring-warning/30 px-2 py-0.5 text-[10px] font-bold text-warning tabular-nums">
             Existentes
-            <span className="text-amber-100 font-extrabold">
+            <span className="text-warning font-extrabold">
               {k.leadsExistentes.toLocaleString("es")}
             </span>
           </span>
@@ -1161,16 +1161,16 @@ const PanelDeControl = () => {
           const balance = k.crmAltas - k.crmBajas;
           const glowColor =
             balance > 0
-              ? "bg-emerald-500"
+              ? "bg-success"
               : balance < 0
-                ? "bg-rose-500"
-                : "bg-orange-500";
+                ? "bg-destructive"
+                : "bg-warning";
           const borderHover =
             balance > 0
-              ? "hover:border-emerald-500/50 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.35)]"
+              ? "hover:border-success/50 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.35)]"
               : balance < 0
-                ? "hover:border-rose-500/50 hover:shadow-[0_0_24px_-4px_rgba(244,63,94,0.35)]"
-                : "hover:border-orange-500/50 hover:shadow-[0_0_24px_-4px_rgba(249,115,22,0.35)]";
+                ? "hover:border-destructive/50 hover:shadow-[0_0_24px_-4px_rgba(244,63,94,0.35)]"
+                : "hover:border-warning/50 hover:shadow-[0_0_24px_-4px_rgba(249,115,22,0.35)]";
           return (
         <button
           type="button"
@@ -1194,11 +1194,11 @@ const PanelDeControl = () => {
                 <Skeleton className="mt-1 h-9 w-32" />
               ) : (
                 <div className="flex items-baseline gap-4 mt-1 tabular-nums">
-                  <span className="flex items-center text-emerald-500 text-2xl font-bold">
+                  <span className="flex items-center text-success text-2xl font-bold">
                     <ArrowUp className="h-5 w-5 mr-0.5" />
                     {k.crmAltas.toLocaleString("es")}
                   </span>
-                  <span className="flex items-center text-rose-500 text-2xl font-bold">
+                  <span className="flex items-center text-destructive text-2xl font-bold">
                     <ArrowDown className="h-5 w-5 mr-0.5" />
                     {k.crmBajas.toLocaleString("es")}
                   </span>
@@ -1210,10 +1210,10 @@ const PanelDeControl = () => {
                 const balance = k.crmAltas - k.crmBajas;
                 const tone =
                   balance > 0
-                    ? "bg-emerald-500/15 ring-emerald-400/30 text-emerald-300"
+                    ? "bg-success/15 ring-success/30 text-success"
                     : balance < 0
-                      ? "bg-rose-500/15 ring-rose-400/30 text-rose-300"
-                      : "bg-orange-500/15 ring-orange-400/30 text-orange-300";
+                      ? "bg-destructive/15 ring-destructive/30 text-destructive"
+                      : "bg-warning/15 ring-warning/30 text-warning";
                 const sign = balance > 0 ? "+" : "";
                 return (
                   <div className="mt-1.5">

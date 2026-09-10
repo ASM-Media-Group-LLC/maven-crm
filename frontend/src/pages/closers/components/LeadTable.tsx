@@ -565,13 +565,13 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   }
 
   const trigger = channels.length === 1 ? (
-    <Button variant="ghost" size="sm" className="h-7 w-7 justify-center p-0 text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp" onClick={() => open(channels[0].id)}>
+    <Button variant="ghost" size="sm" className="h-7 w-7 justify-center p-0 text-whatsapp hover:text-whatsapp/80" disabled={busy} title="WhatsApp" onClick={() => open(channels[0].id)}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WhatsAppIcon className="h-3.5 w-3.5" />}
     </Button>
   ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 gap-0.5 px-1.5 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} title="WhatsApp">
+        <Button variant="ghost" size="sm" className="h-7 gap-0.5 px-1.5 text-xs text-whatsapp hover:text-whatsapp/80" disabled={busy} title="WhatsApp">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WhatsAppIcon className="h-3.5 w-3.5" />} <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -699,7 +699,7 @@ const LeadContactButtons = ({ leadId, source, resolvedPhone, onlyfansUrl }: { le
       closerCreatorId={source === "closer" ? leadId : null}
       phone={resolvedPhone}
       compact
-      className="h-7 gap-0.5 px-1.5 text-xs text-sky-600 hover:text-sky-700"
+      className="h-7 gap-0.5 px-1.5 text-xs text-telegram hover:text-telegram/80"
     />
     <OfLink url={onlyfansUrl} />
   </div>

@@ -159,16 +159,16 @@ export default function GrabacionesPage() {
         <StatChip
           label="Vencen esta semana"
           value={usage ? String(usage.expiring_next_week) : "—"}
-          color={usage && usage.expiring_next_week > 0 ? "bg-amber-500" : "bg-muted-foreground/40"}
+          color={usage && usage.expiring_next_week > 0 ? "bg-warning" : "bg-muted-foreground/40"}
           icon={<Clock className="h-3.5 w-3.5" />}
           className={cn(
             "col-span-2 sm:col-span-1",
-            !!usage && usage.expiring_next_week > 0 && "border-amber-500/30 bg-amber-500/10",
+            !!usage && usage.expiring_next_week > 0 && "border-warning/30 bg-warning/10",
           )}
         />
       </div>
 
-      <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-700 dark:text-amber-300">
+      <div className="flex items-start gap-2 rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-[13px] leading-snug text-warning">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitas
@@ -276,7 +276,7 @@ export default function GrabacionesPage() {
               <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                 <div className={cn(
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                  r.source === "meet" ? "bg-primary/10 text-primary" : "bg-violet-500/10 text-violet-500",
+                  r.source === "meet" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent",
                 )}>
                   {r.source === "meet" ? <Video className="h-5 w-5" /> : <Users2 className="h-5 w-5" />}
                 </div>
@@ -285,8 +285,8 @@ export default function GrabacionesPage() {
                   <div className="flex items-center gap-2">
                     <span className="truncate font-semibold text-foreground">{r.title || r.room_name}</span>
                     {r.status === "recording" && (
-                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-500">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> En curso
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" /> En curso
                       </span>
                     )}
                     {r.status === "processing" && (
@@ -304,7 +304,7 @@ export default function GrabacionesPage() {
                       <>
                         <span>·</span>
                         <span className={cn(
-                          dias <= 2 ? "font-semibold text-destructive" : dias <= 7 ? "font-medium text-amber-600 dark:text-amber-400" : "",
+                          dias <= 2 ? "font-semibold text-destructive" : dias <= 7 ? "font-medium text-warning" : "",
                         )}>
                           {dias <= 0 ? "vence hoy" : `vence en ${dias} ${dias === 1 ? "día" : "días"}`}
                         </span>

@@ -170,9 +170,9 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
       {/* Leyenda */}
       <p className="text-[11px] text-muted-foreground">
         <span className="font-medium text-foreground/80">Estado:</span>{" "}
-        <span className="text-rose-500">● Sin gestión</span> (≥75% de sus leads asignados vencidos) ·{" "}
-        <span className="text-amber-500">● Atrasado</span> (algunos leads con contacto vencido por cadencia) ·{" "}
-        <span className="text-emerald-500">● Al día</span> (sin vencidos).{"  "}
+        <span className="text-destructive">● Sin gestión</span> (≥75% de sus leads asignados vencidos) ·{" "}
+        <span className="text-warning">● Atrasado</span> (algunos leads con contacto vencido por cadencia) ·{" "}
+        <span className="text-success">● Al día</span> (sin vencidos).{"  "}
         <span className="font-medium text-foreground/80">Auto</span> = contacto registrado solo al escribir desde la bandeja WA/TG.
       </p>
 
@@ -213,7 +213,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                       <TableCell><Badge variant={meta.variant} className="whitespace-nowrap">{meta.label}</Badge></TableCell>
                       <TableCell className="font-medium">{r.employee_name}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{r.leads_assigned}</TableCell>
-                      <TableCell className={cn("text-right font-semibold tabular-nums", r.leads_overdue > 0 ? "text-rose-500" : "text-muted-foreground")}>
+                      <TableCell className={cn("text-right font-semibold tabular-nums", r.leads_overdue > 0 ? "text-destructive" : "text-muted-foreground")}>
                         {r.leads_overdue || "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{r.leads_touched}</TableCell>
@@ -284,7 +284,7 @@ const EmployeeActivityDetail = ({
             {stats.map((s) => (
               <div key={s.label} className="text-right">
                 <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className={cn("text-lg font-bold tabular-nums leading-tight", s.danger && "text-rose-500")}>{s.value}</p>
+                <p className={cn("text-lg font-bold tabular-nums leading-tight", s.danger && "text-destructive")}>{s.value}</p>
               </div>
             ))}
           </div>
@@ -328,7 +328,7 @@ const EmployeeActivityDetail = ({
                     return (
                       <div key={c.contact_id} className="flex gap-3">
                         <div className="flex flex-col items-center">
-                          <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-border bg-background", c.is_auto ? "text-amber-500" : "text-muted-foreground")}>
+                          <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-border bg-background", c.is_auto ? "text-warning" : "text-muted-foreground")}>
                             <Icon className="h-3.5 w-3.5" />
                           </div>
                           {idx < dayRows.length - 1 && <div className="min-h-[16px] w-px flex-1 bg-border" />}
@@ -355,7 +355,7 @@ const EmployeeActivityDetail = ({
                             {c.result && <Badge variant={resultVariant(c.result)} className="h-5 text-[11px]">{c.result}</Badge>}
                             {c.lead_stage && c.lead_stage !== "Asignada" && <Badge variant="outline" className="h-5 text-[11px]">{c.lead_stage}</Badge>}
                             {c.lead_category && <span className="text-[11px] text-muted-foreground">cat. {c.lead_category}</span>}
-                            {money && <span className="text-[11px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{money}</span>}
+                            {money && <span className="text-[11px] font-medium tabular-nums text-success">{money}</span>}
                           </div>
                           {showNote && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{c.notes}</p>}
                         </div>

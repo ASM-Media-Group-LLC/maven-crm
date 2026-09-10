@@ -230,8 +230,8 @@ const PromologEntryDetailDialog = ({
             );
             const promo = promoDate ? byDate[promoDate] : undefined;
             return (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-                <p className="text-xs text-amber-400 font-semibold">
+              <div className="rounded-md border border-warning/30 bg-warning/5 p-3 space-y-2">
+                <p className="text-xs text-warning font-semibold">
                   Ingresos (BLU) · alrededor de la promo
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -240,7 +240,7 @@ const PromologEntryDetailDialog = ({
                     return (
                       <div
                         key={e.date}
-                        className={`rounded-md px-2.5 py-1.5 text-center border ${isPromo ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-muted/30"}`}
+                        className={`rounded-md px-2.5 py-1.5 text-center border ${isPromo ? "border-warning/60 bg-warning/10" : "border-border bg-muted/30"}`}
                       >
                         <div className="text-[10px] text-muted-foreground">
                           {fmtDay(e.date)}{isPromo ? " · promo" : ""}
@@ -328,9 +328,9 @@ const PromologEntryDetailDialog = ({
           {/* AI reasoning + confidence — solo si fue analizada por el pipeline
               automático y NO hay galería (la galería ya muestra el reasoning por story). */}
           {!(dayNetworks && dayNetworks.length > 0) && !showStoryGallery && entry.ai_reasoning && (
-            <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-blue-400 font-semibold">Análisis AI</p>
+                <p className="text-xs text-primary font-semibold">Análisis AI</p>
                 {entry.ai_confidence != null && (
                   <Badge variant="secondary-soft" className="text-[10px] tabular-nums">
                     Confianza: {(entry.ai_confidence * 100).toFixed(0)}%

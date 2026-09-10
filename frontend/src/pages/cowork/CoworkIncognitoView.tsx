@@ -82,13 +82,13 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Barra de estado: que el ADMIN nunca dude en qué modo está. */}
-      <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-violet-500/10 border-b border-violet-500/20">
-        <VenetianMask className="h-5 w-5 text-violet-500 shrink-0" />
+      <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-accent/10 border-b border-accent/20">
+        <VenetianMask className="h-5 w-5 text-accent shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="font-semibold text-foreground">{sesion.name}</span>
           <span className="text-xs text-muted-foreground"> · Modo incógnito — nadie te ve ni te escucha (solo otro admin sabe que estás acá)</span>
           {sesion.incognito.length > 0 && (
-            <span className="block text-xs text-violet-500 truncate">
+            <span className="block text-xs text-accent truncate">
               🕶 También de incógnito: {sesion.incognito.join(", ")}
             </span>
           )}
@@ -116,7 +116,7 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
                   <div className="flex items-center gap-2 px-3 py-2">
                     <span className={`font-medium text-sm truncate flex-1 ${room.id === "hub" ? "text-amber-500" : "text-foreground"}`}>{room.name}</span>
                     {room.online != null && (
-                      <span className={`text-[11px] ${room.online > 0 ? "text-emerald-500 font-medium" : "text-muted-foreground"}`}>
+                      <span className={`text-[11px] ${room.online > 0 ? "text-success font-medium" : "text-muted-foreground"}`}>
                         {room.online} en línea
                       </span>
                     )}

@@ -73,7 +73,7 @@ export default function CorreoConectarPage() {
 
       {done && (
         <>
-          <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+          <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
           <h1 className="mt-5 text-2xl font-semibold tracking-tight">Correo conectado</h1>
           <p className="mt-2 text-muted-foreground">{done}</p>
           <Button className="mt-7" onClick={() => navigate("/correo")}>

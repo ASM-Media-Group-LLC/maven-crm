@@ -313,7 +313,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
                     // sincronice su propio estado/persistencia.
                     config.onIncomingAudioMutedChange?.(next);
                   }}
-                  className={`h-6 w-6 rounded-md flex items-center justify-center hover:bg-background/60 ${config.incomingAudioMuted ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-6 w-6 rounded-md flex items-center justify-center hover:bg-background/60 ${config.incomingAudioMuted ? "text-warning hover:text-warning/80" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {config.incomingAudioMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
                 </button>
@@ -372,7 +372,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
             setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
             config.onIncomingAudioMutedChange?.(next);
           }}
-          className={`fixed top-2 left-2 z-[200] h-8 w-8 rounded-full flex items-center justify-center bg-black/55 backdrop-blur-sm transition-colors ${config.incomingAudioMuted ? "text-amber-400 hover:text-amber-300" : "text-white/80 hover:text-white"}`}
+          className={`fixed top-2 left-2 z-[200] h-8 w-8 rounded-full flex items-center justify-center bg-black/55 backdrop-blur-sm transition-colors ${config.incomingAudioMuted ? "text-warning hover:text-warning/80" : "text-white/80 hover:text-white"}`}
         >
           {config.incomingAudioMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>,

@@ -379,7 +379,7 @@ export default function GroupMembersPanel({
                   <p className="text-[13px] truncate leading-tight">{reqName(req.user_id)}</p>
                   <p className="text-[11px] text-muted-foreground truncate leading-tight">Propuesto por {reqName(req.requested_by)}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-green-600 hover:text-green-700 hover:bg-green-500/10" onClick={() => approveRequest(req)} disabled={reqActing === req.id} title="Aprobar" aria-label={`Aprobar a ${reqName(req.user_id)}`}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-success hover:text-success hover:bg-success/10" onClick={() => approveRequest(req)} disabled={reqActing === req.id} title="Aprobar" aria-label={`Aprobar a ${reqName(req.user_id)}`}>
                   {reqActing === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-4 w-4" />}
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => rejectRequest(req)} disabled={reqActing === req.id} title="Rechazar" aria-label={`Rechazar a ${reqName(req.user_id)}`}>
@@ -488,7 +488,7 @@ export default function GroupMembersPanel({
                   />
                   <span className={cn(
                     "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
-                    online ? "bg-green-500" : "bg-muted-foreground/30"
+                    online ? "bg-success" : "bg-muted-foreground/30"
                   )} />
                 </div>
                 <div className="flex-1 min-w-0">

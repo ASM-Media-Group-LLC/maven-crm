@@ -129,10 +129,10 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
                   <TableCell className="text-right text-sm tabular-nums">
                     {row.total_tasks}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums text-emerald-400">
+                  <TableCell className="text-right text-sm tabular-nums text-success">
                     {row.completed_tasks}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums text-amber-400">
+                  <TableCell className="text-right text-sm tabular-nums text-warning">
                     {row.pending_tasks}
                   </TableCell>
                   <TableCell>
@@ -142,7 +142,7 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
                         className="h-1.5 flex-1 bg-muted/40"
                         indicatorClassName={
                           pct === 100
-                            ? "bg-emerald-500"
+                            ? "bg-success"
                             : pct >= 50
                             ? "bg-sky-500"
                             : "bg-primary"

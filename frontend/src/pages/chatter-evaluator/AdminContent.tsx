@@ -181,7 +181,7 @@ const ProfilesSection = () => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 if (!confirmDelete) return;
@@ -385,7 +385,7 @@ const CriteriaSection = () => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void handleConfirmedDelete();
@@ -411,7 +411,7 @@ const CriteriaSection = () => {
           <div className="space-y-3 py-2">
             <div>
               <Label htmlFor="crit_es" className="text-xs">
-                Etiqueta (ES) <span className="text-rose-400">*</span>
+                Etiqueta (ES) <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="crit_es"

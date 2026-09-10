@@ -1530,7 +1530,7 @@ const CallDetailPage = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Ver Instagram"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-instagram-pink via-instagram-purple to-instagram-orange text-white shadow-md transition-transform"
                       >
                         <InstagramIcon className="h-3.5 w-3.5" />
                       </a>
@@ -1817,7 +1817,7 @@ const ModelNameLink = ({
       href={targetUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="truncate text-2xl font-black tracking-tight transition-colors hover:text-pink-400"
+      className="truncate text-2xl font-black tracking-tight transition-colors hover:text-instagram-pink"
       title={isFallback ? `Buscar a ${name} en Instagram` : "Ver Instagram"}
     >
       {name}
@@ -1904,8 +1904,8 @@ const AudioWithCaptions = ({
         Tu navegador no soporta audio HTML5.
       </audio>
       {hasCaptions && (
-        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
-          <p className="mb-1.5 text-xs font-bold text-violet-400">
+        <div className="rounded-xl border border-accent/30 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent p-4">
+          <p className="mb-1.5 text-xs font-bold text-accent">
             Captions en vivo
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">
@@ -1922,7 +1922,7 @@ const AudioWithCaptions = ({
                     className={cn(
                       "transition-colors",
                       isActive
-                        ? "rounded bg-violet-500/30 px-1 font-semibold text-foreground"
+                        ? "rounded bg-accent/30 px-1 font-semibold text-foreground"
                         : "",
                     )}
                   >

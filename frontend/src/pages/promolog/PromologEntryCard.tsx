@@ -308,7 +308,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 onClick={() => setEditResult("si")}
                 className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                   editResult === "si"
-                    ? "bg-cyan-500 text-white"
+                    ? "bg-success text-success-foreground"
                     : "border border-input bg-background text-muted-foreground hover:bg-accent"
                 }`}
               >
@@ -320,7 +320,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 onClick={() => setEditResult("no")}
                 className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                   editResult === "no"
-                    ? "bg-blue-500 text-white"
+                    ? "bg-destructive text-destructive-foreground"
                     : "border border-input bg-background text-muted-foreground hover:bg-accent"
                 }`}
               >
@@ -443,7 +443,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
               Cancelar
             </Button>
             <Button
-              className="bg-cyan-500 hover:bg-cyan-600 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={() => {
                 setEditOpen(false);
                 toast({ title: "Promoción actualizada", description: `Los cambios para ${entry.name} han sido guardados.` });

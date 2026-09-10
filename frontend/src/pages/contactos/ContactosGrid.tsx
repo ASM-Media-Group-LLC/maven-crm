@@ -126,7 +126,7 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
                     {(c as any).whatsapp && (
                       <WhatsAppLink
                         phone={(c as any).whatsapp}
-                        className="text-green-500 hover:text-green-400 transition-colors"
+                        className="text-whatsapp hover:text-whatsapp/80 transition-colors"
                         onClick={(e) => e.stopPropagation()}
                         hideForNonAdmin
                       >

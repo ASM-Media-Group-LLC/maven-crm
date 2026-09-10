@@ -395,7 +395,7 @@ const ChatterProfileEditContent = () => {
                     placeholder="https://…/avatar.png"
                   />
                   {form.avatar_url.includes("roleplaychatters.imaginehub.me") && (
-                    <p className="mt-1 text-[11px] text-amber-500/80">
+                    <p className="mt-1 text-[11px] text-warning/80">
                       ⚠ Este avatar todavía está alojado en el servidor anterior. Sube uno nuevo
                       para que pase a tu Storage propio.
                     </p>

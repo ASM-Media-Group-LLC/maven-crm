@@ -220,7 +220,7 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
             <div className="space-y-1.5">
               <Label>Precio (USD)</Label>
               <Input inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="200"
-                className={precioRaro ? "border-amber-500/60 focus-visible:ring-amber-500/40" : undefined} />
+                className={precioRaro ? "border-warning/60 focus-visible:ring-warning/40" : undefined} />
             </div>
             <div className="space-y-1.5">
               <Label>Pagado</Label>
@@ -229,15 +229,15 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
             <div className="space-y-1.5">
               <Label>Gasto del fan</Label>
               <Input inputMode="decimal" value={gastoFan} onChange={(e) => setGastoFan(e.target.value)} placeholder="5850"
-                className={gastoRaro ? "border-amber-500/60 focus-visible:ring-amber-500/40" : undefined} />
+                className={gastoRaro ? "border-warning/60 focus-visible:ring-warning/40" : undefined} />
             </div>
             {num(precio) != null && num(pagado) != null && saldo > 0 && (
-              <p className="col-span-3 text-[11px] text-amber-500">Saldo pendiente: ${saldo.toFixed(0)}</p>
+              <p className="col-span-3 text-[11px] text-warning">Saldo pendiente: ${saldo.toFixed(0)}</p>
             )}
             {/* Del sheet llegaron precios de "$5.500.000": si el monto es imposible
                 se avisa acá y el pedido queda marcado para revisar. */}
             {(precioRaro || gastoRaro) && (
-              <p className="col-span-3 text-[11px] text-amber-500">
+              <p className="col-span-3 text-[11px] text-warning">
                 ¿{precioRaro ? usd(num(precio)) : usd(num(gastoFan))}? Parece un error de tipeo
                 ({precioRaro ? `un personalizado ronda los $150; el techo son ${usd(TECHO_PRECIO)}` : `el techo del gasto del fan son ${usd(TECHO_GASTO_FAN)}`}).
                 Si lo guardás así, el pedido queda marcado como "monto por revisar".
@@ -266,7 +266,7 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
                     key={f.id}
                     type="button"
                     onClick={() => setFlags((cur) => on ? cur.filter((x) => x !== f.id) : [...cur, f.id])}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${on ? "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400" : "border-border text-muted-foreground hover:bg-muted"}`}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${on ? "bg-warning/15 border-warning/40 text-warning" : "border-border text-muted-foreground hover:bg-muted"}`}
                   >
                     {f.label}
                   </button>
