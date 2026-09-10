@@ -9,12 +9,12 @@ const radios = [
 ];
 
 const enRetirada = [
-  { vieja: "rounded-sm", px: "8px", nueva: "rounded-control" },
-  { vieja: "rounded-md", px: "10px", nueva: "rounded-control" },
-  { vieja: "rounded-lg", px: "12px", nueva: "rounded-panel" },
-  { vieja: "rounded-xl", px: "12px", nueva: "rounded-panel" },
-  { vieja: "rounded-2xl", px: "16px", nueva: "rounded-card" },
-  { vieja: "rounded-3xl", px: "24px", nueva: "rounded-card" },
+  { vieja: "rounded-sm", px: "8px", ahora: "8px", nueva: "rounded-control" },
+  { vieja: "rounded-md", px: "10px", ahora: "8px", nueva: "rounded-control" },
+  { vieja: "rounded-lg", px: "12px", ahora: "12px", nueva: "rounded-panel" },
+  { vieja: "rounded-xl", px: "12px", ahora: "12px", nueva: "rounded-panel" },
+  { vieja: "rounded-2xl", px: "16px", ahora: "16px", nueva: "rounded-card" },
+  { vieja: "rounded-3xl", px: "24px", ahora: "16px", nueva: "rounded-card" },
 ];
 
 export const BordersSection = () => (
@@ -45,7 +45,9 @@ export const BordersSection = () => (
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">En retirada</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        La escala por tamaño se migra en la fase 2 del rediseño. Equivalencias para el barrido:
+        La escala por tamaño quedó re-pineada a los tres radios en la configuración de Tailwind (corte 5 de la fase 2): sm y md
+        miden 8, lg y xl 12, 2xl y 3xl 16. Así nada se dibuja fuera del sistema aunque una pantalla vieja siga usando el nombre
+        viejo; los nombres se reemplazan por rol en cada pantalla que se toca. Equivalencias:
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm max-w-xl">
@@ -53,6 +55,7 @@ export const BordersSection = () => (
             <tr className="border-b border-border text-left">
               <th className="pb-2 pr-4 font-medium">Clase vieja</th>
               <th className="pb-2 pr-4 font-medium">Medía</th>
+              <th className="pb-2 pr-4 font-medium">Mide ahora</th>
               <th className="pb-2 font-medium">Pasa a</th>
             </tr>
           </thead>
@@ -61,6 +64,7 @@ export const BordersSection = () => (
               <tr key={r.vieja} className="border-b border-border/50">
                 <td className="py-2 pr-4 font-mono text-xs text-destructive line-through">{r.vieja}</td>
                 <td className="py-2 pr-4 text-muted-foreground">{r.px}</td>
+                <td className="py-2 pr-4 text-muted-foreground">{r.ahora}</td>
                 <td className="py-2 font-mono text-xs text-primary">{r.nueva}</td>
               </tr>
             ))}
