@@ -480,7 +480,9 @@ export default function ParrillaPage() {
       : <Badge variant="secondary">borrador</Badge>;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 min-h-0 flex-col">
+      {/* flex-1 min-h-0 (no h-full): la pantalla toma lo que queda debajo de la
+          barra superior en vez del 100 % de la columna, que empujaba la barra. */}
       {/* El tablero es un DOCUMENTO: paleta clara propia (tokens light fijados acá)
           aunque la app esté en dark mode — igual en pantalla, impresión y Gotenberg. */}
       <style>{`
@@ -516,23 +518,31 @@ export default function ParrillaPage() {
       `}</style>
 
       {/* Header */}
+      {/* Encabezado: el mismo aire que las demás pantallas (antes heredaba el
+          py-2 de la barra compacta y quedaba pegado a la barra superior). La
+          semana y su estado son el CONTEXTO de la pantalla, así que van bajo el
+          título; a la derecha quedan solo los botones, en una fila. */}
       <PageHeader
-        className="shrink-0 border-b px-4 py-2 print-hide"
+        className="shrink-0 border-b px-6 pt-5 pb-4 print-hide"
         icon={<CalendarRange />}
         title="Parrilla de contenido"
+        subtitle={
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <Select value={grid?.id ?? ""} onValueChange={handleSelectWeek}>
+              <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder="Semana" /></SelectTrigger>
+              <SelectContent>
+                {grids.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {g.status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {statusBadge}
+          </div>
+        }
         actions={
           <>
-          {statusBadge}
-          <Select value={grid?.id ?? ""} onValueChange={handleSelectWeek}>
-            <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder="Semana" /></SelectTrigger>
-            <SelectContent>
-              {grids.map((g) => (
-                <SelectItem key={g.id} value={g.id}>
-                  {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {g.status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm"><Palette className="mr-1 h-4 w-4" /> Tema</Button>
