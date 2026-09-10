@@ -154,8 +154,8 @@ export default function MeetPage() {
         debajo la fila para entrar con link o código, y las reuniones abiertas
         como lista de tarjetas. Antes Meet era una tarjeta angosta y centrada,
         con todo apilado, y al lado de Cowork parecía otro producto. */}
-    <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6">
-      <div className="w-full max-w-3xl rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+    <div className="flex flex-col gap-6 p-4 md:p-6">
+      <div className="w-full rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
         <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 md:h-12 md:w-12">
             <Video className="h-7 w-7 text-primary md:h-6 md:w-6" />
@@ -200,7 +200,7 @@ export default function MeetPage() {
       </div>
 
       {!loading && myRooms.length > 0 && (
-        <div className="w-full max-w-3xl flex flex-col gap-2">
+        <div className="w-full flex flex-col gap-2">
           <h2 className="text-xs font-semibold text-muted-foreground px-1">
             Tus reuniones abiertas · {myRooms.length}
           </h2>

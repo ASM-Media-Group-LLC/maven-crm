@@ -1181,7 +1181,7 @@ const SpammerDetailDialog = ({
             </div>
 
             <p className="text-sm leading-relaxed">
-              <span className="text-xs font-bold text-accent mr-2">Resumen</span>
+              <span className="text-xs font-bold text-violet-400 mr-2">Resumen</span>
               {a.summary}
             </p>
 

@@ -57,7 +57,7 @@ export default function ChatterQaNotifications() {
   const filtered = (usersQ.data ?? []).filter((u) => !pickerFilter.trim() || (u.full_name ?? "").toLowerCase().includes(pickerFilter.toLowerCase()));
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
         A quién se le manda el QA. Los botones <b>Enviar email</b> (en el reporte) y <b>Reenviar QA</b> (en la lista) usan estos destinatarios. Los switches gobiernan el aviso automático cuando termine el borrador IA.
       </p>
