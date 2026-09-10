@@ -75,15 +75,21 @@ export default {
         "instagram-orange": "hsl(var(--instagram-orange))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        // Los tres radios del sistema (rediseño 09/2026): se declaran por rol,
-        // no por tamaño. `rounded-full` sigue para chips y avatares. La escala
-        // sm/md/lg/xl/2xl/3xl queda en retirada: ver /design-system → Radios.
+        // Los tres radios del sistema (rediseño 09/2026), declarados por rol:
+        // control 8 px, panel 12 px, card 16 px; `rounded-full` para chips y avatares.
         control: "0.5rem",
         panel: "0.75rem",
         card: "1rem",
+        // La escala por tamaño queda RE-PINEADA a esos tres valores (fase 2, corte 5):
+        // así nada se dibuja fuera del sistema aunque una pantalla vieja siga usando
+        // el nombre viejo. sm y md = control (md medía 10), lg y xl = panel,
+        // 2xl y 3xl = card (3xl medía 24). Las pantallas nuevas usan los nombres por rol.
+        sm: "0.5rem",
+        md: "0.5rem",
+        lg: "0.75rem",
+        xl: "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1rem",
       },
       fontFamily: {
         // Fuente display del reskin — solo títulos/números grandes vía
