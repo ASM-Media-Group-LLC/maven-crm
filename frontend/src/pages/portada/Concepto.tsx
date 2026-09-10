@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import { BookOpen, Brain, Check, ChevronRight, Clock, Plug, Settings, Star, Zap } from "lucide-react";
 import "./portada.css";
@@ -59,10 +60,7 @@ export default function Concepto() {
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none" }}>
             <i style={{ width: 26, height: 26 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff"
-                strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 19V7l8 7 8-7v12" />
-              </svg>
+              <MarcaM alto="12px" />
             </i>
             Maven
           </Link>

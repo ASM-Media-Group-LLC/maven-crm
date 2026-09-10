@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import "./portada.css";
 import { SKINS, tokensDe } from "./skins";
@@ -18,9 +19,7 @@ export default function Privacidad() {
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none", color: "inherit" }}>
             <i style={{ width: 22, height: 22 }}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 19V7l8 7 8-7v12" />
-              </svg>
+              <MarcaM alto="10px" />
             </i>
             Maven
           </Link>
