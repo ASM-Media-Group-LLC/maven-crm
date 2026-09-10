@@ -15,6 +15,11 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
  */
 export const FAB_SIZE = 56; // h-14 w-14
 export const MARGIN = 8; // margen mínimo al borde de la ventana
+/** Ancla dentro de la pila del muelle (arriba de la nubecita del Messenger)
+ *  donde otras pantallas pueden colgar un botón por portal. Hoy lo usa el
+ *  Supervisor Hub de Cowork cuando está minimizado: así el «Hub» queda
+ *  siempre en el mismo lugar y sigue al muelle si lo arrastran. */
+export const MUELLE_EXTRA_ID = "muelle-flotante-extra";
 const DEFAULT_GAP = 24; // bottom-6 right-6
 const DRAG_THRESHOLD = 5; // px de movimiento para considerar "arrastre" (vs click)
 

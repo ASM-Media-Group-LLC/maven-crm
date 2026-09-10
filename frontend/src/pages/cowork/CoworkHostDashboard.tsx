@@ -44,6 +44,7 @@ import CoworkPausasDialog from "./CoworkPausasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -1135,6 +1136,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const isMobile = useIsMobile();
   const [salaEnHoja, setSalaEnHoja] = useState<string | null>(null);
 
+  // Dónde colgar el botón «Hub» cuando el hub está minimizado: en la pila del
+  // muelle flotante (encima de la nubecita del Messenger), que es lo que la
+  // gente ya sabe dónde está. Antes quedaba donde hubiera quedado la ventana
+  // al arrastrarla, o sea en cualquier lado. Se busca al minimizar (el muelle
+  // vive por encima del router, así que ya está en el DOM), y si no hay
+  // muelle (sin Messenger ni Clari) el botón cae abajo a la derecha.
+  const [anclaMuelle, setAnclaMuelle] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setAnclaMuelle(hubMinimized ? document.getElementById(MUELLE_EXTRA_ID) : null);
+  }, [hubMinimized, isMobile]);
+
   const minutosTexto = (seg: number) => (seg < 60 ? `${seg} s` : `${Math.floor(seg / 60)} min`);
 
   type Etiqueta = { key: string; texto: string; tono: "warning" | "destructive" | "muted"; icono: LucideIcon };
@@ -1987,23 +1999,30 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {/* Ventanita del Hub DENTRO de Maven (cuando NO está en ventana flotante).
           Arrastrable, redimensionable por la esquina, y con pop-out a ventana del SO. */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
+        <>
+          {hubMinimized && (() => {
+            const boton = (
+              <Button
+                variant="secondary"
+                size="sm"
+                className={cn("gap-1.5 shadow-lg border border-border/60 bg-card/85 backdrop-blur-xl hover:bg-muted text-foreground rounded-full", salaEnHoja && "invisible")}
+                title="Volver a mostrar el Supervisor Hub"
+                onClick={() => setHubMinimized(false)}
+              >
+                <Headphones className="h-3.5 w-3.5" />
+                Hub
+              </Button>
+            );
+            return anclaMuelle
+              ? createPortal(boton, anclaMuelle)
+              : <div className={`fixed right-4 bottom-4 tactil:bottom-24 ${hubPinned ? "z-[120]" : "z-30"}`}>{boton}</div>;
+          })()}
         <div
-          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${salaEnHoja ? "invisible" : ""} ${
-            hubPos && !hubMaximized ? "" : hubMinimized ? "bottom-4 right-4 tactil:bottom-24" : "bottom-4 right-4"
+          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${salaEnHoja || hubMinimized ? "invisible" : ""} ${
+            hubPos && !hubMaximized ? "" : "bottom-4 right-4"
           }`}
           style={hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
         >
-          {hubMinimized && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-1.5 shadow-lg border border-border/60 bg-card/85 backdrop-blur-xl hover:bg-muted text-foreground rounded-full"
-              onClick={() => setHubMinimized(false)}
-            >
-              <Headphones className="h-3.5 w-3.5" />
-              Hub
-            </Button>
-          )}
           <div
             ref={hubPanelRef}
             className={`relative rounded-2xl border border-border/60 bg-card/85 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col ${
@@ -2097,6 +2116,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Reglas de la sesión (qué alertas existen y cuándo se escala al
