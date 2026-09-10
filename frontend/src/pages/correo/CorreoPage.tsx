@@ -715,7 +715,7 @@ export default function CorreoPage() {
               <p className="text-sm text-muted-foreground">Elige un correo para leerlo.</p>
             </div>
           ) : mensaje.isLoading ? (
-            <div className="w-full max-w-3xl space-y-4 px-4 py-6 sm:px-6 2xl:max-w-4xl">
+            <div className="w-full space-y-4 px-4 py-6 sm:px-6">
               <Skeleton className="h-7 w-3/4" />
               <div className="flex items-center gap-3">
                 <Skeleton className="h-11 w-11 rounded-full" />
@@ -736,7 +736,7 @@ export default function CorreoPage() {
               {/* Alineado a la IZQUIERDA, no centrado: en un monitor ancho el
                   correo quedaba flotando en el medio con dos gutters enormes.
                   Se le da un poco más de ancho recién en pantallas 2xl. */}
-              <article className="w-full max-w-3xl px-4 py-6 sm:px-6 2xl:max-w-4xl">
+              <article className="w-full px-4 py-6 sm:px-6">
                 <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
                   {mensaje.data.subject}
                 </h2>

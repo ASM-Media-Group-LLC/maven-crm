@@ -1904,8 +1904,8 @@ const AudioWithCaptions = ({
         Tu navegador no soporta audio HTML5.
       </audio>
       {hasCaptions && (
-        <div className="rounded-xl border border-accent/30 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent p-4">
-          <p className="mb-1.5 text-xs font-bold text-accent">
+        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
+          <p className="mb-1.5 text-xs font-bold text-violet-400">
             Captions en vivo
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">
@@ -1922,7 +1922,7 @@ const AudioWithCaptions = ({
                     className={cn(
                       "transition-colors",
                       isActive
-                        ? "rounded bg-accent/30 px-1 font-semibold text-foreground"
+                        ? "rounded bg-violet-500/30 px-1 font-semibold text-foreground"
                         : "",
                     )}
                   >

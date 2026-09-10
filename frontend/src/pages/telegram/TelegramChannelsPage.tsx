@@ -119,7 +119,7 @@ const TelegramChannelsPage = () => {
   );
 
   return (
-    <div className="space-y-5 px-6 py-5 max-w-3xl">
+    <div className="space-y-5 px-6 py-5">
       {/* Header */}
       <PageHeader
         icon={<TelegramIcon />}

@@ -260,12 +260,12 @@ export default function CoworkPage() {
   if (!sessionId) {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto">
-      <div className="min-h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         {/* Encabezado de la pantalla: va ARRIBA y las listas de salas abajo
             (pedido de Jhon, 03/09/2026). Al dejar de ser un pie se le bajó el
             alto: si no, en un portátil el título se comía la pantalla y había
             que scrollear para ver a qué sala entrar. */}
-        <div className="w-full max-w-3xl rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+        <div className="w-full rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
           {/* En pantalla ancha el encabezado es una FILA (icono + título a la
               izquierda, acciones a la derecha): en columna se comía media
               pantalla y había que scrollear para ver las salas. En móvil se
@@ -334,10 +334,11 @@ export default function CoworkPage() {
             que faltaban sesiones. Ahora los admins ven TODAS acá, con su rol en
             cada una; el resto ve las suyas. Las finalizadas van al final. */}
         {!loadingSessions && filasActivas.length > 0 && (
-          <div className="w-full max-w-3xl flex flex-col gap-2">
+          <div className="w-full flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-muted-foreground px-1">
               Sesiones activas{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
+            <div className="flex flex-col gap-2">
             {filasActivas.map((s) => (
               <div
                 key={s.id}
@@ -359,7 +360,7 @@ export default function CoworkPage() {
                         </span>
                       )}
                       {s.incognito.length > 0 && (
-                        <span className="text-accent" title="Solo los admins ven esto">
+                        <span className="text-violet-500" title="Solo los admins ven esto">
                           {" "}· 🕶 {s.incognito.join(", ")}
                         </span>
                       )}
@@ -396,7 +397,7 @@ export default function CoworkPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="rounded-full gap-1 shrink-0 text-accent hover:text-accent/80"
+                        className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
                         title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
                         onClick={() => setSearchParams({ session: s.id, spy: "1" })}
                       >
@@ -455,6 +456,7 @@ export default function CoworkPage() {
                 )}
               </div>
             ))}
+            </div>
           </div>
         )}
 
@@ -462,10 +464,11 @@ export default function CoworkPage() {
             las finalizadas de la empresa; el resto, las sesiones donde estuvo.
             Ventana de 10 días: lo más viejo se va solo (Jhon, 08/09). */}
         {finalizadas.length > 0 && (
-          <div className="w-full max-w-3xl flex flex-col gap-2">
+          <div className="w-full flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-muted-foreground px-1 flex items-center gap-1.5">
               <History className="h-3.5 w-3.5" /> Finalizadas recientemente <span className="font-normal normal-case tracking-normal">· últimos 10 días</span>
             </h2>
+            <div className="flex flex-col gap-2">
             {finalizadas.map((f) => (
               <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-2.5">
                 <div className="flex-1 min-w-0">
@@ -480,6 +483,7 @@ export default function CoworkPage() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
 

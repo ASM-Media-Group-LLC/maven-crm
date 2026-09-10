@@ -81,7 +81,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "high_potential",
       title: "Alto Potencial",
       icon: Zap,
-      bg: "bg-accent",
+      bg: "bg-violet-500",
       content: (
         <p className="text-3xl font-bold tabular-nums leading-tight mt-1">{data.highPotential.length}</p>
       ),

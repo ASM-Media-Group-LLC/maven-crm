@@ -148,7 +148,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   // puede Volver / navegar y le avisamos con un toast al terminar (useQaProcessingWatcher).
   if (row.status === "processing" || draft.isPending) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
         <div className="relative overflow-hidden rounded-2xl border border-white/10 p-10 text-center"
           style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.20), hsl(var(--accent) / 0.08) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.45)" }}>
@@ -195,7 +195,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   const tone = veredictoTone(veredicto);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="space-y-4">
       {/* ── Hero (gradiente + avatar + gauge de veredicto) ── */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5"
         style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.07) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.4)" }}>
