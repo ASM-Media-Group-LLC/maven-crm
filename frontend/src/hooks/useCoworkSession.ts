@@ -20,6 +20,10 @@ export interface CoworkSessionRow {
   updated_at: string;
   /** Reglas de alerta propias de la sesión. null/ausente = estándar. */
   alert_rules?: unknown;
+  /** Quién guardó las reglas por última vez. null = nadie las tocó (o volvió al estándar). */
+  alert_rules_updated_by?: string | null;
+  /** Cuándo. Aparte de `updated_at`, que también se mueve al renombrar la sesión. */
+  alert_rules_updated_at?: string | null;
   /** Quién la finalizó (auth user id). Lo escribe la edge en endSession. */
   ended_by?: string | null;
   /** Hasta cuándo vale el enlace de host. null = nunca emitido. */

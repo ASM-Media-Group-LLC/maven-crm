@@ -1380,10 +1380,21 @@ serve(async (req) => {
       if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
 
       const reglas = rules === null ? null : normalizarReglas(rules);
+      const ahora = new Date().toISOString();
+      // Queda registrado QUIÉN y CUÁNDO. Antes solo se movía `updated_at`, que
+      // también cambia al renombrar la sesión, así que no había forma de saber
+      // quién había apagado las alertas de una sala (Jhon, 09/09/2026).
+      // Al volver al estándar se limpia el autor: no hay nada personalizado que
+      // atribuirle a nadie.
       const { data: updated, error: upErr } = await admin.from("cowork_sessions")
-        .update({ alert_rules: reglas, updated_at: new Date().toISOString() })
+        .update({
+          alert_rules: reglas,
+          updated_at: ahora,
+          alert_rules_updated_by: reglas === null ? null : userId,
+          alert_rules_updated_at: reglas === null ? null : ahora,
+        })
         .eq("id", sessionId)
-        .select("id, alert_rules")
+        .select("id, alert_rules, alert_rules_updated_by, alert_rules_updated_at")
         .single();
       if (upErr) return err(req, upErr.message, 500);
       return json(req, { session: updated });

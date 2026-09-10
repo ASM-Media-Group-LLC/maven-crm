@@ -30,6 +30,9 @@ interface Props {
   /** Lo que la sesión tiene guardado HOY (ya normalizado). */
   reglas: ReglasCowork;
   nombreSesion: string;
+  /** Quién dejó estas reglas y cuándo. Vacío = nadie las tocó desde que se
+   *  registra (10/09/2026), o la sesión sigue el estándar. */
+  autoria?: { quien: string | null; cuando: string | null };
   /** Recibe lo que va a la base: null = volver al estándar. */
   onGuardar: (r: ReglasCowork | null) => Promise<unknown>;
 }
@@ -95,7 +98,18 @@ function resumenPausas(p: ReglaPausas): string {
   return `Baño ${p.banoMin} min/día · Break ${p.breakMin} min · ${supervisor}`;
 }
 
-export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreSesion, onGuardar }: Props) {
+/** "por Yoselin Castillo · 8 de sept", o null si no hay nada que decir. */
+export function firmaDeLasReglas(autoria?: { quien: string | null; cuando: string | null }): string | null {
+  if (!autoria?.quien && !autoria?.cuando) return null;
+  const cuando = autoria.cuando
+    ? new Date(autoria.cuando).toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+    : null;
+  if (autoria.quien && cuando) return `por ${autoria.quien} · ${cuando}`;
+  if (autoria.quien) return `por ${autoria.quien}`;
+  return `el ${cuando}`;
+}
+
+export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreSesion, autoria, onGuardar }: Props) {
   const [borrador, setBorrador] = useState<ReglasCowork>(reglas);
   const [guardando, setGuardando] = useState(false);
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
@@ -179,6 +193,14 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <p className="text-xs font-semibold text-primary">Reglas de esta sesión</p>
           <DialogTitle className="font-display text-[26px] leading-tight tracking-tight">{nombreSesion || "Esta sesión"}</DialogTitle>
           <DialogDescription>Aplican a todas las personas que entren a esta sesión, hoy y en adelante.</DialogDescription>
+          {/* Quién las dejó así. Antes no quedaba registro: Jhon vio cuatro
+              sesiones con las alertas apagadas y no había forma de saber quién
+              lo había hecho (09/09/2026). */}
+          {firmaDeLasReglas(autoria) && (
+            <p className="text-xs text-muted-foreground">
+              Personalizadas {firmaDeLasReglas(autoria)}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="px-7 space-y-2">

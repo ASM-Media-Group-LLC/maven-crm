@@ -2111,6 +2111,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         onOpenChange={setReglasOpen}
         reglas={reglas}
         nombreSesion={cowork.session?.name ?? ""}
+        autoria={{
+          // El nombre sale del mapa de perfiles que el hook ya trae para los
+          // miembros; quien cambió las reglas es host, así que está ahí.
+          quien: cowork.session?.alert_rules_updated_by
+            ? (cowork.profiles[cowork.session.alert_rules_updated_by] ?? null)
+            : null,
+          cuando: cowork.session?.alert_rules_updated_at ?? null,
+        }}
         onGuardar={(r) => cowork.updateAlertRules(r)}
       />
 
