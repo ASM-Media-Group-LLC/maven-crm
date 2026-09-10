@@ -95,7 +95,7 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
               <Resumen label="Con excesos" valor={String(data.totales.conExcesos)} alerta={data.totales.conExcesos > 0} />
             </div>
             <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-xs" data-testid="tabla-pausas">
+              <table className="tabla-movil w-full text-xs" data-testid="tabla-pausas">
                 <thead className="bg-muted/50 text-muted-foreground">
                   <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
                     <th>Persona</th>

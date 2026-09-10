@@ -165,7 +165,7 @@ function Masivos({ identityId, desde, hasta }: { identityId: string; desde: stri
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="tabla-movil w-full text-xs">
         <thead className="text-muted-foreground">
           <tr className="border-b border-border">
             <th className="py-1.5 pr-3 text-left font-medium">Día</th>
@@ -324,7 +324,7 @@ export default function ChatterRendimiento() {
           <EmptyState icon={Users} title="Sin chatters" description="No hay chatters activos para mostrar." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="tabla-movil w-full text-sm">
               <thead className="border-b border-border bg-secondary/50 text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2.5 pl-4 pr-3 text-left font-medium">Chatter</th>

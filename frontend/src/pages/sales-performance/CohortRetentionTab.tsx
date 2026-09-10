@@ -89,7 +89,7 @@ const CohortRetentionTab = ({ rows, maxOffset, loading, periodLabel }: Props) =>
 
           {/* Matriz heatmap */}
           <div className="rounded-xl border border-border overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
+            <table className="tabla-movil w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Cohorte</th>

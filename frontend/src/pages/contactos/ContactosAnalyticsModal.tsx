@@ -750,7 +750,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
                     <div>
                       <p className="text-xs text-muted-foreground mb-2 font-semibold">Ventas por Plataforma</p>
                       <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
+                        <table className="tabla-movil w-full text-sm">
                           <thead>
                             <tr className="border-b bg-muted/50">
                               <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Plataforma</th>
@@ -775,7 +775,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
                     <div>
                       <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
                       <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
+                        <table className="tabla-movil w-full text-sm">
                           <thead>
                             <tr className="border-b bg-muted/50">
                               <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>

@@ -80,7 +80,7 @@ export default function Equipo({ puedeGestionar, hoy = new Date() }: { puedeGest
         <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">Todavía no hay grupos de {agency === "plus" ? "Plus" : "Massive"}.</div>
       ) : (
         <div className="rounded-2xl border bg-card overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="tabla-movil w-full min-w-[920px] text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                 <th className="px-3 py-2.5 text-left font-medium w-[150px]">Grupo</th>

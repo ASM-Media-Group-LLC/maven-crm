@@ -68,7 +68,7 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
       </div>
 
       <div className="rounded-xl border border-border overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="tabla-movil w-full border-collapse text-sm">
           <thead>
             <tr className="bg-muted/50 text-muted-foreground">
               <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Creadora</th>

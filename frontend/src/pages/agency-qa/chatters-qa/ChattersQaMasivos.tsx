@@ -103,7 +103,7 @@ export default function ChattersQaMasivos() {
           )}
 
           <div className="overflow-x-auto rounded-2xl border border-white/[0.07] bg-white/[0.02] backdrop-blur-md">
-            <table className="w-full border-collapse text-sm">
+            <table className="tabla-movil w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-white/[0.03] text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">Copy</th>

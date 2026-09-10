@@ -214,7 +214,7 @@ const AdminApiKeys = () => {
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="tabla-movil w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Nombre</th>

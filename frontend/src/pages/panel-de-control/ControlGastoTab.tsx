@@ -353,7 +353,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="tabla-movil w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="py-2 pr-3">Fecha</th>
