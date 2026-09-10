@@ -421,7 +421,7 @@ const DashboardSidebar = () => {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="gap-0.5 px-2 py-1">
+      <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
         <CollapsibleSidebarGroup
           label={t("sidebar.menu")}
           storageKey="menu"
