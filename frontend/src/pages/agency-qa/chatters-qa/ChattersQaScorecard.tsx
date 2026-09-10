@@ -97,7 +97,7 @@ function CompanyTable({ company, rows, prevByName }: {
         <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold tabular-nums ${toneClass[pctTone(avg)]}`}>prom. {avg}%</span>
       </div>
       <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
+      <table className="tabla-movil w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-white/[0.06] text-xs text-muted-foreground">
             <th className="sticky left-0 z-10 bg-card/70 px-3 py-2 text-left font-medium backdrop-blur">Chatter</th>

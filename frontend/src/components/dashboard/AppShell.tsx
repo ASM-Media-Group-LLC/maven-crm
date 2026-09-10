@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import { instalarTablasMovil } from "@/lib/tablasMovil";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
 import { ChatProvider } from "@/hooks/ChatProvider";
@@ -58,6 +59,9 @@ const AppShell = () => {
   useEffect(() => {
     document.title = "Maven";
   }, []);
+  // Los <table> crudos (clase tabla-movil) se vuelven tarjetas en el teléfono;
+  // acá se les ponen los rótulos de columna. Ver lib/tablasMovil.ts.
+  useEffect(() => instalarTablasMovil(), []);
 
   const { popups } = useAnnouncementsByChannel();
   // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),

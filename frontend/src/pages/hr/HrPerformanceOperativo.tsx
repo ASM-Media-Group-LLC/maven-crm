@@ -80,7 +80,7 @@ export default function HrPerformanceOperativo() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               {tab === "chatters" && (
-                <table className="w-full min-w-[720px] text-sm">
+                <table className="tabla-movil w-full min-w-[720px] text-sm">
                   <Thead cols={["Chatter", "Horas", "Activ.", "Ventas", "Ingreso ag.", "Costo", "Margen", "ROI", ""]} />
                   <tbody>
                     {chatter.data?.map((r) => (
@@ -102,7 +102,7 @@ export default function HrPerformanceOperativo() {
               )}
 
               {tab === "closers" && (
-                <table className="w-full min-w-[680px] text-sm">
+                <table className="tabla-movil w-full min-w-[680px] text-sm">
                   <Thead cols={["Closer", "Horas", "Activ.", "Leads", "Cerradas", "Monetización", "USD/h", "QA", ""]} />
                   <tbody>
                     {closer.data?.map((r) => (
@@ -124,7 +124,7 @@ export default function HrPerformanceOperativo() {
               )}
 
               {tab === "llg" && (
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="tabla-movil w-full min-w-[520px] text-sm">
                   <Thead cols={["LLG", "Horas", "Activ.", "Leads", "Leads/h"]} />
                   <tbody>
                     {llg.data?.map((r) => (
@@ -142,7 +142,7 @@ export default function HrPerformanceOperativo() {
               )}
 
               {tab === "managers" && (
-                <table className="w-full min-w-[480px] text-sm">
+                <table className="tabla-movil w-full min-w-[480px] text-sm">
                   <Thead cols={["Manager", "Días", "Horas", "Actividad"]} />
                   <tbody>
                     {manager.data?.map((r) => (

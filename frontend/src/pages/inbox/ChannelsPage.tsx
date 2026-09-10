@@ -242,7 +242,7 @@ const ChannelsPage = () => {
             description="Crea uno con el nombre de su instancia de Evolution."
           />
         ) : (
-          <table className="w-full text-sm">
+          <table className="tabla-movil w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Canal</th>

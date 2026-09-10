@@ -89,7 +89,7 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="tabla-movil w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-4 py-3 text-left font-semibold">Persona</th>

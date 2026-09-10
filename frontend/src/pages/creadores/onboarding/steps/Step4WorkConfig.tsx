@@ -356,7 +356,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
+              <table className="tabla-movil w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="text-left p-2 font-medium">

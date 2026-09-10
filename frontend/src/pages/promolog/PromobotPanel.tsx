@@ -643,7 +643,7 @@ const PromobotPanel = () => {
           ) : (
             <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="tabla-movil w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
                     <th className="px-2 py-1.5 font-medium">Inicio</th>

@@ -146,7 +146,7 @@ const InboxAnalyticsPage = () => {
           <div>
             <p className="text-xs text-muted-foreground mb-2 font-semibold">Por closer</p>
             <div className="rounded-lg border overflow-x-auto">
-              <table className="w-full text-sm min-w-[520px]">
+              <table className="tabla-movil w-full text-sm min-w-[520px]">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
                     <th className="text-left p-2 font-semibold">Closer</th>
@@ -177,7 +177,7 @@ const InboxAnalyticsPage = () => {
           <div>
             <p className="text-xs text-muted-foreground mb-2 font-semibold">Por línea</p>
             <div className="rounded-lg border overflow-x-auto">
-              <table className="w-full text-sm min-w-[420px]">
+              <table className="tabla-movil w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
                     <th className="text-left p-2 font-semibold">Línea</th>

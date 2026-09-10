@@ -161,7 +161,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
           )}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-xs">
+            <table className="tabla-movil w-full min-w-[420px] text-xs">
               <thead className="text-xs text-muted-foreground">
                 <tr>
                   <th className="py-1 text-left font-semibold">Día</th>
