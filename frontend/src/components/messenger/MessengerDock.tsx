@@ -183,10 +183,13 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           return <Burbuja key={id} conversation={c} onOpen={() => abrirChat(id)} onClose={() => cerrar(id)} />;
         })}
 
-        {/* Ancla para lo que otras pantallas cuelgan encima de la nubecita
-            (el «Hub» minimizado de Cowork). `contents`: lo que llegue por
-            portal entra a la pila como un hijo más. */}
-        <div id={MUELLE_EXTRA_ID} className="contents" />
+        {/* Ancla para lo que otras pantallas cuelgan encima de la nubecita (el
+            «Hub» minimizado de Cowork). Mide lo mismo que una burbuja y nada de
+            alto: lo que llegue por portal se posiciona absoluto sobre ella y
+            NO ensancha la pila (con `contents` una píldora más ancha corría las
+            burbujas). `data-lado` dice de qué lado de la pantalla está el
+            muelle, para que lo colgado se alinee hacia adentro. */}
+        <div id={MUELLE_EXTRA_ID} data-lado={haciaIzquierda ? "derecha" : "izquierda"} className="relative h-0 w-14" />
       </div>
       )}
     </DockContext.Provider>
