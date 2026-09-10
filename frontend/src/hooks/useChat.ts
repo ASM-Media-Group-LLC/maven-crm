@@ -20,6 +20,7 @@ import { profileName } from "@/pages/messenger/utils";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
 import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
+import { queHacerConLaCarga } from "@/hooks/queHacerConLaCarga";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -89,16 +90,27 @@ export function useChat() {
     // contenido, no el estado visible.
     const primeraVez = cargadoParaRef.current !== user.id;
     if (primeraVez) setLoading(true);
+    // Si CUALQUIER petición de esta recarga falla, se aborta y la lista se
+    // queda como estaba. Antes un fallo de red se leía como "no tienes chats"
+    // y se borraba todo (Grace y Brayan, 10/09). Ver queHacerConLaCarga.
+    let abortada = false;
     try {
-      const { data: participations } = await supabase
+      const participaciones = await supabase
         .from("chat_participants")
         .select("conversation_id, last_read_at")
         .eq("user_id", user.id);
 
-      if (!participations || participations.length === 0) {
+      const veredicto = queHacerConLaCarga(participaciones);
+      if (veredicto === "abortar") {
+        console.error("[useChat] no pude cargar las participaciones:", participaciones.error?.message ?? "sin datos");
+        abortada = true;
+        return;
+      }
+      if (veredicto === "vaciar") {
         setConversations([]);
         return;
       }
+      const participations = participaciones.data as { conversation_id: string; last_read_at: string | null }[];
 
       const convIds = participations.map((p: any) => p.conversation_id);
       const lastReadMap: Record<string, string | null> = {};
@@ -122,13 +134,21 @@ export function useChat() {
         supabase.rpc("get_last_messages", { _user_id: user.id }),
       ]);
 
-      const convs = convsResult.data;
-      const allParticipants = allParticipantsResult.data;
-
-      if (!convs) {
-        setConversations([]);
+      // Las tres tienen que llegar. Si falla la de vistas previas y se siguiera
+      // igual, el filtro de abajo escondería todos los DMs que no creó uno
+      // (los toma por "sin mensajes"); si falla la de participantes, todo el
+      // mundo sale como "Usuario". Mejor no tocar nada y reintentar después.
+      const fallida = [convsResult, allParticipantsResult, lastMsgsResult].find(
+        (r) => queHacerConLaCarga(r as { error: unknown; data: unknown[] | null }) === "abortar",
+      );
+      if (fallida) {
+        console.error("[useChat] no pude cargar la lista:", fallida.error?.message ?? "sin datos");
+        abortada = true;
         return;
       }
+
+      const convs = convsResult.data!;
+      const allParticipants = allParticipantsResult.data;
 
       // Un chat sin mensajes simplemente no viene en la respuesta y se queda sin
       // vista previa, igual que antes.
@@ -192,7 +212,10 @@ export function useChat() {
       setConversations(visible);
       cargadoParaRef.current = user.id;
     } finally {
-      if (primeraVez) setLoading(false);
+      // Si la PRIMERA carga falló, se deja "Cargando…" en vez de un "Inicia una
+      // conversación" falso. El poll de 20 s y volver al primer plano vuelven a
+      // intentar, y ahí sí se apaga.
+      if (primeraVez && !abortada) setLoading(false);
     }
     // loadProfiles es estable (useCallback sin deps): va acá porque ahora se
     // usa adentro para reintentar cuando el mapa quedó vacío.
