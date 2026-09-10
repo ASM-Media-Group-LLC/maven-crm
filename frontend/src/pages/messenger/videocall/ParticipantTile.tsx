@@ -373,7 +373,9 @@ const ParticipantTile = memo(function ParticipantTile({
         <UserAvatar
           name={participant.name}
           size="xl"
-          className={cn("z-[1]", large ? "h-24 w-24" : "h-16 w-16")}
+          // En el recuadro chico (tira del teléfono, caritas de la ventana flotante)
+          // el avatar de 64 px se pisaba con el nombre (Jhon, 10/09).
+          className={cn("z-[1]", large ? "h-24 w-24" : compact ? "h-10 w-10" : "h-16 w-16")}
         />
       )}
 
@@ -511,9 +513,9 @@ const ParticipantTile = memo(function ParticipantTile({
       )}
 
       {/* Bottom bar */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2.5 py-1.5 z-10 bg-gradient-to-t from-black/50 to-transparent">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-white">
+      <div className={cn("absolute bottom-0 left-0 right-0 flex items-center justify-between z-10 bg-gradient-to-t from-black/50 to-transparent", compact ? "px-1.5 py-1" : "px-2.5 py-1.5")}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={cn("truncate font-medium text-white", compact ? "text-[10px]" : "text-xs")}>
             {participant.isLocal ? "Tú" : participant.name}
           </span>
           {participant.isMuted && (

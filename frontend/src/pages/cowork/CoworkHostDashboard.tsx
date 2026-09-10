@@ -1974,7 +1974,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </div>
                       )}
 
-                      {participants.length > 0 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
+                      {personas.length === 1 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
                         <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
                           {personas.map((p) => (
                             <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
@@ -1994,6 +1994,25 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       )}
 
                     </div>
+
+                    {/* Con dos o más personas los chips encimados tapaban el video de
+                        la tercera (Jhon, 10/09). Van listadas DEBAJO del video, cada una
+                        con su reloj; sobre el video solo queda quien está solo. */}
+                    {personas.length > 1 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
+                      <ul className="mx-2 mb-2 divide-y divide-border/40 rounded-xl bg-muted/30 px-2 md:mx-0 md:mb-0 md:rounded-none md:border-t md:border-border/40 md:bg-transparent md:px-3">
+                        {personas.map((p) => (
+                          <li key={p.uid} className="flex items-center gap-1.5 py-1 text-[11px]">
+                            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-muted-foreground/40")} />
+                            <span className="min-w-0 flex-1 truncate text-foreground/90">{p.nombre}</span>
+                            {p.reloj && (
+                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.motivo ? `Reloj detenido: ${p.motivo}` : "Reloj de hoy corriendo"}>
+                                {p.reloj}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
                     {/* Una fila: los cuatro controles de la sala y Entrar. Solo
                         en escritorio; en el teléfono viven en la hoja inferior. */}
@@ -2022,9 +2041,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
       {/* Sala activa a PANTALLA COMPLETA. Salir ("Volver al dashboard" o el rojo) la
           cuelga — sin ventanita de sala: la única miniatura es la del Hub, y los videos
-          de las salas ya se ven en vivo en las cards del dashboard. */}
+          de las salas ya se ven en vivo en las cards del dashboard.
+          En el teléfono ocupa toda la pantalla y deja libre la franja del reloj y la
+          batería (pt-safe): la barra de "Volver al dashboard" quedaba debajo (Jhon,
+          10/09). En escritorio, la ventana con margen de siempre. */}
       {activeRoomLk && activeRoomId && (
-        <div className="fixed inset-4 z-[110] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[110] flex flex-col overflow-hidden border-border bg-card pt-safe pb-safe md:inset-4 md:rounded-2xl md:border md:shadow-2xl">
           <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
             <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
               <DoorOpen className="h-3 w-3" />
@@ -2068,13 +2090,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialCamOn={false}
               getToken={getActiveRoomToken}
               leaveLabel="Colgar"
-              // Flechas + lista para saltar de SESIÓN sin volver al dashboard.
-              // Cambiar de sesión desmonta todo esto (la sala se cuelga sola)
-              // y llegás al Hub de la otra sesión con el micro apagado.
+              // Flechas + lista para moverse entre las SALAS de esta sesión sin
+              // volver al dashboard (Jhon, 10/09: cambiar de sesión se hace solo
+              // desde el Supervisor Hub). Moverse = "Entrar" a la otra: la actual
+              // se cuelga y a la nueva llegás con el micro apagado.
               roomSwitcher={{
-                rooms: sesionesNavegables,
-                currentId: cowork.session?.id ?? "",
-                onSwitch: cambiarDeSesion,
+                rooms: cowork.rooms.map((r) => ({ id: r.id, name: r.name })),
+                currentId: activeRoomId,
+                onSwitch: enterRoom,
               }}
             />
           </div>
@@ -2121,32 +2144,46 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               : <div className={`fixed right-4 bottom-4 tactil:bottom-24 ${hubPinned ? "z-[120]" : "z-30"}`}>{boton}</div>;
           })()}
         <div
-          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${salaEnHoja || hubMinimized ? "invisible" : ""} ${
-            hubPos && !hubMaximized ? "" : "bottom-4 right-4"
-          }`}
-          style={hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
+          className={cn(
+            "fixed flex flex-col items-end",
+            // En el teléfono la hoja va por ENCIMA del muelle de burbujas (z-50):
+            // si no, la nube de Chats y Clari se montan sobre sus controles.
+            // Minimizado, el Hub vuelve a ser la píldora del muelle.
+            hubPinned ? "z-[120]" : isMobile ? "z-[60]" : "z-30",
+            (salaEnHoja || hubMinimized) && "invisible",
+            // Teléfono: hoja inferior a lo ancho, siempre abajo (Jhon, 10/09: la
+            // ventanita de 230 px no encuadraba y se movía sin querer al tocarla).
+            isMobile ? "inset-x-0 bottom-0" : (hubPos && !hubMaximized ? "" : "bottom-4 right-4"),
+          )}
+          style={!isMobile && hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
         >
           <div
             ref={hubPanelRef}
-            className={`relative rounded-2xl border border-border/60 bg-card/85 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col ${
-              hubMaximized
-                ? "w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]"
-                : hubSize ? "" : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
-            } ${hubMinimized ? "hidden" : ""}`}
-            style={hubMaximized ? undefined : {
-              // En el teléfono arranca más baja: a 380 px tapaba la sala entera.
-              ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: isMobile ? 230 : 380 }),
-              // Nunca más alto que la pantalla. Aplica también al alto que la
-              // persona haya elegido arrastrando la esquina: si después gira el
-              // teléfono, ese alto tampoco entra.
-              maxHeight: "calc(100dvh - 2rem)",
-            }}
+            className={cn(
+              "relative border border-border/60 bg-card/85 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col",
+              isMobile
+                ? (hubMaximized ? "w-screen h-[100dvh] rounded-none border-0 pt-safe pb-safe" : "w-screen rounded-t-2xl border-x-0 border-b-0 pb-safe")
+                : hubMaximized
+                  ? "w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)] rounded-2xl"
+                  : cn("rounded-2xl", hubSize ? "" : "w-96 md:w-[480px]"),
+              hubMinimized && "hidden",
+            )}
+            style={hubMaximized ? undefined : isMobile
+              // Media pantalla: arriba siguen viéndose las salas; adentro entran la
+              // barra, el video con la tira de gente y la fila de controles entera.
+              ? { height: "min(58dvh, 520px)" }
+              : {
+                ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 380 }),
+                // Nunca más alto que la pantalla. Aplica también al alto que la
+                // persona haya elegido arrastrando la esquina.
+                maxHeight: "calc(100dvh - 2rem)",
+              }}
           >
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 shrink-0">
               <div
-                className={`flex flex-1 items-center gap-1.5 text-xs text-foreground font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
-                onPointerDown={(e) => { if (!hubMaximized) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
-                title={hubMaximized ? undefined : "Arrastra para mover la ventana"}
+                className={cn("flex flex-1 items-center gap-1.5 text-xs text-foreground font-medium select-none", !hubMaximized && !isMobile && "cursor-move touch-none")}
+                onPointerDown={(e) => { if (!hubMaximized && !isMobile) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
+                title={hubMaximized || isMobile ? undefined : "Arrastra para mover la ventana"}
               >
                 <Headphones className="h-3 w-3 text-warning" />
                 Supervisor Hub

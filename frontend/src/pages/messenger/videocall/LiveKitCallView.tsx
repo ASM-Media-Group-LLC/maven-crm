@@ -17,6 +17,7 @@ import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
 import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
 import { cn } from "@/lib/utils";
+import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
@@ -706,16 +707,27 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             // cedía (le faltaba `min-w-0`), la barra terminaba empujada fuera
             // del `overflow-hidden` del padre. La cámara estaba en el DOM pero
             // fuera de lo visible: Alexandra solo veía el cuadro de su pantalla.
-            <div className={cn("h-full", effectiveCompact ? "relative" : "flex gap-2")}>
+            <div className={cn("h-full", effectiveCompact ? (tactil ? "flex flex-col gap-1.5" : "relative") : "flex gap-2")}>
               {spotlightParticipant && (
                 // `min-w-0` es lo que le permite al panel grande achicarse. Sin
                 // eso, un flex item se niega a bajar de su contenido y desborda.
-                <div className={effectiveCompact ? "h-full" : "flex-1 min-w-0"}>
+                <div className={effectiveCompact ? (tactil ? "min-h-0 flex-1" : "h-full") : "flex-1 min-w-0"}>
                   <ParticipantTile compact={effectiveCompact} participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
               )}
               {otrosParticipantes.length > 0 && (
-                effectiveCompact ? (
+                effectiveCompact && tactil ? (
+                  // Teléfono: TODOS los demás en una tira debajo, deslizable y con su
+                  // nombre (Jhon, 10/09: "no veo todos los participantes"). Las dos
+                  // caritas encimadas de la ventana flotante son para el mouse.
+                  <div className="flex h-24 shrink-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {otrosParticipantes.map((p) => (
+                      <div key={`${p.identity}-${p.sid}`} className="aspect-video h-full shrink-0 overflow-hidden rounded-lg ring-1 ring-white/15">
+                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                      </div>
+                    ))}
+                  </div>
+                ) : effectiveCompact ? (
                   // Esquina inferior derecha, encima de la pantalla. Se muestran
                   // como mucho DOS: en una ventana de este tamaño, una tira de
                   // nueve caritas no se ve, estorba.
@@ -851,7 +863,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onVideoInputChange={handleVideoInputChange}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
-        hideScreenShare={hideScreenShare}
+        // Los teléfonos no exponen getDisplayMedia: el botón sobraba y hacía
+        // envolver la fila de controles en dos renglones (Jhon, 10/09).
+        hideScreenShare={hideScreenShare || !puedeCompartirPantalla()}
         hideLeaveButton={hideLeaveButton}
         leaveLabel={leaveLabel}
         leaveIcon={leaveIcon}
