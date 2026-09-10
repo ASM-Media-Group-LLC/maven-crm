@@ -80,7 +80,7 @@ export function WaChatButton({
   if (channels.length === 0) {
     return <span className="text-xs text-muted-foreground" title="No tienes canales de WhatsApp asignados">WhatsApp</span>;
   }
-  const btnClass = className ?? "h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700";
+  const btnClass = className ?? "h-7 gap-1 text-xs text-whatsapp hover:text-whatsapp/90";
   const trigger = channels.length === 1 ? (
     <Button variant="ghost" size="sm" className={btnClass} disabled={busy} onClick={() => open(channels[0].id)}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WhatsAppIcon className="h-3.5 w-3.5" />} WhatsApp

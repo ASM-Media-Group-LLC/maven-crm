@@ -652,7 +652,7 @@ const TelegramInboxPage = () => {
                                 <span className={cn("min-w-0 flex-1 truncate text-sm", unread ? "font-bold" : "font-medium")}>
                                   {peerLabel(c)}
                                 </span>
-                                <span className={cn("ml-auto shrink-0 text-[10px] tabular-nums", unread ? "font-semibold text-sky-500" : "text-muted-foreground")}>
+                                <span className={cn("ml-auto shrink-0 text-[10px] tabular-nums", unread ? "font-semibold text-telegram" : "text-muted-foreground")}>
                                   {fmtTime(c.last_message_at, dtLocale)}
                                 </span>
                               </div>
@@ -824,7 +824,7 @@ const TelegramInboxPage = () => {
                               ) : null}
 
                               {hasQuote && (
-                                <div className={cn("mb-1 rounded border-l-2 px-2 py-1 text-xs", isOut ? "border-white/50 bg-black/10" : "border-sky-400 bg-muted/60")}>
+                                <div className={cn("mb-1 rounded border-l-2 px-2 py-1 text-xs", isOut ? "border-white/50 bg-black/10" : "border-telegram bg-muted/60")}>
                                   <p className="truncate opacity-80">{quoted ? (quoted.body || `[${quoted.msg_type}]`) : t("tg.quotedMessage")}</p>
                                 </div>
                               )}
@@ -948,10 +948,10 @@ const TelegramInboxPage = () => {
                   onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
                   sendButtonClassName={TG_GRAD}
                   replyBar={replyingTo ? (
-                    <div className="flex items-center gap-2 rounded-lg border-l-2 border-sky-400 bg-muted/60 px-2 py-1.5 text-xs">
-                      <Reply className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                    <div className="flex items-center gap-2 rounded-lg border-l-2 border-telegram bg-muted/60 px-2 py-1.5 text-xs">
+                      <Reply className="h-3.5 w-3.5 shrink-0 text-telegram" />
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sky-600 dark:text-sky-400">{t("tg.replying")}</div>
+                        <div className="font-medium text-telegram">{t("tg.replying")}</div>
                         <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
                       </div>
                       <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label={t("composer.cancelReply")}>

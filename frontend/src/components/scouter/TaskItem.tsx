@@ -86,7 +86,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
     <div
       className={`rounded-lg border p-3 space-y-2 transition-all ${
         isDone
-          ? "border-emerald-500/20 bg-emerald-500/5 opacity-70"
+          ? "border-success/20 bg-success/5 opacity-70"
           : isSkipped
           ? "border-border/30 bg-muted/10 opacity-50"
           : "border-border bg-card/50"
@@ -97,7 +97,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
         {/* Task type icon */}
         <div className="mt-0.5 shrink-0">
           {isDone ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-success" />
           ) : (
             TASK_ICONS[task.task_type]
           )}

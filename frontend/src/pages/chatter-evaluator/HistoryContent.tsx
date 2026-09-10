@@ -244,7 +244,7 @@ const HistoryContent = () => {
               al menos una selección activa. Le mostramos el contador y
               los dos CTAs (limpiar / borrar). */}
           {canDelete && selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 rounded-md border border-rose-500/40 bg-rose-500/5 px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs">
               <span className="font-medium">
                 {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
               </span>
@@ -322,7 +322,7 @@ const HistoryContent = () => {
                         className={
                           "group flex items-center gap-3 p-3 transition-colors " +
                           (selected
-                            ? "bg-rose-500/5 hover:bg-rose-500/10"
+                            ? "bg-destructive/5 hover:bg-destructive/10"
                             : "hover:bg-muted/40")
                         }
                       >
@@ -428,7 +428,7 @@ const HistoryContent = () => {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void confirmDelete();
@@ -465,7 +465,7 @@ const HistoryContent = () => {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
                 void confirmBulkDelete();

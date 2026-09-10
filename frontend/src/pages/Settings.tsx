@@ -657,7 +657,7 @@ const WhatsappPhoneCard = ({
     <Card>
       <CardContent className="p-6 space-y-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-whatsapp/10 text-whatsapp">
             <MessageCircle className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
@@ -667,12 +667,12 @@ const WhatsappPhoneCard = ({
             </p>
           </div>
           {isLinked && isVerified && (
-            <Badge variant="default" className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-700">
+            <Badge variant="default" className="gap-1 text-[10px] bg-success hover:bg-success/90">
               <CheckCircle2 className="h-2.5 w-2.5" /> {t("settings.waVerified")}
             </Badge>
           )}
           {isLinked && !isVerified && (
-            <Badge variant="outline" className="gap-1 text-[10px] border-amber-500 text-amber-600 dark:text-amber-400">
+            <Badge variant="outline" className="gap-1 text-[10px] border-warning text-warning">
               <AlertCircle className="h-2.5 w-2.5" /> {t("settings.waPending")}
             </Badge>
           )}
@@ -720,9 +720,9 @@ const WhatsappPhoneCard = ({
             {isVerified ? (
               <>
                 <div className="flex items-center gap-2 text-xs">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
                   <span className="font-medium">
-                    {t("settings.waVerifiedAs")} <span className="text-emerald-600">{pushName ?? t("settings.waNoPushName")}</span>
+                    {t("settings.waVerifiedAs")} <span className="text-success">{pushName ?? t("settings.waNoPushName")}</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
@@ -742,7 +742,7 @@ const WhatsappPhoneCard = ({
             ) : (
               <>
                 <div className="flex items-center gap-2 text-xs">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertCircle className="h-4 w-4 text-warning" />
                   <span className="font-medium">{t("settings.waNeedsVerify")}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
@@ -759,7 +759,7 @@ const WhatsappPhoneCard = ({
                   {t("settings.waVerify")}
                 </Button>
                 {verif && (
-                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 space-y-1">
+                  <div className="rounded-md border border-success/30 bg-success/5 p-2 space-y-1">
                     <p className="text-[11px] text-muted-foreground">
                       {t("settings.waYourCode")} <code className="px-1.5 py-0.5 rounded bg-muted font-semibold tracking-widest">{verif.code}</code>
                     </p>
@@ -769,7 +769,7 @@ const WhatsappPhoneCard = ({
                         href={verif.wa_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline text-emerald-600"
+                        className="underline text-success"
                       >
                         {t("settings.waOpenAgain")}
                       </a>{" "}

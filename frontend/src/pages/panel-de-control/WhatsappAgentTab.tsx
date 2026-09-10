@@ -335,7 +335,7 @@ function Stat({
       <div className={cn(
         "p-2 rounded-md",
         accent === "overdue" && value > 0
-          ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+          ? "bg-warning/10 text-warning"
           : "bg-muted text-muted-foreground",
       )}>
         <Icon className="h-4 w-4" />
@@ -438,9 +438,9 @@ function CommitmentsList({ groupId }: { groupId: string }) {
 
 function StatusBadge({ status }: { status: WhatsappCommitment["status"] }) {
   const meta: Record<WhatsappCommitment["status"], { label: string; cls: string }> = {
-    pending: { label: "pending", cls: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-    overdue: { label: "overdue", cls: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-    done: { label: "done", cls: "bg-green-500/10 text-green-600 dark:text-green-400" },
+    pending: { label: "pending", cls: "bg-primary/10 text-primary" },
+    overdue: { label: "overdue", cls: "bg-warning/10 text-warning" },
+    done: { label: "done", cls: "bg-success/10 text-success" },
     stale: { label: "stale", cls: "bg-muted text-muted-foreground" },
     cancelled: { label: "cancelled", cls: "bg-muted text-muted-foreground line-through" },
   };
@@ -690,7 +690,7 @@ function CostsCard({ groupId }: { groupId: string }) {
         {delta !== null && (
           <Badge variant="outline" className={cn(
             "text-[10px]",
-            delta > 20 ? "border-orange-500 text-orange-600" : delta < -20 ? "border-emerald-500 text-emerald-600" : "",
+            delta > 20 ? "border-warning text-warning" : delta < -20 ? "border-success text-success" : "",
           )}>
             {delta > 0 ? "+" : ""}{delta.toFixed(0)}% vs mes anterior
           </Badge>
@@ -891,12 +891,12 @@ function Metric({ label, value, accent }: { label: string; value: number | null;
   return (
     <div className={cn(
       "rounded-md p-2 text-center",
-      accent === "positive" ? "bg-emerald-500/10" : "bg-muted/30",
+      accent === "positive" ? "bg-success/10" : "bg-muted/30",
     )}>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={cn(
         "text-lg font-semibold tabular-nums",
-        accent === "positive" ? "text-emerald-700 dark:text-emerald-400" : undefined,
+        accent === "positive" ? "text-success" : undefined,
       )}>
         {value ?? "—"}
       </p>
@@ -953,7 +953,7 @@ function AskAgentDialog({
           <DialogDescription>
             La respuesta se mandará al grupo <strong>{group.name}</strong>.
             {!group.bot_enabled && (
-              <span className="block mt-1 text-orange-600">
+              <span className="block mt-1 text-warning">
                 ⚠ El bot está OFF para este grupo — la respuesta se va a generar pero NO se va a enviar.
               </span>
             )}

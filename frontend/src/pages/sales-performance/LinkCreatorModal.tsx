@@ -268,21 +268,21 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
           </div>
         ) : mode === "confirm" && selectedCreator ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900/50 dark:bg-orange-950/30 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-medium">Cuenta adicional</span>
               </div>
-              <p className="text-sm text-orange-600 dark:text-orange-300">
+              <p className="text-sm text-warning">
                 <span className="font-medium">{selectedCreator.name}</span> ya tiene{" "}
                 {selectedCreator.accountCount} {selectedCreator.accountCount === 1 ? "cuenta vinculada" : "cuentas vinculadas"}:
               </p>
-              <ul className="text-xs text-orange-600 dark:text-orange-300 list-disc list-inside">
+              <ul className="text-xs text-warning list-disc list-inside">
                 {selectedCreator.accounts.map((a) => (
                   <li key={a}>{a}</li>
                 ))}
               </ul>
-              <p className="text-sm text-orange-600 dark:text-orange-300">
+              <p className="text-sm text-warning">
                 ¿Vincular <span className="font-medium">"{pendingCreator}"</span> como cuenta adicional?
               </p>
             </div>

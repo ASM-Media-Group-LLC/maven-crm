@@ -109,8 +109,8 @@ const ResetPassword = () => {
 
   const RequirementItem = ({ met, label }: { met: boolean; label: string }) => (
     <div className="flex items-center gap-1.5 text-xs">
-      {met ? <Check className="h-3 w-3 text-green-500" /> : <X className="h-3 w-3 text-muted-foreground" />}
-      <span className={met ? "text-green-500" : "text-muted-foreground"}>{label}</span>
+      {met ? <Check className="h-3 w-3 text-success" /> : <X className="h-3 w-3 text-muted-foreground" />}
+      <span className={met ? "text-success" : "text-muted-foreground"}>{label}</span>
     </div>
   );
 
@@ -131,7 +131,7 @@ const ResetPassword = () => {
 
         {!recoveryReady ? (
           <div className="space-y-4 text-center">
-            <p className="text-sm text-red-400 font-medium">{t("auth.resetLinkInvalid")}</p>
+            <p className="text-sm text-destructive font-medium">{t("auth.resetLinkInvalid")}</p>
             <p className="text-sm text-white/50">
               {t("auth.resetLinkInvalidHint")}
             </p>

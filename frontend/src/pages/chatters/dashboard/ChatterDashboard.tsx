@@ -141,7 +141,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                           <>
                             <Inicial nombre={c.creator_handle} />
                             <span className="min-w-0 flex-1 truncate font-mono text-[12px]">@{c.creator_handle}</span>
-                            {c.mad && <span className="rounded bg-slate-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-300">mad</span>}
+                            {c.mad && <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase text-muted-foreground">mad</span>}
                             {url ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" /> : <span className="text-[9px] text-muted-foreground">sin ficha</span>}
                           </>
                         );

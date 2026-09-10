@@ -497,8 +497,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 {/* Aviso: qué registró YA el bot hoy para esta creadora (evita recargas
                     manuales redundantes). Informativo — no bloquea el override. */}
                 {mode === "add" && alreadyToday.size > 0 && (
-                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                  <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5">
+                    <p className="text-xs font-medium text-warning">
                       Ya registrado hoy — normalmente no hace falta volver a cargarlo:
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -533,7 +533,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                         <button key={opt.value} type="button" onClick={() => toggleNet(opt.value)} className={`relative flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                           {isSelected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-2.5 w-2.5" /></span>}
                           {mode === "add" && !isSelected && alreadyToday.has(opt.value) && (
-                            <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-amber-500" title="Ya registrado hoy" />
+                            <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-warning" title="Ya registrado hoy" />
                           )}
                           <Icon className="h-5 w-5" />{opt.label}
                         </button>

@@ -52,7 +52,7 @@ const statusVariant: Record<string, "destructive" | "default" | "secondary" | "o
 
 const priorityColor: Record<string, string> = {
   urgent: "text-destructive",
-  high: "text-orange-500",
+  high: "text-warning",
   medium: "text-primary",
   low: "text-muted-foreground",
 };

@@ -42,9 +42,9 @@ const money = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Mat
 
 const tonoNota = (n: number | null) =>
   n == null ? { texto: "text-muted-foreground", barra: "bg-muted-foreground/40", hero: "from-primary/15" }
-  : n >= 8 ? { texto: "text-emerald-500", barra: "bg-emerald-500", hero: "from-emerald-500/20" }
-  : n >= 6 ? { texto: "text-amber-500", barra: "bg-amber-500", hero: "from-amber-500/20" }
-  : { texto: "text-red-500", barra: "bg-red-500", hero: "from-red-500/20" };
+  : n >= 8 ? { texto: "text-success", barra: "bg-success", hero: "from-success/20" }
+  : n >= 6 ? { texto: "text-warning", barra: "bg-warning", hero: "from-warning/20" }
+  : { texto: "text-destructive", barra: "bg-destructive", hero: "from-destructive/20" };
 
 const OBJETIVOS: Record<string, string> = {
   promo: "que tu roster promocione",
@@ -122,13 +122,13 @@ function PorQueEsaNota({ nota, meta }: { nota: NotaDelBot; meta: number | null }
       {piezas.map((p) => (
         <div key={p.label} className="flex items-center gap-2 text-xs" title={p.ayuda}>
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full",
-            p.ok == null ? "bg-muted-foreground/40" : p.ok ? "bg-emerald-500" : "bg-amber-500")} />
+            p.ok == null ? "bg-muted-foreground/40" : p.ok ? "bg-success" : "bg-warning")} />
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{p.label}</span>
-          <span className={cn("shrink-0 font-medium tabular-nums", p.ok === false && "text-amber-500")}>{p.valor}</span>
+          <span className={cn("shrink-0 font-medium tabular-nums", p.ok === false && "text-warning")}>{p.valor}</span>
         </div>
       ))}
       {franjasMax > 0 && franjas === 0 && (
-        <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-500">
+        <p className="flex items-start gap-1.5 rounded-lg bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
           Sin reportes en las franjas: ahí se van hasta 1,5 puntos de tu nota.
         </p>
@@ -284,7 +284,7 @@ export default function ManagerDashboard({ forzado = false }: {
               valor={pctPromo != null ? `${pctPromo}%` : "—"}
               pie={promoMias.length > 0 ? `${promocionaron} de ${promoMias.length} en el rango` : promo.isLoading ? "cargando…" : "sin lectura de promolog en el rango"}
               icono={Megaphone} color="bg-amber-500" tinte="from-amber-500/10"
-              barra={pctPromo != null ? { pct: pctPromo, clase: pctPromo >= 80 ? "bg-emerald-500" : "bg-amber-500" } : undefined}
+              barra={pctPromo != null ? { pct: pctPromo, clase: pctPromo >= 80 ? "bg-success" : "bg-warning" } : undefined}
             />
             <Kpi
               label="Ingresos de tus modelos"
@@ -316,7 +316,7 @@ export default function ManagerDashboard({ forzado = false }: {
               valor={horas.actividad != null ? `${horas.actividad}%` : "—"}
               pie="actividad de teclado y mouse"
               icono={MousePointerClick} color="bg-fuchsia-500" tinte="from-fuchsia-500/10"
-              barra={horas.actividad != null ? { pct: horas.actividad, clase: horas.actividad >= 60 ? "bg-emerald-500" : "bg-amber-500" } : undefined}
+              barra={horas.actividad != null ? { pct: horas.actividad, clase: horas.actividad >= 60 ? "bg-success" : "bg-warning" } : undefined}
             />
           </div>
         )}
@@ -409,12 +409,12 @@ export default function ManagerDashboard({ forzado = false }: {
                       <>
                         <div className="hidden w-24 sm:block">
                           <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                            <div className={cn("h-full rounded-full", p.score >= 70 ? "bg-emerald-500" : p.score >= 40 ? "bg-amber-500" : "bg-red-500")}
+                            <div className={cn("h-full rounded-full", p.score >= 70 ? "bg-success" : p.score >= 40 ? "bg-warning" : "bg-destructive")}
                               style={{ width: `${Math.max(3, p.score)}%` }} />
                           </div>
                         </div>
                         <span className={cn("w-10 shrink-0 text-right text-sm font-semibold tabular-nums",
-                          p.score >= 70 ? "text-emerald-500" : p.score >= 40 ? "text-amber-500" : "text-red-500")}>
+                          p.score >= 70 ? "text-success" : p.score >= 40 ? "text-warning" : "text-destructive")}>
                           {p.score}
                         </span>
                       </>

@@ -72,7 +72,7 @@ const StepDot = ({
           done
             ? "border-success bg-success text-white"
             : active
-            ? "border-amber-400 bg-amber-400/15 text-amber-400"
+            ? "border-warning bg-warning/15 text-warning"
             : "border-border text-muted-foreground"
         }`}
       >
@@ -80,7 +80,7 @@ const StepDot = ({
       </div>
       <span
         className={`text-[10px] font-medium ${
-          active ? "text-amber-400" : done ? "text-success" : "text-muted-foreground"
+          active ? "text-warning" : done ? "text-success" : "text-muted-foreground"
         }`}
       >
         {label}
@@ -163,9 +163,9 @@ const Step1 = ({
       </div>
 
       {/* Info notice */}
-      <div className="flex items-start gap-2 rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2.5">
-        <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-        <p className="text-xs text-blue-300">
+      <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+        <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+        <p className="text-xs text-primary">
           Las cuentas serán sincronizadas automáticamente en segundo plano. Solo necesitas confirmar
           el handle — no hace falta ingresar ninguna contraseña.
         </p>
@@ -439,7 +439,7 @@ const SpammerOnboarding = () => {
       <div className="w-full max-w-lg">
         {/* Header branding */}
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Instagram className="h-6 w-6 text-amber-400" />
+          <Instagram className="h-6 w-6 text-instagram-orange" />
           <span className="text-lg font-bold tracking-tight">Mis Cuentas</span>
         </div>
         <p className="text-center text-xs text-muted-foreground mb-8">

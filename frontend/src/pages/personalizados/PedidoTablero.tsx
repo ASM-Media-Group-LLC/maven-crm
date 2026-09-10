@@ -48,12 +48,12 @@ export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
             </span>
           )}
           {restan !== null && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${restan <= 2 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${restan <= 2 ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"}`}>
               {restan === 0 ? "Vence hoy" : `${restan}d`}
             </span>
           )}
-          {saldo > 0 && p.price_usd != null && p.paid_usd != null && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-amber-500/15 text-amber-600">Debe {usd(saldo)}</span>}
-          {p.flags.length > 0 && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-amber-500/15 text-amber-600">⚠ {p.flags.length}</span>}
+          {saldo > 0 && p.price_usd != null && p.paid_usd != null && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-warning/15 text-warning">Debe {usd(saldo)}</span>}
+          {p.flags.length > 0 && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-warning/15 text-warning">⚠ {p.flags.length}</span>}
         </div>
       )}
     </button>

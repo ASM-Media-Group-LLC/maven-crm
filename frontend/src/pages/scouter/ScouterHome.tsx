@@ -488,8 +488,8 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
     return [
       { key: "total", label: "Total scouteadas", big: stats.data?.total ?? 0, statusVal: "all" as const, color: "bg-blue-500" },
       { key: "contacted", label: "Contactadas", big: stats.data?.contactedDistinct ?? 0, statusVal: "all" as const, color: "bg-amber-500" },
-      { key: "interested", label: "Interesadas", big: stats.data?.interested ?? 0, statusVal: "confirmed" as const, color: "bg-emerald-500" },
-      { key: "noResponse", label: "No responden", big: stats.data?.noResponse ?? 0, statusVal: "all" as const, color: "bg-rose-500" },
+      { key: "interested", label: "Interesadas", big: stats.data?.interested ?? 0, statusVal: "confirmed" as const, color: "bg-success" },
+      { key: "noResponse", label: "No responden", big: stats.data?.noResponse ?? 0, statusVal: "all" as const, color: "bg-destructive" },
     ];
   }, [stats.data]);
 

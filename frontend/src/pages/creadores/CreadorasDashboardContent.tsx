@@ -600,7 +600,7 @@ const CreadorasDashboardContent = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                      className="text-muted-foreground hover:text-instagram-pink transition-colors shrink-0"
                       title="Abrir Instagram"
                     >
                       <Instagram className="h-3.5 w-3.5" />

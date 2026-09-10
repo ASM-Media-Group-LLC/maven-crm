@@ -35,7 +35,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   activo: { label: "Activo", variant: "default", icon: Wifi, dotColor: "bg-success" },
   inactivo: { label: "Inactivo", variant: "secondary", icon: WifiOff, dotColor: "bg-warning" },
   desconectado: { label: "Desconectado", variant: "outline", icon: WifiOff, dotColor: "bg-muted-foreground/40" },
-  en_pausa: { label: "En Pausa", variant: "secondary", icon: Pause, dotColor: "bg-blue-500" },
+  en_pausa: { label: "En Pausa", variant: "secondary", icon: Pause, dotColor: "bg-primary" },
 };
 
 // ─── Activity Bar ─────────────────────────────────────────────────────────────

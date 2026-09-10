@@ -258,7 +258,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           Antes tenía un avatar grande + descripción de 3 líneas que
           quitaba espacio cuando había cards. Ahora es una sola línea. */}
       <div className="flex flex-wrap items-center gap-2">
-        <Instagram className="h-4 w-4 text-pink-400 shrink-0" />
+        <Instagram className="h-4 w-4 text-instagram-pink shrink-0" />
         <h2 className="text-sm font-semibold">
           {viewMode === "mine" ? "Mis cuentas IG" : "Salud de Cuentas IG"}
         </h2>
@@ -458,7 +458,7 @@ const SpammerCard = ({
           setConfirmDelete(true);
         }}
         title="Eliminar esta cuenta"
-        className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 transition-all hover:bg-rose-500/15 hover:text-rose-400 group-hover:opacity-100 focus:opacity-100"
+        className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 transition-all hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -470,11 +470,11 @@ const SpammerCard = ({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="truncate font-mono text-sm font-semibold">@{r.instagram_handle}</span>
             {r.is_verified && (
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
             )}
             {r.is_restricted && (
               <span
-                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-rose-500/20 text-rose-300"
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-destructive/20 text-destructive"
                 title="IG marcó la cuenta como restringida — oculta a viewers no-loggeados."
               >
                 <Lock className="h-2.5 w-2.5" />
@@ -483,7 +483,7 @@ const SpammerCard = ({
             )}
             {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
               <span
-                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-300"
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-warning/20 text-warning"
                 title="No pudimos leer el perfil automáticamente. Reintenta el scan o sube un screenshot — no significa que esté restringida."
               >
                 <AlertCircle className="h-2.5 w-2.5" />
@@ -513,12 +513,12 @@ const SpammerCard = ({
             Escaneando con IA…
           </div>
         ) : r.scan_status === "failed" ? (
-          <div className="flex items-start gap-1.5 text-xs text-rose-400">
+          <div className="flex items-start gap-1.5 text-xs text-destructive">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span className="line-clamp-2">{r.scan_error ?? "Scan fallido"}</span>
           </div>
         ) : !r.is_restricted && r.scan_status === "awaiting_screenshot" ? (
-          <div className="flex items-start gap-1.5 text-xs text-amber-400">
+          <div className="flex items-start gap-1.5 text-xs text-warning">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span className="line-clamp-2">
               No se pudo leer — reintenta el scan o sube un screenshot.
@@ -574,7 +574,7 @@ const SpammerCard = ({
                 onSuccess: () => setConfirmDelete(false),
               });
             }}
-            className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-600"
+            className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
           >
             {deleteAccount.isPending ? "Eliminando..." : "Sí, eliminar"}
           </AlertDialogAction>
@@ -771,10 +771,10 @@ const StatBox = ({
 
 const RestrictedRecoveryGuide = () => {
   return (
-    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-3">
+    <div className="rounded-lg border border-success/30 bg-success/5 p-3 space-y-3">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-emerald-400" />
-        <h3 className="text-xs font-bold text-emerald-400">
+        <Sparkles className="h-4 w-4 text-success" />
+        <h3 className="text-xs font-bold text-success">
           Cómo recuperar esta cuenta
         </h3>
       </div>
@@ -796,7 +796,7 @@ const RestrictedRecoveryGuide = () => {
           <p className="font-semibold text-foreground mb-1">
             Si decides recuperar:
           </p>
-          <ol className="list-decimal space-y-1.5 pl-4 text-muted-foreground marker:text-emerald-400">
+          <ol className="list-decimal space-y-1.5 pl-4 text-muted-foreground marker:text-success">
             <li>
               <strong className="text-foreground">Verificar email Y teléfono real</strong> (no
               virtual): Settings → Account → Personal information.
@@ -818,7 +818,7 @@ const RestrictedRecoveryGuide = () => {
               Report a Problem. Explica que eres una agencia legítima.
             </li>
             <li>
-              <strong className="text-foreground text-rose-400">PARAR todo outreach</strong> por 7-14 días.
+              <strong className="text-foreground text-destructive">PARAR todo outreach</strong> por 7-14 días.
               Navega normal, like a posts, sigue cuentas, postea 2-3 cosas propias. Si sigues
               spammeando DMs, IG nunca levanta el flag.
             </li>
@@ -833,15 +833,15 @@ const RestrictedRecoveryGuide = () => {
           <p className="font-semibold text-foreground mb-1">
             Si decides abandonar y crear nueva:
           </p>
-          <ul className="list-disc space-y-1 pl-4 text-muted-foreground marker:text-emerald-400">
+          <ul className="list-disc space-y-1 pl-4 text-muted-foreground marker:text-success">
             <li>SIM física fresca, email dedicado, dispositivo limpio.</li>
             <li>Día 1: profile completo (foto logo, bio profesional, link al sitio, business).</li>
-            <li>Días 1-14: warm-up — browsear, likes, posts propios. <strong className="text-rose-400">CERO DMs</strong>.</li>
+            <li>Días 1-14: warm-up — browsear, likes, posts propios. <strong className="text-destructive">CERO DMs</strong>.</li>
             <li>Día 14+: ramp-up gradual de outreach.</li>
           </ul>
         </div>
 
-        <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-amber-200/90">
+        <div className="rounded-md bg-warning/10 border border-warning/30 p-2 text-[11px] text-warning">
           <strong>Reglas permanentes:</strong> nunca copy-paste el mismo DM ·
           espaciar 2-3 min entre DMs · 1 IP/device por cuenta · profile completo
           ANTES de cualquier outreach · mínimo 5 posts del roster en feed.
@@ -913,15 +913,15 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
       className={cn(
         "rounded-lg border-2 border-dashed p-4 transition-colors space-y-3",
         hasScreenshots
-          ? "border-emerald-500/40 bg-emerald-500/5"
-          : "border-amber-500/40 bg-amber-500/5",
+          ? "border-success/40 bg-success/5"
+          : "border-warning/40 bg-warning/5",
       )}
     >
       <div className="flex items-start gap-3">
         <Sparkles
           className={cn(
             "h-5 w-5 mt-0.5 shrink-0",
-            hasScreenshots ? "text-emerald-400" : "text-amber-400",
+            hasScreenshots ? "text-success" : "text-warning",
           )}
         />
         <div className="flex-1 min-w-0">
@@ -958,8 +958,8 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
                 uploadMut.isPending
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : hasScreenshots
-                  ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
-                  : "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30",
+                  ? "bg-success/20 text-success hover:bg-success/30"
+                  : "bg-warning/20 text-warning hover:bg-warning/30",
               )}
             >
               {uploadMut.isPending ? (
@@ -1012,7 +1012,7 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
                     })
                   }
                   disabled={removing}
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity hover:bg-rose-500 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
                   aria-label="Quitar screenshot"
                   title="Quitar screenshot"
                 >
@@ -1034,15 +1034,15 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
 // ─── Detail dialog ─────────────────────────────────────────────────
 
 const SEVERITY_STYLE: Record<SpammerAccountAiRedFlag["severity"], string> = {
-  low: "bg-amber-500/15 text-amber-400",
+  low: "bg-warning/15 text-warning",
   medium: "bg-orange-500/15 text-orange-400",
-  high: "bg-rose-500/15 text-rose-400",
+  high: "bg-destructive/15 text-destructive",
 };
 
 const WOULD_RESPOND_STYLE: Record<NonNullable<SpammerAccountAiAnalysis["would_respond"]>, { label: string; cls: string }> = {
-  si: { label: "Sí respondería", cls: "bg-emerald-500/15 text-emerald-400" },
-  tal_vez: { label: "Tal vez respondería", cls: "bg-amber-500/15 text-amber-400" },
-  no: { label: "No respondería", cls: "bg-rose-500/15 text-rose-400" },
+  si: { label: "Sí respondería", cls: "bg-success/15 text-success" },
+  tal_vez: { label: "Tal vez respondería", cls: "bg-warning/15 text-warning" },
+  no: { label: "No respondería", cls: "bg-destructive/15 text-destructive" },
 };
 
 const SpammerDetailDialog = ({
@@ -1076,13 +1076,13 @@ const SpammerDetailDialog = ({
                   href={r.instagram_url || `https://instagram.com/${r.instagram_handle}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-base hover:text-pink-400 transition-colors"
+                  className="font-mono text-base hover:text-instagram-pink transition-colors"
                 >
                   @{r.instagram_handle}
                 </a>
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                 {r.is_verified && (
-                  <CheckCircle2 className="h-4 w-4 text-sky-400" title="Verificada" />
+                  <CheckCircle2 className="h-4 w-4 text-primary" title="Verificada" />
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs">
@@ -1096,11 +1096,11 @@ const SpammerDetailDialog = ({
 
         {/* Restricted banner — deal-breaker para outreach */}
         {r.is_restricted && (
-          <div className="rounded-lg border border-rose-500/50 bg-rose-500/10 p-3">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
             <div className="flex items-start gap-2">
-              <Lock className="h-4 w-4 mt-0.5 shrink-0 text-rose-400" />
+              <Lock className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
               <div className="text-xs leading-relaxed">
-                <span className="font-semibold text-rose-400 text-xs block mb-1">
+                <span className="font-semibold text-destructive text-xs block mb-1">
                   IG marcó la cuenta como restringida
                 </span>
                 <span className="text-foreground/80">
@@ -1135,11 +1135,11 @@ const SpammerDetailDialog = ({
             bloqueó la lectura. El closer reintenta el scan o sube un
             screenshot de su propia cuenta logueada para analizarla igual. */}
         {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-3">
+          <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
               <div className="text-xs leading-relaxed">
-                <span className="font-semibold text-amber-400 text-xs block mb-1">
+                <span className="font-semibold text-warning text-xs block mb-1">
                   No pudimos leer el perfil automáticamente
                 </span>
                 <span className="text-foreground/80">
@@ -1181,13 +1181,13 @@ const SpammerDetailDialog = ({
             </div>
 
             <p className="text-sm leading-relaxed">
-              <span className="text-xs font-bold text-violet-400 mr-2">Resumen</span>
+              <span className="text-xs font-bold text-accent mr-2">Resumen</span>
               {a.summary}
             </p>
 
             {a.would_respond === "no" && a.why_not && (
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
-                <div className="text-xs font-bold text-rose-400 mb-1">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <div className="text-xs font-bold text-destructive mb-1">
                   Por qué NO respondería
                 </div>
                 <p className="text-sm">{a.why_not}</p>
@@ -1195,11 +1195,11 @@ const SpammerDetailDialog = ({
             )}
 
             {a.urgent_improvements && a.urgent_improvements.length > 0 && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                <div className="text-xs font-bold text-amber-400 mb-2">
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <div className="text-xs font-bold text-warning mb-2">
                   Mejoras urgentes
                 </div>
-                <ul className="space-y-1 pl-4 list-disc text-sm marker:text-amber-400">
+                <ul className="space-y-1 pl-4 list-disc text-sm marker:text-warning">
                   {a.urgent_improvements.map((u, i) => (
                     <li key={i}>{u}</li>
                   ))}
@@ -1209,11 +1209,11 @@ const SpammerDetailDialog = ({
 
             <div className="grid gap-3 sm:grid-cols-2">
               {a.strengths.length > 0 && (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                  <div className="text-xs font-bold text-emerald-400 mb-2">
+                <div className="rounded-lg border border-success/30 bg-success/5 p-3">
+                  <div className="text-xs font-bold text-success mb-2">
                     Fortalezas
                   </div>
-                  <ul className="space-y-1 pl-4 list-disc text-xs marker:text-emerald-400">
+                  <ul className="space-y-1 pl-4 list-disc text-xs marker:text-success">
                     {a.strengths.map((s, i) => (
                       <li key={i}>{s}</li>
                     ))}
@@ -1406,11 +1406,11 @@ const StatListDialog = ({
                           @{r.instagram_handle}
                         </span>
                         {r.is_verified && (
-                          <CheckCircle2 className="h-3 w-3 shrink-0 text-sky-400" />
+                          <CheckCircle2 className="h-3 w-3 shrink-0 text-primary" />
                         )}
                         {r.is_restricted && (
                           <span
-                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold bg-rose-500/20 text-rose-300"
+                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold bg-destructive/20 text-destructive"
                             title="IG marcó la cuenta como restringida — las creators target no pueden verla sin login."
                           >
                             <Lock className="h-2.5 w-2.5" />
@@ -1431,7 +1431,7 @@ const StatListDialog = ({
                         )}
                       </div>
                       {r.scan_status === "failed" && r.scan_error && (
-                        <div className="mt-0.5 flex items-start gap-1 text-[10px] text-rose-400">
+                        <div className="mt-0.5 flex items-start gap-1 text-[10px] text-destructive">
                           <AlertCircle className="h-2.5 w-2.5 mt-0.5 shrink-0" />
                           <span className="line-clamp-1">{r.scan_error}</span>
                         </div>

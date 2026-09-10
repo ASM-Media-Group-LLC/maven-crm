@@ -164,7 +164,7 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
                     >
                       {s.label && <div className="truncate text-[11px] font-semibold text-foreground">{s.label}</div>}
                       <div className="line-clamp-2 text-xs text-muted-foreground">{s.text}</div>
-                      <span className={`mt-0.5 inline-flex items-center gap-0.5 text-[9px] ${s.send_on_click ? "text-amber-500" : "text-muted-foreground/70"}`}>
+                      <span className={`mt-0.5 inline-flex items-center gap-0.5 text-[9px] ${s.send_on_click ? "text-warning" : "text-muted-foreground/70"}`}>
                         {s.send_on_click ? <><Zap className="h-2.5 w-2.5" /> envía al click</> : <>↳ va al cajón</>}
                       </span>
                     </button>

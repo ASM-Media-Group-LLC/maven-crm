@@ -105,7 +105,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
       >
         <Bot className="h-6 w-6" />
         {!open && hasActivity && (
-          <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
+          <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-success shadow-sm" />
         )}
       </button>
 
@@ -126,7 +126,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
                   Clari AI
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" />
                   En línea
                 </div>
               </div>
@@ -144,7 +144,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label="Cerrar"
                 title="Cerrar"
               >

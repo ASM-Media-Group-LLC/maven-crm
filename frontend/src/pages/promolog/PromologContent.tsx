@@ -1159,10 +1159,10 @@ const PromologContent = () => {
               <DialogTitle>Selecciona una Creadora Activa</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-3 gap-3">
-              <Card className="border-t-[3px] border-t-blue-500">
+              <Card className="border-t-[3px] border-t-primary">
                 <CardContent className="p-3 text-center">
                   <p className="text-xs text-muted-foreground">Total Activas</p>
-                  <p className="text-xl font-bold text-blue-500">{totalActiveCreators}</p>
+                  <p className="text-xl font-bold text-primary">{totalActiveCreators}</p>
                 </CardContent>
               </Card>
               <Card className="border-t-[3px] border-t-warning">
@@ -1474,7 +1474,7 @@ const PromologContent = () => {
         <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {kpiModalType === "creadores_escaneados" && <Users className="h-5 w-5 text-blue-500" />}
+              {kpiModalType === "creadores_escaneados" && <Users className="h-5 w-5 text-primary" />}
               {kpiModalTitle}
             </DialogTitle>
             <DialogDescription>

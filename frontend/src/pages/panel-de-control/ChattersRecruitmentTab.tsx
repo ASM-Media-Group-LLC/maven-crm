@@ -277,7 +277,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
           </div>
         </button>
 
-        <Card className="p-5 border-2 border-emerald-500/30 relative overflow-hidden">
+        <Card className="p-5 border-2 border-success/30 relative overflow-hidden">
           <div className="relative">
             <p className="text-xs text-foreground/80 font-semibold">
               Tasa de aprobación
@@ -312,10 +312,10 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
         ))}
 
         {/* Tasa de aprobación — derived metric, sin popup */}
-        <Card className="p-4 border-2 border-emerald-500/30 relative overflow-hidden">
+        <Card className="p-4 border-2 border-success/30 relative overflow-hidden">
           <div className="relative space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500">
-              <TrendingUp className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success">
+              <TrendingUp className="h-5 w-5 text-success-foreground" />
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
@@ -366,7 +366,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
           <FunnelStep label="Evaluadas"   value={k.evaluated} color="text-violet-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Aprobadas"   value={k.apto}      color="text-emerald-400" />
+          <FunnelStep label="Aprobadas"   value={k.apto}      color="text-success" />
         </div>
       </Card>
 

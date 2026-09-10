@@ -137,7 +137,7 @@ const TelegramChannelsPage = () => {
       {/* Líneas (tg_channels) + auto-asignación — espejo del editor de canales de WhatsApp. */}
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-sky-500" />
+          <Users className="h-4 w-4 text-telegram" />
           <h2 className="text-sm font-semibold">Líneas y auto-asignación</h2>
           {canEdit && (
             <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1.5 text-xs" disabled={syncing} onClick={() => syncChannels({ manual: true })} title="Traer las cuentas vinculadas del gateway">
@@ -159,7 +159,7 @@ const TelegramChannelsPage = () => {
           <div className="divide-y rounded-md border">
             {channels.map((c) => (
               <div key={c.id} className="flex items-center gap-3 px-3 py-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-telegram/10 text-telegram">
                   <TelegramIcon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -186,7 +186,7 @@ const TelegramChannelsPage = () => {
       {/* Conectar cuenta (gateway) */}
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center gap-2">
-          <Radio className="h-4 w-4 text-sky-500" />
+          <Radio className="h-4 w-4 text-telegram" />
           <h2 className="text-sm font-semibold">Vincular una cuenta de Telegram</h2>
         </div>
         <p className="text-sm text-muted-foreground">

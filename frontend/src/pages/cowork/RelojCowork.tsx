@@ -34,7 +34,7 @@ export default function RelojCowork({ compacto = false, className }: { compacto?
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 h-7 text-[11px] font-medium tabular-nums shrink-0 transition-colors",
         corre
           ? "border-success/30 bg-success/10 text-success"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          : "border-warning/30 bg-warning/10 text-warning",
         className,
       )}
     >

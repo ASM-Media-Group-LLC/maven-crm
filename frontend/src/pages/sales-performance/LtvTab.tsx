@@ -32,9 +32,9 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg bg-emerald-500/5 border border-emerald-400/30 px-4 py-2.5">
+      <div className="rounded-lg bg-success/5 border border-success/30 px-4 py-2.5">
         <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <UserCheck className="h-3.5 w-3.5 text-emerald-400" /> Customer Lifetime Value — estimado
+          <UserCheck className="h-3.5 w-3.5 text-success" /> Customer Lifetime Value — estimado
         </p>
         <p className="text-[10px] text-muted-foreground mt-0.5 flex items-start gap-1">
           <Info className="h-3 w-3 mt-px shrink-0" />
@@ -49,9 +49,9 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/5 p-3 text-center">
+        <div className="rounded-xl border border-success/40 bg-success/5 p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase">LTV estimado</p>
-          <p className="text-xl font-bold tabular-nums text-emerald-400">{money(data.aggLtv)}</p>
+          <p className="text-xl font-bold tabular-nums text-success">{money(data.aggLtv)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase">ARPU / mes</p>
@@ -83,7 +83,7 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
                 <td className="px-3 py-1.5 font-medium whitespace-nowrap">{c.name}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{Math.round(c.activeFans).toLocaleString("en-US")}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{money(c.arpuMonthly)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-emerald-500">{money(c.ltv)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-success">{money(c.ltv)}</td>
               </tr>
             ))}
           </tbody>

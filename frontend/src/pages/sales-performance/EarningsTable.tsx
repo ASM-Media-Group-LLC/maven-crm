@@ -157,7 +157,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
+                                className="h-6 w-6 text-warning hover:text-warning/90 hover:bg-warning/10"
                                 onClick={() =>
                                   setLinkModal({
                                     open: true,

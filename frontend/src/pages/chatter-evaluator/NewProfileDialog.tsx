@@ -259,7 +259,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
             <div className="space-y-3">
               <div>
                 <Label htmlFor="profile_key" className="text-xs">
-                  Clave interna <span className="text-rose-400">*</span>
+                  Clave interna <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="profile_key"
@@ -405,12 +405,12 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
           </div>
 
           {/* Prices */}
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
-            <div className="mb-2 text-xs font-semibold text-amber-500">Precios</div>
+          <div className="rounded-md border border-warning/40 bg-warning/5 p-3">
+            <div className="mb-2 text-xs font-semibold text-warning">Precios</div>
             <div className="space-y-2">
               {prices.map((p) => (
                 <div key={p.key} className="flex items-center gap-2">
-                  <span className="w-20 shrink-0 font-mono text-xs font-bold text-amber-500">
+                  <span className="w-20 shrink-0 font-mono text-xs font-bold text-warning">
                     {p.key}
                   </span>
                   <Input

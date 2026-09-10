@@ -768,7 +768,7 @@ const Dashboard2 = () => {
           <div className="flex items-center gap-1.5">
             {dashTab === "pareto" && isTop && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title="Top 80/20" />}
             {c.instagramHandle && (
-              <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0" onClick={(e) => e.stopPropagation()}>
+              <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-instagram-pink transition-colors shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Instagram className="h-3.5 w-3.5" />
               </a>
             )}
@@ -1220,7 +1220,7 @@ const Dashboard2 = () => {
                               <ListRow key={i}>
                                 <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0">{i + 1}</span>
                                 {a.creator.instagramHandle && (
-                                  <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                  <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-instagram-pink transition-colors shrink-0">
                                     <Instagram className="h-3.5 w-3.5" />
                                   </a>
                                 )}
@@ -2600,7 +2600,7 @@ const Dashboard2 = () => {
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Expiran ≤7d</p>
-                            <p className="text-lg font-bold tabular-nums text-orange-400">{soon}</p>
+                            <p className="text-lg font-bold tabular-nums text-warning">{soon}</p>
                           </div>
                         </div>
                         {topFansLoading ? (
@@ -2637,7 +2637,7 @@ const Dashboard2 = () => {
                                           ? <Badge variant="outline" className="text-muted-foreground">Inactivo</Badge>
                                           : <Badge variant="outline" className="text-success border-success/30">Activo</Badge>}
                                       </TableCell>
-                                      <TableCell className={`text-sm tabular-nums whitespace-nowrap ${expSoon ? "text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                                      <TableCell className={`text-sm tabular-nums whitespace-nowrap ${expSoon ? "text-warning font-medium" : "text-muted-foreground"}`}>
                                         {exp ? format(exp, "dd MMM yy", { locale: es }) : "—"}{expSoon && " ⚠"}
                                       </TableCell>
                                     </TableRow>
@@ -2676,7 +2676,7 @@ const Dashboard2 = () => {
                       .filter((c) => c.d7 != null && c.newFans >= 10)
                       .sort((a, b) => (a.d7 ?? 0) - (b.d7 ?? 0));
                     const snap = rows.length ? `${rows[rows.length - 1]?.cohort_date} → ${rows[0]?.cohort_date}` : "—";
-                    const retColor = (v: number | null) => v == null ? "text-muted-foreground" : v < 40 ? "text-destructive" : v < 60 ? "text-orange-400" : "text-success";
+                    const retColor = (v: number | null) => v == null ? "text-muted-foreground" : v < 40 ? "text-destructive" : v < 60 ? "text-warning" : "text-success";
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">

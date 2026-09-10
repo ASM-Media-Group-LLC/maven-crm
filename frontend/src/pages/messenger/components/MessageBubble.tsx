@@ -122,7 +122,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           /* Si llegó el archivo, quien mira es admin (la tabla es solo-admin por
              RLS): se conserva el mensaje original con tinte rosa + etiqueta de
              eliminado, mismo criterio que Chatter Evaluator. */
-          <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-rose-500/10 border border-rose-500/25">
+          <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-destructive/10 border border-destructive/25">
             {deletedArchive.type === "image" && deletedArchive.file_url ? (
               <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : deletedArchive.file_url ? (
@@ -133,7 +133,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             {deletedArchive.content && (
               <p className="text-sm whitespace-pre-wrap break-words mt-1">{deletedArchive.content}</p>
             )}
-            <div className="mt-0.5 text-[10px] italic text-rose-300/90">Eliminado por el autor · solo admins</div>
+            <div className="mt-0.5 text-[10px] italic text-destructive/90">Eliminado por el autor · solo admins</div>
           </div>
         ) : (
           <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
@@ -557,7 +557,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="flex items-center gap-0.5 text-[10px] font-medium text-red-200 hover:text-white transition-colors"
+                  className="flex items-center gap-0.5 text-[10px] font-medium text-destructive hover:text-white transition-colors"
                   title="No se envió · toca para reintentar"
                 >
                   <RotateCw className="h-3 w-3" />

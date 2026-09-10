@@ -120,7 +120,7 @@ export default function CloserDashboard() {
   return (
     <main className="flex-1 overflow-y-auto">
       <div className={cn("sticky top-0 z-10 border-b border-white/10 bg-gradient-to-r via-background/60 to-background/60 px-4 py-3 backdrop-blur-xl md:px-6",
-        pipeline.vencidos.length > 0 ? "from-amber-500/20" : "from-emerald-500/15")}>
+        pipeline.vencidos.length > 0 ? "from-warning/20" : "from-success/15")}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/20">
@@ -131,8 +131,8 @@ export default function CloserDashboard() {
               <p className="text-[11px] text-muted-foreground">
                 {pipeline.asignadas} asignada{pipeline.asignadas === 1 ? "" : "s"}
                 {pipeline.vencidos.length > 0
-                  ? <> · <span className="font-medium text-amber-500">{pipeline.vencidos.length} con seguimiento vencido</span></>
-                  : leads.length > 0 && <> · <span className="font-medium text-emerald-500">al día con los seguimientos</span></>}
+                  ? <> · <span className="font-medium text-warning">{pipeline.vencidos.length} con seguimiento vencido</span></>
+                  : leads.length > 0 && <> · <span className="font-medium text-success">al día con los seguimientos</span></>}
               </p>
             </div>
           </div>
@@ -208,21 +208,21 @@ export default function CloserDashboard() {
               valor={qa.score != null ? qa.score.toFixed(0) : "—"}
               pie={qa.calls > 0 ? `${qa.calls} call${qa.calls === 1 ? "" : "s"} en el rango` : "sin calls evaluadas"}
               icono={Headphones} color="bg-amber-500" tinte="from-amber-500/10"
-              barra={qa.score != null ? { pct: qa.score, clase: qa.score >= 70 ? "bg-emerald-500" : "bg-amber-500" } : undefined}
+              barra={qa.score != null ? { pct: qa.score, clase: qa.score >= 70 ? "bg-success" : "bg-warning" } : undefined}
             />
           </div>
         )}
 
         {/* ── A CONTACTAR HOY ── */}
-        <section className="overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.07] to-transparent">
+        <section className="overflow-hidden rounded-2xl border border-warning/20 bg-gradient-to-br from-warning/[0.07] to-transparent">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500">
-                <Phone className="h-4 w-4 text-white" />
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning">
+                <Phone className="h-4 w-4 text-warning-foreground" />
               </span>
               <h2 className="text-sm font-semibold">A contactar hoy</h2>
               {pipeline.vencidos.length > 0 && (
-                <Badge variant="outline" className="rounded-full border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-500">
+                <Badge variant="outline" className="rounded-full border-warning/30 bg-warning/10 text-[10px] text-warning">
                   {pipeline.vencidos.length}
                 </Badge>
               )}
@@ -235,7 +235,7 @@ export default function CloserDashboard() {
             <div className="space-y-2 p-4">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-11 rounded-lg" />)}</div>
           ) : pipeline.vencidos.length === 0 ? (
             <p className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <CheckCircle2 className="h-4 w-4 text-success" />
               {leads.length === 0 ? "Todavía no tienes leads asignadas." : "Ningún seguimiento vencido. Al día."}
             </p>
           ) : (
@@ -243,7 +243,7 @@ export default function CloserDashboard() {
               {pipeline.vencidos.slice(0, 12).map(({ l, atraso }) => (
                 <li key={l.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                   <span className={cn("w-12 shrink-0 rounded-full px-2 py-0.5 text-center text-[11px] font-bold tabular-nums",
-                    atraso >= 7 ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-500")}>
+                    atraso >= 7 ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning")}>
                     {atraso}d
                   </span>
                   <div className="min-w-0 flex-1">
@@ -297,14 +297,14 @@ export default function CloserDashboard() {
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
                           <div className={cn("h-full rounded-full",
-                            s === "Asignada" ? "bg-sky-500" : CERRADAS.includes(s) ? "bg-emerald-500" : "bg-muted-foreground/40")}
+                            s === "Asignada" ? "bg-sky-500" : CERRADAS.includes(s) ? "bg-success" : "bg-muted-foreground/40")}
                             style={{ width: `${Math.max(2, pct)}%` }} />
                         </div>
                       </div>
                     );
                   })}
                   {pipeline.porDecidir.length > 0 && (
-                    <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-500">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
                       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                       {pipeline.porDecidir.length} lead{pipeline.porDecidir.length === 1 ? "" : "s"} con los 6 contactos hechos: hay que decidir si seguir o marcarla No interesada.
                     </p>

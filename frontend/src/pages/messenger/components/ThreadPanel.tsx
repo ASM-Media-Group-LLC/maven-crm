@@ -262,7 +262,7 @@ export default function ThreadPanel({
       // Con fila de archivo = quien mira es admin (RLS solo-admin) → ve el original.
       if (arch) {
         return (
-          <div className="rounded-lg px-2 py-1.5 bg-rose-500/10 border border-rose-500/25">
+          <div className="rounded-lg px-2 py-1.5 bg-destructive/10 border border-destructive/25">
             {arch.type === "image" && arch.file_url ? (
               <img src={arch.file_url} alt={arch.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : arch.file_url ? (
@@ -271,7 +271,7 @@ export default function ThreadPanel({
               </a>
             ) : null}
             {arch.content && <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{arch.content}</p>}
-            <div className="mt-0.5 text-[10px] italic text-rose-300/90">Eliminado por el autor · solo admins</div>
+            <div className="mt-0.5 text-[10px] italic text-destructive/90">Eliminado por el autor · solo admins</div>
           </div>
         );
       }

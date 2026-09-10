@@ -384,7 +384,7 @@ const HRSchedules = () => {
           <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/hr/horarios/horas-extras")}>
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/10"><Timer className="h-5 w-5 text-amber-600" /></div>
+                <div className="p-2 rounded-lg bg-warning/10"><Timer className="h-5 w-5 text-warning" /></div>
                 <div>
                   <p className="font-medium">Horas Extras</p>
                   <p className="text-xs text-muted-foreground">Registrar y gestionar horas extras</p>
@@ -396,7 +396,7 @@ const HRSchedules = () => {
           <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/hr/horarios/banco-horas")}>
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-emerald-500/10"><Banknote className="h-5 w-5 text-emerald-600" /></div>
+                <div className="p-2 rounded-lg bg-success/10"><Banknote className="h-5 w-5 text-success" /></div>
                 <div>
                   <p className="font-medium">Banco de Horas</p>
                   <p className="text-xs text-muted-foreground">Gestionar acumulación y uso de horas</p>

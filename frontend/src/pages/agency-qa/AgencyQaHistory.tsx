@@ -100,7 +100,7 @@ const StatusBadge = ({
   }
   if (status === "processing") {
     return (
-      <Badge variant="outline" className="gap-1 border-sky-500/40 text-sky-400">
+      <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
         <Loader2 className="h-3 w-3 animate-spin" />
         Procesando…
       </Badge>
@@ -425,7 +425,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                               type="button"
                               onClick={(e) => handleRetry(e, call.id)}
                               disabled={reprocess.isPending}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-50"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
                               title="Reintentar transcripción + análisis"
                             >
                               <RotateCw className={reprocess.isPending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />

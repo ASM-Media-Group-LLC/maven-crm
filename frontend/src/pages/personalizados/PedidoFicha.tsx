@@ -203,7 +203,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 </span>
                 <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{fecha(pedido.requested_on)}</span>
                 {pedido.due_on && (
-                  <span className={`inline-flex items-center gap-1 ${alerta?.nivel === "vencido" ? "font-medium text-red-500" : ""}`}>
+                  <span className={`inline-flex items-center gap-1 ${alerta?.nivel === "vencido" ? "font-medium text-destructive" : ""}`}>
                     <Clock className="h-3 w-3" />Entrega {fecha(pedido.due_on)}
                   </span>
                 )}
@@ -274,11 +274,11 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 <div className="mt-4">
                   <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                     <div
-                      className={`h-full rounded-full ${saldo > 0 ? "bg-amber-500" : "bg-emerald-500/80"}`}
+                      className={`h-full rounded-full ${saldo > 0 ? "bg-warning" : "bg-success/80"}`}
                       style={{ width: `${Math.min(100, Math.round((pagado / precio) * 100))}%` }}
                     />
                   </div>
-                  <p className={`mt-1.5 text-[11px] ${saldo > 0 ? "text-amber-500" : "text-muted-foreground"}`}>
+                  <p className={`mt-1.5 text-[11px] ${saldo > 0 ? "text-warning" : "text-muted-foreground"}`}>
                     {saldo > 0 ? `Falta cobrar ${usd(saldo)} de ${usd(precio)}` : "Cobrado completo"}
                   </p>
                 </div>
@@ -288,9 +288,9 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
 
           {/* AVISOS (los "amarillos" del sheet) */}
           {pedido.flags.length > 0 && (
-            <section className="space-y-1.5 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+            <section className="space-y-1.5 rounded-2xl border border-warning/20 bg-warning/5 px-4 py-3">
               {pedido.flags.map((f) => (
-                <p key={f} className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400">
+                <p key={f} className="flex items-start gap-2 text-xs text-warning">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{flagDe(f)}
                 </p>
               ))}
@@ -346,7 +346,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                           <span className="max-w-full truncate text-[10px] text-muted-foreground">{a.file_name}</span>
                         </div>
                       )}
-                      <span className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${a.kind === "entrega" ? "bg-emerald-500/80 text-white" : "bg-black/55 text-white"}`}>
+                      <span className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${a.kind === "entrega" ? "bg-success/80 text-success-foreground" : "bg-black/55 text-white"}`}>
                         {a.kind === "entrega" ? "Entrega" : "Ref."}
                       </span>
                       <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -364,7 +364,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
           <section>
             <Titulo
               icono={StickyNote}
-              extra={notasGuardadas ? <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500"><Check className="h-3 w-3" />Guardado</span> : null}
+              extra={notasGuardadas ? <span className="inline-flex items-center gap-1 text-[11px] text-success"><Check className="h-3 w-3" />Guardado</span> : null}
             >
               Notas internas
             </Titulo>

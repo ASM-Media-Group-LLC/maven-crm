@@ -42,15 +42,15 @@ const pct = (real: number, esperado: number) => (esperado > 0 ? Math.round((100 
 /** Color del cumplimiento: verde llegó, ámbar cerca, rojo lejos. */
 const tonoCumplimiento = (p: number | null) =>
   p == null ? { texto: "text-muted-foreground", barra: "bg-muted-foreground/40", hero: "from-primary/15" }
-  : p >= 100 ? { texto: "text-emerald-500", barra: "bg-emerald-500", hero: "from-emerald-500/20" }
-  : p >= 70 ? { texto: "text-amber-500", barra: "bg-amber-500", hero: "from-amber-500/20" }
-  : { texto: "text-red-500", barra: "bg-red-500", hero: "from-red-500/20" };
+  : p >= 100 ? { texto: "text-success", barra: "bg-success", hero: "from-success/20" }
+  : p >= 70 ? { texto: "text-warning", barra: "bg-warning", hero: "from-warning/20" }
+  : { texto: "text-destructive", barra: "bg-destructive", hero: "from-destructive/20" };
 
 const tonoNota = (nota: number | null) =>
   nota == null ? { texto: "text-muted-foreground", anillo: "ring-border", punto: "bg-muted-foreground/40" }
-  : nota >= 8 ? { texto: "text-emerald-500", anillo: "ring-emerald-500/30", punto: "bg-emerald-500" }
-  : nota >= 6 ? { texto: "text-amber-500", anillo: "ring-amber-500/30", punto: "bg-amber-500" }
-  : { texto: "text-red-500", anillo: "ring-red-500/30", punto: "bg-red-500" };
+  : nota >= 8 ? { texto: "text-success", anillo: "ring-success/30", punto: "bg-success" }
+  : nota >= 6 ? { texto: "text-warning", anillo: "ring-warning/30", punto: "bg-warning" }
+  : { texto: "text-destructive", anillo: "ring-destructive/30", punto: "bg-destructive" };
 
 type Orden = "nota" | "ventas";
 
@@ -400,7 +400,7 @@ export default function EquipoDashboard() {
               {hoy.notas.length > 0 && (
                 <div className="mt-3 space-y-1.5 border-t border-white/5 pt-3">
                   {hoy.notas.map((n) => (
-                    <p key={n} className="flex items-start gap-1.5 text-[11px] text-amber-500">
+                    <p key={n} className="flex items-start gap-1.5 text-[11px] text-warning">
                       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{n}
                     </p>
                   ))}
@@ -412,13 +412,13 @@ export default function EquipoDashboard() {
 
         {/* ── A QUIÉN EMPUJAR — una ficha por persona, con el motivo ── */}
         {!cargando && atencion.hay > 0 && (
-          <section className="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-transparent p-4">
+          <section className="rounded-2xl border border-warning/20 bg-gradient-to-r from-warning/10 to-transparent p-4">
             <div className="mb-2.5 flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning">
                 <AlertTriangle className="h-4 w-4 text-white" />
               </span>
               <h2 className="text-sm font-semibold">A quién empujar</h2>
-              <Badge variant="outline" className="rounded-full border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-500">{atencion.hay}</Badge>
+              <Badge variant="outline" className="rounded-full border-warning/30 bg-warning/10 text-[10px] text-warning">{atencion.hay}</Badge>
             </div>
             <div className="flex flex-wrap gap-2">
               {atencion.gente.map(([id, p]) => (
@@ -427,8 +427,8 @@ export default function EquipoDashboard() {
                   nombre={p.nombre}
                   detalle={p.motivos.join(" · ")}
                   icono={p.nivel === 2 ? TrendingDown : p.nivel === 1 ? Gauge : AlertTriangle}
-                  clase={p.nivel === 2 ? "border-red-500/30 bg-red-500/10 text-red-400"
-                    : p.nivel === 1 ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+                  clase={p.nivel === 2 ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : p.nivel === 1 ? "border-warning/30 bg-warning/10 text-warning"
                     : "border-white/10 bg-white/5 text-muted-foreground"}
                 />
               ))}
@@ -527,7 +527,7 @@ function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPerio
             {/* El feedback del TL ya está dentro de la nota; acá se dice cuánto
                 de ella es feedback, para que nadie tenga que adivinarlo. */}
             {!!f.feedback_n && (
-              <span className={Number(f.feedback_puntos) < 0 ? "text-red-400" : "text-emerald-500"}>
+              <span className={Number(f.feedback_puntos) < 0 ? "text-destructive" : "text-success"}>
                 {" "}· feedback {Number(f.feedback_puntos) > 0 ? "+" : ""}{Number(f.feedback_puntos)}
               </span>
             )}

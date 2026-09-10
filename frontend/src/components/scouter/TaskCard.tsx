@@ -88,7 +88,7 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
     <div
       className={`rounded-xl border p-4 space-y-3 transition-all ${
         allDone
-          ? "border-emerald-500/30 shadow-[0_0_12px_-4px_rgb(34_197_94_/_0.3)]"
+          ? "border-success/30 shadow-[0_0_12px_-4px_rgb(34_197_94_/_0.3)]"
           : allSkipped
           ? "border-border/30 bg-muted/10 opacity-60"
           : "border-border bg-card"

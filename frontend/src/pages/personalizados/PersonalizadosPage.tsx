@@ -205,13 +205,13 @@ export default function PersonalizadosPage() {
               key={k.l}
               title={k.ayuda}
               className={`rounded-2xl border px-3 py-2 ${
-                k.nivel === "vencido" ? "border-red-500/40 bg-red-500/5"
-                : k.nivel === "atencion" ? "border-amber-500/30 bg-amber-500/5"
+                k.nivel === "vencido" ? "border-destructive/40 bg-destructive/5"
+                : k.nivel === "atencion" ? "border-warning/30 bg-warning/5"
                 : "border-border/60 bg-card"
               }`}
             >
               <p className="text-xs text-muted-foreground">{k.l}</p>
-              <p className={`text-lg font-semibold leading-tight ${k.nivel === "vencido" ? "text-red-500" : k.nivel === "atencion" ? "text-amber-500" : ""}`}>{k.v}</p>
+              <p className={`text-lg font-semibold leading-tight ${k.nivel === "vencido" ? "text-destructive" : k.nivel === "atencion" ? "text-warning" : ""}`}>{k.v}</p>
             </div>
           ))}
         </div>

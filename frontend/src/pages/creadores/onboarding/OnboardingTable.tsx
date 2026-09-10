@@ -32,7 +32,7 @@ interface Props {
 const statusConfig = {
   Completado: { icon: CheckCircle2, className: "bg-success/10 text-success border-success/20" },
   Pendiente: { icon: Clock, className: "bg-muted text-muted-foreground border-border" },
-  "En Progreso": { icon: Loader2, className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  "En Progreso": { icon: Loader2, className: "bg-primary/10 text-primary border-primary/20" },
 };
 
 const OnboardingTable = ({ data, onManage }: Props) => {
@@ -100,7 +100,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                         <Tooltip>
                         <TooltipTrigger asChild>
                             <span className="inline-flex shrink-0">
-                              <ShieldAlert className="h-4 w-4 text-orange-500" />
+                              <ShieldAlert className="h-4 w-4 text-warning" />
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
@@ -129,7 +129,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="inline-flex">
-                            <ShieldAlert className="h-4 w-4 text-orange-500" />
+                            <ShieldAlert className="h-4 w-4 text-warning" />
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>Pendiente de aprobación</TooltipContent>

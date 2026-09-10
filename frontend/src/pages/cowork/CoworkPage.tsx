@@ -354,12 +354,12 @@ export default function CoworkPage() {
                       {s.hostName && s.createdBy !== userId ? ` · de ${s.hostName}` : ""}
                       {" · "}{s.members} {s.members === 1 ? "miembro" : "miembros"}
                       {s.online != null && (
-                        <span className={s.online > 0 ? "text-emerald-500 font-medium" : ""}>
+                        <span className={s.online > 0 ? "text-success font-medium" : ""}>
                           {" "}· {s.online} en línea
                         </span>
                       )}
                       {s.incognito.length > 0 && (
-                        <span className="text-violet-500" title="Solo los admins ven esto">
+                        <span className="text-accent" title="Solo los admins ven esto">
                           {" "}· 🕶 {s.incognito.join(", ")}
                         </span>
                       )}
@@ -396,7 +396,7 @@ export default function CoworkPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
+                        className="rounded-full gap-1 shrink-0 text-accent hover:text-accent/80"
                         title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
                         onClick={() => setSearchParams({ session: s.id, spy: "1" })}
                       >
@@ -444,7 +444,7 @@ export default function CoworkPage() {
                       >
                         <span className={
                           r.online != null && r.online > 0
-                            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+                            ? "h-1.5 w-1.5 rounded-full bg-success"
                             : "h-1.5 w-1.5 rounded-full bg-muted-foreground/30"
                         } />
                         {r.name}

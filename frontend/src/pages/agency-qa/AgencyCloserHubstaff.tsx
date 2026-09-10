@@ -55,7 +55,7 @@ export default function AgencyCloserHubstaff() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 text-emerald-500" /> Esfuerzo vs Cierre
+            <Activity className="h-4 w-4 text-success" /> Esfuerzo vs Cierre
           </h3>
           <p className="text-sm text-muted-foreground">
             Horas de Hubstaff cruzadas con el pipeline y la QA de llamadas — {stats && periodLabel(stats.period)}.

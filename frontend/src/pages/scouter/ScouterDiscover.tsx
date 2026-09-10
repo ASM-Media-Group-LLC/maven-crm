@@ -258,24 +258,24 @@ const LeadFoundRow = ({ line }: { line: LeadFoundLine }) => {
   const aiCfg = line.aiStatus ? AI_STATUS_COLORS[line.aiStatus] : null;
   return (
     <div className="flex items-center gap-2 group">
-      <span className="shrink-0 text-zinc-600 select-none tabular-nums">{line.ts}</span>
-      <span className="text-emerald-400 select-none">✓</span>
+      <span className="shrink-0 text-muted-foreground select-none tabular-nums">{line.ts}</span>
+      <span className="text-success select-none">✓</span>
       <span className="shrink-0">{line.flag}</span>
       <a
         href={`https://www.instagram.com/${line.handle}/`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-white font-semibold hover:text-emerald-300 truncate"
+        className="text-white font-semibold hover:text-success truncate"
       >
         @{line.handle}
       </a>
       {line.followers != null && (
-        <span className="text-zinc-500 tabular-nums shrink-0">
+        <span className="text-muted-foreground tabular-nums shrink-0">
           {formatFollowers(line.followers)}
         </span>
       )}
       {line.country && (
-        <span className="text-zinc-500 truncate hidden md:inline">· {line.country}</span>
+        <span className="text-muted-foreground truncate hidden md:inline">· {line.country}</span>
       )}
       {line.companySlug && (
         <span className="text-violet-400/80 truncate hidden md:inline">
@@ -319,7 +319,7 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
       <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
         <Terminal className="h-3.5 w-3.5 text-emerald-400" />
         <span className="text-xs font-semibold text-emerald-400/90">Scout Console</span>
-        <span className="text-[10px] text-zinc-500 ml-auto tabular-nums">
+        <span className="text-[10px] text-muted-foreground ml-auto tabular-nums">
           {lines.length} líneas
         </span>
       </div>
@@ -329,9 +329,9 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
         className="max-h-[280px] min-h-[160px] overflow-y-auto px-3 py-2 font-mono text-[11px] leading-[1.6]"
       >
         {lines.length === 0 ? (
-          <div className="flex items-center gap-1.5 text-zinc-600 py-4">
+          <div className="flex items-center gap-1.5 text-muted-foreground py-4">
             <span
-              className="inline-block h-2 w-2 rounded-full bg-zinc-600"
+              className="inline-block h-2 w-2 rounded-full bg-muted-foreground"
               style={{ animation: "discover-blink 1s step-end infinite" }}
             />
             Esperando actividad del worker…
@@ -340,7 +340,7 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
           lines.map((line) =>
             line.kind === "plain" ? (
               <div key={line.id} className="flex gap-2">
-                <span className="shrink-0 text-zinc-600 select-none">{line.ts}</span>
+                <span className="shrink-0 text-muted-foreground select-none">{line.ts}</span>
                 <span style={{ color: LEVEL_COLORS[line.level] }}>{line.text}</span>
               </div>
             ) : (

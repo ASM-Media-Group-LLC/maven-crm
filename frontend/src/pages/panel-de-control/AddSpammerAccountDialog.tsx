@@ -135,7 +135,7 @@ const AddSpammerAccountDialog = ({ open, onOpenChange }: Props) => {
               <p className="mt-1 text-[11px] text-destructive">{handleError}</p>
             )}
             {!handleError && cleanedHandle && cleanedHandle !== handle.trim().replace(/^@+/, "") && (
-              <p className="mt-1 text-[11px] text-emerald-500">
+              <p className="mt-1 text-[11px] text-success">
                 Detectado: @{cleanedHandle}
               </p>
             )}
