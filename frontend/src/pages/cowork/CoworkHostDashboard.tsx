@@ -10,7 +10,8 @@ import {
   X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelLeftClose, PanelLeftOpen,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, Timer } from "lucide-react";
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
+  type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -42,6 +43,52 @@ import CoworkReglasDialog from "./CoworkReglasDialog";
 import CoworkPausasDialog from "./CoworkPausasDialog";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { UserAvatar } from "@/components/UserAvatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
+// Un control de la tarjeta de sala (escuchar, hablar, cámara, pantalla). El
+// estado se lee por el color, no por la palabra: apagado es neutro, encendido
+// es verde (algo tuyo está saliendo a esa sala) y "caído" es rojo latiendo,
+// porque un botón verde con el micro muerto es el peor de los mundos. Antes
+// "Hablar" apagado era rojo, y en una sesión de once salas eran once botones
+// rojos gritando sin que pasara nada.
+function BotonSala({ activo, tono = "verde", icono: Icono, etiqueta, title, grande, onClick }: {
+  activo: boolean;
+  /** "neutro": encendido es el estado normal (escuchar); "verde": encendido
+   *  es algo tuyo saliendo a la sala; "caido": está encendido pero no llega. */
+  tono?: "neutro" | "verde" | "caido";
+  icono: LucideIcon;
+  /** Texto al lado del icono. En la tarjeta solo lo lleva Hablar; en la hoja
+   *  del teléfono lo llevan todos. */
+  etiqueta?: string;
+  title: string;
+  grande?: boolean;
+  onClick: () => void;
+}) {
+  const color = tono === "caido"
+    ? "bg-destructive text-white animate-pulse motion-reduce:animate-none"
+    : activo
+      ? (tono === "neutro" ? "text-foreground hover:bg-muted" : "bg-success text-white hover:bg-success/90")
+      : "text-muted-foreground/60 hover:bg-muted hover:text-foreground";
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-pressed={activo}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
+        grande ? "h-11 flex-1 px-3" : "h-8 min-w-8 px-2 tactil:h-10 tactil:min-w-10",
+        color,
+      )}
+    >
+      <Icono className={grande ? "h-4 w-4" : "h-3.5 w-3.5"} />
+      {etiqueta && <span>{etiqueta}</span>}
+    </button>
+  );
+}
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -1097,6 +1144,135 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     finally { setRoomBusy(false); }
   };
 
+  // ── Tarjeta de sala (rediseño, fase 6) ──────────────────────────────────
+  //
+  // El video es el protagonista. Lo que antes iba ARRIBA del video como texto
+  // (reloj, "Compartiendo: …", pausas) ahora va ENCIMA del video: los llamados
+  // como etiquetas y la gente con su reloj al pie. Los controles bajan a una
+  // sola fila; editar, cerrar y copiar el enlace se guardan en el menú «⋯».
+  // En el teléfono la tarjeta es solo el video: al tocarla, sus controles
+  // suben en una hoja inferior.
+  const isMobile = useIsMobile();
+  const [salaEnHoja, setSalaEnHoja] = useState<string | null>(null);
+
+  const minutosTexto = (seg: number) => (seg < 60 ? `${seg} s` : `${Math.floor(seg / 60)} min`);
+
+  type Etiqueta = { key: string; texto: string; tono: "warning" | "destructive" | "muted"; icono: LucideIcon };
+  /** Los llamados de atención de una sala: lo que el supervisor tiene que ver
+   *  sin leer. Con dos personas en la sala, cada etiqueta dice de quién es. */
+  const etiquetasDe = (participants: Array<{ user_id: string }>, sinPausaGlobal: boolean): Etiqueta[] => {
+    const out: Etiqueta[] = [];
+    for (const a of participants) {
+      const ms = mediaStates[a.user_id];
+      const quien = participants.length > 1 ? `${nombreYApellido(cowork.profiles[a.user_id])} · ` : "";
+      const problema = faceIssue(ms);
+      if (problema && ms?.faceSince) {
+        out.push({
+          key: `${a.user_id}-cara`,
+          icono: problema === "Cámara apagada" ? VideoOff : EyeOff,
+          texto: `${quien}${problema} · ${minutosTexto(Math.floor((now - ms.faceSince) / 1000))}`,
+          tono: "warning",
+        });
+      }
+      if (sinPantalla(ms) && ms?.screenShareSince) {
+        out.push({
+          key: `${a.user_id}-pantalla`,
+          icono: MonitorOff,
+          texto: `${quien}Sin pantalla · ${minutosTexto(Math.floor((now - ms.screenShareSince) / 1000))}`,
+          tono: "warning",
+        });
+      }
+      const pausa = sinPausaGlobal ? pausaDe(a.user_id) : null;
+      if (pausa) {
+        out.push({
+          key: `${a.user_id}-pausa`,
+          icono: Coffee,
+          texto: `${quien}${pausa.etiqueta} ${pausa.cuenta.texto}`,
+          tono: pausa.cuenta.estado === "excedida" ? "destructive" : pausa.cuenta.estado === "poco" ? "warning" : "muted",
+        });
+      }
+    }
+    return out;
+  };
+  const TONO_ETIQUETA: Record<Etiqueta["tono"], string> = {
+    warning: "bg-warning text-warning-foreground",
+    destructive: "bg-destructive text-white animate-pulse motion-reduce:animate-none",
+    muted: "bg-black/60 text-white",
+  };
+
+  /** La gente de una sala con su reloj de Cowork (el mismo número que ve la
+   *  persona, porque viaja por presencia). */
+  const personasDe = (participants: Array<{ user_id: string }>) => participants.map((a) => {
+    const reloj = relojDesdePresencia(mediaStates[a.user_id]);
+    const corre = reloj?.estado === "activo";
+    return {
+      uid: a.user_id,
+      nombre: nombreYApellido(cowork.profiles[a.user_id]),
+      online: isOnline(a.user_id),
+      reloj: reloj ? formatoReloj(segundosMostrados(reloj, now)) : null,
+      corre,
+      motivo: reloj && !corre ? motivoDetenidoDeOtro(reloj.estado) : null,
+    };
+  });
+
+  /** Los cuatro controles de una sala. Misma lógica que siempre (escuchar /
+   *  hablar / cámara / pantalla por sala); solo cambia el tamaño: en la
+   *  tarjeta son iconos, en la hoja del teléfono llevan su palabra. */
+  const controlesDeSala = (room: CoworkRoom, grande: boolean) => (
+    <>
+      <BotonSala
+        grande={grande}
+        tono="neutro"
+        activo={hearFor(room.id)}
+        icono={hearFor(room.id) ? Volume2 : VolumeX}
+        etiqueta={grande ? (hearFor(room.id) ? "Escuchando" : "Silenciada") : undefined}
+        title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la escuchas). Toca para escuchar."}
+        onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
+      />
+      <BotonSala
+        grande={grande}
+        tono={broadcastFor(room.id) && micCaido ? "caido" : "verde"}
+        activo={broadcastFor(room.id)}
+        icono={broadcastFor(room.id) && !micCaido ? Mic : MicOff}
+        etiqueta={broadcastFor(room.id) ? (micCaido ? "Micro caído" : "Hablando") : "Hablar"}
+        title={broadcastFor(room.id)
+          ? (micCaido ? "Tu micrófono no está llegando a esta sala." : "Tu voz va a esta sala. Toca para dejar de hablarle.")
+          : "Toca para hablarle solo a esta sala."}
+        onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+      />
+      <BotonSala
+        grande={grande}
+        activo={camFor(room.id)}
+        icono={camFor(room.id) ? Video : VideoOff}
+        etiqueta={grande ? "Cámara" : undefined}
+        title={camFor(room.id) ? "Tu cámara se ve en esta sala. Toca para apagarla acá." : "Comparte tu cámara solo con esta sala."}
+        onClick={() => setRoomCam((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+      />
+      <BotonSala
+        grande={grande}
+        activo={screenFor(room.id)}
+        icono={screenFor(room.id) ? ScreenShare : ScreenShareOff}
+        etiqueta={grande ? "Pantalla" : undefined}
+        title={screenFor(room.id) ? "Tu pantalla se ve en esta sala. Toca para dejar de compartirla acá." : "Comparte tu pantalla solo con esta sala."}
+        onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+      />
+    </>
+  );
+
+  const copiarEnlaceDeSala = (room: CoworkRoom) => {
+    const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success(`Enlace de ${room.name} copiado`);
+  };
+  const copiarCodigoDeSala = (room: CoworkRoom) => {
+    if (!room.join_code) return;
+    navigator.clipboard.writeText(room.join_code);
+    toast.success(`Código de ${room.name}: ${room.join_code}`);
+  };
+
+  const conectadas = cowork.assignments.filter((a) => a.is_active).length;
+  const fraseDeSalas = `${conectadas} ${conectadas === 1 ? "persona conectada" : "personas conectadas"} en ${cowork.rooms.length} ${cowork.rooms.length === 1 ? "sala" : "salas"}.`;
+
   return (
     <div className="flex flex-1 min-h-0 bg-background text-foreground relative">
       {/* Mobile sidebar toggle */}
@@ -1169,7 +1345,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
       <div className={`
         fixed md:relative z-40 md:z-auto
-        w-72 md:w-80 h-[calc(100dvh-3.5rem)] md:h-full
+        w-72 xl:w-80 h-[calc(100dvh-3.5rem)] md:h-full
         border-r border-border flex flex-col bg-card
         transition-transform duration-200 ease-in-out
         ${sidebarCollapsed ? "md:hidden" : ""}
@@ -1282,7 +1458,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 text-[10px] text-warning hover:text-warning/80 px-1.5"
+                  className="h-5 text-[10px] text-primary hover:text-primary/80 px-1.5"
                   onClick={() => setHubMinimized(!hubMinimized)}
                 >
                   {hubMinimized ? "Mostrar" : "Minimizar"}
@@ -1291,7 +1467,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 text-[10px] text-warning hover:text-warning/80 px-1.5"
+                  className="h-5 text-[10px] text-primary hover:text-primary/80 px-1.5"
                   onClick={conectarHub}
                 >
                   Reconectar
@@ -1488,10 +1664,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             />
           </div>
         ) : (
-          <div className="flex-1 overflow-auto p-4 pt-14 pb-32 md:p-6">
-            <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-              <h3 className="text-sm font-medium text-muted-foreground">Seleccione sala para ingresar</h3>
-              <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 pt-14 pb-28 md:p-6 md:pb-32">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-semibold leading-tight text-foreground">Salas</h2>
+                <p className="text-sm text-muted-foreground">{fraseDeSalas}</p>
+              </div>
+              {/* Los cuatro botones globales fijan TODAS las salas de un golpe;
+                  en el teléfono quedan solo con el icono para caber en una fila. */}
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -1502,7 +1683,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarEscuchaDeTodas(!todasEscuchando)}
                 >
                   {todasEscuchando ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  {todasEscuchando ? "Escuchando todas" : "Escuchar todas"}
+                  <span className="hidden sm:inline">{todasEscuchando ? "Escuchando todas" : "Escuchar todas"}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1526,7 +1707,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarMicDeTodas(!hablandoATodas)}
                 >
                   {hablandoATodas && !micCaido ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  {micCaido ? "Micro caído" : hablandoATodas ? "Hablando a todas" : "Hablar a todas"}
+                  <span className="hidden sm:inline">{micCaido ? "Micro caído" : hablandoATodas ? "Hablando a todas" : "Hablar a todas"}</span>
                 </Button>
                 {/* Cámara y pantalla a todas: mismo modelo que escuchar/hablar —
                     el global fija todas y después se apagan salas individuales. */}
@@ -1540,7 +1721,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarCamDeTodas(!camaraATodas)}
                 >
                   {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-                  {camaraATodas ? "Cámara en todas" : "Cámara a todas"}
+                  <span className="hidden sm:inline">{camaraATodas ? "Cámara en todas" : "Cámara a todas"}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1552,363 +1733,209 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={() => fijarScreenDeTodas(!pantallaATodas)}
                 >
                   {pantallaATodas ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
-                  {pantallaATodas ? "Pantalla en todas" : "Pantalla a todas"}
+                  <span className="hidden sm:inline">{pantallaATodas ? "Pantalla en todas" : "Pantalla a todas"}</span>
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   className="gap-1 rounded-full h-8 shrink-0"
+                  title="Añadir sala"
                   onClick={() => { setAddName(""); setAddOpen(true); }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Añadir sala
+                  <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Añadir sala</span>
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+            {/* La grilla se llena sola: en un monitor grande entran cinco o
+                seis salas por fila y todas quedan a la vista; en una ventana
+                angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
+            <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
               {cowork.rooms.map((room) => {
                 const participants = getRoomParticipants(room.id);
-                const sharers = getRoomSharers(room.id);
                 const speakers = roomSpeakers[room.id] ?? [];
+                const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
+                const etiquetas = etiquetasDe(participants, !pausaSala);
+                const personas = personasDe(participants);
+                const monitor = (showVideo: boolean) => (
+                  <CoworkRoomMonitor
+                    roomId={room.id}
+                    roomName={room.name}
+                    issueToken={cowork.issueLiveKitToken}
+                    showVideo={showVideo}
+                    showNames={false}
+                    hearOn={hearFor(room.id)}
+                    broadcastOn={broadcastFor(room.id)}
+                    micBaseTrack={micBaseTrack}
+                    camOn={camFor(room.id)}
+                    camBaseTrack={camBaseTrack}
+                    screenOn={screenFor(room.id)}
+                    screenBaseTrack={screenBaseTrack}
+                    enabled={activeRoomId !== room.id}
+                    onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
+                    onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
+                  />
+                );
                 return (
                   <div
                     key={room.id}
-                    className={`bg-card border rounded-2xl overflow-hidden transition-colors ${
-                      // Verde manda sobre azul: que alguien esté HABLANDO ahora es
-                      // más urgente de ver que que esté compartiendo pantalla.
-                      speakers.length
-                        ? "border-success"
-                        : sharers.length
-                          ? "border-primary/50"
-                          : "border-border"
-                    }`}
+                    data-sala={room.id}
+                    role={isMobile ? "button" : undefined}
+                    tabIndex={isMobile ? 0 : undefined}
+                    // En el teléfono la tarjeta entera abre su hoja de controles.
+                    // Un toque sobre un botón de adentro (el de ver la pantalla
+                    // compartida) hace lo suyo y no abre nada.
+                    onClick={isMobile ? (e) => { if ((e.target as HTMLElement).closest("button")) return; setSalaEnHoja(room.id); } : undefined}
+                    onKeyDown={isMobile ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSalaEnHoja(room.id); } } : undefined}
+                    className={cn(
+                      "flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card transition-colors",
+                      // Verde cuando alguien está HABLANDO ahora: es lo único que
+                      // amerita pintar la tarjeta. Compartir pantalla es lo normal
+                      // y ya no colorea el borde; lo anormal (no compartir) sale
+                      // como etiqueta sobre el video.
+                      speakers.length ? "border-success" : "border-border",
+                      isMobile && "cursor-pointer active:bg-muted/40",
+                    )}
                   >
-                    <div className="p-4 pb-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-foreground truncate">{room.name}</span>
-                        <div className="flex items-center gap-1 tactil:gap-1.5 shrink-0">
-                          <Badge variant="secondary" className="text-[10px] rounded-full">
-                            {participants.length} <Users2 className="h-2.5 w-2.5 ml-0.5" />
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 tactil:h-9 tactil:w-9 text-muted-foreground hover:text-foreground rounded-lg"
-                            title="Editar sala"
-                            onClick={() => openEdit(room)}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 tactil:h-9 tactil:w-9 text-muted-foreground hover:text-destructive rounded-lg"
-                            title="Cerrar sala"
-                            onClick={() => setCloseTarget(room)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                      {/* Quién de esta sala está en pausa y hace cuánto. Verde
-                          mientras esté dentro del límite; rojo y parpadeando si
-                          se pasó — es lo que el coordinador tiene que ver sin
-                          leer, de un vistazo sobre la miniatura. */}
-                      {(() => {
-                        const enPausa = participants
-                          .map((p) => ({ p, pausa: pausaDe(p.user_id) }))
-                          .filter((x) => x.pausa);
-                        if (!enPausa.length) return null;
-                        return (
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            {enPausa.map(({ p, pausa }) => (
-                              <span
-                                key={p.user_id}
-                                className={cn(
-                                  "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-                                  pausa!.cuenta.estado === "excedida" ? "bg-destructive/20 animate-pulse"
-                                    : pausa!.cuenta.estado === "poco" ? "bg-warning/15"
-                                    : "bg-success/15",
-                                  clasesPausa(pausa!.cuenta.estado),
-                                )}
-                                title={`${cowork.profiles[p.user_id] || "Alguien"} · ${pausa!.etiqueta}${pausa!.excedida ? " · PASADO del límite" : " · le quedan " + pausa!.cuenta.texto}`}
-                              >
-                                <Coffee className="h-2.5 w-2.5 shrink-0" />
-                                <span className="truncate max-w-[92px]">{nombreYApellido(cowork.profiles[p.user_id])}</span> {pausa!.cuenta.texto}
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      {/* El reloj de tiempo trabajado de cada persona (reemplazo de
-                          Hubstaff): el mismo número que ve la persona, porque viaja
-                          por presencia desde su último latido. Verde corriendo, gris
-                          detenido con el motivo. */}
-                      {(() => {
-                        const conReloj = participants
-                          .map((p) => ({ p, reloj: relojDesdePresencia(mediaStates[p.user_id]) }))
-                          .filter((x) => x.reloj);
-                        if (!conReloj.length) return null;
-                        return (
-                          <div className="mt-1 flex flex-wrap items-center gap-1" data-testid="relojes-sala">
-                            {conReloj.map(({ p, reloj }) => {
-                              const corre = reloj!.estado === "activo";
-                              const seg = segundosMostrados(reloj, now);
-                              const motivo = motivoDetenidoDeOtro(reloj!.estado);
-                              return (
-                                <span
-                                  key={p.user_id}
-                                  className={cn(
-                                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-                                    corre ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
-                                  )}
-                                  title={`${cowork.profiles[p.user_id] || "Alguien"} · hoy ${formatoReloj(seg)} con el reloj corriendo${corre ? "" : ` · detenido: ${motivo}`}`}
-                                >
-                                  <Timer className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="truncate max-w-[92px]">{nombreYApellido(cowork.profiles[p.user_id])}</span> {formatoReloj(seg)}
-                                  {!corre && motivo && <span className="font-normal opacity-80">· {motivo}</span>}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                      {/* Estado de pantalla compartida de la sala, con quién comparte. */}
-                      <div className="mt-1 flex items-center gap-1.5">
-                        {pausaDeLaSala(participants.map((p) => p.user_id)) ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Coffee className="h-3 w-3 shrink-0" /> En pausa · cámara y pantalla apagadas
-                          </span>
-                        ) : sharers.length > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium">
-                            <Monitor className="h-3 w-3 shrink-0" /> Compartiendo: {sharers.join(", ")}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                            <Monitor className="h-3 w-3 shrink-0" /> Sin pantalla compartida
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="p-4 pt-1 space-y-3">
-                      {participants.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground/50 italic">Sin participantes</p>
-                      ) : (
-                        <>
-                          {(room.preview_mode ?? "video") === "avatars" ? (
-                            <>
-                              <div className="grid grid-cols-2 gap-2">
-                                {participants.map((a) => {
-                                  const fullName = cowork.profiles[a.user_id] || "User";
-                                  const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-                                  const online = isOnline(a.user_id);
-                                  return (
-                                    <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
-                                      <div className="relative">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
-                                          {initials}
-                                        </div>
-                                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-success" : "bg-muted-foreground/30"}`} />
-                                      </div>
-                                      <span className="text-[11px] text-muted-foreground truncate w-full">{fullName}</span>
-                                      {(() => {
-                                        const ms = mediaStates[a.user_id];
-                                        if (!ms) return null;
-                                        return (
-                                          <div className="flex items-center gap-1.5 mt-0.5">
-                                            {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
-                                            {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
-                                            {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
-                                            {faceIssue(ms) && (
-                                              <span
-                                                className="flex items-center gap-0.5 text-[10px] text-warning"
-                                                title={`${faceIssue(ms)} desde hace ${formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}`}
-                                              >
-                                                <EyeOff className="h-3 w-3" />
-                                                {formatBreak(Math.floor((now - (ms.faceSince as number)) / 1000))}
-                                              </span>
-                                            )}
-                                            {sinPantalla(ms) && (
-                                              <span
-                                                className="flex items-center gap-0.5 text-[10px] text-warning"
-                                                title={`Sin compartir pantalla desde hace ${formatBreak(Math.floor((now - (ms.screenShareSince as number)) / 1000))}`}
-                                              >
-                                                <MonitorOff className="h-3 w-3" />
-                                                {formatBreak(Math.floor((now - (ms.screenShareSince as number)) / 1000))}
-                                              </span>
-                                            )}
-                                            {ms.onBreak && ms.breakStartedAt && (
-                                              <span className="flex items-center gap-0.5 text-[10px] text-warning font-mono tabular-nums">
-                                                <Coffee className="h-3 w-3" />
-                                                {formatBreak(Math.max(0, Math.floor((now - ms.breakStartedAt) / 1000)))}
-                                              </span>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
-                              <CoworkRoomMonitor
-                                roomId={room.id}
-                                roomName={room.name}
-                                issueToken={cowork.issueLiveKitToken}
-                                showVideo={false}
-                                hearOn={hearFor(room.id)}
-                                broadcastOn={broadcastFor(room.id)}
-                                micBaseTrack={micBaseTrack}
-                                camOn={camFor(room.id)}
-                                camBaseTrack={camBaseTrack}
-                                screenOn={screenFor(room.id)}
-                                screenBaseTrack={screenBaseTrack}
-                                enabled={activeRoomId !== room.id}
-                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
-                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
-                              />
-                            </>
-                          ) : pausaDeLaSala(participants.map((p) => p.user_id)) ? (
-                            <>
-                              <SalaEnPausa pausa={pausaDeLaSala(participants.map((p) => p.user_id))!} />
-                              {/* El monitor sigue conectado SOLO para el audio: el
-                                  supervisor puede hablarle a la sala cuando vuelva. */}
-                              <CoworkRoomMonitor
-                                roomId={room.id}
-                                roomName={room.name}
-                                issueToken={cowork.issueLiveKitToken}
-                                showVideo={false}
-                                hearOn={hearFor(room.id)}
-                                broadcastOn={broadcastFor(room.id)}
-                                micBaseTrack={micBaseTrack}
-                                camOn={camFor(room.id)}
-                                camBaseTrack={camBaseTrack}
-                                screenOn={screenFor(room.id)}
-                                screenBaseTrack={screenBaseTrack}
-                                enabled={activeRoomId !== room.id}
-                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
-                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
-                              />
-                            </>
-                          ) : (
-                            <div className="h-36 rounded-xl overflow-hidden bg-black/40 border border-border">
-                              <CoworkRoomMonitor
-                                roomId={room.id}
-                                roomName={room.name}
-                                issueToken={cowork.issueLiveKitToken}
-                                showVideo
-                                hearOn={hearFor(room.id)}
-                                broadcastOn={broadcastFor(room.id)}
-                                micBaseTrack={micBaseTrack}
-                                camOn={camFor(room.id)}
-                                camBaseTrack={camBaseTrack}
-                                screenOn={screenFor(room.id)}
-                                screenBaseTrack={screenBaseTrack}
-                                enabled={activeRoomId !== room.id}
-                                onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
-                                onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
-                              />
-                            </div>
-                          )}
-
-                          {/* Central de audio por sala: escuchar (🔊) y hablarle (🎤) */}
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg ${hearFor(room.id) ? "text-foreground" : "text-muted-foreground/50"}`}
-                              title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la escuchas). Toca para escuchar."}
-                              onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
-                            >
-                              {hearFor(room.id) ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                              {hearFor(room.id) ? "Escuchando" : "Silenciada"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${broadcastFor(room.id) ? "bg-success text-white hover:bg-success/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
-                              title={broadcastFor(room.id)
-                                ? "Tu voz va a esta sala. Toca para dejar de hablarle."
-                                : "Toca para hablarle solo a esta sala."}
-                              onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
-                            >
-                              {broadcastFor(room.id) ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                              {broadcastFor(room.id) ? "Hablando" : "Hablar"}
-                            </Button>
-                          </div>
-                          {/* Fila 2: broadcast de cámara y pantalla a ESTA sala.
-                              Igual que el 🎤: el global enciende todas, acá se
-                              apagan (o encienden) salas puntuales. */}
-                          <div className="flex gap-1 mt-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${camFor(room.id) ? "bg-success text-white hover:bg-success/90" : "text-muted-foreground/60 hover:text-foreground"}`}
-                              title={camFor(room.id)
-                                ? "Tu cámara se ve en esta sala. Toca para apagarla acá."
-                                : "Comparte tu cámara solo con esta sala."}
-                              onClick={() => setRoomCam((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
-                            >
-                              {camFor(room.id) ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-                              {camFor(room.id) ? "Cámara" : "Cámara"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 tactil:h-9 flex-1 text-[11px] gap-1 rounded-lg font-medium ${screenFor(room.id) ? "bg-success text-white hover:bg-success/90" : "text-muted-foreground/60 hover:text-foreground"}`}
-                              title={screenFor(room.id)
-                                ? "Tu pantalla se ve en esta sala. Toca para dejar de compartirla acá."
-                                : "Comparte tu pantalla solo con esta sala."}
-                              onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
-                            >
-                              {screenFor(room.id) ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
-                              Pantalla
-                            </Button>
-                          </div>
-                        </>
-                      )}
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="flex-1 h-8 tactil:h-9 text-xs gap-1 rounded-xl"
-                          onClick={() => enterRoom(room.id)}
-                        >
-                          <DoorOpen className="h-3 w-3" /> Entrar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 tactil:h-9 tactil:w-9 text-primary hover:text-primary/80 rounded-xl"
-                          title="Copiar enlace de participante para esta sala"
-                          onClick={() => {
-                            const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
-                            navigator.clipboard.writeText(url);
-                            toast.success(`Enlace de ${room.name} copiado`);
-                          }}
-                        >
-                          <Share2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-
-                      {/* Código de la sala: la alternativa al link que sobrevive a
-                          WhatsApp y se puede dictar por voz. El participante lo pega
-                          en "Entrar con el código de tu sala". */}
+                    {/* Cabecera de una línea: nombre, código y cuántos hay. */}
+                    <div className="flex h-10 items-center gap-2 px-3">
+                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{room.name}</span>
                       {room.join_code && (
                         <button
                           type="button"
                           title="Copiar código de esta sala"
-                          className="flex items-center justify-center gap-1.5 w-full py-0 tactil:py-2 text-[11px] text-muted-foreground hover:text-primary active:text-primary transition-colors"
-                          onClick={() => {
-                            navigator.clipboard.writeText(room.join_code!);
-                            toast.success(`Código de ${room.name}: ${room.join_code}`);
-                          }}
+                          className="hidden md:inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
+                          onClick={() => copiarCodigoDeSala(room)}
                         >
-                          <KeyRound className="h-3 w-3" />
-                          <span className="font-mono tracking-[0.2em]">{room.join_code}</span>
+                          {room.join_code}
                           <Copy className="h-2.5 w-2.5 opacity-60" />
                         </button>
                       )}
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={`${participants.length} en la sala`}>
+                        <Users2 className="h-3 w-3" />{participants.length}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="hidden md:inline-flex h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
+                            title="Más opciones de la sala"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
+                            <Link2 className="mr-2 h-4 w-4" /> Copiar enlace de participante
+                          </DropdownMenuItem>
+                          {room.join_code && (
+                            <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
+                              <KeyRound className="mr-2 h-4 w-4" /> Copiar código <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openEdit(room)}>
+                            <Pencil className="mr-2 h-4 w-4" /> Editar sala
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
+                            <X className="mr-2 h-4 w-4" /> Cerrar sala
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    {/* El video, a 16:9 y de borde a borde. Encima: los llamados
+                        (arriba a la izquierda) y la gente con su reloj (abajo). */}
+                    <div className={cn("relative aspect-video overflow-hidden", participants.length === 0 ? "bg-muted/50" : "bg-black/40")}>
+                      {participants.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
+                          <Users2 className="h-5 w-5" />
+                          <span className="text-xs">Sin participantes</span>
+                        </div>
+                      ) : pausaSala ? (
+                        <>
+                          {/* En pausa la miniatura se apaga (mock aprobado el 08/09).
+                              El monitor sigue conectado SOLO para el audio. */}
+                          <SalaEnPausa pausa={pausaSala} className="h-full w-full rounded-none border-0" />
+                          {monitor(false)}
+                        </>
+                      ) : (room.preview_mode ?? "video") === "avatars" ? (
+                        <>
+                          <div className="flex h-full flex-wrap items-center justify-center gap-4 p-3">
+                            {participants.map((a) => {
+                              const ms = mediaStates[a.user_id];
+                              return (
+                                <div key={a.user_id} className="flex flex-col items-center gap-1">
+                                  <UserAvatar name={cowork.profiles[a.user_id]} size="lg" status={isOnline(a.user_id) ? "online" : "away"} />
+                                  <span className="max-w-[120px] truncate text-[11px] text-muted-foreground">{nombreYApellido(cowork.profiles[a.user_id])}</span>
+                                  {ms && (
+                                    <div className="flex items-center gap-1.5">
+                                      {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
+                                      {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
+                                      {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
+                          {monitor(false)}
+                        </>
+                      ) : (
+                        monitor(true)
+                      )}
+
+                      {etiquetas.length > 0 && (
+                        <div className="pointer-events-none absolute left-2 top-2 flex max-w-[80%] flex-col items-start gap-1">
+                          {etiquetas.map((e) => (
+                            <span
+                              key={e.key}
+                              className={cn("inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm", TONO_ETIQUETA[e.tono])}
+                            >
+                              <e.icono className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{e.texto}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {participants.length > 0 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
+                        <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
+                          {personas.map((p) => (
+                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-white/40")} />
+                              <span className="truncate">{p.nombre}</span>
+                              {p.reloj && (
+                                // En el teléfono la miniatura mide 175 px: el nombre manda y el
+                                // reloj se lee en la hoja de la sala.
+                                <span className={cn("hidden shrink-0 font-mono tabular-nums md:inline", p.corre ? "text-success" : "text-white/60")} title={p.motivo ? `Reloj detenido: ${p.motivo}` : "Reloj de hoy corriendo"}>
+                                  {p.reloj}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* Una fila: los cuatro controles de la sala y Entrar. Solo
+                        en escritorio; en el teléfono viven en la hoja inferior. */}
+                    <div className="hidden md:flex items-center gap-1 px-2 py-2">
+                      {participants.length > 0 && (
+                        <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
+                          {controlesDeSala(room, false)}
+                        </div>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="ml-auto h-8 gap-1.5 rounded-lg text-xs"
+                        onClick={() => enterRoom(room.id)}
+                      >
+                        <DoorOpen className="h-3.5 w-3.5" /> Entrar
+                      </Button>
                     </div>
                   </div>
                 );
@@ -1984,7 +2011,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           Arrastrable, redimensionable por la esquina, y con pop-out a ventana del SO. */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
         <div
-          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${
+          className={`fixed flex flex-col items-end ${hubPinned ? "z-[120]" : "z-30"} ${salaEnHoja ? "invisible" : ""} ${
             hubPos && !hubMaximized ? "" : hubMinimized ? "bottom-4 right-4 tactil:bottom-24" : "bottom-4 right-4"
           }`}
           style={hubPos && !hubMaximized ? { left: hubPos.x, top: hubPos.y } : undefined}
@@ -1993,7 +2020,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <Button
               variant="secondary"
               size="sm"
-              className="gap-1.5 shadow-lg border border-border bg-card hover:bg-muted text-amber-500 rounded-full"
+              className="gap-1.5 shadow-lg border border-border/60 bg-card/85 backdrop-blur-xl hover:bg-muted text-foreground rounded-full"
               onClick={() => setHubMinimized(false)}
             >
               <Headphones className="h-3.5 w-3.5" />
@@ -2002,26 +2029,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           )}
           <div
             ref={hubPanelRef}
-            className={`relative rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col ${
+            className={`relative rounded-2xl border border-border/60 bg-card/85 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col ${
               hubMaximized
                 ? "w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]"
                 : hubSize ? "" : "w-[calc(100vw-2rem)] sm:w-96 md:w-[480px]"
             } ${hubMinimized ? "hidden" : ""}`}
             style={hubMaximized ? undefined : {
-              ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 380 }),
+              // En el teléfono arranca más baja: a 380 px tapaba la sala entera.
+              ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: isMobile ? 230 : 380 }),
               // Nunca más alto que la pantalla. Aplica también al alto que la
               // persona haya elegido arrastrando la esquina: si después gira el
               // teléfono, ese alto tampoco entra.
               maxHeight: "calc(100dvh - 2rem)",
             }}
           >
-            <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 shrink-0">
               <div
-                className={`flex flex-1 items-center gap-1.5 text-xs text-amber-500 font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
+                className={`flex flex-1 items-center gap-1.5 text-xs text-foreground font-medium select-none ${hubMaximized ? "" : "cursor-move touch-none"}`}
                 onPointerDown={(e) => { if (!hubMaximized) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
                 title={hubMaximized ? undefined : "Arrastra para mover la ventana"}
               >
-                <Headphones className="h-3 w-3" />
+                <Headphones className="h-3 w-3 text-success" />
                 Supervisor Hub
               </div>
               <div className="flex gap-0.5">
@@ -2098,6 +2126,79 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           supervisor). Guardar las escribe en cowork_sessions.alert_rules; el
           realtime de la sesión las trae de vuelta a todos, incluido este
           dashboard. */}
+      {/* Teléfono: los controles de la sala que se tocó, en una hoja inferior.
+          Misma lógica que los botones de la tarjeta en escritorio. */}
+      <Sheet open={!!salaEnHoja} onOpenChange={(o) => { if (!o) setSalaEnHoja(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6 pt-3">
+          {(() => {
+            const room = cowork.rooms.find((r) => r.id === salaEnHoja);
+            if (!room) return null;
+            const participants = getRoomParticipants(room.id);
+            const personas = personasDe(participants);
+            const etiquetas = etiquetasDe(participants, !pausaDeLaSala(participants.map((p) => p.user_id)));
+            return (
+              <>
+                <SheetHeader className="text-left">
+                  <SheetTitle className="flex items-center gap-2 font-display">
+                    {room.name}
+                    <span className="text-xs font-normal text-muted-foreground">{participants.length} {participants.length === 1 ? "persona" : "personas"}</span>
+                  </SheetTitle>
+                  <SheetDescription>
+                    {room.join_code ? <>Código de la sala <span className="font-mono tracking-[0.18em] text-foreground">{room.join_code}</span></> : "Sala sin código."}
+                  </SheetDescription>
+                </SheetHeader>
+                {personas.length > 0 && (
+                  <ul className="mt-3 space-y-2">
+                    {personas.map((p) => (
+                      <li key={p.uid} className="flex items-center gap-2 text-sm">
+                        <UserAvatar name={p.nombre} size="sm" status={p.online ? "online" : "away"} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{p.nombre}</span>
+                          {p.motivo && <span className="block truncate text-xs text-muted-foreground">Reloj detenido: {p.motivo}</span>}
+                        </span>
+                        {p.reloj && (
+                          <span className={cn("shrink-0 font-mono text-xs tabular-nums", p.corre ? "text-success" : "text-muted-foreground")}>
+                            {p.reloj}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {etiquetas.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {etiquetas.map((e) => (
+                      <span key={e.key} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", TONO_ETIQUETA[e.tono])}>
+                        <e.icono className="h-3 w-3" />{e.texto}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {participants.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
+                    {controlesDeSala(room, true)}
+                  </div>
+                )}
+                <Button className="mt-3 h-11 w-full gap-2 rounded-xl" onClick={() => { setSalaEnHoja(null); enterRoom(room.id); }}>
+                  <DoorOpen className="h-4 w-4" /> Entrar a la sala
+                </Button>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs" onClick={() => copiarEnlaceDeSala(room)}>
+                    <Link2 className="h-3.5 w-3.5" /> Enlace
+                  </Button>
+                  <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs" onClick={() => { setSalaEnHoja(null); openEdit(room); }}>
+                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs text-destructive hover:text-destructive" onClick={() => { setSalaEnHoja(null); setCloseTarget(room); }}>
+                    <X className="h-3.5 w-3.5" /> Cerrar
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
       <CoworkPausasDialog
         open={pausasOpen}
         onOpenChange={setPausasOpen}

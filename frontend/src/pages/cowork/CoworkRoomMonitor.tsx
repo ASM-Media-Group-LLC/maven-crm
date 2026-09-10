@@ -38,6 +38,9 @@ interface Props {
   // Reporta quién está HABLANDO ahora (ActiveSpeakersChanged). El dashboard lo usa
   // para pintar la card en verde: se ve de un vistazo dónde hay conversación.
   onSpeakingChange?: (names: string[]) => void;
+  /** Dibujar el nombre sobre cada miniatura. El tablero del supervisor lo
+   *  apaga porque pone la gente (con su reloj) él mismo, al pie del video. */
+  showNames?: boolean;
 }
 
 // Video por participante: su cámara y su pantalla (cualquiera puede faltar).
@@ -67,7 +70,7 @@ function VideoTile({ track }: { track: any }) {
 // cámara; si comparte pantalla, el botón deja alternar. Si NO comparte, el botón va
 // deshabilitado. Solo se ADJUNTA (y por ende streamea) el track que se está viendo — el otro
 // queda pausado por adaptiveStream, así ver la pantalla no cuesta ancho de banda hasta pedirlo.
-function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void }) {
+function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean }) {
   const canSwap = !!pv.screen;
   const activeTrack = viewingScreen && pv.screen ? pv.screen : pv.camera;
   return (
@@ -96,7 +99,7 @@ function MonitorTile({ pv, viewingScreen, onSwap }: { pv: PartVideo; viewingScre
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
       </button>
-      {(pv.name || viewingScreen) && (
+      {showName && (pv.name || viewingScreen) && (
         <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">
           {pv.name}{viewingScreen ? " · pantalla" : ""}
         </span>
@@ -221,7 +224,7 @@ function useClonPublicado(opts: {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange }: Props) {
+export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true }: Props) {
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -464,6 +467,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
                 key={pv.identity}
                 pv={pv}
                 viewingScreen={!!screenView[pv.identity] && !!pv.screen}
+                showName={showNames}
                 onSwap={() => setScreenView((m) => ({ ...m, [pv.identity]: !m[pv.identity] }))}
               />
             ))}
