@@ -42,7 +42,7 @@ const ESTRELLAS: Array<[number, number, number]> = [
 ];
 const PINOS: Array<[number, number]> = [[26, 44], [44, 60], [60, 36], [236, 40], [256, 58], [276, 34], [296, 48]];
 
-function PaisajeDePausa({ excedida }: { excedida: boolean }) {
+export function PaisajeDePausa({ excedida }: { excedida: boolean }) {
   // Cada panel lleva sus propios degradados: con varios en pantalla, ids
   // repetidos harían que todos usaran los del primero.
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");

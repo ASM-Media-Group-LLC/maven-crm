@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  fijarPausaSupervisor, leerPausaSupervisor, suscribirPausaSupervisor,
-  etiquetaDePausaSupervisor, fraseDeSupervisoresEnPausa, esEstadoSupervisor,
+  fijarPausaSupervisor, leerPausaSupervisor, suscribirPausaSupervisor, leerDesdePausaSupervisor,
+  etiquetaDePausaSupervisor, fraseDeSupervisoresEnPausa, esEstadoSupervisor, subtituloDePausaSupervisor,
 } from "@/lib/pausaSupervisor";
 import { separarPresencias } from "@/hooks/useCoworkMediaPresence";
 
@@ -36,7 +36,7 @@ describe("lo que ve el chatter", () => {
       { nombre: "Álvaro", estado: "break" },
       { nombre: "Yoselin", estado: null },
       { nombre: "Daniel", estado: "lunch" },
-    ])).toBe("Álvaro está en break · Daniel está almorzando");
+    ])).toBe("Álvaro está en break · Daniel está en lunch");
   });
   it("sin nadie en pausa no hay banner", () => {
     expect(fraseDeSupervisoresEnPausa([{ nombre: "Álvaro", estado: null }, { nombre: "X", estado: undefined }])).toBeNull();
@@ -72,5 +72,30 @@ describe("separarPresencias — el supervisor NO entra a la lista de gente", () 
       { esSupervisor: true, supervisorEstado: "break" },
       { esSupervisor: true, supervisorEstado: "lunch" },
     ]).supervisor).toBe("lunch");
+  });
+  it("trae desde cuándo, y null si no lo dijo o está disponible", () => {
+    expect(separarPresencias([{ esSupervisor: true, supervisorEstado: "break", supervisorDesde: 1234 }]).supervisorDesde).toBe(1234);
+    expect(separarPresencias([{ esSupervisor: true, supervisorEstado: "break" }]).supervisorDesde).toBeNull();
+    expect(separarPresencias([{ esSupervisor: true, supervisorEstado: null, supervisorDesde: 1234 }]).supervisorDesde).toBeNull();
+  });
+});
+
+describe("la pausa del supervisor — desde cuándo y qué le dice al chatter", () => {
+  it("guarda desde cuándo está en ESE estado y lo borra al volver", () => {
+    fijarPausaSupervisor("break", 1_000);
+    expect(leerDesdePausaSupervisor()).toBe(1_000);
+    fijarPausaSupervisor("break", 2_000); // repetir el mismo estado no reinicia
+    expect(leerDesdePausaSupervisor()).toBe(1_000);
+    fijarPausaSupervisor("lunch", 3_000); // cambiar de estado sí
+    expect(leerDesdePausaSupervisor()).toBe(3_000);
+    fijarPausaSupervisor(null);
+    expect(leerDesdePausaSupervisor()).toBeNull();
+  });
+  it("Lunch, no Almorzando (Jhon, 10/09), y un subtítulo por estado", () => {
+    expect(etiquetaDePausaSupervisor("lunch")).toBe("Lunch");
+    expect(subtituloDePausaSupervisor("break")).toMatch(/minutos/);
+    expect(subtituloDePausaSupervisor("lunch")).toMatch(/lunch/);
+    expect(subtituloDePausaSupervisor("ausente")).toMatch(/disponible/);
+    expect(subtituloDePausaSupervisor(null)).toBeNull();
   });
 });

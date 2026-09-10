@@ -13,7 +13,8 @@ import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMedia
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
 import RelojCowork from "./RelojCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
-import { fraseDeSupervisoresEnPausa } from "@/lib/pausaSupervisor";
+import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
+import SupervisorEnPausa from "@/pages/cowork/SupervisorEnPausa";
 import { nombreYApellido } from "@/lib/pausaCowork";
 import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePausa";
 import { marcarPausa } from "@/lib/coworkPausa";
@@ -103,13 +104,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     pestanaPrincipal ? cowork.session?.id : undefined, userId, { persistente: true },
   );
   // "Tu supervisor está en pausa": los hosts de la sesión que marcaron break,
-  // almuerzo o ausente desde la tacita del Hub. Según su estado y SIN contador
-  // (Jhon, 10/09/2026): es disponibilidad, no tiempo que medir.
-  const avisoSupervisores = fraseDeSupervisoresEnPausa(
-    cowork.memberships
-      .filter((m) => m.role === "host")
-      .map((m) => ({ nombre: nombreYApellido(cowork.profiles[m.user_id]), estado: supervisores[m.user_id] })),
-  );
+  // lunch o ausente desde la tacita del Hub. Según su estado y SIN contador
+  // (Jhon, 10/09/2026): hacia el chatter es disponibilidad, no tiempo que medir.
+  const supervisoresEnPausa = cowork.memberships
+    .filter((m) => m.role === "host" && esEstadoSupervisor(supervisores[m.user_id]))
+    .map((m) => ({ uid: m.user_id, nombre: nombreYApellido(cowork.profiles[m.user_id]), estado: supervisores[m.user_id] as EstadoSupervisor }));
 
   // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
   // por presence, así el coordinador lo ve en vivo aunque recargue su dashboard.
@@ -766,15 +765,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <RelojCowork className="hidden md:inline-flex" />
           <RelojCowork compacto className="md:hidden" />
         </div>
-        {avisoSupervisores && (
-          <div
-            data-testid="aviso-supervisor-en-pausa"
-            className="shrink-0 flex items-center justify-center gap-2 px-3 py-1.5 bg-warning/15 text-warning text-xs font-medium text-center"
-          >
-            <Coffee className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{avisoSupervisores}</span>
-          </div>
-        )}
 
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
@@ -896,6 +886,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Tu supervisor está en pausa (break / lunch / ausente): la pantalla del
+          mock, con el paisaje y sin contador. Entre la barra y el video, así se
+          ve sin tapar a nadie. */}
+      {supervisoresEnPausa.length > 0 && (
+        <SupervisorEnPausa supervisores={supervisoresEnPausa} className="mx-3 mt-2 shrink-0 md:mx-4" />
+      )}
 
       {/* Video area */}
       <div className="flex-1 min-h-0">

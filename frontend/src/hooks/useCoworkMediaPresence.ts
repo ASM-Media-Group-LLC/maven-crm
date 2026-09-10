@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
+import { esEstadoSupervisor, type EstadoSupervisor, leerDesdePausaSupervisor } from "@/lib/pausaSupervisor";
 
 export interface MediaState {
   micOn: boolean;
@@ -44,7 +44,9 @@ interface UseCoworkMediaPresenceResult {
   trackMediaState: (state: MediaState) => void;
   /** Disponibilidad de cada supervisor de la sesión (clave = su user_id). `null` = disponible. */
   supervisores: Record<string, EstadoSupervisor | null>;
-  /** El supervisor anuncia break / almuerzo / ausente, o `null` = disponible. */
+  /** Desde cuándo está en pausa cada supervisor (epoch ms); `null` si está disponible o no lo dijo. */
+  supervisoresDesde: Record<string, number | null>;
+  /** El supervisor anuncia break / lunch / ausente, o `null` = disponible. */
   trackEstadoSupervisor: (estado: EstadoSupervisor | null) => void;
 }
 
@@ -80,6 +82,8 @@ type PayloadPresencia = Partial<MediaState> & {
    *  propio supervisor. */
   esSupervisor?: boolean;
   supervisorEstado?: EstadoSupervisor | null;
+  /** Desde cuándo (epoch ms). Lo ven los otros supervisores; el chatter no. */
+  supervisorDesde?: number | null;
 };
 
 interface CanalVivo {
@@ -90,7 +94,7 @@ interface CanalVivo {
    *  canal SIGUE VIVO — es justamente el punto. */
   usos: number;
   /** Lo avisan a quien esté escuchando cuando cambia el estado de la sala. */
-  oyentes: Set<(estados: Record<string, MediaState>, supervisores: Record<string, EstadoSupervisor | null>) => void>;
+  oyentes: Set<(estados: Record<string, MediaState>, supervisores: Record<string, EstadoSupervisor | null>, supervisoresDesde: Record<string, number | null>) => void>;
   /** Lo último que se publicó, para poder re-publicarlo si hiciera falta. */
   ultimoEstado: MediaState | null;
   /** Si este canal lo abrió un SUPERVISOR: su disponibilidad. `undefined` = no
@@ -149,14 +153,15 @@ export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; 
 
 /** De las conexiones de una clave, cuáles son GENTE y cuál es la disponibilidad
  *  del supervisor (si alguna la trae). Puro, para probarlo. */
-export function separarPresencias<T extends { esSupervisor?: boolean; supervisorEstado?: unknown }>(
+export function separarPresencias<T extends { esSupervisor?: boolean; supervisorEstado?: unknown; supervisorDesde?: unknown }>(
   presencias: T[] | undefined,
-): { gente: T[]; supervisor: EstadoSupervisor | null | undefined } {
+): { gente: T[]; supervisor: EstadoSupervisor | null | undefined; supervisorDesde: number | null } {
   const gente = (presencias ?? []).filter((p) => !p.esSupervisor);
   const deSupervisor = (presencias ?? []).filter((p) => p.esSupervisor);
-  if (!deSupervisor.length) return { gente, supervisor: undefined };
+  if (!deSupervisor.length) return { gente, supervisor: undefined, supervisorDesde: null };
   const ultima = deSupervisor[deSupervisor.length - 1];
-  return { gente, supervisor: esEstadoSupervisor(ultima.supervisorEstado) ? ultima.supervisorEstado : null };
+  const supervisor = esEstadoSupervisor(ultima.supervisorEstado) ? ultima.supervisorEstado : null;
+  return { gente, supervisor, supervisorDesde: supervisor && typeof ultima.supervisorDesde === "number" ? ultima.supervisorDesde : null };
 }
 
 function leerSupervisores(canal: CanalRealtime): Record<string, EstadoSupervisor | null> {
@@ -165,6 +170,17 @@ function leerSupervisores(canal: CanalRealtime): Record<string, EstadoSupervisor
   Object.entries(estado).forEach(([key, presencias]) => {
     const { supervisor } = separarPresencias(presencias);
     if (supervisor !== undefined) resultado[key] = supervisor;
+  });
+  return resultado;
+}
+
+/** Desde cuándo está en pausa cada supervisor (clave = user_id); solo los que lo publicaron. */
+function leerSupervisoresDesde(canal: CanalRealtime): Record<string, number | null> {
+  const estado = canal.presenceState<PayloadPresencia>();
+  const resultado: Record<string, number | null> = {};
+  Object.entries(estado).forEach(([key, presencias]) => {
+    const { supervisor, supervisorDesde } = separarPresencias(presencias);
+    if (supervisor !== undefined) resultado[key] = supervisorDesde;
   });
   return resultado;
 }
@@ -281,7 +297,9 @@ function olvidarPendiente() {
  *  un par de veces al día, no diez por segundo. */
 function enviarSupervisor(entrada: CanalVivo, estado: EstadoSupervisor | null) {
   entrada.ultimoSupervisor = estado;
-  const envio = entrada.canal.track({ user_id: entrada.userId, esSupervisor: true, supervisorEstado: estado });
+  // `desde` sale del store (es quien sabe cuándo se tocó la tacita); así el
+  // re-anuncio al re-suscribirse conserva el tiempo real y no lo reinicia.
+  const envio = entrada.canal.track({ user_id: entrada.userId, esSupervisor: true, supervisorEstado: estado, supervisorDesde: estado ? leerDesdePausaSupervisor() : null });
   void Promise.resolve(envio).then((r) => {
     if (r !== "ok") console.warn("[cowork] la disponibilidad del supervisor no se pudo publicar:", r);
   }).catch((e) => console.warn("[cowork] la disponibilidad del supervisor no se pudo publicar:", e));
@@ -373,7 +391,7 @@ function abrirCanal(sessionId: string, userId: string): CanalVivo {
   const avisar = () => {
     const estados = leerEstados(canal);
     const supervisores = leerSupervisores(canal);
-    entrada.oyentes.forEach((f) => f(estados, supervisores));
+    entrada.oyentes.forEach((f) => f(estados, supervisores, leerSupervisoresDesde(canal)));
   };
 
   canal
@@ -529,7 +547,7 @@ function revisarSalud() {
   // Aunque el canal esté sano, se relee: un `sync` perdido no deja rastro.
   // Esto NO manda nada, solo lee lo que ya está en memoria — es gratis.
   const estados = leerEstados(entrada.canal);
-  entrada.oyentes.forEach((f) => f(estados, leerSupervisores(entrada.canal)));
+  entrada.oyentes.forEach((f) => f(estados, leerSupervisores(entrada.canal), leerSupervisoresDesde(entrada.canal)));
 
   // Y el chequeo que de verdad importa para quien PUBLICA: "yo debería
   // aparecer en esta sala, ¿aparezco?". Si no, se reanuncia — pero con techo:
@@ -608,6 +626,7 @@ export function useCoworkMediaPresence(
   /** Disponibilidad de cada supervisor de la sesión (clave = su user_id).
    *  Solo aparecen los que la publicaron alguna vez; `null` = disponible. */
   const [supervisores, setSupervisores] = useState<Record<string, EstadoSupervisor | null>>({});
+  const [supervisoresDesde, setSupervisoresDesde] = useState<Record<string, number | null>>({});
   const persistente = !!opciones?.persistente;
   // En una ref para que cambiarla no re-suscriba el canal.
   const persistenteRef = useRef(persistente);
@@ -618,9 +637,10 @@ export function useCoworkMediaPresence(
     let cancelado = false;
     let entrada: CanalVivo | null = null;
 
-    const oyente = (estados: Record<string, MediaState>, sups: Record<string, EstadoSupervisor | null>) => {
+    const oyente = (estados: Record<string, MediaState>, sups: Record<string, EstadoSupervisor | null>, desdes: Record<string, number | null>) => {
       setMediaStates(estados);
       setSupervisores(sups);
+      setSupervisoresDesde(desdes);
     };
     const engancharse = (e: CanalVivo) => {
       entrada = e;
@@ -630,6 +650,7 @@ export function useCoworkMediaPresence(
       // esperar al próximo evento (si no, la lista aparece vacía un instante).
       setMediaStates(leerEstados(e.canal));
       setSupervisores(leerSupervisores(e.canal));
+      setSupervisoresDesde(leerSupervisoresDesde(e.canal));
     };
 
     const preparar = async () => {
@@ -685,5 +706,5 @@ export function useCoworkMediaPresence(
     [userId],
   );
 
-  return { mediaStates, supervisores, trackMediaState, trackEstadoSupervisor };
+  return { mediaStates, supervisores, supervisoresDesde, trackMediaState, trackEstadoSupervisor };
 }

@@ -44,7 +44,7 @@ import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-supp
 import CoworkReglasDialog from "./CoworkReglasDialog";
 import CoworkPausasDialog from "./CoworkPausasDialog";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
-import { leerPausaSupervisor, suscribirPausaSupervisor } from "@/lib/pausaSupervisor";
+import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor, etiquetaDePausaSupervisor } from "@/lib/pausaSupervisor";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -103,7 +103,7 @@ interface Props {
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
-  const { mediaStates, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
+  const { mediaStates, supervisores, supervisoresDesde, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
   // La pausa del supervisor (break / almuerzo / ausente) se elige con la tacita
   // de la barra del Hub y se publica por presencia para que los chatters la
   // vean. Aparte de `mediaStates` a propósito: ver useCoworkMediaPresence.
@@ -1647,6 +1647,39 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       <span className={cn("text-[11px] font-mono tabular-nums", clasesPausa(p.cuenta.estado))}>
                         {p.cuenta.texto}
                       </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Supervisores en pausa (break / lunch / ausente desde la tacita del
+              Hub). Acá SÍ con el tiempo: lo ven los supervisores entre sí; los
+              chatters solo ven la pantalla sin contador (Jhon, 10/09). */}
+          {(() => {
+            const sups = Object.entries(supervisores)
+              .filter(([, e]) => esEstadoSupervisor(e))
+              .map(([uid, e]) => ({
+                uid,
+                nombre: nombreYApellido(cowork.profiles[uid]) || "Supervisor",
+                etiqueta: etiquetaDePausaSupervisor(e) ?? "",
+                desde: supervisoresDesde[uid] ?? null,
+              }));
+            if (!sups.length) return null;
+            return (
+              <div className="p-3 border-t border-border/50 space-y-2">
+                <h3 className="text-xs font-medium text-warning flex items-center gap-1">
+                  <Coffee className="h-3 w-3" /> Supervisores en pausa ({sups.length})
+                </h3>
+                {sups.map((s) => (
+                  <div key={s.uid} className="bg-warning/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-foreground/80">{s.nombre}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant="outline" className="text-[9px] border-warning/30 text-warning rounded-full">{s.etiqueta}</Badge>
+                      {s.desde != null && (
+                        <span className="text-[11px] font-mono tabular-nums text-warning">{formatoReloj(Math.max(0, Math.floor((now - s.desde) / 1000)))}</span>
+                      )}
                     </div>
                   </div>
                 ))}
