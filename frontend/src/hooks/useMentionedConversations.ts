@@ -50,8 +50,9 @@ export function useMentionedConversations(
     });
 
     if (error) {
+      // Un fallo no vacía el badge: se conserva lo que había y el próximo
+      // refresco lo vuelve a pedir. Antes se apagaban todas las menciones.
       console.error("[useMentionedConversations] mentions query error:", error);
-      setMentionedIds(new Set());
       return;
     }
 

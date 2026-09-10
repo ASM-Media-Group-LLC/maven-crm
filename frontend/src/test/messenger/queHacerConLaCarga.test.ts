@@ -26,3 +26,19 @@ describe("queHacerConLaCarga", () => {
     expect(queHacerConLaCarga({ error: null, data: [{ id: 1 }] })).toBe("seguir");
   });
 });
+
+// El reintento del chat abierto: cinco esperas crecientes (~67 s en total) y
+// después se rinde — el evento `online` del navegador cubre lo que sea más largo.
+import { esperaDeReintento, ESPERAS_DE_REINTENTO_MS } from "@/hooks/queHacerConLaCarga";
+
+describe("esperaDeReintento", () => {
+  it("crece y suma alrededor de un minuto, que es lo que dura un corte típico", () => {
+    expect([0, 1, 2, 3, 4].map(esperaDeReintento)).toEqual([2_000, 5_000, 10_000, 20_000, 30_000]);
+    expect(ESPERAS_DE_REINTENTO_MS.reduce((a, b) => a + b, 0)).toBe(67_000);
+  });
+
+  it("después del último intento se rinde", () => {
+    expect(esperaDeReintento(5)).toBeNull();
+    expect(esperaDeReintento(99)).toBeNull();
+  });
+});

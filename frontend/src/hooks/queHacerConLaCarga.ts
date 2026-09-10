@@ -22,3 +22,15 @@ export function queHacerConLaCarga(r: {
   if (r.data.length === 0) return "vaciar";
   return "seguir";
 }
+
+/**
+ * Cuánto esperar antes de reintentar la carga de mensajes del chat abierto,
+ * según el número de intento fallido (0 = primer fallo). `null` = ya no más.
+ * Suman ~67 s: cubren un corte como los de Grace (un minuto) sin martillar el
+ * servidor; los cortes más largos los cubre el evento `online` del navegador.
+ */
+export const ESPERAS_DE_REINTENTO_MS = [2_000, 5_000, 10_000, 20_000, 30_000] as const;
+
+export function esperaDeReintento(intento: number): number | null {
+  return ESPERAS_DE_REINTENTO_MS[intento] ?? null;
+}

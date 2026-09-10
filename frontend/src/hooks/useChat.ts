@@ -20,7 +20,7 @@ import { profileName } from "@/pages/messenger/utils";
 import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
 import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
-import { queHacerConLaCarga } from "@/hooks/queHacerConLaCarga";
+import { queHacerConLaCarga, esperaDeReintento } from "@/hooks/queHacerConLaCarga";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -159,11 +159,17 @@ export function useChat() {
 
       // Server-side unread counts — single RPC call
       const unreadMap: Record<string, number> = {};
-      const { data: unreadData } = await supabase.rpc("get_unread_counts", { _user_id: user.id });
-      if (unreadData) {
-        for (const row of unreadData as any[]) {
-          unreadMap[row.conversation_id] = row.unread_count || 0;
-        }
+      const noLeidos = await supabase.rpc("get_unread_counts", { _user_id: user.id });
+      // Si falla, se aborta como las otras cuatro peticiones. Antes seguía con
+      // el mapa vacío y TODAS las burbujas de no leídos saltaban a 0 hasta el
+      // siguiente refresco.
+      if (queHacerConLaCarga(noLeidos as { error: unknown; data: unknown[] | null }) === "abortar") {
+        console.error("[useChat] no pude cargar los no leídos:", noLeidos.error?.message ?? "sin datos");
+        abortada = true;
+        return;
+      }
+      for (const row of (noLeidos.data ?? []) as any[]) {
+        unreadMap[row.conversation_id] = row.unread_count || 0;
       }
 
       const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
@@ -582,23 +588,41 @@ export function useChat() {
       setConversations((prev) => [optimisticConv, ...prev]);
 
       (async () => {
-        // Check server-side for existing direct chat with this user
-        const { data: myParticipations } = await supabase
+        // Check server-side for existing direct chat with this user.
+        // ⚠️ Si la comprobación FALLA, NO se crea nada. Antes un fallo de red se
+        // leía como "no existe" y se creaba un segundo DM con la misma persona
+        // — y la base no tiene candado para eso (solo la clave primaria).
+        const abortarApertura = (motivo: string) => {
+          console.error("[startDirectChat] no pude comprobar si el DM existía:", motivo);
+          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+          toast.error("Sin conexión: no pude abrir el chat. Inténtalo de nuevo.");
+        };
+        const participacionesMias = await supabase
           .from("chat_participants")
           .select("conversation_id")
           .eq("user_id", user.id);
+        if (queHacerConLaCarga(participacionesMias) === "abortar") {
+          abortarApertura(participacionesMias.error?.message ?? "sin datos");
+          return;
+        }
+        const myParticipations = participacionesMias.data;
 
         if (myParticipations && myParticipations.length > 0) {
           const myConvIds = myParticipations.map((p: any) => p.conversation_id);
           
           // Find if otherUserId is in any of my direct conversations
-          const { data: otherP } = await supabase
+          const otros = await supabase
             .from("chat_participants")
             .select("conversation_id, chat_conversations!inner(type)")
             .eq("user_id", otherUserId)
             .eq("chat_conversations.type", "direct")
             .in("conversation_id", myConvIds)
             .limit(1);
+          if (queHacerConLaCarga(otros) === "abortar") {
+            abortarApertura(otros.error?.message ?? "sin datos");
+            return;
+          }
+          const otherP = otros.data;
 
           if (otherP && otherP.length > 0) {
             // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
@@ -874,6 +898,15 @@ export function useMessages(
   currentConvRef.current = conversationId;
   onNewMessageRef.current = onNewMessage;
 
+  // De qué conversación son los mensajes que hay en pantalla. Sirve para decidir,
+  // cuando una carga falla, si lo que hay se conserva (es de ESTE chat: recarga)
+  // o se limpia (es de OTRO chat: no puede quedar bajo este encabezado).
+  const mensajesDeRef = useRef<string | null>(null);
+  // Reintento con espera creciente cuando la carga falla (ver esperaDeReintento).
+  const intentosCargaRef = useRef(0);
+  const reintentoCargaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargaFallidaRef = useRef(false);
+
   // Load initial messages
   const loadMessages = useCallback(async () => {
     if (!conversationId) {
@@ -882,8 +915,10 @@ export function useMessages(
       return;
     }
     setLoading(true);
+    // true mientras haya un reintento programado: el spinner se queda encendido.
+    let reintentando = false;
     try {
-      const { data } = await supabase
+      const res = await supabase
         .from("chat_messages")
         .select("*")
         .eq("conversation_id", conversationId)
@@ -892,8 +927,30 @@ export function useMessages(
 
       // Si cambiaron de conversación mientras cargaba, descartar (no pisar el chat activo).
       if (conversationId !== currentConvRef.current) return;
+
+      // Un fallo de red NO es "no hay mensajes". Antes `(data || [])` dejaba el
+      // chat abierto en blanco y nada lo recargaba hasta cambiar de chat (Grace,
+      // 10/09: "no salían los chats ni nada").
+      if (queHacerConLaCarga(res) === "abortar") {
+        console.error("[useMessages] no pude cargar los mensajes:", res.error?.message ?? "sin datos");
+        cargaFallidaRef.current = true;
+        // Lo que hay en pantalla: si es de OTRO chat se limpia; si es de este, se conserva.
+        if (mensajesDeRef.current !== conversationId) setMessages([]);
+        const espera = esperaDeReintento(intentosCargaRef.current++);
+        if (espera !== null) {
+          reintentando = true;
+          reintentoCargaRef.current = setTimeout(() => {
+            if (currentConvRef.current === conversationId) void loadMessagesRef.current?.();
+          }, espera);
+        }
+        return;
+      }
+      intentosCargaRef.current = 0;
+      cargaFallidaRef.current = false;
+      const data = res.data;
       const sorted = ((data as ChatMessage[]) || []).reverse();
       setMessages(sorted);
+      mensajesDeRef.current = conversationId;
       setHasMore((data?.length || 0) >= PAGE_SIZE);
       optimisticIdsRef.current.clear();
 
@@ -935,13 +992,24 @@ export function useMessages(
           .then();
       }
     } finally {
-      // Solo el load de la conversación vigente controla el spinner.
-      if (conversationId === currentConvRef.current) setLoading(false);
+      // Solo el load de la conversación vigente controla el spinner — y si hay un
+      // reintento en camino, se queda encendido en vez de mostrar un vacío falso.
+      if (conversationId === currentConvRef.current && !reintentando) setLoading(false);
     }
   }, [conversationId, user]);
 
   // Keep ref updated for use inside effects without triggering re-subscriptions
   loadMessagesRef.current = loadMessages;
+
+  // Al volver la red, si la última carga falló, se reintenta. Los reintentos con
+  // espera cubren cortes cortos (~1 min); este cubre los largos.
+  useEffect(() => {
+    const alVolverLaRed = () => {
+      if (cargaFallidaRef.current) void loadMessagesRef.current?.();
+    };
+    window.addEventListener("online", alVolverLaRed);
+    return () => window.removeEventListener("online", alVolverLaRed);
+  }, []);
 
   // Load older messages (infinite scroll) — uses ref to avoid re-creation
   const loadOlderMessages = useCallback(async () => {
@@ -953,7 +1021,7 @@ export function useMessages(
     const oldestMessage = currentMessages[0];
     
     try {
-      const { data } = await supabase
+      const res = await supabase
         .from("chat_messages")
         .select("*")
         .eq("conversation_id", conversationId)
@@ -962,6 +1030,14 @@ export function useMessages(
         .limit(PAGE_SIZE);
 
       if (conversationId !== currentConvRef.current) return; // cambió de chat mientras cargaba
+      // Un fallo no es "ya no hay más": se deja hasMore como está y el próximo
+      // scroll lo vuelve a intentar. Antes se apagaba y el historial quedaba
+      // cortado hasta reabrir el chat.
+      if (queHacerConLaCarga(res) === "abortar") {
+        console.error("[useMessages] no pude cargar mensajes anteriores:", res.error?.message ?? "sin datos");
+        return;
+      }
+      const data = res.data;
       if (data && data.length > 0) {
         const older = (data as ChatMessage[]).reverse();
         setMessages(prev => [...older, ...prev]);
@@ -976,6 +1052,12 @@ export function useMessages(
 
   useEffect(() => {
     loadMessages();
+    return () => {
+      // Cambió el chat (o se desmontó): el reintento pendiente era del anterior.
+      if (reintentoCargaRef.current) clearTimeout(reintentoCargaRef.current);
+      reintentoCargaRef.current = null;
+      intentosCargaRef.current = 0;
+    };
   }, [loadMessages]);
 
   // Al recuperar conexión, reintentar automáticamente los mensajes fallidos.
