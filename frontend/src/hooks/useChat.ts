@@ -23,6 +23,13 @@ import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
 import { queHacerConLaCarga, esperaDeReintento } from "@/hooks/queHacerConLaCarga";
 import { toast } from "sonner";
 
+// Cada cuánto se recarga la lista entera aunque no haya pasado nada. Es solo la
+// red de seguridad: los mensajes nuevos se aplican en memoria por realtime y los
+// canales reviven solos si se caen (#1796). Estaba en 20 s desde cuando ninguna
+// de esas dos cosas era cierta; cada recarga son 4 peticiones, y en prod una
+// persona llegaba a 5 recargas/min (~1.200 peticiones/hora solo en esto).
+export const POLL_LISTA_MS = 60_000;
+
 export function useChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
@@ -496,18 +503,19 @@ export function useChat() {
 
         // CLOSED también: es terminal (el socket murió en segundo plano y nadie lo
         // vuelve a levantar); antes solo se atendían ERROR y TIMED_OUT.
+        // Acá NO se recarga: el canal nuevo recarga al quedar SUBSCRIBED (arriba),
+        // que es cuando de verdad sirve. Recargar en los dos daba pares de recargas
+        // con <1 s de diferencia en cada reconexión (medido en prod, 10/09).
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          scheduleConversationsReload(true);
           scheduleChannelReconnect();
         }
       });
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void loadConversations();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
+    // Volver a la pestaña ya NO recarga por sí solo. Si estuvo oculta poco, el
+    // canal siguió vivo y la lista está al día; si estuvo oculta ≥30 s (o se cayó
+    // la red), useReanudarAlVolver levanta un canal nuevo y ESE recarga al quedar
+    // SUBSCRIBED. Recargar también acá duplicaba cada vuelta, y con Cowork y
+    // WhatsApp al lado la gente alterna pestañas cada pocos segundos.
 
     // Fallback sync por si el websocket se cae. El realtime ya trae los cambios en
     // vivo, así que esto es solo red de seguridad → 20s (antes 5s recargaba toda la
@@ -516,7 +524,7 @@ export function useChat() {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 20_000);
+    }, POLL_LISTA_MS);
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
@@ -524,7 +532,6 @@ export function useChat() {
         clearTimeout(chatRealtimeReconnectTimerRef.current);
         chatRealtimeReconnectTimerRef.current = null;
       }
-      document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
       cancelado = true;
       supabase.removeChannel(channel);
