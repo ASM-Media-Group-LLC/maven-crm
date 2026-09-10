@@ -5,7 +5,7 @@ import { Shield, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry, LeadGenQA } from "./useLeadGen";
@@ -111,11 +111,7 @@ const LeadGenSupervisorView = ({ leads, profiles }: Props) => {
                 <TableRow key={sup.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                          {sup.name.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={sup.name} size="sm" />
                       <span className="font-medium text-sm">{sup.name}</span>
                     </div>
                   </TableCell>

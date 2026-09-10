@@ -1,6 +1,6 @@
 import { ArrowRight, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Trash2, ShoppingCart } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,13 +55,6 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
     <div className="space-y-2">
       {contactos.map((c) => {
         const cleanHandle = c.instagram.replace(/^@/, "");
-        const initials = c.nombre
-          .split(/\s+/)
-          .map((p) => p[0])
-          .filter(Boolean)
-          .slice(0, 2)
-          .join("")
-          .toUpperCase() || "?";
         const recordType = (c as unknown as { record_type?: string }).record_type;
         const salesChannels = channelsByContact?.get(c.id) ?? [];
         // Color de fila: el estado del RPC, o "en proceso" (amarillo) si solo tiene
@@ -76,10 +69,7 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
             className={`group w-full rounded-xl border p-3 text-left transition-colors ${rowBg}`}
           >
             <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 shrink-0">
-                {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.nombre} />}
-                <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar name={c.nombre} src={c.profile_picture_url} size="lg" className="shrink-0" />
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">

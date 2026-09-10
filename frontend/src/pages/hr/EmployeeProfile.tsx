@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
@@ -483,10 +483,7 @@ export default function EmployeeProfile() {
                       Acceso activo
                     </div>
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={linkedProfile.avatar_url ?? ""} />
-                        <AvatarFallback>{(linkedProfile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={linkedProfile.full_name} src={linkedProfile.avatar_url} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{linkedProfile.full_name ?? "Sin nombre"}</p>
                         {linkedProfile.role && (
@@ -538,10 +535,7 @@ export default function EmployeeProfile() {
                                     setLinkOpen(false);
                                   }}
                                 >
-                                  <Avatar className="h-6 w-6 mr-2">
-                                    <AvatarImage src={profile.avatar_url ?? ""} />
-                                    <AvatarFallback className="text-xs">{(profile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-                                  </Avatar>
+                                  <UserAvatar name={profile.full_name} src={profile.avatar_url} size="xs" className="mr-2" />
                                   {profile.full_name ?? "Sin nombre"}
                                 </CommandItem>
                               ))}

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Shield, UserCog, User, Headphones, DollarSign, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AdminUser } from "./useAdminUsers";
@@ -72,10 +72,7 @@ const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: Cha
         {user && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={user.avatar_url ?? ""} />
-                <AvatarFallback>{(user.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
+              <UserAvatar name={user.full_name} src={user.avatar_url} seed={user.avatar_seed} size="md" />
               <div>
                 <p className="font-medium">{user.full_name || "Sin nombre"}</p>
                 <p className="text-sm text-muted-foreground">Rol actual: {user.role ?? "Sin rol"}</p>

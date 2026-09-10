@@ -60,7 +60,7 @@ import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks/useTimezone";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1267,10 +1267,7 @@ const PromologContent = () => {
                                   }}
                                 >
                                   <div className="relative shrink-0">
-                                    <Avatar className="h-8 w-8 border border-muted-foreground/30">
-                                      {creator.profile_photo_url ? <AvatarImage src={creator.profile_photo_url} alt={creator.name} /> : null}
-                                      <AvatarFallback className="bg-muted text-xs font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar name={creator.name} src={creator.profile_photo_url} size="sm" className="border border-muted-foreground/30" />
                                     {!promotedTodayIds.has(creator.id) && (
                                       <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title="Sin promo hoy" />
                                     )}

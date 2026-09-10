@@ -1,6 +1,6 @@
 import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall, Trophy, Phone } from "lucide-react";
 import StatChip from "@/components/StatChip";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { formatCompact } from "@/lib/format";
 
 interface ActiveFilter {
@@ -39,14 +39,6 @@ const categoryConfig = [
   { key: "c", label: "C", icon: ArrowDownRight, color: "bg-muted-foreground" },
 ];
 
-// Helper para iniciales del avatar — máximo 2 chars en uppercase.
-const initials = (name: string): string => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "??";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-};
-
 // Card "hero" para Mejor LLG — span 2 en md, 3 en lg → layout
 // horizontal con avatar + nombre completo + métrica destacada. Mismo
 // estilo glass que las demás KpiCards (gradient corner + glow ámbar
@@ -63,11 +55,7 @@ const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?
       </div>
       {data ? (
         <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarFallback className="bg-amber-500/20 text-amber-200 font-semibold">
-              {initials(data.name)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar name={data.name} size="lg" />
           <div className="flex-1 min-w-0">
             <p className="text-base font-bold leading-tight truncate" title={data.name}>{data.name}</p>
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">

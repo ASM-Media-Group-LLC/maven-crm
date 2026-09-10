@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, X, Upload, Facebook, Youtube, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -456,10 +456,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
           <Card className="bg-muted">
             <CardContent className="p-3 space-y-2">
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  {headerPhoto ? <AvatarImage src={headerPhoto} alt={headerName} /> : null}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{headerName.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <UserAvatar name={headerName} src={headerPhoto} size="md" />
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold">{headerName}</span>
                   {headerHandle && <span className="text-xs text-muted-foreground">@{cleanHandle(headerHandle)}</span>}

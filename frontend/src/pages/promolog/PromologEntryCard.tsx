@@ -3,7 +3,7 @@ import { AlertTriangle, Clock, User, Pencil, Check, X as XMark, ExternalLink, Up
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   Dialog,
   DialogContent,
@@ -127,15 +127,6 @@ const ResultIcon = ({ result }: { result: string }) =>
   ) : (
     <XMark className="h-3.5 w-3.5 text-destructive" />
   );
-
-const getInitials = (name: string) => {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-};
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -279,11 +270,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
 
           <Card className="bg-muted">
             <CardContent className="p-3 flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                  {getInitials(entry.name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar name={entry.name} size="md" />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold">{entry.name}</span>
                 {entry.handle && (

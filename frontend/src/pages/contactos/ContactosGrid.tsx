@@ -3,7 +3,7 @@ import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { WhatsAppLink } from "@/components/MaskedPhone";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,13 +50,6 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
     <TooltipProvider>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {contactos.map((c) => {
-          const initials = c.nombre
-            .split(" ")
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join("")
-            .toUpperCase();
-
           const cityLabel = c.city || "No aplicable";
           const locationLabel = c.pais
             ? `${getCountryShortDisplay(c.pais)} · ${cityLabel}`
@@ -71,9 +64,7 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
               <CardContent className="p-4 flex flex-col gap-3">
                 {/* Top row: avatar+info left, date right */}
                 <div className="flex items-start gap-3">
-                  <Avatar className="h-12 w-12 shrink-0">
-                    <AvatarFallback className="text-sm">{initials}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={c.nombre} size="lg" className="shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-semibold text-primary">
                       {c.pais && <span className="mr-1">{getCountryFlag(c.pais)}</span>}
