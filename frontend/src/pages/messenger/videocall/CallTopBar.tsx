@@ -44,8 +44,13 @@ export default function CallTopBar({
   return (
     <div className={cn("shrink-0 flex items-center justify-between bg-background", compact ? "px-2 py-1" : "px-4 py-2")}>
       <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
-        <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
-        {extra}
+        {/* Con selector de sesiones/salas, el selector VA EN LUGAR del nombre:
+            el selector ya dice dónde estás, y en el Supervisor Hub el nombre
+            además se repetía con el título de la ventanita, uno debajo del otro
+            (Jhon, 10/09). Sin selector —un Meet, una videollamada— el nombre. */}
+        {extra ?? (
+          <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
+        )}
         {(!compact || tactil) && (
           <>
             <div className="h-4 w-px bg-muted" />
