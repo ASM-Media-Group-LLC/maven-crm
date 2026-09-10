@@ -72,6 +72,10 @@ interface CallControlsProps {
   onToggleNoiseCancellation?: () => void;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
+  /** Un control más, a la derecha del chat. Lo usa el Supervisor Hub para la
+   *  tacita de pausa. Va como hueco y no como botón propio para que esta barra
+   *  —cuyo ancho está medido— no aprenda nada de Cowork. */
+  controlesExtra?: React.ReactNode;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
@@ -352,7 +356,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil,
+  onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
   backgroundEffect, onToggleBlurBackground,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -638,6 +642,7 @@ export default function CallControls({
             )}
             <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" compact tactil={tactil} />
             <PanelBtn icon={MessageSquare} active={isChatOpen} onClick={onToggleChat} label="Chat" badge={!isChatOpen ? unreadChatCount : undefined} compact tactil={tactil} />
+            {controlesExtra}
           </>
         )}
       </div>
@@ -654,6 +659,7 @@ export default function CallControls({
             label="Chat"
             badge={!isChatOpen ? unreadChatCount : undefined}
           />
+          {controlesExtra}
         </div>
       )}
     </div>

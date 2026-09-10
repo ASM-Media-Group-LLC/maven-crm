@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
@@ -96,6 +96,8 @@ interface LiveKitCallViewProps {
     currentId: string;
     onSwitch: (id: string) => void;
   };
+  /** Un control más en la barra, a la derecha del chat (la tacita del Hub). */
+  controlesExtra?: ReactNode;
   /** Habilita el botón de grabar (Meet/Cowork, solo usuarios con cuenta).
    *  Sin este prop igual se muestra el punto rojo pasivo cuando la sala se
    *  está grabando — que un invitado sepa que lo graban no es opcional. */
@@ -116,7 +118,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -858,6 +860,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
+        controlesExtra={controlesExtra}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />

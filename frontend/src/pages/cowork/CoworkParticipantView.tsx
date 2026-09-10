@@ -13,6 +13,8 @@ import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMedia
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
 import RelojCowork from "./RelojCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
+import { fraseDeSupervisoresEnPausa } from "@/lib/pausaSupervisor";
+import { nombreYApellido } from "@/lib/pausaCowork";
 import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePausa";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
@@ -97,8 +99,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // abierto en otra, esta no entra a la llamada, no publica presencia ni late.
   const { principal: pestanaPrincipal, tomarEstaPestana } = usePestanaPrincipal(cowork.session?.id);
 
-  const { trackMediaState } = useCoworkMediaPresence(
+  const { trackMediaState, supervisores } = useCoworkMediaPresence(
     pestanaPrincipal ? cowork.session?.id : undefined, userId, { persistente: true },
+  );
+  // "Tu supervisor está en pausa": los hosts de la sesión que marcaron break,
+  // almuerzo o ausente desde la tacita del Hub. Según su estado y SIN contador
+  // (Jhon, 10/09/2026): es disponibilidad, no tiempo que medir.
+  const avisoSupervisores = fraseDeSupervisoresEnPausa(
+    cowork.memberships
+      .filter((m) => m.role === "host")
+      .map((m) => ({ nombre: nombreYApellido(cowork.profiles[m.user_id]), estado: supervisores[m.user_id] })),
   );
 
   // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
@@ -756,6 +766,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <RelojCowork className="hidden md:inline-flex" />
           <RelojCowork compacto className="md:hidden" />
         </div>
+        {avisoSupervisores && (
+          <div
+            data-testid="aviso-supervisor-en-pausa"
+            className="shrink-0 flex items-center justify-center gap-2 px-3 py-1.5 bg-warning/15 text-warning text-xs font-medium text-center"
+          >
+            <Coffee className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{avisoSupervisores}</span>
+          </div>
+        )}
 
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
