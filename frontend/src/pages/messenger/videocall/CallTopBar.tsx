@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Link2, LayoutGrid, Shield, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -15,10 +15,13 @@ interface CallTopBarProps {
    *  cronómetro vuelve solo en ese caso: en 340px no hay lugar, en un teléfono
    *  sí — y saber cuánto lleva la llamada es de lo más básico. */
   tactil?: boolean;
+  /** Algo más al lado del nombre (Cowork pone acá el selector de sesión: sobre
+   *  el video tapaba el nombre de la gente). */
+  extra?: ReactNode;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -42,6 +45,7 @@ export default function CallTopBar({
     <div className={cn("shrink-0 flex items-center justify-between bg-background", compact ? "px-2 py-1" : "px-4 py-2")}>
       <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
         <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
+        {extra}
         {(!compact || tactil) && (
           <>
             <div className="h-4 w-px bg-muted" />

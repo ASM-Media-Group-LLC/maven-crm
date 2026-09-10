@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
-  X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
+  X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelLeftClose, PanelLeftOpen,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
@@ -133,27 +133,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
-  // Confirmación del botón de apagado (Power) del dashboard: finalizar es
-  // irreversible y saca a todos — nunca a un solo clic.
-  const [confirmarApagado, setConfirmarApagado] = useState(false);
-  const [apagando, setApagando] = useState(false);
-  const confirmarFinalizarSesion = async () => {
-    setApagando(true);
-    try {
-      setActiveRoomLk(null);
-      setActiveRoomId(null);
-      setActiveRoomName(null);
-      colgarHub();
-      await cowork.endSession();
-      toast.success("Sesión finalizada");
-      navigate("/cowork");
-    } catch {
-      toast.error("No se pudo finalizar la sesión");
-    } finally {
-      setApagando(false);
-      setConfirmarApagado(false);
-    }
-  };
   // Silenciar el Hub SOLO para mí (pedido de Álvaro 01/09): metido en una sala
   // seguía escuchando a los managers del Hub sin ninguna forma de callarlos.
   // No mutea a nadie ni toca mi micro: es volumen local de reproducción
@@ -702,6 +681,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       displayName,
       callDisplayName: "Supervisor Hub",
       isAdmin: true,
+      hideEndForAll: true,
       onLeave: colgarHub,
       hideShareLink: true,
       hideLeaveButton: true,
@@ -1368,22 +1348,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               </button>
               <p className="text-xs text-muted-foreground">Supervisor Dashboard</p>
             </div>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:inline-flex h-7 w-7 text-muted-foreground hover:text-foreground"
-                title="Ocultar este panel"
-                onClick={() => { setSidebarCollapsed(true); localStorage.setItem("maven.cowork.sidebar.collapsed", "1"); }}
-              >
-                <PanelLeftClose className="h-3.5 w-3.5" />
-              </Button>
+            {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
+                una tenía el suyo (el enlace en acento, el apagado en rojo) y la
+                fila se veía desparejada. Finalizar la sesión ya no está acá:
+                vive en la lista de sesiones, fuera del tablero. */}
+            <div className="flex shrink-0 items-center gap-0.5">
               {puedeFinalizar && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-primary hover:text-primary/80"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                   title="Copiar enlace de host (vale 30 minutos)"
+                  aria-label="Copiar enlace de host"
                   disabled={copiandoEnlace}
                   // El código se pide AL COPIAR, no al abrir el tablero: el servidor
                   // lo emite con vencimiento, y uno pedido hace tres horas ya no
@@ -1404,46 +1380,45 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     }
                   }}
                 >
-                  <Share2 className="h-3.5 w-3.5" />
+                  <Share2 className="h-4 w-4" />
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                 title="Pausas: baño y break por persona"
+                aria-label="Pausas"
                 onClick={() => setPausasOpen(true)}
               >
-                <Coffee className="h-3.5 w-3.5" />
+                <Coffee className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="relative h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                 title="Reglas de esta sesión"
+                aria-label="Reglas de esta sesión"
                 onClick={() => setReglasOpen(true)}
               >
-                <Settings2 className="h-3.5 w-3.5" />
+                <Settings2 className="h-4 w-4" />
                 {/* Punto cuando la sesión NO sigue el estándar: de un vistazo se
                     sabe que acá los avisos son distintos a los de siempre. */}
                 {!sonEstandar(reglas) && (
-                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
                 )}
               </Button>
-              {puedeFinalizar && (
+              <span className="mx-0.5 hidden h-4 w-px bg-border md:block" aria-hidden />
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-destructive hover:text-destructive/80"
-                title="Finalizar la sesión para todos"
-                // Finalizar saca a TODOS y no se puede deshacer: pasa por la
-                // misma confirmación que el botón del landing. Este apagaba
-                // directo — un clic de más y veintitrés personas afuera.
-                onClick={() => setConfirmarApagado(true)}
+                className="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:inline-flex"
+                title="Ocultar este panel"
+                aria-label="Ocultar este panel"
+                onClick={() => { setSidebarCollapsed(true); localStorage.setItem("maven.cowork.sidebar.collapsed", "1"); }}
               >
-                <Power className="h-3.5 w-3.5" />
+                <PanelLeftClose className="h-4 w-4" />
               </Button>
-              )}
             </div>
           </div>
         </div>
@@ -1983,6 +1958,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               displayName={displayName}
               callDisplayName={activeRoomName || undefined}
               isAdmin={true}
+              // Una sala de Cowork no se termina desde adentro de la llamada.
+              hideEndForAll
               onLeave={leaveActiveRoom}
               recording={{ source: "cowork", title: activeRoomName || undefined }}
               hideShareLink
@@ -2300,32 +2277,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       </Dialog>
 
       {/* Cerrar sala (confirmación) */}
-      {/* Misma confirmación (texto incluido) que el Finalizar del landing:
-          nombra la sesión y cuánta gente hay adentro. */}
-      <AlertDialog open={confirmarApagado} onOpenChange={(o) => { if (!o && !apagando) setConfirmarApagado(false); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Finalizar «{cowork.session?.name ?? "esta sesión"}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {cowork.memberships.length > 1
-                ? `Se cierra para las ${cowork.memberships.length} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
-                : "Se cierra la sesión para todos los participantes."}
-              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={apagando}
-              onClick={(e) => { e.preventDefault(); void confirmarFinalizarSesion(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {apagando ? "Finalizando…" : "Finalizar sesión"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={!!closeTarget} onOpenChange={(o) => { if (!o) setCloseTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
