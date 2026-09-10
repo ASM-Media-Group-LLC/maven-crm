@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
@@ -631,11 +631,7 @@ const LeadGenContent = () => {
                     <Card key={ag.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                              {ag.name.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={ag.name} size="md" />
                           <div>
                             <p className="font-semibold text-sm">{ag.name}</p>
                             <p className="text-xs text-muted-foreground">
@@ -718,11 +714,7 @@ const LeadGenContent = () => {
                         <TableRow key={ag.id} className="cursor-pointer" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                  {ag.name.slice(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={ag.name} size="sm" />
                               <span className="font-medium text-sm">{ag.name}</span>
                             </div>
                           </TableCell>

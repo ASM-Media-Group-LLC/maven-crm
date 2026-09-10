@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, startOfMonth, isSameMonth, isToday, isAfter, startOfDay } from "date-fns";
 import { ChevronLeft, ChevronRight, Check, X as XIcon, CircleDashed } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks/useTimezone";
@@ -452,10 +452,11 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
           {/* Encabezado: creadora + resumen + leyenda */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={selectedCreator?.profile_photo_url || undefined} />
-                <AvatarFallback>{(selectedCreator?.artistic_name || selectedCreator?.name || "?").charAt(0)}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={selectedCreator?.artistic_name || selectedCreator?.name}
+                src={selectedCreator?.profile_photo_url}
+                size="md"
+              />
               <div>
                 <p className="text-sm font-semibold leading-tight">{selectedCreator?.artistic_name || selectedCreator?.name}</p>
                 <p className="text-xs text-muted-foreground">

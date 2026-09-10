@@ -38,12 +38,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { avatarGradient } from "@/lib/avatarColor";
 import { EmptyState } from "@/components/EmptyState";
 import { MailBody } from "@/components/correo/MailBody";
 import { MailComposer, type BorradorInicial } from "@/components/correo/MailComposer";
@@ -106,14 +105,6 @@ function nombreCarpeta(f: string): string {
 
 function iconoCarpeta(f: string): LucideIcon {
   return CARPETAS[f]?.icono ?? Mail;
-}
-
-/** Iniciales para el avatar. Local a propósito: la de Messenger vive en
- *  `pages/messenger/utils` y importarla acoplaría las dos pantallas. */
-function iniciales(nombre: string): string {
-  const partes = nombre.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return "?";
-  return partes.map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
 /** Fecha corta para la lista: hora si es hoy, día y mes si es de este año. */
@@ -751,16 +742,7 @@ export default function CorreoPage() {
                 </h2>
 
                 <div className="mt-4 flex items-start gap-3">
-                  <Avatar className="h-11 w-11 shrink-0">
-                    <AvatarFallback
-                      className={cn(
-                        "bg-gradient-to-br text-sm font-bold text-white",
-                        avatarGradient(correoDe(mensaje.data.from)),
-                      )}
-                    >
-                      {iniciales(nombreDe(mensaje.data.from))}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={nombreDe(mensaje.data.from)} size="lg" className="shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-medium">{nombreDe(mensaje.data.from)}</span>
@@ -980,16 +962,7 @@ function FilaMensaje({
         m.unread && !activo && !seleccionado && "bg-primary/[0.04]",
       )}
     >
-      <Avatar className={cn("h-10 w-10 shrink-0", activo && "ring-2 ring-primary/20")}>
-        <AvatarFallback
-          className={cn(
-            "bg-gradient-to-br text-xs font-bold text-white",
-            avatarGradient(correoDe(quien)),
-          )}
-        >
-          {iniciales(nombre)}
-        </AvatarFallback>
-      </Avatar>
+      <UserAvatar name={nombre} size="md" className={cn("shrink-0", activo && "ring-2 ring-primary/20")} />
 
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-baseline justify-between gap-2">

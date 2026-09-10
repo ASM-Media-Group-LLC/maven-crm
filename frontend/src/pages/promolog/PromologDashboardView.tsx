@@ -23,7 +23,7 @@ import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "
 import { es } from "date-fns/locale";
 import StatChip from "@/components/StatChip";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ListRowButton } from "@/components/ui/list-row";
@@ -333,14 +333,6 @@ const PromologDashboardView = ({
   }, [dedupedEntries]);
 
   // ── Render helpers ──────────────────────────────────────────────────
-  const getInitials = (name: string) => name
-    .split(" ")
-    .map(w => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const goToCreator = (creatorId: string) => {
     if (!creatorId.startsWith("__no_id__")) {
       navigate(`/creadores/${creatorId}`);
@@ -630,10 +622,7 @@ const PromologDashboardView = ({
                 {recommendations.slice(0, 20).map((r) => (
                   <ListRowButton key={r.id} onClick={() => goToCreator(r.id)} className="justify-between gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        {r.photo ? <AvatarImage src={r.photo} alt={r.name} /> : null}
-                        <AvatarFallback className="text-[10px]">{getInitials(r.name)}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={r.name} src={r.photo} size="xs" />
                       <div className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium">{r.name}</span>
                         <span className="block truncate text-[10px] text-muted-foreground">{r.reason}</span>
@@ -747,7 +736,6 @@ const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) =>
           {items.map((item) => {
             const style = POSITION_STYLES[item.position];
             const tone = item.category ? categoryTone(item.category) : null;
-            const initials = item.name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
             return (
               <button
                 key={item.creatorId}
@@ -756,10 +744,7 @@ const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) =>
                 className={`group w-full flex items-center gap-3 rounded-lg border border-border bg-card/40 p-2.5 text-left transition-colors hover:border-primary/40 hover:bg-card/60 ring-1 ${style.ring}`}
               >
                 <span className="text-xl shrink-0" aria-hidden>{style.medal}</span>
-                <Avatar className="h-9 w-9 shrink-0">
-                  {item.photo ? <AvatarImage src={item.photo} alt={item.name} /> : null}
-                  <AvatarFallback className="text-[10px]">{initials || "?"}</AvatarFallback>
-                </Avatar>
+                <UserAvatar name={item.name} src={item.photo} size="md" className="shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-sm truncate">{item.name}</span>

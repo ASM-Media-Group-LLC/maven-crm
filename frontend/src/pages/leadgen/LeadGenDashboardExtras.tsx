@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Phone, Trophy, TrendingUp } from "lucide-react";
 
 // Extras del subtab Dashboard de LeadGen:
@@ -48,13 +48,6 @@ const QUALITY_LABELS: Record<string, string> = {
   "a+": "A+", "a": "A", "b+": "B+", "b": "B", "c": "C",
 };
 const QUALITY_ORDER = ["a+", "a", "b+", "b", "c"];
-
-const initials = (name: string): string => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "??";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-};
 
 const tooltipStyle: React.CSSProperties = {
   backgroundColor: "hsl(var(--card))",
@@ -112,11 +105,7 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-sm ring-1 ${medalColor}`}>
                       {idx + 1}
                     </div>
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback className="bg-muted text-xs">
-                        {initials(llg.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={llg.name} size="sm" className="shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" title={llg.name}>{llg.name}</p>
                       <p className="text-[11px] text-muted-foreground">

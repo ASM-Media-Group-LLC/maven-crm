@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,8 +35,6 @@ interface PendingAssign {
   userName: string;
   currentRole: string | null;
 }
-
-const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "U";
 
 const ManageRoleUsersModal = ({
   open,
@@ -132,10 +130,7 @@ const ManageRoleUsersModal = ({
                     {assignedMembers.map((m) => (
                       <li key={m.id} className="flex items-center justify-between p-3 hover:bg-muted/40">
                         <div className="flex items-center gap-3 min-w-0">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={m.avatar_url ?? ""} />
-                            <AvatarFallback>{initials(m.full_name)}</AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={m.full_name} src={m.avatar_url} size="sm" />
                           <span className="text-sm truncate">{m.full_name}</span>
                         </div>
                         <Button
@@ -182,10 +177,7 @@ const ManageRoleUsersModal = ({
                     {availableUsers.map((u) => (
                       <li key={u.id} className="flex items-center justify-between p-3 hover:bg-muted/40">
                         <div className="flex items-center gap-3 min-w-0">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={u.avatar_url ?? ""} />
-                            <AvatarFallback>{initials(u.full_name ?? "U")}</AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={u.full_name ?? "U"} src={u.avatar_url} size="sm" />
                           <div className="min-w-0">
                             <p className="text-sm truncate">{u.full_name || "Sin nombre"}</p>
                             <div className="flex items-center gap-2 mt-0.5">

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Loader2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -139,8 +139,6 @@ const SuccessView = ({
     </div>
   );
 };
-
-const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "U";
 
 export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
   const { user } = useAuth();
@@ -275,12 +273,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                     return (
                       <SelectItem key={ev.user_id} value={ev.user_id}>
                         <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={ev.avatar_url ?? ""} />
-                            <AvatarFallback className="text-[10px]">
-                              {initials(ev.full_name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar name={ev.full_name} src={ev.avatar_url} size="xs" />
                           <span>
                             {isSelf ? "Yo · " : ""}
                             {ev.full_name}

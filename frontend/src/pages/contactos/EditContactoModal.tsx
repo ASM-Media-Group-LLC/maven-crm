@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
@@ -256,10 +256,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Foto de Perfil</Label>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    {profilePhoto ? <AvatarImage src={profilePhoto.url} /> : null}
-                    <AvatarFallback className="text-xs">{nombre.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={nombre} src={profilePhoto?.url} size="lg" />
                   <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "piclink" })}>
                     <Upload className="mr-1.5 h-3.5 w-3.5" /> Subir
                   </Button>
