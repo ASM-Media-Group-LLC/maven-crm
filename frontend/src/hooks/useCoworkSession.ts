@@ -285,6 +285,14 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId, clientId: idDePestana() });
   }, [sessionId]);
 
+  /** Apaga las asignaciones de quien lleva más de 3 min sin latir: cerró la
+   *  pestaña sin salir. Solo hosts; lo llama el tablero cada un par de minutos. */
+  const barrerAsignacionesColgadas = useCallback(async () => {
+    const r = await invokeCowork("barrerAsignacionesColgadas", { sessionId });
+    if ((r as { cerradas?: number })?.cerradas) await fetchData(true);
+    return r;
+  }, [sessionId, fetchData]);
+
   const requestHost = useCallback(async (roomId: string, message?: string, requestOneOnOne?: boolean) => {
     return invokeCowork("requestHost", { sessionId, roomId, message, requestOneOnOne: !!requestOneOnOne });
   }, [sessionId]);
@@ -416,7 +424,7 @@ export function useCoworkSession(sessionId: string | null) {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
-    issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
+    issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest, barrerAsignacionesColgadas,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
     listMyActiveSessions, listMyEndedSessions, leaveSessionById, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
   };

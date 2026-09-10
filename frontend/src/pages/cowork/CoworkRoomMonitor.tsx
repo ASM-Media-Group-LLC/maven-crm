@@ -38,6 +38,11 @@ interface Props {
   // Reporta quién está HABLANDO ahora (ActiveSpeakersChanged). El dashboard lo usa
   // para pintar la card en verde: se ve de un vistazo dónde hay conversación.
   onSpeakingChange?: (names: string[]) => void;
+  /** Quién está CONECTADO a esta sala según LiveKit (ids de usuario). `null` =
+   *  no se sabe (el monitor no conectó, o está apagado). Es la verdad para la
+   *  tarjeta: las asignaciones quedan activas aunque la persona cierre la
+   *  pestaña sin salir. */
+  onParticipantsChange?: (ids: string[] | null) => void;
   /** Dibujar el nombre sobre cada miniatura. El tablero del supervisor lo
    *  apaga porque pone la gente (con su reloj) él mismo, al pie del video. */
   showNames?: boolean;
@@ -224,7 +229,7 @@ function useClonPublicado(opts: {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true }: Props) {
+export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange }: Props) {
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -243,6 +248,8 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
   const roomRef = useRef<Room | null>(null);
   const onSharersRef = useRef(onSharersChange);
   onSharersRef.current = onSharersChange;
+  const onParticipantsRef = useRef(onParticipantsChange);
+  onParticipantsRef.current = onParticipantsChange;
   /** Mi propia identidad en ESTA sala, capturada al conectar.
    *  Antes se leía `roomRef.current?.localParticipant?.identity` en el momento
    *  de filtrar, y durante una reconexión eso puede ser null: ahí el filtro no
@@ -260,7 +267,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
   // Conexión (una sola vez por sala). Si el coordinador entró a esta sala, NO conectamos
   // el monitor (evita la doble presencia 📢-monitor + participante real).
   useEffect(() => {
-    if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); onSpeakingRef.current?.([]); return; }
+    if (!enabled) { setStatus("connecting"); onSharersRef.current?.([]); onSpeakingRef.current?.([]); onParticipantsRef.current?.(null); return; }
     let cancelled = false;
     // Espera creciente, con techo: si LiveKit está caído no tiene sentido
     // martillarlo desde nueve miniaturas a la vez, pero tampoco rendirse.
@@ -319,13 +326,18 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
     const recomputeSharers = () => {
       if (!roomRef.current) return;
       const names: string[] = [];
+      const ids: string[] = [];
       roomRef.current.remoteParticipants.forEach((p: any) => {
+        const identity: string = p.identity || "";
+        // Otros monitores y vistas previas de supervisores no son gente de la sala.
+        if (!identity.startsWith("__")) ids.push(identity);
         const sharing = Array.from(p.trackPublications.values()).some(
           (pub: any) => pub.source === Track.Source.ScreenShare && pub.kind === Track.Kind.Video,
         );
         if (sharing) names.push(p.name || p.identity || "Alguien");
       });
       onSharersRef.current?.(names);
+      onParticipantsRef.current?.(ids);
     };
 
     room
@@ -361,6 +373,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       // como la miniatura parpadeando y la persona entrando y saliendo sola.
       .on(RoomEvent.Disconnected, (razon) => {
         if (cancelled) return;
+        onParticipantsRef.current?.(null);   // sin conexión no hay verdad que ofrecer
         if (esOtraPestana(razon)) { setStatus("duplicada"); return; }
         setStatus("error");
         programarReintento();

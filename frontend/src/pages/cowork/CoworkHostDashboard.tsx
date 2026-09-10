@@ -35,6 +35,8 @@ import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaP
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
+import { personasEnSala, relojDeRespaldo, latidoFresco } from "@/lib/coworkOcupacion";
+import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
@@ -100,6 +102,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
   const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
+  // Quién está CONECTADO a cada sala según LiveKit, reportado por el monitor de
+  // esa sala. `null` = ese monitor no sabe. Es la verdad para las tarjetas: las
+  // asignaciones quedan activas aunque la persona cierre la pestaña sin salir
+  // (Jhon, 10/09: "aparece Julián si no está conectado").
+  const [roomConectados, setRoomConectados] = useState<Record<string, string[] | null>>({});
+  // Reloj de respaldo desde la base (lo que dejó el latido), para cuando la
+  // presencia de Realtime no llega y la persona igual está trabajando (Jhon,
+  // 10/09: "Camila aparece con puntico gris y sin contador").
+  const relojRespaldo = useRelojDeSala(cowork.session?.id);
   // Las reglas de ESTA sesión (lib/coworkReglas): qué alertas existen y a qué
   // umbral se escala al supervisor. Sin `alert_rules` en la fila es el
   // estándar, o sea lo que Cowork hizo siempre. Va ARRIBA de todo lo que la
@@ -375,6 +386,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       excedida: p!.excedida,
     };
   };
+  // Cada dos minutos se apagan las asignaciones de quien lleva más de tres sin
+  // latir: cerró la pestaña sin salir y su nombre se quedaba en la tarjeta para
+  // siempre. Lo hace el servidor con el latido como prueba; acá solo se dispara.
+  useEffect(() => {
+    if (!cowork.session?.id) return;
+    const barrer = () => { void cowork.barrerAsignacionesColgadas?.().catch(() => { /* la próxima */ }); };
+    const primero = window.setTimeout(barrer, 20_000);
+    const id = window.setInterval(barrer, 2 * 60_000);
+    return () => { window.clearTimeout(primero); window.clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cowork.session?.id]);
+
   // Barra lateral plegada, como el menu de Maven. Se recuerda porque es una
   // preferencia de espacio en pantalla, no un estado de la operacion.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -1195,12 +1218,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   /** La gente de una sala con su reloj de Cowork (el mismo número que ve la
    *  persona, porque viaja por presencia). */
   const personasDe = (participants: Array<{ user_id: string }>) => participants.map((a) => {
-    const reloj = relojDesdePresencia(mediaStates[a.user_id]);
+    // La presencia manda; si no llegó, el reloj que el latido dejó en la base.
+    const reloj = relojDesdePresencia(mediaStates[a.user_id]) ?? relojDeRespaldo(relojRespaldo[a.user_id], now);
     const corre = reloj?.estado === "activo";
     return {
       uid: a.user_id,
       nombre: nombreYApellido(cowork.profiles[a.user_id]),
-      online: isOnline(a.user_id),
+      // Verde si la presencia general la ve, O si su latido es reciente: está
+      // trabajando aunque el socket de Realtime se le haya caído.
+      online: isOnline(a.user_id) || latidoFresco(relojRespaldo[a.user_id], now),
       reloj: reloj ? formatoReloj(segundosMostrados(reloj, now)) : null,
       corre,
       motivo: reloj && !corre ? motivoDetenidoDeOtro(reloj.estado) : null,
@@ -1738,7 +1764,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
             <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
               {cowork.rooms.map((room) => {
-                const participants = getRoomParticipants(room.id);
+                // Asignados que ESTÁN, según LiveKit. Si el monitor no sabe
+                // (no conectó, o está apagado porque entré a esta sala), los
+                // asignados a secas.
+                const asignados = getRoomParticipants(room.id);
+                const presentes = new Set(personasEnSala(asignados.map((a) => a.user_id), roomConectados[room.id]));
+                const participants = asignados.filter((a) => presentes.has(a.user_id));
                 const speakers = roomSpeakers[room.id] ?? [];
                 const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
                 const etiquetas = etiquetasDe(participants, !pausaSala);
@@ -1760,6 +1791,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     enabled={activeRoomId !== room.id}
                     onSharersChange={(names) => setRoomSharers((m) => ({ ...m, [room.id]: names }))}
                     onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
+                    onParticipantsChange={(ids) => setRoomConectados((m) => ({ ...m, [room.id]: ids }))}
                   />
                 );
                 return (

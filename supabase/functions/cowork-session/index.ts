@@ -629,6 +629,44 @@ serve(async (req) => {
       return json(req, { ok: true, estado, detalle, segmento: nuevo.id, segundosHoy: await segundosHoy() });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // BARRER ASIGNACIONES COLGADAS — host only
+    //
+    // Las asignaciones quedan `is_active` aunque la persona cierre la pestaña
+    // sin salir (el `pagehide` no siempre llega: cierre del navegador, PC
+    // apagada, red muerta). Jhon (10/09/2026): "en PLUS 4 aparece Julián si no
+    // está conectado" — su último latido era de hacía 12 horas.
+    //
+    // El latido es la señal buena: llega cada 30 s por HTTP mientras la persona
+    // está en la sala. Quien lleva más de 3 minutos sin latir y más de 3
+    // minutos asignado (para no barrer a quien acaba de entrar y todavía no
+    // late), se da por ido: se apaga su asignación y se cierra su reloj.
+    // Lo llama el tablero del supervisor cada un par de minutos.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "barrerAsignacionesColgadas") {
+      const { sessionId } = body;
+      if (!sessionId) return err(req, "sessionId required");
+      const { data: hostCheck } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err(req, "Only hosts", 403);
+
+      const corte = new Date(Date.now() - 3 * 60_000).toISOString();
+      const { data: activas } = await admin.from("cowork_room_assignments")
+        .select("id, user_id").eq("session_id", sessionId).eq("is_active", true).lt("assigned_at", corte);
+      if (!activas?.length) return json(req, { ok: true, cerradas: 0 });
+
+      const { data: latidos } = await admin.from("cowork_tiempo_segmentos")
+        .select("user_id").in("user_id", activas.map((a: { user_id: string }) => a.user_id)).gt("last_seen_at", corte);
+      const vivos = new Set((latidos ?? []).map((l: { user_id: string }) => l.user_id));
+      const colgadas = (activas as Array<{ id: string; user_id: string }>).filter((a) => !vivos.has(a.user_id));
+      if (!colgadas.length) return json(req, { ok: true, cerradas: 0 });
+
+      await admin.from("cowork_room_assignments").update({ is_active: false }).in("id", colgadas.map((a) => a.id));
+      for (const a of colgadas) await cerrarSegmentosAbiertos({ userId: a.user_id });
+      console.log(`[cowork] barridas ${colgadas.length} asignaciones colgadas en ${sessionId}`);
+      return json(req, { ok: true, cerradas: colgadas.length });
+    }
+
     if (action === "leaveRoom") {
       const { sessionId } = body;
       if (!sessionId) return err(req, "sessionId required");
