@@ -2015,17 +2015,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 aria-label="Volver a mostrar el Supervisor Hub"
                 onClick={() => setHubMinimized(false)}
                 className={cn(
-                  "glass-panel group flex h-14 items-center gap-2.5 rounded-full pl-2 pr-4 text-foreground",
-                  "ring-1 ring-warning/35 shadow-[0_10px_28px_-10px_hsl(var(--warning)/.55)]",
+                  "glass-panel group flex h-10 items-center gap-2 rounded-full pl-1.5 pr-3.5 text-foreground",
+                  "ring-1 ring-warning/35 shadow-[0_8px_22px_-10px_hsl(var(--warning)/.55)]",
                   "transition-transform hover:scale-105 active:scale-95 motion-reduce:transition-none",
                   anclaMuelle && `absolute bottom-0 ${lado}`,
                   salaEnHoja && "invisible",
                 )}
               >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning/15 text-warning transition-colors group-hover:bg-warning/25">
-                  <Headphones className="h-5 w-5" />
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-warning/15 text-warning transition-colors group-hover:bg-warning/25">
+                  <Headphones className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-semibold">Hub</span>
+                <span className="text-[13px] font-semibold">Hub</span>
               </button>
             );
             return anclaMuelle
