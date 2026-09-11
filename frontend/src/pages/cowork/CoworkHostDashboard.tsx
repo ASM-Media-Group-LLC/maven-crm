@@ -1471,17 +1471,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">Supervisor Dashboard</p>
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
+              {/* El nombre ES el botón para renombrar (Jhon, 10/09): el lápiz que
+                  iba al lado quedaba tapado por la barrita de acciones. Al pasar
+                  el mouse se subraya, para que se note que se puede tocar. */}
               <button
                 type="button"
-                className="group flex min-w-0 items-center gap-1.5 text-left"
+                className="group flex min-w-0 items-center text-left"
                 title="Cambiar el nombre de la sesión"
                 onClick={() => {
                   setSessionName(cowork.session?.name || "");
                   setRenameOpen(true);
                 }}
               >
-                <h2 className="truncate font-display text-base font-semibold text-foreground">{cowork.session?.name}</h2>
-                <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                <h2 className="truncate font-display text-base font-semibold text-foreground decoration-primary/60 decoration-dotted underline-offset-4 transition-colors group-hover:text-primary group-hover:underline">{cowork.session?.name}</h2>
               </button>
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
