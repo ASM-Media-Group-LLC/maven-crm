@@ -558,7 +558,7 @@ const CreadoresTable = ({ creators }: Props) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel />
           <AlertDialogAction
             onClick={() =>
               bluToggleTarget &&
@@ -588,7 +588,7 @@ const CreadoresTable = ({ creators }: Props) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel />
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => {

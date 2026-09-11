@@ -573,7 +573,7 @@ export default function GroupMembersPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removing}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={removing} />
             <AlertDialogAction onClick={handleRemoveMember} disabled={removing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Eliminar
@@ -592,7 +592,7 @@ export default function GroupMembersPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={leavingGroup}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={leavingGroup} />
             <AlertDialogAction onClick={handleLeaveGroup} disabled={leavingGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {leavingGroup ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Salir

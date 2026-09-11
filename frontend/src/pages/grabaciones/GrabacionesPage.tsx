@@ -429,7 +429,7 @@ export default function GrabacionesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const r = porBorrar; setPorBorrar(null); if (r) void handleDelete(r); }}

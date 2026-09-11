@@ -305,7 +305,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel />
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => deleteCreator.mutate(c.id)}

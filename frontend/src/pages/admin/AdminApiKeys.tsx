@@ -460,7 +460,7 @@ const AdminApiKeys = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => revokeTarget && revokeMut.mutate(revokeTarget.id)}>
               {revokeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Revocar"}

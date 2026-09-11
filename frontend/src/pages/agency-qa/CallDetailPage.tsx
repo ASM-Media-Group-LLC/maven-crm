@@ -1454,9 +1454,7 @@ const CallDetailPage = ({
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={fireWebhook.isPending}>
-                  Cancelar
-                </AlertDialogCancel>
+                <AlertDialogCancel disabled={fireWebhook.isPending} />
                 <AlertDialogAction
                   onClick={handleResend}
                   disabled={fireWebhook.isPending}

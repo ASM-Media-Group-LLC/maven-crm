@@ -219,7 +219,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
                   <Command>
                     <CommandInput placeholder="Buscar por handle o nombre..." />
                     <CommandList>
-                      <CommandEmpty>Sin resultados.</CommandEmpty>
+                      <CommandEmpty />
                       {pendingContacts.length > 0 && (
                         <CommandGroup heading="Contactos pendientes (se convierten al asignar)">
                           {pendingContacts.map((c) => (

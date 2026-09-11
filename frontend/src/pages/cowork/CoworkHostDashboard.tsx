@@ -2632,7 +2632,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={roomBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={roomBusy} />
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleCloseRoom(); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

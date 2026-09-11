@@ -511,7 +511,7 @@ export default function ProspectosPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel />
               <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
                 {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
               </AlertDialogAction>

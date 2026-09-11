@@ -145,7 +145,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
           <Command>
             <CommandInput placeholder="Buscar agente..." />
             <CommandList>
-              <CommandEmpty>Sin resultados.</CommandEmpty>
+              <CommandEmpty />
               <CommandGroup>
                 <CommandItem
                   onSelect={() => {
@@ -192,7 +192,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
             <Command>
               <CommandInput placeholder="Buscar canal..." />
               <CommandList>
-                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandEmpty />
                 <CommandGroup>
                   {salesChannelOptions.map((o) => (
                     <CommandItem key={o.id} onSelect={() => toggleChannel(o.id)}>

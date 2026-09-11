@@ -18,7 +18,7 @@ const DeleteUserDialog = ({ open, onOpenChange, userName, onConfirm, isLoading }
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+        <AlertDialogCancel />
         <AlertDialogAction onClick={onConfirm} disabled={isLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
           {isLoading ? "Eliminando..." : "Eliminar"}
         </AlertDialogAction>

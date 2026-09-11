@@ -186,7 +186,7 @@ export default function AiChatSidebar({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => {

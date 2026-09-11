@@ -565,7 +565,7 @@ const SpammerCard = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteAccount.isPending}>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleteAccount.isPending} />
           <AlertDialogAction
             disabled={deleteAccount.isPending}
             onClick={(e) => {

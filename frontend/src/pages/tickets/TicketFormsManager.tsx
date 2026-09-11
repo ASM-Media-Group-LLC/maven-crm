@@ -130,7 +130,7 @@ const TicketFormsManager = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               onClick={() => {
                 if (toArchive) deleteForm.mutate(toArchive.id);

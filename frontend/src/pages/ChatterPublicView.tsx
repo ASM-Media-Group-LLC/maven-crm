@@ -1645,7 +1645,7 @@ const ChatterPublicView = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingMsg}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingMsg} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={async (e) => {

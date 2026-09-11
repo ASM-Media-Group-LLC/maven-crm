@@ -235,7 +235,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               onClick={() => unlinkTarget && unlinkMutation.mutate(unlinkTarget.pendingCreator)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

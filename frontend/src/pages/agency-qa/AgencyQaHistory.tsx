@@ -482,9 +482,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteCall.isPending}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteCall.isPending} />
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleteCall.isPending}
@@ -526,9 +524,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={fireWebhook.isPending}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={fireWebhook.isPending} />
             <AlertDialogAction
               onClick={confirmResend}
               disabled={fireWebhook.isPending}

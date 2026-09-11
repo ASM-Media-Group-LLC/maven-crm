@@ -1752,7 +1752,7 @@ export const ChatPanel = ({ session }: Props) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMsgMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMsgMut.isPending} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
@@ -1788,7 +1788,7 @@ export const ChatPanel = ({ session }: Props) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={endMut.isPending} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {

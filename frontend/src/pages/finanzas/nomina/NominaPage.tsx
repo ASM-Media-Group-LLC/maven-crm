@@ -439,7 +439,7 @@ export default function NominaPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => closeMonthMutation.mutate()} disabled={closeMonthMutation.isPending}>
               <Lock className="h-4 w-4 mr-1" />Confirmar Cierre
             </AlertDialogAction>
@@ -463,7 +463,7 @@ export default function NominaPage() {
             <AlertDialogDescription>Se eliminará "{deleteItem?.period_name}". Esta acción no se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteItem && deletePeriod.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

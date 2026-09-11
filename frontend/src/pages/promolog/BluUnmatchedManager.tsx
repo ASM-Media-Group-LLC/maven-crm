@@ -156,7 +156,7 @@ const BluUnmatchedManager = () => {
                             <Command>
                               <CommandInput placeholder="Buscar creadora…" />
                               <CommandList>
-                                <CommandEmpty>Sin resultados.</CommandEmpty>
+                                <CommandEmpty />
                                 {creators.map((c) => (
                                   <CommandItem
                                     key={c.id}

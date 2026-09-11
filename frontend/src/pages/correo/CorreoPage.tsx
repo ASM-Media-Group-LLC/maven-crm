@@ -601,7 +601,7 @@ export default function CorreoPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const e = confirmarBorrado; setConfirmarBorrado(null); if (e) lanzarMasiva("delete", e); }}

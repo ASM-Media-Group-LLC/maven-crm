@@ -548,7 +548,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1078,7 +1078,7 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>¿Eliminar programa?</AlertDialogTitle><AlertDialogDescription>El programa se desactivará.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1284,7 +1284,7 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

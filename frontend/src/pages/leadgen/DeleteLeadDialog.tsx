@@ -56,7 +56,7 @@ const DeleteLeadDialog = ({ open, onOpenChange, lead }: Props) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting} />
           <AlertDialogAction
             onClick={handleDelete}
             disabled={isDeleting}

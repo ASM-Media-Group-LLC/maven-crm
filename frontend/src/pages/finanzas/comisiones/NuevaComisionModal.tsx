@@ -136,7 +136,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
                 <Command>
                   <CommandInput placeholder="Buscar creador..." />
                   <CommandList onWheel={(e) => e.stopPropagation()}>
-                    <CommandEmpty>Sin resultados.</CommandEmpty>
+                    <CommandEmpty />
                     <CommandGroup>
                       {creators.map(c => (
                         <CommandItem key={c.id} value={c.artistic_name || c.name} onSelect={() => { setCreatorId(c.id); setCreatorOpen(false); }}>

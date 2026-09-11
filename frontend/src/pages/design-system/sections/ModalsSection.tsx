@@ -88,7 +88,7 @@ export const ModalsSection = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel />
               <AlertDialogAction>Continuar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
