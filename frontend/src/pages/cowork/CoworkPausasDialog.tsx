@@ -2,13 +2,15 @@
 // break lleva cada persona, y quién se pasó. Baño se mide contra el presupuesto
 // del DÍA; break contra el tope por pausa que fijó el supervisor en las reglas.
 import { useState } from "react";
-import { Coffee, Loader2, RefreshCw } from "lucide-react";
+import { Coffee, Loader2, RefreshCw, Video } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCoworkPausas } from "@/hooks/useCoworkPausas";
+import { useCoworkMeetsResumen } from "@/hooks/useCoworkMeetsResumen";
+import { fechaHoraCorta } from "@/lib/coworkMeetsResumen";
 import { fechaBogota } from "@/pages/admin/coworkVsHubstaff/useCoworkVsHubstaff";
-import { fraseDeExcesos, minutosLegibles } from "@/lib/coworkPausasResumen";
+import { fraseDeExcesos, minutosLegibles, type PersonaPausas } from "@/lib/coworkPausasResumen";
 
 const RANGOS = [
   { id: "hoy", label: "Hoy", dias: 0 },
@@ -32,6 +34,21 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
   const hasta = fechaBogota(0);
   const desde = fechaBogota(r.dias);
   const { data, cargando, error, refrescar } = useCoworkPausas(desde, hasta, todas ? null : sessionId, open);
+  // Los meets grupales (Jhon, 10/09): mismo rango y misma sesión, categoría aparte.
+  const meets = useCoworkMeetsResumen(desde, hasta, todas ? null : sessionId, open);
+  const meetDe = new Map((meets.data?.personas ?? []).map((p) => [p.userId, p]));
+  // La tabla junta a quien tuvo pausas y a quien SOLO tuvo meets (con las pausas en cero).
+  const filasTabla: PersonaPausas[] = [
+    ...(data?.personas ?? []),
+    ...(meets.data?.personas ?? [])
+      .filter((mp) => !(data?.personas ?? []).some((p) => p.userId === mp.userId))
+      .map((mp) => ({
+        userId: mp.userId, nombre: mp.nombre, dias: 0, banos: 0, segBano: 0, diasBanoExcedido: 0,
+        breaks: 0, segBreak: 0, breaksExcedidos: 0, segBreakDeMas: 0, autoCerradas: 0, conExcesos: false,
+      })),
+  ];
+  const hayAlgo = filasTabla.length > 0 || (meets.data?.meets.length ?? 0) > 0;
+  const cargandoTodo = cargando || meets.cargando;
 
   return (
     // NO modal: con el diálogo abierto se puede seguir moviendo la ventanita del
@@ -44,10 +61,10 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Coffee className="h-4 w-4" /> Pausas</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Coffee className="h-4 w-4" /> Pausas y meets</DialogTitle>
           <DialogDescription>
             Baño se mide contra el presupuesto del día ({banoMin} min). Break contra el tope por pausa ({breakMin} min).
-            Los topes se cambian en las reglas de la sesión.
+            Los topes se cambian en las reglas de la sesión. El meet grupal no es pausa: cuenta como tiempo trabajado y se lista aparte.
           </DialogDescription>
         </DialogHeader>
 
@@ -72,26 +89,28 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
               Todas las sesiones
             </button>
           </div>
-          <Button variant="ghost" size="icon" className="ml-auto h-7 w-7" title="Actualizar" onClick={() => void refrescar()}>
-            <RefreshCw className={cn("h-3.5 w-3.5", cargando && "animate-spin")} />
+          <Button variant="ghost" size="icon" className="ml-auto h-7 w-7" title="Actualizar" onClick={() => { void refrescar(); void meets.refrescar(); }}>
+            <RefreshCw className={cn("h-3.5 w-3.5", cargandoTodo && "animate-spin")} />
           </Button>
         </div>
 
         {error && <p className="text-xs text-destructive">No se pudieron traer las pausas: {error.message}</p>}
-        {cargando && !data && (
+        {meets.error && <p className="text-xs text-destructive">No se pudieron traer los meets: {meets.error.message}</p>}
+        {cargandoTodo && !data && !meets.data && (
           <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</div>
         )}
 
-        {data && data.personas.length === 0 && !cargando && (
-          <p className="py-8 text-center text-sm text-muted-foreground">Nadie marcó pausas en este período.</p>
+        {data && meets.data && !hayAlgo && !cargandoTodo && (
+          <p className="py-8 text-center text-sm text-muted-foreground">Nadie marcó pausas ni hubo meets grupales en este período.</p>
         )}
 
-        {data && data.personas.length > 0 && (
+        {data && hayAlgo && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <Resumen label="Personas" valor={String(data.totales.personas)} />
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <Resumen label="Personas" valor={String(filasTabla.length)} />
               <Resumen label="Baño" valor={minutosLegibles(data.totales.segBano)} sub={`${data.totales.banos} idas`} />
               <Resumen label="Break" valor={minutosLegibles(data.totales.segBreak)} sub={`${data.totales.breaks} breaks`} />
+              <Resumen label="Meet grupal" valor={minutosLegibles(meets.data?.totales.segMeet ?? 0)} sub={`${meets.data?.totales.meets ?? 0} ${(meets.data?.totales.meets ?? 0) === 1 ? "meet" : "meets"}`} />
               <Resumen label="Con excesos" valor={String(data.totales.conExcesos)} alerta={data.totales.conExcesos > 0} />
             </div>
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -101,11 +120,12 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
                     <th>Persona</th>
                     <th className="!text-right">Baño</th>
                     <th className="!text-right">Break</th>
+                    <th className="!text-right">Meet</th>
                     <th>Excesos</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.personas.map((p) => {
+                  {filasTabla.map((p) => {
                     const excesos = fraseDeExcesos(p);
                     return (
                       <tr key={p.userId} className="border-t border-border/60 [&>td]:px-3 [&>td]:py-2 align-top">
@@ -124,6 +144,17 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
                           <div className={cn(p.breaksExcedidos > 0 && "text-destructive font-semibold")}>{minutosLegibles(p.segBreak)}</div>
                           <div className="text-[10px] text-muted-foreground">{p.breaks} {p.breaks === 1 ? "break" : "breaks"}</div>
                         </td>
+                        <td className="text-right tabular-nums">
+                          {(() => {
+                            const m = meetDe.get(p.userId);
+                            return m ? (
+                              <>
+                                <div className="text-primary">{minutosLegibles(m.segMeet)}</div>
+                                <div className="text-[10px] text-muted-foreground">{m.meets} {m.meets === 1 ? "meet" : "meets"}</div>
+                              </>
+                            ) : <div className="text-muted-foreground">—</div>;
+                          })()}
+                        </td>
                         <td className={cn(excesos ? "text-destructive" : "text-muted-foreground")}>{excesos ?? "Va bien"}</td>
                       </tr>
                     );
@@ -131,6 +162,34 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
                 </tbody>
               </table>
             </div>
+            {/* Cada meet del período: cuándo, cuánto duró, quién lo invocó y quiénes fueron. */}
+            {meets.data && meets.data.meets.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Video className="h-3.5 w-3.5 text-primary" /> Meets grupales ({meets.data.meets.length})
+                </h3>
+                {meets.data.meets.map((m) => (
+                  <div key={m.meetId} className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium text-foreground">{fechaHoraCorta(m.startedAt)}</span>
+                      <span className="tabular-nums text-primary">{minutosLegibles(m.segundos)}</span>
+                      {m.abierto && <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">En curso</span>}
+                      <span className="text-muted-foreground">· lo invocó {m.creador}</span>
+                      {todas && <span className="text-muted-foreground">· {m.sesion}</span>}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {m.gente.map((g) => (
+                        <span key={g.userId} className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-0.5 text-[11px]">
+                          <span className="font-medium">{g.nombre}</span>
+                          {g.sala && <span className="text-muted-foreground">· {g.sala}</span>}
+                          <span className="tabular-nums text-muted-foreground">· {minutosLegibles(g.segundos)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </DialogContent>

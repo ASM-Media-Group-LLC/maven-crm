@@ -13,6 +13,8 @@ export interface DiaDeCowork {
   horas: number;
   /** Horas dentro de la sala, corriendo o no. */
   horasEnSala: number;
+  /** De las horas con el reloj corriendo, las que fueron meet grupal. */
+  horasMeet: number;
 }
 
 const SIN_DIAS: DiaDeCowork[] = [];
@@ -32,8 +34,8 @@ export function useMiTiempoCowork(desde: string, hasta: string) {
         _desde: desde, _hasta: hasta, _user_id: user!.id, _limit: 500, _offset: 0,
       });
       if (error) throw new Error(error.message);
-      return ((data ?? []) as Array<{ dia: string; seg_activo: number; seg_en_sala: number }>)
-        .map((r) => ({ date: r.dia, horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600 }))
+      return ((data ?? []) as Array<{ dia: string; seg_activo: number; seg_meet?: number | null; seg_en_sala: number }>)
+        .map((r) => ({ date: r.dia, horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600, horasMeet: Number(r.seg_meet ?? 0) / 3600 }))
         .sort((a, b) => a.date.localeCompare(b.date));
     },
   });
@@ -44,11 +46,13 @@ export function useMiTiempoCowork(desde: string, hasta: string) {
 export function resumirTiempoCowork(dias: DiaDeCowork[]) {
   const horas = dias.reduce((s, d) => s + d.horas, 0);
   const horasEnSala = dias.reduce((s, d) => s + d.horasEnSala, 0);
-  return { horas, horasEnSala, diasConReloj: dias.filter((d) => d.horas > 0).length };
+  const horasMeet = dias.reduce((s, d) => s + (d.horasMeet ?? 0), 0);
+  return { horas, horasEnSala, horasMeet, diasConReloj: dias.filter((d) => d.horas > 0).length };
 }
 
 /** "31.5 h · 34.2 h en sala" — el pie de la tarjeta. */
 export function pieTiempoCowork(r: ReturnType<typeof resumirTiempoCowork>, cargando: boolean): string {
   if (r.diasConReloj === 0) return cargando ? "cargando…" : "sin tiempo en Cowork en el rango";
-  return `${r.diasConReloj} día${r.diasConReloj === 1 ? "" : "s"} · ${r.horasEnSala.toFixed(1)} h en sala`;
+  const meet = r.horasMeet > 0 ? ` · ${r.horasMeet.toFixed(1)} h en meet grupal` : "";
+  return `${r.diasConReloj} día${r.diasConReloj === 1 ? "" : "s"} · ${r.horasEnSala.toFixed(1)} h en sala${meet}`;
 }

@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 export interface TiempoCoworkDePersona {
   horas: number;
   horasEnSala: number;
+  /** De `horas`, las que fueron meet grupal. */
+  horasMeet: number;
   diasConReloj: number;
 }
 
@@ -32,8 +34,8 @@ export function useEquipoTiempoCowork(desde: string, hasta: string) {
       const { data, error } = await db.rpc("equipo_tiempo_cowork", { _desde: desde, _hasta: hasta });
       if (error) throw new Error(error.message);
       const mapa: TiempoCoworkPorPersona = new Map();
-      for (const r of (data ?? []) as Array<{ user_id: string; seg_activo: number | string; seg_en_sala: number | string; dias_con_reloj: number }>) {
-        mapa.set(r.user_id, { horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600, diasConReloj: Number(r.dias_con_reloj) });
+      for (const r of (data ?? []) as Array<{ user_id: string; seg_activo: number | string; seg_meet?: number | string | null; seg_en_sala: number | string; dias_con_reloj: number }>) {
+        mapa.set(r.user_id, { horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600, horasMeet: Number(r.seg_meet ?? 0) / 3600, diasConReloj: Number(r.dias_con_reloj) });
       }
       return mapa;
     },
@@ -46,13 +48,14 @@ export function useEquipoTiempoCowork(desde: string, hasta: string) {
 export function sumarCoworkDelEquipo(
   filas: Array<{ maven_user_id: string | null }>,
   porPersona: TiempoCoworkPorPersona,
-): { horas: number; personasConReloj: number } {
-  let horas = 0, personasConReloj = 0;
+): { horas: number; horasMeet: number; personasConReloj: number } {
+  let horas = 0, horasMeet = 0, personasConReloj = 0;
   for (const f of filas) {
     const t = f.maven_user_id ? porPersona.get(f.maven_user_id) : undefined;
     if (!t) continue;
     horas += t.horas;
+    horasMeet += t.horasMeet ?? 0;
     if (t.horas > 0) personasConReloj++;
   }
-  return { horas, personasConReloj };
+  return { horas, horasMeet, personasConReloj };
 }
