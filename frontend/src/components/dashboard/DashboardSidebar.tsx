@@ -91,22 +91,22 @@ const DashboardSidebar = () => {
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: "Correo", url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
+    { title: t("nav.mail"), url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
     // del "+" (Jhon, 09/09/2026); WhatsApp y Telegram lo siguen teniendo acá.
-    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
-    { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
-    { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
-    { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
+    { title: t("nav.messenger"), url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
+    { title: t("nav.cowork"), url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
+    { title: t("nav.meet"), url: "/meet", icon: Video, module: "Meet" },
+    { title: t("nav.recordings"), url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
   const creadoresSubItems = [
-    { title: "Dashboard", url: "/creadores/dashboard", submodule: "Dashboard" },
-    { title: "Listado", url: "/creadores", submodule: "Lista" },
-    { title: "Onboarding", url: "/creadores/onboarding", submodule: "Onboarding" },
-    { title: "Offboarding", url: "/creadores/offboarding", submodule: "Offboarding" },
+    { title: t("nav.creators.dashboard"), url: "/creadores/dashboard", submodule: "Dashboard" },
+    { title: t("nav.creators.list"), url: "/creadores", submodule: "Lista" },
+    { title: t("nav.creators.onboarding"), url: "/creadores/onboarding", submodule: "Onboarding" },
+    { title: t("nav.creators.offboarding"), url: "/creadores/offboarding", submodule: "Offboarding" },
   ].filter(item => canAccess("Creadores", item.submodule));
 
   const allCreadoresItems = creadoresSubItems;
@@ -116,19 +116,19 @@ const DashboardSidebar = () => {
 
   const operationsMenuAll: { title: string; url: string; icon: any; badge?: number; module: string; submodule: string | undefined }[] = [
     { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined },
-    { title: "Parrilla", url: "/parrilla", icon: CalendarRange, module: "Parrilla", submodule: undefined },
-    { title: "Personalizados", url: "/personalizados", icon: Gift, module: "Personalizados", submodule: undefined },
+    { title: t("nav.contentGrid"), url: "/parrilla", icon: CalendarRange, module: "Parrilla", submodule: undefined },
+    { title: t("nav.customs"), url: "/personalizados", icon: Gift, module: "Personalizados", submodule: undefined },
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
-    { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
-    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined },
-    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined },
+    { title: t("nav.phones"), url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
+    { title: t("nav.whatsapp"), url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined },
+    { title: t("nav.telegram"), url: "/telegram/bandeja", icon: TelegramIcon, badge: tgInboxCount || undefined, module: "Telegram", submodule: undefined },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
-    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
-    { title: "Chatters · Rendimiento", url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento" as string | undefined },
-    { title: "Chatters · Horarios", url: "/chatters/horarios", icon: CalendarDays, module: "Chatters", submodule: "Horarios" as string | undefined },
-    { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
-    { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
+    { title: t("nav.chatterEvaluator"), url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
+    { title: t("nav.chattersPerformance"), url: "/chatter-evaluator/rendimiento", icon: Gauge, module: "Chatters", submodule: "Rendimiento" as string | undefined },
+    { title: t("nav.chattersSchedules"), url: "/chatters/horarios", icon: CalendarDays, module: "Chatters", submodule: "Horarios" as string | undefined },
+    { title: t("nav.scouterAssist"), url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
+    { title: t("nav.companyQa"), url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
@@ -159,88 +159,88 @@ const DashboardSidebar = () => {
 
   const hrGroupsAll: HRGroup[] = [
     {
-      label: "Employee Lifecycle",
+      label: t("nav.hr.lifecycle"),
       icon: UserCheck,
       key: "lifecycle",
       items: [
-        { title: "Personal", url: "/hr/personal", submodule: "Empleados Activos" },
-        { title: "Candidatos", url: "/hr/candidatos", submodule: "Candidatos" },
-        { title: "Onboarding", url: "/hr/onboarding", submodule: "Onboarding" },
-        { title: "Empleados Activos", url: "/hr/directorio", submodule: "Empleados Activos" },
-        { title: "Offboarding", url: "/hr/offboarding", submodule: "Offboarding" },
+        { title: t("nav.hr.staff"), url: "/hr/personal", submodule: "Empleados Activos" },
+        { title: t("nav.hr.candidates"), url: "/hr/candidatos", submodule: "Candidatos" },
+        { title: t("nav.hr.onboarding"), url: "/hr/onboarding", submodule: "Onboarding" },
+        { title: t("nav.hr.activeEmployees"), url: "/hr/directorio", submodule: "Empleados Activos" },
+        { title: t("nav.hr.offboarding"), url: "/hr/offboarding", submodule: "Offboarding" },
       ],
     },
     {
-      label: "Gestión Laboral",
+      label: t("nav.hr.laborManagement"),
       icon: Clock,
       key: "gestion",
       subGroups: [
         {
-          label: "Control de Tiempo",
+          label: t("nav.hr.timeControl"),
           key: "tiempo",
           items: [
-            { title: "Asistencia", url: "/hr/asistencia", submodule: "Asistencia" },
-            { title: "Horarios y Turnos", url: "/hr/horarios", submodule: "Horarios" },
-            { title: "Horario del personal", url: "/hr/horarios-personal", submodule: "Horarios" },
-            { title: "Horarios Chatters", url: "/hr/horarios-chatters", submodule: "Horarios Chatters" },
-            { title: "Horas Extra", url: "/hr/horarios/horas-extras", submodule: "Horas Extra" },
-            { title: "Banco de Horas", url: "/hr/horarios/banco-horas", submodule: "Banco de Horas" },
+            { title: t("nav.hr.attendance"), url: "/hr/asistencia", submodule: "Asistencia" },
+            { title: t("nav.hr.schedules"), url: "/hr/horarios", submodule: "Horarios" },
+            { title: t("nav.hr.staffSchedule"), url: "/hr/horarios-personal", submodule: "Horarios" },
+            { title: t("nav.hr.chatterSchedules"), url: "/hr/horarios-chatters", submodule: "Horarios Chatters" },
+            { title: t("nav.hr.overtime"), url: "/hr/horarios/horas-extras", submodule: "Horas Extra" },
+            { title: t("nav.hr.hoursBank"), url: "/hr/horarios/banco-horas", submodule: "Banco de Horas" },
           ],
         },
         {
-          label: "Ausencias",
+          label: t("nav.hr.absences"),
           key: "ausencias",
           items: [
-            { title: "Vacaciones", url: "/hr/vacaciones", submodule: "Vacaciones" },
-            { title: "Permisos", url: "/hr/permisos", submodule: "Permisos" },
+            { title: t("nav.hr.vacations"), url: "/hr/vacaciones", submodule: "Vacaciones" },
+            { title: t("nav.hr.leave"), url: "/hr/permisos", submodule: "Permisos" },
           ],
         },
       ],
       items: [
-        { title: "Monitoreo", url: "/hr/monitoreo", submodule: "Monitoreo" },
+        { title: t("nav.hr.monitoring"), url: "/hr/monitoreo", submodule: "Monitoreo" },
       ],
     },
     {
-      label: "Seguimiento",
+      label: t("nav.hr.tracking"),
       icon: Eye,
       key: "seguimiento",
       items: [
-        { title: "Incidentes", url: "/hr/incidentes", submodule: "Incidentes" },
+        { title: t("nav.hr.incidents"), url: "/hr/incidentes", submodule: "Incidentes" },
       ],
     },
     {
-      label: "Desarrollo & Performance",
+      label: t("nav.hr.development"),
       icon: GraduationCap,
       key: "desarrollo",
       items: [
-        { title: "Desempeño", url: "/hr/desempeno", submodule: "Desempeño" },
-        { title: "Capacitación", url: "/hr/capacitacion", submodule: "Capacitación" },
+        { title: t("nav.hr.performance"), url: "/hr/desempeno", submodule: "Desempeño" },
+        { title: t("nav.hr.training"), url: "/hr/capacitacion", submodule: "Capacitación" },
       ],
     },
     {
-      label: "Organización",
+      label: t("nav.hr.organization"),
       icon: Users,
       key: "organizacion",
       items: [
-        { title: "Directorio", url: "/hr/organizacion/directorio", submodule: "Directorio" },
-        { title: "Organigrama", url: "/hr/organizacion/organigrama", submodule: "Organigrama" },
+        { title: t("nav.hr.directory"), url: "/hr/organizacion/directorio", submodule: "Directorio" },
+        { title: t("nav.hr.orgChart"), url: "/hr/organizacion/organigrama", submodule: "Organigrama" },
       ],
     },
     {
-      label: "Finanzas Operativas",
+      label: t("nav.hr.opsFinance"),
       icon: Wallet,
       key: "finanzas",
       items: [
-        { title: "Nómina y costo", url: "/hr/nomina", submodule: "Deducciones" },
-        { title: "Deducciones", url: "/hr/deducciones", submodule: "Deducciones" },
+        { title: t("nav.hr.payroll"), url: "/hr/nomina", submodule: "Deducciones" },
+        { title: t("nav.hr.deductions"), url: "/hr/deducciones", submodule: "Deducciones" },
       ],
     },
     {
-      label: "Comunicación",
+      label: t("nav.hr.communication"),
       icon: Bell,
       key: "comunicacion",
       items: [
-        { title: "Anuncios Internos", url: "/hr/anuncios", submodule: "Anuncios" },
+        { title: t("nav.hr.announcements"), url: "/hr/anuncios", submodule: "Anuncios" },
       ],
     },
   ];
@@ -303,7 +303,7 @@ const DashboardSidebar = () => {
     | { kind: "label"; title: string }
     | { kind: "separator" }
   > = [
-    ...(showHRDashboard ? [{ title: "Dashboard HR", url: "/hr" }] : []),
+    ...(showHRDashboard ? [{ title: t("nav.hr.dashboard"), url: "/hr" }] : []),
     ...hrGroups.flatMap((g) => {
       const flat: Array<{ title: string; url: string }> = [];
       if (g.items)
@@ -378,7 +378,7 @@ const DashboardSidebar = () => {
         <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
           <Link
           to="/dashboard"
-          aria-label="Ir al Dashboard"
+          aria-label={t("nav.goToDashboard")}
           className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Logo size="sm" collapsed={collapsed} />
@@ -387,13 +387,13 @@ const DashboardSidebar = () => {
         <SidebarContent className="gap-2 px-3 py-3">
           {permisosFallaron ? (
             <div className="space-y-2 rounded-xl border border-border/60 bg-muted/40 p-3">
-              <p className="text-xs font-medium">No pudimos cargar tu menú</p>
+              <p className="text-xs font-medium">{t("nav.menuLoadFailed")}</p>
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Fue la conexión, no tu cuenta. Sigues con la sesión abierta.
+                {t("nav.menuLoadFailedHint")}
               </p>
               <Button size="sm" variant="secondary" className="h-7 w-full gap-1.5 text-xs" onClick={reintentarPermisos}>
                 <RefreshCw className="h-3 w-3" />
-                Reintentar
+                {t("nav.retry")}
               </Button>
             </div>
           ) : (
@@ -414,7 +414,7 @@ const DashboardSidebar = () => {
       <SidebarHeader className="flex h-20 flex-row items-center justify-center px-4 shrink-0">
         <Link
           to="/dashboard"
-          aria-label="Ir al Dashboard"
+          aria-label={t("nav.goToDashboard")}
           className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Logo size={collapsed ? "sm" : "md"} collapsed={collapsed} />
@@ -496,38 +496,38 @@ const DashboardSidebar = () => {
 
           const finanzasGroupsAll: FinGroup[] = [
             {
-              label: "Operaciones",
+              label: t("nav.fin.operations"),
               icon: Calculator,
               key: "fin-ops",
               items: [
-                { title: "Nómina", url: "/finanzas/nomina", submodule: "Nómina" },
-                { title: "Horas & Variables", url: "/finanzas/horas-variables", submodule: "Horas Variables" },
+                { title: t("nav.fin.payroll"), url: "/finanzas/nomina", submodule: "Nómina" },
+                { title: t("nav.fin.hoursVariables"), url: "/finanzas/horas-variables", submodule: "Horas Variables" },
               ],
             },
             {
-              label: "Facturación",
+              label: t("nav.fin.billing"),
               icon: FileText,
               key: "fin-fact",
               items: [
-                { title: "Invoices", url: "/finanzas/facturacion/invoices", submodule: "Invoices" },
-                { title: "Templates", url: "/finanzas/facturacion/templates", submodule: "Templates" },
+                { title: t("nav.fin.invoices"), url: "/finanzas/facturacion/invoices", submodule: "Invoices" },
+                { title: t("nav.fin.templates"), url: "/finanzas/facturacion/templates", submodule: "Templates" },
               ],
             },
             {
-              label: "Análisis",
+              label: t("nav.fin.analysis"),
               icon: BarChart3,
               key: "fin-analysis",
               items: [
-                { title: "Control Financiero", url: "/finanzas/control", submodule: "Control Financiero" },
-                { title: "Reportes Avanzados", url: "/finanzas/reportes", submodule: "Reportes" },
+                { title: t("nav.fin.control"), url: "/finanzas/control", submodule: "Control Financiero" },
+                { title: t("nav.fin.reports"), url: "/finanzas/reportes", submodule: "Reportes" },
               ],
             },
             {
-              label: "Configuración",
+              label: t("nav.fin.settings"),
               icon: Settings,
               key: "fin-config",
               items: [
-                { title: "Config. Financiera", url: "/finanzas/configuracion", submodule: "Configuración" },
+                { title: t("nav.fin.settingsItem"), url: "/finanzas/configuracion", submodule: "Configuración" },
               ],
             },
           ];
@@ -543,8 +543,8 @@ const DashboardSidebar = () => {
           const showFinCollections = canAccess("Finanzas", "Collections");
 
           const finFlatItems = [
-            ...(showFinDashboard ? [{ title: "Dashboard", url: "/finanzas" }] : []),
-            ...(showFinCollections ? [{ title: "Collections", url: "/finanzas/collections" }] : []),
+            ...(showFinDashboard ? [{ title: t("nav.dashboard"), url: "/finanzas" }] : []),
+            ...(showFinCollections ? [{ title: t("nav.fin.collections"), url: "/finanzas/collections" }] : []),
             ...finanzasGroups.flatMap(g => g.items.map(i => ({ title: i.title, url: i.url }))),
           ];
 
@@ -559,8 +559,8 @@ const DashboardSidebar = () => {
           );
 
           const finCollapsedItems: CI[] = [
-            { title: "Dashboard Financiero", url: "/finanzas" },
-            { title: "Collections", url: "/finanzas/collections" },
+            { title: t("nav.fin.dashboard"), url: "/finanzas" },
+            { title: t("nav.fin.collections"), url: "/finanzas/collections" },
             ...finanzasGroups.flatMap((g) => [
               { kind: "separator" } as const,
               { kind: "label", title: g.label } as const,
@@ -581,9 +581,9 @@ const DashboardSidebar = () => {
                     <SidebarMenuItem>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <SidebarMenuButton tooltip="Finanzas" className={`sidebar-glass-hover ${isFinanzasActive ? "sidebar-glass-active font-medium" : ""}`}>
+                          <SidebarMenuButton tooltip={t("nav.finance")} className={`sidebar-glass-hover ${isFinanzasActive ? "sidebar-glass-active font-medium" : ""}`}>
                             <Wallet className="h-4 w-4 shrink-0" />
-                            <span>Finanzas</span>
+                            <span>{t("nav.finance")}</span>
                           </SidebarMenuButton>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
@@ -599,10 +599,10 @@ const DashboardSidebar = () => {
                     <>
                       {showFinDashboard && (
                         <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard Financiero">
+                          <SidebarMenuButton asChild tooltip={t("nav.fin.dashboard")}>
                             <NavLink to="/finanzas" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                               <LayoutDashboard className="h-4 w-4 shrink-0" />
-                              <span>Dashboard Financiero</span>
+                              <span>{t("nav.fin.dashboard")}</span>
                             </NavLink>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -610,10 +610,10 @@ const DashboardSidebar = () => {
 
                       {showFinCollections && (
                         <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Collections">
+                          <SidebarMenuButton asChild tooltip={t("nav.fin.collections")}>
                             <NavLink to="/finanzas/collections" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                               <DollarSign className="h-4 w-4 shrink-0" />
-                              <span>Collections</span>
+                              <span>{t("nav.fin.collections")}</span>
                             </NavLink>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -667,14 +667,14 @@ const DashboardSidebar = () => {
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton tooltip="Empleados" className={`sidebar-glass-hover ${isHRActive ? "sidebar-glass-active font-medium" : ""}`}>
+                      <SidebarMenuButton tooltip={t("nav.staff")} className={`sidebar-glass-hover ${isHRActive ? "sidebar-glass-active font-medium" : ""}`}>
                         <UserCog className="h-4 w-4 shrink-0" />
-                        <span>Empleados</span>
+                        <span>{t("nav.staff")}</span>
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
                       <DropdownMenuItem onClick={() => navigate("/hr")} className={pathname === "/hr" ? "bg-accent text-accent-foreground font-medium" : ""}>
-                        Dashboard HR
+                        {t("nav.hr.dashboard")}
                       </DropdownMenuItem>
                       {hrFlatItems.map((item) => (
                         <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
@@ -688,10 +688,10 @@ const DashboardSidebar = () => {
                 <>
                   {showHRDashboard && (
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Dashboard HR">
+                      <SidebarMenuButton asChild tooltip={t("nav.hr.dashboard")}>
                         <NavLink to="/hr" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                           <LayoutDashboard className="h-4 w-4 shrink-0" />
-                          <span>Dashboard HR</span>
+                          <span>{t("nav.hr.dashboard")}</span>
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -819,7 +819,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-2">
-        <div title="Sesión activa" aria-label="Sesión activa">
+        <div title={t("nav.activeSession")} aria-label={t("nav.activeSession")}>
           <UserAvatar
             name={fullName}
             src={avatarUrl}
@@ -866,7 +866,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           borde inferior-derecho del avatar (patrón estándar Slack/Discord/
           Linear) y el nombre tiene su línea completa, más limpio. */}
       <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/70 p-2">
-        <div className="shrink-0" title="Sesión activa" aria-label="Sesión activa">
+        <div className="shrink-0" title={t("nav.activeSession")} aria-label={t("nav.activeSession")}>
           {/* El del sidebar DESPLEGADO. Va aparte del de arriba (el plegado):
               son dos avatares distintos y los dos tienen que seguir el estado. */}
           <UserAvatar
