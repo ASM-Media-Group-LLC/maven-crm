@@ -361,6 +361,11 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       .on(RoomEvent.TrackUnpublished, () => recomputeSharers())
       .on(RoomEvent.ParticipantConnected, () => recomputeSharers())
       .on(RoomEvent.ParticipantDisconnected, () => recomputeSharers())
+      // En una reconexión completa livekit-client vacía la lista de gente y la
+      // vuelve a llenar cuando entra: mientras tanto NO se sabe quién está
+      // (null → la tarjeta cae a los asignados en vez de decir "Sin participantes").
+      .on(RoomEvent.Reconnecting, () => onParticipantsRef.current?.(null))
+      .on(RoomEvent.Reconnected, () => recomputeSharers())
       // Quién habla AHORA. Excluimos al participante local: cuando el coordinador
       // le habla a la sala publica su micro acá, y su propia voz no debe pintar la
       // card como si estuvieran hablando los chatters.

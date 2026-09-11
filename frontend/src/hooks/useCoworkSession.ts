@@ -274,9 +274,22 @@ export function useCoworkSession(sessionId: string | null) {
 
     channelsRef.current = [sessionCh, roomsCh, assignCh, reqCh, ssCh, memCh, meetsCh, meetPartsCh];
 
+    // Red de seguridad (Jhon, 10/09: "tengo que actualizar para ver quiénes
+    // están en break, voy perdiendo pantallas"): un canal de Realtime puede
+    // morir en silencio y nada lo vuelve a traer. Cada minuto, y al volver a la
+    // pestaña o a tener red, se relee todo aunque no haya llegado ningún
+    // evento. Siete lecturas por minuto por pantalla abierta: barato.
+    const cadaMinuto = window.setInterval(realtimeRefetch, 60_000);
+    const alVolver = () => { if (document.visibilityState === "visible") realtimeRefetch(); };
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("online", realtimeRefetch);
+
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
       channelsRef.current = [];
+      window.clearInterval(cadaMinuto);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("online", realtimeRefetch);
     };
   }, [sessionId, fetchData]);
 

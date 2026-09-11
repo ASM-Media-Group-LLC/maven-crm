@@ -1383,7 +1383,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const presentes = new Set(personasEnSala(asignados.map((a) => a.user_id), roomConectados[room.id]));
     const participants = asignados.filter((a) => presentes.has(a.user_id));
     const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
-    return { room, participants, pausaSala };
+    return { room, asignados, participants, pausaSala };
   });
 
   return (
@@ -1786,16 +1786,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 return <p className="text-xs text-muted-foreground px-1">Nadie está compartiendo pantalla</p>;
               }
               return filas.map((f) => {
+                // Está en la lista porque LiveKit la ve compartiendo AHORA: conectada
+                // por definición. La presencia general (isOnline) llegaba a pintar gris
+                // a gente activa (Daniela, 10/09), así que el punto solo distingue pausa.
                 const enPausa = f.uid ? !!pausaDe(f.uid) : false;
-                const conectada = f.uid ? isOnline(f.uid) : true;
                 return (
                   <div key={f.key} className="bg-primary/5 rounded-xl px-2 py-1.5 flex items-center gap-2">
                     <UserAvatar name={f.uid ? cowork.profiles[f.uid] : f.nombre} src={f.uid ? cowork.avatares[f.uid]?.src : null} seed={f.uid ? cowork.avatares[f.uid]?.seed : null} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={cn("h-2 w-2 shrink-0 rounded-full", enPausa ? "bg-warning" : conectada ? "bg-success" : "bg-muted-foreground/40")}
-                          title={enPausa ? "En pausa" : conectada ? "Conectada en Cowork" : "Sin señal"}
+                          className={cn("h-2 w-2 shrink-0 rounded-full", enPausa ? "bg-warning" : "bg-success")}
+                          title={enPausa ? "En pausa" : "Conectada en Cowork"}
                         />
                         <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
                       </div>
@@ -1973,7 +1975,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   </div>
                 );
               })}
-              {fichas.map(({ room, participants, pausaSala }) => {
+              {fichas.map(({ room, asignados, participants, pausaSala }) => {
                 const speakers = roomSpeakers[room.id] ?? [];
                 const etiquetas = etiquetasDe(participants, !pausaSala);
                 const personas = personasDe(participants);
@@ -2075,10 +2077,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       participants.length === 0 ? "bg-muted/50" : "bg-black/40",
                     )}>
                       {participants.length === 0 ? (
-                        <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
-                          <Users2 className="h-5 w-5" />
-                          <span className="text-xs">Sin participantes</span>
-                        </div>
+                        <>
+                          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
+                            <Users2 className="h-5 w-5" />
+                            <span className="text-xs">Sin participantes</span>
+                          </div>
+                          {/* El monitor sigue MONTADO aunque no vea a nadie. Antes se
+                              desmontaba acá, y como es él quien avisa quién está, ya no
+                              podía avisar que alguien llegó (o volvió tras un corte de
+                              red): la sala quedaba "Sin participantes" y sin pantalla
+                              hasta recargar el tablero (Jhon, 10/09). Solo si hay
+                              asignados: una sala vacía de verdad no gasta conexión. */}
+                          {asignados.length > 0 && monitor(false)}
+                        </>
                       ) : pausaSala ? (
                         <>
                           {/* En pausa la miniatura se apaga (mock aprobado el 08/09).
