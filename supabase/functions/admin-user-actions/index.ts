@@ -172,8 +172,11 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
-      if (!first_name || !last_name) {
-        return new Response(JSON.stringify({ error: "first_name y last_name son requeridos" }), {
+      // El APELLIDO es opcional (pedido de Jhon, 11/09/2026). Hay gente con un
+      // solo nombre y hay buzones funcionales —capturados@, soporte@— que no
+      // tienen apellido y obligaba a inventar uno.
+      if (!first_name) {
+        return new Response(JSON.stringify({ error: "first_name es requerido" }), {
           status: 400,
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
@@ -212,7 +215,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      const fullName = `${first_name} ${last_name}`;
+      // filter(Boolean): sin apellido, un template daría "Capturados " con un
+      // espacio colgando que después aparece en el Para de cada correo.
+      const fullName = [first_name, last_name].filter(Boolean).join(" ");
       // Generamos un password temporal para que el usuario pueda
       // entrar al primer login sin esperar magic link. Mismo alfabeto
       // (sin símbolos) que reset_password — fácil de copy-paste.
@@ -1169,8 +1174,8 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
-      const newFullName = first_name && last_name
-        ? `${first_name} ${last_name}`
+      const newFullName = first_name
+        ? [first_name, last_name].filter(Boolean).join(" ")
         : full_name;
 
       if (!newFullName) {

@@ -99,3 +99,19 @@ describe("sugerir dirección para MIGRAR a alguien que ya tiene correo", () => {
     expect(sugerirParaMigrar("josé.peña@unlok.me")).toBe(`jose.pena@${DOMINIO_CASILLA}`);
   });
 });
+
+// Apellido OPCIONAL desde el 11/09/2026: hay gente con un solo nombre y
+// buzones funcionales (capturados@, soporte@) que no tienen apellido.
+describe("sin apellido", () => {
+  it("arma la dirección solo con el nombre, sin punto colgando", () => {
+    expect(sugerirDireccion("Capturados", "")).toBe("capturados@maven-ai.me");
+  });
+
+  it("aguanta el apellido en blanco de solo espacios", () => {
+    expect(sugerirDireccion("Madonna", "   ")).toBe("madonna@maven-ai.me");
+  });
+
+  it("sigue devolviendo null si NO hay ni nombre ni apellido", () => {
+    expect(sugerirDireccion("", "")).toBeNull();
+  });
+});

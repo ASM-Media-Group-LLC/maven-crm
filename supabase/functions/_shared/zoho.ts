@@ -194,9 +194,14 @@ export function createMailbox(input: CreateMailboxInput): Promise<ZohoResult<Zoh
     body: JSON.stringify({
       primaryEmailAddress: input.email,
       password: input.password,
-      displayName: `${input.firstName} ${input.lastName}`,
+      // El apellido es opcional en Maven, pero Zoho lo trata como obligatorio:
+      // se le manda el nombre otra vez para que no lo rechace. El displayName
+      // —que es lo ÚNICO que ve una persona— se arma con las partes que
+      // existan, así un buzón sin apellido no queda como "Capturados
+      // Capturados" ni con un espacio colgando al final.
+      displayName: [input.firstName, input.lastName].filter(Boolean).join(" "),
       firstName: input.firstName,
-      lastName: input.lastName,
+      lastName: input.lastName || input.firstName,
     }),
   });
 }

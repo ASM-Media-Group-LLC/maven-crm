@@ -99,8 +99,10 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
   });
 
   const externoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailExterno.trim());
+  // El apellido NO entra acá: es opcional (hay gente con un solo nombre y
+  // buzones funcionales como capturados@ que no tienen apellido).
   const puedeEnviar =
-    !!firstName.trim() && !!lastName.trim() &&
+    !!firstName.trim() &&
     (tipoCorreo === "maven" || externoValido);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -248,7 +250,9 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lastName">Apellido</Label>
+                <Label htmlFor="lastName">
+                  Apellido <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -257,7 +261,6 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="pl-9"
-                    required
                     maxLength={50}
                   />
                 </div>
