@@ -1164,12 +1164,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Quién comparte pantalla en cada sala — VERDAD de LiveKit reportada por cada
   // CoworkRoomMonitor (más confiable que el presence auto-reportado, que fallaba y
   // mostraba "nadie comparte" aunque alguien lo estuviera haciendo).
-  const [roomSharers, setRoomSharers] = useState<Record<string, string[]>>({});
+  // Quién comparte pantalla en cada sala (ids), según LiveKit. Los nombres
+  // que el monitor también manda ya no hacen falta: el panel los saca del perfil.
   const [roomSharerIds, setRoomSharerIds] = useState<Record<string, string[]>>({});
   // Quién está HABLANDO en cada sala (ActiveSpeakersChanged de LiveKit), para
   // pintar la card en verde mientras alguien habla.
   const [roomSpeakers, setRoomSpeakers] = useState<Record<string, string[]>>({});
-  const getRoomSharers = (roomId: string) => roomSharers[roomId] ?? [];
 
   const handleAddRoom = async () => {
     const name = addName.trim();
@@ -1765,45 +1765,53 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             );
           })()}
 
-          {/* Pantallas compartidas EN VIVO por sala (ya no hay aprobaciones: compartir
-              es directo para todos; acá solo se ve quién está compartiendo y dónde). */}
+          {/* Quién está EN las salas ahora (los asignados que el monitor ve), con
+              su estado —verde trabajando, naranja en baño o break, violeta en meet
+              grupal— y el monitorcito si comparte pantalla. Antes la lista era solo
+              "quién comparte pantalla": como la pausa apaga la pantalla, la gente
+              en break desaparecía de la lista justo cuando más importaba verla
+              (Jhon, 10/09). */}
           <section className="mx-3 my-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
-            <div className="flex items-center gap-2">
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/15 text-primary"><Monitor className="h-3.5 w-3.5" /></span>
-              <h3 className="text-xs font-semibold text-foreground">Pantallas en vivo</h3>
-            </div>
             {(() => {
-              // Una fila por persona (Jhon, 10/09): su avatar, un punto de estado
-              // —verde conectada, naranja en break o baño— y el menú para
-              // escribirle por Messenger sin salir del tablero. Si el monitor aún
-              // no reportó ids (versión vieja en caché), caen los nombres de antes.
-              const filas = cowork.rooms.flatMap((room) => {
-                const ids = roomSharerIds[room.id] ?? [];
-                if (ids.length) return ids.map((uid) => ({ key: `${room.id}-${uid}`, room, uid, nombre: nombreYApellido(cowork.profiles[uid]) || "Alguien" }));
-                return getRoomSharers(room.id).map((n) => ({ key: `${room.id}-${n}`, room, uid: null as string | null, nombre: n }));
-              });
-              if (filas.length === 0) {
-                return <p className="text-xs text-muted-foreground px-1">Nadie está compartiendo pantalla</p>;
-              }
-              return filas.map((f) => {
-                // Está en la lista porque LiveKit la ve compartiendo AHORA: conectada
-                // por definición. La presencia general (isOnline) llegaba a pintar gris
-                // a gente activa (Daniela, 10/09), así que el punto solo distingue pausa.
-                const enPausa = f.uid ? !!pausaDe(f.uid) : false;
-                return (
-                  <div key={f.key} className="bg-primary/5 rounded-xl px-2 py-1.5 flex items-center gap-2">
-                    <UserAvatar name={f.uid ? cowork.profiles[f.uid] : f.nombre} src={f.uid ? cowork.avatares[f.uid]?.src : null} seed={f.uid ? cowork.avatares[f.uid]?.seed : null} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={cn("h-2 w-2 shrink-0 rounded-full", enPausa ? "bg-warning" : "bg-success")}
-                          title={enPausa ? "En pausa" : "Conectada en Cowork"}
-                        />
-                        <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
+              const filas = fichas.flatMap(({ room, participants }) => participants.map((a) => {
+                const uid = a.user_id;
+                const pausa = pausaDe(uid);
+                return {
+                  key: `${room.id}-${uid}`,
+                  uid,
+                  room,
+                  nombre: nombreYApellido(cowork.profiles[uid]) || "Alguien",
+                  etiquetaPausa: pausa ? pausa.etiqueta : null,
+                  enMeet: !!meetDe(uid),
+                  comparte: (roomSharerIds[room.id] ?? []).includes(uid),
+                };
+              }));
+              return (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/15 text-primary"><Users2 className="h-3.5 w-3.5" /></span>
+                    <h3 className="text-xs font-semibold text-foreground">En las salas</h3>
+                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{filas.length}</span>
+                  </div>
+                  {filas.length === 0 && <p className="px-1 text-xs text-muted-foreground">Nadie conectado en las salas</p>}
+                  {filas.map((f) => (
+                    <div key={f.key} className={cn("flex items-center gap-2 rounded-xl px-2 py-1.5", f.etiquetaPausa ? "bg-warning/10" : "bg-primary/5")}>
+                      <UserAvatar name={cowork.profiles[f.uid]} src={cowork.avatares[f.uid]?.src} seed={cowork.avatares[f.uid]?.seed} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn("h-2 w-2 shrink-0 rounded-full", f.etiquetaPausa ? "bg-warning" : f.enMeet ? "bg-primary" : "bg-success")}
+                            title={f.etiquetaPausa ? `En ${f.etiquetaPausa.toLowerCase()}` : f.enMeet ? "En meet grupal" : "Trabajando"}
+                          />
+                          <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
+                        </div>
+                        <span className="block truncate text-[10px] text-primary/80">
+                          {f.room.name}{f.etiquetaPausa ? ` · ${f.etiquetaPausa}` : f.enMeet ? " · Meet grupal" : ""}
+                        </span>
                       </div>
-                      <span className="block truncate text-[10px] text-primary/80">{f.room.name}</span>
-                    </div>
-                    {f.uid && (
+                      <span className="shrink-0" title={f.comparte ? "Compartiendo pantalla" : "Sin pantalla compartida"}>
+                        {f.comparte ? <Monitor className="h-3.5 w-3.5 text-primary" /> : <MonitorOff className="h-3.5 w-3.5 text-muted-foreground/40" />}
+                      </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-foreground" title="Más">
@@ -1811,15 +1819,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem onClick={() => escribirA(f.uid!)}>
+                          <DropdownMenuItem onClick={() => escribirA(f.uid)}>
                             <MessageCircle className="mr-2 h-4 w-4" /> Escribirle por Messenger
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )}
-                  </div>
-                );
-              });
+                    </div>
+                  ))}
+                </>
+              );
             })()}
           </section>
         </ScrollArea>
@@ -1994,7 +2002,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
                     enabled={activeRoomId !== room.id}
-                    onSharersChange={(names, ids) => { setRoomSharers((m) => ({ ...m, [room.id]: names })); setRoomSharerIds((m) => ({ ...m, [room.id]: ids ?? [] })); }}
+                    onSharersChange={(_names, ids) => setRoomSharerIds((m) => ({ ...m, [room.id]: ids ?? [] }))}
                     onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
                     onParticipantsChange={(ids) => setRoomConectados((m) => ({ ...m, [room.id]: ids }))}
                   />
