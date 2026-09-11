@@ -166,6 +166,9 @@ export function useCoworkSession(sessionId: string | null) {
   const [myAssignment, setMyAssignment] = useState<CoworkAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  /** Foto real y avatar_seed (DiceBear) de cada miembro, para que el tablero
+   *  dibuje la misma cara que el Messenger y no solo iniciales (Jhon, 10/09). */
+  const [avatares, setAvatares] = useState<Record<string, { src: string | null; seed: string | null }>>({});
   const initialLoadDone = useRef(false);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
@@ -215,10 +218,15 @@ export function useCoworkSession(sessionId: string | null) {
 
       const userIds = (mems as CoworkMembership[])?.map(m => m.user_id) || [];
       if (userIds.length) {
-        const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", userIds);
         const map: Record<string, string> = {};
-        profs?.forEach((p: any) => { map[p.id] = p.full_name || "User"; });
+        const caras: Record<string, { src: string | null; seed: string | null }> = {};
+        profs?.forEach((p: any) => {
+          map[p.id] = p.full_name || "User";
+          caras[p.id] = { src: p.avatar_url ?? null, seed: p.avatar_seed ?? null };
+        });
         setProfiles(map);
+        setAvatares(caras);
       }
     } finally {
       if (!silent) setLoading(false);
@@ -473,7 +481,7 @@ export function useCoworkSession(sessionId: string | null) {
 
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests, meets,
-    myMembership, myAssignment, isHost, loading, profiles,
+    myMembership, myAssignment, isHost, loading, profiles, avatares,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest, barrerAsignacionesColgadas,
     crearMeetGrupal, terminarMeetGrupal, salirDeMeetGrupal, joinMeetGrupal,

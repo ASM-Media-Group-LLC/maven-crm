@@ -1605,7 +1605,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   <div key={req.id} className={`rounded-xl p-2.5 space-y-1 ${is1on1 ? "bg-primary/5" : "bg-warning/10"}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex min-w-0 items-center gap-2">
-                        <UserAvatar name={cowork.profiles[req.user_id]} size="sm" />
+                        <UserAvatar name={cowork.profiles[req.user_id]} src={cowork.avatares[req.user_id]?.src} seed={cowork.avatares[req.user_id]?.seed} size="sm" />
                         <span className="truncate text-xs font-medium text-foreground/90">{cowork.profiles[req.user_id] || "User"}</span>
                         {is1on1 ? <Phone className="h-3 w-3 shrink-0 text-primary" /> : <Hand className="h-3 w-3 shrink-0 text-warning" />}
                       </div>
@@ -1713,7 +1713,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 {enPausa.map((p) => (
                   <div key={p.uid} className="bg-warning/10 rounded-xl px-2 py-1.5 flex items-center justify-between gap-2">
                     <div className="min-w-0 flex items-center gap-2">
-                      <UserAvatar name={p.nombre} size="sm" />
+                      <UserAvatar name={p.nombre} src={cowork.avatares[p.uid]?.src} seed={cowork.avatares[p.uid]?.seed} size="sm" />
                       <span className="text-xs text-foreground/90 truncate">{p.nombre}</span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1790,7 +1790,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 const conectada = f.uid ? isOnline(f.uid) : true;
                 return (
                   <div key={f.key} className="bg-primary/5 rounded-xl px-2 py-1.5 flex items-center gap-2">
-                    <UserAvatar name={f.uid ? cowork.profiles[f.uid] : f.nombre} size="sm" />
+                    <UserAvatar name={f.uid ? cowork.profiles[f.uid] : f.nombre} src={f.uid ? cowork.avatares[f.uid]?.src : null} seed={f.uid ? cowork.avatares[f.uid]?.seed : null} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span
@@ -2093,7 +2093,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               const ms = mediaStates[a.user_id];
                               return (
                                 <div key={a.user_id} className="flex flex-col items-center gap-1">
-                                  <UserAvatar name={cowork.profiles[a.user_id]} size="lg" status={isOnline(a.user_id) ? "online" : "away"} />
+                                  <UserAvatar name={cowork.profiles[a.user_id]} src={cowork.avatares[a.user_id]?.src} seed={cowork.avatares[a.user_id]?.seed} size="lg" status={isOnline(a.user_id) ? "online" : "away"} />
                                   <span className="max-w-[120px] truncate text-[11px] text-muted-foreground">{nombreYApellido(cowork.profiles[a.user_id])}</span>
                                   {ms && (
                                     <div className="flex items-center gap-1.5">
@@ -2444,7 +2444,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   <ul className="mt-3 space-y-2">
                     {personas.map((p) => (
                       <li key={p.uid} className="flex items-center gap-2 text-sm">
-                        <UserAvatar name={p.nombre} size="sm" status={p.online ? "online" : "away"} />
+                        <UserAvatar name={p.nombre} src={cowork.avatares[p.uid]?.src} seed={cowork.avatares[p.uid]?.seed} size="sm" status={p.online ? "online" : "away"} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate">{p.nombre}</span>
                           {p.motivo && <span className="block truncate text-xs text-muted-foreground">Reloj detenido: {p.motivo}</span>}
