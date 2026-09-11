@@ -247,18 +247,48 @@ export class ImapClient {
   }
 
   async listFolders(): Promise<{ ok: boolean; folders: string[]; error?: string }> {
+    const r = await this.listFoldersDetalle();
+    return { ok: r.ok, folders: r.folders.map((f) => f.nombre), error: r.error };
+  }
+
+  /** Como listFolders pero CONSERVANDO las banderas de cada carpeta.
+   *
+   *  Las banderas son la única forma fiable de saber cuál es "Enviados": el
+   *  nombre cambia con el idioma del buzón (Enviado, Sent, Éléments envoyés…)
+   *  y buscar por nombre falla en cuanto alguien tiene el correo en otro
+   *  idioma. El servidor marca la carpeta especial con \Sent (RFC 6154). */
+  async listFoldersDetalle(): Promise<
+    { ok: boolean; folders: { nombre: string; banderas: string }[]; error?: string }
+  > {
     const res = await this.command('LIST "" "*"');
     if (!res.ok) return { ok: false, folders: [], error: res.error };
 
     // Cada línea es: * LIST (\Flags) "/" "Nombre"
     // El nombre puede venir entre comillas o suelto, y puede tener espacios.
-    const folders: string[] = [];
+    const folders: { nombre: string; banderas: string }[] = [];
     for (const line of res.lines) {
-      const m = line.match(/^\*\s+LIST\s+\([^)]*\)\s+("[^"]*"|NIL)\s+(.+)$/i);
+      const m = line.match(/^\*\s+LIST\s+\(([^)]*)\)\s+("[^"]*"|NIL)\s+(.+)$/i);
       if (!m) continue;
-      folders.push(m[2].trim().replace(/^"(.*)"$/, "$1"));
+      folders.push({
+        banderas: m[1],
+        nombre: m[3].trim().replace(/^"(.*)"$/, "$1"),
+      });
     }
     return { ok: true, folders };
+  }
+
+  /** La carpeta de ENVIADOS de este buzón, o null si no se puede determinar.
+   *
+   *  Primero por la bandera especial \Sent, que es independiente del idioma.
+   *  Si el servidor no la publica, se cae a una lista de nombres conocidos —
+   *  ese respaldo es una apuesta, la bandera no. */
+  async carpetaDeEnviados(): Promise<string | null> {
+    const r = await this.listFoldersDetalle();
+    if (!r.ok) return null;
+    const especial = r.folders.find((f) => /\\Sent\b/i.test(f.banderas));
+    if (especial) return especial.nombre;
+    const conocidos = ["sent", "enviado", "enviados", "sent items", "sent mail", "elementos enviados"];
+    return r.folders.find((f) => conocidos.includes(f.nombre.toLowerCase()))?.nombre ?? null;
   }
 
   async selectFolder(
@@ -446,7 +476,7 @@ export class ImapClient {
     folder: string,
     flags: string,
     rfc822: string,
-  ): Promise<{ ok: boolean; uid?: number; error?: string }> {
+  ): Promise<{ ok: boolean; uid?: number; uidvalidity?: number; error?: string }> {
     const tag = this.nextTag();
     const bytes = enc.encode(rfc822);
     // El nombre de carpeta va entre comillas; escapamos " y \ por las dudas.
@@ -468,8 +498,14 @@ export class ImapClient {
     await escribirTodo(this.conn, enc.encode("\r\n"), CMD_TIMEOUT_MS, "IMAP");
     const res = await this.awaitCompletion(tag);
     if (!res.ok) return { ok: false, error: res.error };
-    const uid = res.completion.match(/APPENDUID \d+ (\d+)/)?.[1];
-    return { ok: true, uid: uid ? Number(uid) : undefined };
+    // APPENDUID trae <uidvalidity> <uid>: los DOS hacen falta, porque la
+    // caché tiene clave única (user_id, folder, uidvalidity, uid).
+    const m = res.completion.match(/APPENDUID (\d+) (\d+)/);
+    return {
+      ok: true,
+      uidvalidity: m ? Number(m[1]) : undefined,
+      uid: m ? Number(m[2]) : undefined,
+    };
   }
 
   /** Cambia banderas de VARIOS mensajes de una vez (un solo comando por lote).

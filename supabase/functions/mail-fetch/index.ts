@@ -875,7 +875,9 @@ Deno.serve(async (req) => {
 
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
-        .select("id, email_address, secret_cipher, secret_nonce, key_version, smtp_host, smtp_port")
+        // imap_host/port van acá además de los de SMTP: después de enviar hay
+        // que abrir IMAP para dejar la copia en Enviados.
+        .select("id, email_address, secret_cipher, secret_nonce, key_version, smtp_host, smtp_port, imap_host, imap_port")
         .eq("user_id", user.id)
         .is("revoked_at", null)
         .maybeSingle();
@@ -946,7 +948,68 @@ Deno.serve(async (req) => {
           .update({ last_used_at: new Date().toISOString(), last_error: null })
           .eq("id", cred.id);
 
-        return json(req, { ok: true, from: fromAddress, to, cc: cc ?? [], subject });
+        // ── Copia en ENVIADOS ──────────────────────────────────────────
+        // SMTP entrega al destinatario y nada más: guardar una copia en
+        // Enviados es trabajo del CLIENTE, con un APPEND por IMAP. Sin esto,
+        // el correo salía bien pero no quedaba rastro en la carpeta —
+        // exactamente lo que reportó Jhon.
+        //
+        // ⚠️ NUNCA falla el envío por esto. El correo YA salió: devolver
+        // error acá haría que la persona lo mandara de nuevo y el
+        // destinatario lo recibiera dos veces. Si la copia no se pudo
+        // guardar, se avisa aparte y el barrido del worker la levanta igual
+        // en cuanto pase por la carpeta.
+        let guardadoEnEnviados = false;
+        let imapCopia: ImapClient | null = null;
+        try {
+          imapCopia = await ImapClient.connect(
+            cred.imap_host as string,
+            cred.imap_port as number,
+          );
+          const authImap = await imapCopia.login(fromAddress, password);
+          if (authImap.ok) {
+            const carpeta = await imapCopia.carpetaDeEnviados();
+            if (carpeta) {
+              const ap = await imapCopia.appendMessage(carpeta, "\\Seen", rfc822);
+              guardadoEnEnviados = ap.ok;
+
+              // Se siembra la caché para que aparezca YA en la pantalla. El
+              // barrido completo pasa cada 30 min y sin esto la persona
+              // manda un correo y sigue sin verlo en Enviados: concluye que
+              // no se arregló nada.
+              if (ap.ok && ap.uid != null && ap.uidvalidity != null) {
+                const messageId = rfc822.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim() ?? null;
+                const nombre = (perfil?.full_name as string) ?? "";
+                await admin.from("mail_messages").upsert({
+                  user_id: user.id,
+                  folder: carpeta,
+                  uidvalidity: ap.uidvalidity,
+                  uid: ap.uid,
+                  from_addr: nombre ? `"${nombre}" <${fromAddress}>` : fromAddress,
+                  to_addr: (to ?? []).join(", "),
+                  subject: subject ?? "(sin asunto)",
+                  date: new Date().toISOString(),
+                  snippet: (text ?? html?.replace(/<[^>]+>/g, " ") ?? "")
+                    .replace(/\s+/g, " ").trim().slice(0, 200),
+                  unread: false,
+                  message_id: messageId,
+                }, { onConflict: "user_id,folder,uidvalidity,uid" });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[mail-fetch] no se pudo guardar la copia en Enviados", e);
+        } finally {
+          if (imapCopia) {
+            await imapCopia.logout();
+            imapCopia.close();
+          }
+        }
+
+        return json(req, {
+          ok: true, from: fromAddress, to, cc: cc ?? [], subject,
+          guardadoEnEnviados,
+        });
       } catch (e) {
         const msg = (e as Error).message ?? "error de SMTP";
         await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
