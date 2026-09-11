@@ -88,14 +88,67 @@ export interface CadenaNC {
  * clona. Una sola cadena para las dos, para que "cancelación de ruido" sea lo
  * mismo en todos lados.
  */
-export async function armarCadenaNC(entrada: MediaStreamTrack): Promise<CadenaNC> {
+// Cuánto puede estar la voz entrando sin que salga nada antes de dar el filtro
+// por trabado: 8 revisiones de 2 s = 16 s hablando a un micrófono "activo" que
+// nadie oye. Umbrales en RMS: 0.05 es voz normal (-26 dBFS); 0.0002 es nada.
+export const VIGILANCIA_NC_MS = 2_000;
+export const REVISIONES_MUDAS_PARA_FALLAR = 8;
+export const RMS_VOZ = 0.05;
+export const RMS_NADA = 0.0002;
+
+/** RMS de la señal en el analizador (dominio del tiempo). Exportado para probarlo. */
+export function rmsDe(muestras: Float32Array): number {
+  let suma = 0;
+  for (let i = 0; i < muestras.length; i++) suma += muestras[i] * muestras[i];
+  return muestras.length ? Math.sqrt(suma / muestras.length) : 0;
+}
+
+/** El filtro se trabó: hay voz a la entrada y nada a la salida, varias veces seguidas. */
+export function filtroTrabado(entradaRms: number, salidaRms: number, seguidasPrevias: number): { seguidas: number; trabado: boolean } {
+  const seguidas = entradaRms > RMS_VOZ && salidaRms < RMS_NADA ? seguidasPrevias + 1 : 0;
+  return { seguidas, trabado: seguidas >= REVISIONES_MUDAS_PARA_FALLAR };
+}
+
+/**
+ * @param alFallar se llama UNA vez si el filtro deja de funcionar ya andando (el
+ *   AudioContext se suspende y no reanuda, o la salida queda muda con voz a la
+ *   entrada). Quien lo recibe apaga el procesador para que el micrófono vuelva
+ *   crudo: mejor ruido que silencio.
+ */
+export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motivo: string) => void): Promise<CadenaNC> {
   // 48 kHz no es una preferencia: RNNoise está entrenado a esa tasa y trabaja
   // en cuadros de 10 ms (480 muestras). El worklet del paquete hace el buffer
   // intermedio desde los 128 del AudioWorklet.
   const ctx = new AudioContext({ sampleRate: 48000 });
   if (ctx.state === "suspended") {
-    try { await ctx.resume(); } catch { /* sin gesto del usuario; el track igual fluye */ }
+    try { await ctx.resume(); } catch { /* se decide abajo */ }
   }
+  // Un AudioContext suspendido NO produce audio: el track "procesado" que sale
+  // de él es silencio puro, y LiveKit lo publica como si fuera la voz. Así
+  // quedó Andrea el 10/09: "me salía el micrófono activo y no me escuchaban".
+  // Si no arranca (sin gesto del usuario, o el navegador lo tiene interrumpido),
+  // acá se corta: el llamador se queda con el micrófono crudo.
+  if (ctx.state !== "running") {
+    try { await ctx.close(); } catch { /* noop */ }
+    throw new Error(`el AudioContext de la cancelación de ruido no arrancó (estado: ${ctx.state})`);
+  }
+  let avisado = false;
+  const fallar = (motivo: string) => {
+    if (avisado) return;
+    avisado = true;
+    console.warn("[NC] filtro fuera de servicio:", motivo);
+    alFallar?.(motivo);
+  };
+  // Si el navegador lo suspende o interrumpe ya andando (cambio de dispositivo,
+  // captura de audio del sistema al compartir pantalla, pestaña en segundo
+  // plano en algunos móviles), un intento de reanudar y, si no vuelve, se avisa.
+  ctx.onstatechange = () => {
+    if (ctx.state === "running" || ctx.state === "closed") return;
+    ctx.resume().then(
+      () => { if (ctx.state !== "running") fallar(`el AudioContext quedó en ${ctx.state}`); },
+      () => fallar(`el AudioContext quedó en ${ctx.state} y no se pudo reanudar`),
+    );
+  };
 
   const fuente = ctx.createMediaStreamSource(new MediaStream([entrada]));
   const destino = ctx.createMediaStreamDestination();
@@ -128,6 +181,29 @@ export async function armarCadenaNC(entrada: MediaStreamTrack): Promise<CadenaNC
   }
   puerta.connect(destino);
   nodos.push(fuente, puerta);
+  // Vigilante de mudez: voz a la entrada y nada a la salida durante 16 s = el
+  // filtro (worklet o WASM) se trabó sin que el contexto cambie de estado.
+  const analizadorEntrada = ctx.createAnalyser();
+  const analizadorSalida = ctx.createAnalyser();
+  analizadorEntrada.fftSize = 256;
+  analizadorSalida.fftSize = 256;
+  fuente.connect(analizadorEntrada);
+  puerta.connect(analizadorSalida);
+  nodos.push(analizadorEntrada, analizadorSalida);
+  const muestras = new Float32Array(256);
+  let seguidas = 0;
+  const vigilante = window.setInterval(() => {
+    if (ctx.state !== "running") return;
+    analizadorEntrada.getFloatTimeDomainData(muestras);
+    const entradaRms = rmsDe(muestras);
+    analizadorSalida.getFloatTimeDomainData(muestras);
+    const veredicto = filtroTrabado(entradaRms, rmsDe(muestras), seguidas);
+    seguidas = veredicto.seguidas;
+    if (veredicto.trabado) {
+      window.clearInterval(vigilante);
+      fallar("hay voz a la entrada y la salida lleva 16 s en silencio");
+    }
+  }, VIGILANCIA_NC_MS);
   motorVigente = motor;
   console.info(`[NC] cancelación de ruido armada: ${motor}`);
 
@@ -136,6 +212,8 @@ export async function armarCadenaNC(entrada: MediaStreamTrack): Promise<CadenaNC
     salida,
     motor,
     async destruir() {
+      window.clearInterval(vigilante);
+      ctx.onstatechange = null;
       for (const n of nodos) { try { n.disconnect(); } catch { /* noop */ } }
       try { rnnoise?.destroy(); } catch { /* noop */ }
       try { salida.stop(); } catch { /* noop */ }
@@ -157,8 +235,11 @@ export class NoiseSuppresionTrackProcessor {
 
   private cadena?: CadenaNC;
 
+  /** Ver `armarCadenaNC`: quién apaga el filtro si deja de funcionar andando. */
+  constructor(private readonly alFallar?: (motivo: string) => void) {}
+
   async init({ track }: { track: LocalTrack<Track.Kind>; element?: HTMLMediaElement }) {
-    this.cadena = await armarCadenaNC(track.mediaStreamTrack);
+    this.cadena = await armarCadenaNC(track.mediaStreamTrack, this.alFallar);
     this.processedTrack = this.cadena.salida;
     this.motor = this.cadena.motor;
   }

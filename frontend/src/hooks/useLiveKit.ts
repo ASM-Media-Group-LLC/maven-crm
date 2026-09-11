@@ -326,6 +326,38 @@ export function useLiveKit() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  // Quién apaga la cancelación de ruido si el filtro deja de funcionar andando
+  // (se fija más abajo, cuando existe `apagarNCPorFallo`; acá va por ref para
+  // que los tres lugares que crean el procesador no dependan del orden).
+  const alFallarNCRef = useRef<(motivo: string) => void>(() => {});
+  // El micrófono CRUDO: si el sistema lo silencia (otro programa lo tomó, cambió
+  // el dispositivo, empezó una captura de audio del sistema al compartir
+  // pantalla) el track queda `muted` y nadie te oye, con la publicación en
+  // verde. Antes no se avisaba; ahora sí, para que la persona apague y prenda.
+  const micVigiladoRef = useRef<MediaStreamTrack | null>(null);
+  const vigilarMicro = useCallback((room: Room) => {
+    const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+      (p) => p.source === Track.Source.Microphone,
+    );
+    const t = micPub?.track?.mediaStreamTrack;
+    if (!t || micVigiladoRef.current === t) return;
+    micVigiladoRef.current = t;
+    t.addEventListener("mute", () => {
+      toast.warning("Tu micrófono dejó de enviar audio", {
+        id: "mic-mudo",
+        description: "El sistema lo silenció o lo tomó otro programa (pasa al compartir pantalla con audio o al cambiar de dispositivo). Apaga y vuelve a prender el micrófono.",
+        duration: 12000,
+      });
+    });
+    t.addEventListener("unmute", () => toast.dismiss("mic-mudo"));
+    t.addEventListener("ended", () => {
+      toast.error("Tu micrófono se desconectó", {
+        id: "mic-mudo",
+        description: "Nadie te escucha. Apaga y vuelve a prender el micrófono, o revisa el dispositivo.",
+        duration: 15000,
+      });
+    });
+  }, []);
   // El fondo al que el hook tuvo que caerse por su cuenta (hoy solo "none",
   // cuando la imagen ya no existe). La UI dibuja su propio estado, así que sin
   // esto el botón se quedaba encendido sobre una cámara sin fondo.
@@ -1181,6 +1213,7 @@ export function useLiveKit() {
       });
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
+        if (publication?.source === Track.Source.Microphone) vigilarMicro(room);
         debouncedRefresh();
         // NOTE: Background is handled by scheduleBackgroundApply on connect
         // and applyConfiguredBackgroundIfNeeded on explicit toggleCam.
@@ -1344,7 +1377,7 @@ export function useLiveKit() {
             );
             const localAudioTrack = micPub?.track;
             if (localAudioTrack) {
-              const processor = new NoiseSuppresionTrackProcessor();
+              const processor = new NoiseSuppresionTrackProcessor((m) => alFallarNCRef.current(m));
               ncProcessorRef.current = processor;
               await (localAudioTrack as any).setProcessor(processor);
               console.info("[LiveKit] Noise cancellation applied on connect");
@@ -1407,7 +1440,7 @@ export function useLiveKit() {
     } finally {
       connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -1450,6 +1483,29 @@ export function useLiveKit() {
   // diciendo "activado" mientras el NC ya no existía. El botón verde mintiendo,
   // otra vez. (El camino feliz de switchActiveDevice NO lo pierde: LiveKit
   // reinicia el track por dentro y llama al restart() del procesador.)
+  /** El filtro dejó de funcionar andando: se apaga para que el micrófono vuelva
+   *  crudo (al parar el procesador LiveKit vuelve a publicar el track original)
+   *  y se avisa. Mejor ruido que silencio: así quedó Andrea el 10/09 sin saberlo. */
+  const apagarNCPorFallo = useCallback(async (motivo: string) => {
+    const room = roomRef.current;
+    ncEnabledRef.current = false;
+    setIsNoiseCancellationOn(false);
+    console.warn("[LiveKit] cancelación de ruido apagada por fallo:", motivo);
+    try {
+      const micPub = Array.from(room?.localParticipant.audioTrackPublications.values() ?? []).find(
+        (p) => p.source === Track.Source.Microphone,
+      );
+      await (micPub?.track as LocalAudioTrack | undefined)?.stopProcessor?.();
+    } catch { /* el procesador ya estaba caído */ }
+    ncProcessorRef.current = null;
+    toast.warning("Cancelación de ruido apagada", {
+      id: "nc-fallo",
+      description: "El filtro dejó de procesar tu voz y te habrían dejado de escuchar. Sigues al aire sin él; puedes volver a activarlo desde el botón.",
+      duration: 10000,
+    });
+  }, []);
+  alFallarNCRef.current = apagarNCPorFallo;
+
   const reapplyNC = useCallback(async () => {
     const room = roomRef.current;
     if (!room || !ncEnabledRef.current) return;
@@ -1464,7 +1520,7 @@ export function useLiveKit() {
       // El procesador viejo quedó huérfano (su track murió): se destruye para
       // no filtrar AudioContexts.
       if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch { /* noop */ } }
-      const processor = new NoiseSuppresionTrackProcessor();
+      const processor = new NoiseSuppresionTrackProcessor((m) => alFallarNCRef.current(m));
       ncProcessorRef.current = processor;
       await t.setProcessor(processor as unknown as Parameters<LocalAudioTrack["setProcessor"]>[0]);
       console.info("[LiveKit] Noise cancellation re-aplicado al track nuevo del micrófono");
@@ -1484,7 +1540,7 @@ export function useLiveKit() {
         shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
       );
       // Encender el micro crea un track nuevo → el NC hay que volver a ponerlo.
-      if (shouldEnable) await reapplyNC();
+      if (shouldEnable) { await reapplyNC(); vigilarMicro(room); }
       // Ensure remote audio playback is unblocked (browsers require a user gesture).
       // toggleMic is always invoked by a user gesture, so this is the right moment.
       if (!room.canPlaybackAudio) {
@@ -1498,7 +1554,7 @@ export function useLiveKit() {
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
     }
-  }, [refreshParticipants, reapplyNC]);
+  }, [refreshParticipants, reapplyNC, vigilarMicro]);
 
   // ── Noise Cancellation toggle ─────────────────────────────────
   const toggleNoiseCancellation = useCallback(async () => {
@@ -1516,7 +1572,7 @@ export function useLiveKit() {
     if (newState) {
       if (!supportsNoiseSuppression()) { ncEnabledRef.current = false; setIsNoiseCancellationOn(false); return; }
       try {
-        const processor = new NoiseSuppresionTrackProcessor();
+        const processor = new NoiseSuppresionTrackProcessor((m) => alFallarNCRef.current(m));
         ncProcessorRef.current = processor;
         await (localAudioTrack as any).setProcessor(processor);
         console.info("[LiveKit] Noise cancellation enabled");
