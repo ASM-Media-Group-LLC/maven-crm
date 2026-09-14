@@ -5,12 +5,22 @@ import { describe, it, expect } from "vitest";
 
 const fuentes = (import.meta as unknown as {
   glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
-}).glob(["/frontend/src/pages/creadores/ViewCreadorModal.tsx", "/frontend/src/pages/creadores/CreadorProfileContent.tsx", "/frontend/src/pages/creadores/CreadoresHeader.tsx", "/frontend/src/pages/creadores/onboarding/OnboardingContent.tsx"], { query: "?raw", import: "default", eager: true });
+}).glob(["/frontend/src/pages/creadores/ViewCreadorModal.tsx", "/frontend/src/pages/creadores/CreadorProfileContent.tsx", "/frontend/src/pages/creadores/CreadoresHeader.tsx", "/frontend/src/pages/creadores/CreadoresSubtabs.tsx", "/frontend/src/pages/creadores/onboarding/OnboardingContent.tsx", "/frontend/src/pages/creadores/onboarding/OnboardingTable.tsx", "/frontend/src/components/ui/subtab-nav.tsx"], { query: "?raw", import: "default", eager: true });
 const fuente = (nombre: string) => {
   const k = Object.keys(fuentes).find((p) => p.endsWith(nombre));
   if (!k) throw new Error(`no encontré ${nombre}`);
   return fuentes[k];
 };
+
+// ¿Hay en el fuente alguna lista de clases que tenga TODAS estas? Mira cualquier
+// cadena entre comillas, así vale igual el className="..." de la página que el
+// cn("...") del componente base. No le importa el orden ni el resto de las
+// clases: la guarda vieja exigía el literal "max-w-full overflow-x-auto" y se
+// pudría con solo reordenar. Un token puede traer alternativas con "|".
+const tieneClases = (src: string, ...clases: string[]) =>
+  (src.match(/"[^"\n]*"/g) ?? [])
+    .map((lit) => lit.slice(1, -1).split(/\s+/))
+    .some((puestas) => clases.every((c) => c.split("|").some((alt) => puestas.includes(alt))));
 
 describe("popup de la creadora (ViewCreadorModal)", () => {
   const s = fuente("ViewCreadorModal.tsx");
@@ -46,8 +56,24 @@ describe("encabezado de Creadoras y Onboarding", () => {
   });
   it("en Onboarding nada hace scrollear la página de lado", () => {
     const s = fuente("OnboardingContent.tsx");
+    // El cuerpo recorta a lo ancho: lo que mida más que el teléfono se desplaza
+    // DENTRO de su caja, sin arrastrar la página.
     expect(s).toContain("overflow-x-hidden");
-    expect(s).toContain("max-w-full overflow-x-auto");
+    // Los filtros (buscador + etapa + vista) envuelven en vez de empujar.
     expect(s).toMatch(/<div className="flex flex-wrap items-center gap-3">/);
+
+    // Y lo que sí es más ancho que el teléfono tiene que poder desplazarse solo,
+    // porque si no ese recorte le come el final:
+    // 1) la tabla, lo único ancho del cuerpo.
+    expect(tieneClases(fuente("OnboardingTable.tsx"), "overflow-auto|overflow-x-auto")).toBe(true);
+    // 2) los subtabs, la única fila ancha que vive FUERA del cuerpo recortado
+    //    (están en el encabezado compartido). Basta con que la protección esté
+    //    en alguno de los archivos del árbol: hoy la pone el <SubtabNav> base y
+    //    CreadoresSubtabs la repite. Esto antes se pedía como literal dentro de
+    //    OnboardingContent, donde envolvía los chips de agencia; esos chips se
+    //    quitaron a propósito en ea697908 (#1697) y la guarda quedó mirando al
+    //    vacío sin que la página hubiera empeorado.
+    const arbol = ["OnboardingContent.tsx", "CreadoresHeader.tsx", "CreadoresSubtabs.tsx", "subtab-nav.tsx"];
+    expect(arbol.some((f) => tieneClases(fuente(f), "max-w-full", "overflow-x-auto"))).toBe(true);
   });
 });
