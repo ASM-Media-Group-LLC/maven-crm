@@ -9,6 +9,7 @@ import {
   VideoPresets,
   ConnectionQuality,
   RoomOptions,
+  TrackEvent,
 } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import {
@@ -335,11 +336,20 @@ export function useLiveKit() {
   // pantalla) el track queda `muted` y nadie te oye, con la publicación en
   // verde. Antes no se avisaba; ahora sí, para que la persona apague y prenda.
   const micVigiladoRef = useRef<MediaStreamTrack | null>(null);
+  // Volver a pedir el micrófono al sistema. Se guarda en un ref porque el
+  // vigilante se declara antes que `reapplyNC` y que las preferencias.
+  const repararMicroRef = useRef<() => Promise<void>>(async () => {});
   const vigilarMicro = useCallback((room: Room) => {
     const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
       (p) => p.source === Track.Source.Microphone,
     );
-    const t = micPub?.track?.mediaStreamTrack;
+    // ⚠️ LA PISTA CRUDA, NO LA PROCESADA. Con la cancelación de ruido puesta
+    // —que viene PRENDIDA por defecto— `mediaStreamTrack` devuelve la salida del
+    // filtro, y esa la fabricamos nosotros: nunca emite `mute` ni `ended`. O sea
+    // que este vigilante, tal como se escribió el 11/09, estaba sordo en la
+    // configuración normal. Los eventos del sistema llegan a la pista de entrada.
+    const conProcesador = micPub?.track as unknown as { _mediaStreamTrack?: MediaStreamTrack } | undefined;
+    const t = conProcesador?._mediaStreamTrack ?? micPub?.track?.mediaStreamTrack;
     if (!t || micVigiladoRef.current === t) return;
     micVigiladoRef.current = t;
     t.addEventListener("mute", () => {
@@ -357,6 +367,30 @@ export function useLiveKit() {
         duration: 15000,
       });
     });
+    // ── Y EL AVISO QUE DE VERDAD IMPORTA ────────────────────────────────────
+    //
+    // Cuando la pista cruda queda silenciada por el sistema, LiveKit espera 5 s
+    // y PAUSA EL ENVÍO: le pone `null` al emisor, así que deja de mandar un solo
+    // paquete. Pero no toca `isMuted`, y el botón del micrófono se dibuja con
+    // eso: queda VERDE mientras nadie la oye. Es exactamente lo que describió
+    // Andrea. Y apagar y prender el micro NO lo cura (con la publicación viva,
+    // LiveKit solo hace `unmute()` y deja el emisor vacío); lo único que lo cura
+    // es volver a pedir el dispositivo, que es lo que hace el botón de acá.
+    const pista = micPub?.track as LocalAudioTrack | undefined;
+    if (pista) {
+      pista.on(TrackEvent.UpstreamPaused, () => {
+        toast.error("Dejaron de escucharte", {
+          id: "mic-sin-salida",
+          description: "Tu micrófono figura encendido pero no está saliendo al aire. El sistema lo silenció o lo tomó otro programa.",
+          duration: Infinity,
+          action: {
+            label: "Reparar",
+            onClick: () => { void repararMicroRef.current(); },
+          },
+        });
+      });
+      pista.on(TrackEvent.UpstreamResumed, () => toast.dismiss("mic-sin-salida"));
+    }
   }, []);
   // El fondo al que el hook tuvo que caerse por su cuenta (hoy solo "none",
   // cuando la imagen ya no existe). La UI dibuja su propio estado, así que sin
@@ -1219,7 +1253,15 @@ export function useLiveKit() {
         // and applyConfiguredBackgroundIfNeeded on explicit toggleCam.
         // We do NOT trigger background apply here to avoid duplicate races.
       });
-      room.on(RoomEvent.LocalTrackUnpublished, debouncedRefresh);
+      room.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+        // Parar de compartir desde la BARRA DE CHROME ("Dejar de compartir") no
+        // pasa por nuestro botón: LiveKit despublica la pista y nadie actualizaba
+        // el estado. Quedaba en "compartiendo", y el siguiente clic en el botón
+        // mandaba un apagado al vacío en vez de volver a compartir — había que
+        // tocarlo dos veces.
+        if (publication?.source === Track.Source.ScreenShare) setIsScreenSharing(false);
+        debouncedRefresh();
+      });
 
       // Connection quality
       room.on(RoomEvent.ConnectionQualityChanged, debouncedRefresh);
@@ -1234,6 +1276,18 @@ export function useLiveKit() {
       // `play()` del elemento no produce sonido si el contexto sigue abajo.
       bajaDesbloqueoAudioRef.current?.();
       bajaDesbloqueoAudioRef.current = registrarDesbloqueo(() => room.startAudio());
+
+      // LiveKit mide 200 ms al publicar el micrófono y avisa si no captó NADA.
+      // El evento existía y nadie lo escuchaba: entrar con el micrófono muerto
+      // (lo tomó otro programa, el dispositivo guardado ya no está) no producía
+      // ni una señal, y la persona se enteraba cuando alguien se lo decía.
+      room.on(RoomEvent.LocalAudioSilenceDetected, () => {
+        toast.warning("Tu micrófono no está captando nada", {
+          id: "mic-sin-captura",
+          description: "Revisa que sea el dispositivo correcto y que no esté silenciado por el sistema.",
+          duration: 12000,
+        });
+      });
 
       // ── Handle autoplay policy (resume audio context) ────────
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
@@ -1529,11 +1583,55 @@ export function useLiveKit() {
     }
   }, []);
 
+  // Volver a PEDIRLE el micrófono al sistema. Es lo único que devuelve el audio
+  // cuando LiveKit ya vació el emisor: con la publicación viva, prender el micro
+  // solo hace `unmute()` y ni siquiera vuelve a mirar el dispositivo.
+  const repararMicro = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+      (p) => p.source === Track.Source.Microphone,
+    );
+    const t = micPub?.track as LocalAudioTrack | undefined;
+    if (!t) return;
+    try {
+      toast.loading("Reconectando el micrófono…", { id: "mic-sin-salida" });
+      await t.restartTrack(getDeviceConstraint(preferredDevicesRef.current.audioDeviceId));
+      await reapplyNC();
+      micVigiladoRef.current = null;        // la pista cruda cambió: hay que volver a vigilarla
+      vigilarMicro(room);
+      toast.success("Micrófono reconectado", { id: "mic-sin-salida", duration: 6000 });
+    } catch (err) {
+      console.error("[LiveKit] no pude reparar el micrófono:", err);
+      toast.error("No pude reconectar el micrófono", {
+        id: "mic-sin-salida",
+        description: "Prueba a elegir otro micrófono en el menú de la llamada y volver al de siempre.",
+        duration: 15000,
+      });
+    }
+  }, [reapplyNC, vigilarMicro]);
+  repararMicroRef.current = repararMicro;
+
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
     try {
       const shouldEnable = !room.localParticipant.isMicrophoneEnabled;
+      // Apagar y prender es lo PRIMERO que hace cualquiera cuando no lo oyen, y
+      // hasta hoy no servía de nada: con la publicación viva LiveKit solo llama
+      // `unmute()` e ignora las restricciones, así que si el emisor estaba vacío
+      // seguía vacío — y el botón volvía a verde. Si la pista necesita que se la
+      // vuelvan a pedir al sistema, se la pedimos antes de prender.
+      if (shouldEnable) {
+        const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+          (p) => p.source === Track.Source.Microphone,
+        );
+        const t = micPub?.track as (LocalAudioTrack & { needsReAcquisition?: boolean }) | undefined;
+        if (t?.needsReAcquisition) {
+          try { await t.restartTrack(getDeviceConstraint(preferredDevicesRef.current.audioDeviceId)); }
+          catch (err) { console.warn("[LiveKit] no pude re-pedir el micrófono al prenderlo:", err); }
+        }
+      }
       if (!shouldEnable) meSilencieYoRef.current = Date.now();
       await room.localParticipant.setMicrophoneEnabled(
         shouldEnable,

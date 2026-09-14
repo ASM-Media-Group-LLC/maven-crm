@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Room, RoomEvent, RemoteTrack, RemoteTrackPublication, RemoteParticipant, Track } from "livekit-client";
-import { marcarAudio, reanudarAudioConGesto, registrarDesbloqueo, perdioLaPista } from "@/lib/audioDeLaLlamada";
+import { marcarAudio, reanudarAudioConGesto, registrarDesbloqueo, motivoDeMudez } from "@/lib/audioDeLaLlamada";
 
 interface Props {
   room: Room | null | undefined;
@@ -132,18 +132,37 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
     // depender de que nadie vuelva a escribir esa línea: mirar el `srcObject`
     // cada pocos segundos no cuesta nada y convierte un silencio permanente en
     // un hueco de tres segundos.
+    //
+    // ⚠️ MIRA TAMBIÉN SI ESTÁ PAUSADO. Antes solo preguntaba si le habían
+    // arrancado la pista, y ese es el caso que MENOS dura: la librería repone la
+    // pista y todo sigue. El que dura es el otro — el elemento pausado CON su
+    // pista puesta —, porque el mapa de acá arriba sigue diciendo "ya está
+    // adjunto" y nadie vuelve a mirarlo: queda mudo el resto de la llamada.
+    //
+    // Y pausados quedan por dos vías conocidas: `detach()` de la librería hace
+    // `pause()` sobre cada elemento (su recycleElement), y mudar la llamada a la
+    // ventana flotante del sistema saca los nodos del documento, lo que los pausa
+    // por especificación. Las dos ocurren justo al empezar a compartir pantalla.
     const vigilante = window.setInterval(() => {
-      let repuestas = 0;
+      const repuestas: string[] = [];
       attachedRef.current.forEach(({ track, el }) => {
-        if (!perdioLaPista(el)) return;
-        repuestas += 1;
-        try { track.attach(el); } catch { /* noop */ }
-        el.play().catch(() => { /* lo resuelve el gesto */ });
+        const motivo = motivoDeMudez(el);
+        if (!motivo) return;
+        repuestas.push(motivo);
+        // Re-adjuntar solo si falta la pista; si solo estaba pausado, alcanza con
+        // volver a reproducir —y re-adjuntar de más haría `pause()` por dentro.
+        if (motivo !== "pausado") { try { track.attach(el); } catch { /* noop */ } }
+        el.play().catch(() => {
+          // Antes este fallo era mudo y el elemento quedaba pausado para siempre.
+          // La espera del gesto cubre la política de autoplay en TODOS los
+          // documentos, incluida la ventana flotante.
+          reanudarAudioConGesto("el vigilante repuso la pista pero no arrancó");
+        });
       });
-      if (repuestas) {
+      if (repuestas.length) {
         console.warn(
-          `[Audio] Le habían arrancado la pista a ${repuestas} elemento(s) de la red de seguridad`,
-          "— re-adjuntadas. Si esto se repite, alguien está haciendo detach() sin argumentos.",
+          `[Audio] ${repuestas.length} elemento(s) de la red de seguridad estaban mudos`,
+          `(${repuestas.join(", ")}) — repuestos.`,
         );
       }
     }, 3000);
