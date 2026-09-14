@@ -92,10 +92,10 @@ export function GifPanel({ onPick, activo, rellenar }: { onPick: (mp4Url: string
             </div>
           )}
           {!loading && err === "config" && (
-            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">GIFs no configurados (falta la API key de Giphy).</div>
+            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">{t("gif.notConfigured")}</div>
           )}
           {!loading && err === "api" && (
-            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">No se pudieron cargar los GIFs. Revisa la API key de Giphy.</div>
+            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">{t("gif.loadError")}</div>
           )}
           {!loading && !err && items.length === 0 && (
             <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">{t("gif.none")}</div>
@@ -112,7 +112,7 @@ export function GifPanel({ onPick, activo, rellenar }: { onPick: (mp4Url: string
           ))}
         </div>
         </div>
-        <p className="mt-1 shrink-0 text-center text-[10px] text-muted-foreground">vía GIPHY</p>
+        <p className="mt-1 shrink-0 text-center text-[10px] text-muted-foreground">{t("gif.viaGiphy")}</p>
     </div>
   );
 }

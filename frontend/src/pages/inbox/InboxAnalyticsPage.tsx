@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ArrowLeft, BarChart3, Clock, MessageSquare, AlertTriangle, Bot } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface AgentRow { user_id: string | null; respondidas: number; sin_responder: number; resp_prom_min: number | null; resp_median_min: number | null; }
 interface ChannelRow { channel_id: string | null; respondidas: number; sin_responder: number; resp_prom_min: number | null; }
@@ -33,6 +34,7 @@ const fmtMin = (m: number | null | undefined): string => {
 const ymd = (d: Date | undefined) => (d ? format(d, "yyyy-MM-dd") : null);
 
 const InboxAnalyticsPage = () => {
+  const { t } = useLanguage();
   const [from, setFrom] = useState<Date | undefined>(subDays(startOfToday(), 29));
   const [to, setTo] = useState<Date | undefined>(startOfToday());
 
@@ -66,9 +68,9 @@ const InboxAnalyticsPage = () => {
     },
     staleTime: 5 * 60_000,
   });
-  const userName = (id: string | null) => (!id ? "Sin asignar" : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
+  const userName = (id: string | null) => (!id ? t("common.unassigned") : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
   const channelName = (id: string | null) => {
-    if (!id) return "Sin línea";
+    if (!id) return t("wa.noLine");
     const c = channels.find((c) => c.id === id);
     return c ? (c.label || c.evolution_instance) : id.slice(0, 8);
   };
@@ -86,19 +88,19 @@ const InboxAnalyticsPage = () => {
       <div className="space-y-4 px-6 py-5">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
+        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title={t("wa.backToInbox")}>
           <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1">
           <PageHeader
-            title="Analítica de la bandeja"
-            subtitle="Tiempo de 1ª respuesta, conversaciones sin responder y volumen — por closer y por línea."
+            title={t("wa.analyticsTitle")}
+            subtitle={t("wa.analyticsSubtitle")}
             icon={<BarChart3 className="h-5 w-5" />}
             actions={
               <>
-                <DateRangePicker from={from} to={to} onApply={(f, t) => { setFrom(f); setTo(t); }} placeholder="Rango de fechas" />
+                <DateRangePicker from={from} to={to} onApply={(f, t) => { setFrom(f); setTo(t); }} placeholder={t("common.dateRange")} />
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/inbox/canales">Canales</Link>
+                  <Link to="/inbox/canales">{t("wa.channels")}</Link>
                 </Button>
               </>
             }
@@ -108,57 +110,57 @@ const InboxAnalyticsPage = () => {
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
-          Error cargando la analítica: {(error as Error).message}
+          {t("wa.analyticsError", { msg: (error as Error).message })}
         </div>
       ) : !isLoading && !data ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Esta sección es solo para management. Si crees que deberías tener acceso, pedíselo a un admin.
+          {t("wa.managementOnly")}
         </div>
       ) : isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t("common.loading")}</p>
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-lg border bg-card p-3 md:col-span-1">
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> 1ª respuesta (mediana)</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {t("wa.firstRespMedian")}</p>
               <p className="text-2xl font-bold text-foreground">{fmtMin(o?.resp_median_min)}</p>
-              <p className="text-xs text-muted-foreground">promedio {fmtMin(o?.resp_prom_min)}</p>
+              <p className="text-xs text-muted-foreground">{t("wa.avgLower", { v: fmtMin(o?.resp_prom_min) })}</p>
             </div>
             <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Sin responder</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {t("wa.unanswered")}</p>
               <p className="text-2xl font-bold" style={{ color: "hsl(0, 65%, 55%)" }}>{o?.sin_responder ?? 0}</p>
-              <p className="text-xs text-muted-foreground">de {o?.convos ?? 0} conversaciones</p>
+              <p className="text-xs text-muted-foreground">{t("wa.ofConversations", { n: o?.convos ?? 0 })}</p>
             </div>
             <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> Respondidas</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> {t("wa.answered")}</p>
               <p className="text-2xl font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{o?.respondidas ?? 0}</p>
-              <p className="text-xs text-muted-foreground">{o?.pct_respondidas ?? 0}% del total</p>
+              <p className="text-xs text-muted-foreground">{t("wa.pctOfTotal", { p: o?.pct_respondidas ?? 0 })}</p>
             </div>
             <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Mensajes (entran / salen)</p>
+              <p className="text-xs text-muted-foreground">{t("wa.messagesInOut")}</p>
               <p className="text-2xl font-bold text-foreground">{o?.entrantes ?? 0} <span className="text-muted-foreground text-lg">/ {o?.sal_humano ?? 0}</span></p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" /> {o?.sal_bot ?? 0} del bot</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" /> {t("wa.fromBot", { n: o?.sal_bot ?? 0 })}</p>
             </div>
           </div>
 
           {/* Por agente */}
           <div>
-            <p className="text-xs text-muted-foreground mb-2 font-semibold">Por closer</p>
+            <p className="text-xs text-muted-foreground mb-2 font-semibold">{t("wa.byCloser")}</p>
             <div className="rounded-lg border overflow-x-auto">
               <table className="tabla-movil w-full text-sm min-w-[520px]">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                    <th className="text-left p-2 font-semibold">Closer</th>
-                    <th className="text-right p-2 font-semibold">1ª resp (mediana)</th>
-                    <th className="text-right p-2 font-semibold">Promedio</th>
-                    <th className="text-right p-2 font-semibold">Respondidas</th>
-                    <th className="text-right p-2 font-semibold">Sin responder</th>
+                    <th className="text-left p-2 font-semibold">{t("wa.closer")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.firstRespMedianShort")}</th>
+                    <th className="text-right p-2 font-semibold">{t("common.average")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.answered")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.unanswered")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {agents.length === 0 ? (
-                    <tr><td colSpan={5} className="p-4 text-center text-muted-foreground text-xs">Sin datos en el rango.</td></tr>
+                    <tr><td colSpan={5} className="p-4 text-center text-muted-foreground text-xs">{t("common.noDataInRange")}</td></tr>
                   ) : agents.map((a) => (
                     <tr key={a.user_id ?? "none"} className="border-b last:border-0">
                       <td className="p-2 font-medium text-foreground">{userName(a.user_id)}</td>
@@ -175,20 +177,20 @@ const InboxAnalyticsPage = () => {
 
           {/* Por línea */}
           <div>
-            <p className="text-xs text-muted-foreground mb-2 font-semibold">Por línea</p>
+            <p className="text-xs text-muted-foreground mb-2 font-semibold">{t("wa.byLine")}</p>
             <div className="rounded-lg border overflow-x-auto">
               <table className="tabla-movil w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                    <th className="text-left p-2 font-semibold">Línea</th>
-                    <th className="text-right p-2 font-semibold">1ª resp (prom)</th>
-                    <th className="text-right p-2 font-semibold">Respondidas</th>
-                    <th className="text-right p-2 font-semibold">Sin responder</th>
+                    <th className="text-left p-2 font-semibold">{t("wa.line")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.firstRespAvgShort")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.answered")}</th>
+                    <th className="text-right p-2 font-semibold">{t("wa.unanswered")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {chans.length === 0 ? (
-                    <tr><td colSpan={4} className="p-4 text-center text-muted-foreground text-xs">Sin datos en el rango.</td></tr>
+                    <tr><td colSpan={4} className="p-4 text-center text-muted-foreground text-xs">{t("common.noDataInRange")}</td></tr>
                   ) : chans.map((c) => (
                     <tr key={c.channel_id ?? "none"} className="border-b last:border-0">
                       <td className="p-2 font-medium text-foreground">{channelName(c.channel_id)}</td>
@@ -203,7 +205,7 @@ const InboxAnalyticsPage = () => {
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            "1ª respuesta" = del primer mensaje entrante de la conversación (en el rango) a la primera respuesta de un agente. La <b>mediana</b> es más fiel que el promedio (que se infla con casos que respondieron días después).
+            {t("wa.slaNoteA")}<b>{t("wa.slaNoteBold")}</b>{t("wa.slaNoteB")}
           </p>
         </>
       )}
