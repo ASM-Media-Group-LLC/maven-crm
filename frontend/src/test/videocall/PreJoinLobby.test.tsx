@@ -18,6 +18,7 @@ vi.mock("@livekit/track-processors", () => ({
 }));
 
 import PreJoinLobby from "@/pages/messenger/videocall/PreJoinLobby";
+import { guardarFondo } from "@/lib/fondoDeLlamada";
 
 describe("PreJoinLobby", () => {
   const defaultProps = {
@@ -29,11 +30,22 @@ describe("PreJoinLobby", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // La sala de espera arranca con el ÚLTIMO fondo elegido (localStorage), así
+    // que sin limpiar, un test que elige fondo le cambia el arranque al siguiente.
+    localStorage.clear();
   });
 
-  it("does not render the call display name (hidden by design)", () => {
+  // El nombre AMIGABLE de la llamada SÍ se dibuja: lo volvió a poner el rediseño
+  // de la sala de espera (56db2358 "Revamp pre-lobby and video UI"), que borró el
+  // comentario "Room/call name hidden by design" y lo reemplazó por un render
+  // condicional de SOLO `callDisplayName`. Lo que se pedía esconder el día antes
+  // (12da73ba "Hide room name in PreJoinLobby") era el nombre TÉCNICO de la sala
+  // —`meet_ab12cd34ef56`, `call-<uuid>`—, y eso sigue oculto: el componente nunca
+  // dibuja `roomName`. Por eso el test comprueba las dos cosas juntas.
+  it("renders the call display name but never the technical room name", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    expect(screen.queryByText("Daily Standup")).not.toBeInTheDocument();
+    expect(screen.getByText("Daily Standup")).toBeInTheDocument();
+    expect(screen.queryByText("test-room")).not.toBeInTheDocument();
   });
 
   it("renders the user display name", () => {
@@ -78,9 +90,22 @@ describe("PreJoinLobby", () => {
     expect(screen.getByTitle("Fondo virtual")).toBeInTheDocument();
   });
 
-  it("shows default background label", () => {
+  // El renglón del fondo dejó de anunciar "Sin fondo virtual" en el rediseño
+  // (56db2358): pasó de "Fondo seleccionado: X" siempre visible a "Fondo: X"
+  // SOLO cuando hay fondo elegido. Con la cámara apagada y sin efecto, decir
+  // "Sin fondo virtual" era ruido en una pantalla que ya tiene el botón de fondo.
+  it("shows no background line when no background is picked (default)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    expect(screen.getByText(/Sin fondo virtual/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sin fondo virtual/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Fondo:/)).not.toBeInTheDocument();
+  });
+
+  it("shows the background line with the chosen background", () => {
+    // Se guarda por la misma vía que usa el componente al elegir fondo, para no
+    // depender del nombre de la clave de localStorage.
+    guardarFondo("blur");
+    render(<PreJoinLobby {...defaultProps} />);
+    expect(screen.getByText("Difuminar fondo")).toBeInTheDocument();
   });
 
   it("shows helper text about changing settings during call", () => {
@@ -108,7 +133,9 @@ describe("PreJoinLobby", () => {
     });
   });
 
-  it("does not render callDisplayName or roomName (hidden by design)", () => {
+  // Sin nombre amigable NO se cae al nombre de la sala: el renglón simplemente
+  // no se dibuja (así se escondió el nombre técnico en 12da73ba).
+  it("does not fall back to the room name when there is no call display name", () => {
     render(<PreJoinLobby {...defaultProps} callDisplayName={undefined} />);
     expect(screen.queryByText("test-room")).not.toBeInTheDocument();
   });
