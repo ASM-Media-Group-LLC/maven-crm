@@ -1511,7 +1511,12 @@ export const useSubmitEvaluation = () => {
             module_origin: "chatter-evaluator",
             priority: input.verdict === "no_apto" ? "high" : "medium",
             deep_link_url: `/chatter-evaluator/workspace?session=${input.sessionId}`,
-            required_permission_module: "ChatterEvaluator",
+            // El módulo tiene que existir en role_permissions o canAccess la
+            // esconde a todo el que no sea admin. "ChatterEvaluator" no existía:
+            // el evaluador vive bajo Chatters → Evaluator (auditoría 15/09; 2
+            // examinadores llevaban semanas sin ver estas notificaciones).
+            required_permission_module: "Chatters",
+            required_permission_submodule: "Evaluator",
           }));
           await sb.from("notifications").insert(rows);
         }

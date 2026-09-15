@@ -117,6 +117,7 @@ export const MODULE_PERMISSION_MAP: Record<string, string | null> = {
   leadgen: "LeadGen",
   closers: "Closers",
   "Comunicación": "HR",
+  "chatter-evaluator": "Chatters",
   messenger: null, // universal
   admin: "Administración",
 };
