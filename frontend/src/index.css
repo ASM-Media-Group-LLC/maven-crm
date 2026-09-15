@@ -1055,3 +1055,37 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
   table.tabla-movil tbody td[colspan] { display: block; text-align: center; }
 }
+
+/* Capa de texto invisible encima del canvas del PDF.
+   Es lo que permite SELECCIONAR, copiar y buscar con Ctrl+F dentro de un
+   documento: sin ella una hoja de vida es una foto y no se puede sacar de ahí
+   ni un teléfono. Reducción de lo que trae pdf.js en web/pdf_viewer.css; las
+   posiciones las escribe pdf.js en cada span y dependen de --scale-factor, que
+   lo pone el componente. */
+.capa-texto-pdf {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+.capa-texto-pdf span,
+.capa-texto-pdf br {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.capa-texto-pdf span.markedContent {
+  top: 0;
+  height: 0;
+}
+.capa-texto-pdf ::selection {
+  background: hsl(var(--primary) / 0.35);
+}
