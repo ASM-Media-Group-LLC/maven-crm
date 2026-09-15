@@ -11,16 +11,12 @@ export type AppRole =
   // comparar strings sueltos.
   | "Chatter";
 
-// Roles que en `role_groups` tienen is_supervisor_or_above = true SIN ser
-// admin/manager. La BD ya los trata como supervisores (RLS "Supervisors+ view
-// all", is_in_role_group('supervisor_or_above')); esta lista existe para que el
-// FRONT no se quede atrás — cuando se desincroniza, el usuario ve la app como si
-// fuera un empleado raso aunque la base le permita todo.
-// Caso real: "Closer Supervisor" faltaba acá, así que a Miguel se le ocultaba la
-// pestaña "Todas" de Closers y las demás se le filtraban a sus propios asignados
-// (0), dejándole el pipeline casi vacío.
-// ⚠️ Rol nuevo de nivel supervisor → agregarlo también acá (ver memoria del
-// sistema de roles: hay 3 capas y todas deben cablearse).
+// FALLBACK únicamente. `isSupervisor` se resuelve de role_groups.is_supervisor_or_above
+// (fuente de verdad, ver el hook abajo). Esta lista solo se consulta si el rol NO
+// tuviera fila en role_groups. NO hace falta mantenerla al día: un rol nuevo de
+// nivel supervisor funciona solo si está bien seteado en role_groups.
+// (Historia: cuando esto era la fuente primaria, cada rename de rol la desincronizaba
+// — "Closer Supervisor" → "Closer +" dejó a Miguel/María como miembros rasos.)
 const SUPERVISOR_ROLES: readonly string[] = [
   "supervisor",
   "Team Leader",
@@ -43,7 +39,7 @@ export const useUserRole = () => {
   // depende TODO lo que se ve. No se ponen ACÁ a propósito — un `retry` dentro
   // del hook pisa al del QueryClient y dejaría las pruebas esperando los
   // reintentos de verdad.
-  const { data: role, isLoading, isError, refetch } = useQuery({
+  const { data: roleData, isLoading, isError, refetch } = useQuery({
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -54,11 +50,28 @@ export const useUserRole = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return (data?.role as AppRole) ?? null;
+      const roleName = (data?.role as AppRole) ?? null;
+      if (!roleName) return null;
+
+      // Fuente de verdad de "es supervisor": role_groups (la MISMA que usa el
+      // RLS del backend). Antes esto se resolvía con una lista hardcodeada que se
+      // desincronizaba en cada rename de rol — "Closer Supervisor" → "Closer +"
+      // dejó a Miguel/María tratados como miembros rasos en el front (sin la tab
+      // "Todas", pipeline filtrado a 0 asignados). Leyéndolo del grupo, cualquier
+      // rol nuevo o renombrado de nivel supervisor funciona sin tocar código.
+      const { data: rg } = await supabase
+        .from("role_groups")
+        .select("is_supervisor_or_above")
+        .eq("role_name", roleName)
+        .maybeSingle();
+
+      return { role: roleName, isSupervisorGroup: !!(rg as { is_supervisor_or_above?: boolean } | null)?.is_supervisor_or_above };
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
   });
+
+  const role = roleData?.role ?? null;
 
   return {
     role: role ?? null,
@@ -70,7 +83,10 @@ export const useUserRole = () => {
     // role_groups (is_supervisor_or_above). Lo incluimos en isSupervisor para que
     // el gating de UI lo trate como tal, y exponemos isTeamLeader por si se quiere
     // distinguir.
-    isSupervisor: !!role && SUPERVISOR_ROLES.includes(role),
+    // De role_groups.is_supervisor_or_above (fuente de verdad). La lista
+    // SUPERVISOR_ROLES queda solo como fallback por si el rol no tuviera fila en
+    // role_groups (rol desconocido) — así ningún rol conocido regresiona.
+    isSupervisor: !!role && ((roleData?.isSupervisorGroup ?? false) || SUPERVISOR_ROLES.includes(role)),
     isTeamLeader: role === "Team Leader",
     isSpammer: role === "spammer",
     // "agent" es el nombre legacy del mismo rol (list_chatters acepta ambos).

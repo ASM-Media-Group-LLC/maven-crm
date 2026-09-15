@@ -102,6 +102,12 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
+  // ⚠️ El elemento al que se adjuntó el audio, guardado aparte. NO se puede leer
+  // `audioRef.current` en la limpieza al desmontar: React vacía los refs de
+  // elementos del DOM ANTES de correr las limpiezas de los efectos pasivos, así
+  // que allí siempre vale null — y `detach(null)` es `detach()`, que desconecta
+  // la pista de TODOS los elementos de la sala. Ver el comentario del final.
+  const attachedAudioElRef = useRef<HTMLAudioElement | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
@@ -113,6 +119,11 @@ const ParticipantTile = memo(function ParticipantTile({
   // ── Robust audio attachment helper ─────────────────────────────
   const attachAudioTrack = useCallback(() => {
     if (participant.isLocal || !room) return;
+    // Quien comparte pantalla dibuja DOS recuadros (su pantalla y su persona) y
+    // los dos son la misma persona de LiveKit: sin esto, ambos adjuntaban el
+    // MISMO micrófono, y con el <audio> de la red de seguridad la voz de esa
+    // persona salía por TRES elementos a la vez. Una pantalla no tiene micrófono.
+    if (participant.esTileDePantalla) return;
 
     const audioEl = audioRef.current;
     if (!audioEl) return;
@@ -139,6 +150,7 @@ const ParticipantTile = memo(function ParticipantTile({
 
         audioTrack.track.attach(audioEl);
         attachedAudioTrackRef.current = audioTrack.track;
+        attachedAudioElRef.current = audioEl;
         audioEl.volume = 1;
 
 
@@ -163,8 +175,9 @@ const ParticipantTile = memo(function ParticipantTile({
     } else if (attachedAudioTrackRef.current && audioEl) {
       try { attachedAudioTrackRef.current.detach(audioEl); } catch {}
       attachedAudioTrackRef.current = null;
+      attachedAudioElRef.current = null;
     }
-  }, [room, participant.identity, participant.isLocal, preferredAudioOutputDeviceId]);
+  }, [room, participant.identity, participant.isLocal, participant.esTileDePantalla, preferredAudioOutputDeviceId]);
 
   // ── Video attachment effect ────────────────────────────────────
   useEffect(() => {
@@ -267,10 +280,10 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => {
-    const videoElRef = videoRef;
-    const audioElRef = audioRef;
     const attachedVideo = attachedVideoTrackRef;
+    const attachedVideoEl = attachedVideoElRef;
     const attachedAudio = attachedAudioTrackRef;
+    const attachedAudioEl = attachedAudioElRef;
     return () => {
       // ⚠️ SOLO NUESTRO ELEMENTO. Acá había además un `detach()` SIN argumentos,
       // y `detach()` sin argumentos desconecta el track de TODOS los elementos
@@ -285,14 +298,29 @@ const ParticipantTile = memo(function ParticipantTile({
       //
       // Resultado: la persona dejaba de escuchar a quien no tuviera recuadro
       // —justamente el supervisor, que entra sin cámara— por el resto del turno.
-      if (attachedVideo.current) {
-        try { attachedVideo.current.detach(videoElRef.current!); } catch {}
-        attachedVideo.current = null;
+      //
+      // ── Y POR QUÉ NO SE LEE `audioRef.current` ACÁ ───────────────────────
+      //
+      // Porque en este punto SIEMPRE vale null. React vacía los refs de los
+      // elementos del DOM en la fase de commit, ANTES de correr las limpiezas
+      // de los efectos pasivos de un componente que se desmonta. O sea que
+      // `detach(audioRef.current)` es literalmente `detach()`: la misma rama
+      // que se creía haber eliminado el 31/08, con el mismo daño. El `!` de
+      // TypeScript tapó el agujero durante dos semanas.
+      //
+      // Por eso el elemento se guarda en un ref NUESTRO al adjuntarlo: ese no
+      // lo toca nadie. Y si no hay elemento, no se desconecta nada — mejor
+      // dejar una pista adjunta a un elemento muerto que callar a toda la sala.
+      if (attachedVideo.current && attachedVideoEl.current) {
+        try { attachedVideo.current.detach(attachedVideoEl.current); } catch {}
       }
-      if (attachedAudio.current) {
-        try { attachedAudio.current.detach(audioElRef.current!); } catch {}
-        attachedAudio.current = null;
+      attachedVideo.current = null;
+      attachedVideoEl.current = null;
+      if (attachedAudio.current && attachedAudioEl.current) {
+        try { attachedAudio.current.detach(attachedAudioEl.current); } catch {}
       }
+      attachedAudio.current = null;
+      attachedAudioEl.current = null;
     };
   }, []);
 
@@ -383,7 +411,7 @@ const ParticipantTile = memo(function ParticipantTile({
           suelto en dos archivos fue exactamente el bug — el sink marcaba
           `data-lk-room-audio` y los recuperadores buscaban `data-lk-audio`, así
           que no encontraban nada y nadie se enteraba. */}
-      {!participant.isLocal && (
+      {!participant.isLocal && !participant.esTileDePantalla && (
         <audio ref={audioRef} autoPlay playsInline {...{ [MARCA_AUDIO]: "true" }} style={{ display: "none" }} />
       )}
 

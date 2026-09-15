@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
+import { base64ABlob } from "@/lib/base64Blob";
 
 /**
  * Buzón del usuario: carpetas, mensajes, lectura y envío.
@@ -453,12 +454,7 @@ export { correoDe, direccionesDe, nombreDe } from "@/lib/mailAddr";
 /** base64 → Blob → descarga del navegador. La DISPARA el usuario con su click
  *  sobre el adjunto de su propio correo; acá solo materializamos el archivo. */
 function dispararDescarga(filename: string, contentType: string, base64: string): void {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const url = URL.createObjectURL(
-    new Blob([bytes], { type: contentType || "application/octet-stream" }),
-  );
+  const url = URL.createObjectURL(base64ABlob(base64, contentType));
   const a = document.createElement("a");
   a.href = url;
   a.download = filename || "adjunto";
@@ -469,10 +465,63 @@ function dispararDescarga(filename: string, contentType: string, base64: string)
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Descarga un adjunto entrante. El binario NO está en la caché de Postgres
- *  (solo su metadata): la edge lo re-baja del proveedor por IMAP y por UID.
+export interface AdjuntoBajado {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+}
+
+/** La consulta de UN adjunto, compartida por el visor y por la descarga: las
+ *  dos piden lo mismo y solo cambia qué hacen con los bytes. Al ser la misma
+ *  llave, ver una hoja de vida y después descargarla NO abre dos sesiones IMAP.
+ *
+ *  `staleTime: Infinity` porque el adjunto de un correo ya recibido no cambia
+ *  nunca: revalidarlo solo costaría otra conexión al proveedor. */
+function adjuntoQuery(folder: string, uid: number, index: number) {
+  return {
+    queryKey: ["mail-attachment", folder, uid, index] as const,
+    queryFn: () =>
+      callMail<AdjuntoBajado>({
+        action: "download_attachment",
+        folder,
+        uid,
+        attachment_index: index,
+      }),
+    staleTime: Infinity,
+  };
+}
+
+/** Trae los bytes de un adjunto SIN guardarlo, para mostrarlo dentro de Maven.
+ *  El binario NO está en la caché de Postgres (solo su metadata): la edge lo
+ *  re-baja del proveedor por IMAP y por UID. */
+export function useAttachmentBytes(args: {
+  folder: string;
+  uid: number | null;
+  index: number | null;
+  enabled: boolean;
+}) {
+  const habilitada = args.enabled && args.uid != null && args.index != null;
+  return useQuery({
+    ...adjuntoQuery(args.folder, args.uid ?? -1, args.index ?? -1),
+    enabled: habilitada,
+    ...SESION_IMAP,
+  });
+}
+
+/** Deja listo el adjunto SIGUIENTE mientras se lee el actual. Con 30 hojas de
+ *  vida en un correo, es la diferencia entre que «Siguiente» sea instantáneo o
+ *  que cada clic espere una ida y vuelta a IMAP. */
+export function usePrefetchAttachment() {
+  const qc = useQueryClient();
+  return (folder: string, uid: number, index: number) => {
+    void qc.prefetchQuery(adjuntoQuery(folder, uid, index));
+  };
+}
+
+/** Descarga un adjunto entrante. Reusa lo que el visor ya haya bajado.
  *  `index` es la posición del adjunto en `MailMessage.attachments`. */
 export function useDownloadAttachment() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
       folder: string;
@@ -480,16 +529,7 @@ export function useDownloadAttachment() {
       index: number;
       filename: string;
     }) => {
-      const r = await callMail<{
-        filename: string;
-        contentType: string;
-        contentBase64: string;
-      }>({
-        action: "download_attachment",
-        folder: args.folder,
-        uid: args.uid,
-        attachment_index: args.index,
-      });
+      const r = await qc.fetchQuery(adjuntoQuery(args.folder, args.uid, args.index));
       dispararDescarga(r.filename || args.filename, r.contentType, r.contentBase64);
     },
   });

@@ -694,6 +694,7 @@ const translations = {
 
   // Sidebar items - Menú (resto del marco de la app)
   "nav.mail": { es: "Correo", en: "Mail" },
+  "nav.office": { es: "Oficina", en: "Office" },
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.meet": { es: "Meet", en: "Meet" },

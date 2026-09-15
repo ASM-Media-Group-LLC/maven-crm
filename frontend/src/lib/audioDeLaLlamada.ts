@@ -92,6 +92,36 @@ export function reproducirAudiosPausados(): number {
   return pausados;
 }
 
+/** Todo lo que puede dejar mudo a un `<audio>` de llamada.
+ *
+ *  `perdioLaPista` mira UN solo bit —si el `srcObject` trae pistas— y con eso
+ *  se construyó el vigilante de la red de seguridad. El bit deja fuera el caso
+ *  que MÁS dura: el elemento PAUSADO con su pista puesta. Pasa cada vez que la
+ *  llamada se muda a la ventana flotante del sistema (sacar un nodo del
+ *  documento pausa su media) y cada vez que la librería desadjunta una pista
+ *  (su `recycleElement` hace `pause()`). Como el vigilante no lo ve y el mapa
+ *  del sink sigue diciendo "ya está adjunto", ese silencio no se cura NUNCA.
+ *
+ *  Devuelve el motivo, no un booleano, para que el aviso diga qué pasó: un
+ *  audio que no suena tiene que dejar rastro de POR QUÉ. */
+export type MotivoDeMudez = "sin-fuente" | "sin-pistas" | "pista-muerta" | "pausado" | null;
+
+export function motivoDeMudez(
+  el: { srcObject?: unknown; paused?: boolean } | null | undefined,
+): MotivoDeMudez {
+  if (!el) return null;
+  const ms = el.srcObject as { getAudioTracks?: () => Array<{ readyState?: string }> } | null | undefined;
+  if (!ms) return "sin-fuente";
+  const pistas = ms.getAudioTracks?.();
+  if (Array.isArray(pistas)) {
+    if (pistas.length === 0) return "sin-pistas";
+    // Una pista "ended" sigue puesta pero ya no entrega nada; re-adjuntar no la
+    // revive, así que se reporta aparte para poder tratarla distinto.
+    if (pistas.every((p) => p?.readyState === "ended")) return "pista-muerta";
+  }
+  return el.paused === true ? "pausado" : null;
+}
+
 /** ¿Este elemento se quedó SIN pista?
  *
  *  Pasa cuando otro componente hace `track.detach()` SIN argumentos: eso

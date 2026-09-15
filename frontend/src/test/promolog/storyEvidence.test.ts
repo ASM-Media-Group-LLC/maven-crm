@@ -4,6 +4,7 @@ import {
   summarizeStories,
   shouldShowGallery,
 } from "@/pages/promolog/storyEvidence";
+import { promotedToResult } from "@/pages/promolog/promoResult";
 import type { PromologEntry } from "@/pages/promolog/PromologEntryCard";
 
 // Factory: PromologEntry mínimo, override lo que importa por test.
@@ -96,14 +97,42 @@ describe("storyEvidence — galería de stories de Promolog", () => {
   });
 
   describe("summarizeStories", () => {
+    // El resultado de Promolog es BINARIO por decisión del owner (#842, a1303760):
+    // SIEMPRE Sí o No. "Pendiente"/"Parcial" dejaron de ser resultados y pasaron a ser
+    // MARCAS aditivas al lado (isUnverified → "no verificado", needs_review → "revisar").
+    // Por eso una lectura NO confirmada cuenta acá como "no promovió": es exactamente lo
+    // que ya pinta el tile de la galería (`story.result !== "Sí"` → equis roja), así que
+    // dejarla afuera del conteo haría que el encabezado contradiga a sus propias fotos.
+    //
+    // Armamos el `result` con promotedToResult (la fuente ÚNICA) en vez de escribirlo a
+    // mano: así el test entra por el mismo embudo que la app y, si la taxonomía se vuelve
+    // a mover, sigue al código en lugar de pudrirse como se pudrió con "Pendiente".
+    const storyConPromotedCrudo = (promoted: string | null) =>
+      makeEntry({ result: promotedToResult(promoted) });
+
     it("cuenta promovió vs no promovió", () => {
       const stories = [
-        makeEntry({ result: "Sí" }),
+        storyConPromotedCrudo("true"),
+        storyConPromotedCrudo("partial"), // legacy: alguna story sí → cuenta como Sí
+        storyConPromotedCrudo("false"),
+        storyConPromotedCrudo("pending"), // lectura no confirmada → No (+ marca "no verificado")
+      ];
+      expect(summarizeStories(stories)).toEqual({ total: 4, promoted: 2, notPromoted: 2 });
+    });
+
+    it("promovió + no promovió SIEMPRE reconcilia con el total (nada queda huérfano)", () => {
+      // El encabezado dice "N historias · X promovió · Y no". Si un resultado raro
+      // (legacy en BD, valor futuro, vacío) no cae de ningún lado, al manager le queda
+      // un hueco sin explicar. Cualquier cosa que no sea "Sí" suma a no promovió.
+      const stories = [
         makeEntry({ result: "Sí" }),
         makeEntry({ result: "No" }),
-        makeEntry({ result: "Pendiente" }),
+        makeEntry({ result: "Pendiente" }), // valor viejo: la app ya no lo produce
+        makeEntry({ result: "" }),
       ];
-      expect(summarizeStories(stories)).toEqual({ total: 4, promoted: 2, notPromoted: 1 });
+      const { total, promoted, notPromoted } = summarizeStories(stories);
+      expect(promoted + notPromoted).toBe(total);
+      expect({ total, promoted, notPromoted }).toEqual({ total: 4, promoted: 1, notPromoted: 3 });
     });
 
     it("maneja lista vacía", () => {

@@ -1,0 +1,13 @@
+{
+  "name": "docs-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor de edición compartida de la Oficina de Maven (Yjs/Hocuspocus). Fusiona lo que escriben varias personas a la vez, reparte los cursores y baja el estado a Postgres. Es quien TIENE LA VERDAD del documento mientras se edita.",
+  "scripts": { "start": "node index.mjs" },
+  "dependencies": {
+    "@hocuspocus/server": "2.15.2",
+    "@hocuspocus/extension-database": "2.15.2",
+    "@supabase/supabase-js": "2.49.4"
+  }
+}
