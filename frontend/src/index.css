@@ -889,6 +889,10 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 :root[data-contrast="high"] .msg-composer-wrap:focus-within {
   outline: 2px solid hsl(var(--ring)) !important;
   outline-offset: 2px;
+  /* Un solo aro. El ring-1 de Tailwind (box-shadow) seguía dibujando otro,
+     pegado al borde y con otro radio; los dos juntos se veían desencajados
+     (Jhon, 15/09, en la ventanita flotante). */
+  box-shadow: none !important;
 }
 
 /* Mismo caso en el compositor de correo (Para/Cc/Cco/Asunto y el cuerpo rico).
