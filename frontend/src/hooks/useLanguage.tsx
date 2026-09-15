@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { type Language, type TranslationKey, getTranslation } from "@/lib/i18n";
 
 interface LanguageContextType {
@@ -20,6 +20,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLanguageState(lang);
     localStorage.setItem("app-language", lang);
   }, []);
+
+  // El idioma del documento tiene que seguir al de la interfaz: de eso dependen
+  // el lector de pantalla (con qué voz lee), el corrector ortográfico del
+  // navegador en cada <textarea> y cómo parte las palabras al final del renglón.
+  // Estaba fijo en "en" en index.html mientras la app hablaba español.
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const toggleLanguage = useCallback(() => {
     setLanguage(language === "es" ? "en" : "es");

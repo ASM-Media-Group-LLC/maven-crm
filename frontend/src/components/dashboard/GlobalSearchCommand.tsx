@@ -27,7 +27,7 @@ import {
   CommandDialog, CommandInput, CommandList, CommandEmpty,
   CommandGroup, CommandItem,
 } from "@/components/ui/command";
-import { NAV_CATALOG, NAV_SECTIONS, filterNavCatalog } from "@/lib/navCatalog";
+import { NAV_CATALOG, NAV_SECTIONS, NAV_SECTION_KEYS, filterNavCatalog } from "@/lib/navCatalog";
 
 const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) => {
   const navigate = useNavigate();
@@ -181,7 +181,7 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
 
         {/* ── Navegación: catálogo completo por sección ─────────────── */}
         {pageSections.map(({ section, items }) => (
-          <CommandGroup key={section} heading={section}>
+          <CommandGroup key={section} heading={t(NAV_SECTION_KEYS[section])}>
             {items.map((p) => (
               <CommandItem
                 key={p.url}
