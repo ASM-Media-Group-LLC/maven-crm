@@ -2,6 +2,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const WORK_AREAS = ["Chat", "Video", "Fotos", "Streaming", "Redes Sociales", "Marketing"];
 const SERVICES = ["Contenido Exclusivo", "Chat Personalizado", "Videos Custom", "Lives", "Otro"];
@@ -24,6 +25,7 @@ function toggleArray(arr: string[], item: string): string[] {
 }
 
 export default function Step3ProfessionalProfile({ data, onChange }: Props) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-6">
       {/* Experience Slider */}
@@ -42,7 +44,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
 
       {/* Work Areas */}
       <div className="space-y-3">
-        <Label>Áreas de trabajo previas</Label>
+        <Label>{t("cr.prevWorkAreas")}</Label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {WORK_AREAS.map((area) => (
             <label key={area} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -58,7 +60,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
 
       {/* Services */}
       <div className="space-y-3">
-        <Label>Servicios que ofrece</Label>
+        <Label>{t("cr.servicesOffered")}</Label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {SERVICES.map((svc) => (
             <label key={svc} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -74,7 +76,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
 
       {/* Personality Traits */}
       <div className="space-y-3">
-        <Label>Características personales</Label>
+        <Label>{t("cr.personalTraits")}</Label>
         <div className="flex flex-wrap gap-2">
           {TRAITS.map((trait) => (
             <Button

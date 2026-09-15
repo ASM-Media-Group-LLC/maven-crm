@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface ProspectRecord {
   id: string;
@@ -77,6 +78,7 @@ export function useProspectos() {
 }
 
 export function useAddProspect() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -93,11 +95,12 @@ export function useAddProspect() {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
       toast({ title: "Prospecto creado" });
     },
-    onError: () => toast({ title: "Error al crear prospecto", variant: "destructive" }),
+    onError: () => toast({ title: t("cr.errCreateProspect"), variant: "destructive" }),
   });
 }
 
 export function useUpdateProspect() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -110,11 +113,12 @@ export function useUpdateProspect() {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
       toast({ title: "Prospecto actualizado" });
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 }
 
 export function useDeleteProspect() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -127,11 +131,12 @@ export function useDeleteProspect() {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
       toast({ title: "Prospecto eliminado" });
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 }
 
 export function useStartOnboarding() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -155,6 +160,6 @@ export function useStartOnboarding() {
       toast({ title: "Onboarding iniciado" });
       navigate(`/creadores/onboarding/${creatorId}`);
     },
-    onError: () => toast({ title: "Error al iniciar onboarding", variant: "destructive" }),
+    onError: () => toast({ title: t("cr.errStartOnboarding"), variant: "destructive" }),
   });
 }

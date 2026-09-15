@@ -29,6 +29,7 @@ import {
 } from "./useProspectos";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -43,6 +44,7 @@ const emptyForm = {
 };
 
 export default function ProspectosPage() {
+  const { t } = useLanguage();
   const { data: prospects = [], isLoading } = useProspectos();
   const addMutation = useAddProspect();
   const updateMutation = useUpdateProspect();
@@ -115,10 +117,10 @@ export default function ProspectosPage() {
         <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
           <PageHeader
             title="Casting"
-            subtitle="Gestiona perfiles y conviértelos en creadoras"
+            subtitle={t("cr.prospectsSubtitle")}
             actions={
               <Button size="sm" onClick={() => setShowAdd(true)}>
-                <Plus className="h-4 w-4 mr-1" />Nuevo Perfil
+                <Plus className="h-4 w-4 mr-1" />{t("cr.newProfile")}
               </Button>
             }
           />
@@ -132,17 +134,17 @@ export default function ProspectosPage() {
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
-                <StatChip label="Total Casting" value={String(prospects.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" />
-                <StatChip label="Pendientes de Contacto" value={String(totalLeads)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
-                <StatChip label="En Negociación" value={String(totalNegociando)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
-                <StatChip label="Tasa de Conversión" value={`${conversionRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={`${totalConvertidos} convertidos`} />
+                <StatChip label={t("cr.totalCasting")} value={String(prospects.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("cr.allRecords")} />
+                <StatChip label={t("cr.pendingContact")} value={String(totalLeads)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={prospects.length > 0 ? t("cr.pctOfTotal", { p: ((totalLeads / prospects.length) * 100).toFixed(0) }) : "—"} />
+                <StatChip label={t("cr.negotiating")} value={String(totalNegociando)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={prospects.length > 0 ? t("cr.pctOfTotal", { p: ((totalNegociando / prospects.length) * 100).toFixed(0) }) : "—"} />
+                <StatChip label={t("cr.conversionRate")} value={`${conversionRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={t("cr.nConverted", { n: totalConvertidos })} />
               </>
             )}
           </div>
 
           {/* Agency Tabs */}
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-            <Button variant={!agencyTab ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab("")}>Todos</Button>
+            <Button variant={!agencyTab ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab("")}>{t("common.all")}</Button>
             {agencyTabs.map((a) => (
               <Button key={a} variant={agencyTab === a ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab(a)}>{a}</Button>
             ))}
@@ -152,12 +154,12 @@ export default function ProspectosPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nombre, Instagram o email..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder={t("cr.prospectSearchPh")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
+                <SelectItem value="__all__">{t("common.all")}</SelectItem>
                 {PROSPECT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -181,9 +183,9 @@ export default function ProspectosPage() {
                     <TableRow className="sticky top-0 z-10 bg-card border-b">
                       <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Plataforma</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Categoría</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.category")}</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Agencia</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
                     </TableRow>
@@ -196,7 +198,7 @@ export default function ProspectosPage() {
                     ) : filtered.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                          {prospects.length === 0 ? 'No hay perfiles. Haz clic en "Nuevo Perfil" para empezar.' : "Sin resultados para los filtros aplicados."}
+                          {prospects.length === 0 ? t("cr.noProfiles") : t("cr.noResultsFilters")}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -229,13 +231,13 @@ export default function ProspectosPage() {
                               <div className="flex items-center gap-1">
                                 <Tooltip><TooltipTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(p)}><Eye className="h-3.5 w-3.5" /></Button>
-                                </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                                </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                                 <Tooltip><TooltipTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                                </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                                </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                                 <Tooltip><TooltipTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                                </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                                </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                                 {p.status !== "convertido" && p.status !== "descartado" && (
                                   <Tooltip><TooltipTrigger asChild>
                                     <Button size="sm" className="h-7 px-2 text-xs ml-1" onClick={() => setOnboardItem(p)}>
@@ -287,12 +289,12 @@ export default function ProspectosPage() {
                           <p><span className="font-medium text-foreground">Plataforma:</span> {p.platform ?? "—"}</p>
                           {p.agency && <p><span className="font-medium text-foreground">Agencia:</span> {p.agency}</p>}
                           <p><span className="font-medium text-foreground">Fuente:</span> {PROSPECT_SOURCES.find((s) => s.value === p.source)?.label ?? "—"}</p>
-                          <p><span className="font-medium text-foreground">Fecha:</span> {format(new Date(p.created_at), "dd/MM/yyyy")}</p>
+                          <p><span className="font-medium text-foreground">{t("cr.dateColon")}</span> {format(new Date(p.created_at), "dd/MM/yyyy")}</p>
                         </div>
                         <div className="flex items-center gap-1 pt-1 border-t border-border">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(p)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3 w-3 mr-1" />Eliminar</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(p)}><Eye className="h-3 w-3 mr-1" />{t("common.view")}</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}><Pencil className="h-3 w-3 mr-1" />{t("common.edit")}</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3 w-3 mr-1" />{t("common.delete")}</Button>
                           {p.status !== "convertido" && p.status !== "descartado" && (
                             <Button size="sm" className="h-7 text-xs ml-auto" onClick={() => setOnboardItem(p)}>
                               <Rocket className="h-3 w-3 mr-1" />Onboarding
@@ -311,21 +313,21 @@ export default function ProspectosPage() {
         {/* View Modal */}
         <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Detalle del Perfil</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("cr.profileDetail")}</DialogTitle></DialogHeader>
             {viewItem && (
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><p className="text-xs text-muted-foreground">Nombre</p><p className="font-medium">{viewItem.name}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.name")}</p><p className="font-medium">{viewItem.name}</p></div>
                   <div><p className="text-xs text-muted-foreground">Instagram</p><p>{viewItem.instagram ? `@${viewItem.instagram.replace(/^@/, "")}` : "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">TikTok</p><p>{viewItem.tiktok ? `@${viewItem.tiktok.replace(/^@/, "")}` : "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Plataforma</p><p>{viewItem.platform ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Categoría</p><p>{viewItem.category ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.category")}</p><p>{viewItem.category ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Agencia</p><p>{viewItem.agency ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">País</p><p>{viewItem.country ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.country")}</p><p>{viewItem.country ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Email</p><p>{viewItem.email ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Teléfono</p><p><MaskedPhone phone={viewItem.phone} /></p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.phone")}</p><p><MaskedPhone phone={viewItem.phone} /></p></div>
                   <div><p className="text-xs text-muted-foreground">Fuente</p><p>{PROSPECT_SOURCES.find((s) => s.value === viewItem.source)?.label ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Fecha</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.date")}</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                   <div>
                     <p className="text-xs text-muted-foreground">Estado</p>
                     {(() => {
@@ -345,32 +347,32 @@ export default function ProspectosPage() {
         {/* Add Modal */}
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Nuevo Perfil</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("cr.newProfile")}</DialogTitle></DialogHeader>
             <div className="space-y-4 max-h-[70vh] overflow-auto pr-1">
               <div className="space-y-1.5">
-                <Label>Nombre <span className="text-destructive">*</span></Label>
+                <Label>{t("common.name")} <span className="text-destructive">*</span></Label>
                 <Input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Instagram (@)</Label>
-                  <Input value={addForm.instagram} onChange={(e) => setAddForm((f) => ({ ...f, instagram: e.target.value }))} placeholder="@usuario" />
+                  <Input value={addForm.instagram} onChange={(e) => setAddForm((f) => ({ ...f, instagram: e.target.value }))} placeholder={t("cr.userHandlePh")} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>TikTok (@)</Label>
-                  <Input value={addForm.tiktok} onChange={(e) => setAddForm((f) => ({ ...f, tiktok: e.target.value }))} placeholder="@usuario" />
+                  <Input value={addForm.tiktok} onChange={(e) => setAddForm((f) => ({ ...f, tiktok: e.target.value }))} placeholder={t("cr.userHandlePh")} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Plataforma Principal</Label>
                   <Select value={addForm.platform || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, platform: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                     <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Categoría</Label>
+                  <Label>{t("common.category")}</Label>
                   <Input value={addForm.category} onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value }))} />
                 </div>
               </div>
@@ -378,12 +380,12 @@ export default function ProspectosPage() {
                 <div className="space-y-1.5">
                   <Label>Agencia</Label>
                   <Select value={addForm.agency || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, agency: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                     <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>País</Label>
+                  <Label>{t("common.country")}</Label>
                   <Input value={addForm.country} onChange={(e) => setAddForm((f) => ({ ...f, country: e.target.value }))} />
                 </div>
               </div>
@@ -393,14 +395,14 @@ export default function ProspectosPage() {
                   <Input type="email" value={addForm.email} onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Teléfono</Label>
+                  <Label>{t("common.phone")}</Label>
                   <PhoneInput value={addForm.phone} onChange={(v) => setAddForm((f) => ({ ...f, phone: v }))} />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Fuente</Label>
                 <Select value={addForm.source || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, source: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -409,7 +411,7 @@ export default function ProspectosPage() {
                 <Textarea rows={3} value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAdd(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setShowAdd(false)}>{t("common.cancel")}</Button>
                 <Button onClick={handleAdd} disabled={!addForm.name.trim() || addMutation.isPending}>
                   {addMutation.isPending ? "Guardando..." : "Crear Prospecto"}
                 </Button>
@@ -421,10 +423,10 @@ export default function ProspectosPage() {
         {/* Edit Modal */}
         <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Editar Prospecto</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("cr.editProspect")}</DialogTitle></DialogHeader>
             <div className="space-y-4 max-h-[70vh] overflow-auto pr-1">
               <div className="space-y-1.5">
-                <Label>Nombre <span className="text-destructive">*</span></Label>
+                <Label>{t("common.name")} <span className="text-destructive">*</span></Label>
                 <Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -441,12 +443,12 @@ export default function ProspectosPage() {
                 <div className="space-y-1.5">
                   <Label>Plataforma</Label>
                   <Select value={editForm.platform || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, platform: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                     <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Categoría</Label>
+                  <Label>{t("common.category")}</Label>
                   <Input value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} />
                 </div>
               </div>
@@ -454,12 +456,12 @@ export default function ProspectosPage() {
                 <div className="space-y-1.5">
                   <Label>Agencia</Label>
                   <Select value={editForm.agency || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, agency: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                     <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>País</Label>
+                  <Label>{t("common.country")}</Label>
                   <Input value={editForm.country} onChange={(e) => setEditForm((f) => ({ ...f, country: e.target.value }))} />
                 </div>
               </div>
@@ -469,7 +471,7 @@ export default function ProspectosPage() {
                   <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Teléfono</Label>
+                  <Label>{t("common.phone")}</Label>
                   <PhoneInput value={editForm.phone} onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))} />
                 </div>
               </div>
@@ -483,7 +485,7 @@ export default function ProspectosPage() {
               <div className="space-y-1.5">
                 <Label>Fuente</Label>
                 <Select value={editForm.source || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, source: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -492,7 +494,7 @@ export default function ProspectosPage() {
                 <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
                 <Button onClick={handleUpdate} disabled={!editForm.name.trim() || updateMutation.isPending}>
                   {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                 </Button>
@@ -505,15 +507,15 @@ export default function ProspectosPage() {
         <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar prospecto?</AlertDialogTitle>
+              <AlertDialogTitle>{t("cr.deleteProspectQ")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Se eliminará permanentemente a <strong>{deleteItem?.name}</strong>. Esta acción no se puede deshacer.
+                {t("cr.deleteProspectA")}<strong>{deleteItem?.name}</strong>{t("cr.offDeleteDescB")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel />
               <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
-                {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+                {deleteMutation.isPending ? t("cr.deleting") : t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -8,6 +8,7 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BookOpen, Sparkles, ShieldAlert, Info } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from "@/components/ui/tooltip";
@@ -62,6 +63,7 @@ interface Props {
 }
 
 export default function Step2PsychologyLimits({ data, onChange }: Props) {
+  const { t } = useLanguage();
   return (
     <TooltipProvider>
     <Accordion type="multiple" defaultValue={["biografia"]} className="space-y-2">
@@ -75,7 +77,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">Detalles cotidianos que sirven para crear conexión emocional y 'mirroring' con tus suscriptores.</TooltipContent>
+              <TooltipContent className="max-w-xs">{t("cr.psyDailyTip")}</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
@@ -95,48 +97,48 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Bebida favorita</Label>
-              <Input value={data.bebidaFavorita} onChange={(e) => onChange("bebidaFavorita", e.target.value)} placeholder="Café, vino tinto..." />
+              <Input value={data.bebidaFavorita} onChange={(e) => onChange("bebidaFavorita", e.target.value)} placeholder={t("cr.drinkPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Música / Artistas</Label>
+              <Label>{t("cr.musicArtists")}</Label>
               <Input value={data.musicaArtistas} onChange={(e) => onChange("musicaArtistas", e.target.value)} placeholder="Bad Bunny, The Weeknd..." />
             </div>
             <div className="space-y-1.5">
-              <Label>Películas / TV</Label>
+              <Label>{t("cr.moviesTV")}</Label>
               <Input value={data.peliculasTV} onChange={(e) => onChange("peliculasTV", e.target.value)} placeholder="Friends, Euphoria..." />
             </div>
             <div className="space-y-1.5">
-              <Label>Mascotas y nombres</Label>
+              <Label>{t("cr.petsNames")}</Label>
               <Input value={data.mascotasNombres} onChange={(e) => onChange("mascotasNombres", e.target.value)} placeholder="Perro: Luna, Gato: Milo" />
             </div>
             <div className="space-y-1.5">
               <Label>Hermanos / Hijos</Label>
-              <Input value={data.hermanos} onChange={(e) => onChange("hermanos", e.target.value)} placeholder="1 hermana mayor, sin hijos" />
+              <Input value={data.hermanos} onChange={(e) => onChange("hermanos", e.target.value)} placeholder={t("cr.siblingsPh")} />
             </div>
             <div className="space-y-1.5">
               <Label>Viajes favoritos</Label>
-              <Input value={data.viajesFavoritos} onChange={(e) => onChange("viajesFavoritos", e.target.value)} placeholder="Cancún, París..." />
+              <Input value={data.viajesFavoritos} onChange={(e) => onChange("viajesFavoritos", e.target.value)} placeholder={t("cr.travelsPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Destinos por visitar</Label>
-              <Input value={data.viajesPorVisitar} onChange={(e) => onChange("viajesPorVisitar", e.target.value)} placeholder="Japón, Grecia..." />
+              <Label>{t("cr.destinationsToVisit")}</Label>
+              <Input value={data.viajesPorVisitar} onChange={(e) => onChange("viajesPorVisitar", e.target.value)} placeholder={t("cr.destinationsPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Nivel de estudios</Label>
+              <Label>{t("cr.educationLevel")}</Label>
               <Select value={data.nivelEstudios} onValueChange={(v) => onChange("nivelEstudios", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("cr.selectLevel")} /></SelectTrigger>
                 <SelectContent>
                   {NIVELES_ESTUDIO.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Horarios de sueño</Label>
+              <Label>{t("cr.sleepSchedule")}</Label>
               <Input value={data.horariosSueno} onChange={(e) => onChange("horariosSueno", e.target.value)} placeholder="Despierta 9am, duerme 1am" />
             </div>
             <div className="space-y-1.5">
-              <Label>Deporte / Equipo favorito</Label>
-              <Input value={data.deporteEquipo} onChange={(e) => onChange("deporteEquipo", e.target.value)} placeholder="Fútbol, Real Madrid..." />
+              <Label>{t("cr.sportTeam")}</Label>
+              <Input value={data.deporteEquipo} onChange={(e) => onChange("deporteEquipo", e.target.value)} placeholder={t("cr.sportPh")} />
             </div>
             <div className="space-y-1.5">
               <Label>Color favorito</Label>
@@ -144,23 +146,23 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Estado civil</Label>
-              <Input value={data.estadoCivil} onChange={(e) => onChange("estadoCivil", e.target.value)} placeholder="Soltera, en una relación..." />
+              <Input value={data.estadoCivil} onChange={(e) => onChange("estadoCivil", e.target.value)} placeholder={t("cr.maritalPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Mejor atributo físico</Label>
+              <Label>{t("cr.bestPhysicalFeature")}</Label>
               <Input value={data.mejorAtributoFisico} onChange={(e) => onChange("mejorAtributoFisico", e.target.value)} placeholder="Ojos, sonrisa, cuerpo..." />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>¿Qué buscas en una pareja?</Label>
-              <Textarea value={data.queBuscasPareja} onChange={(e) => onChange("queBuscasPareja", e.target.value)} placeholder="Describe lo que la creadora busca en una pareja..." rows={3} />
+              <Label>{t("cr.lookForInPartner")}</Label>
+              <Textarea value={data.queBuscasPareja} onChange={(e) => onChange("queBuscasPareja", e.target.value)} placeholder={t("cr.lookForInPartnerPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>Metas a largo plazo</Label>
-              <Textarea value={data.metasLargoPlazo} onChange={(e) => onChange("metasLargoPlazo", e.target.value)} placeholder="Metas personales y profesionales a largo plazo..." rows={3} />
+              <Textarea value={data.metasLargoPlazo} onChange={(e) => onChange("metasLargoPlazo", e.target.value)} placeholder={t("cr.longTermGoalsPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>Rutina diaria</Label>
-              <Textarea value={data.rutinaDiaria} onChange={(e) => onChange("rutinaDiaria", e.target.value)} placeholder="Describe la rutina diaria de la creadora..." rows={3} />
+              <Textarea value={data.rutinaDiaria} onChange={(e) => onChange("rutinaDiaria", e.target.value)} placeholder={t("cr.dailyRoutinePh")} rows={3} />
             </div>
           </div>
         </AccordionContent>
@@ -176,56 +178,56 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">Tus respuestas aquí definen el 'alma' de tu cuenta. Al saber cómo te describes y qué emojis usas, tu equipo de chat podrá hablar exactamente como tú, evitando que los fans sospechen que hay alguien más detrás de la pantalla.</TooltipContent>
+              <TooltipContent className="max-w-xs">{t("cr.psySoulTip")}</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
         <AccordionContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="md:col-span-2 space-y-1.5">
-              <Label>Describe un día perfecto</Label>
-              <Textarea value={data.diaPerfecto} onChange={(e) => onChange("diaPerfecto", e.target.value)} placeholder="Despertar tarde, desayuno en la cama, playa por la tarde..." rows={3} />
+              <Label>{t("cr.describePerfectDay")}</Label>
+              <Textarea value={data.diaPerfecto} onChange={(e) => onChange("diaPerfecto", e.target.value)} placeholder={t("cr.perfectDayPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>¿Cómo eres cuando nadie te ve?</Label>
-              <Textarea value={data.comoEresCuandoNadieVe} onChange={(e) => onChange("comoEresCuandoNadieVe", e.target.value)} placeholder="Describe cómo es la creadora en su intimidad..." rows={3} />
+              <Label>{t("cr.howAreYouAlone")}</Label>
+              <Textarea value={data.comoEresCuandoNadieVe} onChange={(e) => onChange("comoEresCuandoNadieVe", e.target.value)} placeholder={t("cr.howAreYouAlonePh")} rows={3} />
             </div>
             <div className="space-y-1.5">
-              <Label>¿Cómo quieres que te llamen los fans?</Label>
+              <Label>{t("cr.whatFansCallYou")}</Label>
               <Input value={data.comoQuieresQueTeLlamen} onChange={(e) => onChange("comoQuieresQueTeLlamen", e.target.value)} placeholder="Diosa, Reina, Princesa..." />
             </div>
             <div className="space-y-1.5">
               <Label>Apodos permitidos</Label>
-              <Input value={data.apodosPermitidos} onChange={(e) => onChange("apodosPermitidos", e.target.value)} placeholder="Bebé, amor, cielo..." />
+              <Input value={data.apodosPermitidos} onChange={(e) => onChange("apodosPermitidos", e.target.value)} placeholder={t("cr.petNamesPh")} />
             </div>
             <div className="space-y-1.5">
               <Label>Palabras prohibidas</Label>
-              <Input value={data.palabrasProhibidas} onChange={(e) => onChange("palabrasProhibidas", e.target.value)} placeholder="Palabras que no se deben usar" />
+              <Input value={data.palabrasProhibidas} onChange={(e) => onChange("palabrasProhibidas", e.target.value)} placeholder={t("cr.bannedWordsPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Emojis más usados</Label>
+              <Label>{t("cr.mostUsedEmojis")}</Label>
               <Input value={data.emojiFrecuente} onChange={(e) => onChange("emojiFrecuente", e.target.value)} placeholder="😘🔥💕" />
             </div>
             <div className="space-y-1.5">
-              <Label>Tono de voz</Label>
+              <Label>{t("cr.toneOfVoice")}</Label>
               <Select value={data.tonoVoz} onValueChange={(v) => onChange("tonoVoz", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar tono" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("cr.selectTone")} /></SelectTrigger>
                 <SelectContent>
                   {TONOS_VOZ.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>¿Qué haces para relajarte después de un día largo?</Label>
-              <Textarea value={data.queHacesRelajarte} onChange={(e) => onChange("queHacesRelajarte", e.target.value)} placeholder="Ver series, meditar, un baño caliente..." rows={3} />
+              <Label>{t("cr.howRelax")}</Label>
+              <Textarea value={data.queHacesRelajarte} onChange={(e) => onChange("queHacesRelajarte", e.target.value)} placeholder={t("cr.howRelaxPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>¿Qué es lo que más te hace reír?</Label>
+              <Label>{t("cr.whatMakesYouLaugh")}</Label>
               <Textarea value={data.queTeHaceReir} onChange={(e) => onChange("queTeHaceReir", e.target.value)} placeholder="Memes, comedia, situaciones absurdas..." rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>¿Qué te motiva a crear contenido en esta plataforma?</Label>
-              <Textarea value={data.queTeMotivaCrear} onChange={(e) => onChange("queTeMotivaCrear", e.target.value)} placeholder="Libertad financiera, expresión personal..." rows={3} />
+              <Label>{t("cr.whatMotivates")}</Label>
+              <Textarea value={data.queTeMotivaCrear} onChange={(e) => onChange("queTeMotivaCrear", e.target.value)} placeholder={t("cr.whatMotivatesPh")} rows={3} />
             </div>
           </div>
         </AccordionContent>
@@ -241,147 +243,147 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">Tus reglas de oro. Nos permite rechazar solicitudes prohibidas de forma firme y sin interrumpir tu día.</TooltipContent>
+              <TooltipContent className="max-w-xs">{t("cr.psyRulesTip")}</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
         <AccordionContent>
           <div className="rounded-md bg-destructive/5 p-4 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-destructive font-semibold">Contenido que JAMÁS haría</Label>
+              <Label className="text-destructive font-semibold">{t("cr.neverDoContent")}</Label>
               <Textarea
                 value={data.contenidoJamasHaria}
                 onChange={(e) => onChange("contenidoJamasHaria", e.target.value)}
-                placeholder="Describe el contenido que la creadora jamás haría bajo ninguna circunstancia..."
+                placeholder={t("cr.neverDoContentPh")}
                 rows={3}
                 className="border-destructive/20"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>¿Qué te incomoda?</Label>
+              <Label>{t("cr.whatBothersYou")}</Label>
               <Textarea
                 value={data.queTeIncomoda}
                 onChange={(e) => onChange("queTeIncomoda", e.target.value)}
-                placeholder="Situaciones, palabras o actitudes que le incomodan..."
+                placeholder={t("cr.whatBothersYouPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>¿Cómo responderías si un usuario pide sexo en persona?</Label>
+                <Label>{t("cr.qSexInPerson")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.respuestaSexoEnPersona}
                 onChange={(e) => onChange("respuestaSexoEnPersona", e.target.value)}
-                placeholder="Escribe la respuesta tipo script que se usaría..."
+                placeholder={t("cr.scriptPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>¿Cómo manejas a un usuario grosero?</Label>
+                <Label>{t("cr.qRudeUser")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.respuestaUsuarioGrosero}
                 onChange={(e) => onChange("respuestaUsuarioGrosero", e.target.value)}
-                placeholder="Estrategia para manejar usuarios agresivos o irrespetuosos..."
+                placeholder={t("cr.qRudeUserPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>¿Cómo respondes a "quiero ver tus desnudos"?</Label>
+                <Label>{t("cr.qNudes")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.respuestaPedirDesnudos}
                 onChange={(e) => onChange("respuestaPedirDesnudos", e.target.value)}
-                placeholder="Respuesta tipo script para esta solicitud común..."
+                placeholder={t("cr.qCommonScriptPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>¿Cómo respondes a "¿cuánto cobras por un encuentro?"</Label>
+                <Label>{t("cr.qMeetPrice")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.respuestaCuantoCobraEncuentro}
                 onChange={(e) => onChange("respuestaCuantoCobraEncuentro", e.target.value)}
-                placeholder="Respuesta tipo script para esta solicitud..."
+                placeholder={t("cr.qScriptPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>¿Cómo respondes a "muéstrame tus partes íntimas"?</Label>
+                <Label>{t("cr.qShowPrivates")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.respuestaMuestraIntimas}
                 onChange={(e) => onChange("respuestaMuestraIntimas", e.target.value)}
-                placeholder="Respuesta tipo script para esta solicitud..."
+                placeholder={t("cr.qScriptPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>Estrategia para usuarios que piden material gratis</Label>
+                <Label>{t("cr.qFreeContent")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                   <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.estrategiaMaterialGratis}
                 onChange={(e) => onChange("estrategiaMaterialGratis", e.target.value)}
-                placeholder="Estrategia para manejar solicitudes de contenido gratis..."
+                placeholder={t("cr.qFreeContentPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>Estrategia ante usuarios con problemas personales profundos</Label>
+                <Label>{t("cr.qDeepProblems")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
+                  <TooltipContent className="max-w-xs">{t("cr.scriptsTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.estrategiaProblemasPersonales}
                 onChange={(e) => onChange("estrategiaProblemasPersonales", e.target.value)}
-                placeholder="Cómo manejar usuarios que confiesan problemas personales muy profundos..."
+                placeholder={t("cr.qDeepProblemsPh")}
                 rows={3}
               />
             </div>

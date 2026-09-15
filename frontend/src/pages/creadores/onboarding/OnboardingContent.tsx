@@ -10,10 +10,12 @@ import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
 import CreadoresHeader from "../CreadoresHeader";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export const FILTRO_POR_DEFECTO = "En curso";
 
 const OnboardingContent = () => {
+  const { t } = useLanguage();
   const { data: creators = [], isLoading } = useOnboarding();
   const { isAgent } = useUserRole();
   const navigate = useNavigate();
@@ -61,10 +63,10 @@ const OnboardingContent = () => {
   };
 
   const kpiCards = [
-    { label: "Total", value: total, icon: Users, filter: "Todas", color: "bg-primary" },
-    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "bg-warning" },
-    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-primary" },
-    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-success" },
+    { label: t("cr.total"), value: total, icon: Users, filter: "Todas", color: "bg-primary" },
+    { label: t("common.pendingPl"), value: pending, icon: Clock, filter: "Pendientes", color: "bg-warning" },
+    { label: t("cr.inProgressCap"), value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-primary" },
+    { label: t("cr.completedPl"), value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-success" },
   ];
 
   const handleCardClick = (creator: OnboardingCreator) => {
@@ -108,7 +110,7 @@ const OnboardingContent = () => {
           <div className="relative min-w-[11rem] max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre o empresa..."
+              placeholder={t("cr.searchByNameOrCompany")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -117,14 +119,14 @@ const OnboardingContent = () => {
 
           <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-full sm:w-[220px]">
-              <SelectValue placeholder="Etapa del Proceso" />
+              <SelectValue placeholder={t("cr.processStage")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todas las etapas</SelectItem>
-              <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
-              <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
-              <SelectItem value="3">Paso 3: Documentación</SelectItem>
-              <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
+              <SelectItem value="__all__">{t("cr.allStages")}</SelectItem>
+              <SelectItem value="1">{t("cr.step1Personal")}</SelectItem>
+              <SelectItem value="2">{t("cr.step2Psych")}</SelectItem>
+              <SelectItem value="3">{t("cr.step3Docs")}</SelectItem>
+              <SelectItem value="4">{t("cr.step4Commercial")}</SelectItem>
             </SelectContent>
           </Select>
 

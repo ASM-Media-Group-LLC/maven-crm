@@ -12,6 +12,7 @@ import VideoOnboarding from "@/components/creadores/VideoOnboarding";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface Step2Data {
   idDocumentFront: UploadedFile[];
@@ -67,18 +68,19 @@ function DocUploader({
   onClickUpload: () => void;
   onRemove: (index: number) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">
         {label}
-        {optional && <span className="text-muted-foreground ml-1 text-xs">(Opcional)</span>}
+        {optional && <span className="text-muted-foreground ml-1 text-xs">{t("cr.optional")}</span>}
       </Label>
       <div
         className="border-2 border-dashed rounded-lg p-5 text-center cursor-pointer hover:border-primary/50 transition-colors"
         onClick={onClickUpload}
       >
         <Icon className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Clic para subir</p>
+        <p className="text-sm text-muted-foreground">{t("cr.clickToUpload")}</p>
       </div>
       {files.length > 0 && (
         <div className="space-y-1">
@@ -98,6 +100,7 @@ function DocUploader({
 }
 
 export default function Step2Documentation({ data, errors, tempId, onChange, creatorId }: Props) {
+  const { t } = useLanguage();
   const [uploadTarget, setUploadTarget] = useState<UploadTarget | null>(null);
 
   const targetFieldMap: Record<Exclude<UploadTarget, "extras">, keyof Step2Data> = {
@@ -138,15 +141,14 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
           <div className="flex items-start gap-2 rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
             <Clapperboard className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Para subir el <b>video de onboarding</b>, guarda primero el borrador
-              (botón de abajo). Después vuelve a este paso.
+              {t("cr.saveDraftFirstA")}<b>{t("cr.onboardingVideo")}</b>{t("cr.saveDraftFirstB")}
             </span>
           </div>
         )}
 
         {/* ID Document Uploaders — 3 separate */}
         <div className="space-y-4">
-          <Label className="text-sm font-semibold">Documento de Identidad</Label>
+          <Label className="text-sm font-semibold">{t("cr.idDocument")}</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DocUploader
               label="Frente"
@@ -165,7 +167,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
               onRemove={(i) => removeFile("idDocumentBack", i)}
             />
             <DocUploader
-              label="Selfie con Documento"
+              label={t("cr.selfieWithId")}
               icon={Camera}
               files={data.selfieDocument}
               fieldKey="selfieDocument"
@@ -178,13 +180,13 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
 
         {/* Profile Photo Upload */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Foto de Perfil</Label>
+          <Label className="text-sm font-medium">{t("cr.profilePhoto")}</Label>
           <div
             className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => setUploadTarget("extras")}
           >
             <ImageIcon className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Clic para subir foto de perfil</p>
+            <p className="text-sm text-muted-foreground">{t("cr.clickToUploadPhoto")}</p>
           </div>
           {data.profilePhotos.length > 0 && (
             <div className="space-y-1">
@@ -220,14 +222,14 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
             value={data.wishlistUrl}
             onChange={(e) => onChange("wishlistUrl", e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">Link de Wishlist de Amazon</p>
+          <p className="text-xs text-muted-foreground">{t("cr.amazonWishlist")}</p>
         </div>
 
         {/* Social Media Links with tooltip */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-primary" />
-            <Label className="text-sm font-medium">Redes Sociales (Verificación de Identidad)</Label>
+            <Label className="text-sm font-medium">{t("cr.socialsIdVerification")}</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -237,7 +239,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
               </TooltipContent>
             </Tooltip>
           </div>
-          <p className="text-xs text-muted-foreground">Estos links nos ayudan a verificar tu identidad</p>
+          <p className="text-xs text-muted-foreground">{t("cr.socialsHelp")}</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -245,7 +247,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
                 <InstagramIcon className="h-3.5 w-3.5" /> Instagram
               </Label>
               <Input
-                placeholder="@usuario"
+                placeholder={t("cr.userHandlePh")}
                 value={data.instagramHandle}
                 onChange={(e) => onChange("instagramHandle", e.target.value)}
               />
@@ -255,7 +257,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
                 <TikTokIcon className="h-3.5 w-3.5" /> TikTok
               </Label>
               <Input
-                placeholder="@usuario"
+                placeholder={t("cr.userHandlePh")}
                 value={data.tiktokHandle}
                 onChange={(e) => onChange("tiktokHandle", e.target.value)}
               />
@@ -265,7 +267,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
                 <XIcon className="h-3.5 w-3.5" /> Twitter / X
               </Label>
               <Input
-                placeholder="@usuario"
+                placeholder={t("cr.userHandlePh")}
                 value={data.twitterHandle}
                 onChange={(e) => onChange("twitterHandle", e.target.value)}
               />
@@ -273,7 +275,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">OnlyFans URL</Label>
               <Input
-                placeholder="https://onlyfans.com/usuario"
+                placeholder={t("cr.onlyfansUrlPh")}
                 value={data.onlyfansUrl}
                 onChange={(e) => onChange("onlyfansUrl", e.target.value)}
               />
@@ -291,10 +293,10 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">URLs exactas de otras plataformas</Label>
+            <Label className="text-xs text-muted-foreground">{t("cr.otherPlatformUrls")}</Label>
             <Input
               type="url"
-              placeholder="https://fansly.com/usuario, https://chaturbate.com/usuario"
+              placeholder={t("cr.otherUrlsPh")}
               value={data.linkOtrasPlataformas}
               onChange={(e) => onChange("linkOtrasPlataformas", e.target.value)}
             />
@@ -309,15 +311,15 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
             onCheckedChange={(v) => onChange("dataConfirmed", !!v)}
           />
           <div>
-            <Label htmlFor="confirm-data" className="cursor-pointer">Confirmo que los datos proporcionados son correctos</Label>
+            <Label htmlFor="confirm-data" className="cursor-pointer">{t("cr.confirmDataCorrect")}</Label>
             {errors.dataConfirmed && <p className="text-xs text-destructive mt-1">{errors.dataConfirmed}</p>}
           </div>
         </div>
 
         {/* Verification Status */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Estado de verificación:</span>
-          <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">Pendiente</Badge>
+          <span className="text-sm text-muted-foreground">{t("cr.verificationStatus")}</span>
+          <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">{t("common.pending")}</Badge>
         </div>
 
         {uploadTarget && (

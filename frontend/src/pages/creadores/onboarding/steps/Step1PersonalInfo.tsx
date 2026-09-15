@@ -10,6 +10,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Separator } from "@/components/ui/separator";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -122,30 +123,31 @@ function SectionLabel({ children, tooltip }: { children: React.ReactNode; toolti
 }
 
 export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
+  const { t } = useLanguage();
   return (
     <TooltipProvider>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* ── Datos básicos ── */}
       <div className="space-y-1.5">
-        <Label>Nombre completo *</Label>
-        <Input value={data.name} onChange={(e) => onChange("name", e.target.value)} placeholder="Nombre completo" />
+        <Label>{t("cr.fullNameReq")}</Label>
+        <Input value={data.name} onChange={(e) => onChange("name", e.target.value)} placeholder={t("common.fullName")} />
         {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Segundo nombre</Label>
-        <Input value={data.segundoNombre} onChange={(e) => onChange("segundoNombre", e.target.value)} placeholder="Segundo nombre" />
+        <Label>{t("cr.middleName")}</Label>
+        <Input value={data.segundoNombre} onChange={(e) => onChange("segundoNombre", e.target.value)} placeholder={t("cr.middleName")} />
       </div>
       <div className="space-y-1.5">
-        <Label>Nombre artístico</Label>
-        <Input value={data.artisticName} onChange={(e) => onChange("artisticName", e.target.value)} placeholder="Nombre artístico" />
+        <Label>{t("cr.stageName")}</Label>
+        <Input value={data.artisticName} onChange={(e) => onChange("artisticName", e.target.value)} placeholder={t("cr.stageName")} />
       </div>
       <div className="space-y-1.5">
         <Label>Email *</Label>
-        <Input type="email" value={data.email} onChange={(e) => onChange("email", e.target.value)} placeholder="correo@ejemplo.com" />
+        <Input type="email" value={data.email} onChange={(e) => onChange("email", e.target.value)} placeholder={t("cr.emailPh")} />
         {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Teléfono *</Label>
+        <Label>{t("cr.phoneReq")}</Label>
         <PhoneInput value={data.phone} onChange={(v) => onChange("phone", v)} />
         {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
       </div>
@@ -155,13 +157,13 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         {errors.age && <p className="text-xs text-destructive">{errors.age}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Fecha de nacimiento</Label>
+        <Label>{t("common.birthDate")}</Label>
         <DateInput className="w-full" value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
       </div>
       <div className="space-y-1.5">
-        <Label>País</Label>
+        <Label>{t("common.country")}</Label>
         <Select value={data.country} onValueChange={(v) => onChange("country", v)}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder={t("cr.selectCountry")} /></SelectTrigger>
           <SelectContent>
             {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
@@ -174,38 +176,38 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>Zona horaria</Label>
         <Select value={data.timezone} onValueChange={(v) => onChange("timezone", v)}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar zona horaria" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder={t("cr.selectTimezone")} /></SelectTrigger>
           <SelectContent>
             {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
       <div className="md:col-span-2 space-y-1.5">
-        <Label>Dirección de residencia completa</Label>
-        <Textarea value={data.direccion} onChange={(e) => onChange("direccion", e.target.value)} placeholder="Dirección completa..." rows={2} />
+        <Label>{t("cr.fullAddress")}</Label>
+        <Textarea value={data.direccion} onChange={(e) => onChange("direccion", e.target.value)} placeholder={t("cr.fullAddressPh")} rows={2} />
       </div>
       <div className="space-y-1.5">
         <Label>Medidas (cm)</Label>
         <Input value={data.medidas} onChange={(e) => onChange("medidas", formatMedidas(e.target.value))} placeholder="90-60-90" maxLength={8} />
       </div>
       <div className="space-y-1.5">
-        <Label>Talla de brasier</Label>
+        <Label>{t("cr.braSize")}</Label>
         <Input value={data.tallaBrasier} onChange={(e) => onChange("tallaBrasier", e.target.value)} placeholder="34B" />
       </div>
 
       {/* ── Perfil Artístico ── */}
-      <SectionLabel tooltip="Define la identidad que verán tus fans. Estos datos son los que utilizará tu equipo de chat para mantener tu personaje.">Perfil Artístico</SectionLabel>
+      <SectionLabel tooltip={t("cr.artisticProfileTip")}>{t("cr.artisticProfile")}</SectionLabel>
       <div className="space-y-1.5">
         <Label>Apodos / Sobrenombres</Label>
-        <Input value={data.apodos} onChange={(e) => onChange("apodos", e.target.value)} placeholder="Sobrenombres que usa..." />
+        <Input value={data.apodos} onChange={(e) => onChange("apodos", e.target.value)} placeholder={t("cr.nicknamesPh")} />
       </div>
       <div className="space-y-1.5">
         <Label>Edad a mostrar</Label>
         <Input type="number" min={18} value={data.edadMostrar} onChange={(e) => onChange("edadMostrar", e.target.value)} placeholder="18" />
       </div>
       <div className="md:col-span-2 space-y-1.5">
-        <Label>Ubicación artística</Label>
-        <Input value={data.ubicacionArtistica} onChange={(e) => onChange("ubicacionArtistica", e.target.value)} placeholder="País/Ciudad que mencionará a los usuarios" />
+        <Label>{t("cr.artisticLocation")}</Label>
+        <Input value={data.ubicacionArtistica} onChange={(e) => onChange("ubicacionArtistica", e.target.value)} placeholder={t("cr.artisticLocationPh")} />
       </div>
 
       {/* ── Identidad Visual ── */}
@@ -213,7 +215,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>Signo zodiacal</Label>
         <Select value={data.signoZodiacal} onValueChange={(v) => onChange("signoZodiacal", v)}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar signo" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder={t("cr.selectSign")} /></SelectTrigger>
           <SelectContent>
             {SIGNOS_ZODIACALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
@@ -224,8 +226,8 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Input value={data.etnicidad} onChange={(e) => onChange("etnicidad", e.target.value)} placeholder="Ej: Latina, Europea..." />
       </div>
       <div className="md:col-span-2 space-y-1.5">
-        <Label>Tatuajes / Piercings (cantidad y ubicación)</Label>
-        <Textarea value={data.tatuajesPiercings} onChange={(e) => onChange("tatuajesPiercings", e.target.value)} placeholder="Ej: 2 tatuajes en brazo derecho, piercing en ombligo..." rows={2} />
+        <Label>{t("cr.tattoosPiercings")}</Label>
+        <Textarea value={data.tatuajesPiercings} onChange={(e) => onChange("tatuajesPiercings", e.target.value)} placeholder={t("cr.tattoosPh")} rows={2} />
       </div>
       <div className="md:col-span-2 space-y-1.5">
         <Label>Cicatrices</Label>
@@ -235,13 +237,13 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       {/* ── Idiomas ── */}
       <SectionLabel>Idiomas</SectionLabel>
       <div className="space-y-1.5">
-        <Label>Idiomas que habla</Label>
-        <Input value={data.idiomas} onChange={(e) => onChange("idiomas", e.target.value)} placeholder="Español, Inglés, Portugués..." />
+        <Label>{t("cr.languages")}</Label>
+        <Input value={data.idiomas} onChange={(e) => onChange("idiomas", e.target.value)} placeholder={t("cr.languagesPh")} />
       </div>
       <div className="space-y-1.5">
-        <Label>Nivel de lectura/escritura</Label>
+        <Label>{t("cr.literacyLevel")}</Label>
         <Select value={data.nivelLectura} onValueChange={(v) => onChange("nivelLectura", v)}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder={t("cr.selectLevel")} /></SelectTrigger>
           <SelectContent>
             {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
           </SelectContent>
@@ -249,24 +251,24 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
 
       {/* ── Privacidad ── */}
-      <SectionLabel tooltip="Tú controlas qué datos reales compartimos. Estos ajustes protegen tu identidad fuera de la plataforma.">Privacidad</SectionLabel>
+      <SectionLabel tooltip={t("cr.privacyTip")}>{t("cr.privacy")}</SectionLabel>
       <div className="md:col-span-2 space-y-3">
         <div className="flex items-center justify-between rounded-lg border p-3">
-          <Label className="text-sm font-normal">¿Podemos mencionar tu nombre real?</Label>
+          <Label className="text-sm font-normal">{t("cr.mayMentionRealName")}</Label>
           <Switch
             checked={data.permisoNombreReal === "si"}
             onCheckedChange={(checked) => onChange("permisoNombreReal", checked ? "si" : "no")}
           />
         </div>
         <div className="flex items-center justify-between rounded-lg border p-3">
-          <Label className="text-sm font-normal">¿Podemos decir tu edad real?</Label>
+          <Label className="text-sm font-normal">{t("cr.mayMentionRealAge")}</Label>
           <Switch
             checked={data.permisoEdadReal === "si"}
             onCheckedChange={(checked) => onChange("permisoEdadReal", checked ? "si" : "no")}
           />
         </div>
         <div className="flex items-center justify-between rounded-lg border p-3">
-          <Label className="text-sm font-normal">¿Podemos mencionar tu ubicación actual?</Label>
+          <Label className="text-sm font-normal">{t("cr.mayMentionLocation")}</Label>
           <Switch
             checked={data.permisoUbicacion === "si"}
             onCheckedChange={(checked) => onChange("permisoUbicacion", checked ? "si" : "no")}

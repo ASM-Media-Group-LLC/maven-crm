@@ -15,6 +15,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import { supabase } from "@/integrations/supabase/client";
 import { createOffboardingRecord } from "../useOffboarding";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Creator {
   id: string;
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function InitiateOffboardingDialog({ open, onOpenChange, onSuccess }: Props) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [creators, setCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,7 +94,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
       onSuccess?.();
       navigate(`/creadores/offboarding/${offboardingId}`);
     } catch (err: any) {
-      toast.error("Error al iniciar offboarding: " + (err.message ?? ""));
+      toast.error(t("cr.errStartOffboarding", { msg: err.message ?? "" }));
     } finally {
       setSubmitting(false);
     }
@@ -108,7 +110,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar creadora..."
+            placeholder={t("cr.searchCreatorPh")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -118,7 +120,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
         <ScrollArea className="h-[280px] -mx-2">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando...
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("common.loading")}
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">
