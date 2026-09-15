@@ -32,3 +32,10 @@ scripts/migrate-chatters/node_modules/
 .sdd/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+
+# Overrides locales de cada quien. Nunca al repo.
+.env.local
+.env.*.local
+frontend/.env.local
+frontend/.env.*.local
+infra/*/.env

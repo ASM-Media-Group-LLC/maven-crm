@@ -167,6 +167,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // universal, así que se ve por default; está acá por lo mismo que Correo — es material
   // sensible (conversaciones grabadas del equipo) y tiene que poder quitársele a un rol.
   def("Menú", "Grabaciones"),
+  // Oficina: documentos escritos dentro de Maven. Módulo plano por ahora; las
+  // hojas de cálculo entran como submódulo cuando existan.
+  def("Menú", "Oficina"),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.

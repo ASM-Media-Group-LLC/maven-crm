@@ -57,8 +57,23 @@ const FUERA_DEL_SHELL = new Set([
  *  páginas sanas. */
 const SIN_SUPERPOSICIONES = /<(?:Dialog|AlertDialog|Sheet|Drawer|Popover|DropdownMenu|ContextMenu|HoverCard|Command|Select)Content\b[^>]*>|<CommandList\b[^>]*>/g;
 
-const tieneScroll = (src: string) =>
-  /overflow-(?:y-)?auto|overflow-y-scroll/.test(src.replace(SIN_SUPERPOSICIONES, ""));
+/** `<Page>` (components/ui/page) ES el contenedor canónico: pone
+ *  `flex-1 min-h-0 overflow-y-auto` por dentro, y `contratoDeDiseno` lo EXIGE en
+ *  toda pantalla nueva. Se reconoce acá por nombre porque el seguidor de imports
+ *  de abajo se salta `@/components/ui/` a propósito —si no, cualquier página que
+ *  importara un Select daría por cubierta—, así que sin esta regla las dos
+ *  guardas se contradicen: adoptar `<Page>` hacía fallar esta.
+ *
+ *  `<Page scroll={false}>` NO cuenta: ahí la pantalla maneja su propio alto
+ *  (conversación, sala, llamada) y el scroll tiene que estar más adentro. */
+const USA_PAGE_CON_SCROLL = /<Page(?![A-Za-z])(?![^>]*scroll=\{false\})/;
+
+const tieneScroll = (src: string) => {
+  const limpio = src.replace(SIN_SUPERPOSICIONES, "");
+  return (
+    /overflow-(?:y-)?auto|overflow-y-scroll/.test(limpio) || USA_PAGE_CON_SCROLL.test(limpio)
+  );
+};
 
 /** Muchas páginas son una cáscara: el contenido (y el scroll) vive en un
  *  componente aparte. Se sigue el rastro de los imports locales —hasta dos
