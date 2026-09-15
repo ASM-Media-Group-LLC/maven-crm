@@ -300,6 +300,9 @@ verify_jwt = false  # auth propia: Bearer del usuario en start/stop/download/del
 [functions.creator-video]
 verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que recordings)
 
+[functions.document-convert]
+verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que creator-video)
+
 [functions.livekit-webhook]
 verify_jwt = false  # lo llama LiveKit, que no puede mandar un JWT de Supabase; se valida la FIRMA del webhook adentro
 

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, FileQuestion, Loader2, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { base64ABlob, base64ABytes, base64ATexto } from "@/lib/base64Blob";
 import VisorPdf from "@/components/correo/VisorPdf";
+import { sePuedeConvertir, useConversionAPdf } from "@/hooks/useConversionAPdf";
 import {
   useAttachmentBytes,
   usePrefetchAttachment,
@@ -11,7 +13,7 @@ import {
 } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 
-type Tipo = "pdf" | "imagen" | "texto" | "ninguno";
+type Tipo = "pdf" | "imagen" | "texto" | "convertible" | "ninguno";
 
 /** Qué sabe dibujar el navegador solo.
  *
@@ -29,6 +31,9 @@ export function tipoDeAdjunto(a: MailAttachment): Tipo {
     return "imagen";
   }
   if (["txt", "csv", "log", "md"].includes(ext) || ct.startsWith("text/plain")) return "texto";
+  // Word, Excel y PowerPoint: el navegador no los dibuja, pero LibreOffice los
+  // pasa a PDF del lado del servidor y entonces sí se leen acá.
+  if (sePuedeConvertir(a.filename)) return "convertible";
   return "ninguno";
 }
 
@@ -90,8 +95,9 @@ export default function AdjuntoVisor({
 
   const prefetch = usePrefetchAttachment();
 
-  // Solo pedimos los bytes de lo que sabemos dibujar: bajar un .zip de 40 MB
-  // para después decir "no se puede ver" es gastar una sesión IMAP al pedo.
+  // Solo pedimos los bytes de lo que se puede mostrar — dibujándolo acá o
+  // convirtiéndolo antes. Bajar un .zip de 40 MB para después decir "no se
+  // puede ver" es gastar una sesión IMAP al pedo.
   const bytes = useAttachmentBytes({
     folder: carpeta,
     uid,
@@ -148,6 +154,27 @@ export default function AdjuntoVisor({
     () => (tipo === "pdf" && bytes.data ? base64ABytes(bytes.data.contentBase64) : null),
     [tipo, bytes.data],
   );
+
+  // Word/Excel/PowerPoint: se manda a convertir y se dibuja el PDF que vuelve.
+  // La espera se paga una sola vez por archivo: el resultado queda guardado.
+  const conversion = useConversionAPdf({
+    filename: actual?.filename ?? "",
+    contentBase64: bytes.data?.contentBase64,
+    enabled: abierto && tipo === "convertible",
+  });
+
+  // El PDF convertido llega como URL firmada; se baja para dibujarlo con el
+  // mismo visor que el resto, y no con un <iframe> que Chrome deja en blanco.
+  const pdfConvertido = useQuery({
+    queryKey: ["pdf-convertido", conversion.data],
+    enabled: !!conversion.data,
+    staleTime: Infinity,
+    queryFn: async (): Promise<Uint8Array> => {
+      const r = await fetch(conversion.data!);
+      if (!r.ok) throw new Error("No se pudo traer el documento convertido");
+      return new Uint8Array(await r.arrayBuffer());
+    },
+  });
 
   const texto = useMemo(
     () => (tipo === "texto" && bytes.data ? base64ATexto(bytes.data.contentBase64) : null),
@@ -206,7 +233,7 @@ export default function AdjuntoVisor({
             <Mensaje
               icono={<FileQuestion className="h-8 w-8 text-muted-foreground" />}
               titulo="Este archivo no se puede ver aquí"
-              detalle="El navegador solo dibuja PDF, imágenes y texto. Descárgalo para abrirlo con el programa que le corresponde."
+              detalle="Se pueden ver acá los PDF, las imágenes, el texto y los documentos de Office. Este hay que descargarlo y abrirlo con el programa que le corresponde."
               accion={
                 <Button
                   size="sm"
@@ -250,6 +277,32 @@ export default function AdjuntoVisor({
             <div className="flex h-full items-center justify-center overflow-auto p-4">
               <img src={url} alt={actual.filename} className="max-h-full max-w-full object-contain" />
             </div>
+          ) : tipo === "convertible" ? (
+            pdfConvertido.data ? (
+              <VisorPdf key={indice} bytes={pdfConvertido.data} nombre={actual.filename} />
+            ) : conversion.isError || pdfConvertido.isError ? (
+              <Mensaje
+                icono={<FileQuestion className="h-8 w-8 text-destructive" />}
+                titulo="No se pudo preparar la vista"
+                detalle={
+                  ((conversion.error ?? pdfConvertido.error) as Error)?.message ||
+                  "El conversor no respondió."
+                }
+                accion={
+                  <Button size="sm" variant="outline" className="rounded-full"
+                    onClick={() => onDescargar(indice)} disabled={descargando}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar {actual.filename}
+                  </Button>
+                }
+              />
+            ) : (
+              <Mensaje
+                icono={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}
+                titulo="Preparando la vista…"
+                detalle="Los documentos de Office se convierten para poder leerlos acá. Se hace una sola vez por archivo."
+              />
+            )
           ) : bytesPdf ? (
             <VisorPdf key={indice} bytes={bytesPdf} nombre={actual.filename} />
           ) : null}
