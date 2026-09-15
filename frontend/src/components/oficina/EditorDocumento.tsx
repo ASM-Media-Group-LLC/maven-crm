@@ -1,9 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import { estaVacio, type Colaboracion } from "@/hooks/useColaboracionDocumento";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Quote, Code2, Undo2, Redo2, Heading1, Heading2, Heading3, Minus,
@@ -16,36 +19,86 @@ import { cn } from "@/lib/utils";
 export function useEditorDocumento(
   contenidoInicial: string,
   onCambio: (html: string, texto: string) => void,
+  colaboracion: Colaboracion | null,
 ) {
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
-      Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
-      Placeholder.configure({ placeholder: "Escribe aquí…" }),
-    ],
-    content: contenidoInicial,
-    editorProps: {
-      attributes: {
-        // `documento-maven` y no `prose`: ver la nota en index.css.
-        class: "documento-maven focus:outline-none min-h-[60vh] px-1 py-2",
-      },
-    },
-    // `getText()` y no una limpieza de HTML a mano: es lo que el propio editor
-    // entiende por "el texto", y es lo que después se busca en Postgres.
-    onUpdate: ({ editor: e }) => onCambio(e.getHTML(), e.getText()),
-  });
+  const colabora = !!colaboracion;
 
-  // Al abrir OTRO documento el componente se reusa; sin esto el segundo se
-  // abriría con el cuerpo del primero.
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3] },
+          // ⚠️ Con colaboración, el historial de TipTap SE APAGA: Yjs trae el
+          // suyo, que sabe deshacer SOLO lo tuyo. Dejar los dos puestos hace que
+          // Ctrl+Z le borre a la otra persona lo que acaba de escribir.
+          ...(colabora ? { history: false as const } : {}),
+        }),
+        Underline,
+        Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+        Placeholder.configure({ placeholder: "Escribe aquí…" }),
+        ...(colaboracion
+          ? [
+              Collaboration.configure({ document: colaboracion.ydoc }),
+              CollaborationCursor.configure({
+                provider: colaboracion.provider,
+                // El `id` viaja además del nombre y el color: es lo que permite
+                // contar a una persona UNA vez aunque tenga dos pestañas.
+                user: colaboracion.yo
+                  ? {
+                      id: colaboracion.yo.id,
+                      name: colaboracion.yo.nombre,
+                      color: colaboracion.yo.color,
+                    }
+                  : { id: "anon", name: "Alguien", color: "hsl(210 70% 55%)" },
+              }),
+            ]
+          : []),
+      ],
+      // ⚠️ Con colaboración NO se pasa `content`: el contenido llega del
+      // servidor. Pasarlo acá lo insertaría en el documento compartido en cada
+      // apertura, y el texto se iría duplicando para todos.
+      ...(colabora ? {} : { content: contenidoInicial }),
+      editorProps: {
+        attributes: {
+          // `documento-maven` y no `prose`: ver la nota en index.css.
+          class: "documento-maven focus:outline-none min-h-[60vh] px-1 py-2",
+        },
+      },
+      // `getText()` y no una limpieza de HTML a mano: es lo que el propio editor
+      // entiende por "el texto", y es lo que después se busca en Postgres.
+      onUpdate: ({ editor: e }) => onCambio(e.getHTML(), e.getText()),
+    },
+    // El editor se reconstruye si aparece o desaparece la colaboración: las
+    // extensiones no se pueden cambiar en caliente.
+    [colabora, colaboracion?.ydoc],
+  );
+
+  // De a uno: al abrir OTRO documento el componente se reusa, y sin esto el
+  // segundo se abriría con el cuerpo del primero.
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || colabora) return;
     if (editor.getHTML() !== contenidoInicial) {
       editor.commands.setContent(contenidoInicial, false);
     }
     // Solo cuando cambia el documento de origen, no en cada tecla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contenidoInicial, editor]);
+  }, [contenidoInicial, editor, colabora]);
+
+  // Colaborando: la SIEMBRA. Un documento escrito antes de la Fase 2 tiene su
+  // HTML en la base pero ningún estado compartido. La primera persona que lo
+  // abre lo pasa al documento de Yjs — una sola vez, y solo si de verdad está
+  // vacío, porque hacerlo dos veces duplicaría el texto para todos.
+  const sembrado = useRef(false);
+  useEffect(() => {
+    sembrado.current = false;
+  }, [colaboracion?.ydoc]);
+  useEffect(() => {
+    if (!editor || !colaboracion?.sincronizado || sembrado.current) return;
+    sembrado.current = true;
+    if (estaVacio(colaboracion.ydoc) && contenidoInicial.trim()) {
+      editor.commands.setContent(contenidoInicial, false);
+    }
+  }, [editor, colaboracion?.sincronizado, colaboracion?.ydoc, contenidoInicial]);
 
   return editor;
 }

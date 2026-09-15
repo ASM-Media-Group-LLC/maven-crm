@@ -1165,3 +1165,31 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .capa-texto-pdf ::selection {
   background: hsl(var(--primary) / 0.35);
 }
+
+/* Los cursores de la edición compartida.
+   La extensión de TipTap dibuja un <span> por persona dentro del texto con el
+   color que publica cada una; acá solo se le da forma. Sin esto el cursor ajeno
+   es invisible y la colaboración parece que no funciona. */
+.documento-maven .collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+.documento-maven .collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  border-radius: 3px 3px 3px 0;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  color: #fff;
+  user-select: none;
+}

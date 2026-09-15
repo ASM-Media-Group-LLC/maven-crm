@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, Check, FileText, History, Loader2, Lock, Users, RotateCcw } from "lucide-react";
+import { ArrowLeft, Check, FileText, History, Loader2, Lock, Users, RotateCcw, WifiOff } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   useDocumento, useGuardarDocumento, useVersionesDeDocumento,
   type VisibilidadDocumento,
 } from "@/hooks/useDocumentos";
+import {
+  useColaboracionDocumento, type Participante,
+} from "@/hooks/useColaboracionDocumento";
 
 /** Cuánto se espera después de la última tecla para guardar. 1,2 s es el punto
  *  donde ya no se guarda en cada letra pero tampoco se siente que no guarda. */
@@ -46,6 +49,9 @@ export default function DocumentoPage() {
   // Siempre habilitada, no solo con el diálogo abierto: en pantalla ancha el
   // historial vive en el panel lateral y tiene que estar ahí sin pedirlo.
   const versiones = useVersionesDeDocumento(id, true);
+  // Si no hay servidor de edición compartida configurado devuelve `null` y todo
+  // sigue funcionando de a uno, como en la Fase 1.
+  const colaboracion = useColaboracionDocumento(id);
 
   // Lo último escrito, fuera de React: el temporizador del guardado lo lee
   // cuando se dispara, y guardarlo en estado provocaría un render por tecla.
@@ -95,7 +101,7 @@ export default function DocumentoPage() {
     [programarGuardado],
   );
 
-  const editor = useEditorDocumento(cargado?.content_html ?? "", alEscribir);
+  const editor = useEditorDocumento(cargado?.content_html ?? "", alEscribir, colaboracion);
 
   // Al salir de la página se guarda lo que quedó en el aire. Sin esto, escribir
   // y navegar enseguida pierde la última frase.
@@ -188,6 +194,7 @@ export default function DocumentoPage() {
 
   const acciones = (
     <>
+      {colaboracion && <Presentes participantes={colaboracion.participantes} />}
       <EstadoDeGuardado estado={estado} />
       <Button size="sm" variant="ghost" className="shrink-0 rounded-full xl:hidden"
         onClick={() => setVerVersiones(true)}>
@@ -251,6 +258,17 @@ export default function DocumentoPage() {
           subtitle={`Última edición ${cuando(cargado.updated_at)}`}
           actions={acciones}
         />
+
+        {colaboracion && (colaboracion.rechazado || colaboracion.estado === "disconnected") && (
+          <div className="flex items-start gap-2 rounded-panel border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+            <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <p className="text-muted-foreground">
+              {colaboracion.rechazado
+                ? "No se pudo entrar a la edición compartida. Lo que escribas se guarda igual, pero por ahora no lo ven los demás en vivo."
+                : "Se perdió la conexión con la edición compartida. Se sigue guardando y se reconecta solo; mientras tanto, los demás no ven tus cambios al instante."}
+            </p>
+          </div>
+        )}
 
         {/* En un monitor grande el documento no se queda en una columna sola en
             medio del vacío: el historial se abre al lado. Debajo de xl, el
@@ -339,6 +357,34 @@ function ListaDeVersiones({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Quiénes están en el documento ahora mismo. Las iniciales alcanzan: son
+ *  compañeros de equipo y el color del borde es el mismo de su cursor, así que
+ *  la burbuja de arriba y la marca en el texto se leen como la misma persona. */
+function Presentes({ participantes }: { participantes: Participante[] }) {
+  if (participantes.length === 0) return null;
+  const visibles = participantes.slice(0, 4);
+  const resto = participantes.length - visibles.length;
+  return (
+    <div className="flex shrink-0 items-center -space-x-1.5">
+      {visibles.map((p) => (
+        <span
+          key={p.id}
+          title={p.nombre}
+          style={{ borderColor: p.color }}
+          className="grid h-7 w-7 place-items-center rounded-full border-2 bg-muted text-[10px] font-semibold uppercase"
+        >
+          {p.nombre.slice(0, 2)}
+        </span>
+      ))}
+      {resto > 0 && (
+        <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-border bg-muted text-[10px] font-semibold">
+          +{resto}
+        </span>
+      )}
+    </div>
   );
 }
 
