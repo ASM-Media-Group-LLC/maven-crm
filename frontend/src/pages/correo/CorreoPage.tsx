@@ -38,6 +38,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import AdjuntoVisor, { tipoDeAdjunto } from "@/components/correo/AdjuntoVisor";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -173,6 +174,8 @@ export default function CorreoPage() {
   // Detalle de destinatarios desplegado. Se cierra al cambiar de correo: si
   // no, abrir uno con veinte personas dejaba el siguiente con el panel puesto.
   const [verDestinatarios, setVerDestinatarios] = useState(false);
+  // Adjunto abierto en el visor (índice dentro de `attachments`).
+  const [adjuntoAbierto, setAdjuntoAbierto] = useState<number | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
@@ -225,7 +228,7 @@ export default function CorreoPage() {
   // deshabilitados: no tienen equivalente IMAP directo.
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   useEffect(() => { setSeleccion(new Set()); }, [queryActiva]);
-  useEffect(() => { setVerDestinatarios(false); }, [sel]);
+  useEffect(() => { setVerDestinatarios(false); setAdjuntoAbierto(null); }, [sel]);
   const toggleSeleccion = (m: MailSummary) =>
     setSeleccion((prev) => {
       const next = new Set(prev);
@@ -838,41 +841,69 @@ export default function CorreoPage() {
                 {mensaje.data.attachments.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {mensaje.data.attachments.map((a, i) => {
-                      // La descarga re-baja el mensaje por UID; sin UID (un
-                      // correo traído por el camino en vivo) no se puede.
+                      // Bajar el adjunto re-baja el mensaje por UID; sin UID (un
+                      // correo traído por el camino en vivo) no se puede — ni
+                      // verlo ni descargarlo.
                       const uid = sel?.uid != null ? Number(sel.uid) : null;
                       const bajando =
                         descargar.isPending && descargar.variables?.index === i;
+                      const sePuedeVer = tipoDeAdjunto(a) !== "ninguno";
                       return (
-                        <button
+                        <div
                           key={i}
-                          type="button"
-                          disabled={uid == null || descargar.isPending}
-                          onClick={() =>
-                            uid != null &&
-                            descargar.mutate(
-                              { folder: carpeta, uid, index: i, filename: a.filename },
-                              { onError: (e) => toast.error((e as Error).message) },
-                            )
-                          }
-                          title={
-                            uid == null
-                              ? "No se puede descargar este adjunto"
-                              : `Descargar ${a.filename}`
-                          }
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/5 px-3 py-1.5 text-xs transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {bajando ? (
-                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          className={cn(
+                            "inline-flex max-w-full items-center rounded-full bg-primary/5 text-xs transition-colors",
+                            uid != null && "hover:bg-primary/10",
+                            uid == null && "opacity-60",
                           )}
-                          <span className="truncate">{a.filename}</span>
-                          <span className="shrink-0 text-muted-foreground">
-                            {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
-                          </span>
-                          <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        </button>
+                        >
+                          {/* El nombre ABRE el archivo dentro de Maven. La
+                              descarga se queda al lado: ver sin bajar es una
+                              comodidad, no un candado. */}
+                          <button
+                            type="button"
+                            disabled={uid == null}
+                            onClick={() => setAdjuntoAbierto(i)}
+                            title={
+                              uid == null
+                                ? "Este adjunto no se puede abrir"
+                                : sePuedeVer
+                                  ? `Ver ${a.filename}`
+                                  : `${a.filename} — este tipo de archivo hay que descargarlo`
+                            }
+                            className="inline-flex min-w-0 items-center gap-1.5 rounded-l-full py-1.5 pl-3 pr-2 disabled:cursor-not-allowed"
+                          >
+                            <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{a.filename}</span>
+                            <span className="shrink-0 text-muted-foreground">
+                              {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uid == null || descargar.isPending}
+                            onClick={() =>
+                              uid != null &&
+                              descargar.mutate(
+                                { folder: carpeta, uid, index: i, filename: a.filename },
+                                { onError: (e) => toast.error((e as Error).message) },
+                              )
+                            }
+                            aria-label={`Descargar ${a.filename}`}
+                            title={
+                              uid == null
+                                ? "No se puede descargar este adjunto"
+                                : `Descargar ${a.filename}`
+                            }
+                            className="shrink-0 rounded-r-full border-l border-border/40 py-1.5 pl-2 pr-3 disabled:cursor-not-allowed"
+                          >
+                            {bajando ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -891,6 +922,24 @@ export default function CorreoPage() {
           ) : null}
         </div>
       </div>
+
+      <AdjuntoVisor
+        indice={adjuntoAbierto}
+        onIndice={setAdjuntoAbierto}
+        adjuntos={mensaje.data?.attachments ?? []}
+        carpeta={carpeta}
+        uid={sel?.uid != null ? Number(sel.uid) : null}
+        descargando={descargar.isPending}
+        onDescargar={(i) => {
+          const uid = sel?.uid != null ? Number(sel.uid) : null;
+          const a = mensaje.data?.attachments[i];
+          if (uid == null || !a) return;
+          descargar.mutate(
+            { folder: carpeta, uid, index: i, filename: a.filename },
+            { onError: (e) => toast.error((e as Error).message) },
+          );
+        }}
+      />
 
       {redactar && (
         <MailComposer

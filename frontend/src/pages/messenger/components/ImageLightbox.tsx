@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, Download, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { descargarArchivo } from "../downloadFile";
@@ -160,7 +161,12 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
 
   const mediaTransition = gesturing ? "" : "transition-transform duration-200";
 
-  return (
+  // Por PORTAL a document.body, no inline. Desde la ventanita flotante (glass-panel)
+  // el visor salía preso en la columna de la ventana y la página se dibujaba
+  // ENCIMA de la imagen (Jhon, 14/09): backdrop-filter crea bloque contenedor para
+  // los descendientes `fixed` —el inset-0 pasa a ser la caja de la ventana— y el
+  // overflow-hidden remata. El z-[100] no servía de nada dentro de ese contexto.
+  return createPortal(
     <div
       ref={containerRef}
       className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center animate-fade-in touch-none"
@@ -231,6 +237,7 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
           draggable={false}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
