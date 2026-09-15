@@ -72,6 +72,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", section: "Menú", keywords: ["sala", "video"] },
   { title: "Meet", url: "/meet", icon: Video, module: "Meet", section: "Menú", keywords: ["reunión", "videollamada"] },
   { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones", section: "Menú", keywords: ["recordings", "meet"] },
+  { title: "Oficina", url: "/oficina", icon: FileText, module: "Oficina", section: "Menú", keywords: ["documentos", "docs", "hojas", "google docs"] },
   { title: "Contactos", i18nKey: "nav.contacts", url: "/contactos", icon: UserPlus, module: "Contactos", section: "Menú", keywords: ["directorio"] },
   { title: "Panel de control", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
 

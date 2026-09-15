@@ -98,6 +98,7 @@ const DashboardSidebar = () => {
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     { title: "Meet", url: "/meet", icon: Video, module: "Meet" },
     { title: "Grabaciones", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
+    { title: "Oficina", url: "/oficina", icon: FileText, module: "Oficina" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
