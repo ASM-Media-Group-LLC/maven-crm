@@ -61,12 +61,18 @@ export default function MessengerPage() {
   // la conversación esté cargada, la seleccionamos y limpiamos el parámetro.
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  // `?c=` es el parámetro; `?chat=` es un alias que hay que aceptar: el trigger
+  // notify_chat_message escribió '/messenger?chat=<id>' en el deep_link_url de
+  // 86.254 notificaciones (30 días) y nadie lo leía, así que el clic en una
+  // notificación de Messenger aterrizaba acá sin abrir el chat (Jhon, 15/09).
+  // El trigger ya escribe ?c=, pero las filas viejas siguen en la campana.
   useEffect(() => {
-    const c = searchParams.get("c");
+    const c = searchParams.get("c") ?? searchParams.get("chat");
     if (!c) return;
     if (conversations.some((x) => x.id === c)) {
       selectChat(c);
       searchParams.delete("c");
+      searchParams.delete("chat");
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, conversations, selectChat, setSearchParams]);

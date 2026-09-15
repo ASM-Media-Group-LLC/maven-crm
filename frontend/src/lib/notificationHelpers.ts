@@ -24,7 +24,8 @@ export function resolveDeepLink(
     lead: `/leadgen?id=${referenceId}`,
     deal: `/closers?id=${referenceId}`,
     closer_creator: `/closers?id=${referenceId}`,
-    conversation: `/messenger?chat=${referenceId}`,
+    // `c`, no `chat`: es el parámetro que MessengerPage lee (auditoría 15/09).
+    conversation: `/messenger?c=${referenceId}`,
     announcement: `/hr/anuncios?id=${referenceId}`,
   };
 
