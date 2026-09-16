@@ -41,6 +41,15 @@ describe("fondo de chat", () => {
     expect(css).toMatch(/\.fondo-de-chat::after \{[^}]*color-mix\(in oklab, hsl\(var\(--primary\)\) var\(--fondo-chat-mezcla\), var\(--fondo-chat-hacia\)\) var\(--fondo-chat-tapiz\),\s*transparent/);
     expect(css).not.toMatch(/--fondo-chat-tinta:/);
   });
+  it("la baldosa se pinta entera: el tamaño de la máscara es el del SVG", () => {
+    // Jhon (16/09): "con la cara completa, no el que sale solo la mitad". Los
+    // garabatos viven dentro de la baldosa sin tocar el borde; si el tamaño
+    // de la máscara no coincide con el del SVG, la baldosa se recorta o se
+    // deforma y vuelven las medias caras.
+    const lado = css.match(/--tapiz-de-chat: url\("data:image\/svg\+xml;utf8,<svg[^>]*width='(\d+)' height='(\d+)'/);
+    expect(lado?.[1]).toBe(lado?.[2]);
+    expect(css).toMatch(new RegExp(`mask: var\\(--tapiz-de-chat\\) 0 0 / ${lado?.[1]}px ${lado?.[1]}px repeat`));
+  });
   it("en alto contraste los garabatos NO se apagan", () => {
     // Se apagaban "por legibilidad", pero el texto del hilo va siempre dentro
     // de burbujas opacas: nunca hay letras sobre el dibujo. La cuenta de Jhon
