@@ -49,12 +49,14 @@ interface ThreadPanelProps {
   totalParticipants: number;
   /** Contenido original de los eliminados. Solo llega a admins (RLS). */
   deletedArchive?: Record<string, DeletedMessageArchive>;
+  /** Respuesta a resaltar y llevar a la vista (llegamos desde una notificación). */
+  resaltada?: string | null;
 }
 
 export default function ThreadPanel({
   parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants, aCiegas,
   onEditMessage, onDeleteMessage, getReactionsForMessage, onToggleReaction,
-  getReadByUsers, getDeliveredByUsers, totalParticipants, deletedArchive,
+  getReadByUsers, getDeliveredByUsers, totalParticipants, deletedArchive, resaltada,
 }: ThreadPanelProps) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -103,6 +105,14 @@ export default function ThreadPanel({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [replies.length]);
+
+  // Llegada desde una notificación: la respuesta mencionada, a la vista y
+  // resaltada. Va DESPUÉS del "pegar al fondo" de arriba para ganarle.
+  const respuestaRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (!resaltada) return;
+    respuestaRefs.current[resaltada]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [resaltada, replies.length]);
 
   const participantNames = useMemo(() =>
     (participants || []).map(p => p.profile?.full_name).filter(Boolean) as string[],
@@ -383,9 +393,11 @@ export default function ThreadPanel({
     return (
       <div
         key={msg.id}
+        ref={(el) => { respuestaRefs.current[msg.id] = el; }}
         className={cn(
-          "px-4 py-2 group/msg transition-colors",
-          isParent ? "bg-muted/20" : "hover:bg-muted/30"
+          "px-4 py-2 group/msg transition-colors duration-700",
+          isParent ? "bg-muted/20" : "hover:bg-muted/30",
+          !isParent && resaltada === msg.id && "bg-primary/10"
         )}
       >
         <div className="flex items-start gap-2">

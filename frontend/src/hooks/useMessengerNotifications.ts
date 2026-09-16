@@ -257,7 +257,7 @@ export function useMessengerNotifications() {
               tono: "ojo",
               duracion: 10_000,
               id: `mencion-${m.id}`,
-              abrir: { etiqueta: tRef.current("avisos.abrir"), alTocar: () => navigateRef.current(`/messenger?c=${convId}`) },
+              abrir: { etiqueta: tRef.current("avisos.abrir"), alTocar: () => navigateRef.current(`/messenger?c=${convId}&m=${m.id}`) },
             });
             return;
           }
@@ -272,7 +272,7 @@ export function useMessengerNotifications() {
           notifyRef.current(
             title,
             body,
-            () => navigateRef.current(`/messenger?c=${m.conversation_id}`),
+            () => navigateRef.current(`/messenger?c=${m.conversation_id}&m=${m.id}`),
             soundOk,
           );
         },
