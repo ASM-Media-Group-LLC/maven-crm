@@ -1060,82 +1060,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   table.tabla-movil tbody td[colspan] { display: block; text-align: center; }
 }
 
-/* El cuerpo de un documento de Oficina.
-   ⚠️ NO se usan las clases `prose`: `@tailwindcss/typography` está en las
-   dependencias pero NO está registrado en los plugins de tailwind.config.ts, así
-   que `prose` no aplica nada y el documento se veía plano — el H1 del mismo
-   tamaño que el párrafo y las listas sin viñetas ni números, porque el preflight
-   de Tailwind se los quita. Activar el plugin cambiaría de golpe el aspecto de
-   los anuncios de RRHH, que hoy también lo usan sin efecto; eso es una decisión
-   aparte. Acá se definen solo los elementos que el editor sabe producir. */
-.documento-maven {
-  color: hsl(var(--foreground));
-  line-height: 1.7;
-}
-.documento-maven > * + * { margin-top: 0.85em; }
-.documento-maven h1 {
-  font-size: 1.65em;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-top: 1.4em;
-}
-.documento-maven h2 {
-  font-size: 1.3em;
-  font-weight: 600;
-  line-height: 1.25;
-  margin-top: 1.3em;
-}
-.documento-maven h3 {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin-top: 1.2em;
-}
-.documento-maven > :first-child { margin-top: 0; }
-.documento-maven ul,
-.documento-maven ol { padding-left: 1.5em; }
-.documento-maven ul { list-style: disc; }
-.documento-maven ol { list-style: decimal; }
-.documento-maven li { margin-top: 0.3em; }
-.documento-maven li::marker { color: hsl(var(--muted-foreground)); }
-.documento-maven blockquote {
-  border-left: 3px solid hsl(var(--primary) / 0.5);
-  padding-left: 1em;
-  color: hsl(var(--muted-foreground));
-  font-style: italic;
-}
-.documento-maven pre {
-  background: hsl(var(--muted));
-  border-radius: 0.5rem;
-  padding: 0.85em 1em;
-  overflow-x: auto;
-  font-size: 0.875em;
-}
-.documento-maven code { font-size: 0.875em; }
-.documento-maven :not(pre) > code {
-  background: hsl(var(--muted));
-  border-radius: 0.25rem;
-  padding: 0.1em 0.35em;
-}
-.documento-maven hr {
-  border: 0;
-  border-top: 1px solid hsl(var(--border));
-  margin: 1.8em 0;
-}
-.documento-maven a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.documento-maven strong { font-weight: 600; }
-/* El marcador de vacío que pone TipTap: sin esto el documento nuevo no dice nada. */
-.documento-maven p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  color: hsl(var(--muted-foreground));
-}
-
 /* Capa de texto invisible encima del canvas del PDF.
    Es lo que permite SELECCIONAR, copiar y buscar con Ctrl+F dentro de un
    documento: sin ella una hoja de vida es una foto y no se puede sacar de ahí
@@ -1168,34 +1092,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 .capa-texto-pdf ::selection {
   background: hsl(var(--primary) / 0.35);
-}
-
-/* Los cursores de la edición compartida.
-   La extensión de TipTap dibuja un <span> por persona dentro del texto con el
-   color que publica cada una; acá solo se le da forma. Sin esto el cursor ajeno
-   es invisible y la colaboración parece que no funciona. */
-.documento-maven .collaboration-cursor__caret {
-  position: relative;
-  margin-left: -1px;
-  margin-right: -1px;
-  border-left: 1px solid;
-  border-right: 1px solid;
-  word-break: normal;
-  pointer-events: none;
-}
-.documento-maven .collaboration-cursor__label {
-  position: absolute;
-  top: -1.4em;
-  left: -1px;
-  border-radius: 3px 3px 3px 0;
-  padding: 0.1rem 0.3rem;
-  font-size: 0.7rem;
-  font-style: normal;
-  font-weight: 600;
-  line-height: normal;
-  white-space: nowrap;
-  color: #fff;
-  user-select: none;
 }
 
 /* ═══ AVISOS (sonner): el botón de acción y su sitio ═══════════════════════
