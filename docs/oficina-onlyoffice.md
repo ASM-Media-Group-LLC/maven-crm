@@ -72,29 +72,32 @@ Lo de abajo ya está hecho en el Dokploy de `217.216.95.7`:
 - **Balde `maven-oficina`** en R2, sin acceso público, y el token de R2 ampliado
   a ese balde (⚠️ el token está limitado a baldes específicos: crear el balde
   **no** alcanza). Se amplió editando el token, que **no** rota el secreto.
+- **DNS**: registro A `oficina` → `217.216.95.7`, TTL media hora.
+  ⚠️ **maven-ai.me está en GoDaddy, no en Cloudflare.** Cloudflare solo tiene
+  R2. Comprobado que resuelve, que el 80 redirige a HTTPS, que el 443 contesta
+  (502: la ruta existe, falta el contenedor) y que
+  `/.well-known/acme-challenge/` **no** se redirige, así que Let's Encrypt va a
+  poder validar cuando el servicio levante.
 
 ## Lo que falta para encenderlo
 
-1. **DNS**: `oficina.maven-ai.me` → `217.216.95.7`, registro A.
-   ⚠️ **maven-ai.me está en GoDaddy, no en Cloudflare.** Cloudflare solo tiene
-   R2. En Dokploy, el botón *Validate DNS* del dominio confirma cuándo resolvió.
-2. **`JWT_SECRET`** en el servicio de Dokploy (pestaña Environment): un secreto
-   largo y aleatorio. La variable ya está creada, vacía.
-3. **Secretos de Supabase** (Edge Functions → Secrets):
+1. **`JWT_SECRET`** en el servicio de Dokploy (pestaña Environment): un secreto
+   largo y aleatorio (`openssl rand -hex 32`). La variable ya está creada, vacía.
+2. **Secretos de Supabase** (Edge Functions → Secrets):
    - `ONLYOFFICE_URL` — `https://oficina.maven-ai.me`
-   - `ONLYOFFICE_JWT_SECRET` — **el mismo** valor del paso 2
+   - `ONLYOFFICE_JWT_SECRET` — **el mismo** valor del paso 1
    - `R2_BUCKET_OFICINA` — no hace falta: `maven-oficina` ya es el valor por
      defecto en el código. Las llaves de R2 son las mismas que ya usan
      grabaciones y el conversor.
-4. **Deploy del servicio** en Dokploy (⚠️ el botón tiene diálogo de
+3. **Deploy del servicio** en Dokploy (⚠️ el botón tiene diálogo de
    confirmación: parece que no hace nada hasta que apretás Confirm).
-5. **Desplegar la edge**, que además hay que redesplegar cada vez que se agrega
+4. **Desplegar la edge**, que además hay que redesplegar cada vez que se agrega
    un secreto: un secreto nuevo NO lo ve una edge ya desplegada.
    ```bash
    npx supabase functions deploy oficina-doc --project-ref lsagslbkliprespbyhts
    ```
 
-⚠️ **No desplegar el servicio antes del paso 2.** Con `JWT_ENABLED=true` y el
+⚠️ **No desplegar el servicio antes del paso 1.** Con `JWT_ENABLED=true` y el
 secreto vacío la firma deja de proteger nada, y Traefik enruta por cabecera
 `Host`: alcanza con mandarle esa cabecera a la IP para llegar al editor aunque
 el DNS todavía no exista.
