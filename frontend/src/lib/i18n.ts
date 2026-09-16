@@ -25,6 +25,16 @@ const translations = {
   // Sidebar items - Resources
   "nav.designSystem": { es: "Design System", en: "Design System" },
   "nav.docs": { es: "Documentación", en: "Documentation" },
+
+  // Correo · mencionar con @ para sumar a alguien al hilo
+  "correo.mencion.ayuda": {
+    es: "Se suma al correo y le llega un aviso",
+    en: "Gets added to the email and receives a notice",
+  },
+  "correo.mencion.listaLabel": {
+    es: "Personas para mencionar",
+    en: "People to mention",
+  },
   "nav.settings": { es: "Settings", en: "Settings" },
 
   // Topbar

@@ -82,6 +82,8 @@
     "https://esm.sh/@livekit/protocol@1.50.4?deps=@bufbuild/protobuf@1.10.0&target=denonext": "77ffc74bfd906cc2f03519e1577a3cd13a9202a36da49bad3cc62450be5bfbcb",
     "https://esm.sh/@livekit/protocol@1.50.4?target=denonext": "c54e8e1c00864de7e2b5c7e07288302bfa06e62bc550018eb217be581551fc7a",
     "https://esm.sh/@supabase/supabase-js@2.111.0": "276104e20b7318fac2be1c67eb9be93f4280f5ec9f2fc5ac7b32e1f0ed6f31ba",
+    "https://esm.sh/@supabase/supabase-js@2.49.4": "d52c4d06946766d328fdd0ac2e007f52bb6d2ef7ce6103ad9f0f57d92b73e978",
+    "https://esm.sh/aws4fetch@1.0.20": "72c2789ab2e7a037ed00c4230574ccc31a0c0cebc7ebd19a2c9da574e3133bc7",
     "https://esm.sh/camelcase-keys@9.1.3/denonext/camelcase-keys.mjs": "a5ec40043166fd80664bfccdd90415e01641bf2fd7dd7ec0b26be17728cf2c69",
     "https://esm.sh/camelcase-keys@9.1.3?target=denonext": "9b73460014a8c94c8cb9c57ebfb212a4546c0efe043bfc57fe0a89aab76cdb58",
     "https://esm.sh/camelcase@8.0.0/denonext/camelcase.mjs": "16b428a988dd016fc89d573b59c2b6d4b8054f1611a2b64375972d9d6747abce",
@@ -172,6 +174,7 @@
         "npm:@dicebear/core@^9.4.3",
         "npm:@eslint/js@^9.32.0",
         "npm:@hello-pangea/dnd@^18.0.1",
+        "npm:@hocuspocus/provider@^2.15.2",
         "npm:@hookform/resolvers@^3.10.0",
         "npm:@livekit/track-processors@~0.7.2",
         "npm:@radix-ui/react-accordion@^1.2.11",
@@ -208,6 +211,8 @@
         "npm:@testing-library/dom@^10.4.1",
         "npm:@testing-library/jest-dom@^6.6.0",
         "npm:@testing-library/react@16",
+        "npm:@tiptap/extension-collaboration-cursor@^2.27.2",
+        "npm:@tiptap/extension-collaboration@^2.27.2",
         "npm:@tiptap/extension-color@^2.27.2",
         "npm:@tiptap/extension-link@^2.27.2",
         "npm:@tiptap/extension-placeholder@^2.27.2",
@@ -242,6 +247,7 @@
         "npm:lucide-react@0.462",
         "npm:mammoth@^1.12.0",
         "npm:next-themes@0.3",
+        "npm:pdfjs-dist@^4.10.38",
         "npm:postcss@^8.5.6",
         "npm:react-day-picker@^8.10.1",
         "npm:react-dom@^18.3.1",
@@ -263,6 +269,7 @@
         "npm:vite@^5.4.19",
         "npm:vitest@^4.0.18",
         "npm:xlsx@~0.18.5",
+        "npm:yjs@^13.6.27",
         "npm:zod@^3.25.76"
       ]
     }

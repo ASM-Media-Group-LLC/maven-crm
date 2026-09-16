@@ -60,6 +60,13 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
         label: "Correo nuevo en la bandeja de entrada",
         canales: ["push"],
       },
+      {
+        // Distinto de "correo nuevo" a propósito: que te nombren pidiendo algo
+        // no es lo mismo que recibir uno más, y se apaga por separado.
+        type: "correo_mencion",
+        label: "Te mencionaron con @ en un correo",
+        canales: ["in_app", "push"],
+      },
     ],
   },
   {

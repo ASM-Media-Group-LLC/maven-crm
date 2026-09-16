@@ -427,6 +427,10 @@ export interface OutgoingMail {
   references?: string;
   /** Adjuntos: nombre, tipo y contenido en base64 (sin el prefijo data:). */
   attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+  /** A quién se mencionó con @ en el cuerpo (ids de Maven). Son los que reciben
+   *  el aviso dentro de la app además del correo. La edge verifica que cada uno
+   *  exista y tenga casilla: mandar un id cualquiera no crea una notificación. */
+  menciones?: string[];
 }
 
 export function useSendMail() {

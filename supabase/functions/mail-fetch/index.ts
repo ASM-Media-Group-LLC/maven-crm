@@ -1006,9 +1006,54 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ── Menciones ────────────────────────────────────────────────────
+        // A quien lo mencionaron con @ le llega, además del correo, un aviso
+        // dentro de Maven. Va DESPUÉS del envío y envuelto en su propio
+        // try/catch: el correo ya salió, y fallar acá no puede convertir un
+        // envío exitoso en un error para quien escribió.
+        let avisados = 0;
+        try {
+          const ids = Array.isArray(body.menciones)
+            ? [...new Set((body.menciones as unknown[]).map(String))].filter((x) =>
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x),
+              )
+            : [];
+          // Nunca avisarse a uno mismo: mencionarse es raro pero posible, y
+          // recibir "te mencionaste" es ruido puro.
+          const destinos = ids.filter((id) => id !== user.id);
+          if (destinos.length) {
+            // Se confirma contra el directorio en vez de confiar en el navegador:
+            // un id inventado no puede generar una notificación.
+            const { data: reales } = await admin
+              .from("v_directorio_correo")
+              .select("user_id")
+              .in("user_id", destinos);
+            const validos = ((reales ?? []) as { user_id: string }[]).map((r) => r.user_id);
+            if (validos.length) {
+              const quien = (perfil?.full_name as string) || fromAddress;
+              const { error: errNotif } = await admin.from("notifications").insert(
+                validos.map((uid) => ({
+                  user_id: uid,
+                  type: "correo_mencion",
+                  title: `${quien} te mencionó en un correo`,
+                  message: subject,
+                  module_origin: "Correo",
+                  required_permission_module: "Correo",
+                  priority: "normal",
+                  deep_link_url: "/correo",
+                })),
+              );
+              if (errNotif) console.error("[mail-fetch] menciones:", errNotif.message);
+              else avisados = validos.length;
+            }
+          }
+        } catch (e) {
+          console.error("[mail-fetch] menciones:", (e as Error).message);
+        }
+
         return json(req, {
           ok: true, from: fromAddress, to, cc: cc ?? [], subject,
-          guardadoEnEnviados,
+          guardadoEnEnviados, avisados,
         });
       } catch (e) {
         const msg = (e as Error).message ?? "error de SMTP";
