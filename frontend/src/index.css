@@ -1334,7 +1334,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   -webkit-mask: var(--tapiz-de-chat) 0 0 / 168px 168px repeat;
   mask: var(--tapiz-de-chat) 0 0 / 168px 168px repeat;
 }
-/* En alto contraste, un dibujo detrás del texto resta legibilidad: solo luces. */
-:root[data-contrast="high"] .fondo-de-chat::after {
-  display: none;
-}
+/* En alto contraste los garabatos se quedan: en el hilo el texto va siempre
+   dentro de burbujas opacas, así que el dibujo nunca queda detrás de letras.
+   Se ocultaban y la cuenta de Jhon (contraste activo) no los veía (16/09). */

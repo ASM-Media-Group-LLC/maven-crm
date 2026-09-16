@@ -41,7 +41,10 @@ describe("fondo de chat", () => {
     expect(css).toMatch(/\.fondo-de-chat::after \{[^}]*color-mix\(in oklab, hsl\(var\(--primary\)\) var\(--fondo-chat-mezcla\), var\(--fondo-chat-hacia\)\) var\(--fondo-chat-tapiz\),\s*transparent/);
     expect(css).not.toMatch(/--fondo-chat-tinta:/);
   });
-  it("en alto contraste se apagan los garabatos", () => {
-    expect(css).toMatch(/\[data-contrast="high"\] \.fondo-de-chat::after \{[^}]*display: none/);
+  it("en alto contraste los garabatos NO se apagan", () => {
+    // Se apagaban "por legibilidad", pero el texto del hilo va siempre dentro
+    // de burbujas opacas: nunca hay letras sobre el dibujo. La cuenta de Jhon
+    // tiene contraste activo y por eso él no los veía (16/09).
+    expect(css).not.toMatch(/\[data-contrast="high"\] \.fondo-de-chat/);
   });
 });
