@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -7,6 +7,7 @@ import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { playNotificationSound } from "@/hooks/useBrowserNotifications";
 
+import { useCanalQueRevive } from "./useCanalQueRevive";
 export interface Notification {
   id: string;
   user_id: string | null;
@@ -36,16 +37,14 @@ interface UseNotificationsOptions {
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
   const { user } = useAuth();
-  // El ID, no el objeto. `useAuth` emite un `user` nuevo por referencia en cada
-  // lectura de sesion, y depender del objeto hacia que este efecto se re-corriera
-  // al arrancar. Con nombre de canal fijo ("notifications-realtime") eso mataba
-  // el canal: el `removeChannel` de la corrida anterior es asincrono y borra por
-  // NOMBRE, asi que se llevaba puesto el canal nuevo (RealtimeClient.js:451).
-  //
-  // Este era el peor de los tres, y por eso nadie lo reporto: fallaba sin un
-  // solo mensaje —el .subscribe() no miraba el estado— y lo tapaba a medias el
-  // refetch de 60 s. Las notificaciones no dejaban de llegar: llegaban hasta un
-  // minuto tarde, y eso se siente como "Maven va lento", no como un bug.
+  // El ID, no el objeto: `useAuth` emite un `user` nuevo por referencia en cada
+  // lectura de sesión. Historia: el canal tenía nombre fijo y cualquier re-corrida
+  // del efecto (el objeto user; después, los ajustes de sonido al cargar) lo
+  // recreaba con el mismo nombre, y el removeChannel del anterior —asíncrono,
+  // por NOMBRE— se llevaba puesto al nuevo (RealtimeClient.js:451). Fallaba sin
+  // un solo mensaje y lo tapaba a medias el refetch de 60 s: las notificaciones
+  // llegaban tarde, no dejaban de llegar, y eso se siente como "Maven va lento".
+  // Hoy el canal va por useCanalQueRevive (abajo), con topic versionado.
   const uid = user?.id;
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
@@ -86,48 +85,41 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     refetchInterval: 60000, // Fallback polling; Realtime is primary
   });
 
-  // ─── Realtime subscription ───────────────────────────────────────
-  useEffect(() => {
-    if (!uid) return;
-
-    const channel = supabase
-      .channel("notifications-realtime")
-      .on(
+  // ─── Realtime: un canal que revive ───────────────────────────────
+  // Mismo patrón que Messenger (useCanalQueRevive): nombre versionado —sin la
+  // carrera del removeChannel por nombre— y, si el socket lo deja en CLOSED,
+  // CHANNEL_ERROR o TIMED_OUT, se vuelve a crear y se refresca la lista. Antes
+  // el canal moría en silencio y la campana quedaba a merced del refetch de
+  // 60 s, que además se pausa cuando la ventana no tiene el foco: una mención
+  // aparecía "mucho rato después", al volver a esa ventana (Jhon, 16/09).
+  // El detonante en su cuenta: sonido apagado. Al cargar ese ajuste el efecto
+  // se re-corría y recreaba el canal con el mismo nombre; el removeChannel del
+  // anterior se llevaba al nuevo. Por eso los ajustes de sonido van por ref.
+  const sonidoRef = useRef({ sonar: notifSettings.sound_enabled, noMolestar: notifSettings.dnd_enabled });
+  sonidoRef.current = { sonar: notifSettings.sound_enabled, noMolestar: notifSettings.dnd_enabled };
+  useCanalQueRevive({
+    topic: uid ? `notifications-${uid}` : null,
+    armar: (canal) =>
+      canal.on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-        },
+        { event: "INSERT", schema: "public", table: "notifications" },
         (payload) => {
           const n = payload.new as Notification;
-          // Only add if it's for this user or role-targeted
+          // Solo las mías o las dirigidas a mi rol.
           if (n.user_id === uid || (n.user_id === null && n.role_target)) {
-            qc.invalidateQueries({ queryKey: ["notifications"] });
+            void qc.invalidateQueries({ queryKey: ["notifications"] });
 
             // Ajustes → Eventos → "En Maven" apagado para este tipo: la fila se
             // guarda igual (de ella salen el push y el correo), pero acá ni se
             // muestra ni suena.
             if (n.type && !isCanalActivoRef.current(n.type, "in_app")) return;
-
-            // Play sound if enabled and not in DND
-            if (notifSettings.sound_enabled && !notifSettings.dnd_enabled) {
-              playNotificationSound();
-            }
+            if (sonidoRef.current.sonar && !sonidoRef.current.noMolestar) playNotificationSound();
           }
         },
-      )
-      .subscribe((estado) => {
-        if (estado !== "SUBSCRIBED") {
-          console.warn("[Notificaciones] El canal esta en:", estado,
-            "— van a llegar con el retraso del refetch, no al instante.");
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [uid, qc, notifSettings.sound_enabled, notifSettings.dnd_enabled]);
+      ),
+    // Al revivir, traer lo que llegó mientras el canal estuvo muerto.
+    alRevivir: () => { void qc.invalidateQueries({ queryKey: ["notifications"] }); },
+  });
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {

@@ -43,6 +43,10 @@ const translations = {
   "topbar.darkMode": { es: "Modo oscuro", en: "Dark mode" },
   "topbar.notifications": { es: "Notificaciones", en: "Notifications" },
   "topbar.noNotifications": { es: "Sin notificaciones nuevas.", en: "No new notifications." },
+  // Aviso de mención dentro de Maven (useMessengerNotifications → avisarPersona).
+  "avisos.abrir": { es: "Abrir", en: "Open" },
+  "messenger.teMenciono": { es: "te mencionó", en: "mentioned you" },
+  "messenger.teMencionoEn": { es: "te mencionó en", en: "mentioned you in" },
   "topbar.changePassword": { es: "Cambiar contraseña", en: "Change password" },
   "topbar.logout": { es: "Cerrar sesión", en: "Log out" },
   "topbar.logoutSuccess": { es: "Sesión cerrada", en: "Logged out" },

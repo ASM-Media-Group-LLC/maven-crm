@@ -539,16 +539,21 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 </Button>
               )}
             </div>
-            <Button
-              variant="ghost" size="icon"
-              className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading}
-              title="Cámara"
-              aria-label="Cámara"
-            >
-              <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
-            </Button>
+            {/* La cámara se va al escribir, como en WhatsApp: el hueco es para el
+                mensaje. El micrófono ya se volvía "enviar" con la misma condición;
+                la cámara se quedaba y en la ventanita (336 px) sobraba (Jhon, 16/09). */}
+            {!(text.trim() || pendingFiles.length > 0) && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={uploading}
+                title="Cámara"
+                aria-label="Cámara"
+              >
+                <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
+              </Button>
+            )}
             {text.trim() || pendingFiles.length > 0 ? (
               <Button
                 size="icon"

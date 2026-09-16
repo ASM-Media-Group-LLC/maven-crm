@@ -1,8 +1,4 @@
-import {
-  Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign,
-  FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList,
-  AlertTriangle, Clock, HelpCircle, type LucideIcon,
-} from "lucide-react";
+import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign } from "lucide-react";
 
 // ─── Deep link resolver ────────────────────────────────────────────
 export function resolveDeepLink(
@@ -55,6 +51,8 @@ export function getModuleIcon(moduleOrigin: string | null): LucideIcon {
 
 // ─── Type icon mapper (fallback) ──────────────────────────────────
 const TYPE_ICONS: Record<string, LucideIcon> = {
+  chat_mention: AtSign,
+  chat_message: MessageSquare,
   onboarding_complete: UserCheck,
   onboarding_inactivity: AlertTriangle,
   verification_approved: UserCheck,
