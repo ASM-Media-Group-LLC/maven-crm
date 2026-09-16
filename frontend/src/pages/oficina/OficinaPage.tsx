@@ -18,9 +18,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  useDocumentos, useCrearDocumento, usePapelera, useBorrarDocumento,
+  useDocumentos, usePapelera, useBorrarDocumento,
   type Documento, type FiltrosDocumentos,
 } from "@/hooks/useDocumentos";
+import { useCrearDocumentoOffice } from "@/hooks/useOnlyOffice";
 
 function cuando(iso: string): string {
   const d = new Date(iso);
@@ -43,7 +44,7 @@ export default function OficinaPage() {
   const [confirmarBorrado, setConfirmarBorrado] = useState<Documento | null>(null);
 
   const docs = useDocumentos({ q, vista });
-  const crear = useCrearDocumento();
+  const crear = useCrearDocumentoOffice();
   const papelera = usePapelera();
   const borrar = useBorrarDocumento();
 
@@ -95,7 +96,7 @@ export default function OficinaPage() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar en el título y dentro del texto…"
+              placeholder="Buscar por título…"
               className="rounded-full pl-9 pr-9"
             />
             {q && (
@@ -157,7 +158,7 @@ export default function OficinaPage() {
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
               {q
-                ? "Se busca en el título y dentro del texto. Probá con otra palabra."
+                ? "Se busca por título. Probá con otra palabra."
                 : vista === "papelera"
                   ? "Lo que mandes a la papelera aparece acá hasta que lo elimines."
                   : "Empezá por un procedimiento, un guion o un acta de reunión."}
