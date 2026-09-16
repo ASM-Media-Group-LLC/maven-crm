@@ -202,7 +202,9 @@ export default function MessageList({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      // El mismo fondo (y el mismo className del que llama) que con mensajes:
+      // el hilo vacío de la ventanita no puede verse distinto al lleno.
+      <div className={cn("fondo-de-chat flex-1 flex items-center justify-center", className)}>
         <div className="text-center space-y-2">
           <div className="h-14 w-14 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
             <span className="text-2xl">💬</span>
@@ -214,7 +216,8 @@ export default function MessageList({
   }
 
   return (
-    <div className={cn("flex-1 relative overflow-hidden", className)}>
+    // `fondo-de-chat`: resplandor + papel tapiz detrás del scroller (index.css).
+    <div className={cn("fondo-de-chat flex-1 relative overflow-hidden", className)}>
     <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (
