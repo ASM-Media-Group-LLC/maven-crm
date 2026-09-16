@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Info, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/UserAvatar";
 import { dicebearSistemaUri } from "@/lib/avatar";
@@ -94,7 +94,19 @@ export function avisarPersona({ nombre, foto, seed, titulo, detalle, tono = "neu
     description: detalle,
     duration: duracion,
     icon: <CaraDelAviso nombre={nombre} foto={foto} seed={seed} tono={tono} />,
-    action: abrir ? { label: abrir.etiqueta, onClick: abrir.alTocar } : undefined,
+    action: abrir
+      ? {
+          // La flecha dice "esto te lleva a otro lado" sin leerlo. El estilo
+          // del botón vive en index.css ("AVISOS (sonner)").
+          label: (
+            <>
+              {abrir.etiqueta}
+              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+            </>
+          ),
+          onClick: abrir.alTocar,
+        }
+      : undefined,
   });
 }
 
