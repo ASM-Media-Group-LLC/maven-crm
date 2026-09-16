@@ -1295,16 +1295,21 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      se resuelve donde se DECLARA, no donde se usa, y si el primario vive
      más abajo (una skin por zona, un mock) queda inválido y anula todo el
      background. Aquí solo van los ingredientes; la mezcla, en el ::after. */
+  /* Mezcla al 100 % = el primario tal cual. Jhon (16/09) prefirió los
+     garabatos tenues Y con el color de la skin (#1847); mezclarlos con
+     blanco los volvía grises y más fuertes (#1848). La perilla queda: si
+     una skin muy oscura no se ve, bajar la mezcla acerca la tinta al
+     blanco (oscuro) o al negro (claro). */
   --fondo-chat-hacia: black;
-  --fondo-chat-mezcla: 70%;
-  --fondo-chat-tapiz: 13%;
+  --fondo-chat-mezcla: 100%;
+  --fondo-chat-tapiz: 7%;
 }
 .dark {
   --fondo-chat-luz-1: .22;
   --fondo-chat-luz-2: .16;
   --fondo-chat-hacia: white;
-  --fondo-chat-mezcla: 55%;
-  --fondo-chat-tapiz: 11%;
+  --fondo-chat-mezcla: 100%;
+  --fondo-chat-tapiz: 8%;
 }
 .fondo-de-chat {
   position: relative;
