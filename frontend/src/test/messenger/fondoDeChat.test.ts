@@ -31,6 +31,16 @@ describe("fondo de chat", () => {
     expect(css).toMatch(/\.fondo-de-chat::after \{[^}]*mask: var\(--tapiz-de-chat\)/);
     expect(css).toMatch(/--tapiz-de-chat: url\("data:image\/svg\+xml/);
   });
+  it("la tinta de los garabatos se aclara en oscuro: con un primario oscuro no se veían", () => {
+    // Jhon (16/09): "solo veo el degradado" con Rojo Kash. El primario a secas
+    // al 8 % desaparece en las skins oscuras; la tinta va mezclada con blanco.
+    expect(css).toMatch(/\.dark \{[^}]*--fondo-chat-hacia: white/);
+    // La mezcla vive en el ::after (donde el primario se hereda del contexto
+    // real), NO en un token de :root con var(--primary) adentro: ahí se
+    // resolvía donde se declara y podía quedar inválida, anulando el fondo.
+    expect(css).toMatch(/\.fondo-de-chat::after \{[^}]*color-mix\(in oklab, hsl\(var\(--primary\)\) var\(--fondo-chat-mezcla\), var\(--fondo-chat-hacia\)\) var\(--fondo-chat-tapiz\),\s*transparent/);
+    expect(css).not.toMatch(/--fondo-chat-tinta:/);
+  });
   it("en alto contraste se apagan los garabatos", () => {
     expect(css).toMatch(/\[data-contrast="high"\] \.fondo-de-chat::after \{[^}]*display: none/);
   });

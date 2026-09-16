@@ -1286,12 +1286,25 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   /* Intensidades: en claro el fondo ya es luminoso y pide menos. */
   --fondo-chat-luz-1: .14;
   --fondo-chat-luz-2: .10;
-  --fondo-chat-tapiz: .07;
+  /* La TINTA de los garabatos no es el primario a secas. Con un primario
+     oscuro (Rojo Kash al 42 % de luz, Dorado al 30 %) sobre fondo oscuro no
+     se veía nada — Jhon (16/09): "solo veo el degradado"; el mock se aprobó
+     con el coral claro de Maven. Se aclara en oscuro y se oscurece en claro,
+     y la opacidad va aparte, así se ve parecido con cualquier skin. */
+  /* ⚠️ La mezcla NO va aquí como token con var(--primary) adentro: un token
+     se resuelve donde se DECLARA, no donde se usa, y si el primario vive
+     más abajo (una skin por zona, un mock) queda inválido y anula todo el
+     background. Aquí solo van los ingredientes; la mezcla, en el ::after. */
+  --fondo-chat-hacia: black;
+  --fondo-chat-mezcla: 70%;
+  --fondo-chat-tapiz: 13%;
 }
 .dark {
   --fondo-chat-luz-1: .22;
   --fondo-chat-luz-2: .16;
-  --fondo-chat-tapiz: .08;
+  --fondo-chat-hacia: white;
+  --fondo-chat-mezcla: 55%;
+  --fondo-chat-tapiz: 11%;
 }
 .fondo-de-chat {
   position: relative;
@@ -1311,7 +1324,13 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     radial-gradient(100% 80% at 100% 100%, hsl(var(--accent) / var(--fondo-chat-luz-2)), transparent 60%);
 }
 .fondo-de-chat::after {
+  /* La primera línea es el respaldo para navegadores sin color-mix. */
   background: hsl(var(--primary) / var(--fondo-chat-tapiz));
+  background: color-mix(
+    in srgb,
+    color-mix(in oklab, hsl(var(--primary)) var(--fondo-chat-mezcla), var(--fondo-chat-hacia)) var(--fondo-chat-tapiz),
+    transparent
+  );
   -webkit-mask: var(--tapiz-de-chat) 0 0 / 168px 168px repeat;
   mask: var(--tapiz-de-chat) 0 0 / 168px 168px repeat;
 }
