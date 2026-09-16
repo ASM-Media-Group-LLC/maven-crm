@@ -39,10 +39,24 @@ const MAIL_CRED_KEY = process.env.MAIL_CRED_KEY;
 const SWEEP_INBOX_MS = Number(process.env.SWEEP_INBOX_MS || process.env.SWEEP_INTERVAL_MS || 60_000);
 const SWEEP_FULL_MS = Number(process.env.SWEEP_FULL_MS || 300_000);
 // Carpetas "calientes": se revisan con la cadencia de INBOX (SWEEP_INBOX_MS) en
-// vez de esperar el barrido completo. "Notification" entra porque ahí Zoho
-// archiva resets de contraseña y avisos (caso BLU 02/09): 5 min de espera para
-// un reset es mucho. Claves canónicas (INBOX siempre se guarda como INBOX).
-const HOT_FOLDERS = (process.env.HOT_FOLDERS || "INBOX,Notification")
+// vez de esperar el barrido completo. Claves canónicas (INBOX siempre se guarda
+// como INBOX).
+//
+// ⚠️ Acá va TODA carpeta a la que Zoho mande correo que urge, no solo el INBOX.
+// Sus reglas sacan del INBOX justamente lo más sensible al tiempo: los códigos
+// de verificación de GitHub y los resets de contraseña caen en "Notification", y
+// los códigos de confirmación de Facebook en "Newsletter" (sí, Zoho los clasifica
+// como boletín). Medido el 16/09/2026 con HOT_FOLDERS=INBOX solo: el INBOX
+// entregaba en 0-1 min y esas dos carpetas en 5, 7, 16 y 20 min, las cuatro
+// entrando en el MISMO segundo — el barrido completo de 30 min. Un código de dos
+// factores que llega 20 minutos tarde ya venció.
+//
+// Que estén acá NO cuesta un SELECT+FETCH por minuto: `revisarCarpeta` pregunta
+// primero con un STATUS (un comando liviano) y solo abre si algo cambió. Lo que
+// el proveedor castigaba —58 casillas × TODAS sus carpetas abiertas cada 5 min—
+// no es esto. El recorte a "INBOX" del 10/09 se decidió el mismo día en que entró
+// esa compuerta (#1803), o sea con el modelo de costo viejo.
+const HOT_FOLDERS = (process.env.HOT_FOLDERS || "INBOX,Notification,Newsletter")
   .split(",").map((s) => s.trim()).filter(Boolean);
 // Espaciado entre logins al arrancar. Los logins en ráfaga son lo que el
 // proveedor castiga (tarpit); 3s a 35 casillas = ~20 logins/min en cada deploy
@@ -325,7 +339,7 @@ class CuentaSync {
     this.estado = "idle";
   }
 
-  /** Barrido "caliente": solo HOT_FOLDERS (INBOX + Notification por defecto),
+  /** Barrido "caliente": solo HOT_FOLDERS (INBOX + Notification + Newsletter),
    *  con la cadencia de SWEEP_INBOX_MS. Solo las que existen en esta casilla —
    *  pedir una carpeta inexistente tiraría todo el ciclo a backoff. */
   async barrerCalientes() {
