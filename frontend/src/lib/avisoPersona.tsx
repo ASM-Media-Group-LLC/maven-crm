@@ -79,18 +79,22 @@ export interface AvisoPersona {
   tono?: TonoAviso;
   /** Milisegundos. Sin esto usa el default de sonner. */
   duracion?: number;
+  /** Botón al lado del aviso que lleva a lo que se está avisando. La etiqueta
+   *  la trae quien llama, ya traducida (acá no hay contexto de React). */
+  abrir?: { etiqueta: string; alTocar: () => void };
   /** Mismo `id` = el aviso se reemplaza en vez de apilarse. Sirve para
    *  eventos que pueden llegar repetidos (una alerta que se reevalúa). */
   id?: string;
 }
 
 /** Un aviso protagonizado por una persona, con su cara. */
-export function avisarPersona({ nombre, foto, seed, titulo, detalle, tono = "neutral", duracion, id }: AvisoPersona) {
+export function avisarPersona({ nombre, foto, seed, titulo, detalle, tono = "neutral", duracion, id, abrir }: AvisoPersona) {
   return toast(titulo, {
     id,
     description: detalle,
     duration: duracion,
     icon: <CaraDelAviso nombre={nombre} foto={foto} seed={seed} tono={tono} />,
+    action: abrir ? { label: abrir.etiqueta, onClick: abrir.alTocar } : undefined,
   });
 }
 

@@ -46,8 +46,14 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
       {
         type: "chat_message",
         label: "Mensajes nuevos",
-        descripcion: "Directos, menciones y grupos. Respeta los chats silenciados y el modo de cada chat.",
+        descripcion: "Directos y grupos. Respeta los chats silenciados y el modo de cada chat. No entran a la campana: viven en la nube de Messenger.",
         canales: ["in_app", "push"],
+      },
+      {
+        type: "chat_mention",
+        label: "Menciones",
+        descripcion: "Cuando alguien te nombra con @. Entra a la campana y avisa dentro de Maven aunque tengas push. Al celular llega como mensaje.",
+        canales: ["in_app"],
       },
     ],
   },

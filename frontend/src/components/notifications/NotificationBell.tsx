@@ -30,6 +30,9 @@ export default function NotificationBell() {
   // en 30 días— y tapaban las notificaciones de verdad: vencimientos de
   // closers, evaluaciones, asignaciones. En /notificaciones se siguen viendo,
   // esa página es el archivo completo.
+  // Las MENCIONES (`chat_mention`, las distingue el trigger) SÍ entran: que te
+  // nombren con @ no es un mensaje cualquiera, y Jhon probó mencionarse desde la
+  // cuenta test y no le llegó nada a ningún lado (16/09).
   const esMensaje = (n: Notification) =>
     n.module_origin === "messenger" && n.type === "chat_message";
 
