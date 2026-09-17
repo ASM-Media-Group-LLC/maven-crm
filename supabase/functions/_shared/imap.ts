@@ -452,6 +452,56 @@ export class ImapClient {
     };
   }
 
+  /** El índice del mensaje: qué partes tiene y con qué número se pide cada una.
+   *  Es barato —no trae contenido— y es lo que permite bajar UN adjunto sin
+   *  arrastrar el correo entero. Devuelve el texto crudo; lo interpreta
+   *  `parsearBodyStructure` en bodystructure.ts. */
+  async fetchBodyStructure(
+    uid: number,
+  ): Promise<{ ok: boolean; texto: string; error?: string }> {
+    const res = await this.command(`UID FETCH ${uid} (BODYSTRUCTURE)`);
+    if (!res.ok) return { ok: false, texto: "", error: res.error };
+    const i = res.raw.indexOf("BODYSTRUCTURE ");
+    if (i < 0) return { ok: false, texto: "", error: "respuesta sin BODYSTRUCTURE" };
+    // Se entrega todo lo que sigue: el lector toma la primera lista balanceada
+    // y se detiene ahí, así que no hace falta recortar el final a mano.
+    return { ok: true, texto: res.raw.slice(i + "BODYSTRUCTURE ".length) };
+  }
+
+  /** Una sola parte del mensaje, por su número ("2", "2.1"…).
+   *
+   *  ⚠️ `BODY.PEEK[...]` y no `BODY[...]`: el segundo marcaría el correo como
+   *  leído solo por descargarle un adjunto. El tope sigue existiendo, pero
+   *  ahora aplica al ARCHIVO y no a la suma de todos: un CV de 37 KB entra
+   *  aunque el correo traiga otros veinte. */
+  async fetchBodyPart(
+    uid: number,
+    seccion: string,
+    maxBytes = 20 * 1024 * 1024,
+  ): Promise<{ ok: boolean; raw: string; truncated: boolean; error?: string }> {
+    // La sección viene de nuestro propio lector, pero igual se valida: va
+    // dentro de un comando IMAP y un valor raro lo rompería.
+    if (!/^\d+(\.\d+)*$/.test(seccion)) {
+      return { ok: false, raw: "", truncated: false, error: "sección inválida" };
+    }
+    const res = await this.command(
+      `UID FETCH ${uid} (BODY.PEEK[${seccion}]<0.${maxBytes}>)`,
+    );
+    if (!res.ok) return { ok: false, raw: "", truncated: false, error: res.error };
+
+    const m = res.raw.match(/\{(\d+)\}\r\n/);
+    if (!m || m.index === undefined) {
+      return { ok: false, raw: "", truncated: false, error: "respuesta sin literal" };
+    }
+    const start = m.index + m[0].length;
+    const len = Number(m[1]);
+    return {
+      ok: true,
+      raw: res.raw.slice(start, start + len),
+      truncated: len >= maxBytes,
+    };
+  }
+
   /** Marca un mensaje como leído. Explícito: lo decide la interfaz cuando el
    *  usuario abre el correo, no el hecho de traerlo. */
   async markSeen(seq: number): Promise<boolean> {

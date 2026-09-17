@@ -20,7 +20,8 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
 import { ImapClient } from "../_shared/imap.ts";
-import { extraerAdjunto, parseMessage } from "../_shared/mime.ts";
+import { decodeBodyToBytes, extraerAdjunto, parseMessage } from "../_shared/mime.ts";
+import { parsearBodyStructure, parteDelAdjunto } from "../_shared/bodystructure.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
@@ -699,22 +700,80 @@ Deno.serve(async (req) => {
         const selr = await client.selectFolder(box);
         if (!selr.ok) return json(req, { error: `IMAP SELECT ${box}: ${selr.error}` }, 502);
 
-        const raw = await client.fetchRawMessageByUid(uid);
-        if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
-        // Si el mensaje se cortó en el tope, el adjunto saldría corrupto: mejor
-        // fallar claro que entregar un archivo a medias.
-        if (raw.truncated) {
-          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+        // La metadata guardada dice QUÉ archivo espera la persona. Sirve para
+        // no depender del orden al cruzar con el BODYSTRUCTURE (ver abajo).
+        const { data: fila } = await admin
+          .from("mail_messages")
+          .select("attachments")
+          .eq("user_id", user.id)
+          .eq("folder", box)
+          .eq("uid", uid)
+          .limit(1)
+          .maybeSingle();
+        const meta = (fila?.attachments as
+          | { filename?: string; sizeBytes?: number }[]
+          | null)?.[idx];
+
+        let adj: { filename: string; contentType: string; bytes: Uint8Array } | null = null;
+
+        // === CAMINO BUENO: pedirle al servidor SOLO esa parte ===
+        // Antes se bajaba el correo entero y se cortaba a 20 MB. Un correo de
+        // RRHH con 24 hojas de vida (~17 MB de archivos, ~23 MB ya en base64)
+        // se pasaba del tope y NINGUNO de los 24 se podía bajar, ni el de
+        // 37 KB (reporte de Andrea, 16/09/2026). Pidiendo la parte suelta, lo
+        // que se descarga es el archivo y nada más.
+        const bs = await client.fetchBodyStructure(uid);
+        if (bs.ok) {
+          const parte = parteDelAdjunto(parsearBodyStructure(bs.texto), idx, {
+            nombre: meta?.filename ?? null,
+            bytes: meta?.sizeBytes ?? null,
+          });
+          if (parte) {
+            const trozo = await client.fetchBodyPart(uid, parte.seccion);
+            if (trozo.ok && !trozo.truncated) {
+              // El CRLF final pertenece al delimitador MIME, no al archivo.
+              const cuerpo = trozo.raw.replace(/\r?\n$/, "");
+              adj = {
+                filename: parte.nombre ?? meta?.filename ?? "adjunto",
+                contentType: `${parte.tipo.toLowerCase()}/${parte.subtipo.toLowerCase()}`,
+                bytes: decodeBodyToBytes(cuerpo, parte.codificacion),
+              };
+            } else if (trozo.ok && trozo.truncated) {
+              return json(req, {
+                error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+              }, 413);
+            }
+          }
         }
 
-        const adj = extraerAdjunto(raw.raw, idx);
-        if (!adj) return json(req, { error: "ese adjunto no está en el mensaje" }, 404);
+        // === RESPALDO: el mensaje entero, como antes ===
+        // Para lo que el BODYSTRUCTURE no cubra (servidores raros, estructuras
+        // que el lector no entienda). Sigue teniendo el tope viejo, pero ahora
+        // es la excepción y no la regla.
+        if (!adj) {
+          const raw = await client.fetchRawMessageByUid(uid);
+          if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
+          // Si el mensaje se cortó en el tope, el adjunto saldría corrupto:
+          // mejor fallar claro que entregar un archivo a medias. ⚠️ El que no
+          // entra es el CORREO, no el archivo — decirlo al revés fue lo que
+          // hizo creer que un CV de 37 KB era "demasiado grande".
+          if (raw.truncated) {
+            return json(req, {
+              error: "este correo es demasiado grande para abrirlo desde acá",
+            }, 413);
+          }
+
+          adj = extraerAdjunto(raw.raw, idx);
+          if (!adj) return json(req, { error: "ese adjunto no está en el mensaje" }, 404);
+        }
 
         // Techo de respuesta: el JSON con el base64 pesa ~1,37× el archivo, y
         // pasarse revienta el límite de la edge con un error opaco. Mejor
         // cortar claro (los adjuntos gigantes son casos raros).
         if (adj.bytes.length > 20 * 1024 * 1024) {
-          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+          return json(req, {
+            error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+          }, 413);
         }
 
         await admin.from("mail_credentials")
