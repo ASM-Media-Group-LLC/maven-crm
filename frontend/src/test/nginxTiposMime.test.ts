@@ -13,10 +13,9 @@ import { resolve } from "node:path";
  *  ⚠️ Se lee con `fs` y no con `?raw`: un import que no resuelve deja el test
  *  sin cargar y el gate lo cuenta como verde (ver vitest_gate_test_files).
  */
-const conf = readFileSync(
-  resolve(__dirname, "../../../nginx.conf"),
-  "utf8",
-);
+// Desde la raíz del repo (root de vitest), como campanaEnVivo.test.ts:
+// `__dirname` no existe en módulos ES y además molesta a tsc.
+const conf = readFileSync(resolve(process.cwd(), "nginx.conf"), "utf8");
 
 describe("nginx.conf: los módulos .mjs", () => {
   it("tiene un bloque propio para .mjs", () => {

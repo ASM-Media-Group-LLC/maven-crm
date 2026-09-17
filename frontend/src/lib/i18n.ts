@@ -35,6 +35,25 @@ const translations = {
     es: "Personas para mencionar",
     en: "People to mention",
   },
+
+  // Correo · la tarjeta de una invitación de calendario (.ics)
+  "correo.evento.cancelada": {
+    es: "Esta reunión fue cancelada",
+    en: "This meeting was cancelled",
+  },
+  "correo.evento.sinTitulo": { es: "Invitación sin título", en: "Untitled invitation" },
+  "correo.evento.todoElDia": { es: "todo el día", en: "all day" },
+  "correo.evento.rango": { es: "{from} a {to}", en: "{from} to {to}" },
+  "correo.evento.seRepite": { es: "Se repite", en: "Repeats" },
+  "correo.evento.organiza": { es: "Organiza", en: "Organized by" },
+  "correo.evento.entrar": { es: "Entrar a la videollamada", en: "Join the video call" },
+  "correo.evento.invitados": { es: "Invitados ({n})", en: "Guests ({n})" },
+  "correo.evento.detalles": { es: "Detalles", en: "Details" },
+  "correo.evento.alguien": { es: "alguien", en: "someone" },
+  "correo.evento.va": { es: "va", en: "going" },
+  "correo.evento.noVa": { es: "no va", en: "not going" },
+  "correo.evento.quizas": { es: "quizás", en: "maybe" },
+  "correo.evento.sinResponder": { es: "sin responder", en: "no reply" },
   "nav.settings": { es: "Settings", en: "Settings" },
 
   // Topbar
