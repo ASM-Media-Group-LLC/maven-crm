@@ -2,7 +2,9 @@
 // silencio. Un QP mal armado = correos truncados o con "=E2=80" visibles.
 // Correr: deno test supabase/functions/_shared/smtp.test.ts
 
-import { buildMessage, encodeHeader, esDireccionSmtp, quotedPrintable } from "./smtp.ts";
+import {
+  buildMessage, encodeHeader, esDireccionSmtp, quotedPrintable, timeoutDelPunto,
+} from "./smtp.ts";
 
 function decodeQP(qp: string): string {
   // Decodificador de referencia: soft breaks fuera, =XX a bytes, UTF-8.
@@ -364,4 +366,34 @@ Deno.test("un adjunto de 20 MB se pliega entero, rápido y sin líneas largas", 
   );
   // La edge tiene 2 s de CPU POR PEDIDO, y plegar es solo un paso de varios.
   assert(ms < 1_500, `plegar tardó ${ms} ms, demasiado del presupuesto de CPU`);
+});
+
+// ── El timeout del punto final ─────────────────────────────────────────────
+// Ver el comentario de `timeoutDelPunto`. El 17/09/2026 un correo de 13 PDF
+// (~25 MB en base64) se envió DOS VECES porque esperábamos la confirmación
+// con el timeout de un comando común.
+
+Deno.test("timeoutDelPunto: un correo sin adjuntos no espera de más", () => {
+  const t = timeoutDelPunto(40 * 1024); // 40 KB de texto
+  assert(t >= 30_000, `piso demasiado bajo: ${t}`);
+  assert(t <= 40_000, `esperar ${t / 1000}s por un correo de texto es absurdo`);
+});
+
+Deno.test("timeoutDelPunto: el correo que falló en prod entra cómodo", () => {
+  // 18,5 MB crudos → ~25 MB en base64, que es lo que viajó de verdad.
+  const t = timeoutDelPunto(25 * 1024 * 1024);
+  assert(t > 20_000, `${t / 1000}s NO mejora los 20s que rompieron en prod`);
+  assert(t >= 150_000, `${t / 1000}s es poco para que Zoho ingiera 25 MB`);
+});
+
+Deno.test("timeoutDelPunto: crece con el tamaño", () => {
+  const chico = timeoutDelPunto(100 * 1024);
+  const medio = timeoutDelPunto(5 * 1024 * 1024);
+  const grande = timeoutDelPunto(25 * 1024 * 1024);
+  assert(chico < medio && medio < grande, `no es monótono: ${chico} ${medio} ${grande}`);
+});
+
+Deno.test("timeoutDelPunto: tiene techo, no espera para siempre", () => {
+  // Un adjunto gigante no puede colgar la edge function hasta que la maten.
+  assert(timeoutDelPunto(500 * 1024 * 1024) <= 180_000, "sin techo");
 });

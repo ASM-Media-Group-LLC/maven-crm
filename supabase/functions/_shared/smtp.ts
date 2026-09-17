@@ -20,6 +20,24 @@ const CONNECT_TIMEOUT_MS = 10_000;
  *  una conexión lenta 20 s no alcanzan. */
 const BODY_TIMEOUT_MS = 60_000;
 
+/** ⚠️ CUÁNTO ESPERAR EL «250 OK» DESPUÉS DEL PUNTO FINAL.
+ *
+ *  Esto NO es un comando más. Cuando mandás el `.` que cierra el DATA, el
+ *  servidor recién ahí ingiere el mensaje entero: lo escanea, lo encola y lo
+ *  acepta. Con 18 MB de hojas de vida eso tarda bastante más que un `EHLO`.
+ *
+ *  Pasó en producción el 17/09/2026: Lina mandó 13 PDF (18,5 MB crudos, ~25 MB
+ *  en base64), los bytes llegaron enteros, y nosotros cortamos a los 20 s del
+ *  `CMD_TIMEOUT_MS` de un comando común. Zoho aceptó igual. Ella vio «no se
+ *  pudo enviar», reintentó, y a los 39 s salió el segundo: Andrea, Mónica y
+ *  Grace recibieron todo dos veces.
+ *
+ *  Crece con el tamaño porque el trabajo del servidor crece con el tamaño. */
+export function timeoutDelPunto(bytes: number): number {
+  const mb = bytes / (1024 * 1024);
+  return Math.min(180_000, 30_000 + Math.ceil(mb) * 6_000);
+}
+
 /** Reloj REAL contra la promesa (mismo arreglo que en imap.ts): el patrón
  *  de chequear Date.now() entre lecturas no sirve cuando el servidor acepta
  *  la conexión y no manda nada — el read bloquea y el reloj no se mira más.
@@ -61,6 +79,12 @@ export interface SmtpResult {
   ok: boolean;
   code: number;
   message: string;
+  /** ⚠️ Se cortó DESPUÉS de que el mensaje entero ya viajó.
+   *
+   *  No es lo mismo que un fallo: los bytes están en el servidor y puede
+   *  haberlos aceptado sin que alcanzáramos a leer el «250 OK». Reintentar a
+   *  ciegas manda el correo dos veces, que es exactamente lo que pasó. */
+  incierto?: boolean;
 }
 
 export class SmtpClient {
@@ -89,8 +113,8 @@ export class SmtpClient {
    *  guion después del código (`250-STARTTLS`) y la última un espacio
    *  (`250 OK`). Cortar en la primera línea deja el resto en el buffer y
    *  desincroniza todo el diálogo. */
-  private async readReply(): Promise<SmtpResult> {
-    const deadline = Date.now() + CMD_TIMEOUT_MS;
+  private async readReply(timeoutMs = CMD_TIMEOUT_MS): Promise<SmtpResult> {
+    const deadline = Date.now() + timeoutMs;
     const chunk = new Uint8Array(4096);
     // Última línea = código seguido de ESPACIO, al principio de línea.
     const done = (b: string) => /^\d{3} [^\r\n]*\r\n/m.test(b) &&
@@ -184,8 +208,15 @@ export class SmtpClient {
     // Si el cuerpo tiene una línea así (pasa con texto plano y con base64),
     // hay que duplicar el punto o el mensaje se corta ahí.
     const stuffed = rfc822.replace(/\r\n\./g, "\r\n..");
-    await escribirTodo(this.conn, enc.encode(stuffed + "\r\n.\r\n"), BODY_TIMEOUT_MS, "SMTP");
-    return await this.readReply();
+    const cuerpo = enc.encode(stuffed + "\r\n.\r\n");
+    await escribirTodo(this.conn, cuerpo, BODY_TIMEOUT_MS, "SMTP");
+
+    // A partir de acá el mensaje YA ESTÁ del otro lado. Si no llega la
+    // respuesta, no sabemos si se aceptó — y eso NO se puede reportar como
+    // "no se pudo enviar", porque invita a reintentar y duplicar.
+    const r = await this.readReply(timeoutDelPunto(cuerpo.byteLength));
+    if (!r.ok && r.code === 0) return { ...r, incierto: true };
+    return r;
   }
 
   async quit(): Promise<void> {
