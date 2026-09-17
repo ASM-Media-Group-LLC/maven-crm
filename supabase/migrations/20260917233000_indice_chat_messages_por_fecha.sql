@@ -1,0 +1,35 @@
+-- El Messenger leía la tabla ENTERA de mensajes cada vez que se caía un canal.
+--
+-- 17/09/2026, tercera caída del día. El "barrido de entregados" del Messenger
+-- (useMessengerNotifications) pedía "los mensajes más recientes que no sean
+-- míos y no estén borrados". Sin índice por fecha, el plan era:
+--
+--   Limit -> Sort (created_at DESC) -> Seq Scan on chat_messages
+--
+-- es decir: leer las 26.207 filas (12 MB) y ORDENARLAS ENTERAS para devolver
+-- 200. Medido en producción: 74.846 llamadas, 189,9 ms de promedio y 7.483 ms
+-- de máximo. Durante la crisis, esa consulta más su upsert de acuses eran
+-- 0,455 núcleos = 23% de todo el trabajo de una base de 2 núcleos compartidos.
+--
+-- El frontend ya trae la mitad del arreglo (el barrido ahora pide solo lo que
+-- llegó desde el último barrido, con `created_at > marca`). Este índice es la
+-- otra mitad: con él, tanto el primer barrido como los incrementales entran
+-- por Index Scan y paran apenas juntan el lote.
+--
+-- Parcial por `is_deleted = false` porque es el filtro fijo de esa consulta:
+-- el índice queda más chico y sirve igual.
+--
+-- NOTA: aplicado SIN CONCURRENTLY, a propósito. La tabla son 12 MB y el índice
+-- se construye en menos de un segundo, así que el bloqueo de escritura es
+-- despreciable; CONCURRENTLY no puede correr dentro de una transacción y las
+-- migraciones van envueltas en una. Si algún día la tabla crece mucho, para
+-- recrearlo conviene CONCURRENTLY suelto en el editor SQL.
+--
+-- APLICADO EN PRODUCCIÓN el 17/09/2026. Plan comprobado después:
+--   Limit -> Index Scan using idx_chat_messages_created_at_desc
+-- (antes: Limit -> Sort -> Seq Scan)
+--
+-- Para revertir:  DROP INDEX public.idx_chat_messages_created_at_desc;
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at_desc
+  ON public.chat_messages (created_at DESC)
+  WHERE is_deleted = false;

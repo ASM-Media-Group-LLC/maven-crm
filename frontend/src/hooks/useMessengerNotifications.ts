@@ -58,6 +58,131 @@ function mentionsMe(content: string | null, myName: string | null): boolean {
   return c.includes(`@${full}`) || (!!first && c.includes(`@${first}`));
 }
 
+// ─────────────────── Barrido de "entregado" (✓✓ gris) ───────────────────
+//
+// POR QUÉ ESTO ESTÁ ACÁ Y NO DENTRO DEL HOOK (17/09/2026, tercera caída del día).
+//
+// El barrido pedía SIEMPRE "los últimos 200 mensajes de toda la base" y escribía
+// hasta 200 acuses. Vivía en el mismo efecto que arma el canal de realtime, con
+// `version` en las dependencias, y `version` sube cada vez que el canal revive.
+// O sea: la app se satura → se caen canales → cada caída dispara 200 lecturas +
+// 200 escrituras → se satura más → se caen más canales. Se realimenta.
+// Medido en producción: 74.846 llamadas, 189,9 ms de promedio y 7.483 ms de
+// máximo; durante la crisis el barrido + su upsert eran 0,455 núcleos = 23% de
+// todo el trabajo de la base (de 2 núcleos compartidos).
+//
+// El arreglo es pedir SOLO LO NUEVO desde el último barrido.
+
+/** Primer barrido de este navegador (todavía no hay marca). Acotado: el resto
+ *  igual queda marcado al abrir la conversación (useChat.ts:988). */
+export const LOTE_PRIMERA_VEZ = 100;
+/** Barridos siguientes: ya filtran por fecha, así que normalmente traen 0 filas.
+ *  El tope es solo un cinturón por si alguien estuvo días sin abrir Maven. */
+export const LOTE_INCREMENTAL = 200;
+/** Una marca más de un día en el futuro es basura (reloj mal puesto, storage
+ *  manipulado), no desfase normal entre el reloj del equipo y el del servidor. */
+export const TOLERANCIA_RELOJ_MS = 24 * 60 * 60 * 1000;
+/** Volver del segundo plano dispara DOS barridos (useReanudarAlVolver de este
+ *  hook + alRevivir de useCanalQueRevive). El freno los junta en uno. */
+export const FRENO_BARRIDO_MS = 10_000;
+/** La marca se guarda unos segundos ANTES del último mensaje visto: un mensaje
+ *  que se confirma en la base justo después de nuestra consulta tiene fecha
+ *  anterior a ella y, sin solape, quedaría fuera del `gt` para siempre. El
+ *  solape lo vuelve a traer y el upsert ignora lo repetido. */
+export const MARGEN_SOLAPE_MS = 2_000;
+
+/** Por usuario: en un equipo compartido, la marca de uno no puede servirle al otro. */
+export const claveDelBarrido = (userId: string) => `messenger:ultimoBarrido:${userId}`;
+
+// La marca vive en localStorage, no en un ref: un ref se pierde al recargar, y
+// recargar (o abrir Maven por la mañana) es JUSTO cuando el barrido sirve. Que
+// quede vieja no hace daño: una marca vieja hace pedir de MÁS, nunca de menos.
+export function leerMarcaDeBarrido(userId: string): string | null {
+  try {
+    return localStorage.getItem(claveDelBarrido(userId));
+  } catch {
+    return null; // modo privado / storage bloqueado → se barre como la primera vez
+  }
+}
+
+export function guardarMarcaDeBarrido(userId: string, iso: string): void {
+  try {
+    localStorage.setItem(claveDelBarrido(userId), iso);
+  } catch {
+    /* sin storage se sigue barriendo como la primera vez: lento, no roto */
+  }
+}
+
+export type PlanDeBarrido = { desde: string | null; limite: number };
+
+/**
+ * Qué pedirle a la base en este barrido.
+ *
+ * ⚠️ REGLA: si la marca falta, no se entiende o apunta al futuro, el peor caso
+ * tiene que ser "marco de más" (un lote acotado) y NUNCA "no marco nada" — una
+ * marca en el futuro dejaría a `gt` sin devolver una sola fila para siempre, y
+ * el ✓✓ gris del Messenger no volvería a aparecer en ese navegador.
+ */
+export function planDeBarrido(marca: string | null | undefined, ahoraMs: number): PlanDeBarrido {
+  const t = marca ? Date.parse(marca) : Number.NaN;
+  if (!Number.isFinite(t) || t > ahoraMs + TOLERANCIA_RELOJ_MS) {
+    return { desde: null, limite: LOTE_PRIMERA_VEZ };
+  }
+  // Normalizar a ISO con milisegundos RECORTA los microsegundos de Postgres, así
+  // que el último mensaje ya marcado puede volver a caer en el lote. Es el lado
+  // bueno del error: el upsert con ignoreDuplicates lo ignora.
+  return { desde: new Date(t).toISOString(), limite: LOTE_INCREMENTAL };
+}
+
+/** Le pone el `gt(created_at)` a la consulta cuando hay marca. Separado para
+ *  poder comprobar en las pruebas que el barrido pide solo lo nuevo. */
+export function aplicarFiltroDelBarrido<Q extends { gt(columna: string, valor: string): Q }>(
+  consulta: Q,
+  plan: PlanDeBarrido,
+): Q {
+  return plan.desde ? consulta.gt("created_at", plan.desde) : consulta;
+}
+
+/** Marca nueva = el mensaje más reciente que acabamos de marcar, menos el
+ *  solape. Se calcula por máximo y no por el primero de la lista: si algún día
+ *  cambia el `order`, la marca no puede adelantarse a mensajes que no marcamos. */
+export function marcaDeLote(filas: { created_at: string }[]): string | null {
+  let max: string | null = null;
+  for (const f of filas) if (f.created_at && (max === null || f.created_at > max)) max = f.created_at;
+  if (max === null) return null;
+  const t = Date.parse(max);
+  // Fecha que no se entiende → no se guarda marca: el próximo barrido repite
+  // este lote (de más), en vez de saltárselo (de menos).
+  return Number.isFinite(t) ? new Date(t - MARGEN_SOLAPE_MS).toISOString() : null;
+}
+
+/** Marca "entregado" lo que llegó desde el último barrido. Devuelve cuántos marcó. */
+export async function barridoDeEntregados(userId: string, ahoraMs = Date.now()): Promise<number> {
+  const plan = planDeBarrido(leerMarcaDeBarrido(userId), ahoraMs);
+  try {
+    const { data, error } = await aplicarFiltroDelBarrido(
+      supabase
+        .from("chat_messages")
+        .select("id, created_at")
+        .neq("sender_id", userId)
+        .eq("is_deleted", false),
+      plan,
+    )
+      .order("created_at", { ascending: false })
+      .limit(plan.limite);
+    const filas = (data as { id: string; created_at: string }[] | null) ?? [];
+    if (error || filas.length === 0) return 0;
+    await markMessagesDelivered(userId, filas.map((f) => f.id));
+    // La marca avanza DESPUÉS de marcar de verdad: si el upsert falla, el
+    // próximo barrido vuelve a traer lo mismo.
+    const nueva = marcaDeLote(filas);
+    if (nueva) guardarMarcaDeBarrido(userId, nueva);
+    return filas.length;
+  } catch {
+    return 0; // sin red o sin permisos: el próximo barrido reintenta lo mismo
+  }
+}
+
 /**
  * Hook GLOBAL del Messenger interno (chat del staff). Montado en AppShell → activo en toda
  * Maven, no solo en /messenger. Reacciona a cada mensaje interno entrante
@@ -121,7 +246,13 @@ export function useMessengerNotifications() {
   tRef.current = t;
   const [version, setVersion] = useState(0);
   useReanudarAlVolver(() => setVersion((v) => v + 1));
+  // Declarado ARRIBA de los efectos a propósito: lo usan los dos.
+  const armarCanalRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
+  const ultimoBarridoRef = useRef(0);
 
+  // EFECTO 1 — se arma UNA vez por usuario. Nada acá depende de `version`: si
+  // volviera a correr en cada resurrección del canal, volveríamos a pedirle el
+  // nombre a la base en cada corte de red.
   useEffect(() => {
     if (!userId) return;
 
@@ -132,19 +263,6 @@ export function useMessengerNotifications() {
       .eq("id", userId)
       .maybeSingle()
       .then(({ data }) => { myNameRef.current = data?.full_name ?? null; });
-
-    // Backfill "entregado" al montar (ignoreDuplicates → no-op para los ya entregados/leídos).
-    void (async () => {
-      const { data } = await supabase
-        .from("chat_messages")
-        .select("id")
-        .neq("sender_id", userId)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(200);
-      const ids = (data as { id: string }[] | null)?.map((m) => m.id) ?? [];
-      if (ids.length) await markMessagesDelivered(userId, ids);
-    })();
 
     // El canal se arma acá (cierra sobre userId y los refs) pero VIVE en
     // useCanalQueRevive, que lo levanta de nuevo si se muere.
@@ -278,9 +396,32 @@ export function useMessengerNotifications() {
         },
       )
 ;
+  }, [userId]);
+
+  // EFECTO 2 — el barrido, y SOLO el barrido. Sigue dependiendo de `version`
+  // porque para esto existe `alRevivir`: marcar lo que llegó mientras el canal
+  // estuvo muerto. Sacarlo de acá haría desaparecer el ✓✓ gris de esos mensajes.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelado = false;
+    const barrer = () => {
+      ultimoBarridoRef.current = Date.now();
+      void barridoDeEntregados(userId);
+    };
+    const faltan = FRENO_BARRIDO_MS - (Date.now() - ultimoBarridoRef.current);
+    if (faltan <= 0) {
+      barrer();
+      return;
+    }
+    // Frenado, NO descartado: si se descartara, los mensajes de esa ventana se
+    // quedarían sin ✓✓ gris hasta la próxima caída del canal.
+    const temporizador = setTimeout(() => { if (!cancelado) barrer(); }, faltan);
+    return () => {
+      cancelado = true;
+      clearTimeout(temporizador);
+    };
   }, [userId, version]);
 
-  const armarCanalRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
   useCanalQueRevive({
     topic: userId ? `chat-incoming-${userId}` : null,
     armar: (canal) => armarCanalRef.current?.(canal) ?? canal,
