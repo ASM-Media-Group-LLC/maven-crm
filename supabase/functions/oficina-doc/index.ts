@@ -18,6 +18,7 @@
 // función con 256 MB de memoria para no ganar nada.
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
+import { EN_BLANCO } from "./plantillas.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -35,43 +36,6 @@ const TIPO_DE_EDITOR: Record<string, string> = {
   docx: "word", xlsx: "cell", pptx: "slide",
 };
 
-/** Un `.docx` vacío, válido y con hoja carta. Va acá adentro y no en R2 porque
- *  es la semilla de TODO documento nuevo: tenerlo en el código lo hace
- *  imposible de borrar por accidente. 2,3 KB. */
-const DOCX_EN_BLANCO = [
-  "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",
-  "AABKBwAAAAA=",
-].join("");
 
 // ── Firma de ONLYOFFICE (JWT HS256, sin dependencias) ───────────────────────
 const b64url = (b: Uint8Array) =>
@@ -290,7 +254,9 @@ Deno.serve(async (req) => {
 
       const id = (fila as { id: string }).id;
       const llave = `documentos/${id}/v1.${extension}`;
-      const bin = atob(DOCX_EN_BLANCO);
+      // Cada formato nace de SU archivo en blanco: un .xlsx que por dentro
+      // sea un .docx lo rechaza ONLYOFFICE sin explicar por qué.
+      const bin = atob(EN_BLANCO[extension]);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       await subir(llave, bytes, MIME[extension]);

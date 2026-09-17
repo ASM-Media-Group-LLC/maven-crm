@@ -1,9 +1,6 @@
 import {
-  LayoutDashboard, Users, UserPlus, Settings, ChevronRight,
-  Bot, Activity, Megaphone, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
-  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
-  MessageCircle, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell, Video,
-  Mail, Clapperboard, CalendarRange, CalendarDays, Gift, RefreshCw } from "lucide-react";
+  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -98,7 +95,6 @@ const DashboardSidebar = () => {
     { title: t("nav.cowork"), url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     { title: t("nav.meet"), url: "/meet", icon: Video, module: "Meet" },
     { title: t("nav.recordings"), url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
-    { title: t("nav.office"), url: "/oficina", icon: FileText, module: "Oficina" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
@@ -351,6 +347,22 @@ const DashboardSidebar = () => {
     isCreadoresActive ||
     enDashboardVentas;
 
+  // ── Oficina ───────────────────────────────────────────────────────────
+  // Dejó de ser una página para ser una suite. Cada formato es su propia
+  // sección, como en Google: la lista de hojas no se mezcla con la de
+  // documentos. Calendario y Drive entran acá cuando existan.
+  const oficinaItemsAll = [
+    { title: t("nav.office.docs"), url: "/oficina", icon: FileText, submodule: "Documentos" },
+    { title: t("nav.office.sheets"), url: "/oficina/hojas", icon: FileSpreadsheet, submodule: "Hojas de cálculo" },
+    { title: t("nav.office.slides"), url: "/oficina/presentaciones", icon: Presentation, submodule: "Presentaciones" },
+  ];
+  const oficinaItems = oficinaItemsAll.filter((i) => canAccess("Oficina", i.submodule));
+  const oficinaCollapsedItems: CI[] = oficinaItems.map((i) => ({ title: i.title, url: i.url }));
+  // ⚠️ Por PREFIJO y no por igualdad: al abrir un documento la ruta es
+  // /oficina/<uuid>, que no está en el menú, y el grupo se apagaba justo
+  // mientras se está trabajando adentro.
+  const isOficinaActive = pathname === "/oficina" || pathname.startsWith("/oficina/");
+
   const operationsCollapsedItems: CI[] = operationsMenu.map((i) => ({
     title: i.title,
     url: i.url,
@@ -461,6 +473,32 @@ const DashboardSidebar = () => {
 
             </SidebarMenu>
         </CollapsibleSidebarGroup>
+
+        {oficinaItems.length > 0 && (
+        <CollapsibleSidebarGroup
+          label={t("nav.office")}
+          storageKey="oficina"
+          icon={FileText}
+          active={isOficinaActive}
+          collapsedItems={oficinaCollapsedItems}
+        >
+            <SidebarMenu>
+              {oficinaItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    {/* `end` en /oficina: sin eso, estar en /oficina/hojas
+                        encendía TAMBIÉN a Documentos, porque NavLink marca por
+                        prefijo y toda la sección cuelga de la misma raíz. */}
+                    <NavLink to={item.url} end={item.url === "/oficina"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+        </CollapsibleSidebarGroup>
+        )}
 
         {operationsMenu.length > 0 && (
         <CollapsibleSidebarGroup

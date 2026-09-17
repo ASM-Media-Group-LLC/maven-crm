@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-  FileText, Plus, Search, Users, Lock, Trash2, RotateCcw, Loader2, X,
+  FileText, FileSpreadsheet, Presentation, Plus, Search, Users, Lock,
+  Trash2, RotateCcw, Loader2, X,
 } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,7 +22,9 @@ import {
   useDocumentos, usePapelera, useBorrarDocumento,
   type Documento, type FiltrosDocumentos,
 } from "@/hooks/useDocumentos";
-import { useCrearDocumentoOffice } from "@/hooks/useOnlyOffice";
+import { useCrearDocumentoOffice, type FormatoDeOficina } from "@/hooks/useOnlyOffice";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 function cuando(iso: string): string {
   const d = new Date(iso);
@@ -30,26 +33,55 @@ function cuando(iso: string): string {
   return format(d, "d MMM yyyy", { locale: es });
 }
 
+/** Cada formato es su propia sección del menú, como en Google: la lista de
+ *  hojas no se mezcla con la de documentos. Lo único que cambia es el formato
+ *  con el que nacen y cómo se llaman las cosas. */
+const FORMATOS: Record<FormatoDeOficina, {
+  titulo: TranslationKey;
+  nuevo: TranslationKey;
+  icono: typeof FileText;
+  vacio: string;
+  ayuda: string;
+}> = {
+  docx: {
+    titulo: "nav.office.docs", nuevo: "oficina.nuevoDoc", icono: FileText,
+    vacio: "Todavía no hay documentos",
+    ayuda: "Empezá por un procedimiento, un guion o un acta de reunión.",
+  },
+  xlsx: {
+    titulo: "nav.office.sheets", nuevo: "oficina.nuevaHoja", icono: FileSpreadsheet,
+    vacio: "Todavía no hay hojas de cálculo",
+    ayuda: "Sirven para un presupuesto, un control de turnos o un listado.",
+  },
+  pptx: {
+    titulo: "nav.office.slides", nuevo: "oficina.nuevaPresentacion", icono: Presentation,
+    vacio: "Todavía no hay presentaciones",
+    ayuda: "Para una inducción, una propuesta o un reporte al equipo.",
+  },
+};
+
 const VISTAS: { id: FiltrosDocumentos["vista"]; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "mios", label: "Míos" },
   { id: "papelera", label: "Papelera" },
 ];
 
-export default function OficinaPage() {
+export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeOficina }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const cfg = FORMATOS[formato];
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [vista, setVista] = useState<FiltrosDocumentos["vista"]>("todos");
   const [confirmarBorrado, setConfirmarBorrado] = useState<Documento | null>(null);
 
-  const docs = useDocumentos({ q, vista });
+  const docs = useDocumentos({ q, vista, extension: formato });
   const crear = useCrearDocumentoOffice();
   const papelera = usePapelera();
   const borrar = useBorrarDocumento();
 
   const nuevo = () => {
-    crear.mutate(undefined, {
+    crear.mutate({ extension: formato }, {
       onSuccess: ({ id }) => navigate(`/oficina/${id}`),
       onError: (e) => toast.error((e as Error).message || "No se pudo crear el documento"),
     });
@@ -75,9 +107,9 @@ export default function OficinaPage() {
     <Page>
       <div className="flex w-full flex-col gap-5">
         <PageHeader
-          title="Oficina"
-          subtitle="Documentos del equipo, escritos en Maven"
-          icon={<FileText />}
+          title={t(cfg.titulo)}
+          subtitle="Del equipo, escritos en Maven"
+          icon={<cfg.icono />}
           actions={
             <Button onClick={nuevo} disabled={crear.isPending} className="rounded-full">
               {crear.isPending ? (
@@ -85,7 +117,7 @@ export default function OficinaPage() {
               ) : (
                 <Plus className="mr-2 h-4 w-4" />
               )}
-              Documento nuevo
+              {t(cfg.nuevo)}
             </Button>
           }
         />
@@ -154,19 +186,19 @@ export default function OficinaPage() {
                 ? "Ningún documento coincide"
                 : vista === "papelera"
                   ? "La papelera está vacía"
-                  : "Todavía no hay documentos"}
+                  : cfg.vacio}
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
               {q
                 ? "Se busca por título. Probá con otra palabra."
                 : vista === "papelera"
                   ? "Lo que mandes a la papelera aparece acá hasta que lo elimines."
-                  : "Empezá por un procedimiento, un guion o un acta de reunión."}
+                  : cfg.ayuda}
             </p>
             {!q && vista !== "papelera" && (
               <Button onClick={nuevo} variant="outline" size="sm" className="mt-4 rounded-full">
                 <Plus className="mr-2 h-4 w-4" />
-                Documento nuevo
+                {t(cfg.nuevo)}
               </Button>
             )}
           </div>
@@ -189,7 +221,7 @@ export default function OficinaPage() {
                       disabled={enPapelera}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
                     >
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <cfg.icono className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
                           {d.title || "Sin título"}

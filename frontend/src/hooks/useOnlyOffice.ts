@@ -35,14 +35,21 @@ export function useAbrirEnOnlyOffice() {
   });
 }
 
+/** Los tres formatos de la Oficina. La extensión ES el tipo: la edge la usa
+ *  para elegir el archivo en blanco y ONLYOFFICE para elegir el editor. */
+export type FormatoDeOficina = "docx" | "xlsx" | "pptx";
+
 export function useCrearDocumentoOffice() {
   return useMutation({
-    mutationFn: async (titulo?: string): Promise<{ id: string }> => {
+    mutationFn: async (
+      args: { titulo?: string; extension?: FormatoDeOficina } = {},
+    ): Promise<{ id: string }> => {
+      const { titulo, extension = "docx" } = args;
       const { data: sesion } = await supabase.auth.getSession();
       const token = sesion.session?.access_token;
       if (!token) throw new Error("Sin sesión");
       const { data, error } = await supabase.functions.invoke("oficina-doc", {
-        body: { action: "crear", titulo, extension: "docx" },
+        body: { action: "crear", titulo, extension },
         headers: { Authorization: `Bearer ${token}` },
       });
       if (error) {
