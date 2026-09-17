@@ -234,9 +234,13 @@ Deno.serve(async (req) => {
 
     if (accion === "crear") {
       const extension = String(body.extension ?? "docx");
+      // `EXTENSIONES` es la única puerta: mientras exista la plantilla en
+      // blanco del formato, se puede crear. Acá vivía además un `extension !==
+      // "docx"` que sobraba desde que existen las tres — y que no se veía
+      // leyendo las constantes, porque las constantes ya las aceptaban.
       if (!EXTENSIONES.has(extension)) throw new HttpError("Formato no soportado", 400);
-      if (extension !== "docx") {
-        throw new HttpError("Por ahora solo documentos de texto (.docx)", 400);
+      if (!EN_BLANCO[extension]) {
+        throw new HttpError(`Falta la plantilla en blanco de .${extension}`, 500);
       }
 
       const { data: fila, error } = await comoLaPersona
