@@ -1,0 +1,24 @@
+-- La campana de notificaciones ordenaba 106.000 filas en cada cargue.
+--
+-- 17/09/2026, segunda caída del día. La consulta que dispara TODA persona al
+-- entrar a Maven es "las 100 notificaciones más recientes que no estén
+-- archivadas". Pero de las 106.164 filas de la tabla, 106.072 no están
+-- archivadas: ese filtro no descarta nada. Sin índice por fecha, Postgres
+-- ordenaba la tabla ENTERA para devolver 100 filas, y encima aplicaba tres
+-- políticas de seguridad fila por fila.
+--
+-- Medido en producción: una sola de esas consultas llevaba 7,2 segundos
+-- corriendo, con 345.554 llamadas acumuladas. Con 59 personas entrando y
+-- saliendo, eso solo mantiene la base ocupada.
+--
+-- Con el índice el plan pasa de ordenar todo a:
+--   Limit -> Index Scan using idx_notifications_created_at_desc
+-- o sea que lee las primeras filas por fecha y para.
+--
+-- Para revertir:  DROP INDEX public.idx_notifications_created_at_desc;
+--
+-- ⚠️ PENDIENTE APARTE: nadie archiva ni purga notificaciones. La tabla crece
+-- sin techo (106 mil filas, 41 MB) y el 99,9% sigue "sin archivar". El índice
+-- tapa el síntoma; hace falta una política de retención.
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at_desc
+  ON public.notifications (created_at DESC);
