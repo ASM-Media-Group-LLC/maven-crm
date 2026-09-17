@@ -538,6 +538,13 @@ const translations = {
   },
   "cal.organiza": { es: "Organiza", en: "Organizer" },
 
+  // Calendario · vista de semana
+  "cal.vistaMes": { es: "Mes", en: "Month" },
+  "cal.vistaSemana": { es: "Semana", en: "Week" },
+  "cal.semanaAnterior": { es: "Semana anterior", en: "Previous week" },
+  "cal.semanaSiguiente": { es: "Semana siguiente", en: "Next week" },
+  "cal.sinEventosSemana": { es: "Nada agendado esta semana", en: "Nothing scheduled this week" },
+
   // Oficina · compartir un documento con personas
   "doc.compartir": { es: "Compartir", en: "Share" },
   "doc.compartirCon": { es: "Compartir con", en: "Share with" },
