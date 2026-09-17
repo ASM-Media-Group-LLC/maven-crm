@@ -424,9 +424,7 @@ const HistoryContent = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMut.isPending}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMut.isPending} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
@@ -461,9 +459,7 @@ const HistoryContent = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkDeleting}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={bulkDeleting} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {

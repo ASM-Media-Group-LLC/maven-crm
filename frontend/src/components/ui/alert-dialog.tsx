@@ -2,6 +2,7 @@ import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import { buttonVariants } from "@/components/ui/button";
 
 const AlertDialog = AlertDialogPrimitive.Root;
@@ -79,16 +80,25 @@ const AlertDialogAction = React.forwardRef<
 ));
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
 
+// El botón de escaparse del diálogo dice «Cancelar» en los 89 lugares donde
+// aparece. En vez de repetir la traducción 89 veces, la pone el primitivo: si no
+// le pasás hijos, se traduce solo. Un diálogo que necesite otra palabra («Ahora
+// no», «Seguir editando») sigue pudiendo pasarla como hijo, igual que siempre.
 const AlertDialogCancel = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Cancel>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel>
->(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Cancel
-    ref={ref}
-    className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", className)}
-    {...props}
-  />
-));
+>(({ className, children, ...props }, ref) => {
+  const { t } = useLanguage();
+  return (
+    <AlertDialogPrimitive.Cancel
+      ref={ref}
+      className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", className)}
+      {...props}
+    >
+      {children ?? t("common.cancel")}
+    </AlertDialogPrimitive.Cancel>
+  );
+});
 AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName;
 
 export {

@@ -153,7 +153,7 @@ function CompanyTable({ company, rows, prevByName }: {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={del.isPending} />
             <AlertDialogAction
               disabled={del.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

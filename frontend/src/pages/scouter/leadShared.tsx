@@ -806,7 +806,7 @@ export const LeadDrawer = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction
               onClick={async () => {
                 setConfirmDiscard(false);

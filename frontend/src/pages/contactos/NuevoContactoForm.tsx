@@ -653,7 +653,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
           <Command>
             <CommandInput placeholder="Buscar compañía..." />
             <CommandList>
-              <CommandEmpty>Sin resultados.</CommandEmpty>
+              <CommandEmpty />
               <CommandGroup>
                 {companies.map((c) => (
                   <CommandItem key={c} value={c} onSelect={() => { onChange(c === value ? "" : c); setOpen(false); }}>

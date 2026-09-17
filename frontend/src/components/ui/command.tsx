@@ -4,6 +4,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const Command = React.forwardRef<
@@ -67,10 +68,20 @@ const CommandList = React.forwardRef<
 
 CommandList.displayName = CommandPrimitive.List.displayName;
 
+// Igual que AlertDialogCancel: «Sin resultados.» es el texto por defecto de
+// todo buscador, así que lo pone el primitivo. Un buscador que quiera decir algo
+// más preciso («No se encontró ninguna creadora») lo sigue pasando como hijo.
 const CommandEmpty = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Empty>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
->((props, ref) => <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm" {...props} />);
+>(({ children, ...props }, ref) => {
+  const { t } = useLanguage();
+  return (
+    <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm" {...props}>
+      {children ?? t("common.noResults")}
+    </CommandPrimitive.Empty>
+  );
+});
 
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 

@@ -660,7 +660,7 @@ export default function FacturacionPage() {
             <AlertDialogDescription>Se eliminará esta nota de pago permanentemente.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => { if (!deleteItem) return; deletePaymentNoteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

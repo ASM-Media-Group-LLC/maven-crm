@@ -443,7 +443,7 @@ export default function HRDeductions() {
             <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente esta deducción de {formatAmount(deleteItem?.amount ?? 0)}.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>

@@ -208,7 +208,7 @@ export const CriteriaPanel = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={resetMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={resetMut.isPending} />
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();

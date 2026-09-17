@@ -467,7 +467,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={endMut.isPending} />
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {

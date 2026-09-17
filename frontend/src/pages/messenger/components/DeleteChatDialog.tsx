@@ -40,7 +40,7 @@ export default function DeleteChatDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel />
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isLoading}

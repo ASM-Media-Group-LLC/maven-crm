@@ -440,7 +440,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
               <AlertDialogDescription>Se borra con su historial y adjuntos. Si solo no se va a hacer, mejor denegarlo: queda el registro.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel />
               <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={async (e) => { e.preventDefault(); try { await borrar.mutateAsync(pedido.id); toast.success("Pedido eliminado"); onClose(); } catch (err) { toast.error("No se pudo eliminar", { description: (err as Error).message }); } }}>
                 Eliminar

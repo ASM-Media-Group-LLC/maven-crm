@@ -612,7 +612,7 @@ const ClosersContent = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={converting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={converting} />
             <AlertDialogAction onClick={(e) => { e.preventDefault(); doConvertToCreator(); }} disabled={converting || convertCheckLoading}>
               {converting ? "Procesando…"
                 : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? "Entendido"

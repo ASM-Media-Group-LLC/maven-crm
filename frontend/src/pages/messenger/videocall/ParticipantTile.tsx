@@ -498,7 +498,7 @@ const ParticipantTile = memo(function ParticipantTile({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel />
             <AlertDialogAction onClick={() => onMuteParticipant?.(participant.identity)}>
               Silenciar para todos
             </AlertDialogAction>

@@ -497,7 +497,7 @@ export default function CoworkPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saliendo}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={saliendo} />
             <AlertDialogAction disabled={saliendo} onClick={(e) => { e.preventDefault(); void confirmarSalir(); }}>
               {saliendo ? "Saliendo…" : "Salir"}
             </AlertDialogAction>
@@ -517,7 +517,7 @@ export default function CoworkPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={finalizando}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={finalizando} />
             <AlertDialogAction
               disabled={finalizando}
               onClick={(e) => { e.preventDefault(); void confirmarFinalizar(); }}

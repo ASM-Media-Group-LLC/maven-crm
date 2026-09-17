@@ -80,7 +80,7 @@ const ViewAsCloserPicker = ({ value, onChange }: Props) => {
               <CommandEmpty>Sin closers en el tenant.</CommandEmpty>
             ) : (
               <>
-                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandEmpty />
                 <CommandGroup heading="Ver como">
                   {closers.map((c) => {
                     const label = c.full_name?.trim() || "(sin nombre)";

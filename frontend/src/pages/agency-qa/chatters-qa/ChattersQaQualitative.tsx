@@ -208,7 +208,7 @@ export default function ChattersQaQualitative() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={del.isPending} />
             <AlertDialogAction
               disabled={del.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -239,7 +239,7 @@ export default function ChattersQaQualitative() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={sendEmail.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={sendEmail.isPending} />
             <AlertDialogAction
               disabled={sendEmail.isPending}
               onClick={(e) => {

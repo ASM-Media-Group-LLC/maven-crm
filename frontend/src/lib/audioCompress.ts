@@ -9,6 +9,8 @@
 // guardar el original como audit trail, tienes que subirlo separado
 // (Storage) — esto solo prepara el archivo que Whisper necesita.
 
+import { traducir } from "@/lib/i18n";
+
 const TARGET_SAMPLE_RATE = 16_000; // 16kHz — Whisper input nativo
 // 24 kbps mono → ~10.8MB para 60 min, ~21.6MB para 120 min.
 // Empezamos en 32 kbps pero llamadas largas (>90 min) cruzaban el
@@ -45,7 +47,7 @@ export async function compressAudioIfNeeded(
     };
   }
 
-  onProgress?.(5, "Decodificando audio…");
+  onProgress?.(5, traducir("audio.decoding"));
 
   // 1. Decode arbitrary input format → AudioBuffer.
   // AudioContext.decodeAudioData soporta mp3/m4a/wav/ogg/webm/flac
@@ -55,7 +57,7 @@ export async function compressAudioIfNeeded(
   const audioBuffer = await decodingCtx.decodeAudioData(arrayBuffer.slice(0));
   await decodingCtx.close();
 
-  onProgress?.(20, "Bajando sample rate…");
+  onProgress?.(20, traducir("audio.downsampling"));
 
   // 2. Render a mono 16kHz version offline.
   // OfflineAudioContext es como AudioContext pero corre tan rápido como
@@ -71,7 +73,7 @@ export async function compressAudioIfNeeded(
   source.start();
   const monoBuffer = await offlineCtx.startRendering();
 
-  onProgress?.(50, "Codificando mp3…");
+  onProgress?.(50, traducir("audio.encoding"));
 
   // 3. Encode mono PCM → mp3 con lamejs.
   const samples = monoBuffer.getChannelData(0); // Float32Array
@@ -109,7 +111,7 @@ export async function compressAudioIfNeeded(
     if (totalBlocks > 0) {
       const pct = 50 + Math.floor((i / totalBlocks) * 45);
       if (pct - lastReported >= 5) {
-        onProgress?.(pct, "Codificando mp3…");
+        onProgress?.(pct, traducir("audio.encoding"));
         lastReported = pct;
         // Yield al event loop así la UI no se traba en archivos grandes.
         await new Promise((resolve) => setTimeout(resolve, 0));

@@ -905,7 +905,7 @@ const CloserCombobox = ({
               </CommandEmpty>
             ) : (
               <>
-                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandEmpty />
                 <CommandGroup>
                   {options.map((opt) => {
                     const label = opt.full_name?.trim() || "(sin nombre)";
@@ -985,7 +985,7 @@ const SupportClosersPicker = ({
           <Command>
             <CommandInput placeholder="Buscar closer…" className="h-9" />
             <CommandList>
-              <CommandEmpty>Sin resultados.</CommandEmpty>
+              <CommandEmpty />
               <CommandGroup>
                 {options.map((opt) => {
                   const label = opt.full_name?.trim() || "(sin nombre)";
@@ -1043,7 +1043,7 @@ const CountryCombobox = ({
         <Command>
           <CommandInput placeholder="Buscar país…" className="h-9" />
           <CommandList>
-            <CommandEmpty>Sin resultados.</CommandEmpty>
+            <CommandEmpty />
             <CommandGroup>
               {CANONICAL_COUNTRIES.map((country) => (
                 <CommandItem

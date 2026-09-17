@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import { type Language, type TranslationKey, getTranslation } from "@/lib/i18n";
+import { type Language, type TranslationKey, getTranslation, fijarIdioma } from "@/lib/i18n";
 
 interface LanguageContextType {
   language: Language;
@@ -13,11 +13,17 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     const stored = localStorage.getItem("app-language");
-    return (stored === "en" || stored === "es") ? stored : "es";
+    const inicial: Language = (stored === "en" || stored === "es") ? stored : "es";
+    // Se fija acá, en el inicializador, y no en un efecto: un toast puede
+    // dispararse antes del primer efecto (por ejemplo si la sesión ya venció al
+    // cargar) y tiene que salir en el idioma correcto desde el arranque.
+    fijarIdioma(inicial);
+    return inicial;
   });
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
+    fijarIdioma(lang);
     localStorage.setItem("app-language", lang);
   }, []);
 

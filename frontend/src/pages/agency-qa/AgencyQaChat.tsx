@@ -693,9 +693,7 @@ const AgencyQaChat = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteSession.isPending}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteSession.isPending} />
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleteSession.isPending}

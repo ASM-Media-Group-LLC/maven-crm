@@ -478,7 +478,7 @@ const ChannelsPage = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteChannel.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteChannel.isPending} />
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); deleteChannel.mutate(); }}
               className="bg-destructive text-white hover:bg-destructive"

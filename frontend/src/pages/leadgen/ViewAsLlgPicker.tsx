@@ -59,7 +59,7 @@ const ViewAsLlgPicker = ({ value, onChange }: Props) => {
               <CommandEmpty>Sin LLGs registrados.</CommandEmpty>
             ) : (
               <>
-                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandEmpty />
                 <CommandGroup heading="Ver como">
                   {llgs.map((l) => {
                     const label = l.full_name?.trim() || "(sin nombre)";
