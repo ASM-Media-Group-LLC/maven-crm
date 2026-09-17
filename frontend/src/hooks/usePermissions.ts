@@ -13,7 +13,11 @@ interface Permission {
 // config. Exportada porque SetPermissionsModal la necesita: un modulo universal SIN
 // fila guardada tiene que mostrarse ENCENDIDO, que es como se comporta de verdad.
 // Si arrancara apagado, abrir un rol y guardar le quitaria un acceso que hoy tiene.
-export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones"];
+// ⚠️ "Universal" = visible por default para todo rol, NO "sin control": el
+// admin puede apagárselo a un rol desde la pantalla de Roles, y lo que cada
+// persona ve adentro lo sigue decidiendo la RLS (en Oficina, dueño o equipo).
+// Oficina entró el 17/09/2026 por pedido de Jhon: la usa todo el mundo.
+export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones", "Oficina"];
 
 export const usePermissions = () => {
   const { role, isAdmin, isLoading: roleLoading, isError: roleError, recargarRol } = useUserRole();

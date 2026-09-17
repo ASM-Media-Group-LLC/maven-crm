@@ -483,6 +483,13 @@ const translations = {
   // Sidebar items - Menú (resto del marco de la app)
   "nav.mail": { es: "Correo", en: "Mail" },
   "nav.office": { es: "Oficina", en: "Office" },
+  // Oficina · las tres secciones de la suite
+  "nav.office.docs": { es: "Documentos", en: "Documents" },
+  "nav.office.sheets": { es: "Hojas de cálculo", en: "Spreadsheets" },
+  "nav.office.slides": { es: "Presentaciones", en: "Presentations" },
+  "oficina.nuevoDoc": { es: "Documento nuevo", en: "New document" },
+  "oficina.nuevaHoja": { es: "Hoja nueva", en: "New spreadsheet" },
+  "oficina.nuevaPresentacion": { es: "Presentación nueva", en: "New presentation" },
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.meet": { es: "Meet", en: "Meet" },
@@ -567,6 +574,7 @@ const translations = {
 
   // Secciones del buscador ⌘K (espejan las del sidebar)
   "nav.section.menu": { es: "Menú", en: "Menu" },
+  "nav.section.office": { es: "Oficina", en: "Office" },
   "nav.section.creators": { es: "Creadoras", en: "Creators" },
   "nav.section.sales": { es: "Ventas", en: "Sales" },
   "nav.section.operations": { es: "Operaciones", en: "Operations" },

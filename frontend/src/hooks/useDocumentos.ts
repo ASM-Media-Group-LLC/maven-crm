@@ -50,6 +50,9 @@ export interface FiltrosDocumentos {
   q: string;
   /** "mios" | "equipo" | "papelera" */
   vista: "todos" | "mios" | "papelera";
+  /** Documentos, hojas o presentaciones. Cada uno es su propia sección del
+   *  menú, como en Google: la lista de hojas no mezcla con la de documentos. */
+  extension?: "docx" | "xlsx" | "pptx";
 }
 
 /** Listado de documentos. La búsqueda por texto va por `buscar_documentos`, que
@@ -59,7 +62,7 @@ export function useDocumentos(filtros: FiltrosDocumentos) {
   const termino = filtros.q.trim();
 
   return useQuery({
-    queryKey: ["documentos", filtros.vista, termino, user?.id],
+    queryKey: ["documentos", filtros.vista, filtros.extension, termino, user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Documento[]> => {
       // ⚠️ Se busca solo por TÍTULO. La búsqueda dentro del texto murió con el
@@ -74,6 +77,7 @@ export function useDocumentos(filtros: FiltrosDocumentos) {
           ? q.not("deleted_at", "is", null)
           : q.is("deleted_at", null);
       if (filtros.vista === "mios" && user) q = q.eq("owner_id", user.id);
+      if (filtros.extension) q = q.eq("extension", filtros.extension);
 
       const { data, error } = await q.order("updated_at", { ascending: false }).limit(200);
       if (error) throw error;
