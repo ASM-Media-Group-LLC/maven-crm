@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, Loader2, Lock, Users, WifiOff } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Lock, Share2, Users, WifiOff } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import {
   useDocumento, useGuardarDocumento, type VisibilidadDocumento,
 } from "@/hooks/useDocumentos";
 import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
+import { useLanguage } from "@/hooks/useLanguage";
+import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
 
 /** El div donde ONLYOFFICE se monta. Tiene que ser un id y no una ref: la API
  *  del editor recibe el NOMBRE del contenedor, no el elemento. */
@@ -20,6 +22,8 @@ export default function DocumentoPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const [compartiendo, setCompartiendo] = useState(false);
   const doc = useDocumento(id);
   const guardar = useGuardarDocumento();
   const abrir = useAbrirEnOnlyOffice();
@@ -93,6 +97,18 @@ export default function DocumentoPage() {
           subtitle={`Versión ${cargado.version}`}
           actions={
             <>
+              {/* Compartir con personas concretas es distinto de la
+                  visibilidad: un documento privado compartido con dos
+                  personas sigue siendo privado. */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-full"
+                onClick={() => setCompartiendo(true)}
+              >
+                <Share2 className="mr-1.5 h-4 w-4" />
+                {t("doc.compartir")}
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -139,6 +155,16 @@ export default function DocumentoPage() {
           <div id={CONTENEDOR} className="h-full w-full" />
         </div>
       </div>
+
+      {id && (
+        <DialogoDeCompartir
+          abierto={compartiendo}
+          onCerrar={() => setCompartiendo(false)}
+          documentoId={id}
+          titulo={cargado.title}
+          soyDueno={!!esMio}
+        />
+      )}
     </Page>
   );
 }
