@@ -109,7 +109,11 @@ function FinancialSummaryCards() {
   const { data: pendingDeductions } = useQuery({
     queryKey: ["hr-fin-pending-deductions"],
     queryFn: async () => {
-      const { count, error } = await supabase.from("employee_deductions").select("id", { count: "exact", head: true }).eq("status", "pending");
+      // Tarjeta "Deducciones Pend." → count:"estimated". Es un aviso de "hay
+      // pendientes, entrá a verlas", no el número con el que se liquida: el
+      // detalle sale de /hr/deducciones. Por debajo del max-rows de PostgREST
+      // sigue siendo el conteo exacto.
+      const { count, error } = await supabase.from("employee_deductions").select("id", { count: "estimated", head: true }).eq("status", "pending");
       if (error) throw error;
       return count ?? 0;
     },

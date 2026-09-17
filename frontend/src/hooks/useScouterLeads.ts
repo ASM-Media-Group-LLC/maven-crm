@@ -226,6 +226,9 @@ export const useScouterLeads = (params: ListParams = {}) => {
       let q = sb
         // vista enmascarada: phone enmascarado para no-admin (revocado en la tabla base)
         .from("v_scouter_leads")
+        // count:"exact" A PROPÓSITO: este `total` es el de la paginación
+        // (.range de abajo). Un estimado cambiaría el número de páginas y
+        // dejaría filas inalcanzables o páginas vacías al final.
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -533,11 +536,15 @@ export const useScouterStats = (filters: ScouterStatsFilters = {}) =>
       const since7d = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
       const since30d = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
 
-      // Count helpers — Supabase returns count via head + exact.
+      // Count helpers — head + count:"estimated". Son cards de KPI: nadie
+      // cierra un turno ni concilia plata con ellas, y "estimated" solo
+      // estima cuando el conjunto pasa el max-rows de PostgREST (por debajo
+      // devuelve el conteo exacto). A cambio, el count deja de recorrer las
+      // ~7.800 filas de scouter_leads en cada card.
       // Aplicamos los filtros activos a TODAS las queries para que las
       // cards coincidan con la grid filtrada.
       const head = (subFilter: (q: any) => any) =>
-        subFilter(applyStatsFilters(sb.from("scouter_leads").select("id", { count: "exact", head: true }), filters));
+        subFilter(applyStatsFilters(sb.from("scouter_leads").select("id", { count: "estimated", head: true }), filters));
 
       const [
         { count: discovered24h },
@@ -652,8 +659,9 @@ export const useScouterFunnel = (window: FunnelWindow = "30d") =>
     queryKey: ["scouter-funnel", window],
     queryFn: async (): Promise<FunnelData> => {
       const since = windowSinceIso(window);
+      // Cifras del embudo (cards, no conciliación) → count:"estimated".
       const head = (filter: (q: any) => any) =>
-        filter(sb.from("scouter_leads").select("id", { count: "exact", head: true }));
+        filter(sb.from("scouter_leads").select("id", { count: "estimated", head: true }));
       const apply = (q: any) => (since ? q.gte("created_at", since) : q);
 
       const [
@@ -1172,9 +1180,11 @@ export const useScouterJobs = (params: ScouterJobsParams = {}) => {
   });
 };
 
-/** Devuelve counts exactos de jobs activos por status. Útil cuando el
- *  contador tiene que mostrar el número real (no truncado por limit).
- *  Usa head + count='exact' — no trae rows, solo el número. */
+/** Devuelve el número de jobs activos por status. Es un indicador de
+ *  profundidad de cola que se repinta cada 30s: usa head + count='estimated'
+ *  (no trae filas y, por debajo del max-rows de PostgREST, el número sigue
+ *  siendo exacto). No sirve para contar con precisión colas de más de mil
+ *  jobs, y no hace falta: ahí lo único que se lee es "hay mucho". */
 export const useScouterJobCounts = () =>
   useQuery({
     queryKey: ["scouter-job-counts"],
@@ -1188,13 +1198,13 @@ export const useScouterJobCounts = () =>
         { count: scoreQueued },
         { count: enrichQueued },
       ] = await Promise.all([
-        sb.from("scouter_jobs").select("*", { count: "exact", head: true }).eq("status", "queued"),
-        sb.from("scouter_jobs").select("*", { count: "exact", head: true }).eq("status", "running"),
-        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+        sb.from("scouter_jobs").select("*", { count: "estimated", head: true }).eq("status", "queued"),
+        sb.from("scouter_jobs").select("*", { count: "estimated", head: true }).eq("status", "running"),
+        sb.from("scouter_jobs").select("*", { count: "estimated", head: true })
           .eq("status", "queued").in("kind", ["discover_seed", "discover_hashtag"]),
-        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+        sb.from("scouter_jobs").select("*", { count: "estimated", head: true })
           .eq("status", "queued").eq("kind", "score_lead"),
-        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+        sb.from("scouter_jobs").select("*", { count: "estimated", head: true })
           .eq("status", "queued").in("kind", ["enrich_handle", "enrich_profile", "refresh_posts"]),
       ]);
       return {

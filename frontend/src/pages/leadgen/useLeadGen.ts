@@ -57,6 +57,10 @@ export type LeadGenNote = {
   user_name?: string;
 };
 
+// ⚠️ Los dos fetch de abajo llevan count:"exact" A PROPÓSITO: su `total` es el
+// de la paginación (.range de 100 en 100). Con un estimado el número de páginas
+// cambiaría y quedarían filas inalcanzables o páginas vacías al final. Los
+// conteos de badges/KPI sí se pasaron a count:"estimated"; estos no.
 type PaginatedResult = { data: LeadGenEntry[]; total: number };
 
 const PAGE_SIZE = 100;

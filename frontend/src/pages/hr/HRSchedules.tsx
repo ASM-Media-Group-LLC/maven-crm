@@ -110,7 +110,9 @@ const HRSchedules = () => {
   const { data: overtimeCount = 0 } = useQuery({
     queryKey: ["overtime_count"],
     queryFn: async () => {
-      const { count, error } = await supabase.from("overtime").select("id", { count: "exact", head: true });
+      // StatChip "Horas Extra" → count:"estimated" (exacto por debajo del
+      // max-rows de PostgREST; el chip no cuadra plata, solo lleva al detalle).
+      const { count, error } = await supabase.from("overtime").select("id", { count: "estimated", head: true });
       if (error) throw error;
       return count ?? 0;
     },

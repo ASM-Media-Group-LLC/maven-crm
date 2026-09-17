@@ -30,6 +30,11 @@ const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
   // PERF: antes se paginaba SECUENCIAL (requests encadenados sobre todo el histórico → lento).
   // Ahora contamos primero (head=true, sin traer filas) y disparamos TODAS las páginas EN PARALELO.
   // Orden estable date+id (tiebreak) para que el .range() no salte/duplique filas entre páginas.
+  // ⚠️ count:"exact" OBLIGATORIO acá: de este número sale `pages`, y de `pages`
+  // salen los .range() que traen TODO el histórico de ingresos. Con
+  // count:"estimated" PostgREST corta el conteo en max-rows+1 → pages=2 → se
+  // perderían ~39.000 filas de plata EN SILENCIO (los meses viejos saldrían
+  // vacíos, igual que el bug de PAGE_SIZE de arriba). No cambiar por rendimiento.
   const { count, error: cErr } = await (supabase as any)
     .from("creator_daily_earnings")
     .select("id", { count: "exact", head: true });

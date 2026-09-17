@@ -49,8 +49,10 @@ export const useOperationalKPIs = () =>
   useQuery({
     queryKey: ["dashboard-operational-kpis"],
     queryFn: async () => {
-      const employeesRes = await (supabase.from("employees_directory").select("id", { count: "exact", head: true }) as any).eq("status", "activo");
-      const absencesRes = await (supabase.from("absences").select("id", { count: "exact", head: true }) as any).eq("status", "approved");
+      // Dos tarjetas de KPI del tablero → count:"estimated" (exacto por
+      // debajo del max-rows de PostgREST, que es donde viven estos números).
+      const employeesRes = await (supabase.from("employees_directory").select("id", { count: "estimated", head: true }) as any).eq("status", "activo");
+      const absencesRes = await (supabase.from("absences").select("id", { count: "estimated", head: true }) as any).eq("status", "approved");
 
       return {
         totalEmployees: employeesRes.count ?? 0,

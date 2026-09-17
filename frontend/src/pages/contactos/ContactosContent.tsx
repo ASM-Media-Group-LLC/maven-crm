@@ -258,6 +258,8 @@ const ContactosContent = () => {
         // Vista enmascarada: phone/email solo vienen reales para admin; el resto NULL.
         // (closers_contacts.phone/email están revocados para no-admin.)
         .from("v_closers_contacts")
+        // count:"exact" a propósito: este total es el de la paginación
+        // (se pinta como "Mostrando X–Y de N"). Un estimado movería las páginas.
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
 

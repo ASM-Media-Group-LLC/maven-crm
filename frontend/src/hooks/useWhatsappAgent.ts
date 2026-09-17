@@ -114,19 +114,25 @@ export function useWhatsappGroupSummary(groupId: string | null) {
     queryKey: ["whatsapp", "group-summary", groupId],
     queryFn: async () => {
       if (!groupId) return null;
+      // Los tres son cifras de resumen de la tarjeta del grupo: nadie concilia
+      // nada con ellas, así que van con count:"estimated" (exacto por debajo
+      // del max-rows de PostgREST, estimado por encima). El de mensajes es el
+      // que importa: un grupo viejo pasa los miles y hoy se recorría entero.
       const [msgsRes, commitsRes, membersRes] = await Promise.all([
         sb
           .from("whatsapp_messages")
-          .select("id", { count: "exact", head: true })
+          .select("id", { count: "estimated", head: true })
           .eq("group_id", groupId),
         sb
+          // head:true — de este solo se usa el count; sin él PostgREST mandaba
+          // además TODAS las filas de `status` para tirarlas acá mismo.
           .from("whatsapp_commitments")
-          .select("status", { count: "exact" })
+          .select("status", { count: "estimated", head: true })
           .eq("group_id", groupId)
           .in("status", ["pending", "overdue"]),
         sb
           .from("whatsapp_members")
-          .select("id", { count: "exact", head: true })
+          .select("id", { count: "estimated", head: true })
           .eq("group_id", groupId),
       ]);
       return {

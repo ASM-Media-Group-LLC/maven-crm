@@ -42,8 +42,11 @@ export const useChattersRecruitment = (range: ChattersRange) =>
       const fromIso = toIso(range.from);
       const toIsoVal = toIsoEndOfDay(range.to);
 
+      // count:"estimated": son las cards del embudo de reclutamiento, no una
+      // paginación ni una nómina. Por debajo del max-rows de PostgREST el
+      // número sigue siendo exacto, que es el caso de cualquier rango normal.
       const head = (table: string, dateCol: string, filter?: (q: any) => any) => {
-        let q = sb.from(table).select("*", { count: "exact", head: true });
+        let q = sb.from(table).select("*", { count: "estimated", head: true });
         if (fromIso) q = q.gte(dateCol, fromIso);
         if (toIsoVal) q = q.lte(dateCol, toIsoVal);
         if (filter) q = filter(q);

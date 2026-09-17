@@ -177,7 +177,16 @@ export interface MetricDetailsResult {
 }
 
 /** Fetch de los items detrás de una métrica. Devuelve hasta 100 rows
- *  + count real para mostrar en el header. */
+ *  + total para mostrar en el header.
+ *
+ *  Los counts de este hook van TODOS con count:"estimated". El número solo
+ *  se pinta en el encabezado del cajón ("Mostrando los 100 más recientes de
+ *  N totales"): es una cifra de tamaño, no una paginación ni una cuadratura
+ *  de plata. Con "exact" cada apertura recorría leadgen_entries completa
+ *  (~24k filas) hasta tres veces. Ojo: "estimated", NO "planned" — planned
+ *  siempre usa la estimación del planificador y en conjuntos chicos dice
+ *  disparates; estimated corta en el max-rows de PostgREST y por debajo de
+ *  ahí devuelve el conteo exacto. */
 export const useMetricDetails = (
   metric: MetricKey,
   range: DashboardRange,
@@ -200,7 +209,7 @@ export const useMetricDetails = (
         case "contacted": {
           // Solo leadgen entries. category_code suele estar null →
           // enriquecemos con creators.category por handle matching.
-          const countQ = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
+          const countQ = sb.from("leadgen_entries").select("*", { count: "estimated", head: true });
           const dataQ = sb
             .from("leadgen_entries")
             .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
@@ -263,10 +272,10 @@ export const useMetricDetails = (
           // first_scouter_contact_at. leadgen.category_code suele
           // estar null, entonces ENRIQUECEMOS con creators.category
           // por handle matching (mismo approach que numbersObtained).
-          const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
+          const countQ1 = sb.from("leadgen_entries").select("*", { count: "estimated", head: true });
           const countQ2 = sb
             .from("scouter_leads")
-            .select("id", { count: "exact", head: true })
+            .select("id", { count: "estimated", head: true })
             .not("first_scouter_contact_at", "is", null);
           const q1 = sb
             .from("leadgen_entries")
@@ -350,7 +359,7 @@ export const useMetricDetails = (
           // Count exacto + fetch limit 100.
           const countQ = sb
             .from("v_model_phone_captures")
-            .select("*", { count: "exact", head: true });
+            .select("*", { count: "estimated", head: true });
           const q = sb
             .from("v_model_phone_captures")
             .select("source_table, source_id, handle, phone, captured_at")
@@ -423,7 +432,7 @@ export const useMetricDetails = (
           const buildQ = (mode: "count" | "data") => {
             let q = sb.from("qa_calls");
             q = mode === "count"
-              ? q.select("*", { count: "exact", head: true })
+              ? q.select("*", { count: "estimated", head: true })
               : q.select(
                   "id, call_date, closer:profiles!closer_id(name:full_name), model:qa_models(name, category), claude_analysis",
                 ).order("call_date", { ascending: false }).limit(limit);
@@ -458,7 +467,7 @@ export const useMetricDetails = (
         case "enteredCrm": {
           const countQ = sb
             .from("creator_blu_history")
-            .select("*", { count: "exact", head: true });
+            .select("*", { count: "estimated", head: true });
           const q = sb
             .from("creator_blu_history")
             .select("id, creator_id, new_state, changed_at, creator:creators(name, category)")
@@ -487,8 +496,8 @@ export const useMetricDetails = (
           // scouter_leads (TODAS, no solo las contactadas). Enriquece
           // con creators.category por handle matching (igual que
           // numbersObtained y totalLeads).
-          const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
-          const countQ2 = sb.from("scouter_leads").select("id", { count: "exact", head: true });
+          const countQ1 = sb.from("leadgen_entries").select("*", { count: "estimated", head: true });
+          const countQ2 = sb.from("scouter_leads").select("id", { count: "estimated", head: true });
           const q1 = sb
             .from("leadgen_entries")
             .select("id, model_handle, phone_e164, status, category_code, created_at")

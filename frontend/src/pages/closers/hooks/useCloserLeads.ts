@@ -438,6 +438,10 @@ export const useCloserLeads = () => {
           q = scopeByAgent(q); // el Closer Supervisor no ve las de sus pares
           return q.order("passed_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
         };
+        // ⚠️ Estos dos counts NO pueden ser estimados: L no solo se muestra,
+        // PARTE la página entre los dos conjuntos (el .range de abajo se
+        // calcula contra L). Un L estimado corre todas las filas: la lista
+        // saltearía unas y repetiría otras.
         const [leadCountRes, dirCountRes] = await Promise.all([
           leadBase().range(0, 0),   // solo para el count exact
           dirBase().range(0, 0),
@@ -787,6 +791,13 @@ export const useCloserLeads = () => {
       const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       // .neq(lead_source, agencia): el pool de modelos no incluye B2B (mismo
       // criterio que la query del listado, si no el contador no cuadra con la lista).
+      // ⚠️ count:"exact" a propósito en los cuatro de abajo, aunque sean
+      // "contadores de pestaña": el mismo número se pinta como total de la
+      // paginación del listado de esa pestaña ("Mostrando 1–50 de N"). Si el
+      // chip estimara y el pie paginara exacto, se contradirían en pantalla.
+      // Además el pool de closer_creators ya pasa las 2.000 filas (o sea, por
+      // encima del max-rows: el estimado SÍ entraría) y las estadísticas de
+      // esa tabla están desviadas ~90% (reltuples 5.197 vs 2.729 reales).
       const [recentRes, oldRes] = await Promise.all([
         supabase.from("closer_creators").select("id", { count: "exact", head: true })
           .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).gte("created_at", cutoff),

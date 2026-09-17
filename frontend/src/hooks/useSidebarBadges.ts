@@ -28,6 +28,13 @@ export function useSidebarBadges() {
     return () => { supabase.removeChannel(ch); };
   }, [user?.id, queryClient]);
 
+  // Todos los counts de acá van con count:"estimated": son BADGES del menú.
+  // Nadie decide nada con el dígito exacto y se repiten cada 60s por persona
+  // conectada, así que son los que más veces pegan a la base. "estimated"
+  // (no "planned") sigue devolviendo el conteo exacto mientras el conjunto
+  // esté por debajo del max-rows de PostgREST — que es el caso normal de un
+  // badge — y recién ahí arriba corta y estima, que es justo lo que se
+  // quiere: el badge no tiene por qué recorrer la tabla entera.
   const { data } = useQuery({
     queryKey: ["sidebar-badges", user?.id, permsLoading],
     queryFn: async () => {
@@ -64,7 +71,7 @@ export function useSidebarBadges() {
         const scope = dataScope("LeadGen");
         let leadQuery = supabase
           .from("leadgen_entries")
-          .select("id", { count: "exact", head: true })
+          .select("id", { count: "estimated", head: true })
           .eq("quality", "pending")
           .gte("created_at", today);
 
@@ -82,7 +89,7 @@ export function useSidebarBadges() {
         const scope = dataScope("CRM");
         let closerQuery = supabase
           .from("closer_creators")
-          .select("id", { count: "exact", head: true })
+          .select("id", { count: "estimated", head: true })
           .eq("stage", "Nuevo")
           .gte("created_at", today);
 
@@ -132,7 +139,7 @@ export function useSidebarBadges() {
         if (ids.length) {
           const { count } = await supabase
             .from("cowork_host_requests")
-            .select("id", { count: "exact", head: true })
+            .select("id", { count: "estimated", head: true })
             .in("session_id", ids)
             .neq("status", "resolved");
           coworkRequestsCount = count ?? 0;
