@@ -8,6 +8,9 @@
 // Acciones (con sesión de Maven):
 //   crear  { titulo?, extension? } → { id }
 //   abrir  { id }                  → { servidor, config }  ← se lo das al editor
+//   historial            { id }              → { currentVersion, history[] }
+//   historial-version    { id, version }     → lo que come `setHistoryData`
+//   historial-restaurar  { id, version }     → { version } la nueva vigente
 //
 // Y una que NO lleva sesión, porque la llama el servidor de ONLYOFFICE:
 //   ?guardar=<token>               ← el aviso de "hay versión nueva"
@@ -18,6 +21,10 @@
 // función con 256 MB de memoria para no ganar nada.
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
+import {
+  archivoDeLaVersion, armarHistorial,
+  type DocumentoParaHistorial, type FilaDeVersion,
+} from "./historial.ts";
 import { EN_BLANCO } from "./plantillas.ts";
 
 const CORS = {
@@ -101,6 +108,13 @@ async function urlFirmada(llave: string, segundos: number): Promise<string> {
     { aws: { signQuery: true } },
   );
   return firmada.url;
+}
+
+async function bajar(llave: string): Promise<Uint8Array> {
+  const { cliente, base } = r2();
+  const resp = await cliente.fetch(`${base}/${llave}`, { method: "GET" });
+  if (!resp.ok) throw new HttpError(`No se pudo leer el archivo (R2 ${resp.status})`, 502);
+  return new Uint8Array(await resp.arrayBuffer());
 }
 
 async function subir(llave: string, bytes: Uint8Array, tipo: string): Promise<void> {
@@ -272,17 +286,21 @@ Deno.serve(async (req) => {
       return responder({ id });
     }
 
-    if (accion !== "abrir") throw new HttpError("Acción desconocida", 400);
-
-    const servidor = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
-    if (!servidor) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
+    // ── De acá para abajo, todas las acciones son SOBRE UN DOCUMENTO ──────
+    // Comparten el mismo control de acceso a propósito: tenerlo escrito una
+    // sola vez es lo que evita que el historial termine siendo la puerta de
+    // atrás que deja leer un documento que no se puede abrir.
+    const ACCIONES_DE_DOC = new Set([
+      "abrir", "historial", "historial-version", "historial-restaurar",
+    ]);
+    if (!ACCIONES_DE_DOC.has(accion)) throw new HttpError("Acción desconocida", 400);
 
     const id = String(body.id ?? "");
     // Se consulta CON EL TOKEN DE LA PERSONA para que conteste la misma RLS que
     // gobierna el resto de Maven, en vez de reimplementar quién puede ver qué.
     const { data: doc, error: errDoc } = await comoLaPersona
       .from("documents")
-      .select("id, title, extension, version, storage_key, owner_id, visibility")
+      .select("id, title, extension, version, storage_key, owner_id, visibility, created_at")
       .eq("id", id)
       .maybeSingle();
     if (errDoc) throw new HttpError(errDoc.message, 400);
@@ -304,6 +322,103 @@ Deno.serve(async (req) => {
         .maybeSingle();
       puedeEditar = !!(compartido as { puede_editar?: boolean } | null)?.puede_editar;
     }
+
+    // ── Historial de versiones ────────────────────────────────────────────
+    if (accion.startsWith("historial")) {
+      const paraHistorial = doc as unknown as DocumentoParaHistorial;
+      const { data: crudas, error: errVer } = await comoLaPersona
+        .from("document_versions")
+        .select("version, storage_key, saved_by, created_at")
+        .eq("document_id", doc.id)
+        .order("version", { ascending: true });
+      if (errVer) throw new HttpError(errVer.message, 400);
+      const filas = (crudas ?? []) as unknown as FilaDeVersion[];
+
+      if (accion === "historial") {
+        const entradas = armarHistorial(paraHistorial, filas);
+        // Los nombres en una sola consulta. `profiles` es legible por cualquiera
+        // con sesión, así que va con el cliente de la persona y no con el admin:
+        // que el historial no pueda mostrar más de lo que ya se puede ver.
+        const ids = [...new Set(entradas.map((e) => e.autorId).filter(Boolean))] as string[];
+        const { data: perfiles } = ids.length
+          ? await comoLaPersona.from("profiles").select("id, full_name").in("id", ids)
+          : { data: [] };
+        const nombre = new Map(
+          ((perfiles ?? []) as { id: string; full_name: string | null }[])
+            .map((p) => [p.id, p.full_name]),
+        );
+        return responder({
+          currentVersion: doc.version,
+          // Las fechas viajan en ISO y las formatea el NAVEGADOR: el panel las
+          // muestra tal cual y la edge no sabe en qué huso está quien mira.
+          history: entradas.map((e) => ({
+            version: e.version,
+            key: e.key,
+            created: e.created,
+            user: e.autorId ? { id: e.autorId, name: nombre.get(e.autorId) || "Alguien" } : undefined,
+          })),
+        });
+      }
+
+      const version = Number(body.version ?? 0);
+      if (!Number.isInteger(version) || version < 1 || version > doc.version) {
+        throw new HttpError("Esa versión no existe", 400);
+      }
+
+      if (accion === "historial-version") {
+        const llave = archivoDeLaVersion(paraHistorial, filas, version);
+        if (!llave) throw new HttpError("Esa versión ya no tiene archivo", 410);
+        // ⚠️ Este objeto lo recibe el editor en vivo, no viaja dentro del config
+        // firmado de la apertura: tiene que llevar SU PROPIA firma o el servidor
+        // lo rechaza cuando JWT está prendido.
+        const datos: Record<string, unknown> = {
+          fileType: doc.extension,
+          key: `${doc.id}-v${version}`,
+          url: await urlFirmada(llave, 3600),
+          version,
+        };
+        if (secretoOO) datos.token = await firmar(datos, secretoOO);
+        return responder(datos);
+      }
+
+      // ── Restaurar ───────────────────────────────────────────────────────
+      // NO se pisa nada: la versión vieja se copia como una versión NUEVA, que
+      // es lo que hace Google. Restaurar borrando sería perder lo que había.
+      if (!puedeEditar) throw new HttpError("No podés editar este documento", 403);
+      if (version === doc.version) throw new HttpError("Esa ya es la versión vigente", 400);
+
+      const origen = archivoDeLaVersion(paraHistorial, filas, version);
+      if (!origen) throw new HttpError("Esa versión ya no tiene archivo", 410);
+      if (!doc.storage_key) throw new HttpError("El documento no tiene archivo", 409);
+
+      const bytes = await bajar(origen);
+      const nuevaVersion = (doc.version as number) + 1;
+      const destino = `documentos/${doc.id}/v${nuevaVersion}.${doc.extension}`;
+      await subir(destino, bytes, MIME[doc.extension as string] ?? "application/octet-stream");
+
+      // El mismo orden que el guardado normal: primero se archiva la vigente y
+      // recién después se mueve el puntero. Si algo falla en el medio, el
+      // documento sigue siendo el que era.
+      await admin.from("document_versions").insert({
+        document_id: doc.id,
+        version: doc.version,
+        storage_key: doc.storage_key,
+        saved_by: user.id,
+      });
+      await admin.from("documents").update({
+        storage_key: destino,
+        size_bytes: bytes.length,
+        version: nuevaVersion,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      }).eq("id", doc.id);
+
+      console.log(`[oficina-doc] ${doc.id} restaurado v${version} como v${nuevaVersion}`);
+      return responder({ version: nuevaVersion });
+    }
+
+    const servidor = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+    if (!servidor) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
 
     const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     const vence = new Date(Date.now() + 12 * 3600_000);

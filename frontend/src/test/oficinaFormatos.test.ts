@@ -64,3 +64,59 @@ describe("los formatos de la Oficina", () => {
     }
   });
 });
+
+// ── El historial de versiones no esquiva el control de acceso ──────────────
+// Vive acá y no junto a los tests del armado porque este archivo ya lee el
+// fuente de la edge: abrir otro que también lo lea suma tres errores de tsc
+// (node:fs, node:path, process) por nada.
+
+/** El trozo del fuente entre dos marcas.
+ *
+ *  ⚠️ Falla si alguna marca no está. Sin esto, `indexOf` devuelve -1, el
+ *  `slice` igual entrega texto y la guarda pasa en verde sin haber mirado el
+ *  código que dice mirar. */
+function entre(desde: string, hasta: string): string {
+  const a = edge.indexOf(desde);
+  const b = edge.indexOf(hasta);
+  expect(a, `no está la marca «${desde}»`).toBeGreaterThan(-1);
+  expect(b, `no está la marca «${hasta}»`).toBeGreaterThan(a);
+  return edge.slice(a, b);
+}
+
+describe("las acciones del historial no esquivan el control de acceso", () => {
+  it("todas están declaradas en ACCIONES_DE_DOC", () => {
+    const declaradas = edge.match(/ACCIONES_DE_DOC = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? "";
+    for (const accion of ["historial", "historial-version", "historial-restaurar"]) {
+      expect(declaradas).toContain(`"${accion}"`);
+    }
+  });
+
+  it("⚠️ el bloque del historial va DESPUÉS de resolver quién puede qué", () => {
+    // Si alguien lo subiera por encima de esta consulta, el historial pasaría
+    // a ser la puerta de atrás que entrega un documento que no se puede abrir.
+    const permiso = edge.indexOf('.from("document_shares")');
+    const bloque = edge.indexOf('accion.startsWith("historial")');
+    expect(permiso).toBeGreaterThan(0);
+    expect(bloque).toBeGreaterThan(permiso);
+  });
+
+  it("restaurar exige permiso de edición", () => {
+    expect(entre("// ── Restaurar ─", "return responder({ version: nuevaVersion })"))
+      .toMatch(/if \(!puedeEditar\) throw/);
+  });
+
+  it("restaurar NO pisa el archivo vigente: lo archiva y escribe uno nuevo", () => {
+    const trozo = entre("// ── Restaurar ─", "return responder({ version: nuevaVersion })");
+    expect(trozo).toContain('.from("document_versions").insert');
+    expect(trozo).toMatch(/v\$\{nuevaVersion\}/);
+    // Nada de borrar de R2 al restaurar.
+    expect(trozo).not.toMatch(/DELETE|\.delete\(/);
+  });
+
+  it("los datos de una versión van firmados aparte del config de apertura", () => {
+    // `setHistoryData` lo recibe el editor en vivo: no viaja dentro del config
+    // firmado, así que sin su propia firma el servidor lo rechaza con JWT.
+    expect(entre('accion === "historial-version"', "// ── Restaurar ─"))
+      .toMatch(/datos\.token = await firmar\(datos, secretoOO\)/);
+  });
+});
