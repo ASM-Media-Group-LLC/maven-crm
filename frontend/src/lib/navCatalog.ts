@@ -74,6 +74,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Cowork", i18nKey: "nav.cowork", url: "/cowork", icon: Users2, module: "Cowork", section: "Menú", keywords: ["sala", "video"] },
   { title: "Meet", i18nKey: "nav.meet", url: "/meet", icon: Video, module: "Meet", section: "Menú", keywords: ["reunión", "videollamada"] },
   { title: "Grabaciones", i18nKey: "nav.recordings", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones", section: "Menú", keywords: ["recordings", "meet"] },
+  { title: "Calendario", i18nKey: "nav.office.calendar", url: "/oficina/calendario", icon: CalendarDays, module: "Oficina", submodule: "Calendario", section: "Oficina", keywords: ["calendario", "agenda", "eventos", "reuniones", "calendar", "oficina"] },
   { title: "Documentos", i18nKey: "nav.office.docs", url: "/oficina", icon: FileText, module: "Oficina", submodule: "Documentos", section: "Oficina", keywords: ["documentos", "docs", "word", "google docs", "oficina"] },
   { title: "Hojas de cálculo", i18nKey: "nav.office.sheets", url: "/oficina/hojas", icon: FileSpreadsheet, module: "Oficina", submodule: "Hojas de cálculo", section: "Oficina", keywords: ["hojas", "excel", "sheets", "calculo", "planilla", "oficina"] },
   { title: "Presentaciones", i18nKey: "nav.office.slides", url: "/oficina/presentaciones", icon: Presentation, module: "Oficina", submodule: "Presentaciones", section: "Oficina", keywords: ["presentaciones", "powerpoint", "slides", "diapositivas", "oficina"] },

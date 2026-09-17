@@ -27,8 +27,9 @@ const subtabsDelCatalogo = (() => {
 })();
 
 describe("Oficina como grupo del menú", () => {
-  it("el catálogo de permisos declara las tres secciones", () => {
+  it("el catálogo de permisos declara las cuatro secciones", () => {
     expect(subtabsDelCatalogo).toEqual([
+      "Calendario",
       "Documentos",
       "Hojas de cálculo",
       "Presentaciones",
@@ -50,10 +51,11 @@ describe("Oficina como grupo del menú", () => {
 });
 
 describe("las rutas de Oficina", () => {
-  it("existen las tres secciones", () => {
+  it("existen las cuatro secciones", () => {
     expect(rutas).toContain('path="/oficina"');
     expect(rutas).toContain('path="/oficina/hojas"');
     expect(rutas).toContain('path="/oficina/presentaciones"');
+    expect(rutas).toContain('path="/oficina/calendario"');
   });
 
   it("⚠️ las rutas fijas van ANTES de /oficina/:id", () => {
@@ -65,12 +67,14 @@ describe("las rutas de Oficina", () => {
     expect(doc).toBeGreaterThan(-1);
     expect(rutas.indexOf('path="/oficina/hojas"')).toBeLessThan(doc);
     expect(rutas.indexOf('path="/oficina/presentaciones"')).toBeLessThan(doc);
+    expect(rutas.indexOf('path="/oficina/calendario"')).toBeLessThan(doc);
   });
 
   it("cada sección entra por su propio submódulo", () => {
     expect(rutas).toContain('module="Oficina" submodule="Documentos"');
     expect(rutas).toContain('module="Oficina" submodule="Hojas de cálculo"');
     expect(rutas).toContain('module="Oficina" submodule="Presentaciones"');
+    expect(rutas).toContain('module="Oficina" submodule="Calendario"');
   });
 });
 
@@ -89,8 +93,10 @@ describe("el catálogo del buscador (⌘K)", () => {
     }
   });
 
-  it("las tres secciones de Oficina son buscables", () => {
+  it("las cuatro secciones de Oficina son buscables", () => {
     const urls = NAV_CATALOG.filter((e) => e.module === "Oficina").map((e) => e.url);
-    expect(urls).toEqual(["/oficina", "/oficina/hojas", "/oficina/presentaciones"]);
+    expect(urls).toEqual([
+      "/oficina/calendario", "/oficina", "/oficina/hojas", "/oficina/presentaciones",
+    ]);
   });
 });

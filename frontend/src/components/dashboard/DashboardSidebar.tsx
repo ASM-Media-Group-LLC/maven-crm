@@ -352,6 +352,7 @@ const DashboardSidebar = () => {
   // sección, como en Google: la lista de hojas no se mezcla con la de
   // documentos. Calendario y Drive entran acá cuando existan.
   const oficinaItemsAll = [
+    { title: t("nav.office.calendar"), url: "/oficina/calendario", icon: CalendarDays, submodule: "Calendario" },
     { title: t("nav.office.docs"), url: "/oficina", icon: FileText, submodule: "Documentos" },
     { title: t("nav.office.sheets"), url: "/oficina/hojas", icon: FileSpreadsheet, submodule: "Hojas de cálculo" },
     { title: t("nav.office.slides"), url: "/oficina/presentaciones", icon: Presentation, submodule: "Presentaciones" },
