@@ -34,15 +34,18 @@ import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2, BarChart3 
 import { EmptyState } from "@/components/EmptyState";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const DEPTS: { value: WaChannelDepartment; label: string }[] = [
-  { value: "closer", label: "Closers" },
-  { value: "manager", label: "Managers" },
-  { value: "recruitment", label: "Reclutamiento" },
-  { value: "chatter", label: "Chatters" },
-  { value: "other", label: "Otro" },
+// Fuera de un componente no hay hook, así que la lista guarda la CLAVE y el
+// texto se resuelve con la t() de quien la dibuja.
+const DEPTS: { value: WaChannelDepartment; key: TranslationKey }[] = [
+  { value: "closer", key: "wa.deptClosers" },
+  { value: "manager", key: "wa.deptManagers" },
+  { value: "recruitment", key: "wa.deptRecruitment" },
+  { value: "chatter", key: "wa.deptChatters" },
+  { value: "other", key: "wa.deptOther" },
 ];
-const deptLabel = (d: string) => DEPTS.find((x) => x.value === d)?.label ?? d;
 
 interface ChannelRow extends WaChannel {
   member_ids: string[];
@@ -61,15 +64,20 @@ const EMPTY_FORM = {
 };
 
 // Salud de envío por línea (RPC wa_line_health): color del puntito según % de fallo 24h.
-const HEALTH_UI: Record<string, { dot: string; text: string; label: string }> = {
-  critico: { dot: "bg-destructive", text: "font-semibold text-destructive", label: "Crítico" },
-  alerta: { dot: "bg-warning", text: "text-warning", label: "Alerta" },
-  ok: { dot: "bg-success", text: "text-muted-foreground", label: "OK" },
-  sin_datos: { dot: "bg-muted-foreground/40", text: "text-muted-foreground", label: "Sin datos" },
+const HEALTH_UI: Record<string, { dot: string; text: string }> = {
+  critico: { dot: "bg-destructive", text: "font-semibold text-destructive" },
+  alerta: { dot: "bg-warning", text: "text-warning" },
+  ok: { dot: "bg-success", text: "text-muted-foreground" },
+  sin_datos: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
 };
 interface LineHealth { channel_id: string; total: number; ok: number; sent_pend: number; failed: number; pct_fallo: number | null; health: string; }
 
 const ChannelsPage = () => {
+  const { t } = useLanguage();
+  const deptLabel = (d: string) => {
+    const e = DEPTS.find((x) => x.value === d);
+    return e ? t(e.key) : d;
+  };
   const qc = useQueryClient();
   const { toast } = useToast();
   const [newOpen, setNewOpen] = useState(false);
@@ -136,7 +144,7 @@ const ChannelsPage = () => {
   const createChannel = useMutation({
     mutationFn: async () => {
       const instance = form.evolution_instance.trim();
-      if (!instance) throw new Error("Falta el nombre de la instancia de Evolution.");
+      if (!instance) throw new Error(t("wa.missingInstance"));
       const { error } = await (supabase as any).from("wa_channels").insert({
         label: form.label.trim() || null,
         evolution_instance: instance,
@@ -147,19 +155,19 @@ const ChannelsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Canal creado" });
+      toast({ title: t("wa.channelCreated") });
       setNewOpen(false);
       setForm(EMPTY_FORM);
       qc.invalidateQueries({ queryKey: ["wa-channels"] });
     },
-    onError: (e: Error) => toast({ title: "No se pudo crear", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.couldNotCreate"), description: e.message, variant: "destructive" }),
   });
 
   const updateChannel = useMutation({
     mutationFn: async () => {
       if (!editing) return;
       const instance = editForm.evolution_instance.trim();
-      if (!instance) throw new Error("Falta el nombre de la instancia de Evolution.");
+      if (!instance) throw new Error(t("wa.missingInstance"));
       const { error } = await (supabase as any).from("wa_channels").update({
         label: editForm.label.trim() || null,
         evolution_instance: instance,
@@ -172,11 +180,11 @@ const ChannelsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Canal actualizado" });
+      toast({ title: t("wa.channelUpdated") });
       setEditing(null);
       qc.invalidateQueries({ queryKey: ["wa-channels"] });
     },
-    onError: (e: Error) => toast({ title: "No se pudo actualizar", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.couldNotUpdate"), description: e.message, variant: "destructive" }),
   });
 
   // Eliminar = hard delete. Los miembros caen por ON DELETE CASCADE; las conversaciones
@@ -188,11 +196,11 @@ const ChannelsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Canal eliminado" });
+      toast({ title: t("wa.channelDeleted") });
       setDeleting(null);
       qc.invalidateQueries({ queryKey: ["wa-channels"] });
     },
-    onError: (e: Error) => toast({ title: "No se pudo eliminar", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.couldNotDelete"), description: e.message, variant: "destructive" }),
   });
 
   const userName = (id: string) => users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
@@ -200,29 +208,29 @@ const ChannelsPage = () => {
   return (
     <div className="space-y-4 px-6 py-5">
       <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
+        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title={t("wa.backToInbox")}>
           <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <PageHeader
           className="flex-1"
           icon={<Radio className="h-5 w-5" />}
-          title="Canales del inbox"
+          title={t("wa.chTitle")}
           subtitle={
             <>
-              Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usa el{" "}
-              <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
+              {t("wa.chSubtitleA")}<b>{t("wa.chSubtitleBold")}</b>{t("wa.chSubtitleB")}
+              <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">{t("wa.chGatewayPanel")}</a>.
             </>
           }
           actions={
             <>
               <Button variant="outline" size="sm" asChild>
-                <Link to="/inbox/analitica"><BarChart3 className="h-4 w-4" /> Analítica</Link>
+                <Link to="/inbox/analitica"><BarChart3 className="h-4 w-4" /> {t("wa.analytics")}</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
               </Button>
               <Button size="sm" onClick={() => setNewOpen(true)}>
-                <Plus className="h-4 w-4" /> Nuevo canal
+                <Plus className="h-4 w-4" /> {t("wa.newChannel")}
               </Button>
             </>
           }
@@ -232,26 +240,26 @@ const ChannelsPage = () => {
       <div className="rounded-md border">
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}
           </div>
         ) : channels.length === 0 ? (
           <EmptyState
             className="py-10"
             seed="inbox-canales"
-            title="Todavía no hay canales."
-            description="Crea uno con el nombre de su instancia de Evolution."
+            title={t("wa.noChannelsTitle")}
+            description={t("wa.noChannelsDesc")}
           />
         ) : (
           <table className="tabla-movil w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Canal</th>
-                <th className="px-3 py-2 font-medium">Instancia</th>
-                <th className="px-3 py-2 font-medium">Depto</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Salud 24h</th>
-                <th className="px-3 py-2 text-right font-medium">Atienden</th>
-                <th className="px-3 py-2 text-right font-medium">Acciones</th>
+                <th className="px-3 py-2 font-medium">{t("wa.channel")}</th>
+                <th className="px-3 py-2 font-medium">{t("wa.instance")}</th>
+                <th className="px-3 py-2 font-medium">{t("wa.dept")}</th>
+                <th className="px-3 py-2 font-medium">{t("common.type")}</th>
+                <th className="px-3 py-2 font-medium">{t("wa.health24h")}</th>
+                <th className="px-3 py-2 text-right font-medium">{t("wa.attending")}</th>
+                <th className="px-3 py-2 text-right font-medium">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -259,14 +267,14 @@ const ChannelsPage = () => {
                 <tr key={c.id} className={`border-b last:border-0 ${c.active ? "" : "opacity-50"}`}>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{c.label || "(sin etiqueta)"}</span>
-                      {!c.active && <Badge variant="secondary-soft" className="text-[10px]">Inactivo</Badge>}
+                      <span className="font-medium">{c.label || t("wa.noLabel")}</span>
+                      {!c.active && <Badge variant="secondary-soft" className="text-[10px]">{t("common.inactive")}</Badge>}
                     </div>
                     {c.phone_e164 && <div className="text-xs text-muted-foreground">{c.phone_e164}</div>}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{c.evolution_instance}</td>
                   <td className="px-3 py-2"><Badge variant="secondary-soft" className="text-[10px]">{deptLabel(c.department)}</Badge></td>
-                  <td className="px-3 py-2 text-xs">{c.type === "dedicated" ? "Dedicado" : "Compartido"}</td>
+                  <td className="px-3 py-2 text-xs">{c.type === "dedicated" ? t("wa.dedicated") : t("wa.shared")}</td>
                   <td className="px-3 py-2">
                     {(() => {
                       const h = healthRows.find((r) => r.channel_id === c.id);
@@ -274,12 +282,12 @@ const ChannelsPage = () => {
                       return (
                         <span
                           className="inline-flex items-center gap-1.5 text-xs"
-                          title={h ? `Últimas 24h · ${h.total} enviados · ${h.ok} entregados · ${h.sent_pend} sin confirmar · ${h.failed} fallidos` : "Sin datos en 24h"}
+                          title={h ? t("wa.healthTooltip", { total: h.total, ok: h.ok, pend: h.sent_pend, failed: h.failed }) : t("wa.noData24h")}
                         >
                           <span className={`h-2 w-2 shrink-0 rounded-full ${ui.dot}`} />
                           {!h || h.health === "sin_datos"
-                            ? <span className="text-muted-foreground">sin datos</span>
-                            : <span className={ui.text}>{h.pct_fallo ?? 0}% fallo <span className="text-muted-foreground">({h.total})</span></span>}
+                            ? <span className="text-muted-foreground">{t("wa.noDataLower")}</span>
+                            : <span className={ui.text}>{t("wa.pctFail", { p: h.pct_fallo ?? 0 })} <span className="text-muted-foreground">({h.total})</span></span>}
                         </span>
                       );
                     })()}
@@ -291,13 +299,13 @@ const ChannelsPage = () => {
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar canal" onClick={() => openEdit(c)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title={t("wa.editChannel")} onClick={() => openEdit(c)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost" size="icon"
                         className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        title="Eliminar canal" onClick={() => setDeleting(c)}
+                        title={t("wa.deleteChannel")} onClick={() => setDeleting(c)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -314,50 +322,50 @@ const ChannelsPage = () => {
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nuevo canal</DialogTitle>
+            <DialogTitle>{t("wa.newChannel")}</DialogTitle>
             <DialogDescription>
-              Registra quién atiende un canal. El "nombre de instancia" debe coincidir con una línea ya conectada en el panel del gateway.
+              {t("wa.newChannelDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Etiqueta</Label>
-              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Ej. Closers-1 / Línea Julieth" />
+              <Label>{t("wa.labelField")}</Label>
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder={t("wa.labelPlaceholder")} />
             </div>
             <div className="space-y-1">
-              <Label>Instancia de Evolution *</Label>
-              <Input value={form.evolution_instance} onChange={(e) => setForm({ ...form, evolution_instance: e.target.value })} placeholder="ej. maven-closers-1" className="font-mono" />
+              <Label>{t("wa.evolutionInstance")}</Label>
+              <Input value={form.evolution_instance} onChange={(e) => setForm({ ...form, evolution_instance: e.target.value })} placeholder={t("wa.instancePlaceholder")} className="font-mono" />
             </div>
             <div className="space-y-1">
-              <Label>Número (opcional)</Label>
+              <Label>{t("wa.phoneOptional")}</Label>
               <Input value={form.phone_e164} onChange={(e) => setForm({ ...form, phone_e164: e.target.value })} placeholder="+57…" />
             </div>
             <div className="flex gap-3">
               <div className="flex-1 space-y-1">
-                <Label>Departamento</Label>
+                <Label>{t("wa.department")}</Label>
                 <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v as WaChannelDepartment })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                    {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{t(d.key)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex-1 space-y-1">
-                <Label>Tipo</Label>
+                <Label>{t("common.type")}</Label>
                 <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as WaChannelType })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="shared">Compartido</SelectItem>
-                    <SelectItem value="dedicated">Dedicado</SelectItem>
+                    <SelectItem value="shared">{t("wa.shared")}</SelectItem>
+                    <SelectItem value="dedicated">{t("wa.dedicated")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setNewOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={() => createChannel.mutate()} disabled={createChannel.isPending || !form.evolution_instance.trim()}>
-              {createChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear"}
+              {createChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -367,58 +375,58 @@ const ChannelsPage = () => {
       <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar canal</DialogTitle>
+            <DialogTitle>{t("wa.editChannel")}</DialogTitle>
             <DialogDescription>
-              Cambia la etiqueta, el número, el departamento o el tipo. Desactivalo para ocultarlo de los selectores sin borrarlo.
+              {t("wa.editChannelDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Etiqueta</Label>
-              <Input value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder="Ej. Closers-1 / Línea Julieth" />
+              <Label>{t("wa.labelField")}</Label>
+              <Input value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder={t("wa.labelPlaceholder")} />
             </div>
             <div className="space-y-1">
-              <Label>Instancia de Evolution *</Label>
+              <Label>{t("wa.evolutionInstance")}</Label>
               <Input value={editForm.evolution_instance} onChange={(e) => setEditForm({ ...editForm, evolution_instance: e.target.value })} className="font-mono" />
             </div>
             <div className="space-y-1">
-              <Label>Número (opcional)</Label>
+              <Label>{t("wa.phoneOptional")}</Label>
               <Input value={editForm.phone_e164} onChange={(e) => setEditForm({ ...editForm, phone_e164: e.target.value })} placeholder="+57…" />
             </div>
             <div className="flex gap-3">
               <div className="flex-1 space-y-1">
-                <Label>Departamento</Label>
+                <Label>{t("wa.department")}</Label>
                 <Select value={editForm.department} onValueChange={(v) => setEditForm({ ...editForm, department: v as WaChannelDepartment })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                    {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{t(d.key)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex-1 space-y-1">
-                <Label>Tipo</Label>
+                <Label>{t("common.type")}</Label>
                 <Select value={editForm.type} onValueChange={(v) => setEditForm({ ...editForm, type: v as WaChannelType })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="shared">Compartido</SelectItem>
-                    <SelectItem value="dedicated">Dedicado</SelectItem>
+                    <SelectItem value="shared">{t("wa.shared")}</SelectItem>
+                    <SelectItem value="dedicated">{t("wa.dedicated")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <label className="flex cursor-pointer items-center gap-2 pt-1">
               <Checkbox checked={editForm.active} onCheckedChange={(v) => setEditForm({ ...editForm, active: v === true })} />
-              <span className="text-sm">Activo <span className="text-muted-foreground">(si lo desactivas, deja de aparecer en los selectores)</span></span>
+              <span className="text-sm">{t("common.active")} <span className="text-muted-foreground">{t("wa.activeHint")}</span></span>
             </label>
             {/* Auto-asignación por línea: las conversaciones NUEVAS de esta línea se asignan
                 a quien marques (uno o varios). Las existentes no se tocan. */}
             <div className="space-y-1.5 pt-1">
-              <Label>Auto-asignar conversaciones nuevas a</Label>
-              <p className="text-[11px] text-muted-foreground">Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques (puedes elegir varias personas). Las existentes no se tocan.</p>
+              <Label>{t("wa.autoAssignTo")}</Label>
+              <p className="text-[11px] text-muted-foreground">{t("wa.autoAssignHelp")}</p>
               <Input
                 value={assigneeSearch}
                 onChange={(e) => setAssigneeSearch(e.target.value)}
-                placeholder="Buscar persona…"
+                placeholder={t("common.searchPerson")}
                 className="h-8 text-sm"
               />
               {(() => {
@@ -429,9 +437,9 @@ const ChannelsPage = () => {
                 return (
                   <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2 space-y-1">
                     {users.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Sin usuarios</p>
+                      <p className="text-xs text-muted-foreground">{t("wa.noUsers")}</p>
                     ) : filtered.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Nadie coincide con “{assigneeSearch}”.</p>
+                      <p className="text-xs text-muted-foreground">{t("wa.nobodyMatches", { q: assigneeSearch })}</p>
                     ) : filtered.map((u) => {
                       const on = editForm.default_assignees.includes(u.id);
                       return (
@@ -453,14 +461,14 @@ const ChannelsPage = () => {
                 );
               })()}
               {editForm.default_assignees.length > 0 && (
-                <p className="text-[11px] text-muted-foreground">{editForm.default_assignees.length} persona(s) — auto-asignación activa en esta línea</p>
+                <p className="text-[11px] text-muted-foreground">{t("wa.autoAssignActive", { n: editForm.default_assignees.length })}</p>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             <Button onClick={() => updateChannel.mutate()} disabled={updateChannel.isPending || !editForm.evolution_instance.trim()}>
-              {updateChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+              {updateChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -470,11 +478,10 @@ const ChannelsPage = () => {
       <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este canal?</AlertDialogTitle>
+            <AlertDialogTitle>{t("wa.deleteChannelQ")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará <b>{deleting?.label || deleting?.evolution_instance}</b>
-              {deleting?.phone_e164 ? ` (${deleting.phone_e164})` : ""}. Las conversaciones de este canal
-              no se borran, pero quedan sin canal y dejan de aparecer en la bandeja. Esta acción no se puede deshacer.
+              {t("wa.willDelete")}<b>{deleting?.label || deleting?.evolution_instance}</b>
+              {deleting?.phone_e164 ? ` (${deleting.phone_e164})` : ""}{t("wa.deleteChannelRest")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -483,7 +490,7 @@ const ChannelsPage = () => {
               onClick={(e) => { e.preventDefault(); deleteChannel.mutate(); }}
               className="bg-destructive text-white hover:bg-destructive"
             >
-              {deleteChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
+              {deleteChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -511,6 +518,7 @@ const MembersDialog = ({
   onOpenChange: (open: boolean) => void;
   onChanged: () => void;
 }) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [memberIds, setMemberIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -532,7 +540,7 @@ const MembersDialog = ({
       if (!error) {
         const next = new Set(memberIds); next.delete(userId); setMemberIds(next); onChanged();
       } else {
-        toast({ title: "Error al quitar", description: error.message, variant: "destructive" });
+        toast({ title: t("wa.errorRemoving"), description: error.message, variant: "destructive" });
       }
     } else {
       const { error } = await (supabase as any)
@@ -540,7 +548,7 @@ const MembersDialog = ({
       if (!error) {
         const next = new Set(memberIds); next.add(userId); setMemberIds(next); onChanged();
       } else {
-        toast({ title: "Error al agregar", description: error.message, variant: "destructive" });
+        toast({ title: t("wa.errorAdding"), description: error.message, variant: "destructive" });
       }
     }
     setBusy(null);
@@ -553,12 +561,12 @@ const MembersDialog = ({
     <Dialog open={channel !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Quién atiende este canal</DialogTitle>
+          <DialogTitle>{t("wa.whoAttends")}</DialogTitle>
           <DialogDescription>
-            {channel ? `${channel.label || channel.evolution_instance} · ${memberIds.size} atendiendo` : ""}
+            {channel ? t("wa.attendingCount", { name: channel.label || channel.evolution_instance, n: memberIds.size }) : ""}
           </DialogDescription>
         </DialogHeader>
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar persona…" className="h-9" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("common.searchPerson")} className="h-9" />
         <ScrollArea className="max-h-80 rounded-md border">
           <div className="divide-y">
             {filtered.map((u) => (
@@ -571,7 +579,7 @@ const MembersDialog = ({
           </div>
         </ScrollArea>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

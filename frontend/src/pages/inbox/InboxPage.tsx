@@ -45,6 +45,8 @@ import { StickerPicker } from "./StickerPicker";
 import { MediaLightbox, type LightboxItem } from "./MediaLightbox";
 import { WaContactAvatar } from "./WaContactAvatar";
 import { AssigneePicker } from "./AssigneePicker";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface ConvRow {
   id: string;
@@ -85,19 +87,20 @@ interface MsgRow {
 // Palomitas de WhatsApp para los mensajes SALIENTES según el estado de entrega:
 // 1 palomita = enviado (server ack), 2 = entregado, 2 azules = leído, ⚠ = no entregado.
 function StatusTick({ status }: { status: string | null }) {
+  const { t } = useLanguage();
   if (status === "failed")
-    return <AlertCircle className="h-3 w-3 text-destructive" aria-label="No entregado" />;
+    return <AlertCircle className="h-3 w-3 text-destructive" aria-label={t("wa.notDelivered")} />;
   if (status === "read")
-    return <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label="Leído" />;
+    return <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label={t("wa.read")} />;
   if (status === "delivered")
-    return <CheckCheck className="h-3.5 w-3.5" aria-label="Entregado" />;
-  return <Check className="h-3.5 w-3.5" aria-label="Enviado" />; // 'sent' o null
+    return <CheckCheck className="h-3.5 w-3.5" aria-label={t("wa.delivered")} />;
+  return <Check className="h-3.5 w-3.5" aria-label={t("wa.sent")} />; // 'sent' o null
 }
 
-const fmtTime = (iso: string | null): string => {
+const fmtTimeRaw = (iso: string | null, locale: string): string => {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString("es-CO", {
+    return new Date(iso).toLocaleString(locale, {
       day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
     });
   } catch {
@@ -107,12 +110,12 @@ const fmtTime = (iso: string | null): string => {
 
 // Prioridad de nombre: rename manual del usuario > nombre resuelto contra Maven
 // (creadora/contacto por teléfono) > push-name de WhatsApp > @IG > placeholder.
-const contactLabel = (c: ConvRow["contact"]): string =>
+const contactLabelRaw = (c: ConvRow["contact"], sinNombre: string): string =>
   c?.manual_name ||
   c?.resolved_name ||
   c?.display_name ||
   (c?.instagram_handle ? "@" + c.instagram_handle.replace(/^@/, "") : "") ||
-  "(sin nombre)";
+  sinNombre;
 
 // Cada canal (línea/marca) tiene su propio color de chip en la lista — como en
 // el mockup (Content P. violeta, Unlock azul, Kash verde…). Color determinista
@@ -138,13 +141,19 @@ const channelChipClass = (key: string | null): string => {
   return CHANNEL_CHIP_PALETTE[h % CHANNEL_CHIP_PALETTE.length];
 };
 
-const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "success-soft" | "warning-soft" }> = {
-  open: { label: "Abierta", variant: "secondary-soft" },
-  pending: { label: "Pendiente", variant: "warning-soft" },
-  closed: { label: "Cerrada", variant: "success-soft" },
+const statusMeta: Record<string, { key: TranslationKey; variant: "secondary-soft" | "success-soft" | "warning-soft" }> = {
+  open: { key: "wa.statusOpen", variant: "secondary-soft" },
+  pending: { key: "wa.statusPending", variant: "warning-soft" },
+  closed: { key: "wa.statusClosed", variant: "success-soft" },
 };
 
 const InboxPage = () => {
+  const { t, language } = useLanguage();
+  // Envoltorios con el mismo nombre que los helpers de módulo: así los sitios
+  // que ya los llamaban no cambian, y el idioma entra por un solo lado.
+  const dtLocale = language === "en" ? "en-US" : "es-CO";
+  const fmtTime = (iso: string | null) => fmtTimeRaw(iso, dtLocale);
+  const contactLabel = (c: ConvRow["contact"]) => contactLabelRaw(c, t("wa.noName"));
   const qc = useQueryClient();
   const { toast } = useToast();
   const { canAccess } = usePermissions();
@@ -487,7 +496,7 @@ const InboxPage = () => {
       qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
       qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
     } catch (e) {
-      toast({ title: "No se pudo enviar el archivo", description: (e as Error).message, variant: "destructive" });
+      toast({ title: t("wa.couldNotSendFile"), description: (e as Error).message, variant: "destructive" });
     } finally {
       setMediaBusy(false);
     }
@@ -546,9 +555,9 @@ const InboxPage = () => {
       const ins = await (supabase as any).from("wa_stickers").insert({ storage_path: path });
       if (ins.error) throw ins.error;
       qc.invalidateQueries({ queryKey: ["wa-stickers"] });
-      toast({ title: "Sticker guardado en tu galería" });
+      toast({ title: t("wa.stickerSaved") });
     } catch (e) {
-      toast({ title: "No se pudo guardar el sticker", description: (e as Error).message, variant: "destructive" });
+      toast({ title: t("sticker.saveError"), description: (e as Error).message, variant: "destructive" });
     }
   };
 
@@ -561,7 +570,7 @@ const InboxPage = () => {
     });
     const res = data as { ok?: boolean; error?: string } | null;
     if (error || !res?.ok) {
-      toast({ title: "No se pudo completar la acción", description: error?.message ?? res?.error ?? "error", variant: "destructive" });
+      toast({ title: t("wa.couldNotCompleteAction"), description: error?.message ?? res?.error ?? "error", variant: "destructive" });
       return;
     }
     qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
@@ -599,13 +608,13 @@ const InboxPage = () => {
         toast(
           res.reason === "not_on_whatsapp"
             ? {
-                title: "⚠ Número no registrado en WhatsApp",
-                description: "El mensaje no se entregó: este número no tiene WhatsApp.",
+                title: t("wa.numberNotOnWhatsApp"),
+                description: t("wa.numberNotOnWhatsAppDesc"),
                 variant: "destructive",
               }
             : {
-                title: "No se pudo enviar por esta línea",
-                description: `La línea de WhatsApp puede estar desconectada — revisa su conexión (panel del gateway) o prueba desde otra línea. Detalle: ${res.error ?? "error del gateway"}`,
+                title: t("wa.couldNotSendThisLine"),
+                description: t("wa.lineDisconnectedDesc", { detail: res.error ?? t("wa.gatewayError") }),
                 variant: "destructive",
               },
         );
@@ -617,8 +626,8 @@ const InboxPage = () => {
       setDraft(text);
       setReplyingTo(replyTo);
       toast({
-        title: "No se pudo enviar",
-        description: error?.message ?? res?.error ?? "Error desconocido",
+        title: t("common.couldNotSend"),
+        description: error?.message ?? res?.error ?? t("wa.unknownError"),
         variant: "destructive",
       });
       return;
@@ -640,15 +649,15 @@ const InboxPage = () => {
     const res = data as { ok?: boolean; result?: string; error?: string; used?: number; limit?: number } | null;
     if (res?.error === "quota_exceeded") {
       toast({
-        title: "Llegaste a tu límite de IA por hoy",
-        description: `Usaste ${res.used ?? "?"}/${res.limit ?? "?"} hoy. Se reinicia mañana.`,
+        title: t("wa.aiLimitReached"),
+        description: t("wa.aiLimitDesc", { used: res.used ?? "?", limit: res.limit ?? "?" }),
       });
       return;
     }
     if (error || !res?.ok || !res.result) {
       toast({
-        title: "El copiloto no pudo responder",
-        description: error?.message ?? res?.error ?? "Error desconocido",
+        title: t("wa.copilotFailed"),
+        description: error?.message ?? res?.error ?? t("wa.unknownError"),
         variant: "destructive",
       });
       return;
@@ -677,8 +686,8 @@ const InboxPage = () => {
     const { error } = await (supabase as any)
       .rpc("wa_set_contact_display_name", { p_contact_id: contactId, p_name: name.trim() || null });
     setSavingName(false);
-    if (error) { toast({ title: "No se pudo guardar el nombre", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Nombre actualizado" });
+    if (error) { toast({ title: t("wa.couldNotSaveName"), description: error.message, variant: "destructive" }); return; }
+    toast({ title: t("wa.nameUpdated") });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversation-one"] });
   };
@@ -686,7 +695,7 @@ const InboxPage = () => {
   // ── Acciones del menú de click derecho de la lista de chats ──────────────
   const toggleFlag = async (id: string, flag: "archived" | "pinned" | "favorite" | "manually_unread", value: boolean) => {
     const { error } = await (supabase as any).rpc("wa_set_conversation_flag", { p_conversation_id: id, p_flag: flag, p_value: value });
-    if (error) { toast({ title: "No se pudo actualizar el chat", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("wa.couldNotUpdateChat"), description: error.message, variant: "destructive" }); return; }
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
   // Marcar leído/no leído: leído resetea el no-leído real (wa_mark_read) + la marca manual.
@@ -706,8 +715,8 @@ const InboxPage = () => {
     const fn = kind === "clear" ? "wa_clear_conversation" : "wa_delete_conversation";
     const { error } = await (supabase as any).rpc(fn, { p_conversation_id: id });
     setDestructive(null);
-    if (error) { toast({ title: "No se pudo completar", description: error.message, variant: "destructive" }); return; }
-    toast({ title: kind === "clear" ? "Chat vaciado" : "Chat eliminado" });
+    if (error) { toast({ title: t("wa.couldNotComplete"), description: error.message, variant: "destructive" }); return; }
+    toast({ title: kind === "clear" ? t("wa.chatCleared") : t("wa.chatDeleted") });
     if (kind === "delete" && selectedId === id) setSelectedId(null);
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
     if (selectedId === id) qc.invalidateQueries({ queryKey: ["wa-inbox-messages", id] });
@@ -719,7 +728,7 @@ const InboxPage = () => {
       ? (supabase as any).from("wa_conversation_labels").insert({ conversation_id: conversationId, label_id: labelId })
       : (supabase as any).from("wa_conversation_labels").delete().eq("conversation_id", conversationId).eq("label_id", labelId);
     const { error } = await q;
-    if (error) { toast({ title: "No se pudo actualizar la lista", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("wa.couldNotUpdateList"), description: error.message, variant: "destructive" }); return; }
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
   const createLabel = async () => {
@@ -727,7 +736,7 @@ const InboxPage = () => {
     if (!name) return;
     const forConv = listDialog?.forConversation ?? null;
     const { data, error } = await (supabase as any).from("wa_labels").insert({ name }).select("id").single();
-    if (error) { toast({ title: "No se pudo crear la lista", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("wa.couldNotCreateList"), description: error.message, variant: "destructive" }); return; }
     if (forConv && data?.id) {
       await (supabase as any).from("wa_conversation_labels").insert({ conversation_id: forConv, label_id: data.id });
     }
@@ -735,23 +744,23 @@ const InboxPage = () => {
     setNewListName("");
     qc.invalidateQueries({ queryKey: ["wa-inbox-labels"] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
-    toast({ title: "Lista creada" });
+    toast({ title: t("wa.listCreated") });
   };
   const deleteLabel = async (labelId: string) => {
     const { error } = await (supabase as any).from("wa_labels").delete().eq("id", labelId);
-    if (error) { toast({ title: "No se pudo borrar la lista", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("wa.couldNotDeleteList"), description: error.message, variant: "destructive" }); return; }
     if (labelFilter === labelId) setLabelFilter(null);
     qc.invalidateQueries({ queryKey: ["wa-inbox-labels"] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
-    toast({ title: "Lista eliminada" });
+    toast({ title: t("wa.listDeleted") });
   };
 
   const setConversationStatus = async (status: string) => {
     if (!selectedId) return;
     const { error } = await (supabase as any)
       .from("wa_conversations").update({ status }).eq("id", selectedId);
-    if (error) { toast({ title: "No se pudo cambiar el estado", description: error.message, variant: "destructive" }); return; }
-    toast({ title: `Conversación ${statusMeta[status]?.label?.toLowerCase() ?? status}` });
+    if (error) { toast({ title: t("wa.couldNotChangeStatus"), description: error.message, variant: "destructive" }); return; }
+    toast({ title: t("wa.conversationStatus", { status: (statusMeta[status] ? t(statusMeta[status].key) : status).toLowerCase() }) });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
@@ -792,7 +801,7 @@ const InboxPage = () => {
     // Sin awaits entre el fin del loop y acá → ningún toggle puede intercalarse.
     assignDesiredRef.current.clear();
     assignPumpingRef.current = false;
-    if (failed) toast({ title: "No se pudo asignar", description: failed, variant: "destructive" });
+    if (failed) toast({ title: t("wa.couldNotAssign"), description: failed, variant: "destructive" });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversation-one"] });
   };
@@ -834,13 +843,13 @@ const InboxPage = () => {
             onClick={() => navigate(backNav.backTo!)}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-primary hover:bg-muted/50 border-b border-border"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Volver a {backNav.backLabel || "atrás"}
+            <ArrowLeft className="h-3.5 w-3.5" /> {t("wa.backTo", { x: backNav.backLabel || t("wa.backFallback") })}
           </button>
         )}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h1 className="text-base font-semibold">Bandeja</h1>
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Actualización en tiempo real">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title={t("wa.realtimeUpdate")}>
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
@@ -850,7 +859,7 @@ const InboxPage = () => {
           <div className="ml-auto flex items-center gap-2">
             <BotonSilenciarCanal channel="wa" className="h-7 w-7" />
             {canAccess("WhatsApp", "Canales") && (
-              <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="Gestionar canales">
+              <Button asChild variant="ghost" size="icon" className="h-7 w-7" title={t("wa.manageChannels")}>
                 <Link to="/inbox/canales"><Radio className="h-4 w-4" /></Link>
               </Button>
             )}
@@ -864,7 +873,7 @@ const InboxPage = () => {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar conversación…"
+            placeholder={t("wa.searchConversation")}
             className="h-9 pl-8"
           />
         </div>
@@ -899,7 +908,7 @@ const InboxPage = () => {
         )}
         {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin-x px-3 pb-3">
-          {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
+          {([["todos", t("common.all")], ["no_leidos", t("wa.unreadPl")], ["favoritos", t("wa.favorites")]] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -928,7 +937,7 @@ const InboxPage = () => {
           <button
             type="button"
             onClick={() => { setNewListName(""); setListDialog({ forConversation: null }); }}
-            title="Nueva lista"
+            title={t("wa.newList")}
             className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-foreground border border-border hover:bg-muted/70"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -948,11 +957,11 @@ const InboxPage = () => {
         <div className="flex-1 overflow-y-auto">
           {convLoading ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}
             </div>
           ) : filtered.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {conversations.length === 0 ? "Todavía no hay conversaciones." : "Sin resultados."}
+              {conversations.length === 0 ? t("wa.noConversations") : t("common.noResults")}
             </div>
           ) : (
             <ul className="space-y-0.5 px-2 py-2">
@@ -1005,7 +1014,7 @@ const InboxPage = () => {
                                 {c.unread_count > 99 ? "99+" : c.unread_count}
                               </span>
                             ) : c.manually_unread ? (
-                              <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary" title="No leído" />
+                              <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary" title={t("wa.unreadOne")} />
                             ) : null}
                           </div>
                         </div>
@@ -1019,18 +1028,18 @@ const InboxPage = () => {
                         <Pin className="mr-2 h-4 w-4" /> {c.pinned ? "Desfijar chat" : "Fijar chat"}
                       </ContextMenuItem>
                       <ContextMenuItem onClick={() => markRead(c.id, unread)}>
-                        <MailOpen className="mr-2 h-4 w-4" /> {unread ? "Marcar como leído" : "Marcar como no leído"}
+                        <MailOpen className="mr-2 h-4 w-4" /> {unread ? t("wa.markAsRead") : t("wa.markAsUnread")}
                       </ContextMenuItem>
                       <ContextMenuItem onClick={() => toggleFlag(c.id, "favorite", !c.favorite)}>
-                        <Star className="mr-2 h-4 w-4" /> {c.favorite ? "Quitar de Favoritos" : "Añadir a Favoritos"}
+                        <Star className="mr-2 h-4 w-4" /> {c.favorite ? t("wa.removeFavorite") : t("wa.addFavorite")}
                       </ContextMenuItem>
                       <ContextMenuSub>
                         <ContextMenuSubTrigger>
-                          <Tags className="mr-2 h-4 w-4" /> Añadir a la lista
+                          <Tags className="mr-2 h-4 w-4" /> {t("wa.addToList")}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent className="w-52">
                           {myLabels.length === 0 && (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin listas todavía</div>
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("wa.noListsYet")}</div>
                           )}
                           {myLabels.map((lb) => (
                             <ContextMenuCheckboxItem
@@ -1044,7 +1053,7 @@ const InboxPage = () => {
                           ))}
                           <ContextMenuSeparator />
                           <ContextMenuItem onClick={() => { setNewListName(""); setListDialog({ forConversation: c.id }); }}>
-                            <Plus className="mr-2 h-4 w-4" /> Nueva lista…
+                            <Plus className="mr-2 h-4 w-4" /> {t("wa.newListEllipsis")}
                           </ContextMenuItem>
                         </ContextMenuSubContent>
                       </ContextMenuSub>
@@ -1052,10 +1061,10 @@ const InboxPage = () => {
                         <>
                           <ContextMenuSeparator />
                           <ContextMenuItem className="text-warning focus:text-warning" onClick={() => setDestructive({ kind: "clear", id: c.id, label: contactLabel(c.contact) })}>
-                            <Eraser className="mr-2 h-4 w-4" /> Vaciar chat
+                            <Eraser className="mr-2 h-4 w-4" /> {t("wa.clearChat")}
                           </ContextMenuItem>
                           <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => setDestructive({ kind: "delete", id: c.id, label: contactLabel(c.contact) })}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar chat
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("wa.deleteChat")}
                           </ContextMenuItem>
                         </>
                       )}
@@ -1073,7 +1082,7 @@ const InboxPage = () => {
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
             <MessageSquare className="h-10 w-10 opacity-30" />
-            <p className="text-sm">Elige una conversación para verla.</p>
+            <p className="text-sm">{t("wa.pickConversation")}</p>
           </div>
         ) : (
           <>
@@ -1082,8 +1091,8 @@ const InboxPage = () => {
                 type="button"
                 onClick={() => setSelectedId(null)}
                 className="-ml-1 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
-                title="Volver a la lista"
-                aria-label="Volver a la lista"
+                title={t("wa.backToList")}
+                aria-label={t("wa.backToList")}
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -1094,7 +1103,7 @@ const InboxPage = () => {
                     type="button"
                     onClick={() => { setNameDraft(selected.contact?.manual_name ?? ""); setContactPanelOpen(true); }}
                     className="truncate text-left text-sm font-semibold hover:underline"
-                    title="Ver info del contacto"
+                    title={t("wa.viewContactInfo")}
                   >
                     {contactLabel(selected.contact)}
                   </button>
@@ -1109,7 +1118,7 @@ const InboxPage = () => {
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted/60 px-1.5 py-0.5 transition-colors hover:bg-primary/15 hover:text-primary"
-                      title="Abrir Instagram del lead"
+                      title={t("wa.openLeadInstagram")}
                     >
                       <Instagram className="h-3 w-3 shrink-0" />
                       @{igHandle}
@@ -1124,10 +1133,10 @@ const InboxPage = () => {
                       variant="outline"
                       size="sm"
                       className="ml-auto h-7 gap-1 text-xs"
-                      title={assigneeNames ? `Asignada a: ${assigneeNames}` : "Asignar conversación"}
+                      title={assigneeNames ? t("wa.assignedTo", { names: assigneeNames }) : t("wa.assignConversation")}
                     >
                       <UserCheck className="h-3.5 w-3.5" />
-                      {assigneeSummary ?? "Asignar"}
+                      {assigneeSummary ?? t("wa.assign")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-56 p-0">
@@ -1142,27 +1151,27 @@ const InboxPage = () => {
               ) : (
                 <span
                   className="ml-auto flex items-center gap-1 text-xs text-muted-foreground"
-                  title={assigneeNames ? `Asignada a: ${assigneeNames}` : "Asignación (solo lectura)"}
+                  title={assigneeNames ? t("wa.assignedTo", { names: assigneeNames }) : t("wa.assignmentReadOnly")}
                 >
                   <UserCheck className="h-3.5 w-3.5" />
-                  {assigneeSummary ?? "Sin asignar"}
+                  {assigneeSummary ?? t("common.unassigned")}
                 </span>
               )}
               <Badge
                 variant={(statusMeta[selected.status] ?? statusMeta.open).variant}
                 className="text-[10px]"
               >
-                {(statusMeta[selected.status] ?? statusMeta.open).label}
+                {t((statusMeta[selected.status] ?? statusMeta.open).key)}
               </Badge>
             </header>
 
             <ScrollArea className="flex-1 px-5 py-4">
               {msgLoading ? (
                 <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando mensajes…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("wa.loadingMessages")}
                 </div>
               ) : messages.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
+                <div className="py-10 text-center text-sm text-muted-foreground">{t("wa.noMessages")}</div>
               ) : (
                 <div className="flex flex-col gap-2">
                   {messages.map((m) => {
@@ -1235,7 +1244,7 @@ const InboxPage = () => {
                                 <button
                                   type="button"
                                   onClick={() => openMediaViewer(m.id)}
-                                  title="Ver en grande"
+                                  title={t("wa.viewLarge")}
                                   className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white transition hover:bg-black/80"
                                 >
                                   <Maximize2 className="h-3.5 w-3.5" />
@@ -1284,9 +1293,9 @@ const InboxPage = () => {
                               <div className="mt-0.5 flex flex-col items-end gap-0.5">
                                 <p
                                   className="flex items-center gap-1 text-[10px] font-medium text-destructive"
-                                  title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verifica el número del contacto."
+                                  title={t("wa.failedTooltip")}
                                 >
-                                  <AlertCircle className="h-3 w-3" /> No entregado · revisa el número
+                                  <AlertCircle className="h-3 w-3" /> {t("wa.notDeliveredCheckNumber")}
                                 </p>
                                 {m.body && m.msg_type === "text" && (
                                   <button
@@ -1294,7 +1303,7 @@ const InboxPage = () => {
                                     onClick={() => sendMessage(m.body!)}
                                     disabled={sending}
                                     className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline disabled:opacity-50"
-                                    title="Reenviar este mensaje (el número ya pudo haberse corregido). Hazlo uno por uno."
+                                    title={t("wa.resendTooltip")}
                                   >
                                     ↻ Reintentar envío
                                   </button>
@@ -1317,7 +1326,7 @@ const InboxPage = () => {
                               <DropdownMenuTrigger asChild>
                                 <button
                                   type="button"
-                                  aria-label="Acciones del mensaje"
+                                  aria-label={t("wa.messageActions")}
                                   className="mb-1 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground focus:opacity-100 group-hover:opacity-100"
                                 >
                                   <MoreHorizontal className="h-4 w-4" />
@@ -1329,7 +1338,7 @@ const InboxPage = () => {
                                 </DropdownMenuItem>
                                 {m.msg_type === "sticker" && m.media_url && (
                                   <DropdownMenuItem onClick={() => saveStickerToGallery(m.media_url!)}>
-                                    <Sticker className="mr-2 h-4 w-4" /> Guardar sticker
+                                    <Sticker className="mr-2 h-4 w-4" /> {t("wa.saveSticker")}
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
@@ -1354,7 +1363,7 @@ const InboxPage = () => {
                                     <button
                                       type="button"
                                       onClick={() => messageAction(m.id, "react", "")}
-                                      aria-label="Quitar reacción"
+                                      aria-label={t("wa.removeReaction")}
                                       className="rounded p-1 text-muted-foreground hover:bg-muted"
                                     >
                                       <X className="h-3.5 w-3.5" />
@@ -1368,7 +1377,7 @@ const InboxPage = () => {
                                       className="text-destructive focus:text-destructive"
                                       onClick={() => messageAction(m.id, "delete")}
                                     >
-                                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar para todos
+                                      <Trash2 className="mr-2 h-4 w-4" /> {t("wa.deleteForEveryone")}
                                     </DropdownMenuItem>
                                   </>
                                 )}
@@ -1389,12 +1398,12 @@ const InboxPage = () => {
               <div className="mx-4 mb-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
                 <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
-                  {copilotInfo.action === "summarize" ? "Resumen del hilo" : "Señales / próximo paso"}
+                  {copilotInfo.action === "summarize" ? t("wa.threadSummary") : t("wa.signalsNextStep")}
                   <button
                     type="button"
                     onClick={() => setCopilotInfo(null)}
                     className="ml-auto text-muted-foreground hover:text-foreground"
-                    title="Cerrar"
+                    title={t("common.close")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1407,7 +1416,7 @@ const InboxPage = () => {
             <Dialog open={contactPanelOpen} onOpenChange={setContactPanelOpen}>
               <DialogContent className="max-w-sm">
                 <DialogHeader>
-                  <DialogTitle className="sr-only">Info del contacto</DialogTitle>
+                  <DialogTitle className="sr-only">{t("wa.contactInfo")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col items-center gap-3 pt-1">
                   {contactAvatar ? (
@@ -1421,14 +1430,14 @@ const InboxPage = () => {
                     <Input
                       value={nameDraft}
                       onChange={(e) => setNameDraft(e.target.value)}
-                      placeholder={selected?.contact?.resolved_name || selected?.contact?.display_name || "Nombre del contacto"}
+                      placeholder={selected?.contact?.resolved_name || selected?.contact?.display_name || t("wa.contactNamePlaceholder")}
                       className="h-9 text-center"
                     />
                     <Button
                       size="icon" variant="outline" className="h-9 w-9 shrink-0"
                       disabled={savingName || nameDraft.trim() === (selected?.contact?.manual_name ?? "")}
                       onClick={() => saveContactName(selected?.contact?.id, nameDraft)}
-                      title="Guardar nombre"
+                      title={t("wa.saveName")}
                     >
                       {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                     </Button>
@@ -1437,7 +1446,7 @@ const InboxPage = () => {
                 <div className="space-y-2.5 text-sm">
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="tabular-nums">{jidToNumber(selected?.contact?.wa_jid) ?? "Número oculto (LID)"}</span>
+                    <span className="tabular-nums">{jidToNumber(selected?.contact?.wa_jid) ?? t("wa.hiddenNumber")}</span>
                   </div>
                   {igHandle && (
                     <a
@@ -1445,7 +1454,7 @@ const InboxPage = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-foreground hover:text-primary hover:underline"
-                      title="Abrir Instagram del lead"
+                      title={t("wa.openLeadInstagram")}
                     >
                       <Instagram className="h-4 w-4 shrink-0" />
                       <span>@{igHandle}</span>
@@ -1458,7 +1467,7 @@ const InboxPage = () => {
                   <div className="flex items-center gap-2">
                     <UserCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 break-words" title={assigneeNames || undefined}>
-                      {assigneeNames || "Sin asignar"}
+                      {assigneeNames || t("common.unassigned")}
                     </span>
                     {canAssign && (
                       <Popover open={assignPanelOpen} onOpenChange={setAssignPanelOpen}>
@@ -1485,7 +1494,7 @@ const InboxPage = () => {
                         className="h-7 flex-1 text-xs"
                         onClick={() => setConversationStatus(st)}
                       >
-                        {statusMeta[st].label}
+                        {t(statusMeta[st].key)}
                       </Button>
                     ))}
                   </div>
@@ -1521,7 +1530,7 @@ const InboxPage = () => {
                 <div className="flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-primary">
-                      {replyingTo.direction === "out" ? "Respondiendo a ti" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
+                      {replyingTo.direction === "out" ? t("wa.replyingToYou") : t("wa.replyingTo", { name: contactLabel(selected?.contact ?? null) })}
                     </p>
                     <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
                   </div>
@@ -1529,7 +1538,7 @@ const InboxPage = () => {
                     type="button"
                     onClick={() => setReplyingTo(null)}
                     className="shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label="Cancelar respuesta"
+                    aria-label={t("composer.cancelReply")}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -1569,7 +1578,7 @@ const InboxPage = () => {
                       }
                     }
                   }}
-                  placeholder="Escribe un mensaje…"
+                  placeholder={t("wa.writeMessage")}
                   className="block min-h-[44px] max-h-[160px] w-full resize-none rounded-2xl border-0 bg-primary/5 px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                 />
                 {/* Enviar DENTRO del cajón, pegado al borde inferior (crece con el cajón). */}
@@ -1578,7 +1587,7 @@ const InboxPage = () => {
                   disabled={sending || !draft.trim()}
                   size="icon"
                   className="absolute bottom-[7px] right-1.5 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
-                  title="Enviar"
+                  title={t("composer.send")}
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
@@ -1593,28 +1602,28 @@ const InboxPage = () => {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
-                      title="Copiloto IA"
+                      title={t("wa.copilotAI")}
                     >
                       {copilotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="w-52">
-                    <DropdownMenuLabel className="text-xs">Copiloto IA</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-xs">{t("wa.copilotAI")}</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => runCopilot("suggest")}>
                       <PenLine className="mr-2 h-4 w-4" /> Sugerir respuesta
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => runCopilot("summarize")}>
-                      <FileText className="mr-2 h-4 w-4" /> Resumir el hilo
+                      <FileText className="mr-2 h-4 w-4" /> {t("wa.summarizeThread")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => runCopilot("signals")}>
-                      <Gauge className="mr-2 h-4 w-4" /> Detectar señales
+                      <Gauge className="mr-2 h-4 w-4" /> {t("wa.detectSignals")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 )}
                 <Button
                   variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
-                  title="Adjuntar archivo"
+                  title={t("wa.attachFile")}
                   disabled={mediaBusy || sending || recording}
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -1622,7 +1631,7 @@ const InboxPage = () => {
                 </Button>
                 <Button
                   variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
-                  title="Grabar nota de voz"
+                  title={t("wa.recordVoiceNote")}
                   disabled={mediaBusy || sending}
                   onClick={startRecording}
                 >
@@ -1657,19 +1666,19 @@ const InboxPage = () => {
       <Dialog open={!!destructive} onOpenChange={(o) => !o && setDestructive(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{destructive?.kind === "clear" ? "Vaciar chat" : "Eliminar chat"}</DialogTitle>
+            <DialogTitle>{destructive?.kind === "clear" ? t("wa.clearChat") : t("wa.deleteChat")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {destructive?.kind === "clear" ? (
-              <>Se borrarán todos los mensajes de <b>{destructive?.label}</b> en la bandeja de Maven (el chat queda vacío). <b>No afecta al WhatsApp real.</b> No se puede deshacer.</>
+              <>{t("wa.clearChatA")}<b>{destructive?.label}</b>{t("wa.clearChatB")}<b>{t("wa.doesNotAffectWhatsApp")}</b> {t("wa.cannotUndoShort")}</>
             ) : (
-              <>Se eliminará la conversación con <b>{destructive?.label}</b> y sus mensajes de la bandeja de Maven. <b>No afecta al WhatsApp real.</b> No se puede deshacer.</>
+              <>{t("wa.deleteChatA")}<b>{destructive?.label}</b>{t("wa.deleteChatB")}<b>{t("wa.doesNotAffectWhatsApp")}</b> {t("wa.cannotUndoShort")}</>
             )}
           </p>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDestructive(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDestructive(null)}>{t("common.cancel")}</Button>
             <Button variant="destructive" onClick={runDestructive}>
-              {destructive?.kind === "clear" ? "Vaciar" : "Eliminar"}
+              {destructive?.kind === "clear" ? t("wa.clear") : t("common.delete")}
             </Button>
           </div>
         </DialogContent>
@@ -1679,22 +1688,22 @@ const InboxPage = () => {
       <Dialog open={!!listDialog} onOpenChange={(o) => !o && setListDialog(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Nueva lista</DialogTitle>
+            <DialogTitle>{t("wa.newList")}</DialogTitle>
           </DialogHeader>
           <Input
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
-            placeholder="Nombre de la lista (ej. VIP, Reclamos…)"
+            placeholder={t("wa.listNamePlaceholder")}
             onKeyDown={(e) => { if (e.key === "Enter") createLabel(); }}
             autoFocus
           />
           {myLabels.length > 0 && (
             <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Mis listas</p>
+              <p className="text-xs font-medium text-muted-foreground">{t("wa.myLists")}</p>
               {myLabels.map((lb) => (
                 <div key={lb.id} className="flex items-center justify-between rounded-md border border-border/60 px-2.5 py-1.5 text-sm">
                   <span className="inline-flex items-center gap-1.5"><Tags className="h-3.5 w-3.5 text-muted-foreground" />{lb.name}</span>
-                  <button type="button" onClick={() => setLabelToDelete({ id: lb.id, name: lb.name })} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-destructive">
+                  <button type="button" onClick={() => setLabelToDelete({ id: lb.id, name: lb.name })} title={t("wa.deleteList")} className="text-muted-foreground transition-colors hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -1702,8 +1711,8 @@ const InboxPage = () => {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setListDialog(null)}>Cerrar</Button>
-            <Button onClick={createLabel} disabled={!newListName.trim()}>Crear</Button>
+            <Button variant="outline" onClick={() => setListDialog(null)}>{t("common.close")}</Button>
+            <Button onClick={createLabel} disabled={!newListName.trim()}>{t("common.create")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1712,18 +1721,18 @@ const InboxPage = () => {
       <Dialog open={!!labelToDelete} onOpenChange={(o) => !o && setLabelToDelete(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Borrar lista</DialogTitle>
+            <DialogTitle>{t("wa.deleteList")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Se borrará la lista <b>{labelToDelete?.name}</b> y se quitará de las conversaciones que la tengan. Los chats no se tocan. No se puede deshacer.
+            {t("wa.deleteListA")}<b>{labelToDelete?.name}</b>{t("wa.deleteListB")}
           </p>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setLabelToDelete(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setLabelToDelete(null)}>{t("common.cancel")}</Button>
             <Button
               variant="destructive"
               onClick={() => { if (labelToDelete) { deleteLabel(labelToDelete.id); setLabelToDelete(null); } }}
             >
-              Borrar
+              {t("wa.erase")}
             </Button>
           </div>
         </DialogContent>
