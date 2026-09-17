@@ -48,6 +48,7 @@ const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 const GrabacionesPage = lazy(() => import("./pages/grabaciones/GrabacionesPage"));
 const OficinaPage = lazy(() => import("./pages/oficina/OficinaPage"));
+const CalendarioPage = lazy(() => import("./pages/calendario/CalendarioPage"));
 const DocumentoPage = lazy(() => import("./pages/oficina/DocumentoPage"));
 // Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
 // se ve por default como Messenger/Cowork/Meet; un admin puede apagárselo a un rol
@@ -346,7 +347,15 @@ const App = () => (
                 <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
                 <Route path="/meet" element={<PermissionRoute module="Meet"><MeetPage /></PermissionRoute>} />
                 <Route path="/grabaciones" element={<PermissionRoute module="Grabaciones"><GrabacionesPage /></PermissionRoute>} />
-                <Route path="/oficina" element={<PermissionRoute module="Oficina"><OficinaPage /></PermissionRoute>} />
+                {/* ⚠️ `/oficina/hojas` y `/oficina/:id` compiten por la misma
+                    forma. React Router 6 rankea lo ESTÁTICO por encima de lo
+                    dinámico, así que gana la sección y no un documento con id
+                    "hojas" (que además no puede existir: los ids son UUID).
+                    Hay guarda en rutasDeOficina.test.ts. */}
+                <Route path="/oficina" element={<PermissionRoute module="Oficina" submodule="Documentos"><OficinaPage formato="docx" /></PermissionRoute>} />
+                <Route path="/oficina/calendario" element={<PermissionRoute module="Oficina" submodule="Calendario"><CalendarioPage /></PermissionRoute>} />
+                <Route path="/oficina/hojas" element={<PermissionRoute module="Oficina" submodule="Hojas de cálculo"><OficinaPage formato="xlsx" /></PermissionRoute>} />
+                <Route path="/oficina/presentaciones" element={<PermissionRoute module="Oficina" submodule="Presentaciones"><OficinaPage formato="pptx" /></PermissionRoute>} />
                 <Route path="/oficina/:id" element={<PermissionRoute module="Oficina"><DocumentoPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />

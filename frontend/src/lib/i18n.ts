@@ -25,6 +25,35 @@ const translations = {
   // Sidebar items - Resources
   "nav.designSystem": { es: "Design System", en: "Design System" },
   "nav.docs": { es: "Documentación", en: "Documentation" },
+
+  // Correo · mencionar con @ para sumar a alguien al hilo
+  "correo.mencion.ayuda": {
+    es: "Se suma al correo y le llega un aviso",
+    en: "Gets added to the email and receives a notice",
+  },
+  "correo.mencion.listaLabel": {
+    es: "Personas para mencionar",
+    en: "People to mention",
+  },
+
+  // Correo · la tarjeta de una invitación de calendario (.ics)
+  "correo.evento.cancelada": {
+    es: "Esta reunión fue cancelada",
+    en: "This meeting was cancelled",
+  },
+  "correo.evento.sinTitulo": { es: "Invitación sin título", en: "Untitled invitation" },
+  "correo.evento.todoElDia": { es: "todo el día", en: "all day" },
+  "correo.evento.rango": { es: "{from} a {to}", en: "{from} to {to}" },
+  "correo.evento.seRepite": { es: "Se repite", en: "Repeats" },
+  "correo.evento.organiza": { es: "Organiza", en: "Organized by" },
+  "correo.evento.entrar": { es: "Entrar a la videollamada", en: "Join the video call" },
+  "correo.evento.invitados": { es: "Invitados ({n})", en: "Guests ({n})" },
+  "correo.evento.detalles": { es: "Detalles", en: "Details" },
+  "correo.evento.alguien": { es: "alguien", en: "someone" },
+  "correo.evento.va": { es: "va", en: "going" },
+  "correo.evento.noVa": { es: "no va", en: "not going" },
+  "correo.evento.quizas": { es: "quizás", en: "maybe" },
+  "correo.evento.sinResponder": { es: "sin responder", en: "no reply" },
   "nav.settings": { es: "Settings", en: "Settings" },
 
   // Topbar
@@ -33,6 +62,10 @@ const translations = {
   "topbar.darkMode": { es: "Modo oscuro", en: "Dark mode" },
   "topbar.notifications": { es: "Notificaciones", en: "Notifications" },
   "topbar.noNotifications": { es: "Sin notificaciones nuevas.", en: "No new notifications." },
+  // Aviso de mención dentro de Maven (useMessengerNotifications → avisarPersona).
+  "avisos.abrir": { es: "Abrir", en: "Open" },
+  "messenger.teMenciono": { es: "te mencionó", en: "mentioned you" },
+  "messenger.teMencionoEn": { es: "te mencionó en", en: "mentioned you in" },
   "topbar.changePassword": { es: "Cambiar contraseña", en: "Change password" },
   "topbar.logout": { es: "Cerrar sesión", en: "Log out" },
   "topbar.logoutSuccess": { es: "Sesión cerrada", en: "Logged out" },
@@ -968,6 +1001,114 @@ const translations = {
   // Sidebar items - Menú (resto del marco de la app)
   "nav.mail": { es: "Correo", en: "Mail" },
   "nav.office": { es: "Oficina", en: "Office" },
+  // Oficina · las tres secciones de la suite
+  "nav.office.docs": { es: "Documentos", en: "Documents" },
+  "nav.office.sheets": { es: "Hojas de cálculo", en: "Spreadsheets" },
+  "nav.office.slides": { es: "Presentaciones", en: "Presentations" },
+  "nav.office.calendar": { es: "Calendario", en: "Calendar" },
+
+  // Oficina · Calendario
+  "cal.subtitulo": { es: "Tus reuniones y las del equipo", en: "Your meetings and the team\u2019s" },
+  "cal.hoy": { es: "Hoy", en: "Today" },
+  "cal.mesAnterior": { es: "Mes anterior", en: "Previous month" },
+  "cal.mesSiguiente": { es: "Mes siguiente", en: "Next month" },
+  "cal.nuevo": { es: "Evento nuevo", en: "New event" },
+  "cal.editar": { es: "Editar evento", en: "Edit event" },
+  "cal.titulo": { es: "Título", en: "Title" },
+  "cal.tituloPlaceholder": { es: "Ej: Inducción con el equipo", en: "e.g. Onboarding with the team" },
+  "cal.todoElDia": { es: "Todo el día", en: "All day" },
+  "cal.empieza": { es: "Empieza", en: "Starts" },
+  "cal.termina": { es: "Termina", en: "Ends" },
+  "cal.lugar": { es: "Lugar", en: "Location" },
+  "cal.enlace": { es: "Link de la videollamada", en: "Video call link" },
+  "cal.notas": { es: "Notas", en: "Notes" },
+  "cal.quienLoVe": { es: "Quién lo ve", en: "Who can see it" },
+  "cal.privado": { es: "Solo yo", en: "Only me" },
+  "cal.equipo": { es: "El equipo", en: "The team" },
+  "cal.guardar": { es: "Guardar", en: "Save" },
+  "cal.creado": { es: "Evento creado", en: "Event created" },
+  "cal.guardado": { es: "Evento guardado", en: "Event saved" },
+  "cal.borrado": { es: "Evento eliminado", en: "Event deleted" },
+  "cal.faltaTitulo": { es: "Ponele un título al evento", en: "Give the event a title" },
+  "cal.finAntes": { es: "Termina antes de empezar", en: "It ends before it starts" },
+  "cal.sinEventos": { es: "Nada agendado este mes", en: "Nothing scheduled this month" },
+  "cal.sinEventosAyuda": {
+    es: "Hacé clic en un día para agendar algo.",
+    en: "Click a day to schedule something.",
+  },
+  "cal.masEventos": { es: "+{n} más", en: "+{n} more" },
+  "cal.entrar": { es: "Entrar", en: "Join" },
+
+  // Calendario · invitados
+  "cal.invitados": { es: "Invitados", en: "Guests" },
+  "cal.buscarPersona": { es: "Buscar a alguien…", en: "Search for someone…" },
+  "cal.sinInvitados": { es: "Todavía no invitaste a nadie", en: "You haven\u2019t invited anyone yet" },
+  "cal.quitar": { es: "Quitar invitado", en: "Remove guest" },
+  "cal.vas": { es: "¿Vas?", en: "Are you going?" },
+  "cal.resp.pendiente": { es: "sin responder", en: "no reply" },
+  "cal.resp.va": { es: "va", en: "going" },
+  "cal.resp.noVa": { es: "no va", en: "not going" },
+  "cal.resp.quizas": { es: "quizás", en: "maybe" },
+  "cal.respondiste": { es: "Respuesta guardada", en: "Reply saved" },
+  "cal.invitaAlGuardar": {
+    es: "Guardá el evento y después invitá a quien quieras",
+    en: "Save the event first, then invite whoever you want",
+  },
+  "cal.organiza": { es: "Organiza", en: "Organizer" },
+
+  // Calendario · vista de semana
+  "cal.vistaMes": { es: "Mes", en: "Month" },
+  "cal.vistaSemana": { es: "Semana", en: "Week" },
+  "cal.semanaAnterior": { es: "Semana anterior", en: "Previous week" },
+  "cal.semanaSiguiente": { es: "Semana siguiente", en: "Next week" },
+  "cal.sinEventosSemana": { es: "Nada agendado esta semana", en: "Nothing scheduled this week" },
+
+  // Oficina · compartir un documento con personas
+  "doc.compartir": { es: "Compartir", en: "Share" },
+  "doc.compartirCon": { es: "Compartir con", en: "Share with" },
+  "doc.compartirTitulo": { es: "Compartir «{name}»", en: "Share “{name}”" },
+  "doc.agregarPersonas": {
+    es: "Agregá personas del equipo",
+    en: "Add people from the team",
+  },
+  "doc.personasConAcceso": { es: "Personas con acceso", en: "People with access" },
+  "doc.dueno": { es: "Dueño", en: "Owner" },
+  "doc.vos": { es: "(vos)", en: "(you)" },
+  "doc.accesoGeneral": { es: "Acceso general", en: "General access" },
+  "doc.restringido": { es: "Restringido", en: "Restricted" },
+  "doc.restringidoAyuda": {
+    es: "Solo las personas con acceso pueden abrirlo",
+    en: "Only people with access can open it",
+  },
+  "doc.todoMaven": { es: "Todo Maven", en: "Everyone at Maven" },
+  "doc.todoMavenAyuda": {
+    es: "Cualquiera del equipo con el link puede abrirlo y editarlo",
+    en: "Anyone on the team with the link can open and edit it",
+  },
+  "doc.copiarLink": { es: "Copiar link", en: "Copy link" },
+  "doc.linkCopiado": { es: "Link copiado", en: "Link copied" },
+  "doc.listo": { es: "Listo", en: "Done" },
+  "doc.quitarAcceso": { es: "Quitar el acceso", en: "Remove access" },
+  "doc.visibilidadCambiada": { es: "Cambió quién lo ve", en: "Changed who can see it" },
+  "doc.soloElDuenoAcceso": {
+    es: "Solo el dueño puede cambiar el acceso general",
+    en: "Only the owner can change general access",
+  },
+  "doc.buscarPersona": { es: "Buscar a alguien…", en: "Search for someone…" },
+  "doc.sinCompartir": { es: "No lo compartiste con nadie", en: "You haven\u2019t shared it with anyone" },
+  "doc.puedeVer": { es: "puede ver", en: "can view" },
+  "doc.puedeEditar": { es: "puede editar", en: "can edit" },
+  "doc.dejarDeCompartir": { es: "Dejar de compartir", en: "Stop sharing" },
+  "doc.compartido": { es: "Compartido", en: "Shared" },
+  "doc.permisoCambiado": { es: "Permiso actualizado", en: "Permission updated" },
+  "doc.soloElDueno": {
+    es: "Solo quien lo creó puede compartirlo",
+    en: "Only its creator can share it",
+  },
+  "doc.compartidoConmigo": { es: "Compartido conmigo", en: "Shared with me" },
+  "oficina.nuevoDoc": { es: "Documento nuevo", en: "New document" },
+  "oficina.nuevaHoja": { es: "Hoja nueva", en: "New spreadsheet" },
+  "oficina.nuevaPresentacion": { es: "Presentación nueva", en: "New presentation" },
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.meet": { es: "Meet", en: "Meet" },
@@ -1052,6 +1193,7 @@ const translations = {
 
   // Secciones del buscador ⌘K (espejan las del sidebar)
   "nav.section.menu": { es: "Menú", en: "Menu" },
+  "nav.section.office": { es: "Oficina", en: "Office" },
   "nav.section.creators": { es: "Creadoras", en: "Creators" },
   "nav.section.sales": { es: "Ventas", en: "Sales" },
   "nav.section.operations": { es: "Operaciones", en: "Operations" },

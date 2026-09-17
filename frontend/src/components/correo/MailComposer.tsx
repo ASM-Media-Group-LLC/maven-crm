@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  AtSign,
   Bold,
   Italic,
   Link2,
@@ -43,7 +44,11 @@ import { toast } from "sonner";
 import { useSendMail, useSaveServerDraft, useDeleteServerDraft } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
+import { correoDe } from "@/lib/mailAddr";
 import RecipientsField from "./RecipientsField";
+import MencionesEnElCuerpo from "./MencionesEnElCuerpo";
+import { useAuth } from "@/hooks/useAuth";
+import type { PersonaDelDirectorio } from "@/hooks/useDirectorioCorreo";
 import { useSugerenciasDestinatarios } from "@/hooks/useSugerenciasDestinatarios";
 import {
   borrarBorrador,
@@ -658,8 +663,26 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   // inválidas aparece al SALIR del campo, no en la primera tecla. Antes,
   // tipear la "j" de juan@… ya mostraba el error en rojo — o sea el estado
   // de error era el estado normal mientras se escribía.
+  // A quién se mencionó con @ en este borrador. Sirve para dos cosas: mostrar
+  // el aviso de "se sumó a X" y decirle a la edge a quién notificar al enviar.
+  const [mencionados, setMencionados] = useState<PersonaDelDirectorio[]>([]);
+  const { user: usuarioActual } = useAuth();
+
   const [tocado, setTocado] = useState<{ to?: boolean; cc?: boolean; bcc?: boolean }>({});
   const [confirmarDescarte, setConfirmarDescarte] = useState(false);
+
+  /** Mencionar a alguien lo SUMA al correo, como en Gmail: por eso la persona
+   *  recibe el hilo y no solo un aviso. Si ya estaba en Para, Cc o Cco no se
+   *  duplica — mencionar a quien ya está es perfectamente válido (es llamarle la
+   *  atención sobre algo), solo que no hay nadie nuevo a quien agregar. */
+  const alMencionar = useCallback((p: PersonaDelDirectorio) => {
+    setMencionados((prev) => (prev.some((x) => x.user_id === p.user_id) ? prev : [...prev, p]));
+    const yaEsta = [to, cc, bcc]
+      .flatMap(partirDirecciones)
+      .some((d) => correoDe(d).toLowerCase() === p.email_address.toLowerCase());
+    if (yaEsta) return;
+    setTo((actual) => (actual.trim() ? `${actual.replace(/[;,\s]*$/, "")}, ${p.email_address}` : p.email_address));
+  }, [to, cc, bcc]);
 
   const destinatarios = partirDirecciones(to);
   const copias = partirDirecciones(cc);
@@ -767,6 +790,15 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           contentType,
           contentBase64,
         })),
+        // Solo los que SIGUEN en el correo: si alguien se mencionó y después se
+        // borró su dirección a mano del campo Para, no corresponde avisarle.
+        menciones: mencionados
+          .filter((m) =>
+            [destinatarios, copias, ocultas]
+              .flat()
+              .some((d) => correoDe(d).toLowerCase() === m.email_address.toLowerCase()),
+          )
+          .map((m) => m.user_id),
       });
       // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
       borrarBorrador(remitente, firma);
@@ -985,7 +1017,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           <div className="mail-composer-row flex-1 bg-white px-5 py-4">
             <div
               className={cn(
-                "text-[#1f2937]",
+                // `relative`: es el ancla de la lista de menciones, que se abre
+                // hacia arriba desde el cuerpo.
+                "relative text-[#1f2937]",
                 // Tailwind resetea listas y citas: se restauran SOLO adentro
                 // del editor, con los mismos valores que htmlParaCorreo.
                 "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6",
@@ -997,9 +1031,31 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               onClick={() => editor?.chain().focus().run()}
             >
               <EditorContent editor={editor} />
+              {/* `relative` en el contenedor de arriba: la lista se ancla al
+                  cuerpo y se abre HACIA ARRIBA, para no quedar tapada por la
+                  barra de envío ni empujar el editor. */}
+              <MencionesEnElCuerpo
+                editor={editor}
+                miUserId={usuarioActual?.id}
+                onMencionar={alMencionar}
+              />
             </div>
           </div>
         </div>
+
+        {mencionados.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
+            <AtSign className="h-3.5 w-3.5 shrink-0" />
+            {/* La frase entera cambia con el número: partirla en "se sumó X" +
+                un final fijo dejaba "Se sumó Fabiana… VAN a recibirlo y LES
+                llega", que es justo el error que uno no ve al escribirlo. */}
+            <span>
+              {mencionados.length === 1
+                ? `Se sumó ${mencionados[0].nombre} a este correo: lo recibe y le llega un aviso en Maven.`
+                : `Se sumaron ${mencionados.length} personas a este correo: lo reciben y les llega un aviso en Maven.`}
+            </span>
+          </div>
+        )}
 
         {adjuntos.length > 0 && (
           <div className="flex flex-wrap gap-2 border-t border-border/60 px-5 py-2">

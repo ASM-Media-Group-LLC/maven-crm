@@ -889,6 +889,10 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 :root[data-contrast="high"] .msg-composer-wrap:focus-within {
   outline: 2px solid hsl(var(--ring)) !important;
   outline-offset: 2px;
+  /* Un solo aro. El ring-1 de Tailwind (box-shadow) seguía dibujando otro,
+     pegado al borde y con otro radio; los dos juntos se veían desencajados
+     (Jhon, 15/09, en la ventanita flotante). */
+  box-shadow: none !important;
 }
 
 /* Mismo caso en el compositor de correo (Para/Cc/Cco/Asunto y el cuerpo rico).
@@ -1056,82 +1060,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   table.tabla-movil tbody td[colspan] { display: block; text-align: center; }
 }
 
-/* El cuerpo de un documento de Oficina.
-   ⚠️ NO se usan las clases `prose`: `@tailwindcss/typography` está en las
-   dependencias pero NO está registrado en los plugins de tailwind.config.ts, así
-   que `prose` no aplica nada y el documento se veía plano — el H1 del mismo
-   tamaño que el párrafo y las listas sin viñetas ni números, porque el preflight
-   de Tailwind se los quita. Activar el plugin cambiaría de golpe el aspecto de
-   los anuncios de RRHH, que hoy también lo usan sin efecto; eso es una decisión
-   aparte. Acá se definen solo los elementos que el editor sabe producir. */
-.documento-maven {
-  color: hsl(var(--foreground));
-  line-height: 1.7;
-}
-.documento-maven > * + * { margin-top: 0.85em; }
-.documento-maven h1 {
-  font-size: 1.65em;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-top: 1.4em;
-}
-.documento-maven h2 {
-  font-size: 1.3em;
-  font-weight: 600;
-  line-height: 1.25;
-  margin-top: 1.3em;
-}
-.documento-maven h3 {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin-top: 1.2em;
-}
-.documento-maven > :first-child { margin-top: 0; }
-.documento-maven ul,
-.documento-maven ol { padding-left: 1.5em; }
-.documento-maven ul { list-style: disc; }
-.documento-maven ol { list-style: decimal; }
-.documento-maven li { margin-top: 0.3em; }
-.documento-maven li::marker { color: hsl(var(--muted-foreground)); }
-.documento-maven blockquote {
-  border-left: 3px solid hsl(var(--primary) / 0.5);
-  padding-left: 1em;
-  color: hsl(var(--muted-foreground));
-  font-style: italic;
-}
-.documento-maven pre {
-  background: hsl(var(--muted));
-  border-radius: 0.5rem;
-  padding: 0.85em 1em;
-  overflow-x: auto;
-  font-size: 0.875em;
-}
-.documento-maven code { font-size: 0.875em; }
-.documento-maven :not(pre) > code {
-  background: hsl(var(--muted));
-  border-radius: 0.25rem;
-  padding: 0.1em 0.35em;
-}
-.documento-maven hr {
-  border: 0;
-  border-top: 1px solid hsl(var(--border));
-  margin: 1.8em 0;
-}
-.documento-maven a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.documento-maven strong { font-weight: 600; }
-/* El marcador de vacío que pone TipTap: sin esto el documento nuevo no dice nada. */
-.documento-maven p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  color: hsl(var(--muted-foreground));
-}
-
 /* Capa de texto invisible encima del canvas del PDF.
    Es lo que permite SELECCIONAR, copiar y buscar con Ctrl+F dentro de un
    documento: sin ella una hoja de vida es una foto y no se puede sacar de ahí
@@ -1166,30 +1094,149 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   background: hsl(var(--primary) / 0.35);
 }
 
-/* Los cursores de la edición compartida.
-   La extensión de TipTap dibuja un <span> por persona dentro del texto con el
-   color que publica cada una; acá solo se le da forma. Sin esto el cursor ajeno
-   es invisible y la colaboración parece que no funciona. */
-.documento-maven .collaboration-cursor__caret {
+/* ═══ AVISOS (sonner): el botón de acción y su sitio ═══════════════════════
+   Sonner inyecta su propio <style> EN RUNTIME, después de esta hoja, con
+   `[data-sonner-toast][data-styled='true'] [data-button]`. Esa regla empata
+   en especificidad con las clases de Tailwind que le poníamos desde el
+   Toaster y gana por venir después: el "Abrir" del aviso de mención salía
+   blanco de fábrica (Jhon, 16/09: "un estilo más estético"). Acá se estila
+   con selectores más específicos y con los tokens de la skin.
+
+   Y el sitio: la X de cerrar va arriba a la derecha, DENTRO de la tarjeta,
+   así que un botón a la derecha del texto quedaba debajo de ella. Ahora el
+   aviso envuelve: cara + texto en el primer renglón y los botones en el
+   segundo, alineados con el texto — la disposición de una notificación del
+   teléfono. Y el texto deja hueco a la derecha para la X. */
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] {
+  flex-wrap: wrap;
+  row-gap: 10px;
+  padding-right: 34px; /* la X ocupa de 8 a 28 px desde el borde */
+}
+[data-sonner-toaster] [data-sonner-toast] [data-content] {
+  /* Llena el primer renglón junto a la cara (32 + 6 de margen + 6 de gap):
+     cualquier botón cae al segundo renglón. Sin cara, crece hasta el borde. */
+  flex: 1 1 calc(100% - 44px);
+  min-width: 0;
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button] {
+  margin: 0;
+  min-width: 3.5rem;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / .12);
+  border: 1px solid hsl(var(--primary) / .35);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .08);
+  transition: background-color .15s, border-color .15s, transform .15s;
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-icon] ~ [data-button] {
+  margin-left: 44px; /* alineado con el texto, no con la cara */
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button] ~ [data-button] {
+  margin-left: 0; /* el segundo botón sigue al primero */
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button]:hover {
+  background: hsl(var(--primary) / .22);
+  border-color: hsl(var(--primary) / .6);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button]:active {
+  transform: translateY(1px);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button]:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  box-shadow: none;
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button][data-cancel] {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--foreground) / .06);
+  border-color: hsl(var(--foreground) / .12);
+  box-shadow: none;
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-button][data-cancel]:hover {
+  background: hsl(var(--foreground) / .10);
+}
+
+/* ═══ FONDO DE CHAT: resplandor + papel tapiz ══════════════════════════════
+   Jhon (16/09): "en las ventanas flotantes el fondo es un poco soso". Eligió
+   la opción 3 del mock: dos luces suaves (coral arriba a la izquierda,
+   violeta abajo a la derecha) y garabatos de chat muy tenues, en la
+   ventanita Y en el hilo del Messenger grande.
+
+   Va en la raíz de MessageList, detrás del scroller, con dos pseudo-
+   elementos en z-index negativo. `isolation: isolate` hace que ese negativo
+   quede ENTRE el fondo de la raíz y su contenido: ni el bg-card/85 de la
+   ventanita ni las burbujas se enteran. Los garabatos van como MÁSCARA sobre
+   un color de la skin, porque un data-URI no puede leer variables: así
+   siguen el color de cada skin. Todo estático, cero costo por mensaje. */
+:root {
+  --tapiz-de-chat: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><g transform='translate(10 12) rotate(-8)'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></g><g transform='translate(72 20) rotate(10)'><path d='M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z'/></g><g transform='translate(134 10) rotate(-14)'><path d='M12 2l3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1L1.7 9.4l7.2-.8z'/></g><g transform='translate(196 16) rotate(6)'><circle cx='11' cy='13' r='8.5'/><path d='M8 12.5h.01M12.5 12.5h.01'/><path d='M8.5 16.5h5'/><path d='M14 9.5l5.5-3.2a1.6 1.6 0 0 1 1.7 2.7L16 12'/></g><g transform='translate(28 74) rotate(6)'><path d='M13 2 4 14h7l-1 8 9-12h-7l1-8z'/></g><g transform='translate(92 68) rotate(-6)'><circle cx='12' cy='12' r='9'/><path d='M8 14s1.5 2 4 2 4-2 4-2'/><path d='M9 9h.01M15 9h.01'/></g><g transform='translate(150 78) rotate(8)'><path d='M4 12a8 8 0 0 1 16 0c0 3-1.5 4.5-1.5 6.5H17c0 1-1 1.5-1.5 1.5H5c-1 0-1.5-1-1-2 .8-1.6 0-4 0-6z'/><path d='M9 10h.01M15 10h.01'/><path d='M9 14c1 1 3 1.2 4.5.3'/></g><g transform='translate(204 70) rotate(12)'><circle cx='12' cy='12' r='4'/><path d='M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8'/></g><g transform='translate(14 134) rotate(-10)'><path d='M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z'/></g><g transform='translate(76 128) rotate(5)'><circle cx='12' cy='12' r='7.5'/><circle cx='4.5' cy='11' r='2'/><circle cx='19.5' cy='11' r='2'/><ellipse cx='9' cy='11.8' rx='2.7' ry='2.3'/><ellipse cx='15' cy='11.8' rx='2.7' ry='2.3'/><path d='M7.6 9.6v1.2M9 9.3v1.2M10.4 9.6v1.2M13.6 9.6v1.2M15 9.3v1.2M16.4 9.6v1.2'/><path d='M10.5 16.5h3'/></g><g transform='translate(138 138) rotate(8)'><path d='M9 18V5l12-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='18' cy='16' r='3'/></g><g transform='translate(198 130) rotate(-6)'><circle cx='12' cy='12' r='9'/><circle cx='8.5' cy='10' r='1.8'/><circle cx='15.5' cy='10' r='1.8'/><path d='M9 14.5c1.5 1.5 4.5 1.5 6 0'/><path d='M6.3 12.5c-.6 1-.4 1.8.2 2.2M17.7 12.5c.6 1 .4 1.8-.2 2.2'/></g><g transform='translate(36 190) rotate(-8)'><path d='M8 4c-2 1.5-3.5 4-3 6.5M16 4c2 1.5 3.5 4 3 6.5'/><path d='M7 9c-1 4-.5 7 1.5 9.5L12 21l3.5-2.5C17.5 16 18 13 17 9'/><path d='M7 9c1-2 3-3 5-3s4 1 5 3'/><path d='M9.5 12h.01M14.5 12h.01'/><path d='M6.5 10.5C5 10 3.5 10.5 3 12M17.5 10.5c1.5-.5 3 0 3.5 1.5'/><path d='M11 17.5c.5 1 1.5 1 2 0'/><path d='M12 21v2'/></g><g transform='translate(100 186) rotate(0)'><circle cx='12' cy='5' r='3'/><path d='M7 21v-5a5 5 0 0 1 10 0v5'/><path d='M7.5 13.5 4 9.5m0 0-1.5 1.5M4 9.5l1.8-1'/><path d='M16.5 13.5 20 9.5m0 0 1.5 1.5M20 9.5l-1.8-1'/></g><g transform='translate(162 192) rotate(10)'><circle cx='12' cy='12' r='9'/><path d='M7.5 8.5l3 3M10.5 8.5l-3 3M13.5 8.5l3 3M16.5 8.5l-3 3'/><ellipse cx='12' cy='16' rx='2' ry='1.6'/></g><g transform='translate(204 188) rotate(-6)'><circle cx='12' cy='13' r='8'/><path d='M6.3 8.2 4.5 3.5 9 6.3M17.7 8.2l1.8-4.7L15 6.3'/><path d='M9 12h.01M15 12h.01'/><path d='M10.8 15.2h2.4L12 16.6z'/><path d='M12 16.6v1.2M12 17.8c-.8.8-1.8.8-2.4.2M12 17.8c.8.8 1.8.8 2.4.2'/><path d='M12 5.3v2.2M9.8 5.8v1.7M14.2 5.8v1.7'/><path d='M4.6 14h1.8M5 16.2h1.6M19.4 14h-1.8M19 16.2h-1.6'/></g></svg>");
+  /* Intensidades: en claro el fondo ya es luminoso y pide menos. */
+  --fondo-chat-luz-1: .14;
+  --fondo-chat-luz-2: .10;
+  /* La TINTA de los garabatos no es el primario a secas. Con un primario
+     oscuro (Rojo Kash al 42 % de luz, Dorado al 30 %) sobre fondo oscuro no
+     se veía nada — Jhon (16/09): "solo veo el degradado"; el mock se aprobó
+     con el coral claro de Maven. Se aclara en oscuro y se oscurece en claro,
+     y la opacidad va aparte, así se ve parecido con cualquier skin. */
+  /* ⚠️ La mezcla NO va aquí como token con var(--primary) adentro: un token
+     se resuelve donde se DECLARA, no donde se usa, y si el primario vive
+     más abajo (una skin por zona, un mock) queda inválido y anula todo el
+     background. Aquí solo van los ingredientes; la mezcla, en el ::after. */
+  /* Baldosa de 240 px con 16 garabatos, ninguno tocando el borde (Jhon,
+     16/09: caras completas). Sus emojis: 🫡 🙈 🤷🏻‍♂️ 🐐 🫠 😵 🥹 🐅, como trazos. */
+  /* Mezcla al 100 % = el primario tal cual. Jhon (16/09) prefirió los
+     garabatos tenues Y con el color de la skin (#1847); mezclarlos con
+     blanco los volvía grises y más fuertes (#1848). La perilla queda: si
+     una skin muy oscura no se ve, bajar la mezcla acerca la tinta al
+     blanco (oscuro) o al negro (claro). */
+  --fondo-chat-hacia: black;
+  --fondo-chat-mezcla: 100%;
+  --fondo-chat-tapiz: 7%;
+}
+.dark {
+  --fondo-chat-luz-1: .22;
+  --fondo-chat-luz-2: .16;
+  --fondo-chat-hacia: white;
+  --fondo-chat-mezcla: 100%;
+  --fondo-chat-tapiz: 8%;
+}
+.fondo-de-chat {
   position: relative;
-  margin-left: -1px;
-  margin-right: -1px;
-  border-left: 1px solid;
-  border-right: 1px solid;
-  word-break: normal;
+  isolation: isolate;
+}
+.fondo-de-chat::before,
+.fondo-de-chat::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
 }
-.documento-maven .collaboration-cursor__label {
-  position: absolute;
-  top: -1.4em;
-  left: -1px;
-  border-radius: 3px 3px 3px 0;
-  padding: 0.1rem 0.3rem;
-  font-size: 0.7rem;
-  font-style: normal;
-  font-weight: 600;
-  line-height: normal;
-  white-space: nowrap;
-  color: #fff;
-  user-select: none;
+.fondo-de-chat::before {
+  background:
+    radial-gradient(140% 90% at 0% 0%, hsl(var(--primary) / var(--fondo-chat-luz-1)), transparent 55%),
+    radial-gradient(100% 80% at 100% 100%, hsl(var(--accent) / var(--fondo-chat-luz-2)), transparent 60%);
 }
+.fondo-de-chat::after {
+  /* La primera línea es el respaldo para navegadores sin color-mix. */
+  background: hsl(var(--primary) / var(--fondo-chat-tapiz));
+  background: color-mix(
+    in srgb,
+    color-mix(in oklab, hsl(var(--primary)) var(--fondo-chat-mezcla), var(--fondo-chat-hacia)) var(--fondo-chat-tapiz),
+    transparent
+  );
+  -webkit-mask: var(--tapiz-de-chat) 0 0 / 240px 240px repeat;
+  mask: var(--tapiz-de-chat) 0 0 / 240px 240px repeat;
+}
+/* En alto contraste los garabatos se quedan: en el hilo el texto va siempre
+   dentro de burbujas opacas, así que el dibujo nunca queda detrás de letras.
+   Se ocultaban y la cuenta de Jhon (contraste activo) no los veía (16/09). */

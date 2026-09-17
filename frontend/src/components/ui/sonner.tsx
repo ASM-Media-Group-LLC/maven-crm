@@ -108,8 +108,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-white/10 group-[.toast]:text-foreground/70 group-[.toast]:border-white/10",
             "group-[.toast]:backdrop-blur-md hover:group-[.toast]:bg-white/20 hover:group-[.toast]:text-foreground",
           ].join(" "),
-          actionButton: "group-[.toast]:rounded-lg group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:rounded-lg group-[.toast]:bg-white/10 group-[.toast]:text-muted-foreground",
+          // ⚠️ Los botones (acción / cancelar) NO se estilan acá. Sonner
+          // inyecta su <style> en runtime, después de nuestra hoja, y su regla
+          // `[data-styled='true'] [data-button]` empata en especificidad con
+          // estas clases y gana: el "Abrir" de la mención salía blanco de
+          // fábrica. Viven en index.css ("AVISOS (sonner)"), junto con la
+          // disposición en dos renglones que los saca de debajo de la X.
         },
       }}
       {...props}

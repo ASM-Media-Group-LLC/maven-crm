@@ -20,7 +20,8 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
 import { ImapClient } from "../_shared/imap.ts";
-import { extraerAdjunto, parseMessage } from "../_shared/mime.ts";
+import { decodeBodyToBytes, extraerAdjunto, parseMessage } from "../_shared/mime.ts";
+import { parsearBodyStructure, parteDelAdjunto } from "../_shared/bodystructure.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
@@ -699,22 +700,80 @@ Deno.serve(async (req) => {
         const selr = await client.selectFolder(box);
         if (!selr.ok) return json(req, { error: `IMAP SELECT ${box}: ${selr.error}` }, 502);
 
-        const raw = await client.fetchRawMessageByUid(uid);
-        if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
-        // Si el mensaje se cortó en el tope, el adjunto saldría corrupto: mejor
-        // fallar claro que entregar un archivo a medias.
-        if (raw.truncated) {
-          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+        // La metadata guardada dice QUÉ archivo espera la persona. Sirve para
+        // no depender del orden al cruzar con el BODYSTRUCTURE (ver abajo).
+        const { data: fila } = await admin
+          .from("mail_messages")
+          .select("attachments")
+          .eq("user_id", user.id)
+          .eq("folder", box)
+          .eq("uid", uid)
+          .limit(1)
+          .maybeSingle();
+        const meta = (fila?.attachments as
+          | { filename?: string; sizeBytes?: number }[]
+          | null)?.[idx];
+
+        let adj: { filename: string; contentType: string; bytes: Uint8Array } | null = null;
+
+        // === CAMINO BUENO: pedirle al servidor SOLO esa parte ===
+        // Antes se bajaba el correo entero y se cortaba a 20 MB. Un correo de
+        // RRHH con 24 hojas de vida (~17 MB de archivos, ~23 MB ya en base64)
+        // se pasaba del tope y NINGUNO de los 24 se podía bajar, ni el de
+        // 37 KB (reporte de Andrea, 16/09/2026). Pidiendo la parte suelta, lo
+        // que se descarga es el archivo y nada más.
+        const bs = await client.fetchBodyStructure(uid);
+        if (bs.ok) {
+          const parte = parteDelAdjunto(parsearBodyStructure(bs.texto), idx, {
+            nombre: meta?.filename ?? null,
+            bytes: meta?.sizeBytes ?? null,
+          });
+          if (parte) {
+            const trozo = await client.fetchBodyPart(uid, parte.seccion);
+            if (trozo.ok && !trozo.truncated) {
+              // El CRLF final pertenece al delimitador MIME, no al archivo.
+              const cuerpo = trozo.raw.replace(/\r?\n$/, "");
+              adj = {
+                filename: parte.nombre ?? meta?.filename ?? "adjunto",
+                contentType: `${parte.tipo.toLowerCase()}/${parte.subtipo.toLowerCase()}`,
+                bytes: decodeBodyToBytes(cuerpo, parte.codificacion),
+              };
+            } else if (trozo.ok && trozo.truncated) {
+              return json(req, {
+                error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+              }, 413);
+            }
+          }
         }
 
-        const adj = extraerAdjunto(raw.raw, idx);
-        if (!adj) return json(req, { error: "ese adjunto no está en el mensaje" }, 404);
+        // === RESPALDO: el mensaje entero, como antes ===
+        // Para lo que el BODYSTRUCTURE no cubra (servidores raros, estructuras
+        // que el lector no entienda). Sigue teniendo el tope viejo, pero ahora
+        // es la excepción y no la regla.
+        if (!adj) {
+          const raw = await client.fetchRawMessageByUid(uid);
+          if (!raw.ok) return json(req, { error: `IMAP FETCH: ${raw.error}` }, 502);
+          // Si el mensaje se cortó en el tope, el adjunto saldría corrupto:
+          // mejor fallar claro que entregar un archivo a medias. ⚠️ El que no
+          // entra es el CORREO, no el archivo — decirlo al revés fue lo que
+          // hizo creer que un CV de 37 KB era "demasiado grande".
+          if (raw.truncated) {
+            return json(req, {
+              error: "este correo es demasiado grande para abrirlo desde acá",
+            }, 413);
+          }
+
+          adj = extraerAdjunto(raw.raw, idx);
+          if (!adj) return json(req, { error: "ese adjunto no está en el mensaje" }, 404);
+        }
 
         // Techo de respuesta: el JSON con el base64 pesa ~1,37× el archivo, y
         // pasarse revienta el límite de la edge con un error opaco. Mejor
         // cortar claro (los adjuntos gigantes son casos raros).
         if (adj.bytes.length > 20 * 1024 * 1024) {
-          return json(req, { error: "el adjunto es demasiado grande para descargarlo desde acá" }, 413);
+          return json(req, {
+            error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+          }, 413);
         }
 
         await admin.from("mail_credentials")
@@ -941,6 +1000,18 @@ Deno.serve(async (req) => {
         const all = [...to, ...(cc ?? []), ...(bcc ?? [])];
         const sent = await smtp.sendMessage(fromAddress, all, rfc822);
         if (!sent.ok) {
+          // ⚠️ DOS FRACASOS DISTINTOS, Y CONFUNDIRLOS DUPLICA CORREOS.
+          // `incierto` = el mensaje entero ya viajó y se cortó esperando la
+          // confirmación. Puede haberse enviado. Decir "no se pudo enviar"
+          // hace que la persona reintente y salga dos veces: pasó el 17/09
+          // con 13 hojas de vida a tres destinatarias.
+          if (sent.incierto) {
+            return json(req, {
+              error: "se envió pero el servidor tardó en confirmar: revisá Enviados ANTES de reintentar, puede haber salido",
+              code: sent.code,
+              incierto: true,
+            }, 504);
+          }
           return json(req, { error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
         }
 
@@ -1006,9 +1077,54 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ── Menciones ────────────────────────────────────────────────────
+        // A quien lo mencionaron con @ le llega, además del correo, un aviso
+        // dentro de Maven. Va DESPUÉS del envío y envuelto en su propio
+        // try/catch: el correo ya salió, y fallar acá no puede convertir un
+        // envío exitoso en un error para quien escribió.
+        let avisados = 0;
+        try {
+          const ids = Array.isArray(body.menciones)
+            ? [...new Set((body.menciones as unknown[]).map(String))].filter((x) =>
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x),
+              )
+            : [];
+          // Nunca avisarse a uno mismo: mencionarse es raro pero posible, y
+          // recibir "te mencionaste" es ruido puro.
+          const destinos = ids.filter((id) => id !== user.id);
+          if (destinos.length) {
+            // Se confirma contra el directorio en vez de confiar en el navegador:
+            // un id inventado no puede generar una notificación.
+            const { data: reales } = await admin
+              .from("v_directorio_correo")
+              .select("user_id")
+              .in("user_id", destinos);
+            const validos = ((reales ?? []) as { user_id: string }[]).map((r) => r.user_id);
+            if (validos.length) {
+              const quien = (perfil?.full_name as string) || fromAddress;
+              const { error: errNotif } = await admin.from("notifications").insert(
+                validos.map((uid) => ({
+                  user_id: uid,
+                  type: "correo_mencion",
+                  title: `${quien} te mencionó en un correo`,
+                  message: subject,
+                  module_origin: "Correo",
+                  required_permission_module: "Correo",
+                  priority: "normal",
+                  deep_link_url: "/correo",
+                })),
+              );
+              if (errNotif) console.error("[mail-fetch] menciones:", errNotif.message);
+              else avisados = validos.length;
+            }
+          }
+        } catch (e) {
+          console.error("[mail-fetch] menciones:", (e as Error).message);
+        }
+
         return json(req, {
           ok: true, from: fromAddress, to, cc: cc ?? [], subject,
-          guardadoEnEnviados,
+          guardadoEnEnviados, avisados,
         });
       } catch (e) {
         const msg = (e as Error).message ?? "error de SMTP";
