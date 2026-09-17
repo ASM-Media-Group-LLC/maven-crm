@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, Loader2, Lock, Share2, Users, WifiOff } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Share2, WifiOff } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  useDocumento, useGuardarDocumento, type VisibilidadDocumento,
-} from "@/hooks/useDocumentos";
+import { useDocumento } from "@/hooks/useDocumentos";
 import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useHistorialDeOficina } from "@/hooks/useHistorialDeOficina";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -26,7 +23,6 @@ export default function DocumentoPage() {
   const { t } = useLanguage();
   const [compartiendo, setCompartiendo] = useState(false);
   const doc = useDocumento(id);
-  const guardar = useGuardarDocumento();
   const abrir = useAbrirEnOnlyOffice();
   // Al salir del historial hay que volver a montar el editor en modo edición.
   // Pedir la configuración de nuevo alcanza: llega un objeto distinto y el
@@ -45,20 +41,6 @@ export default function DocumentoPage() {
 
   const cargado = doc.data;
   const esMio = cargado?.owner_id === user?.id;
-
-  const cambiarVisibilidad = (v: VisibilidadDocumento) => {
-    if (!id) return;
-    guardar.mutate(
-      { id, visibility: v },
-      {
-        onSuccess: () => {
-          void doc.refetch();
-          toast.success(v === "equipo" ? "Ahora lo ve todo el equipo" : "Ahora es privado");
-        },
-        onError: (e) => toast.error((e as Error).message || "No se pudo cambiar"),
-      },
-    );
-  };
 
   if (doc.isPending) {
     return (
@@ -103,9 +85,9 @@ export default function DocumentoPage() {
           subtitle={`Versión ${cargado.version}`}
           actions={
             <>
-              {/* Compartir con personas concretas es distinto de la
-                  visibilidad: un documento privado compartido con dos
-                  personas sigue siendo privado. */}
+              {/* Un solo botón: adentro del diálogo están las personas
+                  concretas Y el acceso general. Antes eran dos controles
+                  separados para contestar la misma pregunta. */}
               <Button
                 size="sm"
                 variant="outline"
@@ -114,22 +96,6 @@ export default function DocumentoPage() {
               >
                 <Share2 className="mr-1.5 h-4 w-4" />
                 {t("doc.compartir")}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 rounded-full"
-                disabled={!esMio || guardar.isPending}
-                title={esMio ? undefined : "Solo quien lo creó puede cambiar quién lo ve"}
-                onClick={() =>
-                  cambiarVisibilidad(cargado.visibility === "equipo" ? "privado" : "equipo")
-                }
-              >
-                {cargado.visibility === "equipo" ? (
-                  <><Users className="mr-1.5 h-4 w-4" /> Equipo</>
-                ) : (
-                  <><Lock className="mr-1.5 h-4 w-4" /> Privado</>
-                )}
               </Button>
               <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
                 aria-label="Volver a Oficina" onClick={() => navigate("/oficina")}>
@@ -168,6 +134,13 @@ export default function DocumentoPage() {
           onCerrar={() => setCompartiendo(false)}
           documentoId={id}
           titulo={cargado.title}
+          ownerId={cargado.owner_id}
+          visibilidad={cargado.visibility}
+          // El acceso general se cambia desde adentro del diálogo, y esta
+          // consulta tiene `staleTime: Infinity` para no pisarle el texto a
+          // quien escribe: sin este refetch el diálogo seguiría mostrando el
+          // valor viejo.
+          onVisibilidadCambiada={() => void doc.refetch()}
           soyDueno={!!esMio}
         />
       )}
