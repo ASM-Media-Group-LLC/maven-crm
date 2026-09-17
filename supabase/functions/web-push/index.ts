@@ -219,7 +219,8 @@ async function notificar(req: Request, admin: Admin, b: NotifyBody, vapid: Vapid
       title,
       body,
       tag: `chat-${msg.conversation_id}`,
-      url: `/messenger?c=${msg.conversation_id}`,
+      // `&m=`: el mensaje concreto. Si es una respuesta de hilo, Messenger abre el hilo.
+      url: `/messenger?c=${msg.conversation_id}&m=${msg.id}`,
       conversationId: msg.conversation_id,
       messageId: msg.id,
     });

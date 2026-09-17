@@ -69,7 +69,18 @@ const ATRIBUTOS = "placeholder|title|alt|aria-label|label|description|tooltip|em
 // renglones y tiene una marca que la prosa no usa, no es texto de pantalla.
 // El `;` a secas no alcanza como marca —el español lo usa— y por eso pide
 // compañía: `);` de código, una flecha, o una palabra reservada.
-const PARECE_CODIGO = /=>|\?\?|[)\]}"']\s*;|\b(?:const|let|var|return|function|import|export|use[A-Z]\w*)\b/;
+// `\[\]` y `)\s*:` son firmas de TIPO, no de prosa. Sin ellas se colaba una
+// lista de parámetros multirrenglón: en
+//
+//     export function repartirSolapados<T extends {…}>(
+//       eventos: T[],
+//       dia: Date,
+//     ): Repartido<T>[] {
+//
+// el `>` de `<T extends …>` se aparea con el `<` de `Repartido<T>`, y lo que
+// queda en el medio son identificadores españoles (`eventos`, `dia`) que se
+// leen como una frase. Ningún texto de pantalla escribe `T[]` ni `): Algo`.
+const PARECE_CODIGO = /=>|\?\?|[)\]}"']\s*;|\[\]|\)\s*:|\b(?:const|let|var|return|function|import|export|use[A-Z]\w*)\b/;
 const PARECE_COMENTARIO = /(?:^|[^:])\/\/|\/\*|\*\/|^\s*\*\s/m;
 
 const esRuidoDeCodigo = (t: string): boolean =>

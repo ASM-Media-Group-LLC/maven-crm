@@ -1,8 +1,4 @@
-import {
-  Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign,
-  FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList,
-  AlertTriangle, Clock, HelpCircle, type LucideIcon,
-} from "lucide-react";
+import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign } from "lucide-react";
 
 // ─── Deep link resolver ────────────────────────────────────────────
 export function resolveDeepLink(
@@ -24,7 +20,8 @@ export function resolveDeepLink(
     lead: `/leadgen?id=${referenceId}`,
     deal: `/closers?id=${referenceId}`,
     closer_creator: `/closers?id=${referenceId}`,
-    conversation: `/messenger?chat=${referenceId}`,
+    // `c`, no `chat`: es el parámetro que MessengerPage lee (auditoría 15/09).
+    conversation: `/messenger?c=${referenceId}`,
     announcement: `/hr/anuncios?id=${referenceId}`,
   };
 
@@ -54,6 +51,8 @@ export function getModuleIcon(moduleOrigin: string | null): LucideIcon {
 
 // ─── Type icon mapper (fallback) ──────────────────────────────────
 const TYPE_ICONS: Record<string, LucideIcon> = {
+  chat_mention: AtSign,
+  chat_message: MessageSquare,
   onboarding_complete: UserCheck,
   onboarding_inactivity: AlertTriangle,
   verification_approved: UserCheck,
@@ -116,6 +115,7 @@ export const MODULE_PERMISSION_MAP: Record<string, string | null> = {
   leadgen: "LeadGen",
   closers: "Closers",
   "Comunicación": "HR",
+  "chatter-evaluator": "Chatters",
   messenger: null, // universal
   admin: "Administración",
 };

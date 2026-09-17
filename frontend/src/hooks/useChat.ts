@@ -1520,12 +1520,21 @@ export function useMessages(
     }
   }, [user]);
 
+  /** Un mensaje suelto por id: para saltar a él desde una notificación (?m=)
+   *  cuando no está en la ventana paginada. null si no existe o no se puede
+   *  leer (RLS). */
+  const traerMensaje = useCallback(async (id: string): Promise<ChatMessage | null> => {
+    const res = await supabase.from("chat_messages").select("*").eq("id", id).maybeSingle();
+    return (res.data as ChatMessage | null) ?? null;
+  }, []);
+
   return {
     messages,
     loading,
     hasMore,
     loadingMore,
     loadOlderMessages,
+    traerMensaje,
     typingUsers,
     sendMessage,
     sendTyping,

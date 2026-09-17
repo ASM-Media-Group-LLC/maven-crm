@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +36,12 @@ interface ChatViewProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  /** Mensaje al que hay que saltar (?m= de una notificación). Si es una
+   *  respuesta de hilo, se abre el hilo de su padre y se resalta ahí. */
+  saltarA?: string | null;
+  onSaltoHecho?: () => void;
+  /** Trae un mensaje por id cuando no está en la ventana cargada. */
+  traerMensaje?: (id: string) => Promise<ChatMessage | null>;
   onMembersChanged?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
@@ -50,6 +56,7 @@ export default function ChatView({
   onEditMessage, onDeleteMessage, onRetryMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers,
   hasMore, loadingMore, onLoadMore, onMembersChanged,
+  saltarA, onSaltoHecho, traerMensaje,
   isPinned, onTogglePin, onArchive, onDelete, canDelete, returnTo,
 }: ChatViewProps) {
   const { user } = useAuth();
@@ -64,6 +71,8 @@ export default function ChatView({
   const [searchQuery, setSearchQuery] = useState("");
   const [threadParent, setThreadParent] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  // La respuesta de hilo a resaltar cuando llegamos desde una notificación.
+  const [respuestaResaltada, setRespuestaResaltada] = useState<string | null>(null);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
@@ -148,6 +157,47 @@ export default function ChatView({
   const handleSearchResultClick = useCallback((messageId: string) => {
     setHighlightedMsgId(messageId);
   }, []);
+
+  // SALTAR A UN MENSAJE (?m= de una notificación). María (16/09): "me abrió el
+  // grupo pero no me llevó al hilo". Si el mensaje es una respuesta de hilo,
+  // hay que abrir el hilo de su padre y resaltarla ahí; si es del timeline,
+  // resaltarlo en la lista. Si todavía no está en la ventana paginada, se
+  // piden páginas anteriores (con tope); el padre del hilo, si tampoco está,
+  // se trae por id.
+  const paginasPedidasRef = useRef(0);
+  const trayendoPadreRef = useRef(false);
+  useEffect(() => {
+    if (!saltarA) return;
+    const destino = messages.find((m) => m.id === saltarA);
+    if (!destino) {
+      if (hasMore && !loadingMore && paginasPedidasRef.current < 6) {
+        paginasPedidasRef.current++;
+        onLoadMore?.();
+      } else if (!loadingMore) {
+        onSaltoHecho?.();
+      }
+      return;
+    }
+    if (destino.is_thread_reply && destino.reply_to_id) {
+      const abrir = (padre: ChatMessage) => {
+        closeSidePanels("thread");
+        setThreadParent(padre);
+        setRespuestaResaltada(destino.id);
+      };
+      const padre = messages.find((m) => m.id === destino.reply_to_id);
+      if (padre) { abrir(padre); onSaltoHecho?.(); return; }
+      if (trayendoPadreRef.current) return;
+      trayendoPadreRef.current = true;
+      void (traerMensaje?.(destino.reply_to_id) ?? Promise.resolve(null)).then((p) => {
+        trayendoPadreRef.current = false;
+        if (p) abrir(p);
+        onSaltoHecho?.();
+      });
+      return;
+    }
+    setHighlightedMsgId(destino.id);
+    onSaltoHecho?.();
+  }, [saltarA, messages, hasMore, loadingMore, onLoadMore, onSaltoHecho, traerMensaje, closeSidePanels]);
 
   // Drag-and-drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -304,7 +354,8 @@ export default function ChatView({
               currentUserId={user?.id}
               onSendReply={handleSendThreadReply}
               deletedArchive={deletedArchive}
-              onClose={() => setThreadParent(null)}
+              onClose={() => { setThreadParent(null); setRespuestaResaltada(null); }}
+              resaltada={respuestaResaltada}
               participants={conversation.participants}
               aCiegas={mencionesACiegas}
               onEditMessage={onEditMessage}

@@ -32,12 +32,14 @@ import {
   ClipboardCheck, Map, Search, Headphones, Video, Users2, MessageCircle,
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
-  CalendarDays, Building2, Briefcase, History, CalendarRange, Gift } from "lucide-react";
+  CalendarDays, Building2, Briefcase, History, CalendarRange, Gift,
+  FileSpreadsheet, Presentation } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
 export type NavSection =
   | "Menú"
+  | "Oficina"
   | "Creadoras"
   | "Ventas"
   | "Operaciones"
@@ -72,7 +74,10 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Cowork", i18nKey: "nav.cowork", url: "/cowork", icon: Users2, module: "Cowork", section: "Menú", keywords: ["sala", "video"] },
   { title: "Meet", i18nKey: "nav.meet", url: "/meet", icon: Video, module: "Meet", section: "Menú", keywords: ["reunión", "videollamada"] },
   { title: "Grabaciones", i18nKey: "nav.recordings", url: "/grabaciones", icon: Clapperboard, module: "Grabaciones", section: "Menú", keywords: ["recordings", "meet"] },
-  { title: "Oficina", i18nKey: "nav.office", url: "/oficina", icon: FileText, module: "Oficina", section: "Menú", keywords: ["documentos", "docs", "hojas", "google docs"] },
+  { title: "Calendario", i18nKey: "nav.office.calendar", url: "/oficina/calendario", icon: CalendarDays, module: "Oficina", submodule: "Calendario", section: "Oficina", keywords: ["calendario", "agenda", "eventos", "reuniones", "calendar", "oficina"] },
+  { title: "Documentos", i18nKey: "nav.office.docs", url: "/oficina", icon: FileText, module: "Oficina", submodule: "Documentos", section: "Oficina", keywords: ["documentos", "docs", "word", "google docs", "oficina"] },
+  { title: "Hojas de cálculo", i18nKey: "nav.office.sheets", url: "/oficina/hojas", icon: FileSpreadsheet, module: "Oficina", submodule: "Hojas de cálculo", section: "Oficina", keywords: ["hojas", "excel", "sheets", "calculo", "planilla", "oficina"] },
+  { title: "Presentaciones", i18nKey: "nav.office.slides", url: "/oficina/presentaciones", icon: Presentation, module: "Oficina", submodule: "Presentaciones", section: "Oficina", keywords: ["presentaciones", "powerpoint", "slides", "diapositivas", "oficina"] },
   { title: "Contactos", i18nKey: "nav.contacts", url: "/contactos", icon: UserPlus, module: "Contactos", section: "Menú", keywords: ["directorio"] },
   { title: "Panel de control", i18nKey: "nav.controlPanel", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
 
@@ -162,6 +167,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
  *  traduce lo que se muestra. */
 export const NAV_SECTION_KEYS: Record<NavSection, TranslationKey> = {
   "Menú": "nav.section.menu",
+  "Oficina": "nav.section.office",
   "Creadoras": "nav.section.creators",
   "Ventas": "nav.section.sales",
   "Operaciones": "nav.section.operations",
@@ -173,7 +179,11 @@ export const NAV_SECTION_KEYS: Record<NavSection, TranslationKey> = {
 
 /** Orden estable de secciones para render agrupado en el ⌘K. */
 export const NAV_SECTIONS: NavSection[] = [
-  "Menú", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Admin", "Sistema",
+  // ⚠️ Es un array, no un Record: si acá falta una sección tsc NO se queja y el
+  // ⌘K simplemente deja de mostrar sus entradas, sin error. Hay guarda en
+  // oficinaEnElMenu.test.ts.
+  // El orden espeja al del menú, donde Oficina va última (Jhon, 17/09).
+  "Menú", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Oficina", "Admin", "Sistema",
 ];
 
 /**

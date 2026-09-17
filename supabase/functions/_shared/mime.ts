@@ -231,7 +231,10 @@ function qpToBytes(input: string): Uint8Array {
   return new Uint8Array(bytes);
 }
 
-function decodeBodyToBytes(body: string, encoding: string): Uint8Array {
+/** Exportada porque el camino de descarga por parte (BODY.PEEK[n]) recibe el
+ *  contenido ya aislado por el servidor y solo le falta decodificarlo: el
+ *  mismo trabajo que hace `extraerAdjunto`, sin parsear MIME a mano. */
+export function decodeBodyToBytes(body: string, encoding: string): Uint8Array {
   const enc = encoding.toLowerCase().trim();
   if (enc === "base64") return base64ToBytes(body);
   if (enc === "quoted-printable") return qpToBytes(body);

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, FileQuestion, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FileAudio, FileQuestion, Loader2, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { base64ABlob, base64ABytes, base64ATexto } from "@/lib/base64Blob";
 import VisorPdf from "@/components/correo/VisorPdf";
+import TarjetaDeEvento from "@/components/correo/TarjetaDeEvento";
+import { leerInvitacion } from "@/lib/ics";
+import { sePuedeConvertir, useConversionAPdf } from "@/hooks/useConversionAPdf";
 import {
   useAttachmentBytes,
   usePrefetchAttachment,
@@ -11,7 +15,24 @@ import {
 } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
 
-type Tipo = "pdf" | "imagen" | "texto" | "ninguno";
+type Tipo =
+  | "pdf" | "imagen" | "texto" | "convertible"
+  | "calendario" | "audio" | "video"
+  | "ninguno";
+
+/** Lo que el navegador reproduce sin ayuda de nadie. Hoy no llega ni un audio
+ *  ni un video al correo, pero cuando llegue no hay nada que construir: el
+ *  `<audio>` y el `<video>` del navegador ya saben. */
+const AUDIO = ["mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "weba"];
+const VIDEO = ["mp4", "m4v", "webm", "ogv", "mov"];
+
+const MIME_MEDIA: Record<string, string> = {
+  mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", ogg: "audio/ogg",
+  oga: "audio/ogg", opus: "audio/ogg", wav: "audio/wav", flac: "audio/flac",
+  weba: "audio/webm",
+  mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", ogv: "video/ogg",
+  mov: "video/quicktime",
+};
 
 /** Qué sabe dibujar el navegador solo.
  *
@@ -28,7 +49,20 @@ export function tipoDeAdjunto(a: MailAttachment): Tipo {
   ) {
     return "imagen";
   }
+  // ⚠️ El calendario va ANTES que el texto: un .ics ES text/calendar, y si se
+  // atrapara como texto plano se vería el archivo crudo en vez de la reunión.
+  // Y se mira el Content-Type primero porque la mitad llegan SIN extensión: de
+  // Google Calendar viene una copia como `invite.ics` y otra llamada
+  // simplemente "adjunto", las dos con el mismo contenido.
+  if (ext === "ics" || ct === "text/calendar" || ct === "application/ics") {
+    return "calendario";
+  }
   if (["txt", "csv", "log", "md"].includes(ext) || ct.startsWith("text/plain")) return "texto";
+  if (AUDIO.includes(ext) || ct.startsWith("audio/")) return "audio";
+  if (VIDEO.includes(ext) || ct.startsWith("video/")) return "video";
+  // Word, Excel y PowerPoint: el navegador no los dibuja, pero LibreOffice los
+  // pasa a PDF del lado del servidor y entonces sí se leen acá.
+  if (sePuedeConvertir(a.filename)) return "convertible";
   return "ninguno";
 }
 
@@ -52,6 +86,16 @@ function mimeParaVer(tipo: Tipo, a: MailAttachment, declarado: string): string {
       avif: "image/avif",
     };
     return porExtension[ext] ?? "application/octet-stream";
+  }
+  // Mismo problema que con las imágenes: un .mp4 anunciado como octet-stream no
+  // se reproduce. El tipo tiene que salir de la extensión.
+  if (tipo === "audio" || tipo === "video") {
+    const ext = a.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
+    if (MIME_MEDIA[ext]) return MIME_MEDIA[ext];
+    if (declarado.toLowerCase().startsWith(tipo === "audio" ? "audio/" : "video/")) {
+      return declarado;
+    }
+    return tipo === "audio" ? "audio/mpeg" : "video/mp4";
   }
   return declarado || "application/octet-stream";
 }
@@ -90,8 +134,9 @@ export default function AdjuntoVisor({
 
   const prefetch = usePrefetchAttachment();
 
-  // Solo pedimos los bytes de lo que sabemos dibujar: bajar un .zip de 40 MB
-  // para después decir "no se puede ver" es gastar una sesión IMAP al pedo.
+  // Solo pedimos los bytes de lo que se puede mostrar — dibujándolo acá o
+  // convirtiéndolo antes. Bajar un .zip de 40 MB para después decir "no se
+  // puede ver" es gastar una sesión IMAP al pedo.
   const bytes = useAttachmentBytes({
     folder: carpeta,
     uid,
@@ -130,7 +175,8 @@ export default function AdjuntoVisor({
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     const d = bytes.data;
-    if (!d || !actual || tipo !== "imagen") {
+    // Imagen, audio y video se dibujan desde un blob; el resto no lo necesita.
+    if (!d || !actual || !["imagen", "audio", "video"].includes(tipo)) {
       setUrl(null);
       return;
     }
@@ -149,8 +195,39 @@ export default function AdjuntoVisor({
     [tipo, bytes.data],
   );
 
+  // Word/Excel/PowerPoint: se manda a convertir y se dibuja el PDF que vuelve.
+  // La espera se paga una sola vez por archivo: el resultado queda guardado.
+  const conversion = useConversionAPdf({
+    filename: actual?.filename ?? "",
+    contentBase64: bytes.data?.contentBase64,
+    enabled: abierto && tipo === "convertible",
+  });
+
+  // El PDF convertido llega como URL firmada; se baja para dibujarlo con el
+  // mismo visor que el resto, y no con un <iframe> que Chrome deja en blanco.
+  const pdfConvertido = useQuery({
+    queryKey: ["pdf-convertido", conversion.data],
+    enabled: !!conversion.data,
+    staleTime: Infinity,
+    queryFn: async (): Promise<Uint8Array> => {
+      const r = await fetch(conversion.data!);
+      if (!r.ok) throw new Error("No se pudo traer el documento convertido");
+      return new Uint8Array(await r.arrayBuffer());
+    },
+  });
+
   const texto = useMemo(
     () => (tipo === "texto" && bytes.data ? base64ATexto(bytes.data.contentBase64) : null),
+    [tipo, bytes.data],
+  );
+
+  // La invitación se lee del .ics y se muestra como una reunión, no como un
+  // archivo. Si no se deja leer, cae al texto crudo más abajo.
+  const evento = useMemo(
+    () =>
+      tipo === "calendario" && bytes.data
+        ? leerInvitacion(base64ATexto(bytes.data.contentBase64))
+        : null,
     [tipo, bytes.data],
   );
 
@@ -206,7 +283,7 @@ export default function AdjuntoVisor({
             <Mensaje
               icono={<FileQuestion className="h-8 w-8 text-muted-foreground" />}
               titulo="Este archivo no se puede ver aquí"
-              detalle="El navegador solo dibuja PDF, imágenes y texto. Descárgalo para abrirlo con el programa que le corresponde."
+              detalle="Se pueden ver acá los PDF, las imágenes, el texto y los documentos de Office. Este hay que descargarlo y abrirlo con el programa que le corresponde."
               accion={
                 <Button
                   size="sm"
@@ -246,10 +323,58 @@ export default function AdjuntoVisor({
             <pre className="h-full overflow-auto whitespace-pre-wrap break-words bg-background p-5 font-mono text-xs leading-relaxed">
               {texto}
             </pre>
+          ) : tipo === "calendario" ? (
+            evento ? (
+              <TarjetaDeEvento evento={evento} />
+            ) : (
+              // Un .ics que no se deja leer se muestra crudo antes que dejar la
+              // pantalla vacía: al menos se ve la hora y quién invita.
+              <pre className="h-full overflow-auto whitespace-pre-wrap break-words bg-background p-5 font-mono text-xs leading-relaxed">
+                {bytes.data ? base64ATexto(bytes.data.contentBase64) : null}
+              </pre>
+            )
           ) : tipo === "imagen" && url ? (
             <div className="flex h-full items-center justify-center overflow-auto p-4">
               <img src={url} alt={actual.filename} className="max-h-full max-w-full object-contain" />
             </div>
+          ) : tipo === "audio" && url ? (
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-6">
+              <FileAudio className="h-10 w-10 text-muted-foreground" />
+              <p className="max-w-full truncate text-sm font-medium">{actual.filename}</p>
+              {/* `controls` y nada más: los del navegador ya traen volumen,
+                  velocidad y descarga, y funcionan con teclado. */}
+              <audio src={url} controls className="w-full max-w-md" />
+            </div>
+          ) : tipo === "video" && url ? (
+            <div className="flex h-full items-center justify-center bg-black/90 p-4">
+              <video src={url} controls playsInline className="max-h-full max-w-full" />
+            </div>
+          ) : tipo === "convertible" ? (
+            pdfConvertido.data ? (
+              <VisorPdf key={indice} bytes={pdfConvertido.data} nombre={actual.filename} />
+            ) : conversion.isError || pdfConvertido.isError ? (
+              <Mensaje
+                icono={<FileQuestion className="h-8 w-8 text-destructive" />}
+                titulo="No se pudo preparar la vista"
+                detalle={
+                  ((conversion.error ?? pdfConvertido.error) as Error)?.message ||
+                  "El conversor no respondió."
+                }
+                accion={
+                  <Button size="sm" variant="outline" className="rounded-full"
+                    onClick={() => onDescargar(indice)} disabled={descargando}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar {actual.filename}
+                  </Button>
+                }
+              />
+            ) : (
+              <Mensaje
+                icono={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}
+                titulo="Preparando la vista…"
+                detalle="Los documentos de Office se convierten para poder leerlos acá. Se hace una sola vez por archivo."
+              />
+            )
           ) : bytesPdf ? (
             <VisorPdf key={indice} bytes={bytesPdf} nombre={actual.filename} />
           ) : null}

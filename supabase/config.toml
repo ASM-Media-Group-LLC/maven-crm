@@ -300,6 +300,12 @@ verify_jwt = false  # auth propia: Bearer del usuario en start/stop/download/del
 [functions.creator-video]
 verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que recordings)
 
+[functions.document-convert]
+verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que creator-video)
+
+[functions.oficina-doc]
+verify_jwt = false  # auth propia: Bearer del usuario, y el aviso de guardado de ONLYOFFICE llega SIN sesión (se valida con token de un solo uso + firma)
+
 [functions.livekit-webhook]
 verify_jwt = false  # lo llama LiveKit, que no puede mandar un JWT de Supabase; se valida la FIRMA del webhook adentro
 

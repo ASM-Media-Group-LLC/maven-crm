@@ -61,12 +61,25 @@ export default function MessengerPage() {
   // la conversación esté cargada, la seleccionamos y limpiamos el parámetro.
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  // `?c=` es el parámetro; `?chat=` es un alias que hay que aceptar: el trigger
+  // notify_chat_message escribió '/messenger?chat=<id>' en el deep_link_url de
+  // 86.254 notificaciones (30 días) y nadie lo leía, así que el clic en una
+  // notificación de Messenger aterrizaba acá sin abrir el chat (Jhon, 15/09).
+  // El trigger ya escribe ?c=, pero las filas viejas siguen en la campana.
+  // `?m=` es el mensaje concreto: una mención dentro de un hilo abre el hilo
+  // (María, 16/09: "me abrió el grupo pero no me llevó al hilo").
+  const [mensajeDestino, setMensajeDestino] = useState<string | null>(null);
+  const saltoHecho = useCallback(() => setMensajeDestino(null), []);
   useEffect(() => {
-    const c = searchParams.get("c");
+    const c = searchParams.get("c") ?? searchParams.get("chat");
+    const m = searchParams.get("m");
     if (!c) return;
     if (conversations.some((x) => x.id === c)) {
       selectChat(c);
+      if (m) setMensajeDestino(m);
       searchParams.delete("c");
+      searchParams.delete("chat");
+      searchParams.delete("m");
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, conversations, selectChat, setSearchParams]);
@@ -109,7 +122,7 @@ export default function MessengerPage() {
   const {
     messages, loading: msgsLoading, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
-    hasMore, loadingMore, loadOlderMessages,
+    hasMore, loadingMore, loadOlderMessages, traerMensaje,
   } = useMessages(activeChatId, handleNewMessage, destinatariosDelTecleo);
 
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
@@ -300,6 +313,9 @@ export default function MessengerPage() {
               hasMore={hasMore}
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}
+              saltarA={mensajeDestino}
+              onSaltoHecho={saltoHecho}
+              traerMensaje={traerMensaje}
               onMembersChanged={loadConversations}
               isPinned={isPinned(activeConv.id)}
               onTogglePin={() => togglePin(activeConv.id)}
