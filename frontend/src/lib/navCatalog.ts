@@ -181,7 +181,8 @@ export const NAV_SECTIONS: NavSection[] = [
   // ⚠️ Es un array, no un Record: si acá falta una sección tsc NO se queja y el
   // ⌘K simplemente deja de mostrar sus entradas, sin error. Hay guarda en
   // oficinaEnElMenu.test.ts.
-  "Menú", "Oficina", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Admin", "Sistema",
+  // El orden espeja al del menú, donde Oficina va última (Jhon, 17/09).
+  "Menú", "Creadoras", "Ventas", "Operaciones", "RRHH", "Finanzas", "Oficina", "Admin", "Sistema",
 ];
 
 /**
