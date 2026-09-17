@@ -24,11 +24,15 @@ interface Props {
   evento?: EventoDelCalendario | null;
   /** Crear uno nuevo en este día. */
   dia?: Date | null;
+  /** Hora a la que se hizo clic en la grilla de la semana, 0-23. Sin esto el
+   *  formulario abre siempre a las 9, que en la vista de semana sería raro:
+   *  hacés clic en las 15:00 y te propone otra hora. */
+  hora?: number | null;
   /** Solo el dueño edita. Un evento del equipo se ve, no se toca. */
   esMio: boolean;
 }
 
-export default function DialogoDeEvento({ abierto, onCerrar, evento, dia, esMio }: Props) {
+export default function DialogoDeEvento({ abierto, onCerrar, evento, dia, hora, esMio }: Props) {
   const { t } = useLanguage();
   const crear = useCrearEvento();
   const guardar = useGuardarEvento();
@@ -65,17 +69,21 @@ export default function DialogoDeEvento({ abierto, onCerrar, evento, dia, esMio 
       return;
     }
     const base = dia ?? new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    // Una reunión que arranca a las 23 termina a las 23:59 y no a las 24:00:
+    // ese fin no existe y el evento se guardaría con fin antes del inicio.
+    const arranca = hora ?? 9;
     setTitulo("");
     setTodoElDia(false);
     setDesdeFecha(claveDeDia(base));
-    setDesdeHora("09:00");
+    setDesdeHora(`${p(arranca)}:00`);
     setHastaFecha(claveDeDia(base));
-    setHastaHora("10:00");
+    setHastaHora(arranca >= 23 ? "23:59" : `${p(arranca + 1)}:00`);
     setLugar("");
     setEnlace("");
     setNotas("");
     setVisibilidad("privado");
-  }, [abierto, evento, dia]);
+  }, [abierto, evento, dia, hora]);
 
   const trabajando = crear.isPending || guardar.isPending || borrar.isPending;
 

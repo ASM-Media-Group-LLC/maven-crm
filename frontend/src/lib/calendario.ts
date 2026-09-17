@@ -109,3 +109,110 @@ export function aCampos(iso: string, todoElDia: boolean): { fecha: string; hora:
   }
   return { fecha: claveDeDia(d), hora: `${p(d.getHours())}:${p(d.getMinutes())}` };
 }
+
+// ── Vista de semana ─────────────────────────────────────────────────────────
+
+const MINUTOS_DEL_DIA = 24 * 60;
+
+/** Los 7 días de la semana que contiene a `fecha`, de lunes a domingo. */
+export function diasDeLaSemana(fecha: Date): Date[] {
+  const lunes = startOfWeek(fecha, { weekStartsOn: 1 });
+  return Array.from({ length: 7 }, (_, i) => addDays(lunes, i));
+}
+
+export function rangoDeLaSemana(fecha: Date): { desde: Date; hasta: Date } {
+  const dias = diasDeLaSemana(fecha);
+  const desde = new Date(dias[0]);
+  desde.setHours(0, 0, 0, 0);
+  const hasta = new Date(dias[6]);
+  hasta.setHours(23, 59, 59, 999);
+  return { desde, hasta };
+}
+
+export interface TrozoDelDia {
+  /** Minutos desde la medianoche de ESE día. */
+  desde: number;
+  /** Cuántos minutos ocupa dentro de ese día. */
+  minutos: number;
+}
+
+/** Qué franja ocupa un evento DENTRO de un día concreto.
+ *
+ *  ⚠️ Se recorta al día: una reunión de 23:00 a 01:00 son dos trozos, uno en
+ *  cada día. Sin recortar, el bloque se dibujaría fuera de la columna o
+ *  estiraría la grilla. Devuelve null si el evento no toca ese día. */
+export function trozoDelDia(
+  ev: { starts_at: string; ends_at: string | null; all_day: boolean },
+  dia: Date,
+): TrozoDelDia | null {
+  if (ev.all_day) return null; // los de día completo van en la banda de arriba
+
+  const inicioDia = new Date(dia);
+  inicioDia.setHours(0, 0, 0, 0);
+  const finDia = new Date(inicioDia.getTime() + MINUTOS_DEL_DIA * 60_000);
+
+  const i = new Date(ev.starts_at);
+  // Sin fin declarado se le dan 30 minutos: un bloque de alto cero no se ve,
+  // y un evento invisible es peor que uno con una duración supuesta.
+  const f = ev.ends_at ? new Date(ev.ends_at) : new Date(i.getTime() + 30 * 60_000);
+  if (f <= inicioDia || i >= finDia) return null;
+
+  const desde = Math.max(0, Math.round((i.getTime() - inicioDia.getTime()) / 60_000));
+  const hasta = Math.min(MINUTOS_DEL_DIA, Math.round((f.getTime() - inicioDia.getTime()) / 60_000));
+  // Piso de 20 minutos para que un evento cortito siga siendo clicable.
+  return { desde, minutos: Math.max(20, hasta - desde) };
+}
+
+export interface Repartido<T> {
+  ev: T;
+  trozo: TrozoDelDia;
+  /** En qué columna cae, 0-based. */
+  columna: number;
+  /** Cuántas columnas comparten su franja. */
+  columnas: number;
+}
+
+/** Reparte en columnas los eventos que se pisan, como hace Google.
+ *
+ *  Sin esto, dos reuniones a la misma hora se dibujan una encima de la otra y
+ *  la de abajo desaparece — que es justo cuando más importa verlas. */
+export function repartirSolapados<T extends { starts_at: string; ends_at: string | null; all_day: boolean }>(
+  eventos: T[],
+  dia: Date,
+): Repartido<T>[] {
+  const conTrozo = eventos
+    .map((ev) => ({ ev, trozo: trozoDelDia(ev, dia) }))
+    .filter((x): x is { ev: T; trozo: TrozoDelDia } => x.trozo !== null)
+    .sort((a, b) => a.trozo.desde - b.trozo.desde || b.trozo.minutos - a.trozo.minutos);
+
+  const salida: Repartido<T>[] = [];
+  let grupo: typeof conTrozo = [];
+  let finDelGrupo = -1;
+
+  const cerrarGrupo = () => {
+    if (!grupo.length) return;
+    // Dentro del grupo, cada uno va a la primera columna libre.
+    const finPorColumna: number[] = [];
+    const asignadas: number[] = [];
+    for (const x of grupo) {
+      let col = finPorColumna.findIndex((fin) => fin <= x.trozo.desde);
+      if (col === -1) { col = finPorColumna.length; finPorColumna.push(0); }
+      finPorColumna[col] = x.trozo.desde + x.trozo.minutos;
+      asignadas.push(col);
+    }
+    const total = finPorColumna.length;
+    grupo.forEach((x, i) => salida.push({ ...x, columna: asignadas[i], columnas: total }));
+    grupo = [];
+    finDelGrupo = -1;
+  };
+
+  for (const x of conTrozo) {
+    // Un grupo es una tanda de eventos encadenados por solapamiento: mientras
+    // uno empiece antes de que termine el grupo, sigue en el mismo reparto.
+    if (grupo.length && x.trozo.desde >= finDelGrupo) cerrarGrupo();
+    grupo.push(x);
+    finDelGrupo = Math.max(finDelGrupo, x.trozo.desde + x.trozo.minutos);
+  }
+  cerrarGrupo();
+  return salida;
+}
