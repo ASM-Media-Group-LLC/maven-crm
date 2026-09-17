@@ -73,6 +73,15 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
     };
     // `handle` cierra sobre este efecto; el canal vive en useCanalQueRevive.
     armarRecibosRef.current = (canal) => canal
+      // ⚠️ ESTAS DOS ESCUCHAS YA NO RECIBEN NADA, a propósito (17/09/2026).
+      // `chat_read_receipts` salió de la publicación de Realtime porque era, con
+      // diferencia, la tabla que más escribía de las 25 publicadas —casi un
+      // millón de escrituras, 4,5 veces la siguiente— y difundir cada "visto" a
+      // todos los suscriptores tenía a la base de rodillas: se cayó Maven.
+      // Se dejan puestas para que volver atrás sea UNA línea de SQL
+      // (ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_read_receipts)
+      // sin tocar el frontend. Los ✓✓ se leen igual al abrir la conversación,
+      // con la consulta de más arriba; lo que se pierde es que se muevan solos.
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_read_receipts" }, handle)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_read_receipts" }, handle);
   }, [conversationId]);

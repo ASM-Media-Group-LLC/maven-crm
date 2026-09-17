@@ -1,0 +1,27 @@
+-- Los acuses de lectura del chat salen de la replicación en vivo.
+--
+-- 17/09/2026, 16:00: Maven se quedó cargando. No fue un despliegue: la base
+-- tocó techo. 56 conexiones de 60, 190 consultas canceladas por tiempo agotado
+-- en una hora, y los errores del servidor saltaron de uno cada quince minutos a
+-- 880 de golpe. El 6% de las llamadas empezó a colgarse, y como el tablero
+-- dispara más de veinte consultas para dibujarse, casi ningún cargue llegaba a
+-- completarse: no fallaba, nunca terminaba.
+--
+-- El mayor consumidor de la base era la replicación de Realtime, con un tercio
+-- del tiempo total y once millones de llamadas. De las 25 tablas publicadas, la
+-- que más escribe con diferencia es esta: casi un millón de escrituras, 4,5
+-- veces más que la siguiente. Cada "visto" de un mensaje se difundía a TODOS
+-- los suscriptores, y eso no lo necesita nadie en vivo.
+--
+-- QUÉ SE PIERDE: los ✓✓ dejan de moverse solos mientras miras la conversación.
+-- Se siguen leyendo al abrirla —useReadReceipts hace su propia consulta, no
+-- depende de la suscripción— así que se ponen al día al recargar o al reabrirla.
+-- El hook mantiene sus dos escuchas (useReadReceipts.ts:76-77); simplemente ya
+-- no les llega nada, sin error.
+--
+-- PARA REVERTIR, una línea:
+--   ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_read_receipts;
+--
+-- Esto es alivio, no el arreglo de fondo. El tope de 60 conexiones dice que la
+-- instancia quedó chica para el tráfico que ya tiene Maven.
+ALTER PUBLICATION supabase_realtime DROP TABLE public.chat_read_receipts;
