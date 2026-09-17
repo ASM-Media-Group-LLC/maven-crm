@@ -11,6 +11,7 @@ import {
   useDocumento, useGuardarDocumento, type VisibilidadDocumento,
 } from "@/hooks/useDocumentos";
 import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
+import { useHistorialDeOficina } from "@/hooks/useHistorialDeOficina";
 import { useLanguage } from "@/hooks/useLanguage";
 import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
 
@@ -27,7 +28,12 @@ export default function DocumentoPage() {
   const doc = useDocumento(id);
   const guardar = useGuardarDocumento();
   const abrir = useAbrirEnOnlyOffice();
-  const { estado, error } = useEditorDeOffice(CONTENEDOR, abrir.data);
+  // Al salir del historial hay que volver a montar el editor en modo edición.
+  // Pedir la configuración de nuevo alcanza: llega un objeto distinto y el
+  // hook remonta solo. Es más barato que recargar la página entera, que es lo
+  // que sugiere ONLYOFFICE.
+  const historial = useHistorialDeOficina(id, () => { if (id) abrir.mutate(id); });
+  const { estado, error } = useEditorDeOffice(CONTENEDOR, abrir.data, historial);
 
   // Pedir la configuración apenas se sabe qué documento es.
   useEffect(() => {
