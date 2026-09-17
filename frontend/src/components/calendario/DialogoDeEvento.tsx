@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/useLanguage";
+import Invitados from "@/components/calendario/Invitados";
 import { aCampos, aInstante, claveDeDia } from "@/lib/calendario";
 import {
   useBorrarEvento, useCrearEvento, useGuardarEvento,
@@ -122,7 +123,9 @@ export default function DialogoDeEvento({ abierto, onCerrar, evento, dia, esMio 
 
   return (
     <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
-      <DialogContent className="max-w-lg">
+      {/* Con invitados el formulario pasa el alto de una pantalla chica: el
+          diálogo scrollea en vez de cortar los botones de abajo. */}
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{evento ? t("cal.editar") : t("cal.nuevo")}</DialogTitle>
         </DialogHeader>
@@ -211,6 +214,11 @@ export default function DialogoDeEvento({ abierto, onCerrar, evento, dia, esMio 
               ))}
             </div>
           </div>
+
+          {/* Invitar es ortogonal a la visibilidad: un evento puede seguir
+              siendo privado y aun así tener invitados, que lo ven porque
+              están invitados. No se vuelve del equipo por invitar a tres. */}
+          <Invitados eventoId={evento?.id} soyDueno={esMio && !!evento} />
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

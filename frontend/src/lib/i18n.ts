@@ -520,6 +520,23 @@ const translations = {
   },
   "cal.masEventos": { es: "+{n} más", en: "+{n} more" },
   "cal.entrar": { es: "Entrar", en: "Join" },
+
+  // Calendario · invitados
+  "cal.invitados": { es: "Invitados", en: "Guests" },
+  "cal.buscarPersona": { es: "Buscar a alguien…", en: "Search for someone…" },
+  "cal.sinInvitados": { es: "Todavía no invitaste a nadie", en: "You haven\u2019t invited anyone yet" },
+  "cal.quitar": { es: "Quitar invitado", en: "Remove guest" },
+  "cal.vas": { es: "¿Vas?", en: "Are you going?" },
+  "cal.resp.pendiente": { es: "sin responder", en: "no reply" },
+  "cal.resp.va": { es: "va", en: "going" },
+  "cal.resp.noVa": { es: "no va", en: "not going" },
+  "cal.resp.quizas": { es: "quizás", en: "maybe" },
+  "cal.respondiste": { es: "Respuesta guardada", en: "Reply saved" },
+  "cal.invitaAlGuardar": {
+    es: "Guardá el evento y después invitá a quien quieras",
+    en: "Save the event first, then invite whoever you want",
+  },
+  "cal.organiza": { es: "Organiza", en: "Organizer" },
   "oficina.nuevoDoc": { es: "Documento nuevo", en: "New document" },
   "oficina.nuevaHoja": { es: "Hoja nueva", en: "New spreadsheet" },
   "oficina.nuevaPresentacion": { es: "Presentación nueva", en: "New presentation" },
