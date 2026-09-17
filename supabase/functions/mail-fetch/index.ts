@@ -1000,6 +1000,18 @@ Deno.serve(async (req) => {
         const all = [...to, ...(cc ?? []), ...(bcc ?? [])];
         const sent = await smtp.sendMessage(fromAddress, all, rfc822);
         if (!sent.ok) {
+          // ⚠️ DOS FRACASOS DISTINTOS, Y CONFUNDIRLOS DUPLICA CORREOS.
+          // `incierto` = el mensaje entero ya viajó y se cortó esperando la
+          // confirmación. Puede haberse enviado. Decir "no se pudo enviar"
+          // hace que la persona reintente y salga dos veces: pasó el 17/09
+          // con 13 hojas de vida a tres destinatarias.
+          if (sent.incierto) {
+            return json(req, {
+              error: "se envió pero el servidor tardó en confirmar: revisá Enviados ANTES de reintentar, puede haber salido",
+              code: sent.code,
+              incierto: true,
+            }, 504);
+          }
           return json(req, { error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
         }
 
