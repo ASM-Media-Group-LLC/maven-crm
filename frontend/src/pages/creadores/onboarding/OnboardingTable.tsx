@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { OnboardingCreator } from "./useOnboarding";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   data: OnboardingCreator[];
@@ -36,6 +37,7 @@ const statusConfig = {
 };
 
 const OnboardingTable = ({ data, onManage }: Props) => {
+  const { t } = useLanguage();
   const { isAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const [deletingItem, setDeletingItem] = useState<OnboardingCreator | null>(null);
@@ -54,11 +56,11 @@ const OnboardingTable = ({ data, onManage }: Props) => {
       // La lista usa queryKey ["onboarding-creators"] (ver useOnboarding). Invalidar
       // ["onboarding"] no refetcheaba → el registro borrado quedaba hasta refrescar.
       queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
-      toast.success("Registro de onboarding eliminado");
+      toast.success(t("cr.onbDeleted"));
       setDeletingItem(null);
     },
     onError: (err: any) => {
-      toast.error("Error al eliminar", { description: err.message });
+      toast.error(t("common.errorDeleting"), { description: err.message });
     },
   });
 
@@ -70,9 +72,9 @@ const OnboardingTable = ({ data, onManage }: Props) => {
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
-              <TableHead>Creadora</TableHead>
+              <TableHead>{t("cr.creator")}</TableHead>
               <TableHead>Agencia</TableHead>
-              <TableHead>Fecha Inicio</TableHead>
+              <TableHead>{t("cr.startDate")}</TableHead>
               <TableHead>Progreso</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Docs</TableHead>
@@ -103,7 +105,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                               <ShieldAlert className="h-4 w-4 text-warning" />
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
+                          <TooltipContent>{t("cr.step3DocsPending")}</TooltipContent>
                         </Tooltip>
                       )}
                     </div>
@@ -132,7 +134,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                             <ShieldAlert className="h-4 w-4 text-warning" />
                           </span>
                         </TooltipTrigger>
-                        <TooltipContent>Pendiente de aprobación</TooltipContent>
+                        <TooltipContent>{t("cr.pendingApproval")}</TooltipContent>
                       </Tooltip>
                     )}
                   </TableCell>
@@ -153,7 +155,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Eliminar</TooltipContent>
+                          <TooltipContent>{t("common.delete")}</TooltipContent>
                         </Tooltip>
                       )}
                     </div>
@@ -175,9 +177,9 @@ const OnboardingTable = ({ data, onManage }: Props) => {
       <AlertDialog open={!!deletingItem} onOpenChange={(open) => { if (!open) setDeletingItem(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar registro de onboarding?</AlertDialogTitle>
+            <AlertDialogTitle>{t("cr.onbDeleteQ")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará el registro de onboarding de <strong>{deletingItem?.name}</strong>. Esta acción no se puede deshacer.
+              {t("cr.onbDeleteDescA")}<strong>{deletingItem?.name}</strong>{t("cr.offDeleteDescB")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -187,7 +189,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
               onClick={() => deletingItem && deleteOnboarding.mutate(deletingItem.id)}
               disabled={deleteOnboarding.isPending}
             >
-              {deleteOnboarding.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteOnboarding.isPending ? t("cr.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

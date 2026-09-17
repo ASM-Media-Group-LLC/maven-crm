@@ -10,25 +10,26 @@ import {
 } from "@/components/ui/accordion";
 import { DollarSign, MessageCircle, Calendar, StickyNote, Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SHIFTS = ["Mañana", "Tarde", "Noche"];
 
 const SERVICES = [
-  { key: "cat_1", label: "Contenido X" },
-  { key: "cat_2", label: "Contenido XX" },
-  { key: "cat_3", label: "Contenido XXX" },
-  { key: "cat_4", label: "Backdoor" },
-  { key: "contenido_personalizado", label: "Contenido Personalizado" },
-  { key: "valoracion_medios", label: "D-Rating" },
-  { key: "videollamada_amistad", label: "Videollamada Amistad" },
-  { key: "videollamada_otro", label: "Videollamada Otro" },
-  { key: "envio_articulos", label: "Venta de Ropa Interior" },
-  { key: "zings", label: "Zings" },
-  { key: "contenido_sensual_artistico", label: "Material de Cortesía/Sensual" },
-  { key: "saludos_personalizados", label: "Saludos a Medida" },
-  { key: "colaboraciones_externas", label: "Colaboraciones con Terceros" },
-  { key: "interaccion_vivo_amistosa", label: "Sesiones de Acompañamiento" },
+  { key: "cat_1", i18n: "cr.svcContentX" as const },
+  { key: "cat_2", i18n: "cr.svcContentXX" as const },
+  { key: "cat_3", i18n: "cr.svcContentXXX" as const },
+  { key: "cat_4", i18n: "cr.svcBackdoor" as const },
+  { key: "contenido_personalizado", i18n: "cr.svcCustomContent" as const },
+  { key: "valoracion_medios", i18n: "cr.svcDRating" as const },
+  { key: "videollamada_amistad", i18n: "cr.svcVideocallFriend" as const },
+  { key: "videollamada_otro", i18n: "cr.svcVideocallOther" as const },
+  { key: "envio_articulos", i18n: "cr.svcUnderwear" as const },
+  { key: "zings", i18n: "cr.svcZings" as const },
+  { key: "contenido_sensual_artistico", i18n: "cr.svcSensual" as const },
+  { key: "saludos_personalizados", i18n: "cr.svcGreetings" as const },
+  { key: "colaboraciones_externas", i18n: "cr.svcCollabs" as const },
+  { key: "interaccion_vivo_amistosa", i18n: "cr.svcCompanionship" as const },
 ] as const;
 
 const CURRENCIES = [
@@ -90,6 +91,7 @@ function toggleShift(schedule: ScheduleGrid, day: string, shift: string): Schedu
 }
 
 export default function Step4WorkConfig({ data, onChange }: Props) {
+  const { t } = useLanguage();
   const updatePricing = (key: string, field: "price" | "notes", value: string) => {
     const current = data.pricing[key] || { price: "", notes: "" };
     onChange("pricing", {
@@ -132,13 +134,13 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                       </Select>
                     </div>
                   </TableHead>
-                  <TableHead className="font-medium">Notas del servicio</TableHead>
+                  <TableHead className="font-medium">{t("cr.serviceNotes")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {SERVICES.map(({ key, label }) => (
+                {SERVICES.map(({ key, i18n }) => (
                   <TableRow key={key}>
-                    <TableCell className="font-medium text-sm">{label}</TableCell>
+                    <TableCell className="font-medium text-sm">{t(i18n)}</TableCell>
                     <TableCell>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">{currencySymbol}</span>
@@ -180,9 +182,9 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Orientación declarada para el perfil</Label>
+                <Label>{t("cr.declaredOrientation")}</Label>
                 <Select value={data.orientacionPerfil} onValueChange={(v) => onChange("orientacionPerfil", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Heterosexual">Heterosexual</SelectItem>
                     <SelectItem value="Bisexual">Bisexual</SelectItem>
@@ -193,9 +195,9 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Plataforma preferida para Videollamadas</Label>
+                <Label>{t("cr.videocallPlatform")}</Label>
                 <Select value={data.plataformaVideollamada} onValueChange={(v) => onChange("plataformaVideollamada", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Telegram">Telegram</SelectItem>
                     <SelectItem value="WhatsApp">WhatsApp</SelectItem>
@@ -207,15 +209,15 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Preferencia de términos de afecto</Label>
+              <Label>{t("cr.affectionTerms")}</Label>
               <Input
                 value={data.terminosAfecto}
                 onChange={(e) => onChange("terminosAfecto", e.target.value)}
-                placeholder="Ej: mi amor, bebe, cariño..."
+                placeholder={t("cr.affectionTermsPh")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Restricciones de seguridad y contenido no permitido</Label>
+              <Label>{t("cr.safetyRestrictions")}</Label>
               <Textarea
                 value={data.restriccionesSeguridad}
                 onChange={(e) => onChange("restriccionesSeguridad", e.target.value)}
@@ -225,8 +227,8 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="space-y-0.5">
-                <Label className="text-sm font-medium">¿Disponible para modalidad de Acompañamiento Virtual (GFE)?</Label>
-                <p className="text-xs text-muted-foreground">Programa de acompañamiento emocional y virtual</p>
+                <Label className="text-sm font-medium">{t("cr.gfeAvailable")}</Label>
+                <p className="text-xs text-muted-foreground">{t("cr.gfeDesc")}</p>
               </div>
               <Switch
                 checked={data.gfeDisponible || false}
@@ -235,8 +237,8 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="space-y-0.5">
-                <Label className="text-sm font-medium">¿Interesada en participar en juegos, rifas o metas de ventas grupales?</Label>
-                <p className="text-xs text-muted-foreground">Actividades grupales de engagement y ventas</p>
+                <Label className="text-sm font-medium">{t("cr.groupActivities")}</Label>
+                <p className="text-xs text-muted-foreground">{t("cr.groupActivitiesDesc")}</p>
               </div>
               <Switch
                 checked={data.interesaDinamicasGrupales || false}
@@ -245,9 +247,9 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Personalidad de Marca</Label>
+                <Label>{t("cr.brandPersonality")}</Label>
                 <Select value={data.personalidadMarca} onValueChange={(v) => onChange("personalidadMarca", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Dulce">Dulce</SelectItem>
                     <SelectItem value="Directa">Directa</SelectItem>
@@ -257,9 +259,9 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Estrategia de Rechazo</Label>
+                <Label>{t("cr.rejectionStrategy")}</Label>
                 <Select value={data.estrategiaRechazo} onValueChange={(v) => onChange("estrategiaRechazo", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Humor">Humor</SelectItem>
                     <SelectItem value="Firmeza">Firmeza</SelectItem>
@@ -269,55 +271,55 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               </div>
             </div>
             <div className="space-y-1.5 max-w-sm">
-              <Label>Tono Emocional</Label>
+              <Label>{t("cr.emotionalTone")}</Label>
               <Select value={data.tonoEmocional} onValueChange={(v) => onChange("tonoEmocional", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Romántico">Romántico</SelectItem>
-                  <SelectItem value="Sensual">Sensual</SelectItem>
+                  <SelectItem value="Romántico">{t("cr.toneRomantic")}</SelectItem>
+                  <SelectItem value="Sensual">{t("cr.toneSensual")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Estrategia de recuperación de suscriptores y manejo de quejas</Label>
+              <Label>{t("cr.winbackStrategy")}</Label>
               <Textarea
                 value={data.estrategiaRecuperacion}
                 onChange={(e) => onChange("estrategiaRecuperacion", e.target.value)}
-                placeholder="Describe cómo recuperar suscriptores inactivos y manejar quejas..."
+                placeholder={t("cr.winbackPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>Frases de Venta Predilectas</Label>
+                <Label>{t("cr.favouriteSalesLines")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">Tus 'palabras mágicas'. Usaremos tus expresiones únicas para cerrar ventas de forma natural y efectiva.</TooltipContent>
+                  <TooltipContent className="max-w-xs">{t("cr.favouriteSalesLinesTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.frasesVenta}
                 onChange={(e) => onChange("frasesVenta", e.target.value)}
-                placeholder="Describe tus términos o frases favoritas para incentivar la compra de contenido (ej. ¿Quieres ver algo especial?, Tengo una sorpresa para ti, etc.)"
+                placeholder={t("cr.favouriteSalesLinesPh")}
                 rows={3}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5">
-                <Label>Gestión de Usuarios VIP</Label>
+                <Label>{t("cr.vipManagement")}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">Instrucciones de manejo para tus mejores clientes. Asegura que reciban el trato exclusivo por el que están pagando.</TooltipContent>
+                  <TooltipContent className="max-w-xs">{t("cr.vipManagementTip")}</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
                 value={data.usuariosVip}
                 onChange={(e) => onChange("usuariosVip", e.target.value)}
-                placeholder="Detalla nombres de usuarios que requieren un manejo preferencial o instrucciones específicas de atención"
+                placeholder={t("cr.vipManagementPh")}
                 rows={3}
               />
             </div>
@@ -335,14 +337,14 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">Vital para que el equipo sepa cuándo estás disponible para generar contenido nuevo solicitado por fans.</TooltipContent>
+              <TooltipContent className="max-w-xs">{t("cr.scheduleTip")}</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
         <AccordionContent>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5 max-w-sm">
-              <Label>Objetivo mensual de ingresos ($)</Label>
+              <Label>{t("cr.monthlyGoal")}</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                 <Input
@@ -369,7 +371,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                             onChange("schedule", newSchedule);
                           }}
                         />
-                        <span>Todos</span>
+                        <span>{t("common.all")}</span>
                       </div>
                     </th>
                     {SHIFTS.map((s) => {
@@ -466,10 +468,8 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionContent>
           <div className="pt-2 space-y-3">
             <p className="text-xs text-muted-foreground">
-              Si está activa en el CRM externo (donde se gestiona su cuenta de
-              OnlyFans), marca <strong>Sí</strong>. Cuenta como ingreso al CRM en
-              el Panel de Control. Si todavía no, marca <strong>No</strong> —
-              después se puede activar desde el listado de Creadoras.
+              {t("cr.bluHelpA")}<strong>{t("cr.bluHelpYes")}</strong>{t("cr.bluHelpB")}
+              <strong>{t("cr.bluHelpNo")}</strong>{t("cr.bluHelpC")}
             </p>
             <div className="flex gap-2">
               <button

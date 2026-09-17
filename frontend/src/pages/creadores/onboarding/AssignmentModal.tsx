@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Popover,
   PopoverContent,
@@ -72,6 +73,7 @@ export default function AssignmentModal({
   onConfirm,
   isSubmitting,
 }: AssignmentModalProps) {
+  const { t } = useLanguage();
   const [selectedManager, setSelectedManager] = useState<string | null>(null);
   const [selectedChatters, setSelectedChatters] = useState<string[]>([]);
   const [managerOpen, setManagerOpen] = useState(false);
@@ -88,8 +90,8 @@ export default function AssignmentModal({
       if (prev.includes(id)) return prev.filter((c) => c !== id);
       if (prev.length >= 3) {
         toast({
-          title: "Máximo 3 chatters",
-          description: "Solo puedes asignar hasta 3 chatters por creadora.",
+          title: t("cr.max3Chatters"),
+          description: t("cr.max3ChattersDesc"),
           variant: "destructive",
         });
         return prev;
@@ -143,15 +145,15 @@ export default function AssignmentModal({
                   ) : selectedManagerName ? (
                     selectedManagerName
                   ) : (
-                    <span className="text-muted-foreground">Seleccionar manager...</span>
+                    <span className="text-muted-foreground">{t("cr.selectManagerPh")}</span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar manager..." />
-                  <CommandEmpty>No se encontraron managers.</CommandEmpty>
+                  <CommandInput placeholder={t("cr.searchManagerPh")} />
+                  <CommandEmpty>{t("cr.noManagersFound")}</CommandEmpty>
                   <CommandGroup className="max-h-48 overflow-y-auto">
                     {managers.map((m) => (
                       <CommandItem
@@ -181,7 +183,7 @@ export default function AssignmentModal({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <Users className="h-4 w-4 text-muted-foreground" />
-              Chatters <span className="text-xs text-muted-foreground">(máx. 3, opcional)</span>
+              Chatters <span className="text-xs text-muted-foreground">{t("cr.max3Optional")}</span>
             </Label>
 
             {/* Selected chatters badges */}
@@ -231,8 +233,8 @@ export default function AssignmentModal({
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar chatter..." />
-                  <CommandEmpty>No se encontraron chatters.</CommandEmpty>
+                  <CommandInput placeholder={t("cr.searchChatterPh")} />
+                  <CommandEmpty>{t("cr.noChattersFound")}</CommandEmpty>
                   <CommandGroup className="max-h-48 overflow-y-auto">
                     {chatters.map((c) => {
                       const isSelected = selectedChatters.includes(c.id);

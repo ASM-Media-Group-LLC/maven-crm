@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStartOnboarding, AGENCY_ORDER, type ProspectRecord } from "./useProspectos";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   prospect: ProspectRecord | null;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function StartOnboardingModal({ prospect, onClose }: Props) {
+  const { t } = useLanguage();
   const [agency, setAgency] = useState(prospect?.agency || "");
   const mutation = useStartOnboarding();
 
@@ -30,7 +32,7 @@ export default function StartOnboardingModal({ prospect, onClose }: Props) {
           <div className="space-y-1.5">
             <Label>Agencia <span className="text-destructive">*</span></Label>
             <Select value={agency} onValueChange={setAgency}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar agencia..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("cr.selectAgencyPh")} /></SelectTrigger>
               <SelectContent>
                 {AGENCY_ORDER.map((a) => (
                   <SelectItem key={a} value={a}>{a}</SelectItem>
@@ -39,7 +41,7 @@ export default function StartOnboardingModal({ prospect, onClose }: Props) {
             </Select>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
             <Button
               disabled={!agency || mutation.isPending}
               onClick={() => mutation.mutate({ prospect, agency })}

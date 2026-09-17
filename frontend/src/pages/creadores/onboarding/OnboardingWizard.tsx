@@ -15,12 +15,14 @@ import Step4WorkConfig, { type Step4Data } from "./steps/Step4WorkConfig";
 import AssignmentModal from "./AssignmentModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const STEPS = [
-  { label: "Información Personal", tooltip: "Datos básicos para validar tu identidad y generar tus contratos legales de forma segura." },
-  { label: "Psicología y Límites", tooltip: "Ayúdanos a clonar tu personalidad. Tus respuestas permiten que tu equipo venda exactamente como tú lo harías." },
-  { label: "Documentación", tooltip: "Archivos necesarios para cumplir con la normativa de las plataformas y verificar la mayoría de edad." },
-  { label: "Configuración", tooltip: "Tu menú comercial. Aquí defines qué vendes y a qué precio para que tu equipo cierre tratos de alto valor." },
+const STEPS: { label: TranslationKey; tooltip: TranslationKey }[] = [
+  { label: "cr.stepPersonal", tooltip: "cr.stepPersonalTip" },
+  { label: "cr.stepPsych", tooltip: "cr.stepPsychTip" },
+  { label: "cr.stepDocs", tooltip: "cr.stepDocsTip" },
+  { label: "cr.stepConfig", tooltip: "cr.stepConfigTip" },
 ];
 
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "" };
@@ -35,6 +37,7 @@ interface Props {
 }
 
 export default function OnboardingWizard({ onCancel, initialStep, editCreatorId }: Props) {
+  const { t } = useLanguage();
   const [step, setStep] = useState(initialStep || 1);
   const [step1, setStep1] = useState<Step1Data>(initialStep1);
   const [step2Psy, setStep2Psy] = useState<Step2PsyData>(initialStep2Psy);
@@ -376,15 +379,15 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     if (step === 4) {
       const hasPrice = Object.values(step4.pricing).some((p) => parseFloat(p.price) > 0);
       if (!hasPrice) {
-        toast({ title: "Precios requeridos", description: "Define al menos un servicio con precio mayor a 0.", variant: "destructive" });
+        toast({ title: t("cr.pricesRequired"), description: t("cr.pricesRequiredDesc"), variant: "destructive" });
         return false;
       }
       // Blu/Infloww obligatorio para publicar. Si no se respondió, le
       // hacemos scroll al accordion y le pedimos al closer que elija.
       if (step4.bluInflowwActive === null || step4.bluInflowwActive === undefined) {
         toast({
-          title: "Falta responder Blu / Infloww",
-          description: "Marca Sí o No al final del wizard antes de publicar.",
+          title: t("cr.missingBluInfloww"),
+          description: t("cr.markYesNoDesc"),
           variant: "destructive",
         });
         // Scroll al acordeón (data-attr en Step4WorkConfig) para que sea
@@ -464,8 +467,8 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       const live = rows.find((r) => r.source === "creators" && r.creator_id !== currentId);
       if (live) {
         toast({
-          title: "Ya existe una creadora con ese Instagram",
-          description: `@${igHandle.replace(/^@/, "")} ya está en Creadoras como "${live.name ?? "?"}" (status: ${live.status}). Edita o reactiva ese perfil en vez de crear un duplicado.`,
+          title: t("cr.instagramTaken"),
+          description: t("cr.instagramTakenDesc", { handle: igHandle.replace(/^@/, ""), name: live.name ?? "?", status: live.status }),
           variant: "destructive",
         });
         return;
@@ -536,6 +539,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       if (!isDraft && createdId) {
         await supabase.from("notifications").insert({
           type: "onboarding_complete",
+          // Se guarda en la base y la leen otras personas: no se traduce.
           title: "Nueva modelo ha completado el onboarding",
           message: `${step1.name} ha completado el proceso de onboarding y está pendiente de verificación.`,
           reference_id: createdId,
@@ -573,7 +577,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     // Validate step 4 pricing
     const hasPrice = Object.values(step4.pricing).some((p) => parseFloat(p.price) > 0);
     if (!hasPrice) {
-      toast({ title: "Precios requeridos", description: "Define al menos un servicio con precio mayor a 0.", variant: "destructive" });
+      toast({ title: t("cr.pricesRequired"), description: t("cr.pricesRequiredDesc"), variant: "destructive" });
       return;
     }
     // Validate step 1
@@ -686,7 +690,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       <Card className="rounded-lg">
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Cargando datos...</span>
+          <span className="ml-2 text-sm text-muted-foreground">{t("cr.loadingData")}</span>
         </CardContent>
       </Card>
     );
@@ -746,14 +750,14 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
                     {isDone ? <Check className="h-4 w-4" /> : num}
                   </div>
                   <span className={`text-xs hidden sm:inline ${isActive ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                    {s.label}
+                    {t(s.label)}
                   </span>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help hidden sm:inline shrink-0" />
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">{s.tooltip}</TooltipContent>
+                      <TooltipContent className="max-w-xs">{t(s.tooltip)}</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   {i < STEPS.length - 1 && <div className="flex-1 h-px bg-border mx-2" />}
@@ -799,10 +803,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         </div>
         <div className="flex items-center gap-2">
           {step > 1 && (
-            <Button variant="outline" onClick={handlePrev} disabled={isSubmitting}>Anterior</Button>
+            <Button variant="outline" onClick={handlePrev} disabled={isSubmitting}>{t("common.previous")}</Button>
           )}
           {step < 4 ? (
-            <Button onClick={handleNext}>Siguiente</Button>
+            <Button onClick={handleNext}>{t("common.next")}</Button>
           ) : (
             <Button onClick={handleFinalize} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

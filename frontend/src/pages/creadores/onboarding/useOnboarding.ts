@@ -108,6 +108,9 @@ async function checkInactivityAlerts(creators: OnboardingCreator[]) {
   const notifications = toNotify.map((c) => ({
     user_id: c.assigned_manager_profile_id,
     type: "onboarding_inactivity",
+    // Se guarda en la base y la lee OTRA persona (el manager asignado), que
+    // puede tener otro idioma: queda en español a propósito, como el resto de
+    // los datos persistidos.
     title: "Creadora inactiva por 3+ días",
     message: `${c.name} no ha actualizado su onboarding en más de 3 días.`,
     reference_id: c.id,

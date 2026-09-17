@@ -38,23 +38,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
 import CreadoresHeader from "../CreadoresHeader";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
-  en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
-  pendiente_aprobacion: { label: "Pend. Aprobación", variant: "bg-warning/15 text-warning border-warning/30" },
-  pendiente_cierre: { label: "Pend. Cierre", variant: "bg-accent/15 text-accent-foreground border-accent/30" },
-  finalizado: { label: "Finalizado", variant: "bg-muted text-muted-foreground border-border" },
+const STATUS_LABELS: Record<string, { key: TranslationKey; variant: string }> = {
+  en_proceso: { key: "cr.offStatusInProgress" as const, variant: "bg-primary/15 text-primary border-primary/30" },
+  pendiente_aprobacion: { key: "cr.offStatusPendingApprovalShort" as const, variant: "bg-warning/15 text-warning border-warning/30" },
+  pendiente_cierre: { key: "cr.offStatusPendingClosureShort" as const, variant: "bg-accent/15 text-accent-foreground border-accent/30" },
+  finalizado: { key: "cr.offStatusDone" as const, variant: "bg-muted text-muted-foreground border-border" },
 };
 
 const CATEGORIAS = [
-  { value: "voluntaria", label: "Voluntaria" },
-  { value: "involuntaria", label: "Involuntaria" },
-  { value: "mutuo_acuerdo", label: "Mutuo Acuerdo" },
-  { value: "incumplimiento", label: "Incumplimiento" },
-  { value: "otro", label: "Otro" },
+  { value: "voluntaria", key: "cr.offCatVoluntary" as const },
+  { value: "involuntaria", key: "cr.offCatInvoluntary" as const },
+  { value: "mutuo_acuerdo", key: "cr.offCatMutual" as const },
+  { value: "incumplimiento", key: "cr.offCatBreach" as const },
+  { value: "otro", key: "cr.offCatOther" as const },
 ];
 
 const OffboardingListPage = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { data: offboardings, isLoading, refetch } = useAllOffboardings();
   const { isAdmin } = useUserRole();
@@ -75,11 +78,11 @@ const OffboardingListPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-offboardings"] });
-      toast.success("Registro de offboarding eliminado");
+      toast.success(t("cr.offDeleted"));
       setDeletingId(null);
     },
     onError: (err: any) => {
-      toast.error("Error al eliminar", { description: err.message });
+      toast.error(t("common.errorDeleting"), { description: err.message });
     },
   });
 
@@ -137,8 +140,8 @@ const OffboardingListPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: "Total", value: stats.total, color: "text-foreground" },
-                { label: "En Proceso", value: stats.enProceso, color: "text-primary" },
-                { label: "Pendientes", value: stats.pendientes, color: "text-warning" },
+                { label: t("cr.offStatusInProgress"), value: stats.enProceso, color: "text-primary" },
+                { label: t("common.pendingPl"), value: stats.pendientes, color: "text-warning" },
                 { label: "Finalizados", value: stats.finalizados, color: "text-muted-foreground" },
               ].map((s) => (
                 <Card key={s.label}>
@@ -155,7 +158,7 @@ const OffboardingListPage = () => {
               <div className="relative flex-1 min-w-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nombre o Instagram..."
+                  placeholder={t("cr.offSearchPh")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
@@ -166,20 +169,20 @@ const OffboardingListPage = () => {
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  {Object.entries(STATUS_LABELS).map(([val, { label }]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  <SelectItem value="_all">{t("common.all")}</SelectItem>
+                  {Object.entries(STATUS_LABELS).map(([val, { key: claveEstado }]) => (
+                    <SelectItem key={val} value={val}>{t(claveEstado)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={categoryFilter || undefined} onValueChange={(v) => setCategoryFilter(v === "_all" ? "" : v)}>
                 <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Categoría" />
+                  <SelectValue placeholder={t("common.category")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="_all">{t("common.all")}</SelectItem>
                   {CATEGORIAS.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    <SelectItem key={c.value} value={c.value}>{t(c.key)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -206,9 +209,9 @@ const OffboardingListPage = () => {
 
             {/* Content */}
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Cargando...</div>
+              <div className="p-8 text-center text-muted-foreground">{t("common.loading")}</div>
             ) : filtered.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">No se encontraron offboardings</div>
+              <div className="p-8 text-center text-muted-foreground">{t("cr.offNotFound")}</div>
             ) : viewMode === "table" ? (
               <Card>
                 <CardContent className="p-0">
@@ -217,8 +220,8 @@ const OffboardingListPage = () => {
                       <TableRow>
                         <TableHead>Creator</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Fecha Salida</TableHead>
+                        <TableHead>{t("common.category")}</TableHead>
+                        <TableHead>{t("cr.exitDateShort")}</TableHead>
                         <TableHead>Aprobaciones</TableHead>
                         <TableHead>Checklist</TableHead>
                         <TableHead className="text-right">Revenue Perdido</TableHead>
@@ -244,10 +247,10 @@ const OffboardingListPage = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={`text-[10px] ${st.variant}`}>{st.label}</Badge>
+                              <Badge variant="outline" className={`text-[10px] ${st.variant}`}>{t(st.key)}</Badge>
                             </TableCell>
                             <TableCell className="text-sm">
-                              {CATEGORIAS.find((c) => c.value === o.categoria)?.label ?? "—"}
+                              {(() => { const c = CATEGORIAS.find((x) => x.value === o.categoria); return c ? t(c.key) : "—"; })()}
                             </TableCell>
                             <TableCell className="text-sm">{o.exit_date ?? "—"}</TableCell>
                             <TableCell className="text-sm">{o.approval_count ?? 0}/2</TableCell>
@@ -310,15 +313,15 @@ const OffboardingListPage = () => {
                             <p className="font-semibold text-sm">{o.creator_name ?? "—"}</p>
                             <p className="text-xs text-muted-foreground">{o.artistic_name ?? o.instagram_handle ?? ""}</p>
                           </div>
-                          <Badge variant="outline" className={`text-[10px] shrink-0 ${st.variant}`}>{st.label}</Badge>
+                          <Badge variant="outline" className={`text-[10px] shrink-0 ${st.variant}`}>{t(st.key)}</Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
-                            <span className="text-muted-foreground">Categoría</span>
-                            <p className="font-medium">{CATEGORIAS.find((c) => c.value === o.categoria)?.label ?? "—"}</p>
+                            <span className="text-muted-foreground">{t("common.category")}</span>
+                            <p className="font-medium">{(() => { const c = CATEGORIAS.find((x) => x.value === o.categoria); return c ? t(c.key) : "—"; })()}</p>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Fecha Salida</span>
+                            <span className="text-muted-foreground">{t("cr.exitDateShort")}</span>
                             <p className="font-medium">{o.exit_date ?? "—"}</p>
                           </div>
                           <div>
@@ -348,9 +351,9 @@ const OffboardingListPage = () => {
     <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar registro de offboarding?</AlertDialogTitle>
+          <AlertDialogTitle>{t("cr.offDeleteQ")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Se eliminará el registro de offboarding de <strong>{deletingId?.name}</strong>. Esta acción no se puede deshacer.
+            {t("cr.offDeleteDescA")}<strong>{deletingId?.name}</strong>{t("cr.offDeleteDescB")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -360,7 +363,7 @@ const OffboardingListPage = () => {
             onClick={() => deletingId && deleteOffboarding.mutate(deletingId.id)}
             disabled={deleteOffboarding.isPending}
           >
-            {deleteOffboarding.isPending ? "Eliminando..." : "Eliminar"}
+            {deleteOffboarding.isPending ? t("cr.deleting") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -35,20 +35,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
-  en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
-  pendiente_aprobacion: { label: "Pendiente Aprobación", variant: "bg-warning/15 text-warning border-warning/30" },
-  pendiente_cierre: { label: "Pendiente Cierre", variant: "bg-accent/15 text-accent-foreground border-accent/30" },
-  finalizado: { label: "Finalizado", variant: "bg-success/15 text-success border-success/30" },
+const STATUS_LABELS: Record<string, { key: TranslationKey; variant: string }> = {
+  en_proceso: { key: "cr.offStatusInProgress" as const, variant: "bg-primary/15 text-primary border-primary/30" },
+  pendiente_aprobacion: { key: "cr.offStatusPendingApproval" as const, variant: "bg-warning/15 text-warning border-warning/30" },
+  pendiente_cierre: { key: "cr.offStatusPendingClosure" as const, variant: "bg-accent/15 text-accent-foreground border-accent/30" },
+  finalizado: { key: "cr.offStatusDone" as const, variant: "bg-success/15 text-success border-success/30" },
 };
 
 const CATEGORIAS = [
-  { value: "voluntaria", label: "Voluntaria" },
-  { value: "involuntaria", label: "Involuntaria" },
-  { value: "mutuo_acuerdo", label: "Mutuo Acuerdo" },
-  { value: "incumplimiento", label: "Incumplimiento" },
-  { value: "otro", label: "Otro" },
+  { value: "voluntaria", key: "cr.offCatVoluntary" as const },
+  { value: "involuntaria", key: "cr.offCatInvoluntary" as const },
+  { value: "mutuo_acuerdo", key: "cr.offCatMutual" as const },
+  { value: "incumplimiento", key: "cr.offCatBreach" as const },
+  { value: "otro", key: "cr.offCatOther" as const },
 ];
 
 // Fixed approver IDs — only these 3 users can approve
@@ -59,11 +61,11 @@ const APPROVER_IDS = [
 ];
 
 const CHECKLIST_ITEMS = [
-  { key: "check_pagos" as const, label: "Pagos completados" },
-  { key: "check_material" as const, label: "Entrega de material" },
-  { key: "check_campanas" as const, label: "Cierre de campañas" },
-  { key: "check_accesos" as const, label: "Accesos removidos" },
-  { key: "check_documentacion" as const, label: "Documentación final" },
+  { key: "check_pagos" as const, i18n: "cr.offChkPayments" as const },
+  { key: "check_material" as const, i18n: "cr.offChkMaterial" as const },
+  { key: "check_campanas" as const, i18n: "cr.offChkCampaigns" as const },
+  { key: "check_accesos" as const, i18n: "cr.offChkAccess" as const },
+  { key: "check_documentacion" as const, i18n: "cr.offChkDocs" as const },
 ];
 
 interface Props {
@@ -74,6 +76,7 @@ interface Props {
 }
 
 const OffboardingSection = ({ creatorId, creatorName, artisticName, instagramHandle }: Props) => {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const {
     offboarding,
@@ -154,7 +157,7 @@ const OffboardingSection = ({ creatorId, creatorName, artisticName, instagramHan
   const handleApprove = () => {
     if (!user?.id) return;
     approve.mutate(user.id, {
-      onSuccess: () => toast({ title: "Aprobación registrada" }),
+      onSuccess: () => toast({ title: t("cr.approvalRegistered") }),
       onError: (err: any) =>
         toast({ title: "Error", description: err.message, variant: "destructive" }),
     });
@@ -169,30 +172,30 @@ const OffboardingSection = ({ creatorId, creatorName, artisticName, instagramHan
   const generateComunicado = () => {
     const text = `
 ═══════════════════════════════════════
-  COMUNICADO DE SALIDA — ${creatorName}
+  ${t("cr.commTitle")} — ${creatorName}
 ═══════════════════════════════════════
 
-▸ Nombre: ${creatorName}
-▸ Nombre Artístico: ${artisticName ?? "N/A"}
+▸ ${t("common.name")}: ${creatorName}
+▸ ${t("cr.commArtisticName")}: ${artisticName ?? "N/A"}
 ▸ Instagram: ${instagramHandle ?? "N/A"}
-▸ Fecha de Salida: ${offboarding.exit_date ?? "Pendiente"}
+▸ ${t("cr.commExitDate")}: ${offboarding.exit_date ?? t("common.pending")}
 
-── MOTIVOS ──────────────────────────
-▸ Operativo: ${form.motivo_operativo || "N/A"}
-▸ Comercial: ${form.motivo_comercial || "N/A"}
-▸ Final: ${form.motivo_final || "N/A"}
-▸ Categoría: ${CATEGORIAS.find((c) => c.value === form.categoria)?.label ?? "N/A"}
+── ${t("cr.commReasons")} ──────────────────────────
+▸ ${t("cr.commOperational")}: ${form.motivo_operativo || "N/A"}
+▸ ${t("cr.commCommercial")}: ${form.motivo_comercial || "N/A"}
+▸ ${t("cr.commFinal")}: ${form.motivo_final || "N/A"}
+▸ ${t("common.category")}: ${(() => { const c = CATEGORIAS.find((x) => x.value === form.categoria); return c ? t(c.key) : "N/A"; })()}
 
-── IMPACTO FINANCIERO ───────────────
-▸ Últimos Ingresos: $${impact.lastRevenue.toLocaleString()}
-▸ Promedio Mensual: $${impact.avgMonthly.toLocaleString()}
-▸ Revenue Perdido Estimado (12m): $${impact.estimatedLost.toLocaleString()}
+── ${t("cr.commFinancialImpact")} ───────────────
+▸ ${t("cr.commLastRevenue")}: $${impact.lastRevenue.toLocaleString()}
+▸ ${t("cr.commAvgMonthly")}: $${impact.avgMonthly.toLocaleString()}
+▸ ${t("cr.commEstLost")}: $${impact.estimatedLost.toLocaleString()}
 
-── NOTAS ADMINISTRATIVAS ────────────
-${form.comentarios || "Sin comentarios"}
+── ${t("cr.commAdminNotes")} ────────────
+${form.comentarios || t("cr.commNoComments")}
 
-── APROBACIONES ─────────────────────
-▸ ${approvalCount} de 2 requeridas completadas
+── ${t("cr.commApprovals")} ─────────────────────
+▸ ${t("cr.commApprovalsDone", { n: approvalCount })}
 
 ═══════════════════════════════════════
     `.trim();
@@ -202,7 +205,7 @@ ${form.comentarios || "Sin comentarios"}
     setTimeout(() => setCopied(false), 2000);
 
     updateOffboarding.mutate({ comunicado_generado: text } as Partial<Offboarding>);
-    toast({ title: "Comunicado copiado al portapapeles" });
+    toast({ title: t("cr.commCopied") });
   };
 
   const getApproverName = (id: string) => {
@@ -220,7 +223,7 @@ ${form.comentarios || "Sin comentarios"}
             <LogOut className="h-5 w-5 text-destructive" />
             <h2 className="text-lg font-semibold">Offboarding</h2>
             <Badge variant="outline" className={`text-xs ${statusInfo.variant}`}>
-              {statusInfo.label}
+              {t(statusInfo.key)}
             </Badge>
           </div>
           <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
@@ -229,14 +232,14 @@ ${form.comentarios || "Sin comentarios"}
         <CollapsibleContent className="mt-4 space-y-4">
           {/* Status selector */}
           <div className="flex items-center gap-3">
-            <Label className="text-xs text-muted-foreground">Estado del proceso:</Label>
+            <Label className="text-xs text-muted-foreground">{t("cr.processStatus")}</Label>
             <Select value={offboarding.status} onValueChange={handleStatusChange}>
               <SelectTrigger className="w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(STATUS_LABELS).map(([val, { label }]) => (
-                  <SelectItem key={val} value={val}>{label}</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([val, { key: claveEstado }]) => (
+                  <SelectItem key={val} value={val}>{t(claveEstado)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -254,7 +257,7 @@ ${form.comentarios || "Sin comentarios"}
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nombre</span>
+                  <span className="text-muted-foreground">{t("common.name")}</span>
                   <span className="font-medium">{creatorName}</span>
                 </div>
                 <div className="flex justify-between">
@@ -266,8 +269,8 @@ ${form.comentarios || "Sin comentarios"}
                   <span className="font-medium">{instagramHandle ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fecha de salida</span>
-                  <span className="font-medium">{offboarding.exit_date ?? "Pendiente"}</span>
+                  <span className="text-muted-foreground">{t("cr.exitDate")}</span>
+                  <span className="font-medium">{offboarding.exit_date ?? t("common.pending")}</span>
                 </div>
               </CardContent>
             </Card>
@@ -277,17 +280,17 @@ ${form.comentarios || "Sin comentarios"}
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
-                  Información de Salida
+                  {t("cr.exitInfo")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Categoría</Label>
+                  <Label className="text-xs">{t("common.category")}</Label>
                   <Select value={form.categoria} onValueChange={(v) => setForm((f) => ({ ...f, categoria: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                     <SelectContent>
                       {CATEGORIAS.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        <SelectItem key={c.value} value={c.value}>{t(c.key)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -308,7 +311,7 @@ ${form.comentarios || "Sin comentarios"}
           {/* Row 2: Motivos */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Doble Motivo de Salida</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t("cr.doubleExitReason")}</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
@@ -317,7 +320,7 @@ ${form.comentarios || "Sin comentarios"}
                   rows={3}
                   value={form.motivo_operativo}
                   onChange={(e) => setForm((f) => ({ ...f, motivo_operativo: e.target.value }))}
-                  placeholder="Razón operativa..."
+                  placeholder={t("cr.operationalReasonPh")}
                 />
               </div>
               <div className="space-y-1.5">
@@ -326,7 +329,7 @@ ${form.comentarios || "Sin comentarios"}
                   rows={3}
                   value={form.motivo_comercial}
                   onChange={(e) => setForm((f) => ({ ...f, motivo_comercial: e.target.value }))}
-                  placeholder="Razón comercial..."
+                  placeholder={t("cr.commercialReasonPh")}
                 />
               </div>
               <div className="space-y-1.5">
@@ -356,7 +359,7 @@ ${form.comentarios || "Sin comentarios"}
               </CardHeader>
               <CardContent className="space-y-3">
                 {approvals.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Aún no hay aprobaciones registradas.</p>
+                  <p className="text-xs text-muted-foreground">{t("cr.noApprovalsYet")}</p>
                 )}
                 {approvals.map((a) => (
                   <div key={a.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 transition-colors">
@@ -366,7 +369,7 @@ ${form.comentarios || "Sin comentarios"}
                         <Check className="h-3 w-3 mr-1" /> Aprobado
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px]">Pendiente</Badge>
+                      <Badge variant="outline" className="text-[10px]">{t("common.pending")}</Badge>
                     )}
                   </div>
                 ))}
@@ -406,7 +409,7 @@ ${form.comentarios || "Sin comentarios"}
                       onCheckedChange={() => handleChecklistToggle(item.key as keyof Offboarding)}
                     />
                     <span className={`text-sm ${offboarding[item.key] ? "line-through text-muted-foreground" : ""}`}>
-                      {item.label}
+                      {t(item.i18n)}
                     </span>
                   </label>
                 ))}
@@ -425,7 +428,7 @@ ${form.comentarios || "Sin comentarios"}
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { label: "Últimos Ingresos", value: impact.lastRevenue, color: "text-primary" },
+                  { label: t("cr.commLastRevenue"), value: impact.lastRevenue, color: "text-primary" },
                   { label: "Promedio Mensual", value: impact.avgMonthly, color: "text-warning" },
                   { label: "Revenue Perdido (12m)", value: impact.estimatedLost, color: "text-destructive" },
                 ].map((m) => (

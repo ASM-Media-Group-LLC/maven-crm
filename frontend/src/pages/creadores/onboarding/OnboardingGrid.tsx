@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert } from "lucide-react";
 import type { OnboardingCreator } from "./useOnboarding";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   data: OnboardingCreator[];
@@ -20,8 +21,9 @@ const statusConfig = {
 };
 
 const OnboardingGrid = ({ data, onManage }: Props) => {
+  const { t } = useLanguage();
   if (data.length === 0) {
-    return <EmptyState seed="onboarding-creadores" title="No hay creadores en onboarding" />;
+    return <EmptyState seed="onboarding-creadores" title={t("cr.noCreatorsOnboarding")} />;
   }
 
   return (
@@ -51,7 +53,7 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
                               <ShieldAlert className="h-4 w-4 text-warning" />
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
+                          <TooltipContent>{t("cr.step3DocsPending")}</TooltipContent>
                         </Tooltip>
                       )}
                     </div>
