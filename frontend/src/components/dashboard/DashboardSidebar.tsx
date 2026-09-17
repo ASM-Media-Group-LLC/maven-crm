@@ -474,32 +474,6 @@ const DashboardSidebar = () => {
             </SidebarMenu>
         </CollapsibleSidebarGroup>
 
-        {oficinaItems.length > 0 && (
-        <CollapsibleSidebarGroup
-          label={t("nav.office")}
-          storageKey="oficina"
-          icon={FileText}
-          active={isOficinaActive}
-          collapsedItems={oficinaCollapsedItems}
-        >
-            <SidebarMenu>
-              {oficinaItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    {/* `end` en /oficina: sin eso, estar en /oficina/hojas
-                        encendía TAMBIÉN a Documentos, porque NavLink marca por
-                        prefijo y toda la sección cuelga de la misma raíz. */}
-                    <NavLink to={item.url} end={item.url === "/oficina"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-        </CollapsibleSidebarGroup>
-        )}
-
         {operationsMenu.length > 0 && (
         <CollapsibleSidebarGroup
           label={t("sidebar.operations")}
@@ -796,6 +770,32 @@ const DashboardSidebar = () => {
                   })}
                 </>
               )}
+            </SidebarMenu>
+        </CollapsibleSidebarGroup>
+        )}
+
+        {oficinaItems.length > 0 && (
+        <CollapsibleSidebarGroup
+          label={t("nav.office")}
+          storageKey="oficina"
+          icon={FileText}
+          active={isOficinaActive}
+          collapsedItems={oficinaCollapsedItems}
+        >
+            <SidebarMenu>
+              {oficinaItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    {/* `end` en /oficina: sin eso, estar en /oficina/hojas
+                        encendía TAMBIÉN a Documentos, porque NavLink marca por
+                        prefijo y toda la sección cuelga de la misma raíz. */}
+                    <NavLink to={item.url} end={item.url === "/oficina"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
         </CollapsibleSidebarGroup>
         )}
