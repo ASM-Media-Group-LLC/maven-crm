@@ -289,7 +289,21 @@ Deno.serve(async (req) => {
     if (!doc) throw new HttpError("Sin acceso a este documento", 403);
     if (!doc.storage_key) throw new HttpError("El documento todavía no tiene archivo", 409);
 
-    const puedeEditar = doc.owner_id === user.id || doc.visibility === "equipo";
+    // ⚠️ El permiso COMPARTIDO tiene que llegar hasta acá. Si no, alguien a
+    // quien le dieron permiso de editar abriría el documento en solo lectura
+    // y no habría forma de darse cuenta desde la UI: ONLYOFFICE simplemente
+    // no deja escribir.
+    let puedeEditar = doc.owner_id === user.id || doc.visibility === "equipo";
+    if (!puedeEditar) {
+      // Con el cliente de la PERSONA: la RLS solo le deja ver su propia fila.
+      const { data: compartido } = await comoLaPersona
+        .from("document_shares")
+        .select("puede_editar")
+        .eq("document_id", doc.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      puedeEditar = !!(compartido as { puede_editar?: boolean } | null)?.puede_editar;
+    }
 
     const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     const vence = new Date(Date.now() + 12 * 3600_000);

@@ -537,6 +537,22 @@ const translations = {
     en: "Save the event first, then invite whoever you want",
   },
   "cal.organiza": { es: "Organiza", en: "Organizer" },
+
+  // Oficina · compartir un documento con personas
+  "doc.compartir": { es: "Compartir", en: "Share" },
+  "doc.compartirCon": { es: "Compartir con", en: "Share with" },
+  "doc.buscarPersona": { es: "Buscar a alguien…", en: "Search for someone…" },
+  "doc.sinCompartir": { es: "No lo compartiste con nadie", en: "You haven\u2019t shared it with anyone" },
+  "doc.puedeVer": { es: "puede ver", en: "can view" },
+  "doc.puedeEditar": { es: "puede editar", en: "can edit" },
+  "doc.dejarDeCompartir": { es: "Dejar de compartir", en: "Stop sharing" },
+  "doc.compartido": { es: "Compartido", en: "Shared" },
+  "doc.permisoCambiado": { es: "Permiso actualizado", en: "Permission updated" },
+  "doc.soloElDueno": {
+    es: "Solo quien lo creó puede compartirlo",
+    en: "Only its creator can share it",
+  },
+  "doc.compartidoConmigo": { es: "Compartido conmigo", en: "Shared with me" },
   "oficina.nuevoDoc": { es: "Documento nuevo", en: "New document" },
   "oficina.nuevaHoja": { es: "Hoja nueva", en: "New spreadsheet" },
   "oficina.nuevaPresentacion": { es: "Presentación nueva", en: "New presentation" },
