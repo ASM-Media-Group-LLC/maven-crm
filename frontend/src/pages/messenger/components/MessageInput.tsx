@@ -453,7 +453,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +
           Enviar a la derecha. NO se tocó la lógica de envío/voz/menciones/upload. */}
-      <div className={cn("px-3 pt-2.5", isMobile ? "pb-0.5" : "pb-2.5")}>
+      {/* En la ventanita (compacto) van 6 px abajo, no 2: el anillo de contraste
+          al enfocar mide 2 px a 2 px del cajón, y la ventana tiene overflow-hidden —
+          con pb-0.5 el aro salía recortado plano por abajo (Jhon, 15/09). */}
+      <div className={cn("px-3 pt-2.5", compacto ? "pb-1.5" : isMobile ? "pb-0.5" : "pb-2.5")}>
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
         {/* Cámara del teléfono: `capture` abre la cámara directo en iOS/Android. */}
         <input ref={cameraInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="image/*,video/*" capture="environment" />
@@ -472,7 +475,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <div className="flex items-end gap-1">
             <Button
               variant="ghost" size="icon"
-              className="h-10 w-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
+              className={cn("h-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8", compacto ? "w-9" : "w-10")}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               title="Adjuntar archivo"
@@ -491,7 +494,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   aCiegas={aCiegas}
                 />
               )}
-              <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-[22px] px-4 py-2.5 pr-[76px] focus-within:ring-1 focus-within:ring-primary/30">
+              {/* En la ventanita (336 px) el cajón quedaba con casi nada de sitio para
+                  escribir: fuera la "A" de formato (queda en teléfono y escritorio) y
+                  el hueco de la derecha pasa a ser de un solo botón (Jhon, 15/09). */}
+              <div className={cn(
+                "msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-[22px] py-2.5 focus-within:ring-1 focus-within:ring-primary/30",
+                compacto ? "pl-3 pr-11" : "px-4 pr-[76px]",
+              )}>
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraft(user?.id, conversationId)}
@@ -507,7 +516,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   bottom-1.5 = (44 − 32) / 2: centrados en el cajón de una línea; si el
                   texto crece se quedan abajo, como en WhatsApp. */}
               <Expresiones
-                className="absolute bottom-1.5 right-[42px] h-8 w-8 text-foreground/90"
+                className={cn("absolute bottom-1.5 h-8 w-8 text-foreground/90", compacto ? "right-1.5" : "right-[42px]")}
                 iconClassName="h-[23px] w-[23px]"
                 favoritos={messengerEmojis}
                 onEmoji={(e) => composerRef.current?.insertText(e)}
@@ -515,29 +524,36 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onSticker={sendStickerUrl}
                 disabled={uploading}
               />
+              {!compacto && (
+                <Button
+                  variant="ghost" size="icon"
+                  className={cn(
+                    "absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full hover:bg-primary/8",
+                    showToolbar ? "bg-primary/15 text-primary" : "text-foreground/90",
+                  )}
+                  onClick={() => setShowToolbar((v) => !v)}
+                  title="Opciones de formato"
+                  aria-label="Opciones de formato"
+                >
+                  <Baseline className="h-[22px] w-[22px]" strokeWidth={2.1} />
+                </Button>
+              )}
+            </div>
+            {/* La cámara se va al escribir, como en WhatsApp: el hueco es para el
+                mensaje. El micrófono ya se volvía "enviar" con la misma condición;
+                la cámara se quedaba y en la ventanita (336 px) sobraba (Jhon, 16/09). */}
+            {!(text.trim() || pendingFiles.length > 0) && (
               <Button
                 variant="ghost" size="icon"
-                className={cn(
-                  "absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full hover:bg-primary/8",
-                  showToolbar ? "bg-primary/15 text-primary" : "text-foreground/90",
-                )}
-                onClick={() => setShowToolbar((v) => !v)}
-                title="Opciones de formato"
-                aria-label="Opciones de formato"
+                className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={uploading}
+                title="Cámara"
+                aria-label="Cámara"
               >
-                <Baseline className="h-[22px] w-[22px]" strokeWidth={2.1} />
+                <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
-            </div>
-            <Button
-              variant="ghost" size="icon"
-              className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading}
-              title="Cámara"
-              aria-label="Cámara"
-            >
-              <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
-            </Button>
+            )}
             {text.trim() || pendingFiles.length > 0 ? (
               <Button
                 size="icon"

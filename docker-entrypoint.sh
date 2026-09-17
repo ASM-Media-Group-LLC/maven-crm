@@ -26,6 +26,10 @@ substitute "__RUNTIME_VITE_SUPABASE_PUBLISHABLE_KEY__" "${VITE_SUPABASE_PUBLISHA
 substitute "__RUNTIME_VITE_SUPABASE_PROJECT_ID__"     "${VITE_SUPABASE_PROJECT_ID:-}"
 substitute "__RUNTIME_VITE_PUBLIC_URL__"              "${VITE_PUBLIC_URL:-}"
 substitute "__RUNTIME_VITE_GIPHY_API_KEY__"           "${VITE_GIPHY_API_KEY:-}"
+# Servidor de edición compartida de la Oficina. Si NO se define, el placeholder
+# se queda tal cual en el bundle y el editor funciona de a uno: `substitute` no
+# hace nada con un valor vacío, y el frontend trata `__RUNTIME_` como "apagado".
+substitute "__RUNTIME_VITE_DOCS_SYNC_URL__"           "${VITE_DOCS_SYNC_URL:-}"
 
 echo "[entrypoint] Runtime env applied: VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-(unset)} VITE_PUBLIC_URL=${VITE_PUBLIC_URL:-(unset)}"
 

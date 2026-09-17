@@ -64,10 +64,13 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
 
   const abrirChat = useCallback((id: string) => {
     // En el teléfono las ventanitas no tienen sentido: vamos a la pantalla.
-    if (isMobile || !puedeMessenger) { navigate(`/messenger?c=${id}`); return; }
+    // Y YA EN /messenger tampoco: ahí las ventanitas no se dibujan, así que abrir
+    // una era no hacer nada — Jhon tocó a María en la nube desde Messenger y el
+    // chat no se abrió (16/09). La página ya sabe seleccionar por ?c=.
+    if (isMobile || !puedeMessenger || enMessenger) { navigate(`/messenger?c=${id}`); return; }
     setMinimizadas((m) => m.filter((x) => x !== id));
     setAbiertas((a) => (a.includes(id) ? a : [id, ...a].slice(0, MAX_ABIERTAS)));
-  }, [isMobile, puedeMessenger, navigate]);
+  }, [isMobile, puedeMessenger, enMessenger, navigate]);
 
   const cerrar = useCallback((id: string) => {
     setAbiertas((a) => a.filter((x) => x !== id));

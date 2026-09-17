@@ -50,7 +50,16 @@ export const esEspanol = (s: string): boolean => {
 const ATRIBUTOS = "placeholder|title|alt|aria-label|label|description|tooltip|emptyMessage";
 
 const FORMAS: RegExp[] = [
-  new RegExp(">([^<>{}\\n][^<>{}]*)<", "g"),                          // texto JSX
+  // Texto JSX, en UNA sola línea.
+  //
+  // ⚠️ El `\n` del segundo grupo es imprescindible, no cosmética: en un .tsx
+  // los genéricos de TypeScript dejan pares `>` … `<` que son CÓDIGO
+  // (`useState<{ a: string }>(null)` seguido de `useState<number>(0)`), y sin
+  // esa restricción la regla los leía como si fueran texto de pantalla y
+  // marcaba el archivo entero. No se pierde cobertura: el primer grupo ya
+  // excluía el salto de línea, así que un texto que empieza en el renglón
+  // siguiente al `>` nunca se detectó.
+  new RegExp(">([^<>{}\\n][^<>{}\\n]*)<", "g"),
   new RegExp(`(?:${ATRIBUTOS})\\s*=\\s*"([^"]{3,})"`, "g"),           // attr="…"
   new RegExp(`(?:${ATRIBUTOS})\\s*=\\s*\\{\\s*["']([^"']{3,})["']\\s*\\}`, "g"), // attr={"…"}
   new RegExp(

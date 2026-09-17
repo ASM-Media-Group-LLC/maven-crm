@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } 
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
 import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
+import ViewCreatorModal from "./components/ViewCreatorModal";
 import ViewAsCloserPicker from "./components/ViewAsCloserPicker";
 import ClosersActivityDashboard from "./components/ClosersActivityDashboard";
 import CloserTable from "./components/LeadTable";
@@ -70,6 +72,41 @@ const ClosersContent = () => {
   const canAssignCloser = canAccess("Closers", "Asignar Closer");
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
+
+  // /closers?id=<closer_creator> — es adonde apuntan las 662 notificaciones al
+  // mes de Closers (contacto vencido, asignación, decisión) y NADIE lo leía: el
+  // clic aterrizaba en la lista sin abrir el registro (auditoría 15/09). Como la
+  // tabla es paginada y filtrada por etapa, el lead puede no estar en pantalla:
+  // se trae por id y se abre su ficha (ViewCreatorModal) encima de lo que haya.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idDesdeNotificacion = searchParams.get("id");
+  const [fichaDesdeNotificacion, setFichaDesdeNotificacion] = useState<CloserCreatorRow | null>(null);
+  useEffect(() => {
+    if (!idDesdeNotificacion) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await supabase.from("closer_creators").select("*").eq("id", idDesdeNotificacion).maybeSingle();
+      if (cancelado) return;
+      if (error || !data) {
+        toast({ title: "Ese lead ya no existe", description: "La notificación apuntaba a un registro que fue borrado o convertido." });
+        searchParams.delete("id");
+        setSearchParams(searchParams, { replace: true });
+        return;
+      }
+      // El tipo generado de la tabla y CloserCreatorRow no son convertibles en
+      // directo (columnas opcionales de más y de menos): se pasa por unknown.
+      setFichaDesdeNotificacion(data as unknown as CloserCreatorRow);
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idDesdeNotificacion]);
+  const cerrarFichaDesdeNotificacion = () => {
+    setFichaDesdeNotificacion(null);
+    if (searchParams.has("id")) {
+      searchParams.delete("id");
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
   const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup, { dateFrom, dateTo, dateField, viewAsCloserId });
   // Subtab top-level — Dashboard (KPI cards) vs Actividad (contactos por empleado) vs Operaciones (tabs/filtros/tabla)
   const [viewTab, setViewTab] = useState<"dashboard" | "actividad" | "operaciones" | "oportunidades">("dashboard");
@@ -534,6 +571,11 @@ const ClosersContent = () => {
         }}
       />
 
+      <ViewCreatorModal
+        creator={fichaDesdeNotificacion as never}
+        open={!!fichaDesdeNotificacion}
+        onOpenChange={(o) => { if (!o) cerrarFichaDesdeNotificacion(); }}
+      />
       <ClosersKpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}

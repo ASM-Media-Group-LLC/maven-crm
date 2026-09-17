@@ -14,6 +14,8 @@ import {
 } from "@/hooks/useBrowserNotifications";
 import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
 import { esMovil } from "@/lib/plataformaPwa";
+import { avisarPersona } from "@/lib/avisoPersona";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -112,6 +114,11 @@ export function useMessengerNotifications() {
   const userId = user?.id ?? null;
   // Este canal no tenía reconexión de ningún tipo: al volver del segundo plano se
   // recrea (el nombre ya es aleatorio, no hay zombi del mismo topic).
+  // Textos del aviso de mención por t(); va por ref para que cambiar de idioma
+  // no re-suscriba el canal.
+  const { t } = useLanguage();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [version, setVersion] = useState(0);
   useReanudarAlVolver(() => setVersion((v) => v + 1));
 
@@ -186,13 +193,17 @@ export function useMessengerNotifications() {
           const isGroup = conv?.type === "group";
 
           let senderName = "Alguien";
+          let senderFoto: string | null = null;
+          let senderSeed: string | null = null;
           try {
             const { data: prof } = await supabase
               .from("profiles")
-              .select("full_name")
+              .select("full_name, avatar_url, avatar_seed")
               .eq("id", m.sender_id)
               .maybeSingle();
             if (prof?.full_name) senderName = prof.full_name;
+            senderFoto = (prof as { avatar_url?: string | null } | null)?.avatar_url ?? null;
+            senderSeed = (prof as { avatar_seed?: string | null } | null)?.avatar_seed ?? null;
           } catch {
             /* nombre genérico */
           }
@@ -223,6 +234,34 @@ export function useMessengerNotifications() {
           //  · en escritorio, si este dispositivo tiene push y el usuario tiene el
           //    opt-in (o los ajustes aún cargan y no sabemos: mejor uno que dos).
           // En ambos casos quedan el sonido y el parpadeo del título.
+          // MENCIÓN con Maven a la vista, en otra pantalla que Messenger: aviso
+          // dentro de la app, pase lo que pase con el push. Las dos reglas de
+          // abajo ("el push la cubre") y la del service worker ("con una ventana
+          // visible no se muestra nada") juntas dejaban CERO aviso visible: Jhon
+          // se mencionó desde la cuenta test y no le llegó nada (16/09). Con
+          // Messenger abierto no hace falta: la lista ya lo marca.
+          const esMencion = mentionsMe(m.content ?? null, myNameRef.current);
+          const mirandoOtraPantalla =
+            document.visibilityState === "visible" && !location.pathname.startsWith("/messenger");
+          if (esMencion && mirandoOtraPantalla) {
+            if (soundOk) playNotificationSound();
+            const convId = m.conversation_id;
+            avisarPersona({
+              nombre: senderName,
+              foto: senderFoto,
+              seed: senderSeed,
+              titulo: isGroup
+                ? `${senderName} ${tRef.current("messenger.teMencionoEn")} ${title}`
+                : `${senderName} ${tRef.current("messenger.teMenciono")}`,
+              detalle: preview,
+              tono: "ojo",
+              duracion: 10_000,
+              id: `mencion-${m.id}`,
+              abrir: { etiqueta: tRef.current("avisos.abrir"), alTocar: () => navigateRef.current(`/messenger?c=${convId}&m=${m.id}`) },
+            });
+            return;
+          }
+
           const pushCubre =
             tienePushEnEsteDispositivo(userId) && (s.push_enabled === true || settingsCargandoRef.current);
           if (esMovil() || pushCubre) {
@@ -233,7 +272,7 @@ export function useMessengerNotifications() {
           notifyRef.current(
             title,
             body,
-            () => navigateRef.current(`/messenger?c=${m.conversation_id}`),
+            () => navigateRef.current(`/messenger?c=${m.conversation_id}&m=${m.id}`),
             soundOk,
           );
         },

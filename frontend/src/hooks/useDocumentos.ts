@@ -8,21 +8,26 @@ export interface Documento {
   id: string;
   title: string;
   folder: string | null;
-  content_html: string;
-  content_text: string;
   visibility: VisibilidadDocumento;
   owner_id: string;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
   deleted_at: string | null;
+  /** Llave del archivo en R2. Null mientras se está creando. */
+  storage_key: string | null;
+  extension: string;
+  size_bytes: number | null;
+  /** Sube en cada guardado; ONLYOFFICE la usa para saber que el archivo cambió. */
+  version: number;
 }
 
 export interface VersionDocumento {
   id: string;
   document_id: string;
-  content_html: string;
-  title: string | null;
+  version: number;
+  storage_key: string;
+  size_bytes: number | null;
   saved_by: string | null;
   created_at: string;
 }
@@ -31,7 +36,7 @@ export interface VersionDocumento {
  *  varias páginas cada uno, traer el cuerpo entero para pintar una lista de
  *  títulos son megas al pedo en cada carga. */
 const COLUMNAS_LISTA =
-  "id, title, folder, visibility, owner_id, created_at, updated_at, updated_by, deleted_at";
+  "id, title, folder, visibility, owner_id, created_at, updated_at, updated_by, deleted_at, extension, version, size_bytes";
 
 /** `types.ts` es un archivo generado que no conoce estas tablas todavía. El
  *  `as never` evita que tsc tire "Type instantiation is excessively deep"; es el
@@ -45,6 +50,9 @@ export interface FiltrosDocumentos {
   q: string;
   /** "mios" | "equipo" | "papelera" */
   vista: "todos" | "mios" | "papelera";
+  /** Documentos, hojas o presentaciones. Cada uno es su propia sección del
+   *  menú, como en Google: la lista de hojas no mezcla con la de documentos. */
+  extension?: "docx" | "xlsx" | "pptx";
 }
 
 /** Listado de documentos. La búsqueda por texto va por `buscar_documentos`, que
@@ -54,21 +62,14 @@ export function useDocumentos(filtros: FiltrosDocumentos) {
   const termino = filtros.q.trim();
 
   return useQuery({
-    queryKey: ["documentos", filtros.vista, termino, user?.id],
+    queryKey: ["documentos", filtros.vista, filtros.extension, termino, user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Documento[]> => {
-      if (termino && filtros.vista !== "papelera") {
-        const { data, error } = await supabase.rpc("buscar_documentos" as never, {
-          termino,
-        } as never);
-        if (error) throw error;
-        const filas = (data ?? []) as unknown as Documento[];
-        return filtros.vista === "mios"
-          ? filas.filter((d) => d.owner_id === user?.id)
-          : filas;
-      }
-
+      // ⚠️ Se busca solo por TÍTULO. La búsqueda dentro del texto murió con el
+      // editor propio: ahora el contenido es un .docx en R2 y para mirar adentro
+      // habría que extraerle el texto al guardar. Queda pendiente.
       let q = tabla("documents").select(COLUMNAS_LISTA);
+      if (termino) q = q.ilike("title", `%${termino.replace(/[%_]/g, "")}%`);
       // La papelera es solo la propia: RLS ya impide ver la de otro, pero
       // pedirlo explícito deja la intención escrita.
       q =
@@ -76,6 +77,7 @@ export function useDocumentos(filtros: FiltrosDocumentos) {
           ? q.not("deleted_at", "is", null)
           : q.is("deleted_at", null);
       if (filtros.vista === "mios" && user) q = q.eq("owner_id", user.id);
+      if (filtros.extension) q = q.eq("extension", filtros.extension);
 
       const { data, error } = await q.order("updated_at", { ascending: false }).limit(200);
       if (error) throw error;
@@ -109,9 +111,9 @@ export function useVersionesDeDocumento(id: string | undefined, abierto: boolean
     enabled: !!id && abierto,
     queryFn: async (): Promise<VersionDocumento[]> => {
       const { data, error } = await tabla("document_versions")
-        .select("id, document_id, content_html, title, saved_by, created_at")
+        .select("id, document_id, version, storage_key, size_bytes, saved_by, created_at")
         .eq("document_id", id!)
-        .order("created_at", { ascending: false })
+        .order("version", { ascending: false })
         .limit(50);
       if (error) throw error;
       return (data ?? []) as unknown as VersionDocumento[];
@@ -119,33 +121,12 @@ export function useVersionesDeDocumento(id: string | undefined, abierto: boolean
   });
 }
 
-export function useCrearDocumento() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async (inicial?: { title?: string; visibility?: VisibilidadDocumento }) => {
-      if (!user) throw new Error("Sin sesión");
-      const { data, error } = await tabla("documents")
-        .insert({
-          title: inicial?.title ?? "Sin título",
-          visibility: inicial?.visibility ?? "privado",
-          owner_id: user.id,
-          updated_by: user.id,
-        } as never)
-        .select("id")
-        .single();
-      if (error) throw error;
-      return data as unknown as { id: string };
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["documentos"] }),
-  });
-}
+// Crear un documento YA NO es un insert: hay que subir además el archivo en
+// blanco a R2, y eso lo hace la edge `oficina-doc`. Ver useOnlyOffice.ts.
 
 interface ParcheDocumento {
   id: string;
   title?: string;
-  content_html?: string;
-  content_text?: string;
   visibility?: VisibilidadDocumento;
   folder?: string | null;
   deleted_at?: string | null;
