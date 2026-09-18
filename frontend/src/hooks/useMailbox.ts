@@ -426,7 +426,14 @@ export interface OutgoingMail {
   in_reply_to?: string;
   references?: string;
   /** Adjuntos: nombre, tipo y contenido en base64 (sin el prefijo data:). */
-  attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+    /** Presente = imagen PEGADA en el cuerpo: viaja con Content-ID y el HTML
+     *  la referencia con `src="cid:…"`, no como archivo adjunto. */
+    contentId?: string;
+  }>;
   /** A quién se mencionó con @ en el cuerpo (ids de Maven). Son los que reciben
    *  el aviso dentro de la app además del correo. La edge verifica que cada uno
    *  exista y tenga casilla: mandar un id cualquiera no crea una notificación. */

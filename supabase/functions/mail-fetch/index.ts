@@ -95,8 +95,13 @@ Deno.serve(async (req) => {
       /** Message-ID al que se responde, para que el hilo no se corte. */
       in_reply_to?: string;
       references?: string;
-      /** Adjuntos a enviar: nombre, tipo y contenido en base64. */
-      attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+      /** Adjuntos a enviar: nombre, tipo y contenido en base64.
+       *  `contentId` presente = es una imagen PEGADA en el cuerpo, no un
+       *  archivo adjunto: viaja con Content-ID y el HTML la referencia con
+       *  `src="cid:…"`. */
+      attachments?: Array<{
+        filename: string; contentType: string; contentBase64: string; contentId?: string;
+      }>;
     };
     if (!action) return json(req, { error: "action is required" }, 400);
 
@@ -920,6 +925,13 @@ Deno.serve(async (req) => {
           typeof a.contentType !== "string" || typeof a.contentBase64 !== "string"
         ) {
           return json(req, { error: "un adjunto viene con formato inválido" }, 400);
+        }
+        // ⚠️ El `contentId` termina en una cabecera `Content-ID: <…>`. Se
+        // acota acá —y no solo se sanea al armar— para que un valor con
+        // CRLF ni siquiera llegue a `buildMessage`.
+        if (a.contentId !== undefined &&
+            (typeof a.contentId !== "string" || !/^[\w.+-]+@[\w.-]+$/.test(a.contentId))) {
+          return json(req, { error: "un adjunto trae un contentId inválido" }, 400);
         }
       }
       // El base64 pesa ~4/3 del archivo; se acota el ARCHIVO a 20 MB (igual que
