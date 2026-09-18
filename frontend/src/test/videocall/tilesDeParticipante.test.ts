@@ -5,6 +5,8 @@ vi.mock("livekit-client", () => ({
   Track: { Source: { Camera: "camera", Microphone: "microphone", ScreenShare: "screen_share" } },
   ParticipantEvent: {}, createLocalTracks: vi.fn(), LocalTrack: class {}, LocalVideoTrack: class {}, RemoteTrack: class {},
   VideoPresets: { h1080: { resolution: { width: 1920, height: 1080 } }, h720: { resolution: { width: 1280, height: 720 } }, h180: {}, h360: {} },
+  // useLiveKit lo lee al importar, para el perfil de la pantalla compartida.
+  ScreenSharePresets: { h360fps3: { width: 640, height: 360, encoding: { maxBitrate: 200000, maxFramerate: 3 } } },
 }));
 
 import { tilesDeParticipante, type LKParticipant } from "@/hooks/useLiveKit";

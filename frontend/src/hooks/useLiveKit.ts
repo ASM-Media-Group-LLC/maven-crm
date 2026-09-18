@@ -7,10 +7,12 @@ import {
   ConnectionState,
   Participant,
   VideoPresets,
+  ScreenSharePresets,
   ConnectionQuality,
   RoomOptions,
   TrackEvent,
 } from "livekit-client";
+import type { TrackPublishOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
@@ -292,6 +294,51 @@ const ROOM_OPTIONS: RoomOptions = {
       return Math.min(300 * Math.pow(2, context.retryCount), 5000);
     },
   },
+};
+
+// ── Cómo se publica la PANTALLA COMPARTIDA ────────────────────────
+//
+// MEDIDO en una llamada real (18/09/2026, Jhon ↔ Juan Pachas, getStats sobre la
+// llamada viva): la pantalla llegaba a 2,5 CUADROS POR SEGUNDO gastando 20 kbps
+// de un presupuesto de 2.500, con CERO paquetes perdidos y 79 ms de ping. O sea:
+// la red estaba limpia y el que no daba abasto era quien comparte. En la misma
+// llamada, el 26% del audio tuvo que ser inventado por el corrector de pérdidas
+// — la voz se cortaba a ráfagas, cada vez que su máquina se saturaba.
+//
+// Hasta ahora esto se publicaba SIN opciones, así que heredaba el
+// `simulcast: true` de publishDefaults, que se escribió pensando en CÁMARAS.
+// Para una pantalla, LiveKit arma con eso DOS codificaciones en paralelo —
+// 1080p@15 y 540p@15— las dos a resolución alta y a 15 fps, sobre contenido en
+// movimiento. Sumadas a las TRES capas de la cámara, son cinco codificaciones
+// de video al mismo tiempo en un portátil.
+//
+// Ninguno de los dos cambios toca la nitidez de la capa principal:
+//
+//  1. La capa chica pasa de 540p@15 a 360p@3. Sirve para lo mismo —las
+//     miniaturas del tablero de Cowork, donde un supervisor mira varias
+//     pantallas a la vez— pero cuesta del orden de cinco veces menos: un cuarto
+//     de los píxeles y un quinto de los cuadros.
+//     ⚠️ NO se apaga el simulcast del todo, que es lo que uno haría de primera:
+//     sin capa chica cada miniatura de Cowork se traería el 1080p entero y el
+//     que sufriría sería el supervisor. Se abarata la capa, no se elimina.
+//
+//  2. `maintain-framerate` le dice al codificador que cuando no dé abasto
+//     ACHIQUE la imagen en vez de congelarla. Es exactamente el fallo medido:
+//     se aferró a los 540p y se desplomó a 2,5 fps. Una pantalla que se achica
+//     se sigue leyendo; una que se congela, no.
+//
+// Lo que NO se toca a propósito: la resolución de la capa principal sigue en
+// 1080p. Bajarla arreglaría el caso de un portátil lento a costa de que a TODOS
+// se les vuelva ilegible una hoja de cálculo o un código, que es lo que el
+// equipo comparte casi siempre. Si hiciera falta, ese es otro cambio y con su
+// propia medición.
+//
+// publishDefaults se COMBINA con esto (LocalParticipant hace
+// `Object.assign({}, publishDefaults, options)`), así que dtx, red y el códec
+// vp8 se heredan igual; acá solo va lo que cambia.
+const PUBLICACION_DE_PANTALLA: TrackPublishOptions = {
+  screenShareSimulcastLayers: [ScreenSharePresets.h360fps3],
+  degradationPreference: "maintain-framerate",
 };
 
 /**
@@ -1796,7 +1843,7 @@ export function useLiveKit() {
         });
         return;
       }
-      await room.localParticipant.setScreenShareEnabled(newState, { audio: newState });
+      await room.localParticipant.setScreenShareEnabled(newState, { audio: newState }, PUBLICACION_DE_PANTALLA);
       setIsScreenSharing(newState);
       debouncedRefresh();
     } catch (err) {
