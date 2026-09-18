@@ -527,6 +527,11 @@ export function useSendMail() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mail-messages", "Enviado"] });
+      // La respuesta que acabás de mandar tiene que aparecer EN SU HILO, no
+      // solo en Enviados: es lo que se ve en Gmail al segundo de darle enviar.
+      // La copia de Enviados la siembra la edge en el mismo envío, así que
+      // acá ya está en la base — solo falta volver a preguntar.
+      qc.invalidateQueries({ queryKey: ["mail-hilo"] });
     },
   });
 }
