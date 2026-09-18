@@ -76,6 +76,7 @@ import {
   useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
 import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
+import { opcionesDePosponer } from "@/lib/posponer";
 import {
   useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
   type EtiquetaDeCorreo,
@@ -295,6 +296,7 @@ export default function CorreoPage() {
     archive: (n) => `${n} ${n === 1 ? "correo archivado" : "correos archivados"}`,
     spam: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"} a Spam`,
     move: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"}`,
+    snooze: (n) => `${n} ${n === 1 ? "correo pospuesto" : "correos pospuestos"}`,
     delete: (n) => carpeta === "Papelera"
       ? `${n} ${n === 1 ? "correo eliminado" : "correos eliminados"} definitivamente`
       : `${n} ${n === 1 ? "correo movido" : "correos movidos"} a la Papelera`,
@@ -324,21 +326,25 @@ export default function CorreoPage() {
     });
   };
 
-  const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[], dest?: string) => {
+  const ejecutarMasiva = (
+    op: OperacionMasiva, items: MailSummary[], dest?: string, volverAt?: string,
+  ) => {
     const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
     if (!elegidos.length) return;
     // Confirmar SIEMPRE que se borra, no solo en Papelera: mover a la
     // Papelera es recuperable, pero un clic accidental en una lista con
     // veinte correos seleccionados no lo parece cuando pasa (pedido de Jhon).
     if (op === "delete") { setConfirmarBorrado(elegidos); return; }
-    lanzarMasiva(op, elegidos, dest);
+    lanzarMasiva(op, elegidos, dest, volverAt);
   };
-  const lanzarMasiva = (op: OperacionMasiva, elegidos: MailSummary[], dest?: string) => {
+  const lanzarMasiva = (
+    op: OperacionMasiva, elegidos: MailSummary[], dest?: string, volverAt?: string,
+  ) => {
     const n = elegidos.length;
     if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
     setSeleccion(new Set());
     masiva.mutate(
-      { folder: carpeta, op, items: elegidos, dest },
+      { folder: carpeta, op, items: elegidos, dest, volverAt },
       {
         onSuccess: (r) => {
           toast.success(NOMBRE_OP[op](n - (r.omitidos ?? 0)), {
@@ -783,7 +789,39 @@ export default function CorreoPage() {
                       <AccionBarra icono={ShieldAlert} etiqueta="Marcar como spam" onClick={() => ejecutarMasiva("spam", items)} disabled={masiva.isPending || carpeta === "Correo no deseado"} />
                       <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? "Eliminar definitivamente" : "Eliminar"} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
-                      <AccionBarra icono={Clock} etiqueta="Posponer" pronto />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            title="Posponer"
+                            disabled={masiva.isPending}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            <Clock className="h-4 w-4" />
+                            <span className="sr-only">Posponer</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56">
+                          {/* Las opciones se calculan al ABRIR el menú, no al
+                              montar la página: con la pestaña abierta desde la
+                              mañana, "esta tarde" ya podría haber pasado. */}
+                          {opcionesDePosponer().map((o) => (
+                            o.cuando && (
+                              <DropdownMenuItem
+                                key={o.clave}
+                                onSelect={() =>
+                                  ejecutarMasiva("snooze", items, undefined, o.cuando!.toISOString())
+                                }
+                              >
+                                <span className="flex-1">{o.rotulo}</span>
+                                <span className="ml-3 text-[10px] tabular-nums text-muted-foreground">
+                                  {format(o.cuando, "d MMM HH:mm", { locale: es })}
+                                </span>
+                              </DropdownMenuItem>
+                            )
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button

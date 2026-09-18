@@ -380,7 +380,8 @@ export function useMarkSeen() {
   });
 }
 
-export type OperacionMasiva = "seen" | "unseen" | "delete" | "archive" | "spam" | "move";
+export type OperacionMasiva =
+  | "seen" | "unseen" | "delete" | "archive" | "spam" | "move" | "snooze";
 
 /** Acciones sobre VARIOS correos de una carpeta (la barra de selección).
  *  Optimista: la lista cambia al instante y se reconcilia con la respuesta.
@@ -390,12 +391,17 @@ export function useMailBulk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
-      { folder, op, items, dest }:
-      { folder: string; op: OperacionMasiva; items: MailSummary[]; dest?: string },
+      { folder, op, items, dest, volverAt }:
+      {
+        folder: string; op: OperacionMasiva; items: MailSummary[];
+        dest?: string;
+        /** Para `snooze`: cuándo tiene que reaparecer, en ISO. */
+        volverAt?: string;
+      },
     ) => {
       const uids = items.map((m) => Number(m.uid)).filter((u) => Number.isInteger(u) && u > 0);
       if (!uids.length) throw new Error("Estos correos no tienen identificador; abre la carpeta de nuevo e inténtalo.");
-      const r = await callMail<{ ok: true; afectados: number }>({ action: "bulk", folder, op, uids, dest });
+      const r = await callMail<{ ok: true; afectados: number }>({ action: "bulk", folder, op, uids, dest, volver_at: volverAt });
       return { ...r, omitidos: items.length - uids.length };
     },
     onMutate: ({ folder, op, items }) => {

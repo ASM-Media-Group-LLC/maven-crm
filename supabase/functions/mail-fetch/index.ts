@@ -383,9 +383,9 @@ Deno.serve(async (req) => {
     // (mail_messages / mail_folders) se ajusta al momento y el sincronizador
     // la termina de cuadrar en su próximo barrido.
     if (action === "bulk") {
-      const { op, uids, dest: destPedido } = body as
-        { op?: string; uids?: unknown; dest?: unknown };
-      const ops = new Set(["seen", "unseen", "delete", "archive", "spam", "move"]);
+      const { op, uids, dest: destPedido, volver_at: volverPedido } = body as
+        { op?: string; uids?: unknown; dest?: unknown; volver_at?: unknown };
+      const ops = new Set(["seen", "unseen", "delete", "archive", "spam", "move", "snooze"]);
       if (!op || !ops.has(op)) return json(req, { error: "op inválida" }, 400);
       const lista = (Array.isArray(uids) ? uids : [])
         .map((u) => Number(u)).filter((u) => Number.isInteger(u) && u > 0).slice(0, 200);
@@ -413,6 +413,23 @@ Deno.serve(async (req) => {
         client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
         const auth = await client.login(cred.email_address as string, password);
         if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        // ── Cuándo vuelve, para "Posponer" ─────────────────────────────
+        // ⚠️ Se valida ANTES de mover. Si se moviera primero y la fecha
+        // resultara basura, el correo quedaría en Snoozed SIN fila que lo
+        // despierte: posponer se habría convertido en esconder para siempre.
+        let volverAt = "";
+        if (op === "snooze") {
+          const t = Date.parse(String(volverPedido ?? ""));
+          if (!Number.isFinite(t)) return json(req, { error: "falta cuándo tiene que volver" }, 400);
+          // Un minuto de piso: posponer "para ya" es no posponer, y el cron
+          // corre cada 5 minutos igual.
+          if (t < Date.now() + 60_000) return json(req, { error: "esa fecha ya pasó" }, 400);
+          // Un año de techo: más allá es casi siempre un error de tipeo, y el
+          // correo se perdería de vista por años.
+          if (t > Date.now() + 365 * 24 * 3600_000) return json(req, { error: "no se puede posponer más de un año" }, 400);
+          volverAt = new Date(t).toISOString();
+        }
+
         // ── El destino de "Mover a" ────────────────────────────────────
         // ⚠️ NO se acepta el nombre tal cual: termina dentro de un comando
         // IMAP. Se compara contra las carpetas REALES de la cuenta y solo se
@@ -443,12 +460,37 @@ Deno.serve(async (req) => {
           ok = await client.deleteUids(lista);
           movidos = true;
         } else {
-          const dest = op === "move" ? destino : DESTINO[op];
+          const dest = op === "move" ? destino : op === "snooze" ? "Snoozed" : DESTINO[op];
           if (dest === box) return json(req, { error: `ya están en ${box}` }, 409);
           ok = await client.moveUids(lista, dest);
           movidos = true;
         }
         if (!ok) return json(req, { error: `IMAP no pudo aplicar "${op}" en ${box}` }, 502);
+
+        // ── Anotar los pospuestos ────────────────────────────────────────
+        // ⚠️ VA ANTES de limpiar la caché: los `message_id` salen justamente de
+        // las filas que el bloque de abajo borra. Al revés, se perderían y no
+        // habría con qué encontrarlos de vuelta en Snoozed.
+        if (op === "snooze") {
+          const { data: filas } = await admin.from("mail_messages")
+            .select("message_id")
+            .eq("user_id", user.id).eq("folder", box).in("uid", lista);
+          const ids = ((filas ?? []) as { message_id: string | null }[])
+            .map((f) => f.message_id).filter(Boolean) as string[];
+          if (ids.length) {
+            await admin.from("mail_snoozed").upsert(
+              ids.map((m) => ({
+                user_id: user.id, message_id: m, folder_origen: box, volver_at: volverAt,
+              })),
+              { onConflict: "user_id,message_id,devuelto_at" },
+            );
+          }
+          // Los que no tienen Message-ID quedan en Snoozed sin despertador. Se
+          // avisa cuántos en vez de dejarlos desaparecer en silencio.
+          if (ids.length < lista.length) {
+            console.warn(`[mail-fetch] snooze: ${lista.length - ids.length} sin message_id`);
+          }
+        }
 
         // Caché al momento (la RLS del usuario no deja borrar filas: va con admin).
         if (movidos) {
