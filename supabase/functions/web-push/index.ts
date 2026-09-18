@@ -223,6 +223,12 @@ async function notificar(req: Request, admin: Admin, b: NotifyBody, vapid: Vapid
       url: `/messenger?c=${msg.conversation_id}&m=${msg.id}`,
       conversationId: msg.conversation_id,
       messageId: msg.id,
+      // A dónde contesta el service worker para decir "me llegó". Va en el
+      // aviso —y no escrito a mano en sw-push.js— porque ese archivo es
+      // estático: se sirve tal cual, sin sustituir variables de entorno, así
+      // que no sabe contra qué proyecto está corriendo. Mandarlo acá lo deja
+      // andando igual en producción y en cualquier otro entorno.
+      ackUrl: `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/push-entregado`,
     });
     const r = await enviarATodas(
       admin,

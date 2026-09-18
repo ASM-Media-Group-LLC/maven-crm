@@ -38,9 +38,48 @@ self.addEventListener("push", function (event) {
     return;
   }
   if (data.title) {
-    event.waitUntil(mostrarAviso(data));
+    // El acuse va en PARALELO al aviso, no después: si hay una ventana de Maven
+    // abierta, `mostrarAviso` sale temprano sin dibujar nada, y aun así el
+    // mensaje LLEGÓ a este dispositivo y hay que decirlo.
+    event.waitUntil(Promise.all([mostrarAviso(data), avisarEntregado(data)]));
   }
 });
+
+// "Le llegó al teléfono" — el ✓ que faltaba.
+//
+// Hasta ahora, a alguien le sonaba el celular y el que mandó seguía viendo
+// "aún no le llegó" hasta que la persona abriera Maven. Le había llegado de
+// verdad y la base no se enteraba.
+//
+// Este service worker NO sabe de quién es el aviso: `web-push` manda el mismo
+// mensaje cifrado a todos los destinatarios. Y tampoco tiene la sesión del
+// usuario, porque un service worker no ve el localStorage donde vive el token.
+//
+// Lo único que sí sabe es su PROPIA suscripción, y esa dirección ya está en la
+// base junto a su dueño. Así que se la manda al servidor y él resuelve quién es.
+// La comprobación de que esa persona pertenece a la conversación la hace la
+// edge `push-entregado`; acá no se decide nada.
+//
+// Si algo falla no se reintenta ni se avisa: es un ✓, no un mensaje. El acuse
+// se vuelve a intentar solo cuando la persona abra Maven.
+function avisarEntregado(data) {
+  if (data.type !== "chat_message" || !data.messageId || !data.ackUrl) {
+    return Promise.resolve();
+  }
+  return self.registration.pushManager
+    .getSubscription()
+    .then(function (sub) {
+      if (!sub || !sub.endpoint) return;
+      return fetch(data.ackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: data.messageId, endpoint: sub.endpoint }),
+      });
+    })
+    .catch(function () {
+      /* sin red o puerta caída: el ✓ se pondrá al abrir Maven */
+    });
+}
 
 function mostrarLlamada(data) {
   var caller = data.caller || "Alguien";

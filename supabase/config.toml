@@ -321,3 +321,11 @@ verify_jwt = false
 # esas visitas son de gente sin cuenta en Maven (candidatos, invitados a Meet).
 [functions.dominio-legacy-hit]
 verify_jwt = false
+
+# El ✓ de "le llegó al teléfono". verify_jwt=false porque quien llama es el
+# service worker, que NO tiene la sesión del usuario (no ve el localStorage).
+# La autorización la da la dirección de suscripción, que es una URL larga y
+# aleatoria del servicio de push, y además se comprueba que esa persona sea
+# participante de la conversación. Solo escribe `delivered_at`, nunca `read_at`.
+[functions.push-entregado]
+verify_jwt = false
