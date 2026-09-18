@@ -236,6 +236,9 @@ export default function AdjuntoVisor({
   return (
     <Dialog open onOpenChange={(v) => !v && onIndice(null)}>
       <DialogContent
+        // El visor pone SU X en el encabezado, junto a Descargar: sin esto
+        // quedan las dos, una encima de la otra.
+        sinCerrar
         // Sin anillo de foco en el contenedor: el diálogo no es un control y el
         // anillo ámbar alrededor del modal entero se lee como un error. Los
         // botones de adentro conservan el suyo.
