@@ -357,6 +357,9 @@ export interface OutgoingAttachment {
   contentType: string;
   /** Contenido en base64 (con o sin saltos: se re-pliega a 76 al armar). */
   contentBase64: string;
+  /** Presente = es una imagen EMBEBIDA en el cuerpo, no un archivo adjunto.
+   *  Viaja con `Content-ID` y el HTML la referencia con `src="cid:…"`. */
+  contentId?: string;
 }
 
 export interface OutgoingMessage {
@@ -540,30 +543,64 @@ export function buildMessage(msg: OutgoingMessage): string {
     return [headers.join("\r\n"), "", cuerpo.cuerpo, ""].join("\r\n");
   }
 
-  // Con adjuntos: multipart/mixed. Primera parte = el cuerpo (que a su vez
-  // puede ser multipart/alternative); después, cada archivo en base64.
+  // ⚠️ DOS CLASES DE ADJUNTO, Y EL ÁRBOL MIME ES DISTINTO PARA CADA UNA.
+  //
+  //   embebidos  — las imágenes PEGADAS en el cuerpo. Van en un
+  //                `multipart/related` JUNTO al HTML que las referencia, y
+  //                llevan `Content-ID`. Sacarlas de ahí y mandarlas como
+  //                adjunto común hace que el correo llegue con un hueco donde
+  //                estaba la imagen.
+  //   archivos   — lo que la persona adjuntó a propósito. `multipart/mixed`.
+  //
+  // El orden importa: related ADENTRO de mixed. Al revés, los clientes no
+  // resuelven el `cid:` porque la imagen no está en el mismo subárbol que el
+  // HTML que la nombra.
+  const embebidos = adjuntos.filter((a) => a.contentId);
+  const archivos = adjuntos.filter((a) => !a.contentId);
+
+  const parteAdjunta = (a: OutgoingAttachment): string[] => [
+    `Content-Type: ${tipoContenidoSeguro(a.contentType)}`,
+    "Content-Transfer-Encoding: base64",
+    a.contentId
+      ? `Content-Disposition: inline; ${dispositionFilename(a.filename)}`
+      : `Content-Disposition: attachment; ${dispositionFilename(a.filename)}`,
+    ...(a.contentId ? [`Content-ID: <${sanitizeHeaderValue(a.contentId)}>`] : []),
+    "",
+    plegarBase64(a.contentBase64),
+    "",
+  ];
+
+  // El cuerpo, ya envuelto con sus imágenes si las hay.
+  let raiz = cuerpo;
+  if (embebidos.length) {
+    const rel = boundary();
+    const dentro = [`--${rel}`, cuerpo.header, "", cuerpo.cuerpo, ""];
+    for (const a of embebidos) dentro.push(`--${rel}`, ...parteAdjunta(a));
+    dentro.push(`--${rel}--`, "");
+    raiz = {
+      header: `Content-Type: multipart/related; type="${cuerpo.header.includes("alternative") ? "multipart/alternative" : "text/html"}"; boundary="${rel}"`,
+      cuerpo: dentro.join("\r\n"),
+    };
+  }
+
+  // Sin archivos adjuntos de verdad, el related (o el cuerpo pelado) es la raíz.
+  if (archivos.length === 0) {
+    headers.push(raiz.header);
+    return [headers.join("\r\n"), "", raiz.cuerpo, ""].join("\r\n");
+  }
+
   const mix = boundary();
   headers.push(`Content-Type: multipart/mixed; boundary="${mix}"`);
   const partes = [
     headers.join("\r\n"),
     "",
     `--${mix}`,
-    cuerpo.header,
+    raiz.header,
     "",
-    cuerpo.cuerpo,
+    raiz.cuerpo,
     "",
   ];
-  for (const a of adjuntos) {
-    partes.push(
-      `--${mix}`,
-      `Content-Type: ${tipoContenidoSeguro(a.contentType)}`,
-      "Content-Transfer-Encoding: base64",
-      `Content-Disposition: attachment; ${dispositionFilename(a.filename)}`,
-      "",
-      plegarBase64(a.contentBase64),
-      "",
-    );
-  }
+  for (const a of archivos) partes.push(`--${mix}`, ...parteAdjunta(a));
   partes.push(`--${mix}--`, "");
   return partes.join("\r\n");
 }

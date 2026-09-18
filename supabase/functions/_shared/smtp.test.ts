@@ -397,3 +397,87 @@ Deno.test("timeoutDelPunto: tiene techo, no espera para siempre", () => {
   // Un adjunto gigante no puede colgar la edge function hasta que la maten.
   assert(timeoutDelPunto(500 * 1024 * 1024) <= 180_000, "sin techo");
 });
+
+// ── Imágenes pegadas en el cuerpo ──────────────────────────────────────────
+// Una captura pegada tiene que viajar como parte MIME con Content-ID adentro
+// de un multipart/related JUNTO al HTML que la nombra. Mandarla como adjunto
+// común hace que el correo llegue con un hueco donde estaba la imagen.
+
+const PNG1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+const base = {
+  from: "jhon@maven-ai.me", to: ["ana@maven-ai.me"], subject: "Hola",
+};
+
+Deno.test("una imagen pegada va en multipart/related con su Content-ID", () => {
+  const rfc = buildMessage({
+    ...base,
+    html: '<p>mirá esto <img src="cid:img1@maven-ai.me"></p>',
+    attachments: [{
+      filename: "imagen-1.png", contentType: "image/png",
+      contentBase64: PNG1x1, contentId: "img1@maven-ai.me",
+    }],
+  });
+  assert(rfc.includes("multipart/related"), "falta el multipart/related");
+  assert(rfc.includes("Content-ID: <img1@maven-ai.me>"), "falta el Content-ID");
+  assert(rfc.includes("Content-Disposition: inline"), "la imagen no va inline");
+  assert(!/Content-Disposition: attachment/.test(rfc), "la imagen NO es un adjunto");
+});
+
+Deno.test("⚠️ el related va ADENTRO del mixed, no al revés", () => {
+  // Al revés, los clientes no resuelven el cid: la imagen no queda en el mismo
+  // subárbol que el HTML que la nombra.
+  const rfc = buildMessage({
+    ...base,
+    html: '<p><img src="cid:img1@maven-ai.me"></p>',
+    attachments: [
+      { filename: "imagen-1.png", contentType: "image/png", contentBase64: PNG1x1, contentId: "img1@maven-ai.me" },
+      { filename: "contrato.pdf", contentType: "application/pdf", contentBase64: PNG1x1 },
+    ],
+  });
+  const mixed = rfc.indexOf("multipart/mixed");
+  const related = rfc.indexOf("multipart/related");
+  assert(mixed > -1 && related > -1, "faltan los dos niveles");
+  assert(mixed < related, "el mixed tiene que estar AFUERA del related");
+});
+
+Deno.test("un archivo adjunto de verdad sigue yendo como attachment", () => {
+  const rfc = buildMessage({
+    ...base,
+    html: "<p>hola</p>",
+    attachments: [{ filename: "contrato.pdf", contentType: "application/pdf", contentBase64: PNG1x1 }],
+  });
+  assert(rfc.includes("Content-Disposition: attachment"), "no va como adjunto");
+  assert(!rfc.includes("multipart/related"), "sin imágenes no hace falta related");
+  assert(!rfc.includes("Content-ID:"), "un adjunto común no lleva Content-ID");
+});
+
+Deno.test("sin adjuntos ni imágenes el mensaje queda como siempre", () => {
+  const rfc = buildMessage({ ...base, html: "<p>hola</p>" });
+  assert(!rfc.includes("multipart/related"), "no debería haber related");
+  assert(!rfc.includes("multipart/mixed"), "no debería haber mixed");
+});
+
+Deno.test("solo imágenes pegadas: related SIN mixed alrededor", () => {
+  // Envolver en un mixed que contiene una sola parte es basura que algunos
+  // clientes dibujan como "1 adjunto" cuando no hay ninguno.
+  const rfc = buildMessage({
+    ...base,
+    html: '<p><img src="cid:img1@maven-ai.me"></p>',
+    attachments: [{ filename: "i.png", contentType: "image/png", contentBase64: PNG1x1, contentId: "img1@maven-ai.me" }],
+  });
+  assert(rfc.includes("multipart/related"), "falta el related");
+  assert(!rfc.includes("multipart/mixed"), "no hace falta el mixed");
+});
+
+Deno.test("⚠️ un Content-ID no puede inyectar cabeceras", () => {
+  const rfc = buildMessage({
+    ...base,
+    html: "<p>x</p>",
+    attachments: [{
+      filename: "i.png", contentType: "image/png", contentBase64: PNG1x1,
+      contentId: "malo@x>\r\nBcc: victima@otra.com",
+    }],
+  });
+  assert(!/^Bcc:/m.test(rfc), "se coló un Bcc por el Content-ID");
+});

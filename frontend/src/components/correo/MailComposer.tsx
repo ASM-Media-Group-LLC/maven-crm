@@ -48,6 +48,9 @@ import { correoDe } from "@/lib/mailAddr";
 import RecipientsField from "./RecipientsField";
 import MencionesEnElCuerpo from "./MencionesEnElCuerpo";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  extraerImagenesEmbebidas, htmlParaBorrador, pesoDeBase64,
+} from "@/lib/mailInline";
 import type { PersonaDelDirectorio } from "@/hooks/useDirectorioCorreo";
 import { useSugerenciasDestinatarios } from "@/hooks/useSugerenciasDestinatarios";
 import {
@@ -60,6 +63,7 @@ import {
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
+import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
@@ -184,6 +188,25 @@ const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *  ninguno de los dos lados sin subir el adjunto a Storage y leerlo de a
  *  pedazos, que es otro trabajo. */
 export const TOPE_ADJUNTOS = 20 * 1024 * 1024;
+
+/** Los tipos de imagen que se pueden pegar. Corta a propósito: la misma lista
+ *  que reconoce `extraerImagenesEmbebidas` al enviar. Si acá entrara un tipo
+ *  que allá no se traduce a `cid:`, la imagen viajaría como `data:` y llegaría
+ *  rota en Outlook y en varios filtros. */
+const TIPOS_PEGABLES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+/** Lo que queda en el borrador donde estaba una imagen pegada. */
+const MARCA_IMAGEN_PERDIDA = "[imagen pegada — se perdió al recuperar el borrador]";
+
+/** Lee un archivo a `data:<tipo>;base64,…`, que es lo que come el editor. */
+function leerDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = () => reject(new Error("no se pudo leer el archivo"));
+    fr.readAsDataURL(file);
+  });
+}
 
 /** Lee un archivo a base64 SIN el prefijo `data:<tipo>;base64,`. */
 function leerBase64(file: File): Promise<string> {
@@ -633,6 +656,54 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     }
   };
 
+  // El editor todavía no existe cuando se arman los manejadores de pegado, así
+  // que lo leen de una ref. Se llena justo después de `useEditor`.
+  const editorRef = useRef<Editor | null>(null);
+
+  /** Cuánto pesan las imágenes YA pegadas en el cuerpo. Cuentan contra el
+   *  mismo tope que los adjuntos: en el correo ocupan lo mismo. */
+  const pesoDelCuerpo = (): number => {
+    const html = editorRef.current?.getHTML() ?? "";
+    return extraerImagenesEmbebidas(html).imagenes
+      .reduce((n, i) => n + pesoDeBase64(i.contentBase64), 0);
+  };
+
+  /** Mete en el cuerpo las imágenes que vengan en un pegado o un arrastre.
+   *
+   *  Devuelve `true` si se ocupó de ellas —así ProseMirror no pega ADEMÁS el
+   *  texto o la ruta del archivo— y `false` si no había ninguna, para que el
+   *  pegado normal siga funcionando.
+   *
+   *  ⚠️ Se inserta de a una y en orden con `await`: `insertContent` en paralelo
+   *  las mete donde esté el cursor en ese instante, que con varias imágenes
+   *  las deja mezcladas al azar. */
+  const pegarImagenes = (datos: DataTransfer | null): boolean => {
+    const imagenes = Array.from(datos?.files ?? []).filter((f) => TIPOS_PEGABLES.has(f.type));
+    if (!imagenes.length) return false;
+
+    void (async () => {
+      const yaHay = adjuntos.reduce((n, a) => n + a.sizeBytes, 0) + pesoDelCuerpo();
+      let acumulado = yaHay;
+      for (const f of imagenes) {
+        // El mismo tope que los adjuntos: una captura pegada ocupa en el
+        // correo lo mismo que una adjuntada, y dejarla fuera del conteo sería
+        // una puerta para pasarse del límite sin darse cuenta.
+        if (acumulado + f.size > TOPE_ADJUNTOS) {
+          toast.error("Con esa imagen el correo pasa los 20 MB.");
+          break;
+        }
+        acumulado += f.size;
+        try {
+          const dataUrl = await leerDataUrl(f);
+          editorRef.current?.chain().focus().setImage({ src: dataUrl }).run();
+        } catch {
+          toast.error(`No se pudo leer ${f.name || "la imagen"}.`);
+        }
+      }
+    })();
+    return true;
+  };
+
   // La cita del correo original entra AL editor como blockquote editable:
   // igual que Gmail, se puede recortar o borrar antes de mandar.
   const contenidoInicial = useMemo(() => {
@@ -676,10 +747,26 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       Color,
       FontSize,
       Placeholder.configure({ placeholder: "Escribe tu mensaje…" }),
+      // `allowBase64`: al pegar, la imagen entra como `data:` y recién al
+      // ENVIAR se convierte en una parte MIME con `cid:`. Sin esto el editor
+      // descarta el src y la imagen pegada desaparece sin decir nada.
+      Image.configure({ allowBase64: true, inline: false }),
     ],
     content: recuperado?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
     autofocus: inicial?.citar ? "start" : false,
     editorProps: {
+      // ── Pegar y soltar imágenes ──────────────────────────────────────────
+      // Lo pidió Jhon: «si copio una imagen, no puedo pegarla directamente».
+      // Una captura pegada es lo más rápido que hay para mostrar algo, y hasta
+      // ahora había que guardarla en el disco y adjuntarla.
+      handlePaste: (_vista, evento) => pegarImagenes(evento.clipboardData),
+      handleDrop: (_vista, evento) => {
+        const dt = (evento as DragEvent).dataTransfer;
+        // Solo se intercepta si trae ARCHIVOS: arrastrar texto dentro del
+        // editor tiene que seguir funcionando como siempre.
+        if (!dt?.files?.length) return false;
+        return pegarImagenes(dt);
+      },
       attributes: {
         // `break-words`: sin esto un texto largo sin espacios (una URL, un id) no
         // tiene dónde partirse y el editor se sale de la hoja. Mismo bug que tenía
@@ -758,6 +845,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     // Editor vacío = "<p></p>", que no es el "" de un correo nuevo sin cita.
     (base.html === "" ? !cuerpoVacio : (editor?.getHTML() ?? "") !== base.html);
 
+  // Los manejadores de pegado leen el editor de acá (se arman antes que él).
+  editorRef.current = editor;
+
   // Guardado con el contenido actual. En un ref para que el autosave y el
   // `beforeunload` siempre vean el estado más nuevo sin re-registrarse.
   const guardarRef = useRef(() => {});
@@ -769,7 +859,11 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       cc,
       bcc,
       subject,
-      html: editor.getHTML(),
+      // ⚠️ SIN las imágenes pegadas: una captura son megas de base64 y el cupo
+      // de localStorage ronda los 5 MB. Guardarlas revienta la cuota y el
+      // autoguardado deja de funcionar EN SILENCIO (está en try/catch): se
+      // perdería el TEXTO del correo por querer guardar una foto.
+      html: htmlParaBorrador(editor.getHTML(), MARCA_IMAGEN_PERDIDA),
       inReplyTo: inicial?.inReplyTo,
       references: inicial?.references,
       ts: Date.now(),
@@ -806,20 +900,31 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const handleEnviar = async () => {
     if (!editor) return;
     try {
+      // ⚠️ Las imágenes PEGADAS salen del cuerpo y se vuelven partes MIME con
+      // `cid:`. Mandarlas como `data:` adentro del HTML funciona en Gmail y en
+      // poco más: Outlook, varios clientes de escritorio y algunos filtros
+      // antispam las descartan, y el correo llega con un hueco.
+      const conCid = extraerImagenesEmbebidas(htmlParaCorreo(editor.getHTML()));
+
       await enviar.mutateAsync({
         to: destinatarios,
         cc: copias,
         bcc: ocultas,
         subject: subject.trim() || "(sin asunto)",
-        html: htmlParaCorreo(editor.getHTML()),
+        html: conCid.html,
+        // El texto alternativo sale del HTML ORIGINAL: da igual, las imágenes
+        // no aportan texto, pero así no depende del orden de los reemplazos.
         text: textoParaCorreo(editor.getHTML()),
         in_reply_to: inicial?.inReplyTo,
         references: inicial?.references,
-        attachments: adjuntos.map(({ filename, contentType, contentBase64 }) => ({
-          filename,
-          contentType,
-          contentBase64,
-        })),
+        attachments: [
+          ...adjuntos.map(({ filename, contentType, contentBase64 }) => ({
+            filename,
+            contentType,
+            contentBase64,
+          })),
+          ...conCid.imagenes,
+        ],
         // Solo los que SIGUEN en el correo: si alguien se mencionó y después se
         // borró su dirección a mano del campo Para, no corresponde avisarle.
         menciones: mencionados
