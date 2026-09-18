@@ -1475,11 +1475,16 @@ export function useMessages(
         toast.info("Espera a que el mensaje termine de enviarse");
         return;
       }
-      // Optimistic update
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
+      // La caja de edición es texto plano, así que el texto rico (negritas,
+      // enlaces, menciones con pastilla) se VACÍA: la burbuja pinta
+      // content_rich cuando existe, y dejarlo hacía que el texto nuevo se
+      // guardara pero en pantalla siguiera el viejo (Jhon, 18/09: "al editar y
+      // darle guardar, no se guarda"). Los 20 editados así se repararon en la
+      // migración ediciones_dejan_el_rico_viejo.
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true, content_rich: null } : m));
       const { error } = await supabase
         .from("chat_messages")
-        .update({ content: newContent, is_edited: true })
+        .update({ content: newContent, is_edited: true, content_rich: null })
         .eq("id", messageId);
       if (error) {
         toast.error("Error al editar mensaje");
