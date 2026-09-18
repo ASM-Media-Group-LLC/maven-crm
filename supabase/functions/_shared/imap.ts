@@ -79,6 +79,22 @@ export interface ImapResult {
   error?: string;
 }
 
+/** Encierra un texto como "quoted string" de IMAP, o devuelve null si no se
+ *  puede.
+ *
+ *  ⚠️ EXISTE PARA UN CASO CONCRETO: buscar un correo por su `Message-ID`. Ese
+ *  valor lo escribió QUIEN MANDÓ EL CORREO —no nosotros— y termina adentro de
+ *  un `UID SEARCH`. Un CR o un LF ahí cierra la línea del comando y lo que
+ *  siga se ejecuta como un comando IMAP propio.
+ *
+ *  Un quoted string de IMAP no admite CR ni LF de ninguna forma (para eso
+ *  están los literales `{n}`), así que si aparecen se devuelve null y el
+ *  llamador NO busca, en vez de improvisar. */
+export function cadenaImap(valor: string): string | null {
+  if (/[\r\n\x00]/.test(valor)) return null;
+  return `"${valor.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 export class ImapClient {
   private conn: Deno.TlsConn;
   /** Lo leído del socket que todavía no se consumió. IMAP no garantiza que

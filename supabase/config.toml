@@ -291,6 +291,9 @@ verify_jwt = false  # auth propia: Bearer del admin + chequeo de rol adentro
 [functions.mail-connect]
 verify_jwt = false  # auth propia: Bearer del usuario + state firmado (HMAC) en el callback
 
+[functions.mail-despertador]
+verify_jwt = false  # entra el cron con X-Cron-Token, no con sesion de Maven
+
 [functions.mail-fetch]
 verify_jwt = false  # auth propia: Bearer del usuario + resuelve su conexión adentro
 
