@@ -1165,6 +1165,17 @@ Deno.serve(async (req) => {
                   })),
                   unread: false,
                   message_id: messageId,
+                  // ⚠️ LAS CABECERAS DEL HILO TAMBIÉN, por lo mismo que el
+                  // cuerpo: sin ellas la fila queda sembrada pero suelta, y
+                  // la respuesta que acabás de mandar se ve como un correo
+                  // aparte al lado de su conversación hasta que el barrido
+                  // completo pase por Enviados. Enviados no está en
+                  // HOT_FOLDERS: son hasta 30 minutos, cada vez.
+                  in_reply_to: in_reply_to ?? null,
+                  // La misma forma que guarda el sync: un arreglo de ids con
+                  // sus picos. La cabecera viaja como UNA línea separada por
+                  // espacios, así que acá se parte.
+                  refs: references?.match(/<[^>]+>/g) ?? null,
                 }, { onConflict: "user_id,folder,uidvalidity,uid" });
               }
             }

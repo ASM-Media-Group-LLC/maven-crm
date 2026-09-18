@@ -12,11 +12,19 @@
 /** Lo mínimo que hace falta de un correo para encadenarlo. */
 export interface CorreoEncadenable {
   messageId?: string | null;
+  // ⚠️ `inReplyTo` y `refs` son OBLIGATORIAS aunque su valor pueda venir
+  // vacío, y se llaman igual que en `MailSummary` a propósito. Estuvieron
+  // opcionales y con otro nombre (`references`), y el resultado fue que
+  // `MailSummary` —que trae `refs`— encajaba igual en esta forma, con
+  // `references` siempre `undefined`: el encadenado por cabeceras quedó
+  // MUERTO sin un solo error de tipos. Siendo obligatorias, quien arme un
+  // correo encadenable tiene que decidir qué pone; el olvido es un error de
+  // compilación y no un hilo que no agrupa.
   /** `In-Reply-To`. Puede faltar: los correos anteriores al 18/09/2026 no lo
    *  tienen guardado. */
-  inReplyTo?: string | null;
+  inReplyTo: string | null | undefined;
   /** `References`, del más viejo al más nuevo. Ídem. */
-  references?: string[] | null;
+  refs: string[] | null | undefined;
   subject: string;
   from: string;
   to?: string;
@@ -126,22 +134,33 @@ export function agruparEnHilos<T extends CorreoEncadenable>(correos: T[]): Hilo<
   correos.forEach((c, i) => {
     if (c.messageId) porMessageId.set(c.messageId, i);
   });
+  // ⚠️ Se anota quién quedó ENGANCHADO de verdad, no quién traía cabeceras.
+  // La diferencia importa: una respuesta que cuelga de un correo que está en
+  // OTRA carpeta (lo normal — respondés desde Maven y la contrarespuesta llega
+  // a Recibidos apuntando a lo que quedó en Enviados) trae cabeceras que acá
+  // no resuelven contra nada. Tratándola como "ya encadenada" se la dejaba
+  // afuera del paso por asunto, y terminaba sola: ni por cabecera ni por
+  // asunto. Es exactamente lo que se veía con «Test» / «Re: Test».
+  const enganchado = new Set<number>();
   correos.forEach((c, i) => {
-    const enlaces = [c.inReplyTo, ...(c.references ?? [])].filter(Boolean) as string[];
+    const enlaces = [c.inReplyTo, ...(c.refs ?? [])].filter(Boolean) as string[];
     for (const ref of enlaces) {
       const j = porMessageId.get(ref);
-      if (j !== undefined) u.unir(i, j);
+      if (j !== undefined && j !== i) {
+        u.unir(i, j);
+        enganchado.add(i);
+        enganchado.add(j);
+      }
     }
   });
 
   // ── 2. Por asunto, solo para los huérfanos ────────────────────────────
-  // "Huérfano" = no trae cabeceras. Un correo que SÍ las trae ya quedó donde
-  // corresponde, y unirlo además por asunto solo podría meterlo en un hilo
-  // ajeno que casualmente se llama igual.
-  const sinCabeceras = (c: T) => !c.inReplyTo && !(c.references ?? []).length;
+  // "Huérfano" = el paso 1 no lo pudo enganchar con NADIE de los cargados. Un
+  // correo que ya quedó en su hilo por cabecera no se toca: unirlo además por
+  // asunto solo podría meterlo en un hilo ajeno que se llama igual.
   const porAsunto = new Map<string, number[]>();
   correos.forEach((c, i) => {
-    if (!sinCabeceras(c)) return;
+    if (enganchado.has(i)) return;
     const norm = asuntoNormalizado(c.subject);
     if (asuntoDemasiadoPobre(norm)) return;
     const ya = porAsunto.get(norm);
