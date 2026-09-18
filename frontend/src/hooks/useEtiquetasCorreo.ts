@@ -122,3 +122,95 @@ export function useEtiquetarCorreos() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-message-labels"] }),
   });
 }
+
+/** Los correos que tienen una etiqueta, de CUALQUIER carpeta.
+ *
+ *  ⚠️ Una etiqueta no es una carpeta: cruza todas. Un correo etiquetado
+ *  "Pagos" y después archivado sigue estando en "Pagos" — si esto filtrara por
+ *  carpeta, desaparecería de su etiqueta al archivarlo, que es justo lo que
+ *  uno NO espera de una etiqueta.
+ *
+ *  Va en dos consultas y no en un join: PostgREST puede anidar, pero la
+ *  relación es por `message_id` (texto) y no por una FK, así que no hay
+ *  relación declarada que seguir. */
+export function useCorreosDeEtiqueta(labelId: string | null) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["mail-por-etiqueta", labelId, user?.id],
+    enabled: !!labelId && !!user,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: rel, error: e1 } = await tabla("mail_message_labels")
+        .select("message_id").eq("label_id", labelId!).limit(500);
+      if (e1) throw e1;
+      const ids = ((rel ?? []) as unknown as { message_id: string }[])
+        .map((r) => r.message_id);
+      if (!ids.length) return [];
+
+      const { data, error } = await supabase
+        .from("mail_messages" as never)
+        .select("id, uid, folder, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id")
+        .in("message_id", ids)
+        .order("date", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      // El mismo correo está en la caché de cada buzón que lo recibió; y si
+      // alguien tiene una copia en dos carpetas, aparecería dos veces. Se
+      // deja UNA por message_id, la más nueva.
+      const vistos = new Set<string>();
+      return ((data ?? []) as unknown as Record<string, unknown>[]).filter((m) => {
+        const k = String(m.message_id ?? m.id);
+        if (vistos.has(k)) return false;
+        vistos.add(k);
+        return true;
+      });
+    },
+  });
+}
+
+/** Cuántos SIN LEER tiene cada etiqueta, para el número de la columna.
+ *
+ *  Va en una consulta aparte y no pegado a `useEtiquetas` porque cambia mucho
+ *  más seguido: las etiquetas casi nunca, los no leídos con cada correo que
+ *  llega. Juntarlas obligaría a re-traer la lista de etiquetas todo el tiempo. */
+export function useNoLeidosPorEtiqueta() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["mail-labels-unread", user?.id],
+    enabled: !!user,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data: rel, error } = await tabla("mail_message_labels")
+        .select("label_id, message_id").limit(5000);
+      if (error) throw error;
+      const filas = (rel ?? []) as unknown as { label_id: string; message_id: string }[];
+      if (!filas.length) return new Map();
+
+      // Qué message_id están sin leer. Se pregunta por los etiquetados y no por
+      // todos: la bandeja tiene miles y las etiquetas, decenas.
+      const ids = [...new Set(filas.map((f) => f.message_id))];
+      const { data: sinLeer } = await supabase
+        .from("mail_messages" as never)
+        .select("message_id")
+        .in("message_id", ids)
+        .eq("unread", true)
+        .limit(5000);
+      const noLeidos = new Set(
+        ((sinLeer ?? []) as unknown as { message_id: string }[]).map((m) => m.message_id),
+      );
+
+      const cuenta = new Map<string, number>();
+      // ⚠️ Por message_id ÚNICO y no por fila: el mismo correo está en la
+      // caché de cada buzón que lo recibió, y contar filas lo contaría dos
+      // veces.
+      const yaContado = new Set<string>();
+      for (const f of filas) {
+        const clave = `${f.label_id}|${f.message_id}`;
+        if (yaContado.has(clave) || !noLeidos.has(f.message_id)) continue;
+        yaContado.add(clave);
+        cuenta.set(f.label_id, (cuenta.get(f.label_id) ?? 0) + 1);
+      }
+      return cuenta;
+    },
+  });
+}
