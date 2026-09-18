@@ -88,7 +88,9 @@ export const TAB_STAGE_MAP: Record<string, string[]> = {
 // Agencias / Ventas). Cada opción se traduce a un filtro sobre los LEADS
 // (closer_creators) y, cuando corresponde, sobre el DIRECTORIO (closers_contacts).
 export const ORIGIN_FILTERS: { value: string; label: string }[] = [
-  { value: "modelos", label: "Modelos (Kash)" },
+  // "target" = las modelos que BUSCAMOS reclutar (prospectos), no creadoras
+  // activas de la agencia. El value "modelos" es la llave interna, no se toca.
+  { value: "modelos", label: "Modelos target" },
   { value: "ex_creadora", label: "Ex-creadoras" },
   { value: "agencia", label: "Agencias" },
   { value: "venta_plataforma", label: "Ventas de plataforma" },
