@@ -22,13 +22,10 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
-import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { PageHeader } from "@/components/ui/page-header";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
-import ContactosKPICards, { type ContactKpiKey } from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosCardList from "./ContactosCardList";
-import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 
 import { SALES_CHANNEL_NONE, SALES_CHANNEL_MULTI } from "./ContactosFilters";
 import { useContactSalesChannels } from "./useContactSalesChannels";
@@ -99,23 +96,20 @@ const normalizeHandleKey = (value: string | null | undefined) =>
 // Persistimos tab + filtros + página en sessionStorage para que al ir a WhatsApp
 // (o a cualquier lado) y VOLVER, el directorio quede exactamente como estaba.
 const VIEWSTATE_KEY = "contactos.viewstate";
-const loadViewState = (): { activeTab?: "dashboard" | "contactos"; filters?: ContactoFilters; page?: number } => {
+const loadViewState = (): { filters?: ContactoFilters; page?: number } => {
   try { return JSON.parse(sessionStorage.getItem(VIEWSTATE_KEY) || "{}") || {}; } catch { return {}; }
 };
 
 const ContactosContent = () => {
   const restored = loadViewState();
-  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">(restored.activeTab ?? "dashboard");
   const [filters, setFilters] = useState<ContactoFilters>(restored.filters ?? emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
-  const [kpiPopup, setKpiPopup] = useState<ContactKpiKey | null>(null);
   // Estado del collapsed por categoría — mismo patrón que panel/
   // dashboard v2: default top expandida, resto colapsadas.
   // null = sin tocar (aplica default: solo la 1ª categoría abierta). Un Set (aunque
   // vacío) = el usuario ya interactuó → respetar su elección. OJO: usar "size===0"
   // como sentinel rompía expandir la última categoría colapsada (al vaciarse el set
   // volvía al default y la re-colapsaba).
-  const [kpiPopupCollapsed, setKpiPopupCollapsed] = useState<Set<string> | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -149,8 +143,8 @@ const ContactosContent = () => {
 
   // Guardar el estado de la vista para restaurarlo al volver (p.ej. desde WhatsApp).
   useEffect(() => {
-    sessionStorage.setItem(VIEWSTATE_KEY, JSON.stringify({ activeTab, filters, page }));
-  }, [activeTab, filters, page]);
+    sessionStorage.setItem(VIEWSTATE_KEY, JSON.stringify({ filters, page }));
+  }, [filters, page]);
 
   // Deep-link desde el ⌘K: /contactos?q=<handle|nombre> abre el directorio con
   // la búsqueda precargada (pisa filtros restaurados) y limpia el parámetro.
@@ -158,7 +152,6 @@ const ContactosContent = () => {
   useEffect(() => {
     const q = searchParams.get("q");
     if (q === null) return;
-    setActiveTab("contactos");
     setFilters({ ...emptyFilters, search: q });
     setPage(1);
     searchParams.delete("q");
@@ -170,7 +163,7 @@ const ContactosContent = () => {
   // Estado de cada contacto (creadora activa / ex-creadora / en proceso) para el color de fila.
   const contactStatuses = useContactStatuses();
   // Backbone del dashboard: embudo + churn server-side, acotado por el calendario global.
-  const { stats: funnelStats, isError: funnelError, refetch: refetchFunnel } = useContactFunnelStats(filters.dateFrom, filters.dateTo);
+  const { stats: funnelStats } = useContactFunnelStats(filters.dateFrom, filters.dateTo);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -336,34 +329,6 @@ const ContactosContent = () => {
   const totalCount = queryResult?.total ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Lista de contactos para el popup de KPI — query lazy: solo dispara cuando el
-  // usuario abre uno de los cards. Server-side vía get_contact_funnel_list: misma
-  // clasificación lifecycle que los conteos → la lista coincide EXACTO. Limitado a
-  // 100 filas (display); los conteos del card siguen siendo globales/server-side.
-  // El bucket "conversion" reusa el mismo set que "creadoras" (es el numerador).
-  const { data: kpiPopupContacts = [], isLoading: kpiPopupLoading } = useQuery({
-    queryKey: ["contact_funnel_list", kpiPopup, filters.dateFrom, filters.dateTo],
-    enabled: kpiPopup !== null,
-    queryFn: async () => {
-      const bucket = kpiPopup === "conversion" ? "creator_active"
-        : kpiPopup === "creadoras" ? "creator_active"
-        : kpiPopup === "proceso" ? "in_progress"
-        : kpiPopup === "sinTocar" ? "none"
-        : kpiPopup === "churn" ? "churn"
-        : "pipeline";
-      const { data, error } = await (supabase as any).rpc("get_contact_funnel_list", {
-        p_bucket: bucket,
-        p_from: filters.dateFrom || null,
-        p_to: filters.dateTo || null,
-      });
-      if (error) {
-        if (error.code === "42501") return [];
-        throw error;
-      }
-      return (data ?? []) as any[];
-    },
-  });
-
   // Resolve created_by UUIDs to profile names
   const creatorIds = useMemo(() => {
     const ids = new Set<string>();
@@ -514,10 +479,20 @@ const ContactosContent = () => {
           }
           actions={
             <>
-              {/* La analítica vive ahora FUSIONADA en el subtab Dashboard (no más
-                  botón + popup). Auditoría queda como acceso discreto dentro del Dashboard.
-                  El "calendario de movimiento" (rango de fechas) es GLOBAL: aplica a
-                  todos los subtabs y también acota la analítica del Dashboard. */}
+              {/* Auditoría vivía dentro del Dashboard, que se eliminó: sin este botón
+                  el log de cambios de categoría se quedaba sin ninguna puerta. */}
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-warning hover:text-warning"
+                  onClick={() => setAuditOpen(true)}
+                >
+                  <ShieldAlert className="mr-2 h-4 w-4" />
+                  Auditoría
+                </Button>
+              )}
+              {/* El "calendario de movimiento" (rango de fechas) acota el listado. */}
               <DateRangePicker
                 from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
                 to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
@@ -541,99 +516,6 @@ const ContactosContent = () => {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-        <SubtabNav className="shrink-0">
-          <SubtabNavItem active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")}>
-            <LayoutDashboard className="mr-1.5 h-4 w-4" />
-            Dashboard
-          </SubtabNavItem>
-          <SubtabNavItem active={activeTab === "contactos"} onClick={() => setActiveTab("contactos")}>
-            <Users className="mr-1.5 h-4 w-4" />
-            Contactos
-          </SubtabNavItem>
-        </SubtabNav>
-
-        {activeTab === "dashboard" && (
-          <div className="space-y-5 overflow-auto px-6 py-5">
-            {funnelError ? (
-              <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
-                <span>No se pudieron cargar las métricas del embudo — los contadores pueden verse en 0.</span>
-                <Button variant="outline" size="sm" onClick={() => void refetchFunnel()}>
-                  Reintentar
-                </Button>
-              </div>
-            ) : null}
-            <ContactosKPICards
-              stats={funnelStats}
-              onClick={(key) => setKpiPopup(key)}
-            />
-            {/* Card "por canal de venta" → admin+manager. La analítica completa
-                (tendencias) + Auditoría siguen siendo SOLO admin (anidado abajo). */}
-            {canSeeChannels && (
-              <div className="space-y-3">
-                <Card>
-                  <CardContent className="pt-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-sm font-semibold">Contactos por canal de venta</h2>
-                      <span className="text-xs text-muted-foreground">
-                        Alcance multi-canal: <span className="font-semibold tabular-nums text-foreground">{salesChannels.multiChannelCount}</span>
-                      </span>
-                    </div>
-                    {salesChannels.isLoading ? (
-                      <p className="text-sm text-muted-foreground">Cargando…</p>
-                    ) : salesChannels.countsByChannel.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sin datos de canales.</p>
-                    ) : (() => {
-                      const maxCount = Math.max(1, ...salesChannels.countsByChannel.map((c) => c.count));
-                      return (
-                        <div className="space-y-2">
-                          {salesChannels.countsByChannel.map((c) => (
-                            <div key={c.id} className="flex items-center gap-3">
-                              <span className="w-40 shrink-0 text-xs font-medium truncate">{c.label}</span>
-                              <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-primary"
-                                  style={{ width: `${(c.count / maxCount) * 100}%` }}
-                                />
-                              </div>
-                              <span className="w-8 shrink-0 text-right text-xs font-semibold tabular-nums">{c.count}</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-                {isAdmin && (
-                  <>
-                <div className="flex items-center justify-between border-t pt-4">
-                  <h2 className="text-sm font-semibold text-muted-foreground">Analítica del directorio</h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-warning hover:text-warning"
-                    onClick={() => setAuditOpen(true)}
-                  >
-                    <ShieldAlert className="mr-2 h-4 w-4" />
-                    Auditoría
-                  </Button>
-                </div>
-                <ContactosAnalyticsModal
-                  inline
-                  enabled={activeTab === "dashboard"}
-                  defaultTab="monthly"
-                  dateFrom={filters.dateFrom}
-                  dateTo={filters.dateTo}
-                  open={false}
-                  onOpenChange={() => {}}
-                />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "contactos" && (
           <>
             <div className="shrink-0">
               <ContactosFilters
@@ -674,7 +556,6 @@ const ContactosContent = () => {
               </DataTableShell>
             )}
           </>
-        )}
       </div>
 
       <ContactoDetailDialog
@@ -707,202 +588,13 @@ const ContactosContent = () => {
         />
       )}
 
-      {/* Auditoría — dialog liviano con SOLO el log de cambios de categoría
-          (antes abría la analítica completa como popup, redundante con el Dashboard inline). */}
+      {/* Auditoría — dialog liviano con SOLO el log de cambios de categoría. */}
       <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Auditoría de cambios</DialogTitle>
           </DialogHeader>
           <CategoryAuditLog open={auditOpen} />
-        </DialogContent>
-      </Dialog>
-
-      {/* KPI POPUP — al clickar un cuadro del Dashboard de Contactos */}
-      <Dialog
-        open={kpiPopup !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setKpiPopup(null);
-            setKpiPopupCollapsed(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {kpiPopup === "pipeline" && `Pipeline vivo (${funnelStats.pipelineVivo.toLocaleString("es")})`}
-              {kpiPopup === "creadoras" && `Creadoras vía pipeline (${funnelStats.creadoras})`}
-              {kpiPopup === "conversion" && `Convirtieron a creadora (${funnelStats.creadoras})`}
-              {kpiPopup === "proceso" && `En proceso (${funnelStats.enProceso})`}
-              {kpiPopup === "sinTocar" && `Sin tocar · pool vivo (${funnelStats.sinTocar})`}
-              {kpiPopup === "churn" && `Se están yendo (${funnelStats.churnLeaving + funnelStats.churnTerminated})`}
-            </DialogTitle>
-            <p className="text-xs text-muted-foreground">
-              {kpiPopup === "pipeline" && "Contactos trabajables (sin el import histórico de Kash) · 100 más recientes"}
-              {kpiPopup === "creadoras" && "Llegaron a creadora desde el pipeline · 100 más recientes"}
-              {kpiPopup === "conversion" && "El numerador de la tasa: contactos que se volvieron creadora · 100 más recientes"}
-              {kpiPopup === "proceso" && "Con closer asignado o ya contactados · 100 más recientes"}
-              {kpiPopup === "sinTocar" && "Pool vivo para repartir (sin tocar todavía) · 100 más recientes"}
-              {kpiPopup === "churn" && "Creadoras saliendo o dadas de baja · agrupadas por estado"}
-            </p>
-          </DialogHeader>
-
-          {kpiPopupLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-sm text-muted-foreground">Cargando…</p>
-            </div>
-          ) : kpiPopupContacts.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-              Sin contactos.
-            </div>
-          ) : (() => {
-            // Agrupar por categoría (physical_appearance). Normalizamos
-            // a uppercase para mergear "b" y "B" en el mismo bucket.
-            // Los valores raw lowercase del DB se preservan al
-            // mostrarlos individualmente pero el agrupado usa la forma
-            // canónica.
-            const normalizeCat = (raw: string | null | undefined): string => {
-              const t = (raw ?? "").trim();
-              if (!t) return "Sin categoría";
-              // Mapeo: "b" → "B", "b+" → "B+", etc.
-              const lower = t.toLowerCase();
-              const map: Record<string, string> = {
-                "elite": "Elite",
-                "a+": "A+", "a": "A",
-                "b+": "B+", "b": "B",
-                "c+": "C+", "c": "C",
-              };
-              return map[lower] ?? t;
-            };
-            const buckets = new Map<string, typeof kpiPopupContacts>();
-            for (const c of kpiPopupContacts) {
-              const key = normalizeCat(c.physical_appearance);
-              const arr = buckets.get(key) ?? [];
-              arr.push(c);
-              buckets.set(key, arr);
-            }
-            const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
-              const sa = CATEGORY_ORDER[a] ?? 999;
-              const sb = CATEGORY_ORDER[b] ?? 999;
-              if (sa !== sb) return sa - sb;
-              return a.localeCompare(b);
-            });
-            const effectiveCollapsed = kpiPopupCollapsed === null
-              ? new Set(sortedCats.slice(1))
-              : kpiPopupCollapsed;
-            const toggleCat = (cat: string) => {
-              const base = kpiPopupCollapsed === null
-                ? new Set(sortedCats.slice(1))
-                : new Set(kpiPopupCollapsed);
-              if (base.has(cat)) base.delete(cat);
-              else base.add(cat);
-              setKpiPopupCollapsed(base);
-            };
-            const renderContactRow = (c: typeof kpiPopupContacts[number]) => {
-              const cleanHandle = (c.handle || "").replace(/^@/, "");
-              const created = c.created_at
-                ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
-                : "—";
-              return (
-                <ListRowButton
-                  key={c.id}
-                  onClick={() => {
-                    const fullContacto = allContactos.find((x) => x.id === c.id);
-                    if (fullContacto) {
-                      setKpiPopup(null);
-                      setKpiPopupCollapsed(null);
-                      handleView(fullContacto);
-                    } else {
-                      const minimal: Contacto = {
-                        id: c.id,
-                        rawCreatedAt: c.created_at || "",
-                        creacion: created,
-                        ticket: "",
-                        nombre: c.name || "",
-                        estado: statusMap[c.status || ""] || c.status || "",
-                        instagram: c.handle || "",
-                        platform: "Instagram",
-                        pais: c.country_code || "",
-                        city: c.city || "",
-                        categoria: c.physical_appearance || "",
-                        whatsapp: "",
-                        interacciones: 0,
-                        creadoPor: "",
-                        email: "",
-                        phone: "",
-                        country_code: c.country_code || "",
-                        company: "",
-                        notes: "",
-                        source: "",
-                        profile_picture_url: c.profile_picture_url || "",
-                        assigned_to: "",
-                        onlyfans_url: "",
-                      };
-                      setKpiPopup(null);
-                      setKpiPopupCollapsed(null);
-                      handleView(minimal);
-                    }
-                  }}
-                  className="group"
-                >
-                  <UserAvatar
-                    name={c.name}
-                    src={c.profile_picture_url}
-                    size="sm"
-                    className="h-8 w-8 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      {c.country_code && <span className="text-xs shrink-0">{getCountryFlag(c.country_code)}</span>}
-                      <p className="font-medium text-sm truncate">{c.name || "—"}</p>
-                    </div>
-                    {cleanHandle && (
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <InstagramIcon className="h-2.5 w-2.5" />
-                        @{cleanHandle}
-                      </p>
-                    )}
-                  </div>
-                  <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
-                    <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
-                      {c.city || "—"}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {c.country_code ? getCountryShortDisplay(c.country_code) : "—"}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
-                      {created}
-                    </span>
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                </ListRowButton>
-              );
-            };
-            return (
-              <div className="space-y-3">
-                {sortedCats.map((cat) => {
-                  const rows = buckets.get(cat)!;
-                  const isCollapsed = effectiveCollapsed.has(cat);
-                  return (
-                    <div key={cat} className="space-y-2">
-                      <CategorySectionHeader
-                        cat={cat}
-                        count={rows.length}
-                        isCollapsed={isCollapsed}
-                        onToggle={() => toggleCat(cat)}
-                      />
-                      {!isCollapsed && (
-                        <div className="space-y-1.5 pl-1">
-                          {rows.map(renderContactRow)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
         </DialogContent>
       </Dialog>
     </main>
