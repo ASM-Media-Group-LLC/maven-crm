@@ -21,8 +21,11 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 
 const marcados: string[][] = [];
 vi.mock("@/hooks/useReadReceipts", () => ({
+  // Devuelve `true` como el de verdad: el barrido solo avanza la marca si la
+  // escritura funcionó. Que el doble devolviera undefined lo hacía ver como fallo.
   markMessagesDelivered: vi.fn(async (_userId: string, ids: string[]) => {
     marcados.push(ids);
+    return true;
   }),
 }));
 
@@ -151,6 +154,19 @@ describe("aplicarFiltroDelBarrido", () => {
 //
 // La regla: cuando hay marca, la tanda va ASCENDENTE, pegada a la marca, para
 // que la marca nueva sea siempre el último mensaje que SÍ se marcó.
+describe("si no se pudo escribir, la marca no avanza", () => {
+  it("un upsert rechazado deja la marca como estaba, para reintentar", async () => {
+    const { markMessagesDelivered } = await import("@/hooks/useReadReceipts");
+    (markMessagesDelivered as unknown as { mockResolvedValueOnce: (v: boolean) => void })
+      .mockResolvedValueOnce(false);
+    const marcaVieja = "2026-09-17T10:00:00.000Z";
+    localStorage.setItem(claveDelBarrido(USUARIO), marcaVieja);
+    filasQueDevuelve = [{ id: "m1", created_at: "2026-09-17T11:00:00.000Z" }];
+    await barridoDeEntregados(USUARIO, AHORA);
+    expect(localStorage.getItem(claveDelBarrido(USUARIO))).toBe(marcaVieja);
+  });
+});
+
 describe("el barrido no puede saltarse mensajes", () => {
   it("con marca pide ASCENDENTE (pegado a la marca), no descendente", () => {
     const plan = planDeBarrido("2026-09-17T17:00:00.000Z", AHORA);

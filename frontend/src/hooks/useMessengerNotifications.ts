@@ -192,9 +192,13 @@ async function tandaDeBarrido(userId: string, plan: PlanDeBarrido): Promise<numb
     .limit(plan.limite);
   const filas = (data as { id: string; created_at: string }[] | null) ?? [];
   if (error || filas.length === 0) return 0;
-  await markMessagesDelivered(userId, filas.map((f) => f.id));
-  // La marca avanza DESPUÉS de marcar de verdad: si el upsert falla, el próximo
-  // barrido vuelve a traer lo mismo.
+  // ⚠️ La marca avanza SOLO si la escritura funcionó de verdad. Antes se hacía
+  // `await` y se ignoraba el resultado: un upsert rechazado por permisos o
+  // cortado por tiempo pasaba por bueno, la marca saltaba igual y esos mensajes
+  // se quedaban sin ✓ para siempre. Ahora, si falló, el próximo barrido vuelve a
+  // traer lo mismo, que es el lado bueno del error.
+  const ok = await markMessagesDelivered(userId, filas.map((f) => f.id));
+  if (!ok) return 0;
   const nueva = marcaDeLote(filas);
   if (nueva) guardarMarcaDeBarrido(userId, nueva);
   return filas.length;

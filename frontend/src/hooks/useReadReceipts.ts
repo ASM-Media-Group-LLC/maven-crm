@@ -4,6 +4,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
+/** Cuántos ids caben en una consulta: la lista viaja en la URL. */
+export const TANDA_RECIBOS = 100;
+
+/** Cada cuánto se repasan los recibos de la conversación ABIERTA.
+ *
+ *  Es el reemplazo del aviso en vivo, que se apagó el 17/09 porque difundir cada
+ *  "visto" a todos los suscriptores tumbó la base. La diferencia de costo es
+ *  enorme: antes, un visto despertaba a TODOS los conectados; ahora es una
+ *  consulta chica por persona, solo de la conversación que tiene abierta, y solo
+ *  con la pestaña a la vista. */
+export const REFRESCO_RECIBOS_MS = 12_000;
+
 export interface ReadReceipt {
   message_id: string;
   user_id: string;
@@ -14,13 +26,19 @@ export interface ReadReceipt {
 // Marca mensajes como ENTREGADOS para un usuario. Insert-only (ignoreDuplicates): no pisa
 // un delivered/read previo. Se llama desde useChat cuando el cliente RECIBE mensajes de otros
 // (canal realtime global + backfill al abrir la conversación).
-export async function markMessagesDelivered(userId: string, messageIds: string[]) {
-  if (!userId || messageIds.length === 0) return;
+export async function markMessagesDelivered(userId: string, messageIds: string[]): Promise<boolean> {
+  if (!userId || messageIds.length === 0) return true;
   const now = new Date().toISOString();
   const rows = messageIds.map((id) => ({ message_id: id, user_id: userId, delivered_at: now }));
-  await supabase
+  // ⚠️ DEVUELVE SI FUNCIONÓ. Antes se hacía `await` y se tiraba el error a la
+  // basura. supabase-js no lanza excepción: devuelve `{ error }`. Así que un
+  // upsert rechazado por permisos o cortado por tiempo pasaba por bueno y el
+  // barrido avanzaba igual su marca — justo lo contrario de lo que promete.
+  const { error } = await supabase
     .from("chat_read_receipts")
     .upsert(rows, { onConflict: "message_id,user_id", ignoreDuplicates: true });
+  if (error) console.warn("[Recibos] no se pudo marcar entregado:", error.message);
+  return !error;
 }
 
 export function useReadReceipts(conversationId: string | null, messages: { id: string; sender_id: string }[]) {
@@ -38,12 +56,26 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
 
   const loadReceipts = useCallback(async () => {
     if (!conversationId || stableMessageIds.length === 0) { setReceipts([]); return; }
-    const last50 = stableMessageIds.slice(-50);
-    const { data } = await supabase
-      .from("chat_read_receipts")
-      .select("message_id, user_id, delivered_at, read_at")
-      .in("message_id", last50);
-    if (data) setReceipts(data as ReadReceipt[]);
+    // ⚠️ TODOS los mensajes cargados, no los últimos 50.
+    //
+    // Con `.slice(-50)` los mensajes de más arriba se quedaban SIN recibo en
+    // memoria. Al abrir coincidía (la página son 50), pero al subir en la
+    // conversación tus propios mensajes viejos volvían a dibujarse como ✓ simple
+    // —parecía que nadie los había leído— y encima `markUnread` los tomaba por
+    // "sin leer" y los re-marcaba en cada cambio, escribiendo de más en la tabla
+    // que más escribe de todas.
+    //
+    // Se pide por tandas porque la lista viaja en la URL y con cientos de ids se
+    // pasa de largo.
+    const partes: ReadReceipt[] = [];
+    for (let i = 0; i < stableMessageIds.length; i += TANDA_RECIBOS) {
+      const { data } = await supabase
+        .from("chat_read_receipts")
+        .select("message_id, user_id, delivered_at, read_at")
+        .in("message_id", stableMessageIds.slice(i, i + TANDA_RECIBOS));
+      if (data) partes.push(...(data as ReadReceipt[]));
+    }
+    setReceipts(partes);
   }, [conversationId, stableMessageIds]);
 
   useEffect(() => { loadReceipts(); }, [loadReceipts]);
@@ -95,6 +127,31 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
     alRevivir: () => void loadReceiptsRef.current(),
   });
 
+  // ── QUE LOS ✓✓ VUELVAN A MOVERSE SOLOS ──────────────────────────────────
+  //
+  // Con la tabla fuera de la replicación en vivo, los recibos solo se recargaban
+  // cuando cambiaba la lista de mensajes. O sea que tus ✓ iban SIEMPRE un mensaje
+  // atrasados: mandabas A, te lo leían, no pasaba nada; mandabas B y recién ahí A
+  // saltaba a ✓✓. Eso es lo que se veía "impreciso".
+  //
+  // Se repasa la conversación abierta cada 12 s, y solo con la pestaña a la
+  // vista: sin nadie mirando no hay ✓ que actualizar, y así no se gasta en las
+  // pestañas de fondo, que son la mayoría. Al volver a la pestaña se repasa de
+  // inmediato, para no esperar el turno.
+  useEffect(() => {
+    if (!conversationId) return;
+    const repasar = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadReceiptsRef.current();
+    };
+    const id = window.setInterval(repasar, REFRESCO_RECIBOS_MS);
+    document.addEventListener("visibilitychange", repasar);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", repasar);
+    };
+  }, [conversationId]);
+
   // Marcar como LEÍDO. Merge (sin ignoreDuplicates): si ya existe la fila de "entregado",
   // la actualiza poniendo read_at (deja delivered_at intacto porque no va en el payload).
   const markAsRead = useCallback(async (msgIds: string[]) => {
@@ -105,7 +162,7 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
       .upsert(rows, { onConflict: "message_id,user_id" });
   }, [user]);
 
-  // Auto-marcar como leído los mensajes visibles solo con la ventana enfocada.
+  // Auto-marcar como leído los mensajes de la conversación abierta.
   const receiptsRef = useRef(receipts);
   receiptsRef.current = receipts;
 
@@ -113,7 +170,19 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
     if (!user || !conversationId || stableOthersIds.length === 0) return;
 
     const markUnread = () => {
-      if (!document.hasFocus()) return;
+      // ⚠️ MISMA REGLA QUE LA BURBUJA DE NO LEÍDOS, a propósito.
+      //
+      // Acá se exigía `document.hasFocus()` y la burbuja (useChat) no exigía
+      // nada. Resultado: quien abría el chat en una ventana de fondo se limpiaba
+      // su propia burbuja, pero al que mandó el mensaje le seguía en gris. Dos
+      // sistemas dando respuestas distintas sobre el mismo hecho, y esa
+      // contradicción se ve como imprecisión.
+      //
+      // Se unifican en "la pestaña está a la vista", que es lo que de verdad
+      // significa que la conversación está delante de alguien. Tener el foco es
+      // más estricto de la cuenta: una ventana visible en un segundo monitor
+      // cuenta como vista, y así lo trata la burbuja.
+      if (document.visibilityState !== "visible") return;
       // "sin leer" = mensaje de OTRO sin recibo MÍO con read_at (puede haber uno solo-entregado).
       const unread = stableOthersIds.filter(id =>
         !receiptsRef.current.find(r => r.message_id === id && r.user_id === user.id && r.read_at)
@@ -124,7 +193,11 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
     markUnread();
 
     window.addEventListener("focus", markUnread);
-    return () => window.removeEventListener("focus", markUnread);
+    document.addEventListener("visibilitychange", markUnread);
+    return () => {
+      window.removeEventListener("focus", markUnread);
+      document.removeEventListener("visibilitychange", markUnread);
+    };
   }, [stableOthersIds, user, conversationId, markAsRead]);
 
   const getReadBy = useCallback((messageId: string): string[] => {
