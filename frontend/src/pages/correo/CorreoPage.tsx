@@ -36,6 +36,9 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -254,25 +257,26 @@ export default function CorreoPage() {
     unseen: (n) => `${n} ${n === 1 ? "correo marcado" : "correos marcados"} como no leído${n === 1 ? "" : "s"}`,
     archive: (n) => `${n} ${n === 1 ? "correo archivado" : "correos archivados"}`,
     spam: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"} a Spam`,
+    move: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"}`,
     delete: (n) => carpeta === "Papelera"
       ? `${n} ${n === 1 ? "correo eliminado" : "correos eliminados"} definitivamente`
       : `${n} ${n === 1 ? "correo movido" : "correos movidos"} a la Papelera`,
   };
-  const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[]) => {
+  const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[], dest?: string) => {
     const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
     if (!elegidos.length) return;
     // Confirmar SIEMPRE que se borra, no solo en Papelera: mover a la
     // Papelera es recuperable, pero un clic accidental en una lista con
     // veinte correos seleccionados no lo parece cuando pasa (pedido de Jhon).
     if (op === "delete") { setConfirmarBorrado(elegidos); return; }
-    lanzarMasiva(op, elegidos);
+    lanzarMasiva(op, elegidos, dest);
   };
-  const lanzarMasiva = (op: OperacionMasiva, elegidos: MailSummary[]) => {
+  const lanzarMasiva = (op: OperacionMasiva, elegidos: MailSummary[], dest?: string) => {
     const n = elegidos.length;
     if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
     setSeleccion(new Set());
     masiva.mutate(
-      { folder: carpeta, op, items: elegidos },
+      { folder: carpeta, op, items: elegidos, dest },
       {
         onSuccess: (r) => {
           toast.success(NOMBRE_OP[op](n - (r.omitidos ?? 0)), {
@@ -698,7 +702,36 @@ export default function CorreoPage() {
                       <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? "Eliminar definitivamente" : "Eliminar"} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
                       <AccionBarra icono={Clock} etiqueta="Posponer" pronto />
-                      <AccionBarra icono={FolderInput} etiqueta="Mover a" pronto />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            title="Mover a"
+                            disabled={masiva.isPending}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            <FolderInput className="h-4 w-4" />
+                            <span className="sr-only">Mover a</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-72 overflow-auto">
+                          {/* Las carpetas REALES de la cuenta, no una lista
+                              escrita a mano: si alguien crea una en Zoho
+                              aparece acá sola, y la edge valida el nombre
+                              contra la misma fuente antes de mover nada. */}
+                          {(carpetas.data ?? [])
+                            .map((c) => c.folder)
+                            .filter((f) => f !== carpeta)
+                            .map((f) => (
+                              <DropdownMenuItem
+                                key={f}
+                                onSelect={() => ejecutarMasiva("move", items, f)}
+                              >
+                                {nombreCarpeta(f)}
+                              </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <AccionBarra icono={Tag} etiqueta="Etiquetar" pronto />
                     </div>
                     <button
