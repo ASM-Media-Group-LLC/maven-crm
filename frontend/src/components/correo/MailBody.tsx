@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ImageOff } from "lucide-react";
+import { ImageOff, MoreHorizontal } from "lucide-react";
+import { partirCitado, partirCitadoTexto } from "@/lib/mailCita";
+import { cn } from "@/lib/utils";
 
 /**
  * Pinta el cuerpo de un correo.
@@ -101,13 +103,34 @@ function textoPlano(t: string): string {
 
 export function MailBody({ html, text, remoteImages, truncated }: Props) {
   const [cargarRemotas, setCargarRemotas] = useState(false);
+  const [verCita, setVerCita] = useState(false);
   const [alto, setAlto] = useState(160);   // provisorio: se remide con el contenido
   const ref = useRef<HTMLIFrameElement>(null);
 
+  // Lo CITADO se pliega, como el «•••» de Gmail. Con los hilos apilados
+  // arriba, la cita es texto repetido — y en una cadena de cinco respuestas
+  // cada mensaje arrastra a los cuatro anteriores, con sangría creciente.
+  const partido = useMemo(
+    () => (html ? partirCitado(html) : { propio: null as string | null, citado: null }),
+    [html],
+  );
+  const partidoTexto = useMemo(
+    () => (!html && text ? partirCitadoTexto(text) : { propio: text, citado: null }),
+    [html, text],
+  );
+  const hayCita = !!(partido.citado ?? partidoTexto.citado);
+
   const srcDoc = useMemo(() => {
-    const cuerpo = html ?? (text ? textoPlano(text) : "<p><em>(sin contenido)</em></p>");
-    return documento(cuerpo, cargarRemotas);
-  }, [html, text, cargarRemotas]);
+    const armarHtml = () =>
+      verCita || !partido.citado
+        ? (html as string)
+        : (partido.propio ?? "");
+    const armarTexto = () => {
+      const t = verCita || !partidoTexto.citado ? text : partidoTexto.propio;
+      return t ? textoPlano(t) : "<p><em>(sin contenido)</em></p>";
+    };
+    return documento(html ? armarHtml() : armarTexto(), cargarRemotas);
+  }, [html, text, cargarRemotas, verCita, partido, partidoTexto]);
 
   // Medimos la altura del contenido para que el correo se lea de corrido, sin
   // un scroll dentro de otro scroll. Se vuelve a medir cuando cambia el
@@ -193,6 +216,25 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         className="w-full rounded-2xl border-0 bg-white"
         style={{ height: alto }}
       />
+
+      {/* El «•••» de Gmail: lo citado plegado. Es un botón de verdad y no un
+          adorno — se abre y se vuelve a cerrar, y mientras está cerrado el
+          correo se lee sin la escalera de citas de las respuestas anteriores. */}
+      {hayCita && (
+        <button
+          type="button"
+          onClick={() => setVerCita((v) => !v)}
+          aria-expanded={verCita}
+          aria-label={verCita ? "Ocultar lo citado" : "Mostrar lo citado"}
+          title={verCita ? "Ocultar lo citado" : "Mostrar lo citado"}
+          className={cn(
+            "flex h-5 items-center rounded-full bg-muted px-2 transition-colors",
+            "hover:bg-muted-foreground/25",
+          )}
+        >
+          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+        </button>
+      )}
     </div>
   );
 }

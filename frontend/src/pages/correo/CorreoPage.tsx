@@ -78,6 +78,7 @@ import {
   useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
 import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
+import { useHiloCompleto } from "@/hooks/useHiloCompleto";
 import { opcionesDePosponer } from "@/lib/posponer";
 import {
   useCorreosDeEtiqueta, useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
@@ -448,6 +449,35 @@ export default function CorreoPage() {
     () => (sel ? hilos.find((h) => h.mensajes.some((m) => claveDe(m) === claveDe(sel))) : undefined),
     [hilos, sel],
   );
+
+  // ⚠️ UNA CONVERSACIÓN NO VIVE EN UNA CARPETA. Lo que te llegó está en
+  // Recibidos y lo que contestaste en Enviados: agrupando dentro de la carpeta
+  // a la vista, el hilo muestra la mitad de la charla — y encima la mitad en
+  // la que uno no habla. Esto trae el resto.
+  const { hilo: hiloCompleto, cargando: cargandoHilo } = useHiloCompleto({
+    conocidos: useMemo(
+      () => hiloAbierto?.mensajes ?? (sel ? [sel] : []),
+      [hiloAbierto, sel],
+    ),
+    asunto: hiloAbierto?.asunto ?? sel?.subject ?? "",
+    habilitado: !!sel && !enBusqueda,
+  });
+
+  /** Los otros mensajes de la conversación, partidos por dónde van respecto
+   *  del abierto. Gmail apila la charla completa y deja expandido el último;
+   *  poner todo arriba haría que una respuesta nueva se lea como si fuera
+   *  anterior a lo que estás leyendo. */
+  const { antes: hiloAntes, despues: hiloDespues } = useMemo(() => {
+    if (!sel) return { antes: [], despues: [] as MailSummary[] };
+    const cuando = Date.parse(sel.date) || 0;
+    const otros = hiloCompleto.filter((m) =>
+      m.messageId ? m.messageId !== sel.messageId : claveDe(m) !== claveDe(sel)
+    );
+    return {
+      antes: otros.filter((m) => (Date.parse(m.date) || 0) <= cuando),
+      despues: otros.filter((m) => (Date.parse(m.date) || 0) > cuando),
+    };
+  }, [hiloCompleto, sel]);
   const cargandoItems = etiquetaVista
     ? correosDeEtiqueta.isLoading
     : enBusqueda ? resultados.isFetching : lista.isLoading;
@@ -1164,39 +1194,11 @@ export default function CorreoPage() {
                   {mensaje.data.subject}
                 </h2>
 
-                {/* ── Lo anterior de la conversación ──────────────────────
-                    Los mensajes previos, plegados: quién y cuándo, con su
-                    resumen. Se abren con un clic y recién ahí se baja el
-                    cuerpo — abrir un hilo de veinte no puede costar veinte
-                    descargas. */}
-                {hiloAbierto && hiloAbierto.cantidad > 1 && (
-                  <ol className="mt-4 flex flex-col gap-1 border-l-2 border-border/50 pl-3">
-                    {hiloAbierto.mensajes
-                      // El abierto es `sel`, no `mensaje.data`: el segundo es el cuerpo
-                      // bajado, sin la identidad de fila (uid/origen) con la que
-                      // se comparan los mensajes de la lista.
-                      .filter((m) => !sel || claveDe(m) !== claveDe(sel))
-                      .map((m) => (
-                        <li key={claveDe(m)}>
-                          <button
-                            type="button"
-                            onClick={() => abrir(m)}
-                            className="flex w-full min-w-0 items-baseline gap-2 rounded-control px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
-                          >
-                            <span className="shrink-0 text-xs font-medium">
-                              {nombreDe(m.from)}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                              {m.snippet}
-                            </span>
-                            <span className="shrink-0 text-[10px] text-muted-foreground">
-                              {fechaCorta(m.date)}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                  </ol>
-                )}
+                {/* ── Lo ANTERIOR de la conversación ──────────────────────
+                    Plegados: quién, cuándo y su resumen. Se abren con un clic
+                    y recién ahí se baja el cuerpo — abrir un hilo de veinte no
+                    puede costar veinte descargas. */}
+                <TiraDeHilo mensajes={hiloAntes} abrir={abrir} className="mt-4" />
 
                 <div className="mt-4 flex items-start gap-3">
                   <UserAvatar name={nombreDe(mensaje.data.from)} size="lg" className="shrink-0" />
@@ -1253,58 +1255,6 @@ export default function CorreoPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {carpeta === "Borrador" ? (
-                    // En Borradores no se responde: se retoma para seguir
-                    // editándolo y mandarlo.
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={editarBorrador}
-                    >
-                      <PenLine className="mr-2 h-4 w-4" />
-                      Editar borrador
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-full"
-                        onClick={responder}
-                      >
-                        <Reply className="mr-2 h-4 w-4" />
-                        Responder
-                      </Button>
-                      {hayVariosDestinatarios && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={responderATodos}
-                        >
-                          <ReplyAll className="mr-2 h-4 w-4" />
-                          Responder a todos
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-full"
-                        onClick={reenviar}
-                        disabled={bajarParaReenviar.isPending}
-                      >
-                        {bajarParaReenviar.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Forward className="mr-2 h-4 w-4" />
-                        )}
-                        {bajarParaReenviar.isPending ? "Trayendo adjuntos…" : "Reenviar"}
-                      </Button>
-                    </>
-                  )}
-                </div>
 
                 {mensaje.data.attachments.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -1385,6 +1335,74 @@ export default function CorreoPage() {
                     truncated={mensaje.data.truncated}
                   />
                 </div>
+
+                {/* ── Lo POSTERIOR ────────────────────────────────────────
+                    Casi siempre son las respuestas propias, que viven en
+                    Enviados: el motivo por el que el hilo se veía a medias. */}
+                <TiraDeHilo mensajes={hiloDespues} abrir={abrir} className="mt-5" />
+
+                {cargandoHilo && hiloAntes.length + hiloDespues.length === 0 && (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Buscando el resto de la conversación…
+                  </p>
+                )}
+
+                {/* ── Responder / Reenviar, ABAJO ─────────────────────────
+                    Es donde los pone Gmail, y con la conversación apilada es
+                    donde tiene sentido: los botones cierran la charla, en vez
+                    de partir en dos el mensaje que estás leyendo. */}
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-border/60 pt-5">
+                  {carpeta === "Borrador" ? (
+                    // En Borradores no se responde: se retoma para seguir
+                    // editándolo y mandarlo.
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={editarBorrador}
+                    >
+                      <PenLine className="mr-2 h-4 w-4" />
+                      Editar borrador
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={responder}
+                      >
+                        <Reply className="mr-2 h-4 w-4" />
+                        Responder
+                      </Button>
+                      {hayVariosDestinatarios && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={responderATodos}
+                        >
+                          <ReplyAll className="mr-2 h-4 w-4" />
+                          Responder a todos
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={reenviar}
+                        disabled={bajarParaReenviar.isPending}
+                      >
+                        {bajarParaReenviar.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Forward className="mr-2 h-4 w-4" />
+                        )}
+                        {bajarParaReenviar.isPending ? "Trayendo adjuntos…" : "Reenviar"}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </article>
             </ScrollArea>
           ) : null}
@@ -1427,6 +1445,88 @@ export default function CorreoPage() {
         <EtiquetasDialog abierto onCerrar={() => setGestionandoEtiquetas(false)} />
       )}
     </div>
+  );
+}
+
+/** Cuántos mensajes plegados se muestran de corrido antes de resumir el medio.
+ *
+ *  Gmail muestra el primero, pliega el medio en una pastilla con el número, y
+ *  deja los últimos. En un hilo de veinte es la diferencia entre ver la charla
+ *  y ver una lista. */
+const PLEGADOS_A_LA_VISTA = 4;
+
+/** Un mensaje de la conversación, plegado: avatar, quién, su resumen y cuándo.
+ *
+ *  Se abre con un clic y recién ahí se baja el cuerpo — abrir un hilo de
+ *  veinte no puede costar veinte descargas por IMAP.
+ *
+ *  ⚠️ Vienen de VARIAS carpetas (tus respuestas están en Enviados), y cada uno
+ *  se abre en la suya: `abrir` usa el `folder` que trae el mensaje. */
+function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => abrir(m)}
+      className="flex w-full min-w-0 items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors hover:bg-muted/50"
+    >
+      <UserAvatar name={nombreDe(m.from)} size="sm" className="shrink-0" />
+      {/* ⚠️ `min-w-0` o el resumen largo se dibuja ENCIMA del vecino en vez de
+          recortarse: el flex hijo no baja de su ancho de contenido sin esto. */}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-tight">
+          {nombreDe(m.from)}
+        </span>
+        <span className="block truncate text-xs leading-tight text-muted-foreground">
+          {m.snippet}
+        </span>
+      </span>
+      <span className="shrink-0 self-start pt-0.5 text-xs text-muted-foreground">
+        {fechaCorta(m.date)}
+      </span>
+    </button>
+  );
+}
+
+/** Los otros mensajes de la conversación, apilados como en Gmail: el primero,
+ *  el medio resumido en una pastilla que se despliega, y los últimos. */
+function TiraDeHilo({
+  mensajes, abrir, className,
+}: {
+  mensajes: MailSummary[];
+  abrir: (m: MailSummary) => void;
+  className?: string;
+}) {
+  const [verTodos, setVerTodos] = useState(false);
+  if (!mensajes.length) return null;
+
+  const resume = !verTodos && mensajes.length > PLEGADOS_A_LA_VISTA + 1;
+  const ocultos = resume ? mensajes.length - PLEGADOS_A_LA_VISTA : 0;
+  const visibles = resume
+    ? [mensajes[0], ...mensajes.slice(mensajes.length - (PLEGADOS_A_LA_VISTA - 1))]
+    : mensajes;
+
+  return (
+    <ol className={cn("flex flex-col divide-y divide-border/50", className)}>
+      {visibles.map((m, i) => (
+        <li key={`${m.folder ?? ""}:${claveDe(m)}`}>
+          {/* La pastilla del medio va DESPUÉS del primero, que es donde Gmail
+              la pone: el arranque del hilo siempre se ve. */}
+          {resume && i === 1 && (
+            <div className="flex items-center gap-3 py-1.5">
+              <button
+                type="button"
+                onClick={() => setVerTodos(true)}
+                className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted-foreground/25"
+              >
+                {ocultos}
+              </button>
+              <span className="h-px flex-1 bg-border/50" />
+            </div>
+          )}
+          <FilaPlegada m={m} abrir={abrir} />
+        </li>
+      ))}
+    </ol>
   );
 }
 
