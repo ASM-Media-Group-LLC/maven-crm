@@ -464,9 +464,12 @@ const ClosersContent = () => {
               </Select>
 
               {/* Origen / línea de negocio (reemplaza los viejos tabs
-                  Ex-creadoras / Agencias / Ventas). */}
+                  Ex-creadoras / Agencias / Ventas). value="" (no "all") cuando
+                  no hay filtro → ningún item matchea → se muestra el placeholder
+                  "Origen" (nombre del campo), como el filtro Agente. Con value="all"
+                  el trigger mostraba el texto largo del item y se cortaba. */}
               <Select
-                value={originFilter || "all"}
+                value={originFilter || ""}
                 onValueChange={(v) => setOriginFilter(v === "all" ? null : v)}
               >
                 <SelectTrigger className="w-full sm:w-48 h-10">
@@ -480,9 +483,11 @@ const ClosersContent = () => {
                 </SelectContent>
               </Select>
 
-              {/* Categoría (nuevo). Usa ilike server-side por el casing sucio. */}
+              {/* Categoría (nuevo). Usa ilike server-side por el casing sucio.
+                  value="" cuando no hay filtro → placeholder "Categoría" (antes,
+                  con value="all", mostraba "Todas las categorías" y se cortaba). */}
               <Select
-                value={categoryFilter || "all"}
+                value={categoryFilter || ""}
                 onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}
               >
                 <SelectTrigger className="w-full sm:w-40 h-10">
