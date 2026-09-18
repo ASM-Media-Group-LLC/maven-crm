@@ -409,6 +409,11 @@ export default function CorreoPage() {
         date: (m.date as string) ?? "",
         snippet: (m.snippet as string) ?? "",
         messageId: (m.message_id as string) ?? undefined,
+        // Las cabeceras del hilo viajan también acá: una etiqueta junta
+        // correos de varias carpetas, que es justo donde más se nota si la
+        // conversación no se arma.
+        inReplyTo: (m.in_reply_to as string) ?? undefined,
+        refs: (m.refs as string[]) ?? undefined,
         unread: !!m.unread,
         origen: "cache" as const,
       }))
@@ -501,6 +506,13 @@ export default function CorreoPage() {
       cc: cc || undefined,
       subject: /^re:/i.test(m.subject) ? m.subject : `Re: ${m.subject}`,
       inReplyTo: messageId || undefined,
+      // ⚠️ `References` es la CADENA entera, no solo el padre: el del padre
+      // más el padre. Mandando solo el padre, el que recibe puede encadenar
+      // esta respuesta pero pierde el resto del hilo si le falta algún
+      // eslabón del medio — y una conversación larga se le parte en trozos.
+      // Es lo que arman Gmail y Outlook, y lo que pide RFC 5322 §3.6.4.
+      references: [...(sel?.refs ?? []), messageId]
+        .filter(Boolean).join(" ") || undefined,
       citar: {
         de: nombreDe(m.from),
         fecha: fechaLarga(m.date),

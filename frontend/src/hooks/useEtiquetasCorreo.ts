@@ -149,7 +149,9 @@ export function useCorreosDeEtiqueta(labelId: string | null) {
 
       const { data, error } = await supabase
         .from("mail_messages" as never)
-        .select("id, uid, folder, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id")
+        .select(
+          "id, uid, folder, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id, in_reply_to, refs",
+        )
         .in("message_id", ids)
         .order("date", { ascending: false })
         .limit(200);

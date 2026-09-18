@@ -54,10 +54,14 @@ export interface MailSummary {
    *  buscaría en la carpeta seleccionada, que no es la suya. En las vistas por
    *  carpeta sobra, porque son todos de la misma. */
   folder?: string;
+  // ⚠️ OBLIGATORIAS aunque el valor pueda ser `undefined`: son lo que usa
+  // `agruparEnHilos` para encadenar. Estando opcionales, un camino que se
+  // olvidara de traerlas compilaba igual y dejaba esa vista sin hilos, sin
+  // aviso de ningún tipo. Así, olvidarlas no compila.
   /** `In-Reply-To`. Falta en lo sincronizado antes del 18/09/2026. */
-  inReplyTo?: string;
+  inReplyTo: string | undefined;
   /** `References`, del más viejo al más nuevo. Ídem. */
-  refs?: string[];
+  refs: string[] | undefined;
   cc?: string;
   unread: boolean;
   /** De dónde salió: decide cómo abrirlo y cómo marcarlo leído. */
@@ -272,7 +276,12 @@ export function useMailMessages(folder: string, enabled: boolean) {
       // Orden explícito por seq descendente: no confiar en el del servidor.
       const orden = [...(r.messages ?? [])].sort((a, b) => b.seq - a.seq);
       return {
-        messages: orden.map((m) => ({ ...m, origen: "vivo" as const })),
+        // El camino en vivo no trae las cabeceras del hilo: es el respaldo de
+        // cuando la caché está vacía y pide los encabezados mínimos. Se
+        // agrupará por asunto, que es lo que puede.
+        messages: orden.map((m) => ({
+          ...m, inReplyTo: undefined, refs: undefined, origen: "vivo" as const,
+        })),
       };
     },
   });
@@ -731,6 +740,10 @@ export function useMailSearch(folder: string, query: string, enabled: boolean) {
           subject: m.subject ?? "(sin asunto)",
           date: m.date ?? "",
           messageId: m.messageId ?? undefined,
+          // La búsqueda no agrupa (ver CorreoPage): quien busca quiere ver los
+          // mensajes que coinciden, no las conversaciones que los contienen.
+          inReplyTo: undefined,
+          refs: undefined,
           unread: !!m.unread,
           origen: "vivo" as const,
         })),

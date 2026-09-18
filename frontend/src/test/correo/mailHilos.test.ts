@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { agruparEnHilos, asuntoNormalizado, type CorreoEncadenable } from "@/lib/mailHilos";
 
 const c = (o: Partial<CorreoEncadenable> & { date: string }): CorreoEncadenable => ({
-  subject: "Contrato", from: "ana@maven-ai.me", to: "bruno@maven-ai.me", ...o,
+  subject: "Contrato", from: "ana@maven-ai.me", to: "bruno@maven-ai.me",
+  inReplyTo: undefined, refs: undefined, ...o,
 });
 
 describe("asuntoNormalizado", () => {
@@ -45,7 +46,7 @@ describe("agruparEnHilos · por cabeceras", () => {
     const h = agruparEnHilos([
       c({ messageId: "<1@z>", date: "2026-09-17T10:00:00Z" }),
       c({ messageId: "<2@z>", inReplyTo: "<1@z>", date: "2026-09-17T11:00:00Z" }),
-      c({ messageId: "<3@z>", references: ["<1@z>", "<2@z>"], date: "2026-09-17T12:00:00Z" }),
+      c({ messageId: "<3@z>", refs: ["<1@z>", "<2@z>"], date: "2026-09-17T12:00:00Z" }),
     ]);
     expect(h).toHaveLength(1);
     expect(h[0].cantidad).toBe(3);
@@ -123,14 +124,89 @@ describe("agruparEnHilos · por asunto, para los que NO traen cabeceras", () => 
     expect(h).toHaveLength(1);
   });
 
-  it("⚠️ un correo CON cabeceras no se re-une por asunto", () => {
-    // Si ya quedó donde corresponde, unirlo además por asunto solo podría
-    // meterlo en un hilo ajeno que casualmente se llama igual.
+  it("⚠️ un correo YA ENCADENADO no se re-une por asunto", () => {
+    // Si el paso por cabeceras lo dejó donde corresponde, unirlo ADEMÁS por
+    // asunto solo podría meterlo en un hilo ajeno que se llama igual.
     const h = agruparEnHilos([
       c({ messageId: "<1@z>", subject: "Contrato", date: "2026-09-17T10:00:00Z" }),
-      c({ messageId: "<2@z>", subject: "Contrato", inReplyTo: "<ajeno@otro>", date: "2026-09-17T11:00:00Z" }),
+      c({ messageId: "<2@z>", subject: "Contrato", inReplyTo: "<1@z>", date: "2026-09-17T11:00:00Z" }),
+      // Mismo asunto y misma gente, pero cuelga de otra conversación que sí
+      // está cargada: se queda en la suya.
+      c({ messageId: "<3@z>", subject: "Contrato", inReplyTo: "<9@z>", date: "2026-09-17T12:00:00Z" }),
+      c({ messageId: "<9@z>", subject: "Otra cosa", date: "2026-09-17T09:00:00Z" }),
     ]);
     expect(h).toHaveLength(2);
+    expect(h.map((x) => x.cantidad).sort()).toEqual([2, 2]);
+  });
+
+  it("⚠️ una respuesta que cuelga de algo QUE NO ESTÁ CARGADO sí se une por asunto", () => {
+    // El caso real: respondés desde Maven (la copia queda en Enviados) y la
+    // contrarespuesta llega a Recibidos apuntando a esa copia. Mirando solo
+    // Recibidos, su `In-Reply-To` no resuelve contra nada.
+    //
+    // Antes contaba como "ya encadenado" por el solo hecho de traer cabecera,
+    // así que también quedaba afuera del paso por asunto: no se unía por
+    // ningún lado y salía como un correo suelto al lado de su propio hilo.
+    const h = agruparEnHilos([
+      c({ messageId: "<1@z>", subject: "Contrato", date: "2026-09-17T10:00:00Z" }),
+      c({ messageId: "<2@z>", subject: "Re: Contrato", inReplyTo: "<enviados@maven-ai.me>", date: "2026-09-17T11:00:00Z" }),
+    ]);
+    expect(h).toHaveLength(1);
+    expect(h[0].cantidad).toBe(2);
+  });
+
+  it("⚠️ pero no la une con desconocidos solo porque la cabecera no resolvió", () => {
+    // La red de seguridad del paso por asunto sigue pidiendo las tres cosas:
+    // mismo asunto, gente en común y menos de 30 días. Acá no hay nadie en
+    // común, así que no se unen.
+    const h = agruparEnHilos([
+      c({ messageId: "<1@z>", subject: "Contrato", date: "2026-09-17T10:00:00Z" }),
+      c({
+        messageId: "<2@z>", subject: "Re: Contrato", inReplyTo: "<ajeno@otro>",
+        from: "otro@ajena.com", to: "tercero@ajena.com", date: "2026-09-17T11:00:00Z",
+      }),
+    ]);
+    expect(h).toHaveLength(2);
+  });
+});
+
+describe("agruparEnHilos · el hilo «Test» de producción", () => {
+  // Los tres correos tal como quedaron en la base el 18/09/2026, con sus
+  // Message-ID de verdad. Jhon los vio como dos renglones sueltos en Recibidos
+  // mientras Gmail los mostraba como UNA conversación.
+  const RAIZ = "<CAA4Qn53gc_DxkrRFFtMFADK1Ukd7iFPdfVEnVuWHyd-v+MptRw@mail.gmail.com>";
+  const ENVIADO = "<dea1da25-5c7e-4814-8d3c-8732f7aecebf@maven-ai.me>";
+  const RESPUESTA = "<CAA4Qn504Vm1My6ay37ET_WEccnHgpTduzOT9UcLLDgnD4cecsg@mail.gmail.com>";
+
+  const recibidos = () => [
+    c({
+      messageId: RAIZ, subject: "Test",
+      from: "jhon.j.lopez@unlok.me", to: "jhon.lopez@maven-ai.me",
+      date: "2026-09-18T20:53:39Z",
+    }),
+    c({
+      messageId: RESPUESTA, subject: "Re: Test",
+      inReplyTo: ENVIADO, refs: [RAIZ, ENVIADO],
+      from: "jhon.j.lopez@unlok.me", to: "jhon.lopez@maven-ai.me",
+      date: "2026-09-18T21:02:52Z",
+    }),
+  ];
+
+  it("los agrupa por References aunque el In-Reply-To apunte a Enviados", () => {
+    const h = agruparEnHilos(recibidos());
+    expect(h).toHaveLength(1);
+    expect(h[0].cantidad).toBe(2);
+    expect(h[0].asunto).toBe("Test");
+  });
+
+  it("⚠️ y también sin References, que es como quedó la copia en Enviados", () => {
+    // La copia sembrada en Enviados no guardaba las cabeceras del hilo, así
+    // que hubo media hora en que ese correo no tenía `refs`. Aun así tiene
+    // que agrupar, por el camino del asunto.
+    const [raiz, respuesta] = recibidos();
+    const h = agruparEnHilos([raiz, { ...respuesta, refs: undefined }]);
+    expect(h).toHaveLength(1);
+    expect(h[0].cantidad).toBe(2);
   });
 });
 
