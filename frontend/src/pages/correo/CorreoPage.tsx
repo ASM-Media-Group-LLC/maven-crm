@@ -22,6 +22,7 @@ import {
   Reply,
   ReplyAll,
   Forward,
+  Check,
   Search,
   Send,
   Signature,
@@ -36,7 +37,8 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -53,6 +55,7 @@ import { MailBody } from "@/components/correo/MailBody";
 import {
   MailComposer, TOPE_ADJUNTOS, type BorradorInicial,
 } from "@/components/correo/MailComposer";
+import EtiquetasDialog from "@/components/correo/EtiquetasDialog";
 import { MailSignatureDialog } from "@/components/correo/MailSignatureDialog";
 import {
   useMailbox,
@@ -73,6 +76,10 @@ import {
   useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
 import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
+import {
+  useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
+  type EtiquetaDeCorreo,
+} from "@/hooks/useEtiquetasCorreo";
 import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
@@ -131,6 +138,13 @@ function fechaLarga(iso: string): string {
   return format(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
 }
 
+/** El fondo de cada etiqueta. Tokens del tema: se ven bien en claro y en
+ *  oscuro, y nadie puede elegir un color ilegible. */
+const FONDO_ETIQUETA: Record<string, string> = {
+  primary: "bg-primary", accent: "bg-accent", success: "bg-success",
+  warning: "bg-warning", destructive: "bg-destructive", muted: "bg-muted-foreground",
+};
+
 const CARPETAS_KEY = "maven.correo.carpetas";
 
 /** ¿La columna de carpetas arranca abierta? Se recuerda, como el panel de Maven. */
@@ -186,6 +200,10 @@ export default function CorreoPage() {
   const [adjuntoAbierto, setAdjuntoAbierto] = useState<number | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
   const bajarParaReenviar = useAdjuntosParaReenviar();
+  const etiquetas = useEtiquetas();
+  const etiquetasPorCorreo = useEtiquetasPorCorreo();
+  const etiquetar = useEtiquetarCorreos();
+  const [gestionandoEtiquetas, setGestionandoEtiquetas] = useState(false);
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
   // La firma que recibe el compositor: solo si está activada y no vacía.
@@ -281,6 +299,31 @@ export default function CorreoPage() {
       ? `${n} ${n === 1 ? "correo eliminado" : "correos eliminados"} definitivamente`
       : `${n} ${n === 1 ? "correo movido" : "correos movidos"} a la Papelera`,
   };
+  /** Pone o saca una etiqueta de lo seleccionado.
+   *
+   *  ⚠️ Los correos SIN `message_id` se quedan afuera y se avisa: la etiqueta
+   *  se guarda por ese id, no por (carpeta, uid). Un uid cambia al mover el
+   *  correo de carpeta, así que la etiqueta se perdería —o se la quedaría otro
+   *  mensaje distinto que reciba ese uid después. */
+  const aplicarEtiqueta = (labelId: string, poner: boolean) => {
+    const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
+    const ids = elegidos.map((m) => m.messageId).filter(Boolean) as string[];
+    if (!ids.length) {
+      toast.error("Estos correos no tienen identificador: vuelve a abrir la carpeta e inténtalo.");
+      return;
+    }
+    const sinId = elegidos.length - ids.length;
+    etiquetar.mutate({ messageIds: ids, labelId, poner }, {
+      onSuccess: () => {
+        toast.success(poner ? "Etiqueta puesta" : "Etiqueta quitada", {
+          description: sinId ? `${sinId} sin identificador quedaron sin etiquetar.` : undefined,
+        });
+        setSeleccion(new Set());
+      },
+      onError: (e) => toast.error((e as Error).message),
+    });
+  };
+
   const ejecutarMasiva = (op: OperacionMasiva, items: MailSummary[], dest?: string) => {
     const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
     if (!elegidos.length) return;
@@ -771,7 +814,50 @@ export default function CorreoPage() {
                             ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <AccionBarra icono={Tag} etiqueta="Etiquetar" pronto />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            title="Etiquetar"
+                            disabled={etiquetar.isPending}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            <Tag className="h-4 w-4" />
+                            <span className="sr-only">Etiquetar</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-72 w-56 overflow-auto">
+                          {(etiquetas.data ?? []).length === 0 && (
+                            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                              Todavía no creaste ninguna.
+                            </p>
+                          )}
+                          {(etiquetas.data ?? []).map((e) => {
+                            // La casilla muestra si TODOS los seleccionados ya
+                            // la tienen: con algunos sí y otros no, tocar
+                            // agrega (que es lo que se espera al etiquetar).
+                            const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
+                            const idsMsg = elegidos.map((m) => m.messageId).filter(Boolean) as string[];
+                            const todos = idsMsg.length > 0 &&
+                              idsMsg.every((id) => (etiquetasPorCorreo.data?.get(id) ?? []).includes(e.id));
+                            return (
+                              <DropdownMenuItem
+                                key={e.id}
+                                onSelect={() => aplicarEtiqueta(e.id, !todos)}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", todos ? "opacity-100" : "opacity-0")} />
+                                <span className={cn("mr-2 h-2 w-2 shrink-0 rounded-full", FONDO_ETIQUETA[e.color])} />
+                                <span className="truncate">{e.nombre}</span>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setGestionandoEtiquetas(true)}>
+                            <span className="mr-2 h-4 w-4" />
+                            Administrar etiquetas…
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <button
                       type="button"
@@ -840,6 +926,15 @@ export default function CorreoPage() {
                   // van apilando los clientes. Lo calcula `agruparEnHilos`
                   // porque el más viejo CARGADO no siempre es la raíz.
                   asuntoDelHilo={h.asunto}
+                  // Las de CUALQUIER mensaje del hilo: etiquetás una
+                  // conversación, no un mensaje suelto adentro de ella.
+                  etiquetas={(() => {
+                    const ids = new Set<string>();
+                    for (const m of h.mensajes) {
+                      for (const id of etiquetasPorCorreo.data?.get(m.messageId ?? "") ?? []) ids.add(id);
+                    }
+                    return (etiquetas.data ?? []).filter((e) => ids.has(e.id));
+                  })()}
                   // Sin leer si CUALQUIERA del hilo lo está: si no, una
                   // conversación con una respuesta nueva se vería leída.
                   hiloSinLeer={h.mensajes.some((m) => m.unread)}
@@ -1141,6 +1236,12 @@ export default function CorreoPage() {
       )}
 
       <MailSignatureDialog abierto={firmaAbierta} onCerrar={() => setFirmaAbierta(false)} />
+
+      {/* Montado SOLO cuando está abierto: cerrado igual correría sus
+          consultas y sus hooks para no mostrar nada. */}
+      {gestionandoEtiquetas && (
+        <EtiquetasDialog abierto onCerrar={() => setGestionandoEtiquetas(false)} />
+      )}
     </div>
   );
 }
@@ -1156,6 +1257,7 @@ function FilaMensaje({
   enHilo,
   hiloSinLeer,
   asuntoDelHilo,
+  etiquetas,
 }: {
   m: MailSummary;
   activo: boolean;
@@ -1175,6 +1277,8 @@ function FilaMensaje({
   hiloSinLeer?: boolean;
   /** El asunto con el que EMPEZÓ la conversación. */
   asuntoDelHilo?: string;
+  /** Las que tiene puestas la conversación. */
+  etiquetas?: EtiquetaDeCorreo[];
 }) {
   // Con varios destinatarios ("a@x, b@y") se muestra el primero.
   const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
@@ -1253,6 +1357,16 @@ function FilaMensaje({
           >
             {asuntoDelHilo || m.subject || "(sin asunto)"}
           </span>
+          {/* Puntos de color y no píldoras con texto: en un renglón que ya
+              lleva nombre, asunto y resumen, tres píldoras se comen el asunto.
+              El nombre está en el `title` y en el menú de Etiquetar. */}
+          {etiquetas?.slice(0, 3).map((e) => (
+            <span
+              key={e.id}
+              title={e.nombre}
+              className={cn("h-2 w-2 shrink-0 rounded-full", FONDO_ETIQUETA[e.color])}
+            />
+          ))}
         </div>
         {m.snippet ? (
           <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">

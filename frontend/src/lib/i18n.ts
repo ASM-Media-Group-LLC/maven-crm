@@ -1063,6 +1063,27 @@ const translations = {
   "cal.semanaSiguiente": { es: "Semana siguiente", en: "Next week" },
   "cal.sinEventosSemana": { es: "Nada agendado esta semana", en: "Nothing scheduled this week" },
 
+  // Correo · etiquetas
+  "mail.labels": { es: "Etiquetas", en: "Labels" },
+  "mail.labels.name": { es: "Nombre de la etiqueta", en: "Label name" },
+  "mail.labels.create": { es: "Crear etiqueta", en: "Create label" },
+  "mail.labels.created": { es: "Etiqueta creada", en: "Label created" },
+  "mail.labels.deleted": { es: "Etiqueta borrada", en: "Label deleted" },
+  "mail.labels.deletedHelp": {
+    es: "Se quitó de los correos que la tenían. Ningún correo se borró.",
+    en: "It was removed from the emails that had it. No email was deleted.",
+  },
+  "mail.labels.duplicate": {
+    es: "Ya tenés una etiqueta con ese nombre.",
+    en: "You already have a label with that name.",
+  },
+  "mail.labels.empty": {
+    es: "Todavía no creaste ninguna. Sirven para agrupar correos sin moverlos de carpeta.",
+    en: "You haven\u2019t created any yet. They group emails without moving them between folders.",
+  },
+  "mail.labels.color": { es: "Color {name}", en: "Color {name}" },
+  "mail.labels.delete": { es: "Borrar {name}", en: "Delete {name}" },
+
   // Oficina · compartir un documento con personas
   "doc.compartir": { es: "Compartir", en: "Share" },
   "doc.compartirCon": { es: "Compartir con", en: "Share with" },
