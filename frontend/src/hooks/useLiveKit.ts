@@ -16,6 +16,7 @@ import type { TrackPublishOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
+  decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
 } from "@/lib/audioDeLaLlamada";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { toast } from "sonner";
@@ -385,7 +386,13 @@ export function useLiveKit() {
   const micVigiladoRef = useRef<MediaStreamTrack | null>(null);
   // Volver a pedir el micrófono al sistema. Se guarda en un ref porque el
   // vigilante se declara antes que `reapplyNC` y que las preferencias.
-  const repararMicroRef = useRef<() => Promise<void>>(async () => {});
+  const repararMicroRef = useRef<(automatica?: boolean) => Promise<void>>(async () => {});
+  // Cuándo quedó callado este micrófono (Date.now()); 0 = está hablando. Lo
+  // sella tanto silenciarse uno mismo como que lo silencie un supervisor.
+  const meSilencieYoRef = useRef(0);
+  // El vigilante del saliente. Se declara acá arriba —con los demás refs— para
+  // que el intervalo de `connect` lo pueda llamar sin usarlo antes de definirlo.
+  const vigilarSalidaDelMicroRef = useRef<() => void>(() => {});
   const vigilarMicro = useCallback((room: Room) => {
     const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
       (p) => p.source === Track.Source.Microphone,
@@ -1284,6 +1291,10 @@ export function useLiveKit() {
         if (!participant?.isLocal) return;
         if (pub?.source !== Track.Source.Microphone) return;
         if (Date.now() - meSilencieYoRef.current < 1500) return; // fui yo
+        // Me silenció OTRO (un supervisor). Se sella igual, para que el
+        // `silencioLargo` de toggleMic mida cuánto lleva callado el micrófono y
+        // no cuándo fue la última vez que esta persona tocó el botón.
+        meSilencieYoRef.current = Date.now();
         // Con id: si enseguida llega el aviso del servidor con nombre y cara
         // ("Jhon silenció tu micrófono"), reemplaza a este en vez de apilarse.
         toast.info("Alguien silenció tu micrófono", {
@@ -1531,6 +1542,7 @@ export function useLiveKit() {
       clearSyncInterval();
       syncIntervalRef.current = setInterval(() => {
         refreshParticipants();
+        vigilarSalidaDelMicroRef.current();
       }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
       clearSyncInterval();
@@ -1574,7 +1586,6 @@ export function useLiveKit() {
   // acá llega el mismo evento que cuando uno se mutea solo. Se marca el momento
   // del muteo propio para poder distinguirlos: sin eso, a quien lo silencian se
   // le corta el micro sin ninguna explicacion y sigue hablando al vacio.
-  const meSilencieYoRef = useRef(0);
 
   // Re-aplicar el noise cancellation al track de micrófono VIGENTE.
   //
@@ -1633,7 +1644,21 @@ export function useLiveKit() {
   // Volver a PEDIRLE el micrófono al sistema. Es lo único que devuelve el audio
   // cuando LiveKit ya vació el emisor: con la publicación viva, prender el micro
   // solo hace `unmute()` y ni siquiera vuelve a mirar el dispositivo.
-  const repararMicro = useCallback(async () => {
+  // El mismo consejo que da `repararMicro` cuando falla, para los dos caminos
+  // de `toggleMic` que hasta hoy solo escribían en la consola.
+  // ⚠️ ID PROPIO, no el de `repararMicro`. sonner REEMPLAZA el toast cuando el
+  // id coincide, y al reemplazarlo pierde la `action`. Con el id compartido,
+  // este aviso de 15 s pisaba el toast permanente que lleva el botón «Reparar»
+  // — o sea que tocar el botón del micro te borraba la única cura a mano.
+  const avisarMicroIrrecuperable = useCallback(() => {
+    toast.error("No pude encender el micrófono", {
+      id: "mic-no-enciende",
+      description: "Otro programa puede tenerlo tomado. Prueba a elegir otro micrófono en el menú de la llamada y volver al de siempre.",
+      duration: 15000,
+    });
+  }, []);
+
+  const repararMicro = useCallback(async (automatica = false) => {
     const room = roomRef.current;
     if (!room) return;
     const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
@@ -1641,23 +1666,97 @@ export function useLiveKit() {
     );
     const t = micPub?.track as LocalAudioTrack | undefined;
     if (!t) return;
+    // ⚠️ La reparación AUTOMÁTICA no puede usar el id del aviso permanente.
+    // sonner fusiona por id y le pisaría la `duration: Infinity` al único aviso
+    // que lleva el botón «Reparar»: se autodestruiría a los 15 s sin que nadie
+    // lo haya tocado, y la persona quedaría muda y sin botón. Eso era aceptable
+    // cuando repararMicro solo corría por un clic; ahora lo dispara el vigilante.
+    const avisoId = automatica ? "mic-reparando-solo" : "mic-sin-salida";
     try {
-      toast.loading("Reconectando el micrófono…", { id: "mic-sin-salida" });
-      await t.restartTrack(getDeviceConstraint(preferredDevicesRef.current.audioDeviceId));
-      await reapplyNC();
+      toast.loading("Reconectando el micrófono…", { id: avisoId });
+      // ⚠️ Soltar el procesador ANTES de re-pedir el micrófono. LiveKit llama a
+      // `processor.restart()` DENTRO de `setMediaStreamTrack`, antes del
+      // `replaceTrack`: si la cadena de cancelación de ruido falla ahí, aborta
+      // la re-adquisición entera y deja a la persona muda. Volver a tener el
+      // micrófono es lo único irrenunciable; el filtro lo repone `reapplyNC`.
+      try { await t.stopProcessor?.(); } catch { /* no había procesador */ }
+      try {
+        await t.restartTrack(getDeviceConstraint(preferredDevicesRef.current.audioDeviceId));
+      } finally {
+        // En un `finally`: si el restart falla, el procesador ya fue soltado
+        // arriba y sin esto la persona se quedaba sin cancelación de ruido el
+        // resto del episodio, sin que nadie se lo dijera.
+        await reapplyNC();
+      }
       micVigiladoRef.current = null;        // la pista cruda cambió: hay que volver a vigilarla
       vigilarMicro(room);
-      toast.success("Micrófono reconectado", { id: "mic-sin-salida", duration: 6000 });
+      toast.success("Micrófono reconectado", { id: avisoId, duration: 6000, action: undefined });
     } catch (err) {
       console.error("[LiveKit] no pude reparar el micrófono:", err);
       toast.error("No pude reconectar el micrófono", {
-        id: "mic-sin-salida",
+        id: avisoId,
         description: "Prueba a elegir otro micrófono en el menú de la llamada y volver al de siempre.",
         duration: 15000,
       });
     }
   }, [reapplyNC, vigilarMicro]);
   repararMicroRef.current = repararMicro;
+
+  // ── EL VIGILANTE DEL SALIENTE ───────────────────────────────────────────────
+  //
+  // El audio ENTRANTE tenía desde el 14/09 un vigilante que corre cada 3 s y se
+  // repara solo (RoomAudioSink). El SALIENTE no tenía ninguno: se arregló con
+  // avisos que dependen de que LiveKit emita un evento Y de que una persona
+  // toque un botón. Los dos supuestos fallan justo en el caso que importa —hay
+  // caminos que no emiten ningún evento, y el aviso se dibuja en la ventana de
+  // Maven, que es la que quien comparte pantalla dejó atrás—. Por eso la gente
+  // terminaba saliendo y volviendo a entrar a la llamada.
+  //
+  // Esto cuelga del intervalo de 3 s que ya existía, a propósito: no agrega un
+  // temporizador nuevo ni seis sitios más donde haya que acordarse de limpiarlo.
+  // La DECISIÓN (cuándo está roto, cada cuánto se puede reintentar, cuántas
+  // veces) vive en `lib/audioDeLaLlamada.ts` como función pura y con pruebas:
+  // su modo de fallo peligroso no es no reparar, es reparar EN BUCLE, y eso hay
+  // que poder probarlo sin una llamada de verdad. Acá queda solo el cableado.
+  const memoriaVigilanteRef = useRef<MemoriaDelVigilante>(MEMORIA_VIGILANTE_VACIA);
+  vigilarSalidaDelMicroRef.current = () => {
+    const room = roomRef.current;
+    const micPub = room
+      ? Array.from(room.localParticipant.audioTrackPublications.values()).find(
+          (p) => p.source === Track.Source.Microphone,
+        )
+      : undefined;
+    const t = micPub?.track as LocalAudioTrack | undefined;
+    // La pista CRUDA: con un procesador puesto, `mediaStreamTrack` es la salida
+    // del filtro, que la fabricamos nosotros y nunca se marca `muted`.
+    const cruda = (t as unknown as { _mediaStreamTrack?: MediaStreamTrack } | undefined)?._mediaStreamTrack
+      ?? t?.mediaStreamTrack;
+    const { reparar, memoria } = decidirSiRepararElMicro(
+      {
+        conectado: !!room && room.state === ConnectionState.Connected,
+        micEncendido: !!room?.localParticipant.isMicrophoneEnabled,
+        hayPista: !!t,
+        upstreamPausado: !!t?.isUpstreamPaused,
+        estadoDeLaPista: cruda?.readyState ?? null,
+        silenciadaPorElSistema: !!cruda?.muted,
+      },
+      memoriaVigilanteRef.current,
+      Date.now(),
+    );
+    memoriaVigilanteRef.current = memoria;
+    if (!reparar) return;
+    console.warn("[LiveKit] el micrófono no está saliendo al aire; reparando solo (intento", memoria.reparaciones, ")");
+    const miSello = memoria.reparandoDesde;
+    void repararMicroRef.current(true).finally(() => {
+      // Se marca terminada SOLO si sigue siendo la mía: si esta reparación se
+      // colgó, venció a los 30 s y arrancó otra, limpiar a ciegas le borraría
+      // la marca a la nueva. Si la promesa NUNCA se asienta, `reparandoDesde`
+      // vence solo dentro de la función pura: el vigilante no queda muerto.
+      if (memoriaVigilanteRef.current.reparandoDesde === miSello) {
+        memoriaVigilanteRef.current = { ...memoriaVigilanteRef.current, reparandoDesde: 0 };
+      }
+    });
+  };
 
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
@@ -1673,10 +1772,45 @@ export function useLiveKit() {
         const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
           (p) => p.source === Track.Source.Microphone,
         );
-        const t = micPub?.track as (LocalAudioTrack & { needsReAcquisition?: boolean }) | undefined;
-        if (t?.needsReAcquisition) {
+        const t = micPub?.track as LocalAudioTrack | undefined;
+        // ⚠️ ACÁ ESTABA `needsReAcquisition`, Y ERA UNA TRAMPA. Esa propiedad de
+        // LiveKit incluye `!enabled` (LocalTrack.ts:402) y silenciar el micro
+        // pone `enabled = false` (LocalTrack.ts:394): o sea que DESPUÉS DE
+        // CUALQUIER SILENCIO era siempre verdadera. Lo que se escribió el 14/09
+        // para un caso raro terminó siendo el camino de TODOS los desmuteos, y
+        // cada uno mataba la pista y pedía el micrófono al sistema de nuevo.
+        //
+        // Eso importa porque `restartTrack` PARA la pista vieja ANTES de pedir
+        // la nueva (LocalTrack.ts:353-360): si ese pedido falla —el dispositivo
+        // lo tomó otro programa, que es justo lo que pasa al compartir pantalla
+        // con audio— queda una pista MUERTA en el emisor. Y ese estado no emite
+        // `mute`, ni `ended`, ni `UpstreamPaused`, que son los eventos que
+        // vigilamos: nadie te oye y no hay un solo aviso. Es lo que reportó
+        // Mónica el 18/09 («debíamos salir e ingresar de nuevo»).
+        //
+        // Ahora se mira la pista CRUDA y solo se vuelve a pedir el dispositivo
+        // si está rota DE VERDAD. Un desmuteo normal vuelve a ser un `unmute()`
+        // seco, sin getUserMedia y sin riesgo. El caso `ended` lo cubre LiveKit
+        // por su cuenta dentro de `unmute()` (LocalAudioTrack.ts:68-82).
+        const cruda = (t as unknown as { _mediaStreamTrack?: MediaStreamTrack } | undefined)?._mediaStreamTrack
+          ?? t?.mediaStreamTrack;
+        const rotaDeVerdad = !!cruda && (cruda.readyState !== "live" || cruda.muted);
+        // ⚠️ Y ADEMÁS tras un silencio LARGO. Sacar el re-pedido del todo perdía
+        // una cura accidental que hoy funciona todos los días: la pausa de
+        // Cowork apaga el micro y lo prende 20-30 min después, y en el medio la
+        // máquina pudo dormirse o el sistema re-rutear el dispositivo. Eso deja
+        // la pista `live` y sin `muted` pero entregando silencio, que no lo
+        // detecta nadie. El churn que causaba el bug eran los silencios CORTOS
+        // —desmutear cada pocos segundos—, y esos quedan fuera.
+        const silencioLargo = meSilencieYoRef.current > 0
+          && Date.now() - meSilencieYoRef.current > 60_000;
+        if (t && (rotaDeVerdad || silencioLargo)) {
           try { await t.restartTrack(getDeviceConstraint(preferredDevicesRef.current.audioDeviceId)); }
-          catch (err) { console.warn("[LiveKit] no pude re-pedir el micrófono al prenderlo:", err); }
+          catch (err) {
+            // Antes esto era un console.warn a secas y la persona no veía NADA.
+            console.warn("[LiveKit] no pude re-pedir el micrófono al prenderlo:", err);
+            avisarMicroIrrecuperable();
+          }
         }
       }
       if (!shouldEnable) meSilencieYoRef.current = Date.now();
@@ -1691,15 +1825,20 @@ export function useLiveKit() {
       if (!room.canPlaybackAudio) {
         room.startAudio().catch(() => {});
       }
+      // Encendido: la marca deja de tener sentido hasta el próximo silencio.
+      if (shouldEnable) meSilencieYoRef.current = 0;
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
       setTimeout(() => refreshParticipants(), 180);
     } catch (err) {
+      // Idem: sin esto, tocar el botón del micro y que no pase nada era
+      // indistinguible de que la app estuviera colgada.
       console.error("Mic toggle error:", err);
+      avisarMicroIrrecuperable();
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
     }
-  }, [refreshParticipants, reapplyNC, vigilarMicro]);
+  }, [refreshParticipants, reapplyNC, vigilarMicro, avisarMicroIrrecuperable]);
 
   // ── Noise Cancellation toggle ─────────────────────────────────
   const toggleNoiseCancellation = useCallback(async () => {
