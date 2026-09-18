@@ -4,7 +4,8 @@
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  listGroups, createGroup, addGroupMembers, removeGroupMembers, addGroupAliases, zohoConfigured,
+  listGroups, createGroup, addGroupMembers, removeGroupMembers, addGroupAliases,
+  setGroupAccess, zohoConfigured,
 } from "../_shared/zoho.ts";
 
 const corsHeaders = (req: Request) =>
@@ -136,14 +137,17 @@ async function provisionMissing(admin: any, zoho: { byEmail: Map<string, { zgid:
 }
 
 // Grupos actuales en Zoho, indexados por email en minúscula.
-async function getZohoGroups(): Promise<{ ok: boolean; error?: string; byEmail: Map<string, { zgid: string; members: Set<string> }> }> {
+async function getZohoGroups(): Promise<{ ok: boolean; error?: string; byEmail: Map<string, { zgid: string; members: Set<string>; accessType: string }> }> {
   const r = await listGroups();
-  const byEmail = new Map<string, { zgid: string; members: Set<string> }>();
+  const byEmail = new Map<string, { zgid: string; members: Set<string>; accessType: string }>();
   if (!r.ok) return { ok: false, error: r.error, byEmail };
   for (const g of r.data?.groups ?? []) {
     byEmail.set(String(g.emailId).toLowerCase(), {
       zgid: String(g.zgid),
       members: new Set((g.mailGroupMemberList ?? []).map((m) => String(m.memberEmailId).toLowerCase())),
+      // Se lee para poder COMPARAR: sin esto habría que mandarle el accessType
+      // a los 17 grupos en cada barrido para que quizá ninguno cambie.
+      accessType: String(g.accessType ?? ""),
     });
   }
   return { ok: true, byEmail };
@@ -287,7 +291,21 @@ Deno.serve(async (req) => {
         let addErr: string | null = null, remErr: string | null = null;
         if (toAdd.length) { const r = await addGroupMembers(m.zgid!, toAdd); if (!r.ok) addErr = r.error ?? "add failed"; }
         if (toRemove.length) { const r = await removeGroupMembers(m.zgid!, toRemove); if (!r.ok) remErr = r.error ?? "remove failed"; }
-        const result = { desired: want.size, added: addErr ? 0 : toAdd.length, removed: remErr ? 0 : toRemove.length, add_error: addErr, remove_error: remErr };
+
+        // ── Quién le puede ESCRIBIR al grupo ──────────────────────────────
+        // `access_type` existía en la tabla pero solo se usaba al CREAR: un
+        // grupo ya creado se quedaba con el que le tocó y cambiarlo en la base
+        // no hacía nada. Ahora el barrido lo aplica, y solo cuando difiere.
+        let accessErr: string | null = null;
+        let accessCambiado = false;
+        const acceso = String(m.access_type ?? "");
+        if (acceso && grp && grp.accessType && grp.accessType !== acceso) {
+          const r = await setGroupAccess(m.zgid!, acceso as "Organization");
+          if (r.ok) accessCambiado = true;
+          else accessErr = r.error ?? "access failed";
+        }
+
+        const result = { desired: want.size, added: addErr ? 0 : toAdd.length, removed: remErr ? 0 : toRemove.length, add_error: addErr, remove_error: remErr, access: accessCambiado ? acceso : null, access_error: accessErr };
         await admin.from("email_role_groups").update({ last_synced_at: new Date().toISOString(), last_sync_result: result, updated_at: new Date().toISOString() }).eq("role", m.role);
         results.push({ role: m.role, group: m.group_email, ...result });
       }
