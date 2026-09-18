@@ -287,6 +287,76 @@ Deno.serve(async (req) => {
       return responder({ id });
     }
 
+    // ── Ver un ADJUNTO del correo en ONLYOFFICE ───────────────────────────
+    // Antes un .docx o un .xlsx adjunto se convertían a PDF: se veía una FOTO
+    // del documento. Las fórmulas de una hoja no se podían mirar, las pestañas
+    // no se podían cambiar, y una tabla ancha salía cortada por el salto de
+    // página que LibreOffice inventaba. Ahora se abre el archivo de verdad.
+    //
+    // La URL firmada la produce `document-convert` (que ya guarda el original
+    // en R2 con caché por SHA-256); acá solo se arma y se FIRMA la config, que
+    // es lo que no se puede hacer en el navegador sin regalar el secreto.
+    if (accion === "adjunto") {
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+      if (!servidorOO) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
+
+      const url = String(body.url ?? "");
+      const nombre = String(body.nombre ?? "adjunto").slice(0, 200);
+      const hash = String(body.hash ?? "");
+      const extension = String(body.extension ?? "");
+
+      if (!EXTENSIONES.has(extension)) throw new HttpError("Formato no soportado", 400);
+      if (!/^[0-9a-f]{64}$/.test(hash)) throw new HttpError("Hash inválido", 400);
+      // ⚠️ La URL va DENTRO de la config firmada, y ONLYOFFICE la va a pedir
+      // desde su servidor. Aceptar cualquiera la convertiría en un cliente
+      // HTTP nuestro apuntando a donde diga quien llame. Solo R2.
+      if (!/^https:\/\/[0-9a-f]+\.r2\.cloudflarestorage\.com\//.test(url)) {
+        throw new HttpError("La URL del adjunto no es de R2", 400);
+      }
+
+      const perfilAdj = await comoLaPersona
+        .from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+
+      const configAdj: Record<string, unknown> = {
+        documentType: TIPO_DE_EDITOR[extension] ?? "word",
+        document: {
+          // La llave es el CONTENIDO: el mismo adjunto abierto por dos
+          // personas es el mismo documento para ONLYOFFICE, que así lo cachea
+          // una sola vez. Y como un adjunto no cambia nunca, la llave estable
+          // no trae el problema de la caché vieja que sí tienen los nuestros.
+          key: `adj-${hash.slice(0, 32)}`,
+          title: nombre,
+          fileType: extension,
+          url,
+          // ⚠️ SOLO LECTURA, y no por prudencia: un adjunto de un correo no es
+          // un documento de Maven. No hay dónde guardarlo — el correo ya se
+          // mandó. Dejar editar sería ofrecer un botón de guardar que no
+          // guarda en ningún lado.
+          permissions: { edit: false, download: true, print: true },
+        },
+        editorConfig: {
+          lang: "es",
+          mode: "view",
+          // Sin `callbackUrl`: no hay a dónde avisar de un guardado que no
+          // puede existir.
+          user: {
+            id: user.id,
+            name: (perfilAdj.data?.full_name as string) || user.email || "Alguien",
+          },
+          customization: {
+            compactHeader: true,
+            toolbarHideFileName: true,
+            hideRightMenu: true,
+            chat: false,
+            comments: false,
+            feedback: false,
+          },
+        },
+      };
+      if (secretoOO) configAdj.token = await firmar(configAdj, secretoOO);
+      return responder({ servidor: servidorOO, config: configAdj });
+    }
+
     // ── De acá para abajo, todas las acciones son SOBRE UN DOCUMENTO ──────
     // Comparten el mismo control de acceso a propósito: tenerlo escrito una
     // sola vez es lo que evita que el historial termine siendo la puerta de

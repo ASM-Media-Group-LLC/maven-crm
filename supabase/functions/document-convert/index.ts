@@ -119,6 +119,23 @@ function r2() {
 
 const llaveDe = (hash: string) => `convertidos/${hash}.pdf`;
 
+/** El ORIGINAL, tal cual vino, para que ONLYOFFICE lo abra.
+ *
+ *  ⚠️ Conserva la extensión porque ONLYOFFICE elige el editor por el
+ *  `fileType`, y además la URL firmada que le pasamos tiene que terminar en
+ *  algo que reconozca. Y va en otra carpeta que los PDF: son cosas distintas
+ *  con vidas distintas. */
+const llaveOriginal = (hash: string, ext: string) => `originales/${hash}.${ext}`;
+
+/** Los que ONLYOFFICE abre DE VERDAD, sin pasar por PDF.
+ *
+ *  Es un subconjunto de `CONVERTIBLES` a propósito: un .doc o un .odt viejos
+ *  los abre mejor LibreOffice convirtiéndolos, y un .rtf directamente no es
+ *  trabajo para el editor de Office. Para esos tres formatos modernos, en
+ *  cambio, convertir a PDF era perder el original: se veía una foto del
+ *  documento en vez del documento. */
+const ONLYOFFICE_ABRE = new Set(["docx", "xlsx", "pptx"]);
+
 async function urlFirmada(llave: string, segundos: number): Promise<string> {
   const { cliente, base } = r2();
   const firmada = await cliente.sign(
@@ -134,15 +151,28 @@ async function existeEnR2(llave: string): Promise<boolean> {
   return resp.ok;
 }
 
-async function subirAR2(llave: string, pdf: Uint8Array): Promise<void> {
+/** Los tipos de los originales. ⚠️ Importa: ONLYOFFICE mira el Content-Type de
+ *  lo que baja, y un .xlsx servido como application/pdf lo rechaza sin decir
+ *  por qué. */
+const MIME_ORIGINAL: Record<string, string> = {
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+
+async function subirAR2(
+  llave: string,
+  bytes: Uint8Array,
+  tipo = "application/pdf",
+): Promise<void> {
   const { cliente, base } = r2();
   const resp = await cliente.fetch(`${base}/${llave}`, {
     method: "PUT",
-    body: pdf as unknown as BodyInit,
-    headers: { "Content-Type": "application/pdf" },
+    body: bytes as unknown as BodyInit,
+    headers: { "Content-Type": tipo },
   });
   if (!resp.ok) {
-    throw new HttpError(`No se pudo guardar el PDF (R2 ${resp.status})`, 502);
+    throw new HttpError(`No se pudo guardar el archivo (R2 ${resp.status})`, 502);
   }
 }
 
@@ -200,6 +230,38 @@ Deno.serve(async (req) => {
     if (accion === "check") {
       const listo = await existeEnR2(llave);
       return responder({ listo, url: listo ? await urlFirmada(llave, 3600) : null });
+    }
+
+    // ── El original, para abrirlo en ONLYOFFICE ────────────────────────────
+    // Mismo trato de dos pasos que la conversión: primero se pregunta por la
+    // huella, que es barato, y solo si no está se suben los bytes. Un adjunto
+    // de 20 MB son ~27 MB en base64 y subirlos cada vez que alguien abre la
+    // misma hoja de vida sería regalar tiempo y ancho de banda.
+    if (accion === "check_original" || accion === "guardar_original") {
+      const ext = extensionDe(String(body.filename ?? ""));
+      if (!ONLYOFFICE_ABRE.has(ext)) {
+        throw new HttpError(`ONLYOFFICE no abre un .${ext || "?"}`, 400);
+      }
+      const llaveOrig = llaveOriginal(hash, ext);
+
+      if (await existeEnR2(llaveOrig)) {
+        return responder({ listo: true, url: await urlFirmada(llaveOrig, 3600) });
+      }
+      if (accion === "check_original") return responder({ listo: false, url: null });
+
+      const b64o = String(body.contentBase64 ?? "");
+      if (!b64o) throw new HttpError("Sin archivo", 400);
+      const bino = atob(b64o);
+      if (bino.length > MAX_BYTES) {
+        throw new HttpError(`El archivo pasa de ${MAX_BYTES / 1024 / 1024} MB`, 413);
+      }
+      const bytesO = new Uint8Array(bino.length);
+      for (let i = 0; i < bino.length; i++) bytesO[i] = bino.charCodeAt(i);
+      // Guardar el original NO consume cupo de conversión: no hay LibreOffice
+      // de por medio, es subir bytes. Cobrarle el cupo haría que abrir tres
+      // adjuntos seguidos entre en la fila de espera sin motivo.
+      await subirAR2(llaveOrig, bytesO, MIME_ORIGINAL[ext]);
+      return responder({ listo: true, url: await urlFirmada(llaveOrig, 3600) });
     }
 
     if (accion !== "convert") throw new HttpError("Acción desconocida", 400);

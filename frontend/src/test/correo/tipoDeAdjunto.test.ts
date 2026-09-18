@@ -10,8 +10,21 @@ describe("tipoDeAdjunto", () => {
     expect(tipoDeAdjunto(adj("cv.pdf"))).toBe("pdf");
     expect(tipoDeAdjunto(adj("foto.png"))).toBe("imagen");
     expect(tipoDeAdjunto(adj("notas.txt"))).toBe("texto");
-    expect(tipoDeAdjunto(adj("informe.docx"))).toBe("convertible");
     expect(tipoDeAdjunto(adj("respaldo.zip"))).toBe("ninguno");
+  });
+
+  it("⚠️ Office moderno va a ONLYOFFICE; el viejo sigue por el conversor", () => {
+    // Convertir un .docx a PDF era ver una FOTO del documento: las fórmulas de
+    // una hoja no se podían mirar y una tabla ancha salía cortada por el salto
+    // de página que LibreOffice le inventaba. Los formatos VIEJOS sí siguen
+    // por LibreOffice, que los abre mejor que ONLYOFFICE.
+    expect(tipoDeAdjunto(adj("informe.docx"))).toBe("office");
+    expect(tipoDeAdjunto(adj("cuentas.xlsx"))).toBe("office");
+    expect(tipoDeAdjunto(adj("pitch.pptx"))).toBe("office");
+
+    expect(tipoDeAdjunto(adj("viejo.doc"))).toBe("convertible");
+    expect(tipoDeAdjunto(adj("viejo.xls"))).toBe("convertible");
+    expect(tipoDeAdjunto(adj("texto.odt"))).toBe("convertible");
   });
 
   it("reconoce una invitación por extensión y por Content-Type", () => {
