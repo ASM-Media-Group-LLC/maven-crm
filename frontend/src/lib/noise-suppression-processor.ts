@@ -1,4 +1,3 @@
-import { LocalTrack, Track } from "livekit-client";
 import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
@@ -150,16 +149,32 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
     );
   };
 
-  const fuente = ctx.createMediaStreamSource(new MediaStream([entrada]));
-  const destino = ctx.createMediaStreamDestination();
+  // ⚠️ TODO LO QUE PUEDA FALLAR ACÁ CIERRA EL AudioContext ANTES DE PROPAGAR.
+  // El contexto se crea arriba; si algo de esto tira y nadie lo cierra, queda un
+  // hilo de audio a 48 kHz vivo por cada intento, reteniendo el micrófono. Los
+  // navegadores topean los AudioContext por documento (Chrome, alrededor del
+  // sexto), y al llegar al tope el `new AudioContext` de arriba empieza a tirar
+  // él mismo — justo lo que no queremos durante un cambio de pista.
+  // Ojo con `addModule`: es una descarga de RED (un 404 tras un deploy, un MIME
+  // mal servido, una CSP) y hasta hoy era la única llamada de la cadena sin
+  // ninguna protección.
+  let fuente: MediaStreamAudioSourceNode;
+  let destino: MediaStreamAudioDestinationNode;
+  let puerta: AudioWorkletNode;
+  try {
+    fuente = ctx.createMediaStreamSource(new MediaStream([entrada]));
+    destino = ctx.createMediaStreamDestination();
+    // La puerta de siempre, ahora de remate. Su regla está testeada en
+    // lib/pisoDeRuido.ts con un port fiel en el worklet.
+    await ctx.audioWorklet.addModule("/worklets/noise-suppression-worklet.js");
+    puerta = new AudioWorkletNode(ctx, "noise-suppression-processor");
+  } catch (e) {
+    try { await ctx.close(); } catch { /* noop */ }
+    throw e;
+  }
   const nodos: AudioNode[] = [];
   let rnnoise: InstanceType<LibNC["RnnoiseWorkletNode"]> | null = null;
   let motor: MotorNC = "puerta";
-
-  // La puerta de siempre, ahora de remate. Su regla está testeada en
-  // lib/pisoDeRuido.ts con un port fiel en el worklet.
-  await ctx.audioWorklet.addModule("/worklets/noise-suppression-worklet.js");
-  const puerta = new AudioWorkletNode(ctx, "noise-suppression-processor");
 
   try {
     const [wasm, lib] = await Promise.all([
@@ -238,15 +253,60 @@ export class NoiseSuppresionTrackProcessor {
   /** Ver `armarCadenaNC`: quién apaga el filtro si deja de funcionar andando. */
   constructor(private readonly alFallar?: (motivo: string) => void) {}
 
-  async init({ track }: { track: LocalTrack<Track.Kind>; element?: HTMLMediaElement }) {
-    this.cadena = await armarCadenaNC(track.mediaStreamTrack, this.alFallar);
-    this.processedTrack = this.cadena.salida;
-    this.motor = this.cadena.motor;
+  // ⚠️ NI `init` NI `restart` PUEDEN TIRAR NUNCA. NO ES ESTILO: ES LA DIFERENCIA
+  // ENTRE QUE ALGUIEN SALGA CON RUIDO O QUE SE QUEDE MUDO.
+  //
+  // LiveKit llama a `restart()` DENTRO de `setMediaStreamTrack`, ANTES de
+  // `sender.replaceTrack` (livekit-client.esm.mjs:18049 y :18057). Si tiramos
+  // ahí, el `replaceTrack` NUNCA corre: el emisor se queda con la pista vieja
+  // —que ya paramos— y la nueva ni se asigna. Silencio permanente, con el
+  // micrófono en verde y sin un solo evento que lo delate. Es exactamente el
+  // bug que venimos persiguiendo desde el 10/09.
+  //
+  // En cambio, si dejamos `processedTrack` sin definir, la línea 18057 hace
+  // `replaceTrack(processedTrack ?? newTrack)` y sale la pista CRUDA. Ruido en
+  // vez de silencio, que es la política que este archivo declara arriba.
+  //
+  // Hasta el 18/09/2026 nada de esto importaba porque `init` tiraba SIEMPRE (le
+  // pasábamos `track.mediaStreamTrack` de un MediaStreamTrack) y LiveKit solo
+  // asigna `this.processor` DESPUÉS de que `init` resuelva: la rama del
+  // procesador dentro de `setMediaStreamTrack` no se ejecutaba jamás. Al
+  // corregir la llamada, esa rama se enciende en TODOS los restartTrack.
+  async init({ track }: { track: MediaStreamTrack; element?: HTMLMediaElement }) {
+    await this.armar(track);
   }
 
-  async restart({ track, element }: { track: LocalTrack<Track.Kind>; element?: HTMLMediaElement }) {
-    await this.destroy();
-    await this.init({ track, element });
+  // ⚠️ NO DESTRUCTIVO. Antes hacía `destroy()` y DESPUÉS `init()`, o sea que
+  // paraba la pista que el emisor estaba transmitiendo y recién entonces
+  // intentaba armar la nueva. Si armar fallaba, ya no había a qué volver.
+  // Ahora se arma la nueva primero y la vieja se suelta solo si la nueva quedó.
+  async restart({ track }: { track: MediaStreamTrack; element?: HTMLMediaElement }) {
+    const vieja = this.cadena;
+    await this.armar(track);
+    if (vieja && vieja !== this.cadena) {
+      try { await vieja.destruir(); } catch { /* ya estaba caída */ }
+    }
+  }
+
+  private async armar(track: MediaStreamTrack) {
+    try {
+      const nueva = await armarCadenaNC(track, this.alFallar);
+      this.cadena = nueva;
+      this.processedTrack = nueva.salida;
+      this.motor = nueva.motor;
+    } catch (e) {
+      // Mejor ruido que silencio: sin pista procesada, LiveKit publica la cruda.
+      this.cadena = undefined;
+      this.processedTrack = undefined;
+      this.motor = null;
+      const motivo = e instanceof Error ? e.message : String(e);
+      console.warn("[NC] no se pudo armar; se sigue con el micrófono crudo:", motivo);
+      // ⚠️ Diferido a propósito: `alFallar` termina llamando a `stopProcessor()`,
+      // y acá todavía estamos DENTRO de `setProcessor`/`setMediaStreamTrack`,
+      // que tienen tomado el cerrojo de cambio de pista de LiveKit. Llamarlo
+      // en línea lo trabaría.
+      if (this.alFallar) { const f = this.alFallar; setTimeout(() => f(motivo), 0); }
+    }
   }
 
   async destroy() {
