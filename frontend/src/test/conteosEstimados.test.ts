@@ -97,11 +97,14 @@ const PRESUPUESTO: Record<string, Presupuesto> = {
     porque: "total de la paginación de la Base de Datos de LeadGen (.range de 100)",
   },
   "/frontend/src/pages/closers/hooks/useCloserLeads.ts": {
-    exactos: 8, estimados: 0,
+    // Eran 8 hasta el #1887: cuatro totales de paginación y cuatro chips de
+    // pestaña. Ese PR convirtió las pestañas en FILTROS y con eso se fueron
+    // los cuatro chips. Los cuatro que quedan siguen teniendo que ser exactos.
+    exactos: 4, estimados: 0,
     porque:
-      "cuatro son totales de paginación (dos de ellos PARTEN la página entre " +
-      "leads y directorio) y cuatro son chips de pestaña que se muestran al " +
-      "lado de ese mismo total: estimar uno solo los haría contradecirse",
+      "los cuatro son totales de paginación, y dos de ellos PARTEN la página " +
+      "entre leads y directorio: con un estimado la lista saltearía unas filas " +
+      "y repetiría otras",
   },
   "/frontend/src/pages/contactos/ContactosContent.tsx": {
     exactos: 1, estimados: 0,
