@@ -62,6 +62,7 @@ import {
   useMailbox,
   useMailFolders,
   useMailMessage,
+  useImagenesIncrustadas,
   useMailMessages,
   useMailRealtime,
   useMarkSeen,
@@ -238,6 +239,15 @@ export default function CorreoPage() {
   // Pedirlos todos a `carpeta` sería buscarlos donde no están.
   const carpetaDelAbierto = sel?.folder ?? carpeta;
   const mensaje = useMailMessage(carpetaDelAbierto, sel);
+  // Las imágenes PEGADAS en el cuerpo viajan como partes del mensaje y el HTML
+  // las nombra con `src="cid:…"`, que ningún navegador sabe pedir. Sin esto se
+  // ven como un ícono roto, sin un solo error que lo explique.
+  const cuerpoConImagenes = useImagenesIncrustadas({
+    folder: carpetaDelAbierto,
+    uid: sel?.uid != null ? Number(sel.uid) : null,
+    html: mensaje.data?.html ?? null,
+    attachments: mensaje.data?.attachments,
+  });
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
   const descargar = useDownloadAttachment();
@@ -1369,7 +1379,7 @@ export default function CorreoPage() {
 
                 <div className="mt-5 border-t border-border/60 pt-5">
                   <MailBody
-                    html={mensaje.data.html}
+                    html={cuerpoConImagenes}
                     text={mensaje.data.text}
                     remoteImages={mensaje.data.remote_images}
                     truncated={mensaje.data.truncated}
