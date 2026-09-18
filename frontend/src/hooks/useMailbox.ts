@@ -49,6 +49,11 @@ export interface MailSummary {
   /** Primeras líneas del cuerpo — solo lo trae la caché. */
   snippet?: string;
   messageId?: string;
+  /** `In-Reply-To`. Falta en lo sincronizado antes del 18/09/2026. */
+  inReplyTo?: string;
+  /** `References`, del más viejo al más nuevo. Ídem. */
+  refs?: string[];
+  cc?: string;
   unread: boolean;
   /** De dónde salió: decide cómo abrirlo y cómo marcarlo leído. */
   origen: "cache" | "vivo";
@@ -196,16 +201,19 @@ export function useMailMessages(folder: string, enabled: boolean) {
     staleTime: 60 * 1000,
     queryFn: async (): Promise<{ messages: MailSummary[] }> => {
       // Caché primero.
+      // ⚠️ `as never` en la tabla: `types.ts` es generado y todavía no conoce
+      // `in_reply_to` ni `refs`, así que el cliente tipado rechaza el select
+      // entero. Mismo patrón que calendar_events y document_shares.
       const { data, error } = await supabase
-        .from("mail_messages")
-        .select("id, uid, from_addr, to_addr, subject, date, snippet, unread, message_id")
+        .from("mail_messages" as never)
+        .select("id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id, in_reply_to, refs")
         .eq("folder", folder)
         .order("date", { ascending: false })
         .limit(50);
       if (error) throw error;
       if (data && data.length > 0) {
         return {
-          messages: data.map((m) => ({
+          messages: (data as unknown as Record<string, unknown>[]).map((m) => ({
             id: m.id as string,
             uid: m.uid as number,
             from: (m.from_addr as string) ?? "",
@@ -214,6 +222,12 @@ export function useMailMessages(folder: string, enabled: boolean) {
             date: (m.date as string) ?? "",
             snippet: (m.snippet as string) ?? "",
             messageId: (m.message_id as string) ?? undefined,
+            // Las cabeceras que encadenan la conversación. Faltan en todo lo
+            // sincronizado antes del 18/09/2026: para esos, `agruparEnHilos`
+            // cae al camino por asunto.
+            inReplyTo: (m.in_reply_to as string) ?? undefined,
+            refs: (m.refs as string[]) ?? undefined,
+            cc: (m.cc_addr as string) ?? undefined,
             unread: !!m.unread,
             origen: "cache" as const,
           })),
