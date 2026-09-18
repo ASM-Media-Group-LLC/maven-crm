@@ -1161,7 +1161,13 @@ Deno.serve(async (req) => {
                     filename: a.filename,
                     contentType: a.contentType,
                     sizeBytes: tamanoDeBase64(a.contentBase64),
-                    contentId: null,
+                    // ⚠️ EL Content-ID, NO `null`. Es lo que ata la imagen
+                    // PEGADA en el cuerpo con la parte que la lleva: el HTML
+                    // dice `src="cid:ese-id"` y el lector lo busca acá. Con
+                    // `null` no hay con qué emparejar, así que tu propia
+                    // imagen se veía rota en Enviados hasta que el barrido
+                    // completo pasara por ahí — media hora, cada vez.
+                    contentId: a.contentId ?? null,
                   })),
                   unread: false,
                   message_id: messageId,

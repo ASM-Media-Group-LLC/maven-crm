@@ -82,6 +82,15 @@ describe("la copia sembrada en Enviados trae el correo entero", () => {
     }
   });
 
+  it("⚠️ el contentId es el DE VERDAD, no null", () => {
+    // Estuvo escrito `contentId: null` fijo. La forma pasaba el test de
+    // arriba —el campo estaba— y aun así la imagen PEGADA en el cuerpo se
+    // veía rota en Enviados: el `src="cid:…"` del HTML se empareja por ese
+    // id, y contra `null` no empareja nada. Media hora, cada correo.
+    expect(siembra).toMatch(/contentId:\s*a\.contentId/);
+    expect(siembra).not.toMatch(/contentId:\s*null/);
+  });
+
   it("el tamaño del adjunto es el decodificado", () => {
     expect(siembra).toMatch(/sizeBytes:\s*tamanoDeBase64\(/);
     // Guardar `.length` del base64 sería el bug que el helper evita.

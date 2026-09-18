@@ -1,9 +1,10 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { base64ABlob } from "@/lib/base64Blob";
+import { adjuntosIncrustados, incrustarCids } from "@/lib/mailCid";
 
 /**
  * Buzón del usuario: carpetas, mensajes, lectura y envío.
@@ -633,6 +634,61 @@ export function useAdjuntosParaReenviar() {
       return bajados;
     },
   });
+}
+
+/** Resuelve las imágenes PEGADAS en el cuerpo del correo.
+ *
+ *  El HTML las referencia con `src="cid:…"` y ningún navegador sabe pedir un
+ *  `cid:` (ver `lib/mailCid.ts`): sin esto, la imagen que mandaste perfecta se
+ *  ve como un ícono roto al releerla. Acá se bajan esas partes y se cambia el
+ *  `src` por los bytes, en `data:`.
+ *
+ *  Baja SOLO las partes que el HTML nombra: un correo con una imagen pegada y
+ *  un PDF de 40 MB adjunto no tiene por qué bajar el PDF para verse.
+ *
+ *  Va por `fetchQuery` con la MISMA llave del visor y de la descarga, así que
+ *  mirar la imagen en grande después no la vuelve a bajar, y `conTurno` dentro
+ *  de `callMail` las pone en fila en vez de abrir una sesión IMAP por imagen.
+ *
+ *  Mientras carga devuelve el HTML tal cual: el correo se lee igual y las
+ *  imágenes aparecen cuando llegan. */
+export function useImagenesIncrustadas(args: {
+  folder: string;
+  uid: number | null;
+  html: string | null;
+  attachments: MailAttachment[] | undefined;
+}): string | null {
+  const qc = useQueryClient();
+  const pedidos = useMemo(
+    () => adjuntosIncrustados(args.html, args.attachments),
+    [args.html, args.attachments],
+  );
+  const llave = pedidos.map((p) => `${p.index}:${p.cid}`).join("|");
+
+  const { data } = useQuery({
+    queryKey: ["mail-inline", args.folder, args.uid, llave] as const,
+    enabled: args.uid != null && pedidos.length > 0,
+    staleTime: Infinity,
+    ...SESION_IMAP,
+    queryFn: async () => {
+      const mapa = new Map<string, { contentType: string; contentBase64: string }>();
+      for (const p of pedidos) {
+        try {
+          const a = await qc.fetchQuery(adjuntoQuery(args.folder, args.uid!, p.index));
+          mapa.set(p.cid, { contentType: a.contentType, contentBase64: a.contentBase64 });
+        } catch {
+          // Una imagen que no se pudo bajar queda rota, como estaba. No es
+          // motivo para dejar sin cuerpo al correo entero.
+        }
+      }
+      return mapa;
+    },
+  });
+
+  return useMemo(
+    () => (args.html && data?.size ? incrustarCids(args.html, data) : args.html),
+    [args.html, data],
+  );
 }
 
 /** Deja listo el adjunto SIGUIENTE mientras se lee el actual. Con 30 hojas de
