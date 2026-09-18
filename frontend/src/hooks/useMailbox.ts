@@ -204,12 +204,30 @@ export function useMailMessages(folder: string, enabled: boolean) {
       // ⚠️ `as never` en la tabla: `types.ts` es generado y todavía no conoce
       // `in_reply_to` ni `refs`, así que el cliente tipado rechaza el select
       // entero. Mismo patrón que calendar_events y document_shares.
-      const { data, error } = await supabase
-        .from("mail_messages" as never)
-        .select("id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id, in_reply_to, refs")
-        .eq("folder", folder)
-        .order("date", { ascending: false })
-        .limit(50);
+      const COLUMNAS_BASE =
+        "id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id";
+      const traer = (cols: string) =>
+        supabase.from("mail_messages" as never)
+          .select(cols)
+          .eq("folder", folder)
+          .order("date", { ascending: false })
+          .limit(50);
+
+      // ⚠️ SE DEGRADA EN VEZ DE CAERSE.
+      //
+      // El 18/09/2026 el frontend salió a producción pidiendo `in_reply_to` y
+      // `refs` ANTES de que la migración estuviera aplicada, y PostgREST
+      // rechazó el select entero: el Correo quedó con "No se pudieron traer
+      // los mensajes · column mail_messages.in_reply_to does not exist" para
+      // todo el mundo. Dos columnas OPCIONALES —que solo mejoran cómo se
+      // agrupan los hilos— voltearon el módulo completo.
+      //
+      // Si faltan, se reintenta sin ellas: los hilos se agrupan por asunto,
+      // que es el camino de respaldo que ya existe, y la bandeja se ve.
+      let { data, error } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
+      if (error && /in_reply_to|refs/.test(error.message ?? "")) {
+        ({ data, error } = await traer(COLUMNAS_BASE));
+      }
       if (error) throw error;
       if (data && data.length > 0) {
         return {
