@@ -274,6 +274,8 @@ export interface ZohoGroup {
   zgid: string | number;
   emailId: string;
   name: string;
+  /** Quién le puede escribir. Ver `setGroupAccess`. */
+  accessType?: string;
   mailGroupMemberList?: ZohoGroupMember[];
 }
 
@@ -325,6 +327,36 @@ export function removeGroupMembers(zgid: string | number, emails: string[]): Pro
     body: JSON.stringify({
       mode: "deleteMailGroupMember",
       mailGroupMemberList: emails.map((e) => ({ memberEmailId: e })),
+    }),
+  });
+}
+
+/** Cambia QUIÉN le puede escribir a un grupo (mode updateMailGroupAdvOptions).
+ *
+ *  - `Public`       — cualquiera, INCLUIDO internet entero.
+ *  - `Organization` — solo quien tenga casilla de la organización.
+ *  - `Group`        — solo los miembros del propio grupo.
+ *  - `Moderated`    — todo pasa por aprobación de un moderador.
+ *
+ *  ⚠️ `Public` NO es "público dentro de la empresa": es que `equipo@` acepta
+ *  correo de cualquier dirección de internet. Es una vía directa de spam y
+ *  phishing a la empresa entera, con el peso extra de venir de una dirección
+ *  que todos reconocen como interna.
+ *
+ *  `holdOrBounce: "hold"` y no `"reject"` a propósito: lo que no pasa el filtro
+ *  queda esperando aprobación en vez de rebotar. Si mañana un proveedor legítimo
+ *  le escribe a `finanzas@`, alguien puede dejarlo pasar; con `reject` el correo
+ *  se pierde y el que lo mandó cree que llegó. */
+export function setGroupAccess(
+  zgid: string | number,
+  accessType: "Public" | "Organization" | "Group" | "Moderated",
+): Promise<ZohoResult> {
+  return zohoFetch(`/groups/${zgid}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      mode: "updateMailGroupAdvOptions",
+      accessType,
+      groupAdminSettings: { holdOrBounce: "hold", adminNotify: true },
     }),
   });
 }
