@@ -15,12 +15,18 @@ interface ConfigDeApertura {
  *  documento de otro. */
 export function useAbrirEnOnlyOffice() {
   return useMutation({
-    mutationFn: async (id: string): Promise<ConfigDeApertura> => {
+    mutationFn: async (
+      { id, tema }: { id: string; tema?: "dark" | "light" },
+    ): Promise<ConfigDeApertura> => {
       const { data: sesion } = await supabase.auth.getSession();
       const token = sesion.session?.access_token;
       if (!token) throw new Error("Sin sesión");
+      // El tema viaja desde acá porque el editor tiene que abrirse del color de
+      // Maven, y Maven tiene su propio claro/oscuro: leerlo del sistema
+      // operativo en la edge daría el color equivocado a quien los tenga
+      // distintos.
       const { data, error } = await supabase.functions.invoke("oficina-doc", {
-        body: { action: "abrir", id },
+        body: { action: "abrir", id, tema },
         headers: { Authorization: `Bearer ${token}` },
       });
       if (error) {

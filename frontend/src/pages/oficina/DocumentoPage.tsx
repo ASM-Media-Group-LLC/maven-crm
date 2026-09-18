@@ -5,6 +5,7 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useDocumento } from "@/hooks/useDocumentos";
 import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
@@ -21,6 +22,9 @@ export default function DocumentoPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
+  // `resolvedTheme` y no `theme`: con "system" puesto, `theme` vale "system" y
+  // el editor abriría con su color por defecto en vez del que se está viendo.
+  const { resolvedTheme } = useTheme();
   const [compartiendo, setCompartiendo] = useState(false);
   const doc = useDocumento(id);
   const abrir = useAbrirEnOnlyOffice();
@@ -28,13 +32,15 @@ export default function DocumentoPage() {
   // Pedir la configuración de nuevo alcanza: llega un objeto distinto y el
   // hook remonta solo. Es más barato que recargar la página entera, que es lo
   // que sugiere ONLYOFFICE.
-  const historial = useHistorialDeOficina(id, () => { if (id) abrir.mutate(id); });
+  const historial = useHistorialDeOficina(id, () => {
+    if (id) abrir.mutate({ id, tema: resolvedTheme === "dark" ? "dark" : "light" });
+  });
   const { estado, error } = useEditorDeOffice(CONTENEDOR, abrir.data, historial);
 
   // Pedir la configuración apenas se sabe qué documento es.
   useEffect(() => {
     if (!id) return;
-    abrir.mutate(id);
+    abrir.mutate({ id, tema: resolvedTheme === "dark" ? "dark" : "light" });
     // Solo al cambiar de documento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

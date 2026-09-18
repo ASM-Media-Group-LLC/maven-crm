@@ -26,6 +26,7 @@ import {
   type DocumentoParaHistorial, type FilaDeVersion,
 } from "./historial.ts";
 import { EN_BLANCO } from "./plantillas.ts";
+import { ALLOWED_ORIGINS } from "../_shared/cors.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -431,6 +432,27 @@ Deno.serve(async (req) => {
     const perfil = await comoLaPersona
       .from("profiles").select("full_name").eq("id", user.id).maybeSingle();
 
+    // ── Tema y botón de volver ────────────────────────────────────────────
+    // El tema lo sabe el NAVEGADOR (Maven tiene su propio claro/oscuro, que no
+    // tiene por qué coincidir con el del sistema operativo), así que viaja en
+    // el pedido. `theme-night` y `theme-white` son los valores por defecto de
+    // ONLYOFFICE para oscuro y claro.
+    //
+    // ⚠️ Si la persona cambia el tema DENTRO del editor, ONLYOFFICE lo guarda
+    // en su localStorage y a partir de ahí le gana a lo que mandemos. Es lo
+    // que queremos: su elección explícita pesa más que nuestra sugerencia.
+    const uiTheme = body.tema === "dark"
+      ? "theme-night"
+      : body.tema === "light"
+        ? "theme-white"
+        : undefined;
+
+    // La URL de vuelta NO se acepta del cliente: se arma con el origen del
+    // pedido y solo si está en la allowlist que ya usa el CORS de Maven. Un
+    // `goback.url` libre sería un enlace a donde quisiera quien llame.
+    const origen = req.headers.get("origin") ?? "";
+    const volverA = ALLOWED_ORIGINS.includes(origen) ? `${origen}/oficina` : null;
+
     const config: Record<string, unknown> = {
       documentType: TIPO_DE_EDITOR[doc.extension as string] ?? "word",
       document: {
@@ -455,12 +477,34 @@ Deno.serve(async (req) => {
           id: user.id,
           name: (perfil.data?.full_name as string) || user.email || "Alguien",
         },
+        // ── Personalización ───────────────────────────────────────────────
+        // ⚠️ SOLO lo que la edición Community permite. `logo` y `customer`
+        // están marcados "available only for ONLYOFFICE Docs Developer" en la
+        // API, y además la AGPL obliga a mantener la marca de ONLYOFFICE
+        // visible: no se toca ni se intenta rodear.
         customization: {
           autosave: true,
           forcesave: true,
-          compactHeader: false,
-          // No se toca el logo: la edición Community obliga a mantener la marca
-          // de ONLYOFFICE, y quitarla exige licencia comercial.
+          // La barra de Maven ya muestra el título y la versión arriba del
+          // editor: repetirlos adentro es una fila entera de pantalla gastada
+          // en decir dos veces lo mismo.
+          compactHeader: true,
+          toolbarHideFileName: true,
+          // El panel derecho arranca plegado. Se abre con un clic y mientras
+          // tanto el documento tiene todo el ancho.
+          hideRightMenu: true,
+          // ⚠️ El chat del editor SE APAGA. Maven ya tiene Messenger; dejar un
+          // segundo lugar para hablar adentro del documento es una trampa:
+          // alguien escribe ahí y nadie lo ve nunca.
+          chat: false,
+          // Los comentarios SÍ quedan: van anclados a un punto del documento,
+          // que es algo que el Messenger no puede hacer.
+          comments: true,
+          // El enlace de feedback apunta a ONLYOFFICE, no a nosotros.
+          feedback: false,
+          features: { spellcheck: true },
+          ...(volverA ? { goback: { text: "Volver a Oficina", url: volverA, blank: false } } : {}),
+          ...(uiTheme ? { uiTheme } : {}),
         },
       },
     };
