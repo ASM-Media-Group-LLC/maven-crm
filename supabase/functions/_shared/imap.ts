@@ -570,6 +570,13 @@ export class ImapClient {
    *  lo soporta (Zoho sí); si no, COPY + \Deleted + UID EXPUNGE. */
   async moveUids(uids: number[], dest: string): Promise<boolean> {
     if (!uids.length) return true;
+    // ⚠️ Un CR o un LF en el nombre CIERRA la línea del comando y lo que venga
+    // después se ejecuta como un comando IMAP propio. Hoy el destino sale de
+    // un mapa fijo, pero desde que "Mover a" acepta el de la persona esto es
+    // la diferencia entre escapar comillas y no tener un agujero. La edge
+    // además valida contra la lista real de carpetas; esto es el segundo
+    // cerrojo, acá abajo, donde se arma el comando.
+    if (/[\r\n\x00]/.test(dest)) return false;
     const d = `"${dest.replace(/"/g, '\\"')}"`;
     const set = uids.join(",");
     const mv = await this.command(`UID MOVE ${set} ${d}`);

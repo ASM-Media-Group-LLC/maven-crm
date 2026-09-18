@@ -383,8 +383,9 @@ Deno.serve(async (req) => {
     // (mail_messages / mail_folders) se ajusta al momento y el sincronizador
     // la termina de cuadrar en su próximo barrido.
     if (action === "bulk") {
-      const { op, uids } = body as { op?: string; uids?: unknown };
-      const ops = new Set(["seen", "unseen", "delete", "archive", "spam"]);
+      const { op, uids, dest: destPedido } = body as
+        { op?: string; uids?: unknown; dest?: unknown };
+      const ops = new Set(["seen", "unseen", "delete", "archive", "spam", "move"]);
       if (!op || !ops.has(op)) return json(req, { error: "op inválida" }, 400);
       const lista = (Array.isArray(uids) ? uids : [])
         .map((u) => Number(u)).filter((u) => Number.isInteger(u) && u > 0).slice(0, 200);
@@ -412,6 +413,25 @@ Deno.serve(async (req) => {
         client = await ImapClient.connect(cred.imap_host as string, cred.imap_port as number);
         const auth = await client.login(cred.email_address as string, password);
         if (!auth.ok) return json(req, { error: `IMAP rechazó la credencial: ${auth.error}` }, 502);
+        // ── El destino de "Mover a" ────────────────────────────────────
+        // ⚠️ NO se acepta el nombre tal cual: termina dentro de un comando
+        // IMAP. Se compara contra las carpetas REALES de la cuenta y solo se
+        // usa la que coincide exacto. Así, además de cerrar la inyección, un
+        // nombre con un typo falla acá con un mensaje claro en vez de que
+        // IMAP conteste algo críptico — o peor, que mueva a una carpeta que
+        // se crea sola.
+        let destino = "";
+        if (op === "move") {
+          const pedido = typeof destPedido === "string" ? destPedido.trim() : "";
+          if (!pedido) return json(req, { error: "falta la carpeta de destino" }, 400);
+          const carpetas = await client.listFolders();
+          if (!carpetas.ok) {
+            return json(req, { error: `IMAP no pudo listar las carpetas: ${carpetas.error}` }, 502);
+          }
+          destino = carpetas.folders.find((f) => f === pedido) ?? "";
+          if (!destino) return json(req, { error: `no existe la carpeta "${pedido}"` }, 400);
+        }
+
         const sel = await client.selectFolder(box);
         if (!sel.ok) return json(req, { error: `IMAP SELECT ${box}: ${sel.error}` }, 502);
 
@@ -423,7 +443,7 @@ Deno.serve(async (req) => {
           ok = await client.deleteUids(lista);
           movidos = true;
         } else {
-          const dest = DESTINO[op];
+          const dest = op === "move" ? destino : DESTINO[op];
           if (dest === box) return json(req, { error: `ya están en ${box}` }, 409);
           ok = await client.moveUids(lista, dest);
           movidos = true;
