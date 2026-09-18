@@ -170,3 +170,40 @@ describe("agruparEnHilos · el orden de la bandeja", () => {
     expect(h).toHaveLength(1);
   });
 });
+
+describe("cómo se presenta el hilo en la lista", () => {
+  it("el hilo se llama como EMPEZÓ, no como su última respuesta", () => {
+    // Con el del último se leería «Re: RE: RV: Hojas de vida», que es ruido de
+    // los clientes de correo, no el tema de la conversación.
+    const h = agruparEnHilos([
+      c({ messageId: "<1@z>", subject: "Hojas de vida Chatters", date: "2026-09-17T10:00:00Z" }),
+      c({ messageId: "<2@z>", inReplyTo: "<1@z>", subject: "RE: RV: Hojas de vida Chatters", date: "2026-09-17T11:00:00Z" }),
+    ]);
+    expect(h[0].asunto).toBe("Hojas de vida Chatters");
+    expect(h[0].ultimo.subject).toBe("RE: RV: Hojas de vida Chatters");
+  });
+
+  it("caso real de prod: 11 correos quedan en 7 conversaciones", () => {
+    const correos = [
+      c({ messageId: "<a1@z>", subject: "Asunto: Transición de Hubstaff a CRM Maven", from: "grace.gelves@maven-ai.me", to: "hhrr@maven-ai.me", date: "2026-09-17T17:00:59Z" }),
+      c({ messageId: "<a2@z>", subject: "Re: Asunto: Transición de Hubstaff a CRM Maven", from: "daniel.duque@maven-ai.me", to: "grace.gelves@maven-ai.me", date: "2026-09-18T15:26:00Z" }),
+      c({ messageId: "<b1@z>", subject: "Hojas de vida Chatters", from: "lina.pertuz@maven-ai.me", to: "andrea.palacio@maven-ai.me", date: "2026-09-17T15:37:00Z" }),
+      c({ messageId: "<b2@z>", subject: "Re: Hojas de vida Chatters", from: "grace.gelves@maven-ai.me", to: "lina.pertuz@maven-ai.me", date: "2026-09-16T23:17:02Z" }),
+      c({ messageId: "<b3@z>", subject: "RE: RV: Hojas de vida Chatters", from: "andrea.palacio@maven-ai.me", to: "lina.pertuz@maven-ai.me", date: "2026-09-16T22:15:35Z" }),
+      c({ messageId: "<c1@z>", subject: "BASE DE DATOS MODELOS", from: "brayan.castano@maven-ai.me", to: "maria.suarez@maven-ai.me", date: "2026-09-17T15:53:00Z" }),
+      c({ messageId: "<c2@z>", subject: "Re: BASE DE DATOS MODELOS", from: "maria.suarez@maven-ai.me", to: "brayan.castano@maven-ai.me", date: "2026-09-18T10:26:00Z" }),
+      c({ messageId: "<d1@z>", subject: "(sin asunto)", from: "x@otra.com", to: "jhon.lopez@maven-ai.me", date: "2026-09-18T09:00:00Z" }),
+      c({ messageId: "<d2@z>", subject: "(sin asunto)", from: "z@tercera.com", to: "jhon.lopez@maven-ai.me", date: "2026-09-18T08:00:00Z" }),
+      c({ messageId: "<e1@z>", subject: "Reporte semanal", from: "ana@maven-ai.me", to: "jhon.lopez@maven-ai.me", date: "2026-01-10T10:00:00Z" }),
+      c({ messageId: "<e2@z>", subject: "Reporte semanal", from: "ana@maven-ai.me", to: "jhon.lopez@maven-ai.me", date: "2026-09-18T10:00:00Z" }),
+    ];
+    const h = agruparEnHilos(correos);
+    expect(h).toHaveLength(7);
+    // El de 3 es el de las hojas de vida, con el «RE: RV:» adentro.
+    expect(h.find((x) => x.cantidad === 3)?.asunto).toBe("Hojas de vida Chatters");
+    // Los dos (sin asunto) y los dos Reporte semanal siguen sueltos.
+    expect(h.filter((x) => x.cantidad === 1)).toHaveLength(4);
+    // Arriba, el hilo con la respuesta más nueva.
+    expect(h[0].ultimo.messageId).toBe("<a2@z>");
+  });
+});
